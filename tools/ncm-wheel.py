@@ -34,6 +34,7 @@ unnecessary then STOP. An important feature for us should not cost any wrists."*
 from __future__ import annotations
 
 import argparse
+import atexit
 import base64
 import io
 import hashlib
@@ -631,52 +632,41 @@ class Input:
 class Output:
     """The only thing in this program that can move a wheel.
 
-    **Every safety rule is enforced on the way in, not by the caller.** `write()` takes a level that has
-    already been clamped and slewed by `Mixer`, and clamps it again here -- because this is the last place a
-    mistake is still cheap, and the cost of a redundant `min()` is nothing against the cost of being wrong.
+    **Two effects, because a wheel is not a gamepad.**
 
-    Design choices that are safety choices:
+      * `CONSTANT` -- a directional torque, used as *self-aligning torque*: the wheel loading up as you turn
+        and wanting to return to centre. This is what hands actually read, and a sine alone reads as nothing.
+        The direction always points BACK TOWARD CENTRE, so it assists the driver the way a real car does
+        rather than fighting them. That is why a constant effect is safe here despite being refused in the
+        first draft: the danger was never the effect type, it was an arbitrary direction.
+      * `SINE` at 125 Hz -- surface texture and slip, layered on top. 25 Hz was the first attempt and it is
+        slow enough that a wheel's inertia swallows it; 125 Hz is what `anyffb` uses on this exact hardware.
 
-      * **A periodic SINE, not a CONSTANT force.** A constant effect is a sustained torque in one direction --
-        it fights the driver and it is what wrenches a wrist. A sine oscillates around centre: it is felt as
-        texture, and its worst case is a buzz rather than a pull.
-      * **The effect is created once and UPDATED**, never re-played per frame. Re-triggering at 30 Hz makes an
-        audible click and, worse, restarts the envelope each time.
-      * **Stop is idempotent and runs on every exit path** -- idle frame, socket close, process exit,
-        exception. A wheel left buzzing after the game closed is the single worst outcome here, and it is the
-        one a crash would otherwise produce.
+    **Cleanup is the part that went wrong in the first version and must not go wrong again.** The owner's
+    wheel was left powered, pulled fully to one side, resisting return to centre -- after `stop()` had been
+    called, the process had exited, and the device had been closed. `SDL_HapticNumEffectsPlaying` still read
+    1. `SDL_HapticStopAll` does not reliably end an infinite effect; the effect must be zeroed, stopped AND
+    destroyed, and the whole thing registered with `atexit` so a crash cannot skip it.
     """
 
-    def __init__(self, device_class: str):
+    def __init__(self, device_class):
         self.device_class = device_class
         self.sdl = None
         self.haptic = None
         self.name = None
         self.caps = {}
-        self.index = None               # None = try every enumerated device
+        self.index = None
         self.opened_index = None
         self.dev = None
-        self.effect_id = None
-        self.effect = None
-        self.last_sent = -1.0
         self.mode = "none"
+        self.sine = self.sine_id = None
+        self.const = self.const_id = None
+        self.last_texture = -1.0
+        self.last_torque = None
+        self._registered = False
 
-    def open(self) -> str:
-        """Open the device and leave a silent effect running. Returns "" on success, else why not.
-
-        Three details copied from `anyffb`, which works on this exact hardware and was worth reading before
-        guessing:
-
-          * **`SDL_Init(SDL_INIT_HAPTIC)`**, not `SDL_InitSubSystem` on an uninitialised SDL. The latter
-            returned *"Haptic error Resetting device"* here.
-          * **`SDL_HapticDirection` constructed properly**, not a field assignment into `.dir[0]`.
-          * **`length = 0xFFFFFFFF`** and an explicit `SDL_HapticSetGain(100)`.
-
-        **`CONSTANT` is deliberately NOT used as a fallback**, though anyffb offers it. A constant effect is a
-        sustained torque in one direction -- it fights the driver rather than texturing the wheel, and it is
-        the shape that hurts. LEFTRIGHT and SINE cover every wheel we expect; a device offering neither gets
-        no force rather than the dangerous one.
-        """
+    # ---------------------------------------------------------------- lifecycle
+    def open(self):
         try:
             import sdl2
             import sdl2.haptic as haptic
@@ -691,10 +681,6 @@ class Output:
             if count < 1:
                 return "no haptic device"
 
-            # **Try every index, not just 0.** A wheel commonly enumerates more than once -- the owner's G29
-            # appears both as a bare name and as a `... USB` entry -- and only one of those may actually
-            # open. Picking index 0 and reporting its failure as "no wheel" would have been wrong twice: the
-            # name it reported was right and the handle it could not get was the wrong one.
             attempts = []
             for i in range(count):
                 if self.index is not None and i != self.index:
@@ -702,112 +688,151 @@ class Output:
                 raw = haptic.SDL_HapticName(i)
                 nm = raw.decode(errors="replace") if isinstance(raw, bytes) else str(raw)
                 dev = haptic.SDL_HapticOpen(i)
-                if dev:
-                    # **Opening is not the test; creating an effect is.** The G29 enumerates three times on
-                    # this machine: index 0 refuses outright, index 1 OPENS and then cannot create an effect
-                    # of any shape, and only index 2 -- the `... USB` entry -- actually works. A handle that
-                    # opens and does nothing is worse than one that refuses, because it looks like success.
-                    probe = haptic.SDL_HapticEffect()
-                    probe.type = haptic.SDL_HAPTIC_SINE
-                    probe.periodic.type = haptic.SDL_HAPTIC_SINE
-                    probe.periodic.direction = haptic.SDL_HapticDirection(
-                        haptic.SDL_HAPTIC_CARTESIAN, (c_long * 3)(0, 0, 0))
-                    probe.periodic.length = 0xFFFFFFFF
-                    probe.periodic.period = 40
-                    probe.periodic.magnitude = 0
-                    pid = haptic.SDL_HapticNewEffect(dev, probe)
-                    if pid >= 0:
-                        haptic.SDL_HapticDestroyEffect(dev, pid)
-                        self.name, self.dev, self.opened_index = nm, dev, i
-                        print("[ffb] haptic %d: %s -- USABLE" % (i, nm), flush=True)
-                        break
-                    haptic.SDL_HapticClose(dev)
-                    attempts.append("%d:%s (opens, cannot create effects)" % (i, nm))
-                    print("[ffb] haptic %d: %s -- opens but creates nothing" % (i, nm), flush=True)
+                if not dev:
+                    err = sdl2.SDL_GetError()
+                    err = err.decode(errors="replace") if isinstance(err, bytes) else str(err)
+                    attempts.append("%d:%s (%s)" % (i, nm, err.strip()))
+                    print("[ffb] haptic %d: %s -- refused (%s)" % (i, nm, err.strip()), flush=True)
                     if not self.name:
                         self.name = nm
                     continue
-                err = sdl2.SDL_GetError()
-                err = err.decode(errors="replace") if isinstance(err, bytes) else str(err)
-                attempts.append("%d:%s (%s)" % (i, nm, err.strip()))
-                print("[ffb] haptic %d: %s -- refused (%s)" % (i, nm, err.strip()), flush=True)
+                # **Opening is not the test; creating an effect is.** This wheel enumerates three times and
+                # the middle one opens while being able to create nothing at all -- which looks like success
+                # and is worse than a refusal.
+                probe = self._sine_effect(c_long, 0)
+                pid = haptic.SDL_HapticNewEffect(dev, probe)
+                if pid >= 0:
+                    haptic.SDL_HapticDestroyEffect(dev, pid)
+                    self.name, self.dev, self.opened_index = nm, dev, i
+                    print("[ffb] haptic %d: %s -- USABLE" % (i, nm), flush=True)
+                    break
+                haptic.SDL_HapticClose(dev)
+                attempts.append("%d:%s (opens, cannot create effects)" % (i, nm))
+                print("[ffb] haptic %d: %s -- opens but creates nothing" % (i, nm), flush=True)
                 if not self.name:
                     self.name = nm
             if not self.dev:
                 return "no haptic index would open -- tried %s" % "; ".join(attempts)
-            caps = haptic.SDL_HapticQuery(self.dev)
+
+            bits = haptic.SDL_HapticQuery(self.dev)
             self.caps = {
-                "constant": bool(caps & haptic.SDL_HAPTIC_CONSTANT),
-                "sine": bool(caps & haptic.SDL_HAPTIC_SINE),
-                "leftright": bool(caps & haptic.SDL_HAPTIC_LEFTRIGHT),
-                "damper": bool(caps & haptic.SDL_HAPTIC_DAMPER),
+                "constant": bool(bits & haptic.SDL_HAPTIC_CONSTANT),
+                "sine": bool(bits & haptic.SDL_HAPTIC_SINE),
+                "leftright": bool(bits & haptic.SDL_HAPTIC_LEFTRIGHT),
+                "damper": bool(bits & haptic.SDL_HAPTIC_DAMPER),
             }
             haptic.SDL_HapticSetGain(self.dev, 100)
 
-            eff = haptic.SDL_HapticEffect()
-            if caps & haptic.SDL_HAPTIC_LEFTRIGHT:
-                self.mode = "leftright"
-                eff.type = haptic.SDL_HAPTIC_LEFTRIGHT
-                eff.leftright.length = 0xFFFFFFFF
-                eff.leftright.large_magnitude = 0
-                eff.leftright.small_magnitude = 0
-            elif caps & haptic.SDL_HAPTIC_SINE:
-                self.mode = "sine"
-                eff.type = haptic.SDL_HAPTIC_SINE
-                eff.periodic.direction = haptic.SDL_HapticDirection(
-                    haptic.SDL_HAPTIC_CARTESIAN, (c_long * 3)(0, 0, 0))
-                eff.periodic.length = 0xFFFFFFFF
-                eff.periodic.period = 40                        # 25 Hz: texture, not a shove
-                eff.periodic.magnitude = 0
-                eff.periodic.offset = 0
-                eff.periodic.phase = 0
-            else:
-                return "device offers neither LEFTRIGHT nor SINE (CONSTANT is refused on purpose)"
+            modes = []
+            if self.caps["sine"]:
+                self.sine = self._sine_effect(c_long, 0)
+                self.sine_id = haptic.SDL_HapticNewEffect(self.dev, self.sine)
+                if self.sine_id >= 0:
+                    haptic.SDL_HapticRunEffect(self.dev, self.sine_id, 1)
+                    modes.append("sine")
+                else:
+                    self.sine = self.sine_id = None
+            if self.caps["constant"]:
+                self.const = self._constant_effect(c_long, 0)
+                self.const_id = haptic.SDL_HapticNewEffect(self.dev, self.const)
+                if self.const_id >= 0:
+                    haptic.SDL_HapticRunEffect(self.dev, self.const_id, 1)
+                    modes.append("constant")
+                else:
+                    self.const = self.const_id = None
+            if not modes:
+                return "device created no usable effect"
+            self.mode = "+".join(modes)
 
-            self.effect = eff
-            self.effect_id = haptic.SDL_HapticNewEffect(self.dev, eff)
-            if self.effect_id < 0:
-                return "SDL_HapticNewEffect failed: %s" % sdl2.SDL_GetError()
-            haptic.SDL_HapticRunEffect(self.dev, self.effect_id, 1)
+            if not self._registered:
+                atexit.register(self.close)
+                self._registered = True
             return ""
         except Exception as exc:                                # noqa: BLE001 - diagnostic path
             return "haptic open failed: %s" % exc
 
-    def write(self, level: float) -> None:
+    def _sine_effect(self, c_long, magnitude):
+        h = self.haptic
+        e = h.SDL_HapticEffect()
+        e.type = h.SDL_HAPTIC_SINE
+        e.periodic.type = h.SDL_HAPTIC_SINE
+        e.periodic.direction = h.SDL_HapticDirection(h.SDL_HAPTIC_CARTESIAN, (c_long * 3)(1, 0, 0))
+        e.periodic.length = 0xFFFFFFFF
+        e.periodic.period = 8                                   # 125 Hz: texture. 25 Hz was swallowed whole.
+        e.periodic.magnitude = int(magnitude)
+        e.periodic.offset = 0
+        e.periodic.phase = 0
+        return e
+
+    def _constant_effect(self, c_long, level):
+        h = self.haptic
+        e = h.SDL_HapticEffect()
+        e.type = h.SDL_HAPTIC_CONSTANT
+        e.constant.type = h.SDL_HAPTIC_CONSTANT
+        e.constant.direction = h.SDL_HapticDirection(h.SDL_HAPTIC_CARTESIAN, (c_long * 3)(1, 0, 0))
+        e.constant.length = 0xFFFFFFFF
+        e.constant.level = int(level)
+        return e
+
+    # ---------------------------------------------------------------- output
+    def write(self, texture, torque=0.0):
+        """`texture` 0..1 of buzz; `torque` -1..1 of centring force, sign carrying which way to push.
+
+        Both are clamped here as well as by the caller. The redundant `min()` costs nothing and this is the
+        last place a mistake is still cheap."""
         if self.mode == "none" or self.sdl is None:
             return
-        level = clamp(self.device_class, level)                 # last line of defence, deliberately redundant
-        if abs(level - self.last_sent) < 0.005:
-            return
-        self.last_sent = level
+        texture = clamp(self.device_class, texture)
+        ceiling = CEILING.get(self.device_class, CEILING["unknown"])
+        torque = max(-ceiling, min(ceiling, torque if torque == torque else 0.0))
         try:
-            mag = int(level * 32767)
-            if self.mode == "leftright":
-                self.effect.leftright.large_magnitude = mag
-                self.effect.leftright.small_magnitude = mag
-            else:
-                self.effect.periodic.magnitude = mag
-            self.haptic.SDL_HapticUpdateEffect(self.dev, self.effect_id, self.effect)
+            if self.sine_id is not None and abs(texture - self.last_texture) >= 0.005:
+                self.last_texture = texture
+                self.sine.periodic.magnitude = int(texture * 32767)
+                self.haptic.SDL_HapticUpdateEffect(self.dev, self.sine_id, self.sine)
+            if self.const_id is not None and (self.last_torque is None
+                                              or abs(torque - self.last_torque) >= 0.005):
+                self.last_torque = torque
+                self.const.constant.level = int(torque * 32767)
+                self.haptic.SDL_HapticUpdateEffect(self.dev, self.const_id, self.const)
         except Exception:                                       # noqa: BLE001 - never let output kill the loop
             self.stop()
 
-    def stop(self) -> None:
-        """Silence, by every means available, and safe to call twice."""
-        self.last_sent = -1.0
-        if self.sdl is None or self.dev is None:
+    def stop(self):
+        """Silence. **Zero, then stop** -- an infinite effect that is merely 'stopped' has been observed to
+        keep playing, so the magnitude is set to zero first and the effect is halted second."""
+        self.last_texture, self.last_torque = -1.0, None
+        if self.haptic is None or self.dev is None:
             return
         try:
+            if self.sine_id is not None:
+                self.sine.periodic.magnitude = 0
+                self.haptic.SDL_HapticUpdateEffect(self.dev, self.sine_id, self.sine)
+                self.haptic.SDL_HapticStopEffect(self.dev, self.sine_id)
+            if self.const_id is not None:
+                self.const.constant.level = 0
+                self.haptic.SDL_HapticUpdateEffect(self.dev, self.const_id, self.const)
+                self.haptic.SDL_HapticStopEffect(self.dev, self.const_id)
             self.haptic.SDL_HapticStopAll(self.dev)
         except Exception:                                       # noqa: BLE001
             pass
 
-    def close(self) -> None:
+    def close(self):
+        """**Destroy, do not merely close.** The first version called `stop()` and `SDL_HapticClose`, the
+        process exited, and `SDL_HapticNumEffectsPlaying` still reported 1 -- the wheel stayed pulled to one
+        side, powered, resisting return to centre. An effect outlives the process that created it unless it
+        is destroyed. Registered with `atexit`, so a crash cannot skip this."""
         self.stop()
         try:
+            for eid in (self.sine_id, self.const_id):
+                if eid is not None:
+                    self.haptic.SDL_HapticDestroyEffect(self.dev, eid)
             if self.haptic and self.dev:
+                self.haptic.SDL_HapticStopAll(self.dev)
                 self.haptic.SDL_HapticClose(self.dev)
         except Exception:                                       # noqa: BLE001
             pass
+        self.sine_id = self.const_id = None
         self.dev, self.mode = None, "none"
 
 
@@ -820,6 +845,7 @@ class Mixer:
         self.device_class = device_class
         self.rung = rung
         self.level = 0.0
+        self.torque = 0.0
         self.last = time.monotonic()
         self.frames = 0
         self.idles = 0
@@ -872,6 +898,7 @@ class Mixer:
                 self.rig.seated = False
             self.idles += 1
             self.level = slew(self.level, 0.0, dt)
+            self.torque = slew(self.torque, 0.0, dt)
             self._emit()
             return self.level
 
@@ -879,12 +906,20 @@ class Mixer:
         if self.rig is not None:
             self.rig.seated = True
         self.frames += 1
+
+        # **Rebalanced after the first drive felt like nothing.** Engine RPM used to dominate, and at half
+        # redline that is a fifth of the scale -- so a car being driven hard produced a whisper. Engine is
+        # now a floor of presence rather than the signal, and what the hands should actually notice is the
+        # road: slip and suspension movement, both of which swing far harder while cornering and braking.
         contributions = []
-        if isinstance(f.get("engine"), (int, float)):
-            contributions.append(0.45 * f["engine"])
-        for key, weight in (("slipTotal", 0.8), ("suspLong", 0.3), ("suspLat", 0.3)):
-            v = f.get(key)
-            if isinstance(v, (int, float)):
+        num = lambda key: f[key] if isinstance(f.get(key), (int, float)) else None
+        engine = num("engine")
+        if engine is not None:
+            contributions.append(0.20 * engine)
+        for key, weight in (("slipTotal", 2.5), ("slipLong", 1.5), ("slipLat", 2.0),
+                            ("suspLong", 1.2), ("suspLat", 1.2)):
+            v = num(key)
+            if v is not None:
                 contributions.append(weight * min(1.0, abs(v)))
         if not contributions:
             self.level = slew(self.level, 0.0, dt)
@@ -896,6 +931,18 @@ class Mixer:
         intensity = min(1.0, sum(contributions))
         target = clamp(self.device_class, intensity * self.rung)
         self.level = slew(self.level, target, dt)
+
+        # **Self-aligning torque: the thing that makes a wheel feel like a wheel.** Magnitude grows with how
+        # far the wheel is turned and how fast the car is going, and the sign always points BACK TOWARD
+        # CENTRE -- it assists, the way a real car's castor does, and never fights the driver toward lock.
+        steer = num("steering")
+        speed = num("speed") or 0.0
+        if steer is None:
+            self.torque = slew(self.torque, 0.0, dt)
+        else:
+            loading = min(1.0, abs(speed) / 20.0)               # full effect by roughly 70 km/h
+            want = -(1.0 if steer > 0 else -1.0) * min(1.0, abs(steer)) * loading * self.rung
+            self.torque = slew(self.torque, want, dt)
         self._emit()
         return self.level
 
@@ -903,10 +950,11 @@ class Mixer:
         """The single point where a level becomes force. Nothing else in this class touches the device, so
         'is force being applied?' has exactly one answer to check."""
         if self.out is not None:
-            self.out.write(self.level)
+            self.out.write(self.level, self.torque)
 
     def silence(self) -> None:
         self.level = 0.0
+        self.torque = 0.0
         if self.out is not None:
             self.out.stop()
 
@@ -921,9 +969,11 @@ class Mixer:
         step = 1.0 / 60.0
         level = 0.0
         for target in (self.rung, 0.0):
-            for _ in range(60):
+            for _ in range(90):
                 level = slew(level, target, step)
-                self.out.write(level)
+                # Texture and a centring push together, so the pulse feels like what driving will feel like
+                # rather than like a buzzer.
+                self.out.write(level, -level)
                 time.sleep(step)
                 if abs(level - target) < 0.002:
                     break
@@ -1057,6 +1107,8 @@ def main() -> int:
                     help="wheel degrees per side mapped to full stick deflection (default 45).")
     ap.add_argument("--wheel-range", type=float, default=900.0,
                     help="the wheel's physical lock-to-lock range in degrees (default 900).")
+    ap.add_argument("--selftest", action="store_true",
+                    help="ramp the wheel through the ladder and exit. Proves hardware output without NCM.")
     ap.add_argument("--profiles", default=None,
                     help="rig profile JSON. Default: tools/wheel-profiles/default.json")
     ap.add_argument("--monitor", action="store_true",
@@ -1104,6 +1156,29 @@ def main() -> int:
 
     mixer = Mixer(args.device_class, rung, armed=args.arm)
     mixer.rig = rig
+
+    if args.selftest:
+        out = Output(args.device_class)
+        out.index = args.device
+        why = out.open()
+        if why:
+            print("[ffb] SELFTEST cannot arm: %s" % why, flush=True)
+            return 2
+        print("[ffb] selftest via %s effect. Ceiling %.2f." % (out.mode, CEILING[args.device_class]),
+              flush=True)
+        try:
+            for step in ladder(args.device_class):
+                print("[ffb]   texture %.2f + centring torque, 2s" % step, flush=True)
+                out.write(step, -step)
+                time.sleep(2.0)
+            out.write(0.0, 0.0)
+        finally:
+            # The first version left the wheel powered and pulled to one side. Destroy, do not merely close.
+            out.close()
+        print("[ffb] selftest done; wheel released", flush=True)
+        if rig is not None:
+            rig.stop()
+        return 0
     mixer.device_name, mixer.caps = name, caps
     if args.arm:
         out = Output(args.device_class)
