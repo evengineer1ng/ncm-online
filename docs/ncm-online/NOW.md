@@ -3,17 +3,17 @@
 > **STATUS: LEDGER** — living session memory, rewritten at the end of every working session.
 > Authority map: [INDEX.md](INDEX.md) — classified 2026-09-24 (L125).
 
-Last rewritten: **2026-09-24 — first NCM Driver Card/nameplate implementation.** Code and migration are built
-and offline-green; nothing in this pass was deployed or claimed live.
+Last rewritten: **2026-09-24 — first NCM Driver Card/nameplate deployed to Development.** Code and migration
+are gate-green and running on NCM Development; no two-client nameplate result is claimed live.
 
 > **Claim before writing:** decisions through **L130**; MASTER_TEST through **2.18 / §AK**; next QA letter
 > **§AL**. BACKLOG next free **IDEA-395**; known issues through **KB-96** plus the existing duplicate KB-87.
 > Historical §Z collision remains: qualify by section (2.14 Machine Index vs 2.16 Help).
 
-## Next action: deploy/restart NCM Development, then drive §AK with two clients
+## Next action: drive §AK with two clients
 
-The first transparent Driver Card is ready for its live pass. Restart once so migration 030 applies, join two
-clients in the same bucket, and run the compact procedure in `wp/MASTER_TEST.md` §AK. It proves the remote
+The first transparent Driver Card is deployed and ready for its live pass. Join two clients in the same bucket
+and run the compact procedure in `wp/MASTER_TEST.md` §AK. It proves the remote
 card, exactly-one-renderer handoff, verified name, default/selected banner, 0–3 badge layout, unavailable
 Fingerprint, projection/distance cleanup, join/leave/body/bucket lifecycle, reload and native fallback.
 
@@ -63,6 +63,11 @@ assertions and **21** focused Driver Card assertions pass, and documentation aut
 checks cover public schema/privacy, badge bound/deduplication, invalid asset fallback, unavailable Fingerprint,
 Unicode/long/hostile names, streamed-entry cleanup, page readiness, and native restoration/handoff order.
 
+Development restart at **16:44 EDT** published resource digest `8e1a8d1f…`, reported schema entries 30 with
+`030:driver_presentation` applied and `pending=[]`, started both NCM resources, scheduler and race control,
+returned HTTP health 200, wrote zero stderr bytes and produced no boot error matches. This is deployment
+evidence only; it does not satisfy any §AK visual/lifecycle row.
+
 ## External art
 
 The supplied `2720.png` collection sheet was used as the neon/hex/banner visual reference. The working first
@@ -70,14 +75,8 @@ card intentionally uses code-native art so dynamic names, badges and Fingerprint
 unapproved launch catalogue is invented. A rights-cleared production banner crop/source is still needed only
 if the owner wants to replace the baseline treatment; it does not block §AK.
 
-## Workspace state to preserve
+## Repository/deployment state
 
-Three research documents remain part of this same uncommitted work and must ship with the implementation
-commit rather than be discarded:
-
-- `docs/research/open77/EXTERNAL_TOOLING_API_AUDIT.md`
-- `docs/research/open77/NCM_SP_ONLINE_CONVERGENCE_AUDIT.md`
-- `docs/research/open77/DRIVER_IDENTITY_NAMEPLATE_RECOVERY_AUDIT.md`
-
-The companion/WebUI probe completed in the intervening session remains authoritative as L129 and §AJ; this
-nameplate pass does not modify or depend on that optional companion architecture.
+Implementation commit `79419ce` is on `origin/main`. The three research audits are preserved in that commit.
+The companion/WebUI probe remains authoritative as L129 and §AJ; this nameplate pass does not modify or depend
+on that optional companion architecture. NCM Online was not contacted or changed.

@@ -878,10 +878,12 @@ Constraint recorded as `IDEA-393`: **the race HUD stays bundled**; only the brid
 
 ## §AK — Driver Card/nameplate first live pass (2026-09-24, NCM Development) — **OWED**
 
-Offline only: 278 core tests per interpreter, 162 resource Lua files, five WebUI scripts, 94 existing panel
-assertions and 21 Driver Card assertions pass. This section requires **two live clients** and claims no live
-result yet. Restart Development once so migration 030 applies, join both clients in the same bucket, and note
-their player IDs. Client A observes Client B unless a row says otherwise.
+Offline gate: 278 core tests per interpreter, 162 resource Lua files, five WebUI scripts, 94 existing panel
+assertions and 21 Driver Card assertions pass. **Deployment PASS, 16:44 EDT:** Development published the new
+resource generation; schema entries 30 includes `030:driver_presentation`, `pending=[]`; both NCM resources,
+scheduler and race control started; HTTP health 200; stderr empty; zero boot error matches. This is not a
+nameplate PASS. The section still requires **two live clients**. Join both in the same bucket and note their
+player IDs. Client A observes Client B unless a row says otherwise.
 
 Use the server console command `ncm.card.preview <B-id> <0|1|2|3> [default|selected]`. `selected` is the
 explicit Development-only alternate; the command changes no accomplishment or persisted entitlement.
