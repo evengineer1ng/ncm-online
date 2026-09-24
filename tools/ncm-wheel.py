@@ -664,6 +664,7 @@ class Output:
         self.mode = "none"
         self.sine = self.sine_id = None
         self.const = self.const_id = None
+        self.conditions = {}
         self.last_texture = -1.0
         self.last_torque = None
         self._registered = False
@@ -723,6 +724,8 @@ class Output:
                 "sine": bool(bits & haptic.SDL_HAPTIC_SINE),
                 "leftright": bool(bits & haptic.SDL_HAPTIC_LEFTRIGHT),
                 "damper": bool(bits & haptic.SDL_HAPTIC_DAMPER),
+                "spring": bool(bits & haptic.SDL_HAPTIC_SPRING),
+                "friction": bool(bits & haptic.SDL_HAPTIC_FRICTION),
             }
             haptic.SDL_HapticSetGain(self.dev, 100)
 
@@ -743,6 +746,19 @@ class Output:
                     modes.append("constant")
                 else:
                     self.const = self.const_id = None
+            # **Condition effects are what stiffness IS.** The device computes these from its own position
+            # and velocity, continuously. Nothing we send per frame can imitate that, which is why the first
+            # version felt floaty no matter how the force channels were tuned.
+            for kind, attr in (("spring", "SPRING"), ("damper", "DAMPER")):
+                if not self.caps.get(kind):
+                    continue
+                eff = self._condition_effect(c_long, getattr(haptic, "SDL_HAPTIC_" + attr), 0.0)
+                eid = haptic.SDL_HapticNewEffect(self.dev, eff)
+                if eid >= 0:
+                    haptic.SDL_HapticRunEffect(self.dev, eid, 1)
+                    self.conditions[kind] = (eff, eid)
+                    modes.append(kind)
+
             if not modes:
                 return "device created no usable effect"
             self.mode = "+".join(modes)
@@ -766,6 +782,45 @@ class Output:
         e.periodic.offset = 0
         e.periodic.phase = 0
         return e
+
+    def _condition_effect(self, c_long, kind, strength):
+        """A SPRING or DAMPER at `strength` 0..1. Both axes are set because a wheel reports one axis and
+        some drivers read the second regardless; leaving it zero has been observed to silence the effect."""
+        h = self.haptic
+        e = h.SDL_HapticEffect()
+        e.type = kind
+        e.condition.type = kind
+        e.condition.direction = h.SDL_HapticDirection(h.SDL_HAPTIC_CARTESIAN, (c_long * 3)(1, 0, 0))
+        e.condition.length = 0xFFFFFFFF
+        sat = int(max(0.0, min(1.0, strength)) * 32767)
+        coeff = int(max(0.0, min(1.0, strength)) * 32767)
+        for axis in (0, 1, 2):
+            e.condition.right_sat[axis] = sat
+            e.condition.left_sat[axis] = sat
+            e.condition.right_coeff[axis] = coeff
+            e.condition.left_coeff[axis] = coeff
+            e.condition.deadband[axis] = 0
+            e.condition.center[axis] = 0
+        return e
+
+    def set_condition(self, kind, strength):
+        """Move a spring or damper. Called when a slider moves, never per frame -- the whole point is that
+        the device does this work itself."""
+        entry = self.conditions.get(kind)
+        if not entry or self.haptic is None or self.dev is None:
+            return False
+        eff, eid = entry
+        sat = int(max(0.0, min(1.0, strength)) * 32767)
+        for axis in (0, 1, 2):
+            eff.condition.right_sat[axis] = sat
+            eff.condition.left_sat[axis] = sat
+            eff.condition.right_coeff[axis] = sat
+            eff.condition.left_coeff[axis] = sat
+        try:
+            self.haptic.SDL_HapticUpdateEffect(self.dev, eid, eff)
+            return True
+        except Exception:                                       # noqa: BLE001
+            return False
 
     def _constant_effect(self, c_long, level):
         h = self.haptic
@@ -816,6 +871,8 @@ class Output:
                 self.const.constant.level = 0
                 self.haptic.SDL_HapticUpdateEffect(self.dev, self.const_id, self.const)
                 self.haptic.SDL_HapticStopEffect(self.dev, self.const_id)
+            for _, eid in self.conditions.values():
+                self.haptic.SDL_HapticStopEffect(self.dev, eid)
             self.haptic.SDL_HapticStopAll(self.dev)
         except Exception:                                       # noqa: BLE001
             pass
@@ -827,7 +884,8 @@ class Output:
         is destroyed. Registered with `atexit`, so a crash cannot skip this."""
         self.stop()
         try:
-            for eid in (self.sine_id, self.const_id):
+            ids = [self.sine_id, self.const_id] + [eid for _, eid in self.conditions.values()]
+            for eid in ids:
                 if eid is not None:
                     self.haptic.SDL_HapticDestroyEffect(self.dev, eid)
             if self.haptic and self.dev:
@@ -836,6 +894,7 @@ class Output:
         except Exception:                                       # noqa: BLE001
             pass
         self.sine_id = self.const_id = None
+        self.conditions = {}
         self.dev, self.mode = None, "none"
 
 
@@ -854,6 +913,15 @@ class Mixer:
         self.idles = 0
         self.device_name = None
         self.caps = {}
+        # **Every one of these is a slider, not a constant.** The owner should never need an editor to change
+        # how their wheel feels, and one person's preference is not a fact about the hardware.
+        self.tune = {
+            "spring": 0.55,     # self-centring weight. The cure for "floaty".
+            "damper": 0.35,     # resistance to being whipped around. Stiffness.
+            "texture": 0.60,    # road and slip rumble
+            "engine": 0.45,     # engine hum, felt at idle as well as at speed
+            "road": 1.00,       # suspension movement
+        }
         self.out = None                 # set by main() only when --arm was given
         self.rig = None                 # set by main(); the mixer gates it on seat state
         # **Force output is opt-in and off.** Everything else in this file runs identically either way, so the
@@ -886,6 +954,8 @@ class Mixer:
             "class": self.device_class,
             "rung": idx, "rungs": rungs, "armed": self.armed, "haptics": self.caps,
         }
+        out["tune"] = dict(self.tune)
+        out["caps"] = dict(self.caps)
         if self.rig is not None:
             out["rig"] = self.rig.describe()
         return out
@@ -918,12 +988,19 @@ class Mixer:
         num = lambda key: f[key] if isinstance(f.get(key), (int, float)) else None
         engine = num("engine")
         if engine is not None:
-            contributions.append(0.20 * engine)
-        for key, weight in (("slipTotal", 2.5), ("slipLong", 1.5), ("slipLat", 2.0),
-                            ("suspLong", 1.2), ("suspLat", 1.2)):
+            # **A car should hum at idle.** Engine contribution used to scale straight from the RPM ratio, so
+            # an idling engine at 15% of redline produced almost nothing. A floor means the machine is always
+            # perceptibly running, and the rest still rises with revs.
+            hum = 0.25 + 0.75 * engine
+            contributions.append(1.2 * self.tune["engine"] * hum)
+        for key, weight in (("slipTotal", 2.5), ("slipLong", 1.5), ("slipLat", 2.0)):
             v = num(key)
             if v is not None:
-                contributions.append(weight * min(1.0, abs(v)))
+                contributions.append(weight * self.tune["texture"] * min(1.0, abs(v)))
+        for key in ("suspLong", "suspLat"):
+            v = num(key)
+            if v is not None:
+                contributions.append(1.2 * self.tune["road"] * min(1.0, abs(v)))
         if not contributions:
             self.level = slew(self.level, 0.0, dt)
             self._emit()
@@ -1062,6 +1139,15 @@ def serve(conn: socket.socket, addr, mixer: Mixer, port: int) -> None:
             if settings.get("rung") is not None:
                 rung = mixer.set_rung(settings["rung"])
                 print("[ffb] rung -> %.2f (%s)" % (rung, mixer.device_class), flush=True)
+            for key in ("spring", "damper", "texture", "engine", "road"):
+                if settings.get(key) is not None:
+                    try:
+                        mixer.tune[key] = max(0.0, min(1.0, float(settings[key])))
+                    except (TypeError, ValueError):
+                        continue
+                    if key in ("spring", "damper") and mixer.out is not None:
+                        mixer.out.set_condition(key, mixer.tune[key])
+                    print("[ffb] %s -> %.2f" % (key, mixer.tune[key]), flush=True)
             if settings.get("steerDegrees") is not None and mixer.rig is not None:
                 deg = mixer.rig.set_steer_degrees(settings["steerDegrees"])
                 print("[in ] steering -> %.0f deg/side (x%.1f)" % (deg, mixer.rig.scale), flush=True)
@@ -1206,6 +1292,8 @@ def main() -> int:
             mixer.armed = False
         else:
             mixer.out = out
+            for kind in ("spring", "damper"):
+                out.set_condition(kind, mixer.tune[kind])
             # Output has just opened the device, so it knows the name and capabilities first-hand. Use those
             # rather than the earlier open/close probe -- one open, one source of truth.
             if out.name:

@@ -1326,6 +1326,47 @@
           row.append(k, wrap); wheelBody.append(row);
         }
 
+        // **Every feel setting is a slider here, because nobody should need a text editor to change how
+        // their wheel feels.** Strength stays the discrete ladder above -- that one is the wrist-safety
+        // property -- but spring, damper and the mix are preference, and preference belongs on a slider.
+        const tune = dev.tune;
+        if (tune) {
+          const caps = dev.caps || {};
+          const knobs = [
+            ["spring", "CENTRING", "Self-centring weight. The cure for a floaty wheel.", caps.spring !== false],
+            ["damper", "STIFFNESS", "Resistance to being whipped around.", caps.damper !== false],
+            ["engine", "ENGINE HUM", "How much the motor is felt, idle included.", true],
+            ["road", "ROAD", "Suspension movement over surfaces and kerbs.", true],
+            ["texture", "SLIP", "Tyre slip under braking and cornering.", true],
+          ];
+          for (const [key, label, hint, available] of knobs) {
+            const row = document.createElement("div"); row.className = "wheel-row";
+            const k = document.createElement("div"); k.className = "k"; k.textContent = label;
+            const wrap = document.createElement("div"); wrap.className = "wheel-range";
+            if (!available) {
+              const na = document.createElement("span"); na.className = "v warn";
+              na.textContent = "not supported by this wheel";
+              wrap.append(na);
+            } else {
+              const slider = document.createElement("input");
+              slider.type = "range"; slider.min = "0"; slider.max = "100"; slider.step = "5";
+              slider.value = String(Math.round((tune[key] != null ? tune[key] : 0) * 100));
+              slider.title = hint;
+              const pct = document.createElement("span"); pct.className = "deg";
+              const show = (v) => { pct.textContent = v + "%"; };
+              show(slider.value);
+              slider.addEventListener("input", () => show(slider.value));
+              // Commit on release. A spring re-created sixty times during one drag would buzz.
+              slider.addEventListener("change", () => {
+                const payload = {}; payload[key] = Number(slider.value) / 100;
+                wheelCmd("settings", payload);
+              });
+              wrap.append(slider, pct);
+            }
+            row.append(k, wrap); wheelBody.append(row);
+          }
+        }
+
         const acts = document.createElement("div"); acts.className = "wheel-actions";
         const test = document.createElement("button");
         test.textContent = "TEST PULSE";

@@ -112,12 +112,19 @@ local function bringUp()
     -- upgraded here -- `clamp` treats it as the most dangerous thing it could be.
     page:on("ncm:ffb.device", function(d)
         if type(d) ~= "table" then return end
+        -- **Rebuilt field by field, and that is why the steering slider never appeared**: `rig` and `tune`
+        -- were simply not in the list, so the panel had nothing to draw them from. Anything the companion
+        -- reports and the panel needs has to be named here; a copy that silently drops fields is worse than
+        -- passing the table through, because it fails quietly and looks like a UI bug.
         device = {
             name = tostring(d.name or "unknown device"),
             class = Feedback.CLASSES[d.class] and d.class or "unknown",
             rung = tonumber(d.rung), rungs = type(d.rungs) == "table" and d.rungs or nil,
             armed = d.armed and true or false,
             haptics = type(d.haptics) == "table" and d.haptics or nil,
+            rig = type(d.rig) == "table" and d.rig or nil,
+            tune = type(d.tune) == "table" and d.tune or nil,
+            caps = type(d.caps) == "table" and d.caps or nil,
         }
         announce()
         log("device: %s | class=%s | rung=%s | armed=%s",
@@ -140,8 +147,26 @@ end
 --- **Absent is not a negative** -- the same rule vehicle_access learned the hard way. If the platform does
 --- not report the field, fall back to the seat read rather than declaring the driver on foot and killing
 --- their steering mid-corner.
+local loggedState = false
+
 local function seated()
     local ok, st = pcall(Open77.character.state)
+    -- The rig was still live on foot even after this check went in, so record what the platform ACTUALLY
+    -- returns rather than continuing to assume a field name. Once per session, like the telemetry probe.
+    if ok and type(st) == "table" and not loggedState then
+        loggedState = true
+        local parts = {}
+        for k, v in pairs(st) do
+            if type(v) ~= "table" and type(v) ~= "function" then
+                parts[#parts + 1] = tostring(k) .. "=" .. tostring(v)
+            end
+        end
+        table.sort(parts)
+        log("character.state: {%s}", table.concat(parts, " "))
+    elseif not ok and not loggedState then
+        loggedState = true
+        log("character.state: UNAVAILABLE (%s)", tostring(st))
+    end
     if ok and type(st) == "table" and type(st.inVehicle) == "boolean" then return st.inVehicle end
     local ok2, seat = pcall(Open77.vehicles.getPlayerSeat)
     if ok2 and type(seat) == "table" then return true end
