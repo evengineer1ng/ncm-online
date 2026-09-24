@@ -147,6 +147,10 @@ def discover():
             print("[ffb] SDL sees no haptic device. On Logitech wheels G HUB must be installed and running.",
                   flush=True)
             return None, "unknown", {}
+        for i in range(count):
+            raw_i = sdl2.SDL_HapticName(i)
+            nm_i = raw_i.decode(errors="replace") if isinstance(raw_i, bytes) else str(raw_i)
+            print("[ffb] haptic %d: %s" % (i, nm_i), flush=True)
         raw = sdl2.SDL_HapticName(0)
         name = raw.decode(errors="replace") if isinstance(raw, bytes) else str(raw)
         dev = sdl2.SDL_HapticOpen(0)
@@ -264,6 +268,8 @@ class Output:
         self.haptic = None
         self.name = None
         self.caps = {}
+        self.index = None               # None = try every enumerated device
+        self.opened_index = None
         self.dev = None
         self.effect_id = None
         self.effect = None
@@ -296,13 +302,33 @@ class Output:
         try:
             if sdl2.SDL_Init(sdl2.SDL_INIT_HAPTIC) != 0:
                 return "SDL_Init(HAPTIC) failed: %s" % sdl2.SDL_GetError()
-            if haptic.SDL_NumHaptics() < 1:
+            count = haptic.SDL_NumHaptics()
+            if count < 1:
                 return "no haptic device"
-            raw = haptic.SDL_HapticName(0)
-            self.name = raw.decode(errors="replace") if isinstance(raw, bytes) else str(raw)
-            self.dev = haptic.SDL_HapticOpen(0)
+
+            # **Try every index, not just 0.** A wheel commonly enumerates more than once -- the owner's G29
+            # appears both as a bare name and as a `... USB` entry -- and only one of those may actually
+            # open. Picking index 0 and reporting its failure as "no wheel" would have been wrong twice: the
+            # name it reported was right and the handle it could not get was the wrong one.
+            attempts = []
+            for i in range(count):
+                if self.index is not None and i != self.index:
+                    continue
+                raw = haptic.SDL_HapticName(i)
+                nm = raw.decode(errors="replace") if isinstance(raw, bytes) else str(raw)
+                dev = haptic.SDL_HapticOpen(i)
+                if dev:
+                    self.name, self.dev, self.opened_index = nm, dev, i
+                    print("[ffb] haptic %d: %s -- OPENED" % (i, nm), flush=True)
+                    break
+                err = sdl2.SDL_GetError()
+                err = err.decode(errors="replace") if isinstance(err, bytes) else str(err)
+                attempts.append("%d:%s (%s)" % (i, nm, err.strip()))
+                print("[ffb] haptic %d: %s -- refused (%s)" % (i, nm, err.strip()), flush=True)
+                if not self.name:
+                    self.name = nm
             if not self.dev:
-                return "SDL_HapticOpen failed: %s" % sdl2.SDL_GetError()
+                return "no haptic index would open -- tried %s" % "; ".join(attempts)
             caps = haptic.SDL_HapticQuery(self.dev)
             self.caps = {
                 "constant": bool(caps & haptic.SDL_HAPTIC_CONSTANT),
@@ -602,6 +628,8 @@ def main() -> int:
     ap.add_argument("--class", dest="device_class", default=None, choices=sorted(CEILING),
                     help="override the detected class. Only ever use this to go LOWER than detection.")
     ap.add_argument("--rung", type=int, default=1, help="1-based rung on this class's ladder (default: lowest)")
+    ap.add_argument("--device", type=int, default=None,
+                    help="force a specific SDL haptic index. Default: try every one until one opens.")
     ap.add_argument("--arm", action="store_true",
                     help="permit force output. OFF by default: everything works identically without it.")
     args = ap.parse_args()
@@ -632,6 +660,7 @@ def main() -> int:
     mixer.device_name, mixer.caps = name, caps
     if args.arm:
         out = Output(args.device_class)
+        out.index = args.device
         why = out.open()
         if why:
             print("[ffb] ARM FAILED: %s" % why, flush=True)
