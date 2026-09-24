@@ -1,5 +1,8 @@
 # NCM COMPONENT GATE — gate version 1 (2026-09-22)
 
+> **STATUS: HISTORICAL** - the brick methodology - a closed experiment (IDEA-301). A record of a moment, never architecture.
+> Authority map: [INDEX.md](../../INDEX.md) - classified 2026-09-24 (L125)
+
 **Read this, then build the brick named in your assignment packet. You do not need, and will not get, the
 repository.** Everything a brick may depend on is in this document plus the files attached to the packet.
 

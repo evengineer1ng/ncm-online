@@ -1,5 +1,8 @@
 # 24 — Foundation reconciliation: Q1–Q70 against the repository
 
+> **STATUS: CURRENT** - authority for: *foundational primitives, contradictions, sequencing* - affirmed 2026-09-24 (L123)
+> Authority map: [INDEX.md](INDEX.md) - classified 2026-09-24 (L125)
+
 **2026-09-24.** Reconciles the owner's answer pass (`23_OPEN_QUESTIONS.md`) against the actual schema, code,
 production data, the full 297-row ledger and the two accepted proposals (`21`, `22`). **Nothing here is
 implemented.** This is the review artifact the owner asked for before the implementation pass.

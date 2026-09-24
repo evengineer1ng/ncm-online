@@ -1,5 +1,8 @@
 # NCM Vehicle Collection
 
+> **STATUS: CURRENT** - authority for: *discovery and collection* - affirmed 2026-09-24
+> Authority map: [INDEX.md](INDEX.md) - classified 2026-09-24 (L125)
+
 > **Terminology evolution (2026-09-23):** this authored discovery/roster design is preserved, but its player
 > concept now expands into the [Machine Index](16_MACHINE_INDEX.md). “Vehicle Collection” remains the existing
 > implementation seam; discovery is identity knowledge, not full specifications or ownership.
@@ -208,7 +211,7 @@ The first vertical slice is built, not deployed or live-validated:
   reveal their basic dossier and independently derived ownership state. The payload owns the replaceable working
   label `Vehicle Collection`.
 
-The implementation deliberately does not claim the unresolved primitive is proven. [E27](experiments/E27_2026-09-22_vehicle-collection-encounter.md)
+The implementation deliberately does not claim the unresolved primitive is proven. [E27](archive/experiments/E27_2026-09-22_vehicle-collection-encounter.md)
 is the required two-client experiment. In particular it must verify cross-resource canonical registration delivery,
 the exact snapshot `record`/bucket fields, stream-distance behavior, dwell rejection and restart persistence before
 this mechanic is marked validated.

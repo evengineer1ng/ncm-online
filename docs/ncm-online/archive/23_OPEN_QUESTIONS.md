@@ -1,5 +1,8 @@
 # 23 — Open design questions, from the classified ledger
 
+> **STATUS: HISTORICAL** - the Q1-Q70 question set, answered 2026-09-24 (L123). A record of a moment, never architecture.
+> Authority map: [INDEX.md](../INDEX.md) - classified 2026-09-24 (L125)
+
 **Raised 2026-09-24**, after classifying all 177 BACKLOG rows (L122). These are the questions whose answers change
 the *data model*, not the presentation. Numbering is **permanent** — answer by number, and a later session can
 cross-reference `Q31` without ambiguity.

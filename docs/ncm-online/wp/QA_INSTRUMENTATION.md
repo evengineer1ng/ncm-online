@@ -1,5 +1,8 @@
 # QA → instrumentation mapping
 
+> **STATUS: CURRENT** - authority for: *mapping the QA corpus to instrumentation* - affirmed 2026-09-24
+> Authority map: [INDEX.md](../INDEX.md) - classified 2026-09-24 (L125)
+
 **What this is.** A durable mapping from the existing QA corpus to what NCM can observe about itself during
 ordinary play. It does **not** replace, summarise or supersede the QA documents; it hangs off their stable
 identifiers and points back at them.

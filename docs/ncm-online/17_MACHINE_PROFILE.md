@@ -1,5 +1,8 @@
 # Individual Machine Profile — design specification
 
+> **STATUS: SPEC** - owner intent, captured and **NOT authorised for implementation**. Do not build from it; do not contradict it. Covers: *the individual machine biography*
+> Authority map: [INDEX.md](INDEX.md) - classified 2026-09-24 (L125)
+
 **Status: SPECIFICATION ONLY. Not implemented, and not authorised for implementation.** Recorded on
 2026-09-23 from the owner's spec so it is not lost, and so the foundations built the same day are checked
 against it. Promotion is a separate, explicit decision.

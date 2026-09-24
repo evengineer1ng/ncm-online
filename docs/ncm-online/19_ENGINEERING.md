@@ -1,5 +1,8 @@
 # Engineering — RPG progression, research, crafting and player manufacturing
 
+> **STATUS: SPEC** - owner intent, captured and **NOT authorised for implementation**. Do not build from it; do not contradict it. Covers: *engineering as a career*
+> Authority map: [INDEX.md](INDEX.md) - classified 2026-09-24 (L125)
+
 **Status: SPECIFICATION CAPTURED 2026-09-23. Nothing built, nothing authorised.** Spec 2 of the owner's
 batch; an addendum follows, then a final parts spec. Capture-only.
 

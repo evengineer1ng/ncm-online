@@ -19,14 +19,15 @@ concern and fix, with a permanent ID, captured when it is spoken rather than whe
 change state; they are never deleted.
 
 At the end of every session: append any new ideas to `BACKLOG.md`, record any decisions in `DECISION_RECORD.md`
-(never a new document), log any defects in `KNOWN_BUGS.md`, and rewrite `NOW.md`. Do not hand-write a fresh
+(never a new document), log any defects in `KNOWN_BUGS.md`, rewrite `NOW.md`, and keep `INDEX.md` accurate if any
+document changed status. `tools/ncm-test.ps1` asserts the documentation invariants, so a lapse fails the gate. Do not hand-write a fresh
 catch-up brief — `NOW.md` plus `BACKLOG.md` is the catch-up brief.
 
 Nothing is *done* because it is built. It is done when a live PASS sits beside it in `wp/MASTER_TEST.md` (L69).
 
 ## OPEN//77 work
 
-Read [docs/research/open77/README.md](docs/research/open77/README.md) and its seven assessment documents before implementation. The NCM Online orientation brief and the living decision record (LOCKED / PROVISIONAL / OPEN / EXPERIMENTS) are in [docs/ncm-online/](docs/ncm-online/00_ORIENTATION_BRIEF.md); update the decision record, not a new document, when a decision changes. Reconnaissance dated 2026-09-18 is static analysis plus primary-source/MCP research; no multiplayer experiments passed. Major OPEN//77 implementation must wait until the reconnaissance is reviewed. Documentation corrections and further read-only research may continue.
+Read [docs/research/open77/README.md](docs/research/open77/README.md) and its seven assessment documents before implementation. **The entry point for NCM Online documentation is [docs/ncm-online/INDEX.md](docs/ncm-online/INDEX.md)** — the authority map. It says which document currently governs which topic, and lists known conflicts rather than resolving them silently. Every document carries a STATUS banner (CURRENT / SPEC / PROPOSAL / SUPERSEDED / HISTORICAL / LEDGER); superseded and historical material lives in `docs/ncm-online/archive/`, preserved but no longer equally discoverable (L125). **Document number and date confer no authority.** The living decision record (LOCKED / PROVISIONAL / OPEN / EXPERIMENTS) is `docs/ncm-online/DECISION_RECORD.md`; update it, not a new document, when a decision changes. Reconnaissance dated 2026-09-18 is static analysis plus primary-source/MCP research; no multiplayer experiments passed. Major OPEN//77 implementation must wait until the reconnaissance is reviewed. Documentation corrections and further read-only research may continue.
 
 Do not assume native CET spawning, mutable single-player globals, TweakDB tuning or JSON saves are network-safe. Platform AI needs a simulating client; off-screen statistical racing is separate. Query current build-pinned official API cards before using methods; preview docs conflict in places. Preserve observed/simulated result provenance.
 

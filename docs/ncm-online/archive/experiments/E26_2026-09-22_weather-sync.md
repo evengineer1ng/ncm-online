@@ -1,5 +1,8 @@
 # E26 — OPEN//77 weather authority synchronization retest
 
+> **STATUS: HISTORICAL** - experiment record. A record of a moment, never architecture.
+> Authority map: [INDEX.md](../../INDEX.md) - classified 2026-09-24 (L125)
+
 Date: 2026-09-22, approximately 19:13–19:40 UTC.  
 Platform: staging `52.60.225.137`, OPEN//77 `2.31.13+op77.87`.  
 Probe: temporary `ncm_weather_probe`.  

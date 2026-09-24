@@ -1,5 +1,8 @@
 # NCM environments — the world and the workshop
 
+> **STATUS: CURRENT** - authority for: *environments, promotion discipline* - affirmed 2026-09-24 (L112, L121)
+> Authority map: [INDEX.md](INDEX.md) - classified 2026-09-24 (L125)
+
 **Status:** architecture agreed (L112). **NCM Development is standing as of 2026-09-24 (L121).**
 NCM Online is **unchanged**: still `serverId = ncm-dev`, unrenamed, and `deploy-staging.ps1` still defaults to
 `-Target online`. Cutover steps 1-2 are done; **steps 3-6 remain the operator's call** and are still gated on

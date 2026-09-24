@@ -1,5 +1,8 @@
 # Batch 2 — "Race Guide + host kit" (cut 2026-09-21; owner: build breadth first, validate once, TW1 tests breadth)
 
+> **STATUS: HISTORICAL** - completed work package. A record of a moment, never architecture.
+> Authority map: [INDEX.md](../../INDEX.md) - classified 2026-09-24 (L125)
+
 **Status 2026-09-21: built and deployed to staging (deploy 7, 16:35 UTC) — every item below has core tests and/or a stub scenario; live validation is the master test doc.** Offline: 78 core tests, 17 stub scenarios (`guide`, `guide2`, `hostkit`, `rolling` new), `luac -p` clean.
 
 Progression: **Batch 1 (built, mostly validated) → Batch 2 build → one big validation pass (Batch 1 leftovers + Batch 2)
@@ -82,7 +85,7 @@ list (L62). Tester instructions rewritten for a QA session in `04_TESTER_WINDOW_
 
 ## Validation pass (after the build, before TW1)
 
-One pass, solo then two clients, logged in **[MASTER_TEST.md](MASTER_TEST.md)** (Batch 1 leftovers are already copied there; Batch 2 sections are added as each feature lands), covering:
+One pass, solo then two clients, logged in **[MASTER_TEST.md](../../wp/MASTER_TEST.md)** (Batch 1 leftovers are already copied there; Batch 2 sections are added as each feature lands), covering:
 
 - **Batch 1 leftovers:** hold-E warp (§3.2); one-run quali → route to the grid → race → results (§8); graph strip / F8
   (§7.4); `ncm.telemetry` mid-race `last client`, `refused=0` (§6.2) + client `telemetry fields:` (§6.1);

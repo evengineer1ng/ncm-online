@@ -1,5 +1,8 @@
 # 08 — Money, purses, entry fees and recovery (audit, 2026-09-22)
 
+> **STATUS: CURRENT** - authority for: *economy intent* - affirmed 2026-09-24 (L84, L85)
+> Authority map: [INDEX.md](INDEX.md) - classified 2026-09-24 (L125)
+
 > Primary-market scope is governed by [17_MARKET_NETWORK.md](17_MARKET_NETWORK.md): Base Market is one stable
 > `marketId`, inventory is market-scoped authored supply, and F6 is not an omniscient global shop.
 

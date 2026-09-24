@@ -1,9 +1,12 @@
 # NCM Team Organizations, Economic Roles and Human Motorsport
 
+> **STATUS: CURRENT** - authority for: *organisations, team ownership, governance, grid slots* - affirmed 2026-09-24 (L92, L93; reaffirmed L123)
+> Authority map: [INDEX.md](INDEX.md) - classified 2026-09-24 (L125)
+
 **Status:** architecture assessment and shaped design. **Nothing in this document is implemented.**
 **Source:** owner design pass, 2026-09-22 (spec 3 of 3, with the OEM/parts postscript).
 **Companions:** [08_ECONOMY.md](08_ECONOMY.md) · [13_VEHICLE_COLLECTION.md](13_VEHICLE_COLLECTION.md) ·
-[05_DATA_MODEL.md](05_DATA_MODEL.md). Ideas live in `BACKLOG.md`; decisions in `DECISION_RECORD.md`.
+[05_DATA_MODEL.md](archive/05_DATA_MODEL.md). Ideas live in `BACKLOG.md`; decisions in `DECISION_RECORD.md`.
 
 This is the constitution for formal human-run motorsport organizations. It is deliberately not a build order.
 

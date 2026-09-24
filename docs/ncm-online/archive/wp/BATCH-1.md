@@ -1,5 +1,8 @@
 # Batch 1 — "Opening, incidents, vocabulary"
 
+> **STATUS: HISTORICAL** - completed work package. A record of a moment, never architecture.
+> Authority map: [INDEX.md](../../INDEX.md) - classified 2026-09-24 (L125)
+
 Built 2026-09-20/21 in one slice (plan: `~/.claude/plans/mighty-chasing-waffle.md`). Every item below has an
 offline proof (core tests and/or a stub scenario) and a **live script** with exact commands and pass lines. Run the
 validation as one pass — log a fail, move on, come back — unless a fail blocks everything.

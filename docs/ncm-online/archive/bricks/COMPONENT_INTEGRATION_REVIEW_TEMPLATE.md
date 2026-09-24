@@ -1,5 +1,8 @@
 # INTEGRATION REVIEW — B-<IDEA>-<slug> v<N> — R<k>
 
+> **STATUS: HISTORICAL** - brick template - closed experiment. A record of a moment, never architecture.
+> Authority map: [INDEX.md](../../INDEX.md) - classified 2026-09-24 (L125)
+
 *Written by the integrator after reading the brick against the live repository. One verdict, a numbered list, and
 nothing the author cannot act on. The author revises from this packet alone; do not re-explain the repository.
 Saved as `ncm/bricks/<id>/reviews/R<k>.md`.*

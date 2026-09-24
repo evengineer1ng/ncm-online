@@ -1,5 +1,8 @@
 # TW1 — controlled multiplayer QA + capture session: run sheet
 
+> **STATUS: HISTORICAL** - Tester Window 1 run sheet. A record of a moment, never architecture.
+> Authority map: [INDEX.md](../INDEX.md) - classified 2026-09-24 (L125)
+
 Decision record L59–L63. Drafted 2026-09-21 with the Batch 2 host kit; the host fills the times on the day.
 Field: 3–5 outside OPEN//77 alpha testers (run it with whoever turns up) + the host in-world (baremetaleven) + one
 observer on Warden. Length: ~60 min of driving inside a 90-min slot. Testing outranks footage (L59).

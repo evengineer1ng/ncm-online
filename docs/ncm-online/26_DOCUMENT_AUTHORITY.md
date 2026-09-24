@@ -1,5 +1,8 @@
 # 26 — Document authority and lifecycle
 
+> **STATUS: PROPOSAL** - a recommendation with **no authority until ruled on**. Covers: *this scheme - directionally accepted, executed as L125*
+> Authority map: [INDEX.md](INDEX.md) - classified 2026-09-24 (L125)
+
 **Status: PROPOSAL. Nothing moved, nothing rewritten, nothing implemented.** Answers the owner's documentation
 pass, 2026-09-24: *"We have too much documentation that is equally discoverable but not equally authoritative…
 Preserve the history. Curate the authority."*

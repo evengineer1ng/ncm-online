@@ -1,5 +1,8 @@
 # COMPONENT ASSIGNMENT — B-<IDEA>-<slug> v<N>
 
+> **STATUS: HISTORICAL** - brick template - closed experiment. A record of a moment, never architecture.
+> Authority map: [INDEX.md](../../INDEX.md) - classified 2026-09-24 (L125)
+
 *Written by the integrator. This packet plus `COMPONENT_GATE.md` plus the attached files is everything the author
 gets. If the author has to ask for the repository, the packet was incomplete — fix the packet, not the gate.*
 

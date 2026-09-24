@@ -1,5 +1,8 @@
 # 07 — The node network as a first-class primitive (audit, 2026-09-22)
 
+> **STATUS: CURRENT** - authority for: *nodes, routes, ordered chains* - affirmed 2026-09-24
+> Authority map: [INDEX.md](INDEX.md) - classified 2026-09-24 (L125)
+
 **Status: audit only. Nothing implemented.** Written in answer to the owner's architecture brief. Read
 `NOW.md` and `BACKLOG.md` first; this document is the reasoning behind IDEA-103, not a decision record — decisions
 go in `DECISION_RECORD.md`.

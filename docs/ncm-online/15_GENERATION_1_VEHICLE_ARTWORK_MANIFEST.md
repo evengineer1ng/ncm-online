@@ -1,5 +1,8 @@
 # NCM Generation 1 Vehicle Collection --- Artwork Source Manifest
 
+> **STATUS: CURRENT** - authority for: *vehicle artwork manifest* - affirmed 2026-09-24
+> Authority map: [INDEX.md](INDEX.md) - classified 2026-09-24 (L125)
+
 > Working asset manifest for the 27 conceptual vehicles in NCM
 > Generation 1. This is a sourcing document, not a change to the
 > canonical vehicle catalogue. \## Source strategy - **Primary grid

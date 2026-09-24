@@ -1,5 +1,8 @@
 # NCM Weather
 
+> **STATUS: CURRENT** - authority for: *weather as world state* - affirmed 2026-09-24
+> Authority map: [INDEX.md](INDEX.md) - classified 2026-09-24 (L125)
+
 **Status:** platform synchronization validated on op77.87; pure core and persistent default-world server adapter
 built and offline-tested; deployment/live validation remain. No competitive, economic, badge, Fishing, or
 vehicle-performance consequence consumes weather yet.
@@ -51,7 +54,7 @@ before weather gains sporting or economic meaning. The executed evidence belongs
 record; the old KB-6 row remains open until then.
 
 **PASS 2026-09-22:** W1–W8 passed with two clients on op77.87. See
-[E26](experiments/E26_2026-09-22_weather-sync.md). KB-6 is closed.
+[E26](archive/experiments/E26_2026-09-22_weather-sync.md). KB-6 is closed.
 
 ## Built core contract (2026-09-22)
 
@@ -215,7 +218,7 @@ changed.** Reported here rather than assumed, per §"Ownership boundaries".
 
 This addendum was written when no Weather Service existed. Both halves have since changed:
 
-- **KB-6 passed** on `op77.87` (W1–W8, [E26](experiments/E26_2026-09-22_weather-sync.md)) and is closed.
+- **KB-6 passed** on `op77.87` (W1–W8, [E26](archive/experiments/E26_2026-09-22_weather-sync.md)) and is closed.
 - **The service is built** — `world.weather` in core plus `ncm_league/server/weather.lua`, publishing the read
   model this document specified.
 

@@ -1,5 +1,8 @@
 # NCM Online — data model (as built, and the three migrations designed next)
 
+> **STATUS: SUPERSEDED** by ncm/online/resources/ncm_league/server/schema/ - the CODE is the authority - kept for history. **Do not build from it.**
+> Authority map: [INDEX.md](../INDEX.md) - classified 2026-09-24 (L125)
+
 Status 2026-09-20. Everything under **Built** exists on staging (migrations 001–007). Everything under
 **Designed** is the shape agreed in the decision record (L52–L57, P39–P43) and lands with M8/M9/M10.
 Rows are owned by the league server (`ncm_league`); `ncm_world` reads and writes the vehicle/venue tables.
@@ -58,7 +61,7 @@ domain parent from which season is unambiguous. Current state alone is insuffici
 `vehicle_discovery` remains the first-identity summary and source for Discoveries Inspired; it is not the whole
 knowledge model. `vehicle_knowledge_evidence` preserves player-scoped evidence with explicit source/epistemic
 kind, occurrence time, optional `asset_id`, payload and unique retry key. Existing rows backfill as observed
-identity reveals only. See [16_MACHINE_INDEX.md](16_MACHINE_INDEX.md).
+identity reveals only. See [16_MACHINE_INDEX.md](../16_MACHINE_INDEX.md).
 
 Market must expose actual stock and call the server identity-reveal seam; canonical catalogue membership alone
 does nothing. Before the first transfer, add immutable vehicle acquisition/transfer history: current
@@ -72,7 +75,7 @@ records attach `(ncm_driver_id, server_id)` to `market_id` with first-known time
 kept distinct rather than encoded as discovery. Unknown markets have no client-visible placeholder or total.
 
 Stock remains shared authoritative assets. Market discovery creates no asset and purchase transfers one existing
-`asset_id` atomically. See [17_MARKET_NETWORK.md](17_MARKET_NETWORK.md).
+`asset_id` atomically. See [17_MARKET_NETWORK.md](../17_MARKET_NETWORK.md).
 
 Migration 017 implements that boundary: nullable title permits authored unsold assets, `market_inventory` scopes
 each listing to a stable market, `vehicle_asset_transfer` preserves production/acquisition history, and ledger

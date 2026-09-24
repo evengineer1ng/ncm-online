@@ -1,5 +1,8 @@
 # NCM apparel — first slice and durable direction
 
+> **STATUS: SPEC** - owner intent, captured and **NOT authorised for implementation**. Do not build from it; do not contradict it. Covers: *apparel entitlement*
+> Authority map: [INDEX.md](INDEX.md) - classified 2026-09-24 (L125)
+
 **Status:** starter clothing built locally; entitlement/store/mod integration designed, not implemented.
 **Constraint:** economy remains held by L85. No apparel price, purchase, resale or paid upgrade is active.
 

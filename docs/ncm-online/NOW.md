@@ -1,9 +1,12 @@
 # NOW — the single next-action index
 
+> **STATUS: LEDGER** - living and append-only, current by construction. Covers: *the single next-action index*
+> Authority map: [INDEX.md](INDEX.md) - classified 2026-09-24 (L125)
+
 **Rewritten at the end of every working session.** Read this first, then BACKLOG.md, KNOWN_BUGS.md,
 DECISION_RECORD.md and the referenced QA rows.
 
-Last rewritten: **2026-09-24 — version control, and NCM Development is standing (L121).** Earlier: the
+Last rewritten: **2026-09-24 — the documentation-authority pass (L125).** Earlier: the
 engineering/wear proposals accepted with one reconciliation (L120); before that KB-87 incident detection, built
 locally and still not deployed.
 
@@ -43,7 +46,26 @@ All three are **invisible in production**, which is always already migrated and 
 
 **Standing rule (L121): Lightsail changes are instrumented on Windows first.**
 
-## NEXT SESSION STARTS HERE -> `HANDOFF_2026-09-25.md`
+## START HERE -> [INDEX.md](INDEX.md)
+
+**The documentation corpus is now classified (L125).** `INDEX.md` is the entry point and says which document
+governs which topic. Every one of the 60 documents carries a STATUS banner; 27 superseded/historical documents
+moved to `archive/` with history intact and every link repaired. `tools/ncm-test.ps1` now asserts it.
+
+**Nothing about NCM itself changed today.** No schema, no gameplay, no foundation work. The two open proposals
+(`25` architecture profile, `26` this scheme) and every A-series ruling stand exactly as L124 left them.
+
+### Still owed before foundation work starts
+
+- **`25` section 10** needs owner decisions: ordinals vs continuous for size/demand; shared platforms; the tire
+  abstraction; whether `facets` stays. Q18/Q19 cannot lock until then.
+- **A1 `origin` retirement mechanics** — the semantic ruling is made (L124); the safe migration path is not.
+- **Stage 0 of `24` section 9** (`IDEA-236`, machine attribution) is still the P0, and production is still
+  losing one attribution per finisher per race.
+
+### Superseded pointer
+
+The cold-start handoff is now at [archive/HANDOFF_2026-09-25.md](archive/HANDOFF_2026-09-25.md).
 
 A cold-start prompt for the next Coder 1 was written on 2026-09-24 and is preserved at
 `HANDOFF_2026-09-25.md`. **Today's objective is the documentation-authority pass** (`26_DOCUMENT_AUTHORITY.md`,

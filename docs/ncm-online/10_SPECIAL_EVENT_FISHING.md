@@ -1,5 +1,8 @@
 # NCM Fishing — automotive special event
 
+> **STATUS: SPEC** - owner intent, captured and **NOT authorised for implementation**. Do not build from it; do not contradict it. Covers: *the fishing special event*
+> Authority map: [INDEX.md](INDEX.md) - classified 2026-09-24 (L125)
+
 **Status:** shaped concept. Not scheduled, built, validated, assigned to a milestone, or part of the initial six
 championships. This document preserves product intent; it is not an implementation specification.
 

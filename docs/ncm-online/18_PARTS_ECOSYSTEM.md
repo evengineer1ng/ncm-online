@@ -1,5 +1,8 @@
 # Procedural component / parts ecosystem — architecture + ontology spec
 
+> **STATUS: SPEC** - owner intent, captured and **NOT authorised for implementation**. Do not build from it; do not contradict it. Covers: *the procedural component/parts ecosystem*
+> Authority map: [INDEX.md](INDEX.md) - classified 2026-09-24 (L125)
+
 **Status: SPECIFICATION CAPTURED 2026-09-23. Nothing built, nothing authorised.** Spec 1 of a batch the owner
 is sending; capture-only until they say otherwise. This document is the faithful record of the spec plus a
 first pass at which existing NCM primitives it should reuse — written now, while the connections are fresh,

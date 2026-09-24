@@ -1,5 +1,8 @@
 # NCM Online — master test (the one validation pass before TW1)
 
+> **STATUS: LEDGER** - living and append-only, current by construction. Covers: *live PASS/FAIL evidence* (L69)
+> Authority map: [INDEX.md](../INDEX.md) - classified 2026-09-24 (L125)
+
 ## W. Walk-in orientation anchor (IDEA-195/L101)
 
 **Built and offline-green; not deployed.** Full gate remains 181/181 core tests under Lua 5.4 and LuaJIT;
@@ -49,7 +52,7 @@ Opened 2026-09-21. This is the single live-validation document: everything Batch
 feature as it lands. Run it as one pass — solo (Session A), two clients (Session B), regression (Session C) — log
 PASS/FAIL in the Results table at the end and move on; only an everything-blocker interrupts. Feature sections are
 added at build time with the same shape as Batch 1: what, files, offline proof, live script with exact commands and
-pass lines. Batch 1's original scripts stay in [BATCH-1.md](BATCH-1.md); their *remaining* steps are copied here.
+pass lines. Batch 1's original scripts stay in [BATCH-1.md](../archive/wp/BATCH-1.md); their *remaining* steps are copied here.
 
 Offline gate (before any deploy): `powershell -NoProfile -ExecutionPolicy Bypass -File tools\ncm-test.ps1`
 (core under Lua 5.4 + LuaJIT, `luac -p` over every resource file) and every `tools\ncm-stub.lua` scenario.
@@ -302,7 +305,7 @@ weather revisions, preset, transition and scheduler timing against canonical ser
 
 24. W1–W8 in `wp/OFFLINE_TEST_QUEUE.md` — **PASS 2026-09-22**. Both clients followed every forced/natural state,
 the rejoining client entered the active transition at its current point, bucket isolation/reacquisition worked, and
-the cleared bucket returned `unknown_bucket`. No unexplained divergence. Evidence: [E26](../experiments/E26_2026-09-22_weather-sync.md).
+the cleared bucket returned `unknown_bucket`. No unexplained divergence. Evidence: [E26](../archive/experiments/E26_2026-09-22_weather-sync.md).
 
 ### 2.8 NCM Weather Service
 
@@ -330,7 +333,7 @@ first discovery only. `encounter_count` reached 2 rather than 4 because a pass m
 consecutive one-second samples — quick drive-bys correctly do not count.
 
 **Not yet run:** §T5 (`ncm.inspired` standings), §T6 (partial-generation recovery, KB-55), §T7 (unreadable-collection
-refusal, KB-54), and the [E27](../experiments/E27_2026-09-22_vehicle-collection-encounter.md) false cases — far,
+refusal, KB-54), and the [E27](../archive/experiments/E27_2026-09-22_vehicle-collection-encounter.md) false cases — far,
 wrong bucket, unstreamed, ambient traffic, and reconnect/restart persistence. The F10 roster wall is also unverified.
 
 ### 2.10 Readiness watchdog — KB-60
@@ -577,7 +580,7 @@ are unchanged. Captured platform contracts: [research evidence](../../research/o
 | 2.4 stream gates: first crossing 3/3 | | |
 | 2.5 rolling start: formation / green at leader / faults / oval default | | |
 | 2.6 fix pass: F9 / thread / ground z / enum name | **PASS (3 of 4)** | F9 opens Messages — confirmed by owner. Ground z: `grid car #7 z from a player 41 m away: 12.0 (node 13.0)` — KB-17 fix working, car spawned on the road. Enum: `npcs.damage.invulnerable = 2` — KB-13 answered. Phone-thread presentation not yet observed. |
-| 2.7 weather authority / KB-6 | **PASS** | Two-client op77.87 W1–W8 complete; all presets, natural scheduling, mid-transition rejoin, bucket override/isolation/reacquisition/clear matched canonical state. [E26](../experiments/E26_2026-09-22_weather-sync.md). |
+| 2.7 weather authority / KB-6 | **PASS** | Two-client op77.87 W1–W8 complete; all presets, natural scheduling, mid-transition rejoin, bucket override/isolation/reacquisition/clear matched canonical state. [E26](../archive/experiments/E26_2026-09-22_weather-sync.md). |
 | 2.8 NCM Weather Service | **PENDING LIVE QA** | Offline: 128/128 core tests on Lua 5.4 and LuaJIT; 100 resource Lua files parse cleanly. Live §X1–X8 not run. |
 | 2.9 Vehicle Collection | **PARTIAL — discovery and provenance PASS (deploy 13, 2026-09-23 00:17–00:18)** | §T1 PASS: `DISCOVERED driver=72519ab3 key=rayfield_caliburn record=Vehicle.v_sport1_rayfield_caliburn_player`. §T2 PASS: `source_driver_id=48831609`, `source_holding=issued` — the fact that cannot be backfilled. §T3 PASS: `encounter_count` 1→2 over 117 s with `source_driver_id` **unchanged**, so the `ON DUPLICATE KEY UPDATE` path does not rewrite credit. §T4 PASS (unplanned): the car's own holder discovered it with `source NULL` — `Discoveries.credit` refused with `self`. Owner saw one toast and no repeat, which is the anti-farm rule holding. Offline: 144/144 core tests, 106 resource files parse. **Still to run: §T5 standings, §T6 partial-generation recovery, §T7 unreadable-collection refusal, plus the E27 false cases (far / wrong bucket / ambient / restart).** |
 | 2.10 readiness watchdog (KB-60) | **ALL PASS — §AD1–§AD7. §AD2 cleared on a real visitor at deploy 21 (KB-64 fixed).** | Deploy 19, 2026-09-23 01:35–01:49 UTC, owner at one client. **§AD1** sweep up, `world.readiness` loaded, zero script errors. **§AD7 PASS unprompted** — a real platform report proved a second resource *does* receive `open77:appearance:readinessDiagnostic`, which was the design's one open uncertainty. **§AD3 PASS** with chat line + yellow toast owner-confirmed, and a typo'd stage correctly refused. **§AD4, §AD5, §AD6 PASS.** **§AD2 initially FAILED → KB-64** (fixed deploy 20, then **PASSED at deploy 21 on the visitor `A`**: two joins, ~58 min, zero readiness lines): a normal join was warned at 47 s and told to reconnect; `staleStageS=45` was holding a ~15 s heartbeat three times too long. Fixed and shipped in **deploy 20** (01:56 UTC, 163/163 green). **§AD2 re-run is the only thing owed: join once and confirm no `readiness:` line.** Two-client §AD6 still unrun. |

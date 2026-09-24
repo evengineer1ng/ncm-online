@@ -1,5 +1,8 @@
 # BRICK.md — B-<IDEA>-<slug>
 
+> **STATUS: HISTORICAL** - brick template - closed experiment. A record of a moment, never architecture.
+> Authority map: [INDEX.md](../../INDEX.md) - classified 2026-09-24 (L125)
+
 *The passport. Filled in by the author, travels with the code, updated by the integrator on admission. Every field
 is present; "none" is a valid answer, a missing field is not.*
 

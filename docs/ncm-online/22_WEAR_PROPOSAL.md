@@ -1,5 +1,8 @@
 # Wear, lifecycle and odometer-driven aging — proposal
 
+> **STATUS: PROPOSAL** - a recommendation with **no authority until ruled on**. Covers: *wear architecture - ACCEPTED; decisions live in L120*
+> Authority map: [INDEX.md](INDEX.md) - classified 2026-09-24 (L125)
+
 **This is the answer to `IDEA-288`.** The spec is captured in `20_WEAR_LIFECYCLE.md`; this is what I propose
 in response. Nothing here is built. No mileage thresholds, no failure probabilities, no effects.
 

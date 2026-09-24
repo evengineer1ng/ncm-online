@@ -1,5 +1,8 @@
 # NCM Online — staged implementation plan
 
+> **STATUS: CURRENT** - authority for: *milestone vocabulary (M0-M12) ONLY; current sequencing is 24* - affirmed 2026-09-24 (L39-L42, L59-L63)
+> Authority map: [INDEX.md](INDEX.md) - classified 2026-09-24 (L125)
+
 Date: 2026-09-19, amended 2026-09-20 (L39–L42: Race Guide, background-by-default, simultaneous events, tester window moved) and **2026-09-21 (L59–L63: TW1 is a controlled multiplayer QA/capture session; TW2 is the first showcase; priority = TW1 operability)**. Status: **approved with amendments; Batch 1 live validation in progress; Batch 2 = TW1 host kit.** Companion to [01_ARCHITECTURE.md](01_ARCHITECTURE.md); decisions in [DECISION_RECORD.md](DECISION_RECORD.md). Experiments (E#) are from [OPEN77_EXPERIMENT_PLAN.md](../research/open77/OPEN77_EXPERIMENT_PLAN.md) plus the additions in the decision record.
 
 Rules of the plan: every milestone belongs to the architecture (no throwaway demos); each has entry dependencies and an exit gate; solo-runnable gates come first (P15: local server + up to two in-world clients on this PC); milestones needing more humans are batched into **tester windows**; an extracted core slice is not done until both hosts consume it (L26), tracked as SP re-adoption passes (R#) interleaved rather than deferred. Sizes are relative (S/M/L/XL); no calendar dates.
@@ -12,7 +15,7 @@ M0 ─► M1 ─► M2 ─► M3 ─► M4-lite ─► M7-lite ─► Batch 1 (o
    M11 (framework & operator surface), M12 (presentation/broadcast), M13 (integrity tier-up) trail as needed
 ```
 
-Tester windows (revised 2026-09-21, L59–L63): **TW1** is a controlled multiplayer QA + footage-capture session with 3–5 OPEN//77 alpha testers — short controlled runs across disciplines, host-driven scenarios, stop/restart/reposition allowed; readiness = the host can create, reset, observe and debug sessions with a small variable field of remote clients. **TW2** is the first showcase and inherits the inaugural-race chain CONNECT → OFFER → ACCEPT → PICKUP → ARRIVAL → GRID REVEAL → ASSIGNED CAR → STAGING/LIGHTS → RACE → RESULT (L43, now TW2's), degrading gracefully below 20 cars. The earlier TW1 analysis in [04_TESTER_WINDOW_1.md](04_TESTER_WINDOW_1.md) now describes TW2 readiness. Progression: local/internal QA → TW1 → fixes/regression → TW2 readiness → TW2.
+Tester windows (revised 2026-09-21, L59–L63): **TW1** is a controlled multiplayer QA + footage-capture session with 3–5 OPEN//77 alpha testers — short controlled runs across disciplines, host-driven scenarios, stop/restart/reposition allowed; readiness = the host can create, reset, observe and debug sessions with a small variable field of remote clients. **TW2** is the first showcase and inherits the inaugural-race chain CONNECT → OFFER → ACCEPT → PICKUP → ARRIVAL → GRID REVEAL → ASSIGNED CAR → STAGING/LIGHTS → RACE → RESULT (L43, now TW2's), degrading gracefully below 20 cars. The earlier TW1 analysis in [04_TESTER_WINDOW_1.md](archive/04_TESTER_WINDOW_1.md) now describes TW2 readiness. Progression: local/internal QA → TW1 → fixes/regression → TW2 readiness → TW2.
 
 Sequencing note (2026-09-20): M2/M3 were cut as a vertical slice ahead of M1's horizontal work (standings, points, box scores, SP fixtures, R1). That **M1-debt** is scheduled right after M3.3 passes, because M4 standings depend on it and it is the first time SP consumes core (L26).
 
@@ -102,7 +105,7 @@ Sequencing note (2026-09-20): M2/M3 were cut as a vertical slice ahead of M1's h
 **Exit gate:** identical seed → identical league; restart mid-schedule matches uninterrupted run; one event settles exactly once whether simulated or live; roster-scale workload within budget.
 
 ### ▶ Tester window 1 — moved (L43)
-No longer after M5. TW1 is the inaugural NCX invitational race, placed after M4-lite → M7-lite → M7.5 (see the diagram and [04_TESTER_WINDOW_1.md](04_TESTER_WINDOW_1.md)). The street-world tester journey of L32 becomes the goal of the **second** street-world window after M5 (fields never empty, Race Guide live).
+No longer after M5. TW1 is the inaugural NCX invitational race, placed after M4-lite → M7-lite → M7.5 (see the diagram and [04_TESTER_WINDOW_1.md](archive/04_TESTER_WINDOW_1.md)). The street-world tester journey of L32 becomes the goal of the **second** street-world window after M5 (fields never empty, Race Guide live).
 
 ## M6 — Physical AI backend and promotion (L; measurement-heavy)
 

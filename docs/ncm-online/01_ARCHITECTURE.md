@@ -1,5 +1,8 @@
 # NCM Online — architecture
 
+> **STATUS: CURRENT** - authority for: *overall system shape - SEE CONFLICT C-1 in INDEX.md* - affirmed 2026-09-24 (L28-L33)
+> Authority map: [INDEX.md](INDEX.md) - classified 2026-09-24 (L125)
+
 Date: 2026-09-19. Status: **approved with amendments (L28–L33)**. Every structural choice traces to [DECISION_RECORD.md](DECISION_RECORD.md) (L = locked, P = provisional) or to platform evidence in [docs/research/open77/](../research/open77/README.md). Platform baseline: OPEN//77 2.31.13+op77.78.
 
 Principle: **Configurable by architecture. Opinionated by default.**

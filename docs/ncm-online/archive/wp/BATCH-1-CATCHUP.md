@@ -4,6 +4,9 @@
 
 # Catch-up brief — paste this into a fresh session opened from C:\Users\eveng\Documents\cyberpunk2077
 
+> **STATUS: SUPERSEDED** by NOW.md - self-declared superseded 2026-09-21 - kept for history. **Do not build from it.**
+> Authority map: [INDEX.md](../../INDEX.md) - classified 2026-09-24 (L125)
+
 You are continuing NCM Online (the Cyberpunk 2077 motorsport mod "NCM" ported to the OPEN//77 multiplayer platform).
 The previous session ended right after **deploying Batch 1 to the staging server without running its live validation**.
 Your first job is to run that validation with me, one step at a time, exactly as written in

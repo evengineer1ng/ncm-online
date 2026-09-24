@@ -1,5 +1,8 @@
 # WP M4-lite — Invitational foundations: organized events, teams & seats, race control
 
+> **STATUS: HISTORICAL** - completed work package. A record of a moment, never architecture.
+> Authority map: [INDEX.md](../../INDEX.md) - classified 2026-09-24 (L125)
+
 Milestone: M4 (lite slice, first of the TW1 chain — see 04_TESTER_WINDOW_1.md). Status: **COMPLETE 2026-09-20 10:44** (live: offers/accept, seat-ordered grid, penalty + audit; DSQ not exercised live — core-tested). Decisions: L18, L19, L43, L45, P21, P23 (offer is a Messages-v0 placeholder), P25.
 
 ## What it does

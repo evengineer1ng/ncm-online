@@ -1,5 +1,8 @@
 # Market Network — supplier and commercial-knowledge architecture
 
+> **STATUS: CURRENT** - authority for: *markets, market discovery* - affirmed 2026-09-24 (L106, L117)
+> Authority map: [INDEX.md](INDEX.md) - classified 2026-09-24 (L125)
+
 **Status:** foundation built locally and offline-green; not deployed or live-validated. Migration 017, the host
 purchase path and the F6 tab implement one universally known `base_market` with a small authored starter-vehicle
 allocation. No dealership network, supplier discovery, component, map or progression content is built.

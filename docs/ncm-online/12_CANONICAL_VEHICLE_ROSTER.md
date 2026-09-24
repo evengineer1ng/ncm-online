@@ -1,5 +1,8 @@
 # NCM Canonical Vehicle Roster — Scoping Report
 
+> **STATUS: SPEC** - owner intent, captured and **NOT authorised for implementation**. Do not build from it; do not contradict it. Covers: *the canonical vehicle roster*
+> Authority map: [INDEX.md](INDEX.md) - classified 2026-09-24 (L125)
+
 **Status:** planning only; not an install list or production manifest.  
 **Source:** `C:\Users\eveng\Downloads\NCM_Collection_Candidate_Matrix_v9.md`, preserved unchanged. The Matrix itself
 estimates roughly 120 named chassis/implementations before its final discoveries.

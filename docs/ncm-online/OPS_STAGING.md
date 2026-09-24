@@ -1,5 +1,8 @@
 # OPS — NCM Staging (AWS Lightsail, Linux)
 
+> **STATUS: CURRENT** - authority for: *day-to-day operation of NCM Online* - affirmed 2026-09-24
+> Authority map: [INDEX.md](INDEX.md) - classified 2026-09-24 (L125)
+
 Day-to-day recipe for the staging server. Facts: Ubuntu 24.04, 2 vCPU / 4 GB, static IP `52.60.225.137`,
 OPEN//77 `2.31.13+op77.84 linux-x64`, server id `6b154fdc-d515-4903-97dd-df37cb966151`, name "NCM Staging",
 unlisted. Layout `/opt/ncm/{server,resources/ncm,mods,logs}`; systemd unit `ncm-server` (`Restart=always`, so any

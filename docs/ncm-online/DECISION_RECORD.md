@@ -1,6 +1,9 @@
 # NCM Online — living decision record
 
-Maintained during the orientation/interview phase. Every entry cites its basis. Move items between sections only with the owner's answer or an experiment result. Companion: [00_ORIENTATION_BRIEF.md](00_ORIENTATION_BRIEF.md).
+> **STATUS: LEDGER** - living and append-only, current by construction. Covers: *every decision NCM has made (L-lines)* (L68)
+> Authority map: [INDEX.md](INDEX.md) - classified 2026-09-24 (L125)
+
+Maintained during the orientation/interview phase. Every entry cites its basis. Move items between sections only with the owner's answer or an experiment result. Companion: [00_ORIENTATION_BRIEF.md](archive/00_ORIENTATION_BRIEF.md).
 
 Legend: **LOCKED** — owner-approved or forced by verified platform facts · **PROVISIONAL** — recommended, not yet approved · **OPEN** — needs the owner · **EXPERIMENT** — needs a measured result.
 
@@ -56,10 +59,10 @@ Last updated: 2026-09-23 — L104 records the Market Network boundary. Previous 
 | **L40** | **The Race Guide — a motorsport TV guide for Night City — is how racing is discovered.** Opened on demand; lists upcoming events with series, start time/countdown, venue, vehicle/class requirements, grid capacity where applicable, and an Interested count. **Interest is digital, entry is physical:** marking Interested is a soft signal that makes the event the player's tracked event (countdown/distance HUD, waypoint to the venue, T−pings) and counts toward "8 interested / 20 max"; it never reserves a grid slot. Only physical entry at the venue (L35) reserves a limited position, and an Interested player never blocks a physically present one. Lifecycle sketch, not prescribed: uninterested → interested/tracked → arrived → entered → staged → racing → finished. (Owner, 2026-09-20.) |
 | **L41** | **Simultaneous events are a supported concept.** Multiple races may run around Night City at once; players choose what they care about. Route-conflict detection is a later concern and overlapping events are not assumed forbidden — occasional intentional interaction may be desirable. (Owner, 2026-09-20.) |
 | **L42** | **External testers come in only when NCM Online is a coherent experience, not a set of primitives.** Tester window 1 is no longer pinned "immediately after M4"; it is gated by an experience checklist (roadmap) and currently expected after M5. Internal one-PC/two-client testing continues throughout. Amends the placement in the roadmap; L32's continuous-journey criterion stands. (Owner, 2026-09-20.) |
-| **L43** | *(2026-09-21: this destination is now **TW2** — L59/L60; TW1 is the QA/capture session.)* **Tester Window 1 is the inaugural NCX vertical slice: one real multiplayer NCX race, up to 20 human drivers.** Readiness is the chain CONNECT → OFFER → ACCEPT → PICKUP → ARRIVAL → GRID REVEAL → ASSIGNED CAR → STAGING/LIGHTS → RACE → RESULT running end to end in an internal rehearsal, not a milestone number. Still an alpha; testers are told so. The field scales 1..20 (6 join → 6 race); 20 is aspirational, never a prerequisite. Analysis and placement in [04_TESTER_WINDOW_1.md](04_TESTER_WINDOW_1.md). Supersedes the "expected after M5" placement in L42; L42's principle (coherent experience before outsiders) stands. (Owner, 2026-09-20.) |
+| **L43** | *(2026-09-21: this destination is now **TW2** — L59/L60; TW1 is the QA/capture session.)* **Tester Window 1 is the inaugural NCX vertical slice: one real multiplayer NCX race, up to 20 human drivers.** Readiness is the chain CONNECT → OFFER → ACCEPT → PICKUP → ARRIVAL → GRID REVEAL → ASSIGNED CAR → STAGING/LIGHTS → RACE → RESULT running end to end in an internal rehearsal, not a milestone number. Still an alpha; testers are told so. The field scales 1..20 (6 join → 6 race); 20 is aspirational, never a prerequisite. Analysis and placement in [04_TESTER_WINDOW_1.md](archive/04_TESTER_WINDOW_1.md). Supersedes the "expected after M5" placement in L42; L42's principle (coherent experience before outsiders) stands. (Owner, 2026-09-20.) |
 | **L44** | **NCX eligibility is a broad earned status; a grid seat is a per-race position.** NCX is never "20 permanent drivers". The mature qualification system is a later design (M9/M10). TW1 is deliberately exceptional: the alpha cohort is granted NCX assignments directly. (Owner, 2026-09-20.) |
 | **L45** | **TW1 team assignment is programmatic and in-game — a sorting hat, not a Discord choice.** Ten NCX team identities (Rayfield, Herrera, Borton, Archer, Miyutsaki, Yorinobu, Kimiko, Raven, Spunky Monkey, Quadra; liveries exist for the RB15), two seats each. Variety first: one driver per team, then second seats; players do not choose, the unexpected offer is part of the presentation. Exact randomisation designed later. (Owner, 2026-09-20.) |
-| **L46** | **NCX venues are a real NCM concept: NCX temporarily transforms parts of Night City into sanctioned motorsport venues** (barriers/course furniture, controlled intersections, grid/start-finish infrastructure, spectator areas, crowds, audio/PA zones, dressing), built before an event and torn down after, preferably in the shared world so nonparticipants can discover and watch, with streaming keeping the cost local. The inaugural onboarding is one-time theatre; the venue is not. (Owner, 2026-09-20; platform verdicts and E19–E22 in [04_TESTER_WINDOW_1.md](04_TESTER_WINDOW_1.md).) |
+| **L46** | **NCX venues are a real NCM concept: NCX temporarily transforms parts of Night City into sanctioned motorsport venues** (barriers/course furniture, controlled intersections, grid/start-finish infrastructure, spectator areas, crowds, audio/PA zones, dressing), built before an event and torn down after, preferably in the shared world so nonparticipants can discover and watch, with streaming keeping the cost local. The inaugural onboarding is one-time theatre; the venue is not. (Owner, 2026-09-20; platform verdicts and E19–E22 in [04_TESTER_WINDOW_1.md](archive/04_TESTER_WINDOW_1.md).) |
 | **L47** | **TW1 presentation classes:** A blockers = race core (incident penalties, corrected time, readable position/progress, unmistakable gates, reliable GPS, missed-gate handling, start/grid/finish/classification, 20-car stability), venue/course readability (grid + start-finish infrastructure, barriers wherever the course could be misread or exited), enough presentation for the reveal. B strong targets = crowd audio, substantial authored crowds (benchmark-gated), extensive barriers, music states, polished arrival/grid environment, convergence/holding, shared-world discoverability. C quality-gated = PA/announcer (good → in, robotic → out). D future = crowd AI, dynamic commentary, generalised chauffeur, editor tooling beyond the drafting loop. (Owner, 2026-09-20.) |
 | **L48** | **The inaugural opening is compact and diegetic:** CONNECT → NCM Driver Profile questionnaire (reads as ordinary onboarding) → profile complete → short NCM orientation (normal NCM only) → back to the world → the assigned team's message arrives → accept → pickup → arrival → grid → reveal. Assignment is never stated by the UI ("your team is X" / scores) — the team contacts the driver; Discord does the rest. Assignments stay private until the team's message. (Owner, 2026-09-20.) |
 | **L49** | **Inaugural course direction: Pacifica Stadium as the major venue (grid/start most likely) and the pre-race Route Plan as the format's strategy layer.** Some sectors have several legal, barrier-dressed routes; drivers declare a route per Route Sector before lights out; navigation guides each driver down their declared branch; branches reconverge at Universal Gates where the pack reforms; used once, at most twice, per course. Not a triathlon: the race stays "who wins in the NCX Formula car". Geometry, timing and balance are decided by scouting, not now. (Owner, 2026-09-20.) |
@@ -110,7 +113,7 @@ Last updated: 2026-09-23 — L104 records the Market Network boundary. Previous 
 | **L85** | **A deterministic unique `idem_key` and typed references must land before any transaction amount becomes non-zero, and the economy implementation does not begin until Deploy 11 is validated.** Two separate holds, both hard. The first is structural: the `ledger` table has no uniqueness beyond an auto-increment id, so a settlement retry would pay a purse twice — KB-38's exact failure mode, except silent and denominated in money. **Duplicate charge, duplicate settlement, and restart/retry are economy GATE tests**, not nice-to-haves. The second is process: Deploy 11 carries 39 unrun QA checks (§K–§O), and starting the economy on top would deepen a built-but-unvalidated stack to the point where a failure becomes hard to attribute. | Owner, 2026-09-22. The second hold is L69/L78 applied deliberately rather than drifted into: building may run ahead of validation, but not indefinitely, and not across a layer as unforgiving as money. |
 | **L86** | **OPEN//77 owns worn presentation; NCM owns apparel entitlement.** NCM never duplicates or directly mutates the platform presentation tables. Issued, earned, purchased, found and sponsored gear converge on one future idempotent entitlement grant; equipping delegates to the platform. Apparel begins as identity/access/provenance, not driving-performance stats. Paid apparel remains under L85. | Owner, 2026-09-22: clothe characters now while deliberately preparing earning, buying, finding, upgrades/effects and modded racing gear. Full boundary: `09_APPAREL.md`. |
 
-| **L87** | **OPEN//77 canonical environment is the validated synchronization substrate; NCM Weather Service owns policy and forecast.** Weather is world state. NCM generates and persists the slower deterministic plan, exposes a confidence-aware forecast and records event provenance; the platform adapter applies/reconciles that plan. Event buckets may override it explicitly. No geographic weather/radar is implied, and downstream performance or Fishing interpretation remains outside the Weather Service. | Owner weather brief + two-client op77.87 live PASS, [E26](experiments/E26_2026-09-22_weather-sync.md). Detailed boundary: [11_WEATHER.md](11_WEATHER.md). |
+| **L87** | **OPEN//77 canonical environment is the validated synchronization substrate; NCM Weather Service owns policy and forecast.** Weather is world state. NCM generates and persists the slower deterministic plan, exposes a confidence-aware forecast and records event provenance; the platform adapter applies/reconciles that plan. Event buckets may override it explicitly. No geographic weather/radar is implied, and downstream performance or Fishing interpretation remains outside the Weather Service. | Owner weather brief + two-client op77.87 live PASS, [E26](archive/experiments/E26_2026-09-22_weather-sync.md). Detailed boundary: [11_WEATHER.md](11_WEATHER.md). |
 | **L88** | **The eventual NCM vehicle canon is broad, curated and literally shared.** Racing has priority, but cheap cars, tuners, classics, bikes, utility machinery and joyful oddballs are legitimate persistent-world content. Every client sees the actual admitted vehicle—no proxy. Tens of GB may be justified; indiscriminate hundreds are not. Preserve future expansion room. The Matrix is not an install list, and local success or Nexus listing proves neither distribution rights nor online readiness. | Owner, 2026-09-22. [12_CANONICAL_VEHICLE_ROSTER.md](12_CANONICAL_VEHICLE_ROSTER.md). |
 | **L89** | **Vehicle Library, Collection, Garage and Active Vehicle are distinct.** Library defines NCM's canon; Collection records a Driver's discoveries; Garage owns physical assets; Active identifies current access/use. Durable identity is an NCM-owned `vehicleKey`, not a TweakDB record or live entity id. Discovery represents legitimate in-world encounter, not asset installation, Guide text or secrecy from the human player. Catalogue growth never erases historical completion. | Owner, 2026-09-22. [13_VEHICLE_COLLECTION.md](13_VEHICLE_COLLECTION.md). |
 | **L90** | **A server reset is announced and counted down. Players are never dropped without warning.** Any restart while anyone is connected is preceded by a broadcast and a **1:00 countdown**, with reminders at 60, 30, 10 and 5 seconds. KB-5 still stands — prefer restarting with nobody on — but when a restart must happen anyway, silence is not an option: dropping someone mid-race costs a race that cannot be re-run, and it is the worst thing a host can do to a session. | Owner, 2026-09-22, after a stranger walked into a live test session: *"if we ever reset server we do it with a broadcast message and a 1:00 countdown."* Also settles the access posture that prompted it — **strangers seeing the server mid-work is acceptable** (*"if they see plumbing, they see plumbing"*), so KB-36 is a courtesy problem, not a security one. |
@@ -162,7 +165,7 @@ Last updated: 2026-09-23 — L104 records the Market Network boundary. Previous 
 | **P19** | **Pings and the next-race heartbeat.** Server notifications at T−15 / T−5 / T−1 for events a driver is eligible for or registered in; a persistent HUD element with countdown and distance to the start venue; a calendar browser. Free-roam always has a "next thing". | L34, L37; `open77_notifications`. | — |
 | **P20** | **Recurring slots in content packs.** Series declare cadence (`every 30m at :00/:30`, `weekly Sat 20:00`), venues, ruleset and backfill policy; the scheduler materialises slots ahead (e.g. next 2 hours of small races, next 2 weeks of big events) and posts them to the calendar and activity feed. | L36, L37. | M3 |
 | **P21** | **Entry lifecycle gains `checked_in`** (after `registered`, before `provisioned`): the state produced by the venue prompt's yes. Advance registration reserves (championship seats); the prompt confirms. Start times are wall-clock; a session sets its bucket's game time/weather (isolated) or inherits the world's. | L35, P13. | — |
-| **P16** | **Packaging: one NCM Content Catalog, two delivery channels.** A versioned catalog (mod, file version, archive hash, components, redistribution, eligibility `sp-only / online-inert / online-unsecured`) drives both the Nexus Collection tiers (NCM Core / Driving / World) for SP and the online packs' required-mod declarations. The Collection is the recommended SP install; the standalone mod page stays canonical/manual. NCM Online never depends on the Collection; the two share pinned hashes so Collection players pre-satisfy online player-fetch. See [03_PACKAGING_AND_COLLECTION.md](03_PACKAGING_AND_COLLECTION.md). | Launcher profile model (Solo vs Stack+World); content-addressed store; owner's Collection research. | E13, OPEN Q24/Q25 |
+| **P16** | **Packaging: one NCM Content Catalog, two delivery channels.** A versioned catalog (mod, file version, archive hash, components, redistribution, eligibility `sp-only / online-inert / online-unsecured`) drives both the Nexus Collection tiers (NCM Core / Driving / World) for SP and the online packs' required-mod declarations. The Collection is the recommended SP install; the standalone mod page stays canonical/manual. NCM Online never depends on the Collection; the two share pinned hashes so Collection players pre-satisfy online player-fetch. See [03_PACKAGING_AND_COLLECTION.md](archive/03_PACKAGING_AND_COLLECTION.md). | Launcher profile model (Solo vs Stack+World); content-addressed store; owner's Collection research. | E13, OPEN Q24/Q25 |
 | P10 | Operator policy lives in `Open77.tunables` + versioned content packs + a server profile; ncm-core ships opinionated defaults; operators cannot alter competitive rules mid-session (round-boundary promotion). Generic exposure grows as choices become apparent. | L14; tunables API. | — |
 | **P22** | **A player is an OPEN//77 identity, never a machine.** NCM keys everything (driver binding, entries, sessions, reconnect grace, ledger, records) on the platform's `userId`/player id and holds no concept of installation, IP, hardware or "primary client". Two instances on one PC connecting as two identities are, to NCM, two remote players; local display/input/process management is a setup concern outside NCM (owner, 2026-09-20). Guardrails: no per-IP or hardware-keyed logic ever (incl. M13 anti-abuse — key on identity); client scripts keep no machine-global state; pad polling stays a fallback behind the platform's own interaction binding because `Open77.input` reads physical devices, not per-instance bindings. Known practical limits on this PC are platform/hardware, not design: KB-4 (second instance renders no chat/notification WebUI and gets no key input at prompts), VRAM, and the Steam single-instance workaround. | Keeps future local-online play free. | Revisit if OPEN//77 adds per-instance input/device binding. |
 | **P23** | **NCM Messages will be OPEN//77-native.** Port the valuable parts of SP messaging — content, conversation trees, response options, state-machine concepts, conditions/consequences (`contact_events.lua` archetypes/offers, `phone_bridge.lua` responses) — never the WovenKit/vanilla-phone implementation. TW1 needs only v0: one authored team offer with Accept/Decline; per-team voices later. | L43, L45. | Inspect SP content when M7.5 starts. |
@@ -222,7 +225,7 @@ Numbering follows [OPEN77_EXPERIMENT_PLAN.md](../research/open77/OPEN77_EXPERIME
 
 | ID | Question | Status |
 |---|---|---|
-| E0 | Access, build pin, event-bus semantics, permission enforcement, restart | **passed 2026-09-19** ([record](experiments/E0_2026-09-19.md)): two clients/identities; DB + idempotent migrations; `TriggerEvent` host-wide/queued (guide stale); tunables promote as documented; `state.save` survives reload not restart; readiness holds consistent (retest with long hold in M2); **open:** read natives may be ungated (`vehicles.all()` without permission returned `{}`) — retest in M2 with a vehicle present |
+| E0 | Access, build pin, event-bus semantics, permission enforcement, restart | **passed 2026-09-19** ([record](archive/experiments/E0_2026-09-19.md)): two clients/identities; DB + idempotent migrations; `TriggerEvent` host-wide/queued (guide stale); tunables promote as documented; `state.save` survives reload not restart; readiness holds consistent (retest with long hold in M2); **open:** read natives may be ungated (`vehicles.all()` without permission returned `{}`) — retest in M2 with a vehicle present |
 | E1 | Course conversion (one circuit, one endpoint root) with authored gates | not run |
 | E2 | Two humans, server gate acceptance, adversarial cases, tie policy | not run |
 | E3 | Grid/readiness/countdown/cleanup with canonical vehicles | not run |
@@ -246,7 +249,7 @@ Numbering follows [OPEN77_EXPERIMENT_PLAN.md](../research/open77/OPEN77_EXPERIME
 | E22 | Sanctioned venue in the shared world: `clearArea` + bucket traffic reduction vs controlled bucket with admitted spectators; per-client traffic divergence on the circuit; NCPD off | not run |
 | E23 | Orientation media in the client WebUI: bundled VP9/Opus WebM (~15–25 MB, `web_files`) in a modal page with skip/done bridge vs unlisted YouTube embed; download time on a fresh join; audio balance; fallback when neither plays | not run |
 | E24 | Navigation for route plans: does `setWaypoint` re-route without a map open once a route exists (KB-1 at speed is unacceptable); worldui/prop gate visual language (branch rings vs universal cylinder/`race.checkpoint`); does branch-gate placement make the engine's road route follow the intended branch | not run |
-| E25 | (observation, unplanned) Is an `unlisted` server private? Two strangers walked into staging 2026-09-21 23:27–23:41 UTC while it was `Visibility=Unlisted, masterListing=enabled` | **observed 2026-09-21** ([record](experiments/E25_2026-09-21_walk-in.md)): not private in practice; cause unknown (staff view vs. ordinary discovery); reported to devs; KB-36/41/42, IDEA-091/092 |
+| E25 | (observation, unplanned) Is an `unlisted` server private? Two strangers walked into staging 2026-09-21 23:27–23:41 UTC while it was `Visibility=Unlisted, masterListing=enabled` | **observed 2026-09-21** ([record](archive/experiments/E25_2026-09-21_walk-in.md)): not private in practice; cause unknown (staff view vs. ordinary discovery); reported to devs; KB-36/41/42, IDEA-091/092 |
 | E0-note | A dedicated-server package **2.31.13+op77.82** exists locally (Downloads, 2026-09-18) while the hosted MCP index tops out at .78 ("no index published for .82"). E0 must record the actual server/client build; API cards are a lower bound until the index catches up. | recorded 2026-09-19 |
 
 ## 2026-09-23 — L106: owned-asset access after purchase (LOCKED contract)
@@ -871,3 +874,80 @@ permanently legible as derived. That remains the owner's call.
 `25_MACHINE_ARCHITECTURE_PROFILE.md` (Q18/Q19 representation) and `26_DOCUMENT_AUTHORITY.md` (documentation
 authority/lifecycle system plus a one-time classification pass). Both are PROPOSAL status; nothing moved,
 nothing rewritten.
+
+## L125 — LOCKED — documentation authority: preserve history, curate authority
+
+Executed 2026-09-24 on the owner's direction, following `26_DOCUMENT_AUTHORITY.md`. **This was the whole of the
+session's work; no foundation or gameplay code was touched.**
+
+### What the scheme is
+
+Every document under `docs/ncm-online/` carries one banner directly under its H1:
+
+```
+> **STATUS: CURRENT** - authority for: *topic* - affirmed <date> (<L-line>)
+> Authority map: [INDEX.md](INDEX.md) - classified <date> (L125)
+```
+
+Six statuses, each distinguished by **what a coder should do about the document**: **CURRENT** (build from it) ·
+**SPEC** (owner intent, do not implement, do not contradict) · **PROPOSAL** (a coder recommendation, no authority
+until ruled) · **SUPERSEDED** (read for history only; the banner names the successor) · **HISTORICAL** (evidence
+of a moment, never architecture) · **LEDGER** (living, append-only, current by construction).
+
+`SPEC` and `PROPOSAL` are deliberately separate so owner-approved intent and coder recommendations never borrow
+authority from one another.
+
+**`INDEX.md` is the entry point**, and `AGENTS.md` now points there instead of at the orientation brief. Authority
+is **per topic**, not per document. Conflicts are listed, not resolved.
+
+### The principle that makes it survive
+
+> **Headers carry authority. Build state lives in the ledgers.**
+
+Almost every document already had a status line, and almost every one stated *build state* — "built locally, not
+deployed", "migrations 001-007". Build state rots on every deploy; nobody goes back to edit prose. Authority
+changes only when a decision changes, and that is already recorded here. `05_DATA_MODEL.md` sat in the corpus
+claiming **migrations 001-007 while the schema was at 023** — that is the failure this inversion prevents.
+
+### Owner rulings applied
+
+- **Move and repair all links, including the four inside this ledger.** A path repair preserves an entry's
+  meaning exactly; it is not a rewrite of substance. No entry's wording changed.
+- **All 60 files**, not the top-level 33 — a half-classified corpus reintroduces the ambiguity being fixed.
+- **Race Tags:** the repository is correct that it is not integrated or tested, **and it should be integrated
+  eventually**. So `bricks/assignments/B-089-race-tags.v1.md` is **SPEC** (wanted, unbuilt) while the brick
+  methodology itself is **HISTORICAL** (a closed experiment). Recorded as conflict C-4 in `INDEX.md`.
+
+### What the verification found, before anything moved
+
+- **The corpus is 60 markdown files, not 33.** `26` §11 counted only the top level and understated the work.
+- **22 of the 60 had no status line at all**, including `MASTER_TEST.md` and every brick document.
+- **Only 9 real markdown links pointed at archive candidates**; the other ~50 references were prose mentions,
+  which do not break when a file moves. The archiving cost was far lower than the raw reference count suggested.
+- **But `DECISION_RECORD.md` — append-only — held 4 of those 9.** That is the conflict that required the owner's
+  ruling above, and it is exactly why §5 said to verify before moving.
+
+### Result
+
+27 documents moved to `docs/ncm-online/archive/` with `git mv`, history intact, **no stub files left behind** — a
+stub would recreate the equal-discoverability problem it was meant to solve. 61 links rewritten. **Zero dangling
+links inside `docs/ncm-online/`.** Full gate green, now including a new assertion.
+
+### The assertion, because three manual lapses are enough
+
+`tools/check-docs-authority.py`, wired into `tools/ncm-test.ps1`, asserts: exactly one banner per document
+(ignoring fenced code blocks, since `26` legitimately shows example banners); a known status; a named successor
+on every SUPERSEDED; presence in `INDEX.md`; no dangling relative link; and no two CURRENT documents claiming the
+same topic. The `next free ID` line in `NOW.md` went stale three times and caused a duplicate-ID collision — the
+lesson taken is that a manual step repeated by humans and agents needs a machine behind it, not more care.
+
+### Three of my own errors, caught during the pass
+
+1. The banner writer skipped an existing banner when a blank line preceded it, leaving one document with two.
+2. The link repairer double-applied to banners already written for their future location, so every archived
+   document pointed one directory too deep.
+3. The link repairer **mangled verbatim captured evidence** — it rewrote an upstream absolute URL
+   (`/docs/server-resources`) inside an OPEN//77 documentation capture into a relative path. Reverted. A link
+   fixer must treat `/`-absolute targets as external and leave captured third-party material alone.
+
+All three were found by the dangling-link check and a diff review, not by inspection of intent.

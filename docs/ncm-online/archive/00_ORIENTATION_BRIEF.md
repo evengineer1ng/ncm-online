@@ -1,6 +1,9 @@
 # NCM Online — orientation and architecture brief
 
-Date: 2026-09-19. Status: **orientation, pre-interview**. No production change was made. Builds on the 2026-09-18 reconnaissance in [docs/research/open77/](../research/open77/README.md); today's new evidence is in [evidence/2026-09-19/](../research/open77/evidence/2026-09-19/README.md).
+> **STATUS: SUPERSEDED** by INDEX.md + NOW.md - kept for history. **Do not build from it.**
+> Authority map: [INDEX.md](../INDEX.md) - classified 2026-09-24 (L125)
+
+Date: 2026-09-19. Status: **orientation, pre-interview**. No production change was made. Builds on the 2026-09-18 reconnaissance in [docs/research/open77/](../../research/open77/README.md); today's new evidence is in [evidence/2026-09-19/](../../research/open77/evidence/2026-09-19/README.md).
 
 Baseline pinned today: OPEN//77 newest published build **2.31.13+op77.78** (unchanged since yesterday; docs index regenerated 2026-09-19, +15 cards/+1 guide at the same build); Freeroam/Race HEAD still **d3f2a7f** (2026-09-09), so yesterday's Race analysis stands unchanged. NCM payload: 7 Lua files changed since yesterday's hash inventory (Spec Field / liveries work, checkpoint-06), `modules/liveries.lua` is new.
 

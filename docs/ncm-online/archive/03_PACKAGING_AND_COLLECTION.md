@@ -1,5 +1,8 @@
 # NCM packaging: Nexus Collection × NCM Online
 
+> **STATUS: SUPERSEDED** by 12_CANONICAL_VEHICLE_ROSTER.md + 13_VEHICLE_COLLECTION.md - kept for history. **Do not build from it.**
+> Authority map: [INDEX.md](../INDEX.md) - classified 2026-09-24 (L125)
+
 Date: 2026-09-19. Status: **provisional (P16), pending owner review**. Inputs: owner's NCM Collection candidate matrix and Vehicle Floodgates research logs 02–06 (owner's document, 2026-09); OPEN//77 `mods` and `server-mods` guides (evidence/2026-09-19).
 
 ## Platform facts this rests on

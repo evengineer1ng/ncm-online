@@ -1,5 +1,8 @@
 # Machine Index — knowledge foundation
 
+> **STATUS: CURRENT** - authority for: *player-scoped machine knowledge* - affirmed 2026-09-24
+> Authority map: [INDEX.md](INDEX.md) - classified 2026-09-24 (L125)
+
 **Status:** foundation implemented locally; migration 016 and live behavior are not deployed or validated.  
 **Working display name:** Machine Index. This name is not a persistence identifier and may change.
 

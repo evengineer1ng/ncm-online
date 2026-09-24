@@ -1,5 +1,8 @@
 # WP M7-lite.0 — Staging server on AWS Lightsail
 
+> **STATUS: HISTORICAL** - completed work package. A record of a moment, never architecture.
+> Authority map: [INDEX.md](../../INDEX.md) - classified 2026-09-24 (L125)
+
 Milestone: M7-lite (first package). Status: **planned 2026-09-20**. Depends on: nothing in code; M4-lite complete. Decisions: Q16 (server on this machine for development), TW1 doc §G3 (residential uplink is unmeasured), L43 (TW1 needs a public server), Q24 (secured/inert first).
 
 ## Why now

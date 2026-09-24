@@ -1,5 +1,8 @@
 # E27 — Vehicle Collection authoritative encounter
 
+> **STATUS: HISTORICAL** - experiment record. A record of a moment, never architecture.
+> Authority map: [INDEX.md](../../INDEX.md) - classified 2026-09-24 (L125)
+
 Date: 2026-09-22  
 Status: **NOT RUN — implementation ready for the next clean deploy**  
 Build target: current staging OPEN//77 op77.87

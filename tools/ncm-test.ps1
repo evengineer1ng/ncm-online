@@ -112,5 +112,26 @@ if ($node -and (Test-Path $resRoot)) {
 } else {
     Write-Host '=== node not found: inline JavaScript gate skipped'
 }
+# Documentation authority (L125). Not a style check: it asserts that a reader can always tell WHICH
+# documents claim to be current, and that navigation to them works. Without this the scheme decays in a
+# few sessions -- which is exactly how superseded TW2 material came to sit beside current architecture.
+$docsCheck = Join-Path $here 'check-docs-authority.py'
+$docsRoot = Join-Path $here (Join-Path '..' 'docs/ncm-online')
+if ((Test-Path $docsCheck) -and (Test-Path $docsRoot)) {
+    $py = Find-Exe @('python', 'python3') @()
+    if ($py) {
+        $dc = & $py $docsCheck $docsRoot 2>&1
+        if ($LASTEXITCODE -ne 0) {
+            $overall = 1
+            Write-Host '=== docs authority FAILED'
+            $dc | Select-Object -First 15 | ForEach-Object { Write-Host ("  {0}" -f $_) }
+        } else {
+            Write-Host ("=== {0}" -f ($dc | Select-Object -Last 1))
+        }
+    } else {
+        Write-Host '=== python not found: docs authority gate skipped'
+    }
+}
+
 if ($overall -eq 0) { Write-Host 'ncm-test: ALL GREEN under every interpreter' } else { Write-Host 'ncm-test: FAILED' }
 exit $overall

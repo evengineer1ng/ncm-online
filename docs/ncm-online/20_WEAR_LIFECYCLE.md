@@ -1,5 +1,8 @@
 # Wear, tear, component lifecycle and odometer-driven mechanical aging
 
+> **STATUS: SPEC** - owner intent, captured and **NOT authorised for implementation**. Do not build from it; do not contradict it. Covers: *wear, condition and component lifecycle*
+> Authority map: [INDEX.md](INDEX.md) - classified 2026-09-24 (L125)
+
 **Status: SPECIFICATION CAPTURED 2026-09-23. Nothing built, nothing authorised.** Spec 3 of the owner's
 batch, and the one that explains why the parts architecture exists at all.
 

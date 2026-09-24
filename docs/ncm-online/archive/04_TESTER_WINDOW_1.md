@@ -1,6 +1,9 @@
 # Tester Window 1 — the inaugural NCX vertical slice
 
-Date: 2026-09-20. Status: **superseded in scope on 2026-09-21 (L59–L63): the destination described here is now Tester Window 2, the first showcase event; Tester Window 1 is a controlled multiplayer QA + capture session with 3–5 testers, planned in [wp/BATCH-2.md](wp/BATCH-2.md).** The analysis below stands as the TW2 readiness map. Original status: scheduling analysis, approved direction (L43–L45, P23–P25). Companion to [02_ROADMAP.md](02_ROADMAP.md); decisions in [DECISION_RECORD.md](DECISION_RECORD.md). This document gives Tester Window 1 (TW1) a destination; it does not move current work.
+> **STATUS: SUPERSEDED** by 14_TEAM_ORGANIZATIONS.md - the granted-equipment model is abolished - kept for history. **Do not build from it.**
+> Authority map: [INDEX.md](../INDEX.md) - classified 2026-09-24 (L125)
+
+Date: 2026-09-20. Status: **superseded in scope on 2026-09-21 (L59–L63): the destination described here is now Tester Window 2, the first showcase event; Tester Window 1 is a controlled multiplayer QA + capture session with 3–5 testers, planned in [wp/BATCH-2.md](wp/BATCH-2.md).** The analysis below stands as the TW2 readiness map. Original status: scheduling analysis, approved direction (L43–L45, P23–P25). Companion to [02_ROADMAP.md](../02_ROADMAP.md); decisions in [DECISION_RECORD.md](../DECISION_RECORD.md). This document gives Tester Window 1 (TW1) a destination; it does not move current work.
 
 **Readiness criterion (replaces "after M4"):** the chain
 `CONNECT → OFFER → ACCEPT → PICKUP → ARRIVAL → GRID REVEAL → ASSIGNED CAR → STAGING/LIGHTS → RACE → RESULT`

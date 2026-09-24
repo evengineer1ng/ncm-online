@@ -1,5 +1,8 @@
 # NCM Chrome — automotive quickhack roster, design pass v0
 
+> **STATUS: SPEC** - owner intent, captured and **NOT authorised for implementation**. Do not build from it; do not contradict it. Covers: *vehicle cyberware / quickhack roster*
+> Authority map: [INDEX.md](INDEX.md) - classified 2026-09-24 (L125)
+
 Date: 2026-09-21. Status: **design capture, NOT implementation.** Owner-authored; agent-verified against
 [CAPABILITY_PALETTE.md](../research/open77/CAPABILITY_PALETTE.md) and the evidence captured the same day.
 Catalogued as IDEA-076 (parent), IDEA-077 (vertical slice), IDEA-078 (notoriety badge). Cross-refs IDEA-064–075.

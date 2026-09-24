@@ -1,5 +1,8 @@
 # 25 — Machine architecture profile: the proposed representation
 
+> **STATUS: PROPOSAL** - a recommendation with **no authority until ruled on**. Covers: *machine architecture profile - awaiting Q18/Q19; section 10 undecided*
+> Authority map: [INDEX.md](INDEX.md) - classified 2026-09-24 (L125)
+
 **Status: PROPOSAL. Nothing implemented, nothing authorised.** Answers **Q18/Q19**, which the owner held back
 pending a concrete representation. Builds on `18_PARTS_ECOSYSTEM.md` ("compatibility is derived, not listed")
 rather than inventing a parallel scheme.

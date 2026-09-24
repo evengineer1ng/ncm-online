@@ -1,5 +1,8 @@
 # COMPONENT ASSIGNMENT — B-089-race-tags v1
 
+> **STATUS: SPEC** - owner intent, captured and **NOT authorised for implementation**. Do not build from it; do not contradict it. Covers: *Race Tags - owner wants it integrated eventually; NOT yet integrated (IDEA-301)*
+> Authority map: [INDEX.md](../../INDEX.md) - classified 2026-09-24 (L125)
+
 *Written by the integrator 2026-09-22. This packet plus `COMPONENT_GATE.md` plus the attached files is everything
 the author gets. Attach: `ncm/core/init.lua`, `ncm/core/tests/run.lua`, `ncm/core/vocabulary/ids.lua` (as
 `provided/vocabulary/ids.lua`), `COMPONENT_GATE.md`, `COMPONENT_MANIFEST_TEMPLATE.md`, and this file.*

@@ -1,5 +1,8 @@
 # Offline test queue — run solo, log as you go
 
+> **STATUS: LEDGER** - living and append-only, current by construction. Covers: *offline test queue* (L69)
+> Authority map: [INDEX.md](../INDEX.md) - classified 2026-09-24 (L125)
+
 ## Starter Market foundation — completed 2026-09-23
 
 - **PASS:** `test_markets.lua` covers stable Base identity, the exact finite allocation, no unknown-market
@@ -1616,7 +1619,7 @@ provenance until W1–W8 pass. Use the temporary `ncm_weather_probe`; every evid
 | W7 | Return A to bucket 0, clear bucket 7701, and capture. | Both report default; `getState(7701)` returns the documented unknown-bucket result. |
 | W8 | Review every canonical/client tuple and check for stale revision, wrong epoch/scope, divergent preset, or unexplained transition reset. | No discrepancy. Mark KB-6 fixed only with this complete PASS. |
 
-**Executed 2026-09-22: W1–W8 PASS on OPEN//77 op77.87.** Durable evidence: [E26](../experiments/E26_2026-09-22_weather-sync.md).
+**Executed 2026-09-22: W1–W8 PASS on OPEN//77 op77.87.** Durable evidence: [E26](../archive/experiments/E26_2026-09-22_weather-sync.md).
 
 ---
 
