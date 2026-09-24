@@ -225,6 +225,18 @@ local function showWheel()
     page:send("panel:wheel", state or { enabled = false, connected = false })
 end
 
+--- Redraw the WHEEL tab whenever the bridge's state actually changes.
+---
+--- **The tab cannot be a one-shot read.** Creating the surface, loading the companion's page and waiting for
+--- its socket all take longer than the button press that started them, so a snapshot taken at click time says
+--- *"companion not detected"* and then stays wrong while a healthy companion sits connected behind it. That
+--- is what happened on the first live run. The bridge now announces; this listens.
+AddEventHandler("ncm:ffb.state", function()
+    if not (page and pageReady) or open ~= "wheel" then return end
+    local state = (type(NcmClientFfbState) == "function") and NcmClientFfbState() or nil
+    page:send("panel:wheel", state or { enabled = false, connected = false })
+end)
+
 local function hide()
     if page and pageReady then page:send("panel:hide", {}) end
     setOpen(nil)

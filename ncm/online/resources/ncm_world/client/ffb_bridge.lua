@@ -36,6 +36,19 @@ local device = nil
 
 --- Read by the NCM panel (`client/panel.lua`) to draw the WHEEL tab. A plain snapshot, so the panel never
 --- reaches into this file's state or has to know a companion exists.
+--- **The panel is a one-shot reader, so it has to be told when to read again.**
+---
+--- Bringing the surface up, loading the page and waiting for the companion's socket all take longer than a
+--- button press. Without this the WHEEL tab renders the state at the instant of the click -- *"companion not
+--- detected"* -- and stays wrong forever while a perfectly healthy companion is connected behind it. That is
+--- exactly what happened on the first live run (2026-09-24).
+---
+--- A client-local event, not a global callback: `panel.lua` is in the same VM and the same resource, and an
+--- event means the bridge does not have to know whether a panel exists.
+local function announce()
+    pcall(TriggerEvent, "ncm:ffb.state")
+end
+
 NcmClientFfbState = function()
     return {
         enabled = enabled, url = url,
@@ -48,7 +61,8 @@ end
 --- there is no second transport and no second place for the two sides to disagree about state.
 NcmClientFfbCommand = function(kind, payload)
     if kind == "enable" then
-        enabled = payload and true or false
+        enabled = (type(payload) == "table") and (payload.on and true or false) or false
+        announce()
         return true
     end
     if not (surface and surfaceReady) then return false, "not_connected" end
@@ -65,6 +79,7 @@ local function tearDown(why)
         log("bridge closed (%s) after %d frame(s), %d skipped", tostring(why), sent, skipped)
     end
     surface, surfaceReady, device = nil, false, nil
+    announce()
 end
 
 local function bringUp()
@@ -77,16 +92,19 @@ local function bringUp()
         -- Not an error worth shouting about: "the companion is not running" is the ordinary case.
         log("bridge unavailable (%s) — is the companion listening on %s?", tostring(reason), url)
         enabled = false
+        announce()
         return
     end
     surface = page
     page:on("ncm:ffb.ready", function(info)
         surfaceReady = true
+        announce()
         log("companion connected: %s", type(info) == "table" and tostring(info.detail or "ok") or "ok")
     end)
     page:on("ncm:ffb.closed", function(info)
         surfaceReady = false
         device = nil
+        announce()
         log("companion dropped: %s", type(info) == "table" and tostring(info.detail or "?") or "?")
     end)
     -- The companion is the only thing that can see the hardware, so it is the only thing that may describe
@@ -101,6 +119,7 @@ local function bringUp()
             armed = d.armed and true or false,
             haptics = type(d.haptics) == "table" and d.haptics or nil,
         }
+        announce()
         log("device: %s | class=%s | rung=%s | armed=%s",
             device.name, device.class, tostring(device.rung), tostring(device.armed))
     end)
