@@ -416,8 +416,19 @@ end
 --- `recorded` is only ever claimed when the machine was observed under the driver at green. Everything else
 --- is `unknown`, deliberately: a result with no machine is a gap in the record, and a gap must never be
 --- dressed up as a fact. The core validator refuses the combinations that would be lies.
+--- The machine this driver is racing. Once a session has gone green the LATCH is authoritative, including
+--- when it holds nil -- "they started in no asset" is an answer, not a missing value. Sessions that never go
+--- green (practice, time trial) have no latch, so the machine they are sitting in now is the machine they set
+--- the lap in.
+local function machineFor(rec, driverId)
+    if not driverId then return nil end
+    if rec and rec.machineOf then return rec.machineOf[driverId] end
+    local pid = rec and rec.playerOf and rec.playerOf[driverId]
+    return pid and seatedByPid[pid] or nil
+end
+
 local function attribution(rec, driverId)
-    local assetId = rec.machineOf and rec.machineOf[driverId] or nil
+    local assetId = machineFor(rec, driverId)
     local source = assetId and "owned_asset" or "unknown"
     local basis = assetId and "recorded" or "unknown"
     local ok, why = NcmCore.get("vocabulary.provenance").validateAttribution({
@@ -595,8 +606,11 @@ local function handle(rec, events, t)
             tell(pid, ("Incident x%d (%s): +%.1f s on your time. Total +%.1f s."):format(mult, tostring(e.kind), e.seconds or 0, e.incidentSec or 0))
             toast(pid, { type = "error", title = ("INCIDENT x%d · +%.1f s"):format(mult, e.seconds or 0), message = ("%s contact · total +%.1f s"):format(tostring(e.kind), e.incidentSec or 0), icon = "NCM", durationMs = 5000 })
             pcall(function()
-                MySQL.insert.await("INSERT INTO incident (session_id, ncm_driver_id, other_driver_id, kind, band, delta_v, seconds, x, y, z, t, attributed) VALUES (?, ?, NULLIF(?, ''), ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                    { s.sessionId, e.driverId, e.other or "", (e.kind == "formation_speed") and "formation" or (e.kind or "car"), e.band or 1, e.dv or 0, e.seconds or 0, e.x or 0, e.y or 0, e.z or 0, t, e.other and "both" or "self" })
+                -- IDEA-236: a machine's biography needs what it was INVOLVED in, not only what it finished.
+                -- Both sides are attributed where known: contact is a fact about two machines.
+                MySQL.insert.await("INSERT INTO incident (session_id, ncm_driver_id, other_driver_id, kind, band, delta_v, seconds, x, y, z, t, attributed, asset_id, other_asset_id) VALUES (?, ?, NULLIF(?, ''), ?, ?, ?, ?, ?, ?, ?, ?, ?, NULLIF(?, ''), NULLIF(?, ''))",
+                    { s.sessionId, e.driverId, e.other or "", (e.kind == "formation_speed") and "formation" or (e.kind or "car"), e.band or 1, e.dv or 0, e.seconds or 0, e.x or 0, e.y or 0, e.z or 0, t, e.other and "both" or "self",
+                      machineFor(rec, e.driverId) or "", machineFor(rec, e.other) or "" })
             end)
         elseif e.type == "dsq" then
             log("session=%s DSQ driver=%s reason=%s", s.sessionId, e.driverId, tostring(e.reason))
@@ -1054,8 +1068,9 @@ function NcmRace.reportGate(rec, pid, driver, gateIndex, pos, t, source)
         toast(pid, { type = "error", title = ("FORMATION · +%.1f s"):format(res.formationSec or 0), message = tostring(res.formationFault):gsub("_", " "), icon = "NCM", durationMs = 5000 })
         local p = positionOf(pid)
         pcall(function()
-            MySQL.insert.await("INSERT INTO incident (session_id, ncm_driver_id, other_driver_id, kind, band, delta_v, seconds, x, y, z, t, attributed) VALUES (?, ?, NULL, 'formation', ?, 0, ?, ?, ?, ?, ?, 'self')",
-                { rec.s.sessionId, driver.ncmDriverId, rec.s.rules.formationBand or 1, res.formationSec or 0, p and p.x or 0, p and p.y or 0, p and p.z or 0, t })
+            MySQL.insert.await("INSERT INTO incident (session_id, ncm_driver_id, other_driver_id, kind, band, delta_v, seconds, x, y, z, t, attributed, asset_id) VALUES (?, ?, NULL, 'formation', ?, 0, ?, ?, ?, ?, ?, 'self', NULLIF(?, ''))",
+                { rec.s.sessionId, driver.ncmDriverId, rec.s.rules.formationBand or 1, res.formationSec or 0, p and p.x or 0, p and p.y or 0, p and p.z or 0, t,
+                  machineFor(rec, driver.ncmDriverId) or "" })
         end)
     elseif g.kind == "green" then
         toast(pid, { type = "info", title = "GREEN", message = "you're through the green — race on", icon = "NCM", durationMs = 2500 })
@@ -1185,9 +1200,10 @@ function NcmRace.practiceComplete(rec, results, reason, t)
         for _, r in ipairs(results) do
             if r.bestSec then
                 MySQL.insert.await(
-                    "INSERT INTO session_result (session_id, ncm_driver_id, entry_id, position, state, total_ms, penalty_ms, gates_done, gates_total, incident_ms, incident_count, best_ms) VALUES (?, ?, NULL, ?, 'finished', ?, 0, ?, ?, ?, ?, ?)",
+                    "INSERT INTO session_result (session_id, ncm_driver_id, entry_id, position, state, total_ms, penalty_ms, gates_done, gates_total, incident_ms, incident_count, best_ms, asset_id, machine_source, attribution_basis) VALUES (?, ?, NULL, ?, 'finished', ?, 0, ?, ?, ?, ?, ?, NULLIF(?, ''), ?, ?)",
                     { rec.s.sessionId, r.driverId, r.position, math.floor(r.bestSec * 1000), r.gatesTotal or 2, r.gatesTotal or 2,
-                      math.floor((r.incidentSec or 0) * 1000), r.incidentCount or 0, math.floor(r.bestSec * 1000) })
+                      math.floor((r.incidentSec or 0) * 1000), r.incidentCount or 0, math.floor(r.bestSec * 1000),
+                      attribution(rec, r.driverId) })
             end
         end
     end)
