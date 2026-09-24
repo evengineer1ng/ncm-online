@@ -131,7 +131,25 @@ end
 --- second place for field names to drift out of agreement with the runtime.
 ---
 --- **This is also the scoping.** There is no path in this file to any vehicle but the one under the driver.
+--- **Are we actually in a car?** Asked of the platform, not inferred from a seat handle.
+---
+--- `getPlayerSeat` proved sticky: a session that spent time on foot still produced 986 vehicle frames and
+--- ZERO idle frames, so the rig kept steering while the driver was walking. `Open77.character.state()`
+--- carries an `inVehicle` flag and is what `client/vehicle_access.lua` already trusts for the same question.
+---
+--- **Absent is not a negative** -- the same rule vehicle_access learned the hard way. If the platform does
+--- not report the field, fall back to the seat read rather than declaring the driver on foot and killing
+--- their steering mid-corner.
+local function seated()
+    local ok, st = pcall(Open77.character.state)
+    if ok and type(st) == "table" and type(st.inVehicle) == "boolean" then return st.inVehicle end
+    local ok2, seat = pcall(Open77.vehicles.getPlayerSeat)
+    if ok2 and type(seat) == "table" then return true end
+    return false
+end
+
 local function ownSnapshot()
+    if not seated() then return nil end
     if type(NcmClientOwnVehicle) ~= "function" then return nil end
     local ok, v = pcall(NcmClientOwnVehicle)
     if not ok or type(v) ~= "table" then return nil end
