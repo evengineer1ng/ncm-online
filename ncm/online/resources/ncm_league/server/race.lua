@@ -36,7 +36,22 @@ end
 local now = function() return Open77.time.unix() end
 local hostRng = function() return math.random() end
 
-local sessions = {}      -- sessionId -> rec { s, kernel, kind, spec, plan, eventId, playerOf, slots, lastPos, toNext, progressM, doneAt, ... }
+-- IDEA-236/IDEA-303: which machine each connected player is sitting in, announced by `ncm_world` because
+-- the two resources are separate Lua VMs and this cannot be read across. Kept here so settlement can resolve
+-- it synchronously; latched per session at GREEN, never read live at settlement (a driver who steps out of
+-- the car after finishing would otherwise settle as nil).
+local seatedByPid = {}   -- playerId -> assetId | nil
+AddEventHandler("ncm:machine.seated", function(pid, assetId)
+    pid = tonumber(pid)
+    if not pid or pid <= 0 then return end
+    seatedByPid[pid] = (type(assetId) == "string" and #assetId == 36) and assetId or nil
+end)
+AddEventHandler("onPlayerDisconnected", function()
+    local pid = tonumber(source)
+    if pid then seatedByPid[pid] = nil end
+end)
+
+local sessions = {}      -- sessionId -> rec { s, kernel, kind, spec, plan, eventId, playerOf, slots, lastPos, toNext, progressM, doneAt, machineOf, ... }
 local plans = {}         -- eventId -> { formatId, specs, i, sessionIds = {}, results = {}, done, e }
 local byEvent = {}       -- eventId -> live sessionId | "done"
 local practices = {}     -- eventId -> rec (on-demand practice, P48; also in `sessions` so gate reports find it)
@@ -395,6 +410,26 @@ local function releaseGridCars(plan, reason)
 end
 
 -- ---------------------------------------------------------------------------------------------
+--- The machine this driver raced, and HOW WELL WE KNOW IT (L124 A4). Returns three values ready for the
+--- insert: assetId (or "" for the NULLIF), machineSource, attributionBasis.
+---
+--- `recorded` is only ever claimed when the machine was observed under the driver at green. Everything else
+--- is `unknown`, deliberately: a result with no machine is a gap in the record, and a gap must never be
+--- dressed up as a fact. The core validator refuses the combinations that would be lies.
+local function attribution(rec, driverId)
+    local assetId = rec.machineOf and rec.machineOf[driverId] or nil
+    local source = assetId and "owned_asset" or "unknown"
+    local basis = assetId and "recorded" or "unknown"
+    local ok, why = NcmCore.get("vocabulary.provenance").validateAttribution({
+        assetId = assetId, machineSource = source, basis = basis })
+    if not ok then
+        -- Never write an attribution core refuses; record the gap and say why.
+        log("attribution refused driver=%s: %s", tostring(driverId), tostring(why))
+        return "", "unknown", "unknown"
+    end
+    return assetId or "", source, basis
+end
+
 -- Completion: persist, settle (zero eddies), announce
 -- ---------------------------------------------------------------------------------------------
 local function complete(rec, results, reason, t)
@@ -412,13 +447,14 @@ local function complete(rec, results, reason, t)
             if state == "timed" then state = "finished" elseif state == "no_time" then state = "dns" end
             MySQL.insert.await(
                 "INSERT INTO session_result (session_id, ncm_driver_id, entry_id, position, state, total_ms, penalty_ms, gap_ms, gates_done, gates_total, jump_start, dnf_reason, " ..
-                "corrected_ms, incident_ms, incident_count, best_ms) " ..
-                "VALUES (?, ?, NULLIF(?, ''), ?, ?, NULLIF(?, -1), ?, NULLIF(?, -1), ?, ?, ?, NULLIF(?, ''), NULLIF(?, -1), ?, ?, NULLIF(?, -1))",
+                "corrected_ms, incident_ms, incident_count, best_ms, asset_id, machine_source, attribution_basis) " ..
+                "VALUES (?, ?, NULLIF(?, ''), ?, ?, NULLIF(?, -1), ?, NULLIF(?, -1), ?, ?, ?, NULLIF(?, ''), NULLIF(?, -1), ?, ?, NULLIF(?, -1), NULLIF(?, ''), ?, ?)",
                 { s.sessionId, r.driverId, r.entryId or "", r.position, state,
                   r.totalSec and math.floor(r.totalSec * 1000) or -1, math.floor((r.penaltySec or 0) * 1000),
                   r.gapSec and math.floor(r.gapSec * 1000) or -1, r.progress or 0, r.gatesTotal or 2, r.jumpStart and 1 or 0, r.dnfReason or "",
                   r.correctedSec and math.floor(r.correctedSec * 1000) or -1, math.floor((r.incidentSec or 0) * 1000), r.incidentCount or 0,
-                  r.bestSec and math.floor(r.bestSec * 1000) or -1 })
+                  r.bestSec and math.floor(r.bestSec * 1000) or -1,
+                  attribution(rec, r.driverId) })
             if r.entryId and rec.kind == "race" then
                 MySQL.update.await("UPDATE entry SET state = ? WHERE entry_id = ?", { r.state, r.entryId })
             end
@@ -527,6 +563,16 @@ local function handle(rec, events, t)
             -- The client renders the light tree from the synced clock (race HUD page); nothing to send.
         elseif e.type == "green" then
             log("session=%s GREEN at %.3f", s.sessionId, e.at)
+            -- Latch the machine each driver actually went racing in. At GREEN rather than at settlement,
+            -- because the car is guaranteed to be under them here and may not be afterwards.
+            rec.machineOf = {}
+            local named, anon = 0, 0
+            for driverId, pid in pairs(rec.playerOf or {}) do
+                local assetId = seatedByPid[pid]
+                rec.machineOf[driverId] = assetId
+                if assetId then named = named + 1 else anon = anon + 1 end
+            end
+            log("session=%s machines at green: %d attributed, %d unknown", s.sessionId, named, anon)
         elseif e.type == "dns" then
             log("session=%s DNS driver=%s reason=%s", s.sessionId, e.driverId, tostring(e.reason))
             tell(rec.playerOf[e.driverId], "You did not start: " .. tostring(e.reason) .. ".")

@@ -184,6 +184,14 @@ local function publish(pid, assetId)
         -- Same machine: refresh the number only, at most once a second.
         if not assetId then return end
     end
+    -- IDEA-236/IDEA-303: the LEAGUE needs to know which machine a driver is sitting in, and cannot see it.
+    -- `ncm_world` and `ncm_league` are separate Lua VMs, so this map is simply invisible over there. Announce
+    -- the change instead -- the inverse of the `ncm:odometer.track` event this module already accepts. Pushed
+    -- rather than answered on request, because the consumer reads it inside settlement, which must stay
+    -- synchronous, deterministic and idempotent (IDEA-164).
+    if shown[pid] ~= assetId then
+        pcall(function() TriggerEvent("ncm:machine.seated", pid, assetId) end)
+    end
     shown[pid] = assetId
     pcall(function()
         if not assetId then Open77.state.player(pid):clear("ncmOdo"); return end

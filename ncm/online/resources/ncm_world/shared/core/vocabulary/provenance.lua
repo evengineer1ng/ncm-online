@@ -48,6 +48,38 @@ Core.define("vocabulary.provenance", function(C)
         "finished", "dnf", "dsq", "withdrawn",
     })
 
+    -- ---------------------------------------------------------------------------------------------
+    -- Machine attribution (IDEA-236, L124 A4)
+    -- ---------------------------------------------------------------------------------------------
+    --
+    -- What KIND of machine produced a result. `unrecorded_legacy` is not an apology -- it is a positive
+    -- statement that the system of the time did not record this, which is different from "no machine was
+    -- involved" and must stay distinguishable from it forever.
+    M.MachineSource = enum("machineSource", {
+        "owned_asset", "team_equipment", "unrecorded_legacy", "unknown",
+    })
+
+    -- How well we know it. The owner's ruling (A4): a derived attribution must remain permanently
+    -- distinguishable from a recorded fact, and must carry the rule that produced it.
+    M.AttributionBasis = enum("attributionBasis", { "recorded", "derived", "unknown" })
+
+    --- Validate an attribution: { assetId?, machineSource?, basis?, rule? }.
+    --- Returns true, or false + reason. The invariants, in order of how badly each would mislead:
+    ---   * `recorded` without an assetId is a lie -- it claims we wrote something down that we did not
+    ---   * `derived` without a rule is unfalsifiable -- nobody can later judge or supersede the reasoning
+    ---   * `unknown` with an assetId is incoherent -- we either know which machine or we do not
+    function M.validateAttribution(a)
+        if type(a) ~= "table" then return false, "attribution_not_table" end
+        local id, basis = a.assetId, a.basis
+        if id ~= nil and type(id) ~= "string" then return false, "asset_id_not_string" end
+        if basis ~= nil and not M.AttributionBasis.is(basis) then return false, "invalid_basis" end
+        if a.machineSource ~= nil and not M.MachineSource.is(a.machineSource) then return false, "invalid_machine_source" end
+        if basis == "recorded" and not id then return false, "recorded_without_asset" end
+        if basis == "derived" and not (type(a.rule) == "string" and #a.rule > 0) then return false, "derived_without_rule" end
+        if basis == "unknown" and id then return false, "unknown_with_asset" end
+        return true
+    end
+
     --- Validate a result context: { origin, serverId?, sessionKind, sanctioned, category? }.
     --- Returns true, or false + reason. Online contexts must name a server; SP contexts must not.
     function M.validateContext(ctx)

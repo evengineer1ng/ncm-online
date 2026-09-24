@@ -39,6 +39,34 @@ return {
         _, why = P.validateContext({ origin = "sp", sessionKind = "race", sanctioned = true, category = "Bad Cat" }); T.eq(why, "invalid_category")
     end,
 
+    machine_attribution = function(T)
+        local P = T.Core.get("vocabulary.provenance")
+        local id = "10000000-0000-4000-8000-000000000001"
+
+        T.eq(P.AttributionBasis.is("recorded"), true)
+        T.eq(P.AttributionBasis.is("guessed"), false, "the vocabulary is closed")
+        T.eq(P.MachineSource.is("unrecorded_legacy"), true)
+
+        -- A recorded attribution claims we wrote it down at the time. Without an asset that is a lie.
+        local ok, why = P.validateAttribution({ basis = "recorded" })
+        T.eq(ok, false); T.eq(why, "recorded_without_asset")
+        T.eq(P.validateAttribution({ basis = "recorded", assetId = id, machineSource = "owned_asset" }), true)
+
+        -- A derived attribution must name the rule that produced it, so a later standard of evidence can
+        -- supersede it without rewriting what this one concluded (L124 A4).
+        ok, why = P.validateAttribution({ basis = "derived", assetId = id })
+        T.eq(ok, false); T.eq(why, "derived_without_rule")
+        T.eq(P.validateAttribution({ basis = "derived", assetId = id, rule = "exclusive_ownership_v1" }), true)
+
+        -- Unknown means unknown. Carrying an assetId alongside it is incoherent.
+        ok, why = P.validateAttribution({ basis = "unknown", assetId = id })
+        T.eq(ok, false); T.eq(why, "unknown_with_asset")
+        T.eq(P.validateAttribution({ basis = "unknown", machineSource = "unrecorded_legacy" }), true)
+
+        ok, why = P.validateAttribution({ basis = "recorded", assetId = id, machineSource = "borrowed" })
+        T.eq(ok, false); T.eq(why, "invalid_machine_source")
+    end,
+
     registry_behaviour = function(T)
         local Core = T.Core
         T.ok(Core.has("vocabulary.ids") and Core.has("vocabulary.provenance"))
