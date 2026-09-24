@@ -35,8 +35,10 @@ from __future__ import annotations
 
 import argparse
 import base64
+import io
 import hashlib
 import json
+import os
 import socket
 import struct
 import sys
@@ -258,87 +260,131 @@ def _read_frame(conn: socket.socket):
 # So pedals are a SEPARATE device from the wheel, and a pedal at rest reads minimum rather than centre.
 
 # --------------------------------------------------------------------------------------------------
-# The rig, as mapped in the owner's JoyMoCo profile ("cyberpunk full rig.json").
+# Input: a rig, a gamepad, or both -> one virtual Xbox 360 pad.
 # --------------------------------------------------------------------------------------------------
 #
-# **Taken from a working profile rather than discovered by pressing things.** The owner's wheel is custom and
-# undocumented -- an `Evenracing 1.0.0` rim on a G29 base -- and its buttons are in no conventional order.
-# Guessing would have produced a wheel that steers and cannot exit a car, which is worse than no wheel.
+# **Nothing about anyone's hardware is hardcoded here.** This is going on a public server, so a rig that
+# nobody here has ever seen has to work. Roles are decided by SHAPE, and a profile file only supplies what
+# shape cannot tell you -- which button on an unlabelled rim is `a`.
 #
-# Three devices, each doing one job:
-#   "Logitech G HUB G29 ... USB"  steering (axis 0) and force feedback
-#   "Sim Pedals"                  axis 0 throttle, axis 2 BRAKE, axis 1 clutch  <- brake is 2, not 1
-#   "Evenracing 1.0.0"            buttons only; its axes are dead and must be ignored
+#   steering  an axis that rests near centre and travels both ways
+#   pedals    axes that rest at one END of travel
+#   rim       many buttons and no usable axes
+#   gamepad   anything SDL's own GameController database recognises
 #
-# The profile's own `ignored` block earns its keep: *"Idle diagnostic: axes sat at -32768 and buttons 14/16
-# fired intermittently"*. Those two buttons would otherwise fire on their own, at random, forever.
-WHEEL_HINTS = ("g29", "g920", "g923", "g27", "racing wheel", "wheel", "base", "moza", "simucube", "simagic",
-               "fanatec", "thrustmaster")
-PEDAL_HINTS = ("pedal", "pedals")
-RIM_HINTS = ("evenracing", "button device")
+# That last one matters most: a standard Xbox pad needs **no profile and no mapping**, because SDL already
+# knows it. The owner's custom rim needs a profile because no database will ever contain it.
+#
+# **The gamepad is never displaced by the rig.** Both feed the same virtual pad and the larger deflection
+# wins, so a driver can hold a controller in their hands and keep the wheel in front of them. On foot the rig
+# is suppressed entirely -- a wheel should not be nudging the walk axis while you are walking.
 
-# Sim Pedals. `released` is the resting end of travel, learned at startup and only defaulted from here.
-PEDAL_THROTTLE_AXIS = 0
-PEDAL_BRAKE_AXIS = 2
-PEDAL_CLUTCH_AXIS = 1
+PROFILE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "wheel-profiles")
 
-# Evenracing rim -> Xbox. Copied verbatim from the profile; the disorder is the hardware's, not a mistake.
-RIM_BUTTONS = {
-    0: "x", 1: "y", 2: "b", 3: "dpad_down", 4: "dpad_left", 5: "dpad_up", 6: "dpad_right",
-    7: "back", 8: "start", 9: "ls", 10: "rs", 11: "lb", 12: "rb", 20: "home", 24: "a", 27: "x",
-}
-RIM_IGNORED_BUTTONS = {14, 16}
+BUTTON_NAMES = ("a", "b", "x", "y", "lb", "rb", "back", "start", "home", "ls", "rs",
+                "dpad_up", "dpad_down", "dpad_left", "dpad_right")
 
-STEER_DEADZONE = 0.015
-STEER_CURVE = 1.3          # gentle expo around centre, straight from the profile
+
+def load_profiles(path=None):
+    """Every profile we can find, plus the defaults block. Missing or broken files are not fatal: a rig
+    still steers without a profile, and refusing to start over a JSON typo would be a poor trade."""
+    path = path or os.path.join(PROFILE_DIR, "default.json")
+    try:
+        with io.open(path, encoding="utf-8") as fh:
+            data = json.load(fh)
+        return data.get("defaults", {}), data.get("profiles", [])
+    except Exception as exc:                                    # noqa: BLE001 - diagnostic path
+        print("[in ] no rig profiles loaded (%s); detection only" % exc, flush=True)
+        return {}, []
+
+
+def match_profile(name, profiles, role=None):
+    low = (name or "").lower()
+    best = None
+    for p in profiles:
+        if role and p.get("role") != role:
+            continue
+        for token in p.get("match", []):
+            if token.lower() in low:
+                # Longest match wins, so "fanatec dd" beats "fanatec".
+                if best is None or len(token) > best[0]:
+                    best = (len(token), p)
+    return best[1] if best else None
+
+
+class Device:
+    """One physical thing, with the role we decided it plays."""
+
+    def __init__(self, index, name, handle, role, profile=None):
+        self.index, self.name, self.handle = index, name, handle
+        self.role, self.profile = role, profile or {}
+        self.rest = {}
 
 
 class Input:
-    """Reads the rig and drives a virtual Xbox 360 pad.
+    """Reads whatever is attached and drives a virtual Xbox 360 pad.
 
-    **Steering range is the headline setting.** A 900-degree wheel mapped one-to-one onto a thumbstick gives
-    a car that barely turns -- full deflection would need half a turn. Only the middle is used: 45 degrees
-    per side maps to full deflection, everything past it clamps. Both numbers come from the owner's profile
-    (`wheel_range_degrees: 900`, `max_angle_degrees: 45`).
-
-    **Buttons matter as much as steering.** A wheel that steers but cannot press A, B or start leaves a
-    driver unable to get out of the car without reaching for a pad.
+    **Steering range is the setting people will actually argue about.** A 900-degree wheel mapped one-to-one
+    onto a thumbstick gives a car that barely turns -- full deflection would need half a turn. Only the middle
+    is used: `steer_degrees` per side maps to full deflection, the rest clamps. 45 is one driver's comfort,
+    not a fact, so it is adjustable live from the NCM panel.
     """
 
-    def __init__(self, steer_degrees=45.0, wheel_range=900.0,
-                 throttle_axis=PEDAL_THROTTLE_AXIS, brake_axis=PEDAL_BRAKE_AXIS,
-                 clutch_axis=PEDAL_CLUTCH_AXIS, deadzone=STEER_DEADZONE):
-        self.steer_degrees = max(5.0, steer_degrees)
-        self.wheel_range = max(90.0, wheel_range)
-        self.throttle_axis, self.brake_axis, self.clutch_axis = throttle_axis, brake_axis, clutch_axis
-        self.deadzone = deadzone
+    def __init__(self, steer_degrees=45.0, wheel_range=900.0, profile_path=None):
+        self.steer_degrees = max(5.0, float(steer_degrees))
+        self.wheel_range = max(90.0, float(wheel_range))
+        self.defaults, self.profiles = load_profiles(profile_path)
+        self.steer_deadzone = float(self.defaults.get("steer_deadzone", 0.015))
+        self.steer_curve = float(self.defaults.get("steer_curve", 1.3))
+        self.pad_deadzone = float(self.defaults.get("gamepad_deadzone", 0.08))
         self.sdl = None
         self.vg = None
         self.pad = None
-        self.wheel = self.pedals = self.rim = None
-        self.wheel_name = self.pedal_name = self.rim_name = None
-        self.rest = {}
-        self.btn = {}
+        self.devices = []
+        self.controllers = []
+        self.steering = self.pedals = self.rim = None
+        self.detected_class = "unknown"
         self.running = False
         self.thread = None
         self.last = {}
         self.pressed = set()
+        # **Seat gating.** None means "NCM has not told us anything", and the rig stays live -- the companion
+        # must be useful on its own. Only an explicit `False` from a connected bridge suppresses it.
+        self.seated = None
 
     @property
     def scale(self):
-        """Full stick deflection per unit of raw axis. 900 lock-to-lock at 45 per side gives 10."""
         return (self.wheel_range / 2.0) / self.steer_degrees
 
-    def _button_targets(self):
-        b = self.vg.XUSB_BUTTON
-        return {
-            "a": b.XUSB_GAMEPAD_A, "b": b.XUSB_GAMEPAD_B, "x": b.XUSB_GAMEPAD_X, "y": b.XUSB_GAMEPAD_Y,
-            "lb": b.XUSB_GAMEPAD_LEFT_SHOULDER, "rb": b.XUSB_GAMEPAD_RIGHT_SHOULDER,
-            "back": b.XUSB_GAMEPAD_BACK, "start": b.XUSB_GAMEPAD_START, "home": b.XUSB_GAMEPAD_GUIDE,
-            "ls": b.XUSB_GAMEPAD_LEFT_THUMB, "rs": b.XUSB_GAMEPAD_RIGHT_THUMB,
-            "dpad_up": b.XUSB_GAMEPAD_DPAD_UP, "dpad_down": b.XUSB_GAMEPAD_DPAD_DOWN,
-            "dpad_left": b.XUSB_GAMEPAD_DPAD_LEFT, "dpad_right": b.XUSB_GAMEPAD_DPAD_RIGHT,
-        }
+    def set_steer_degrees(self, degrees):
+        self.steer_degrees = max(5.0, min(540.0, float(degrees)))
+        return self.steer_degrees
+
+    # ---------------------------------------------------------------- detection
+    def _classify(self, sdl2, index, handle, name):
+        """Decide what a device IS from how it behaves, not from what it is called."""
+        profile = match_profile(name, self.profiles)
+        if profile and profile.get("role"):
+            return profile["role"], profile
+
+        n_axes = sdl2.SDL_JoystickNumAxes(handle)
+        n_buttons = sdl2.SDL_JoystickNumButtons(handle)
+        if n_axes == 0 and n_buttons > 0:
+            return "rim", profile
+        # Sample resting positions: a pedal sits at an end of travel, a wheel sits near centre.
+        for _ in range(10):
+            sdl2.SDL_JoystickUpdate()
+            time.sleep(0.01)
+        values = [sdl2.SDL_JoystickGetAxis(handle, a) for a in range(n_axes)]
+        extreme = sum(1 for v in values if abs(v) > 24000)
+        centred = sum(1 for v in values if abs(v) < 4000)
+        if n_axes and extreme >= max(1, n_axes // 2) and centred == 0:
+            return "pedals", profile
+        if centred and n_buttons < 26:
+            return "steering", profile
+        if n_buttons >= 26:
+            return "rim", profile
+        return "other", profile
 
     def open(self):
         try:
@@ -348,121 +394,205 @@ class Input:
             return "input unavailable: %s (is ViGEmBus installed?)" % exc
         self.sdl, self.vg = sdl2, vg
         try:
-            sdl2.SDL_Init(sdl2.SDL_INIT_JOYSTICK)
-            sdl2.SDL_JoystickEventState(sdl2.SDL_IGNORE)        # we poll; nothing drains an event queue
+            sdl2.SDL_Init(sdl2.SDL_INIT_JOYSTICK | sdl2.SDL_INIT_GAMECONTROLLER)
+            sdl2.SDL_JoystickEventState(sdl2.SDL_IGNORE)
+            sdl2.SDL_GameControllerEventState(sdl2.SDL_IGNORE)
+
             for i in range(sdl2.SDL_NumJoysticks()):
                 raw = sdl2.SDL_JoystickNameForIndex(i)
                 nm = (raw.decode(errors="replace") if isinstance(raw, bytes) else str(raw))
-                low = nm.lower()
+                # **A recognised gamepad is taken as a gamepad and never taken apart.** SDL's own database
+                # already knows which button is `a` on an Xbox pad; re-deriving that would be worse.
+                if sdl2.SDL_IsGameController(i):
+                    ctrl = sdl2.SDL_GameControllerOpen(i)
+                    if ctrl:
+                        self.controllers.append((nm, ctrl))
+                        print("[in ] gamepad: %d %s (SDL mapping)" % (i, nm), flush=True)
+                        continue
                 handle = sdl2.SDL_JoystickOpen(i)
-                buttons = sdl2.SDL_JoystickNumButtons(handle)
-                if self.pedals is None and any(h in low for h in PEDAL_HINTS):
-                    self.pedals, self.pedal_name = handle, nm
-                    print("[in ] pedals : %d %s" % (i, nm), flush=True)
-                elif self.wheel is None and any(h in low for h in WHEEL_HINTS):
-                    # **Steering is claimed before the rim, deliberately.** The G29 reports 25 buttons, so a
-                    # naive "lots of buttons means rim" test stole the only steering device and left the rig
-                    # with none. The wheel is identified by NAME; the rim is whatever is left over.
-                    self.wheel, self.wheel_name = handle, nm
-                    print("[in ] wheel  : %d %s" % (i, nm), flush=True)
-                elif self.rim is None and (any(h in low for h in RIM_HINTS) or buttons >= 26):
-                    # The custom rim reports no useful name on this machine ("axis 28 button device"), so it
-                    # is also recognised by shape: more buttons than any wheel base, and no steering role.
-                    self.rim, self.rim_name = handle, nm
-                    print("[in ] rim    : %d %s (%d buttons)" % (i, nm, buttons), flush=True)
+                if not handle:
+                    continue
+                role, profile = self._classify(sdl2, i, handle, nm)
+                dev = Device(i, nm, handle, role, profile)
+                tag = (profile or {}).get("name")
+                print("[in ] %-8s: %d %s%s" % (role, i, nm, (" [%s]" % tag) if tag else " [detected]"),
+                      flush=True)
+                if role == "steering" and self.steering is None:
+                    self.steering = dev
+                    self.detected_class = (profile or {}).get("device_class", "unknown")
+                elif role == "pedals" and self.pedals is None:
+                    self.pedals = dev
+                elif role == "rim" and self.rim is None:
+                    self.rim = dev
                 else:
-                    sdl2.SDL_JoystickClose(handle)
-            if self.wheel is None:
-                return "no steering device found among the attached joysticks"
-            self.pad = vg.VX360Gamepad()
-            self.btn = self._button_targets()
+                    self.devices.append(dev)
 
-            # A pedal rests at one END of its travel, not at centre. **The first read after opening is a
-            # lie**: SDL reports 0 for every axis until it has actually polled, so calibrating immediately
-            # captured 0 as "released" and a pedal resting at -32768 read as FULLY PRESSED -- the pad held
-            # full throttle and full brake at once. Settle, then trust it.
-            if self.pedals is not None:
-                count = sdl2.SDL_JoystickNumAxes(self.pedals)
-                deadline = time.monotonic() + 2.0
-                values = [0] * count
-                while time.monotonic() < deadline:
-                    sdl2.SDL_JoystickUpdate()
-                    values = [sdl2.SDL_JoystickGetAxis(self.pedals, a) for a in range(count)]
-                    if any(v != 0 for v in values):
-                        break                                   # SDL has polled for real
-                    time.sleep(0.02)
-                if all(v == 0 for v in values):
-                    # **Evidence, not a guess.** The owner profile records Sim Pedals as
-                    # `released: -32768.0, pressed: 32767.0`. All-zero after two seconds of polling means SDL
-                    # never reported, and believing it would peg throttle and brake at 100%.
-                    values = [-32768] * count
-                    print("[in ] pedal rest: SDL never reported; assuming -32768 released, per the rig profile",
-                          flush=True)
-                else:
-                    print("[in ] pedal rest: %s  (feet off while this starts)" % (values,), flush=True)
-                for a in range(count):
-                    self.rest[a] = values[a]
+            if self.steering is None and not self.controllers:
+                return "nothing usable attached"
+
+            self.pad = vg.VX360Gamepad()
+            self._calibrate_pedals()
             return ""
         except Exception as exc:                                # noqa: BLE001 - diagnostic path
             return "input open failed: %s" % exc
 
-    def _pedal(self, axis):
-        """0.0 released, 1.0 fully pressed, whichever direction this hardware travels."""
-        if self.pedals is None or axis not in self.rest:
-            return 0.0
-        v = self.sdl.SDL_JoystickGetAxis(self.pedals, axis)
-        rest = self.rest[axis]
-        span = 65535.0 if abs(rest) > 16384 else 32767.0
-        travel = abs(v - rest) / span
-        return max(0.0, min(1.0, travel))
+    def _calibrate_pedals(self):
+        """Learn where 'released' is. **The first read after opening is a lie** -- SDL reports 0 for every
+        axis until it has actually polled, and believing that made a released pedal look fully pressed, with
+        the virtual pad holding full throttle and full brake at once."""
+        if self.pedals is None:
+            return
+        sdl2 = self.sdl
+        count = sdl2.SDL_JoystickNumAxes(self.pedals.handle)
+        deadline = time.monotonic() + 2.0
+        values = [0] * count
+        while time.monotonic() < deadline:
+            sdl2.SDL_JoystickUpdate()
+            values = [sdl2.SDL_JoystickGetAxis(self.pedals.handle, a) for a in range(count)]
+            if any(v != 0 for v in values):
+                break
+            time.sleep(0.02)
+        if all(v == 0 for v in values):
+            fallback = int(self.pedals.profile.get("released", -32768))
+            values = [fallback] * count
+            print("[in ] pedal rest: SDL never reported; assuming %d released" % fallback, flush=True)
+        else:
+            print("[in ] pedal rest: %s (feet off while this starts)" % (values,), flush=True)
+        for a in range(count):
+            self.pedals.rest[a] = values[a]
 
+    # ---------------------------------------------------------------- reading
+    def _pedal(self, which):
+        if self.pedals is None:
+            return 0.0
+        axis = self.pedals.profile.get("axes", {}).get(which)
+        if axis is None:
+            axis = {"throttle": 0, "brake": 1, "clutch": 2}.get(which)
+        if axis is None or axis not in self.pedals.rest:
+            return 0.0
+        v = self.sdl.SDL_JoystickGetAxis(self.pedals.handle, axis)
+        rest = self.pedals.rest[axis]
+        span = 65535.0 if abs(rest) > 16384 else 32767.0
+        return max(0.0, min(1.0, abs(v - rest) / span))
+
+    def _steer(self):
+        if self.steering is None:
+            return 0.0
+        axis = self.steering.profile.get("axes", {}).get("steer", 0)
+        raw = self.sdl.SDL_JoystickGetAxis(self.steering.handle, axis) / 32767.0
+        value = max(-1.0, min(1.0, raw * self.scale))
+        if abs(value) < self.steer_deadzone:
+            return 0.0
+        if self.steer_curve != 1.0:
+            value = (1.0 if value > 0 else -1.0) * (abs(value) ** self.steer_curve)
+        return value
+
+    def _gamepad_state(self):
+        """Whatever the handheld controller is doing, through SDL's own mapping."""
+        sdl2 = self.sdl
+        state = {"lx": 0.0, "ly": 0.0, "rx": 0.0, "ry": 0.0, "lt": 0.0, "rt": 0.0, "buttons": set()}
+        axis_map = {"lx": sdl2.SDL_CONTROLLER_AXIS_LEFTX, "ly": sdl2.SDL_CONTROLLER_AXIS_LEFTY,
+                    "rx": sdl2.SDL_CONTROLLER_AXIS_RIGHTX, "ry": sdl2.SDL_CONTROLLER_AXIS_RIGHTY}
+        btn_map = {"a": sdl2.SDL_CONTROLLER_BUTTON_A, "b": sdl2.SDL_CONTROLLER_BUTTON_B,
+                   "x": sdl2.SDL_CONTROLLER_BUTTON_X, "y": sdl2.SDL_CONTROLLER_BUTTON_Y,
+                   "lb": sdl2.SDL_CONTROLLER_BUTTON_LEFTSHOULDER,
+                   "rb": sdl2.SDL_CONTROLLER_BUTTON_RIGHTSHOULDER,
+                   "back": sdl2.SDL_CONTROLLER_BUTTON_BACK, "start": sdl2.SDL_CONTROLLER_BUTTON_START,
+                   "home": sdl2.SDL_CONTROLLER_BUTTON_GUIDE,
+                   "ls": sdl2.SDL_CONTROLLER_BUTTON_LEFTSTICK,
+                   "rs": sdl2.SDL_CONTROLLER_BUTTON_RIGHTSTICK,
+                   "dpad_up": sdl2.SDL_CONTROLLER_BUTTON_DPAD_UP,
+                   "dpad_down": sdl2.SDL_CONTROLLER_BUTTON_DPAD_DOWN,
+                   "dpad_left": sdl2.SDL_CONTROLLER_BUTTON_DPAD_LEFT,
+                   "dpad_right": sdl2.SDL_CONTROLLER_BUTTON_DPAD_RIGHT}
+        for _, ctrl in self.controllers:
+            for key, axis in axis_map.items():
+                v = sdl2.SDL_GameControllerGetAxis(ctrl, axis) / 32767.0
+                # **Stick drift is not steering.** A resting Xbox pad reported 0.032 here, and because the
+                # merge takes the larger deflection that drift beat a perfectly centred wheel and put a
+                # permanent lean into the car. Deadzone first, merge second.
+                if abs(v) < self.pad_deadzone:
+                    v = 0.0
+                if abs(v) > abs(state[key]):
+                    state[key] = max(-1.0, min(1.0, v))
+            for key, axis in (("lt", sdl2.SDL_CONTROLLER_AXIS_TRIGGERLEFT),
+                              ("rt", sdl2.SDL_CONTROLLER_AXIS_TRIGGERRIGHT)):
+                v = max(0.0, sdl2.SDL_GameControllerGetAxis(ctrl, axis) / 32767.0)
+                if v < self.pad_deadzone:
+                    v = 0.0
+                state[key] = max(state[key], v)
+            for name, btn in btn_map.items():
+                if sdl2.SDL_GameControllerGetButton(ctrl, btn):
+                    state["buttons"].add(name)
+        return state
+
+    def _rim_buttons(self):
+        """Rim buttons, per profile. No profile means no rim buttons -- guessing which one is `a` on an
+        unknown rim could bind `home` to a paddle and drop a player out of the game."""
+        out = set()
+        if self.rim is None:
+            return out
+        mapping = self.rim.profile.get("buttons") or {}
+        ignored = set(self.rim.profile.get("ignore_buttons") or [])
+        for raw_index, target in mapping.items():
+            index = int(raw_index)
+            if index in ignored or target not in BUTTON_NAMES:
+                continue
+            if self.sdl.SDL_JoystickGetButton(self.rim.handle, index):
+                out.add(target)
+        return out
+
+    # ---------------------------------------------------------------- output
     def _tick(self):
         sdl2 = self.sdl
         sdl2.SDL_JoystickUpdate()
+        sdl2.SDL_GameControllerUpdate()
 
-        raw = sdl2.SDL_JoystickGetAxis(self.wheel, 0) / 32767.0
-        steer = max(-1.0, min(1.0, raw * self.scale))
-        if abs(steer) < self.deadzone:
-            steer = 0.0
-        elif STEER_CURVE != 1.0:
-            steer = (1.0 if steer > 0 else -1.0) * (abs(steer) ** STEER_CURVE)
+        pad_state = self._gamepad_state()
+        # On foot, the rig contributes nothing. Only an explicit `False` from a connected NCM suppresses it;
+        # `None` means nobody has said, and the companion has to work on its own.
+        rig_live = self.seated is not False
+        steer = self._steer() if rig_live else 0.0
+        throttle = self._pedal("throttle") if rig_live else 0.0
+        brake = self._pedal("brake") if rig_live else 0.0
+        rim = self._rim_buttons() if rig_live else set()
 
-        throttle = self._pedal(self.throttle_axis)
-        brake = self._pedal(self.brake_axis)
-        clutch = self._pedal(self.clutch_axis)
+        # Larger deflection wins, so holding a controller never fights the wheel in front of you.
+        lx = steer if abs(steer) >= abs(pad_state["lx"]) else pad_state["lx"]
+        rt = max(throttle, pad_state["rt"])
+        lt = max(brake, pad_state["lt"])
+        held = rim | pad_state["buttons"]
 
-        self.pad.left_joystick_float(x_value_float=steer, y_value_float=0.0)
-        self.pad.right_trigger_float(value_float=throttle)
-        self.pad.left_trigger_float(value_float=brake)
+        self.pad.left_joystick_float(x_value_float=lx, y_value_float=-pad_state["ly"])
+        self.pad.right_joystick_float(x_value_float=pad_state["rx"], y_value_float=-pad_state["ry"])
+        self.pad.right_trigger_float(value_float=rt)
+        self.pad.left_trigger_float(value_float=lt)
 
-        if self.rim is not None:
-            for index, target in RIM_BUTTONS.items():
-                if index in RIM_IGNORED_BUTTONS:
-                    continue
-                down = bool(sdl2.SDL_JoystickGetButton(self.rim, index))
-                key = (index, target)
-                if down and key not in self.pressed:
-                    self.pressed.add(key)
-                    self.pad.press_button(button=self.btn[target])
-                elif not down and key in self.pressed:
-                    self.pressed.discard(key)
-                    # Two rim buttons map to `x`. Release only when NEITHER is held, or letting go of one
-                    # would cancel the other.
-                    if not any(t == target for _, t in self.pressed):
-                        self.pad.release_button(button=self.btn[target])
+        for name in BUTTON_NAMES:
+            target = getattr(self.vg.XUSB_BUTTON, "XUSB_GAMEPAD_" + {
+                "lb": "LEFT_SHOULDER", "rb": "RIGHT_SHOULDER", "home": "GUIDE",
+                "ls": "LEFT_THUMB", "rs": "RIGHT_THUMB",
+                "dpad_up": "DPAD_UP", "dpad_down": "DPAD_DOWN",
+                "dpad_left": "DPAD_LEFT", "dpad_right": "DPAD_RIGHT",
+            }.get(name, name.upper()))
+            if name in held and name not in self.pressed:
+                self.pressed.add(name)
+                self.pad.press_button(button=target)
+            elif name not in held and name in self.pressed:
+                self.pressed.discard(name)
+                self.pad.release_button(button=target)
 
         self.pad.update()
-        self.last = {"steer": steer, "throttle": throttle, "brake": brake, "clutch": clutch, "raw": raw,
-                     "buttons": sorted(t for _, t in self.pressed)}
+        self.last = {"steer": lx, "throttle": rt, "brake": lt, "rig": rig_live,
+                     "buttons": sorted(self.pressed)}
 
     def start(self):
-        if self.running or self.wheel is None:
+        if self.running or self.pad is None:
             return
         self.running = True
 
         def loop():
-            # 120 Hz. Steering is the one signal whose latency a driver feels directly, and polling a
-            # handful of axes costs nothing beside that.
+            # 120 Hz. Steering latency is the one thing a driver feels directly.
             while self.running:
                 try:
                     self._tick()
@@ -472,11 +602,20 @@ class Input:
 
         self.thread = threading.Thread(target=loop, daemon=True)
         self.thread.start()
-        print("[in ] steering %.0f deg/side (range %.0f, scale x%.1f, curve %.1f) | throttle ax%d brake ax%d "
-              "clutch ax%d | %d rim buttons mapped"
-              % (self.steer_degrees, self.wheel_range, self.scale, STEER_CURVE, self.throttle_axis,
-                 self.brake_axis, self.clutch_axis,
-                 len([b for b in RIM_BUTTONS if b not in RIM_IGNORED_BUTTONS])), flush=True)
+        print("[in ] steering %.0f deg/side (range %.0f, x%.1f, curve %.1f) | %d gamepad(s) merged"
+              % (self.steer_degrees, self.wheel_range, self.scale, self.steer_curve, len(self.controllers)),
+              flush=True)
+
+    def describe(self):
+        return {
+            "steering": self.steering.name if self.steering else None,
+            "pedals": self.pedals.name if self.pedals else None,
+            "rim": self.rim.name if self.rim else None,
+            "gamepads": [n for n, _ in self.controllers],
+            "steerDegrees": self.steer_degrees,
+            "wheelRange": self.wheel_range,
+            "rigLive": self.seated is not False,
+        }
 
     def stop(self):
         """Release everything. A virtual pad left holding a trigger is a car left accelerating."""
@@ -687,6 +826,7 @@ class Mixer:
         self.device_name = None
         self.caps = {}
         self.out = None                 # set by main() only when --arm was given
+        self.rig = None                 # set by main(); the mixer gates it on seat state
         # **Force output is opt-in and off.** Everything else in this file runs identically either way, so the
         # difference between watching telemetry and moving a wheel is one flag rather than a code path nobody
         # exercised until the day it mattered.
@@ -712,22 +852,32 @@ class Mixer:
             idx = rungs.index(self.rung) + 1
         except ValueError:
             idx = 1
-        return {
+        out = {
             "name": self.device_name or "no haptic device",
             "class": self.device_class,
             "rung": idx, "rungs": rungs, "armed": self.armed, "haptics": self.caps,
         }
+        if self.rig is not None:
+            out["rig"] = self.rig.describe()
+        return out
 
     def feed(self, f: dict) -> float:
         now = time.monotonic()
         dt, self.last = now - self.last, now
 
         if f.get("idle"):
+            # An `idle` frame means NCM has a driver who is NOT in a car. That is also the on-foot signal for
+            # the rig: a wheel must not nudge the walk axis while someone is walking.
+            if self.rig is not None:
+                self.rig.seated = False
             self.idles += 1
             self.level = slew(self.level, 0.0, dt)
             self._emit()
             return self.level
 
+        # A real frame means a driver in a car, so the rig is live again.
+        if self.rig is not None:
+            self.rig.seated = True
         self.frames += 1
         contributions = []
         if isinstance(f.get("engine"), (int, float)):
@@ -743,7 +893,8 @@ class Mixer:
 
         # The rung IS the scale. Channel weights sum to roughly 0..1.8, so the lowest rung (0.05) puts a
         # fully-loaded car at about a twentieth of the device maximum -- which is where tuning starts.
-        target = clamp(self.device_class, sum(contributions) * self.rung)
+        intensity = min(1.0, sum(contributions))
+        target = clamp(self.device_class, intensity * self.rung)
         self.level = slew(self.level, target, dt)
         self._emit()
         return self.level
@@ -854,8 +1005,13 @@ def serve(conn: socket.socket, addr, mixer: Mixer, port: int) -> None:
             continue
         cmd = f.get("cmd")
         if cmd == "settings":
-            rung = mixer.set_rung((f.get("settings") or {}).get("rung"))
-            print("[ffb] rung -> %.2f (%s)" % (rung, mixer.device_class), flush=True)
+            settings = f.get("settings") or {}
+            if settings.get("rung") is not None:
+                rung = mixer.set_rung(settings["rung"])
+                print("[ffb] rung -> %.2f (%s)" % (rung, mixer.device_class), flush=True)
+            if settings.get("steerDegrees") is not None and mixer.rig is not None:
+                deg = mixer.rig.set_steer_degrees(settings["steerDegrees"])
+                print("[in ] steering -> %.0f deg/side (x%.1f)" % (deg, mixer.rig.scale), flush=True)
             say({"device": mixer.describe()})
             continue
         if cmd == "test":
@@ -901,9 +1057,8 @@ def main() -> int:
                     help="wheel degrees per side mapped to full stick deflection (default 45).")
     ap.add_argument("--wheel-range", type=float, default=900.0,
                     help="the wheel's physical lock-to-lock range in degrees (default 900).")
-    ap.add_argument("--throttle-axis", type=int, default=PEDAL_THROTTLE_AXIS)
-    ap.add_argument("--brake-axis", type=int, default=PEDAL_BRAKE_AXIS)
-    ap.add_argument("--clutch-axis", type=int, default=PEDAL_CLUTCH_AXIS)
+    ap.add_argument("--profiles", default=None,
+                    help="rig profile JSON. Default: tools/wheel-profiles/default.json")
     ap.add_argument("--monitor", action="store_true",
                     help="print live steering and pedal values. Use it to confirm which axis is which.")
     ap.add_argument("--device", type=int, default=None,
@@ -939,7 +1094,7 @@ def main() -> int:
     rig = None
     if not args.no_input:
         rig = Input(steer_degrees=args.steer_degrees, wheel_range=args.wheel_range,
-                    throttle_axis=args.throttle_axis, brake_axis=args.brake_axis, clutch_axis=args.clutch_axis)
+                    profile_path=args.profiles)
         why_in = rig.open()
         if why_in:
             print("[in ] INPUT UNAVAILABLE: %s" % why_in, flush=True)
@@ -948,6 +1103,7 @@ def main() -> int:
             rig.start()
 
     mixer = Mixer(args.device_class, rung, armed=args.arm)
+    mixer.rig = rig
     mixer.device_name, mixer.caps = name, caps
     if args.arm:
         out = Output(args.device_class)

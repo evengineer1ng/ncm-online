@@ -208,6 +208,12 @@
     .wheel-rungs button.on { color: var(--accent); border-color: var(--accent); box-shadow: inset 0 -3px var(--accent); }
     .wheel-actions { display: flex; gap: 10px; margin-top: 18px; }
     .wheel-actions button { min-width: 150px; padding: 11px 16px; font: 700 14px/1 var(--mono); letter-spacing: .1em; }
+    /* Steering range is a SLIDER and force strength is not, deliberately. Range is comfort -- one driver's
+       45 degrees is another's 90 -- while strength is the wrist-safety property, and a continuous control
+       there would undo the ladder at exactly the step nobody would notice. */
+    .wheel-range { display: flex; align-items: center; gap: 12px; }
+    .wheel-range input[type=range] { width: 260px; accent-color: var(--accent); }
+    .wheel-range .deg { font: 700 15px/1 var(--mono); color: var(--accent); min-width: 74px; }
     .wheel-note { margin-top: 16px; font: 600 13px/1.6 var(--mono); color: var(--dim); max-width: 760px; }
     .wheel-note b { color: var(--warn); }
     .schedule, .event-detail, .collection-wall, .vehicle-dossier, .help-scroll { min-height:0; }
@@ -356,7 +362,7 @@
       // The NCM shell nav. ONE definition, rendered into whichever panel is open, so a surface can never be
       // present in one panel's tab strip and missing from another's. Add a surface here and it appears
       // everywhere at once; that is the whole point.
-      const SHELL_TABS = [["guide", "RACE GUIDE"], ["market", "MARKET"], ["collection", "MACHINE INDEX"], ["wheel", "WHEEL"], ["help", "HELP"]];
+      const SHELL_TABS = [["guide", "RACE GUIDE"], ["market", "MARKET"], ["collection", "MACHINE INDEX"], ["wheel", "WHEEL/PEDALS"], ["help", "HELP"]];
       function renderNav(container, current) {
         if (!container) return;
         container.innerHTML = "";
@@ -1287,6 +1293,36 @@
             b.addEventListener("click", () => wheelCmd("settings", { rung: i + 1 }));
             wrap.append(b);
           });
+          row.append(k, wrap); wheelBody.append(row);
+        }
+
+        // The rig, reported by the companion. Named devices rather than a count, because "a wheel is
+        // connected" is not the same reassurance as seeing your own wheel's name.
+        const rig = dev.rig;
+        if (rig) {
+          if (rig.steering) wheelBody.append(wheelRow("STEERING", rig.steering, "ok"));
+          if (rig.pedals) wheelBody.append(wheelRow("PEDALS", rig.pedals, "ok"));
+          if (rig.rim) wheelBody.append(wheelRow("RIM", rig.rim, "ok"));
+          if (rig.gamepads && rig.gamepads.length) {
+            wheelBody.append(wheelRow("CONTROLLER", rig.gamepads.join(", "), "ok"));
+          }
+          wheelBody.append(wheelRow("RIG INPUT", rig.rigLive ? "ACTIVE" : "ON FOOT — rig idle",
+            rig.rigLive ? "" : "warn"));
+
+          const row = document.createElement("div"); row.className = "wheel-row";
+          const k = document.createElement("div"); k.className = "k"; k.textContent = "STEERING RANGE";
+          const wrap = document.createElement("div"); wrap.className = "wheel-range";
+          const slider = document.createElement("input");
+          slider.type = "range"; slider.min = "15"; slider.max = "180"; slider.step = "5";
+          slider.value = String(Math.round(rig.steerDegrees || 45));
+          const deg = document.createElement("span"); deg.className = "deg";
+          const show = (v) => { deg.textContent = v + "\u00B0 / side"; };
+          show(slider.value);
+          slider.addEventListener("input", () => show(slider.value));
+          // Commit on release, not on every pixel of drag: each change re-scales live steering, and doing
+          // that sixty times during one drag would make the car twitch while the slider moved.
+          slider.addEventListener("change", () => wheelCmd("settings", { steerDegrees: Number(slider.value) }));
+          wrap.append(slider, deg);
           row.append(k, wrap); wheelBody.append(row);
         }
 

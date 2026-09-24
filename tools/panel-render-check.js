@@ -409,7 +409,7 @@ for (const [panel, navId] of [["guide", "guideNav"], ["market", "marketNav"], ["
   fire("panel:show", { panel: panel });
   if (panel === "help") fire("panel:help", HELP_MIN);
   const labels = navLabels(navId);
-  check(panel + " panel offers every shell surface", labels.join("|") === "RACE GUIDE|MARKET|MACHINE INDEX|WHEEL|HELP",
+  check(panel + " panel offers every shell surface", labels.join("|") === "RACE GUIDE|MARKET|MACHINE INDEX|WHEEL/PEDALS|HELP",
     panel + " nav = [" + labels.join(", ") + "]");
   const active = (document.getElementById(navId).children || []).filter(b => b.classList.contains("active"));
   check(panel + " panel marks itself as the current tab", active.length === 1 && active[0].disabled === true,
