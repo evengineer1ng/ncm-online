@@ -55,6 +55,19 @@ reference, so the car fielded was never written down. Every further race adds an
 and cheap; impossible to backfill. Two owner decisions sit beside it: `IDEA-233` (do admin grants carry serials?)
 and `IDEA-238` (are NCX team cars assets?) — both hold open holes in the serial space.
 
+## Owner's one-pass answer is the next input (IDEA-295)
+
+**`23_OPEN_QUESTIONS.md` — 70 numbered structural questions**, raised against the classified ledger and held
+deliberately in one document so they can be answered together and cross-referenced. Tagged **BLOCKING / SHAPES /
+LATER**, each with a recommendation where one exists, so "Q14 agree" is a complete answer. Numbering is permanent.
+
+The four that most change the schema: **Q20/Q21** (do the 19 existing vehicles get factory components, and do
+those components inherit the machine's distance), **Q16** (do installed parts transfer with a sold car), **Q2**
+(what `asset_id` holds when the car raced is not an asset), and **Q48** (design the trade envelope before parts
+exist, since per-asset transfer cannot express atomic multi-item trade).
+
+**Nothing in §A-§K gets inferred.** An unanswered structural question stays open.
+
 ### Next, in order
 
 1. ~~`IDEA-292`~~ **done** — 110 legacy rows relabelled `ncm-devbox-legacy`. Nothing on the dev box wears
