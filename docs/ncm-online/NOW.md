@@ -7,7 +7,7 @@ Last rewritten: **2026-09-24 — version control, and NCM Development is standin
 engineering/wear proposals accepted with one reconciliation (L120); before that KB-87 incident detection, built
 locally and still not deployed.
 
-> **Claim before writing:** decisions through **L122**; MASTER_TEST through **2.18** / **§AG**; next QA
+> **Claim before writing:** decisions through **L123**; MASTER_TEST through **2.18** / **§AG**; next QA
 > letter **§AH**. BACKLOG next free **IDEA-295**; known issues through **KB-93**.
 > *(This block was stale until 2026-09-24 — it still claimed L119 / IDEA-241 / KB-87 while 172 BACKLOG rows,
 > L120 and KB-91 already existed. It is the only guard against reusing an ID, so correct it every session.)*
@@ -40,6 +40,23 @@ All three are **invisible in production**, which is always already migrated and 
 - **KB-92** — a `SQL 1146` that only fires when the schema is behind the code, i.e. on every fresh install.
 
 **Standing rule (L121): Lightsail changes are instrumented on Windows first.**
+
+## STOPPED FOR REVIEW -- reconciliation delivered, nothing implemented (L123)
+
+All 70 questions answered by the owner 2026-09-24. `24_FOUNDATION_RECONCILIATION.md` reconciles them against the
+schema, code, production data and the full 297-row ledger.
+
+**Headline: most of this is already designed and blocked on one missing primitive.** NCM has no principal that can
+hold title, money or custody -- everything is keyed to a driver. `14_TEAM_ORGANIZATIONS.md` (L92/L93) and
+`IDEA-139/142/157/162/168` already specify what the Q4/Q6/Q15/Q45/Q46/Q48/Q50 answers describe, and migration 015
+even named the ALTER. **`IDEA-297` (owner principal) is the highest-leverage row in the ledger.**
+
+**Bleeding now, measured against production:** 29 unattributable results (+1 per finisher per race), 9
+driver-only incident rows, `player_market_knowledge` empty since migration 017. **Stage 0 -- `asset_id` on
+`session_result` and `incident` -- is the only thing recommended for early promotion to Online.**
+
+**Five answers needed before Stage 1:** A1 `origin` semantics, A2 serial allocator for team machines, A4 whether
+ownership-at-the-time is authoritative attribution, A5 visible conditions without effects, Q18/Q19 profile shape.
 
 ## The ledger is classified now — and one foundation is already leaking (L122)
 

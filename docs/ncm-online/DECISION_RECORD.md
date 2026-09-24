@@ -728,3 +728,63 @@ is cheaper than discovering the foundation after building on it.
 Corollary, learned twice now: **the "next free ID" line has been stale twice** (left at IDEA-127 while the ledger
 ran to 183, then at 205 while it ran to 294). It is the only guard against reusing a permanent ID. Checking it
 against the last row is now part of appending.
+
+## L123 — LOCKED — the Q1–Q70 answer pass, and the ten governing principles
+
+Owner answered all seventy questions of `23_OPEN_QUESTIONS.md` on 2026-09-24. Reconciliation against the
+repository is `24_FOUNDATION_RECONCILIATION.md`. **Nothing implemented; stopped for review as instructed.**
+
+### The governing principle the pass established
+
+> **Do not preserve exceptions created by obsolete prototypes as permanent ontology.**
+
+A car is a machine asset. A component is a component asset. "Team car", "grid car", "street car" describe use,
+custody, ownership or history — not species. TW2-era grants, temporary NCX equipment behaviour and alpha/debug
+conveniences are implementation artifacts, and must not become architecture merely because they still exist in
+documentation. The purpose of the pass is **preparedness**: where a modest decision now prevents a painful
+retrofit later, prefer being prepared.
+
+### The ten cross-cutting decisions
+
+Identity for persistent physical things · history is append-oriented · unknown history stays unknown · world
+identity is distinct from runtime identity · property is conserved (destructive reverse engineering is the one
+defined exception) · prepare seams without simulating them · record irrecoverable facts early · Development
+proves and Online confirms · alpha scaffolding is not ontology · prefer shared primitives over isolated fixes.
+
+### What the reconciliation found
+
+**Most of this is already designed and blocked on one missing primitive.** The answers to Q4, Q6, Q15, Q45, Q46,
+Q48, Q50 describe a world `14_TEAM_ORGANIZATIONS.md` (L92/L93) and `IDEA-139/142/157/162/168` already specify.
+They are blocked on the same thing: **NCM has no principal that can hold title, money or custody — everything is
+keyed to a driver.** Migration 015 named `owner_principal_kind/id` in writing as "a cheap later ALTER"; the
+foresight was recorded and never spent. So `14_TEAM_ORGANIZATIONS.md` is **reaffirmed, not superseded**, and
+becomes the specification for that work.
+
+**Ten primitives satisfy most of the seventy answers**, four carrying the weight: **owner principal**, **physical
+asset** (shared supertype of machine and component), **custody** (which makes install/remove/store/list/trade one
+operation shape), and the **transfer envelope** (atomic multi-item settlement, replacing a per-asset idempotency
+key that cannot express "car + part + cash ↔ car + cash").
+
+**A constraint found that the effects audit must be given, not left to discover:** `setPerformance` is one profile
+per vehicle, does not stack, and class homologation ceilings already claim it (`IDEA-079`/`IDEA-102`). The real
+question for `IDEA-249` is therefore narrower and harder than "what can we manipulate".
+
+### Corrections recorded against my own prior work
+
+- **L122's counts were drawn from 57% of the ledger.** A row-matcher skipped 119 rows whose IDs were bolded.
+  Corrected: F1 58 · F0 24 · INV 38 · GATE 10 — 82 foundational rows plus 38 invariants, not 35.
+- **`IDEA-239`/`IDEA-240` are duplicate IDs, and mine** — a second instance of the `IDEA-190` collision, both
+  pairs appended while the header's "next free ID" still read IDEA-205. Annotated, not renumbered: L68 makes IDs
+  permanent and the remedy is the owner's call (`IDEA-296`).
+- **Q57 was overstated by me.** Having checked, the behavioural substrate largely exists — `incident` already
+  records session, both drivers and a severity band. What is missing is machine attribution on those rows. Q57 is
+  real, but it is not bleeding the way Q1 is. What *is* bleeding, measured: 29 unattributable results, 9
+  driver-only incident rows, and `player_market_knowledge` with 0 rows since migration 017.
+
+### Open
+
+Five answers are needed before Stage 1 can be designed rather than guessed: **A1** `origin` semantics (it does two
+unrelated jobs today and Q6 abolishes one of them), **A2** whether team machines draw from the same serial
+sequences, **A4** whether "owned exactly one asset at the time" counts as authoritative attribution for the 29
+legacy results, **A5** whether a player-visible condition with no mechanical effect is acceptable in the interim,
+and the Q18/Q19 architecture-profile representation the owner asked to see first.
