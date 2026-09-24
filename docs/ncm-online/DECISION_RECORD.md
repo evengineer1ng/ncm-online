@@ -1073,3 +1073,42 @@ recorded here, and in `IDEA-357`, so the next reader finds a decision rather tha
 Extends L127's lesson one step. L127 says a vocabulary value with no producer is a guess with a schema behind
 it; this says a validator with no safe caller is a guess with a function behind it. In both cases the honest
 move is to leave the seam visible and say why.
+
+---
+
+## L129 — PROVISIONAL — the companion hosts the page; NCM owns the data; the seam is a same-origin socket
+
+Proven 2026-09-24 (`IDEA-387`, `IDEA-392`, MASTER_TEST §AJ). **PROVISIONAL**: the owner drove the
+investigation and approved the probe, but has not ruled on the architecture that came out of it.
+
+### The rule
+
+**A bundled NCM WebUI page has no outbound network at all** — not a scheme policy, no network. Its origin is
+a private scheme (`https://r-NN-g-1.cym-ui`), and `ws`, `wss`, `http` and `https` alike fail in ~0ms without
+opening a socket.
+
+**So the direction is inverted.** When NCM needs to reach a process on the player's machine, the *companion*
+serves an HTML page and NCM creates a surface whose `entry` is that URL. The page's origin is then a real
+`http://127.0.0.1:<port>`, a socket back to it is same-origin, and — the fact that makes it useful —
+**`Open77.webui.create` still injects the Lua bridge into the configured top-level entry origin**, so client
+Lua talks to it with the ordinary `page:send` / event bridge.
+
+No TLS, no certificate, no trust-store change: loopback is a secure context over plain HTTP.
+
+### The constraint that comes with it
+
+**The race HUD stays bundled** (`IDEA-393`). Once remote entries work it is tempting to serve the HUD that way
+and get hot reload for free. That would make core race presentation fail whenever an optional peripheral
+process is closed, on a machine NCM does not control. Only the bridge surface is remote, and its failure mode
+is that it does not appear.
+
+And per `IDEA-388`, the bridge carries **the local player's own occupied vehicle and nothing else**, by
+construction rather than by policy — otherwise it reopens the leak `IDEA-341` was filed to close.
+
+### Why this is recorded as a decision rather than a note
+
+Two sessions and an outside researcher each read the same documentation and each concluded the bundled page
+should be able to dial out. It cannot. **The documentation is not wrong — the sentence about fetch and WS
+applies to pages that have a network stack, and the bundled virtual origin does not.** That distinction is
+invisible in the docs and cost three probe rounds to establish, so it belongs somewhere a reader will find it
+before spending the same three rounds.

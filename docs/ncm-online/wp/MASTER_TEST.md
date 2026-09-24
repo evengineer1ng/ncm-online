@@ -855,3 +855,21 @@ definitions -- exit 0 both times, all 3 evidence rows and all 3 discovery rows p
 
 **OWED regardless of this session:** migration 028's *fresh-world* behaviour cannot be proven on a world that
 already has rows. That case stays owed (`IDEA-319`).
+
+---
+
+## §AJ — can a WebUI surface reach a local companion? (2026-09-24, NCM Development) — **PASS**
+
+`IDEA-387`. Run `python tools/ws-probe-server.py`, then `/ncm.bridgeprobe` in the client.
+
+| # | Result |
+|---|---|
+| §AJ1 | **FAIL, expected and informative.** From the **bundled** HUD page (`/ncm.wsprobe`): `ws-live`, `ws-dead`, `wss-dead`, `fetch-http`, `fetch-https` — **all ERROR at ~0ms**, whole matrix in 1ms, listener never saw a TCP connection. Origin `https://r-NN-g-1.cym-ui`, `secureContext=true`. **Not mixed content** — that spares the secure schemes and these failed too. A private scheme with no outbound network. |
+| §AJ2 | **PASS.** `WebUI.create({ entry = "http://127.0.0.1:38480/bridge.html" })` accepted and loaded, under the real game browser (`Chrome/144`, distinct from the PowerShell self-test earlier in the same log). |
+| §AJ3 | **PASS — the load-bearing one.** `hasBridge=true`. The Lua bridge **is** injected into a non-bundled origin, so `page:send` / `Open77.emit` work exactly as for a bundled page. |
+| §AJ4 | **PASS.** Same-origin WebSocket handshake completed; listener logged `Origin: http://127.0.0.1:38480`. |
+| §AJ5 | **PASS.** Payload frame received and parsed server-side: `{"origin":"http://127.0.0.1:38480","probe":"ncm-bridge"}`. Proves data flow, not only a handshake. |
+| §AJ6 | **No TLS needed.** `secureContext=true` over plain `http://127.0.0.1` — loopback is potentially trustworthy. No certificate, no trust-store change. |
+
+**Conclusion:** the FFB/companion bridge is viable, via the remote-entry inversion rather than the bundled page.
+Constraint recorded as `IDEA-393`: **the race HUD stays bundled**; only the bridge surface is remote.
