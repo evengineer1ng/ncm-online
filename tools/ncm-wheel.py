@@ -285,6 +285,10 @@ def _read_frame(conn: socket.socket):
 
 PROFILE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "wheel-profiles")
 
+# A button box or rim reports no useful name on some hardware (the owner's reads as "axis 28 button device"),
+# so it is recognised by shape as well: many buttons and no axes that behave like controls.
+RIM_HINTS = ("evenracing", "button device", "button box", "rim", "wheelbase buttons")
+
 BUTTON_NAMES = ("a", "b", "x", "y", "lb", "rb", "back", "start", "home", "ls", "rs",
                 "dpad_up", "dpad_down", "dpad_left", "dpad_right")
 
@@ -323,6 +327,7 @@ class Device:
         self.index, self.name, self.handle = index, name, handle
         self.role, self.profile = role, profile or {}
         self.rest = {}
+        self.polled = False
 
 
 class Input:
@@ -347,6 +352,8 @@ class Input:
         self.devices = []
         self.controllers = []
         self.steering = self.pedals = self.rim = None
+        self.steer_axis = 0
+        self.pedal_axes = {}
         self.detected_class = "unknown"
         self.running = False
         self.thread = None
@@ -365,30 +372,36 @@ class Input:
         return self.steer_degrees
 
     # ---------------------------------------------------------------- detection
-    def _classify(self, sdl2, index, handle, name):
-        """Decide what a device IS from how it behaves, not from what it is called."""
-        profile = match_profile(name, self.profiles)
-        if profile and profile.get("role"):
-            return profile["role"], profile
+    def _rest_values(self, sdl2, handle, n_axes):
+        """Where every axis sits when nobody is touching it.
 
-        n_axes = sdl2.SDL_JoystickNumAxes(handle)
-        n_buttons = sdl2.SDL_JoystickNumButtons(handle)
-        if n_axes == 0 and n_buttons > 0:
-            return "rim", profile
-        # Sample resting positions: a pedal sits at an end of travel, a wheel sits near centre.
-        for _ in range(10):
+        **The first read after opening is a lie** -- SDL reports 0 for every axis until it has actually
+        polled, and believing that made a released pedal look fully pressed, with the virtual pad holding
+        full throttle and full brake at once. So poll until something is non-zero, or give up after two
+        seconds and say so."""
+        deadline = time.monotonic() + 2.0
+        values = [0] * n_axes
+        while time.monotonic() < deadline:
             sdl2.SDL_JoystickUpdate()
-            time.sleep(0.01)
-        values = [sdl2.SDL_JoystickGetAxis(handle, a) for a in range(n_axes)]
-        extreme = sum(1 for v in values if abs(v) > 24000)
-        centred = sum(1 for v in values if abs(v) < 4000)
-        if n_axes and extreme >= max(1, n_axes // 2) and centred == 0:
-            return "pedals", profile
-        if centred and n_buttons < 26:
-            return "steering", profile
-        if n_buttons >= 26:
-            return "rim", profile
-        return "other", profile
+            values = [sdl2.SDL_JoystickGetAxis(handle, a) for a in range(n_axes)]
+            if any(v != 0 for v in values):
+                return values, True
+            time.sleep(0.02)
+        return values, False
+
+    def _classify_axes(self, values):
+        """Which axes are steering and which are pedals, by where they REST.
+
+        A steering axis sits at centre and travels both ways. A pedal sits at one end of its travel. That
+        distinction is what a device name cannot tell you and what every rig has in common, so it is the
+        thing worth testing."""
+        centred, pedals = [], []
+        for axis, v in enumerate(values):
+            if abs(v) < 4000:
+                centred.append(axis)
+            elif abs(v) > 24000:
+                pedals.append(axis)
+        return centred, pedals
 
     def open(self):
         try:
@@ -411,25 +424,60 @@ class Input:
                     ctrl = sdl2.SDL_GameControllerOpen(i)
                     if ctrl:
                         self.controllers.append((nm, ctrl))
-                        print("[in ] gamepad: %d %s (SDL mapping)" % (i, nm), flush=True)
+                        print("[in ] gamepad : %d %s (SDL mapping)" % (i, nm), flush=True)
                         continue
                 handle = sdl2.SDL_JoystickOpen(i)
                 if not handle:
                     continue
-                role, profile = self._classify(sdl2, i, handle, nm)
-                dev = Device(i, nm, handle, role, profile)
+
+                profile = match_profile(nm, self.profiles)
+                n_axes = sdl2.SDL_JoystickNumAxes(handle)
+                n_buttons = sdl2.SDL_JoystickNumButtons(handle)
+                values, polled = self._rest_values(sdl2, handle, n_axes)
+                ignore = set((profile or {}).get("ignore_axes") or [])
+                usable = [v if a not in ignore else 0 for a, v in enumerate(values)]
+                centred, pedal_axes = self._classify_axes(usable)
+                for a in ignore:
+                    if a in centred:
+                        centred.remove(a)
+                dev = Device(i, nm, handle, "", profile)
+                dev.rest = {a: values[a] for a in range(n_axes)}
+                dev.polled = polled
                 tag = (profile or {}).get("name")
-                print("[in ] %-8s: %d %s%s" % (role, i, nm, (" [%s]" % tag) if tag else " [detected]"),
-                      flush=True)
-                if role == "steering" and self.steering is None:
-                    self.steering = dev
+                roles = []
+
+                # **One device can hold two roles.** A Thrustmaster presents wheel and pedals together.
+                if self.steering is None and centred and n_buttons < 26:
+                    axis = (profile or {}).get("axes", {}).get("steer", centred[0])
+                    self.steering, self.steer_axis = dev, axis
                     self.detected_class = (profile or {}).get("device_class", "unknown")
-                elif role == "pedals" and self.pedals is None:
+                    roles.append("steering ax%d" % axis)
+                if pedal_axes and self.pedals is None:
                     self.pedals = dev
-                elif role == "rim" and self.rim is None:
+                    mapped = (profile or {}).get("axes") or {}
+                    for which, fallback in (("throttle", 0), ("brake", 1), ("clutch", 2)):
+                        if which in mapped:
+                            self.pedal_axes[which] = mapped[which]
+                        elif fallback < len(pedal_axes):
+                            # Convention for a combined wheel, in axis order: throttle, brake, clutch. It is
+                            # a guess, so it is PRINTED -- a tester who finds them swapped can say so, and
+                            # a profile entry then makes it permanent for that hardware.
+                            self.pedal_axes[which] = pedal_axes[fallback]
+                    roles.append("pedals " + ", ".join(
+                        "%s=ax%s" % (k, v) for k, v in sorted(self.pedal_axes.items())))
+                if not roles and self.rim is None and (
+                        (profile or {}).get("role") == "rim" or
+                        any(h in nm.lower() for h in RIM_HINTS) or (n_buttons >= 26 and not pedal_axes)):
                     self.rim = dev
-                else:
+                    roles.append("%d buttons" % n_buttons)
+
+                if roles:
+                    print("[in ] %-8s: %d %s%s -- %s"
+                          % ("device", i, nm, (" [%s]" % tag) if tag else " [detected]", "; ".join(roles)),
+                          flush=True)
                     self.devices.append(dev)
+                else:
+                    sdl2.SDL_JoystickClose(handle)
 
             if self.steering is None and not self.controllers:
                 return "nothing usable attached"
@@ -441,37 +489,24 @@ class Input:
             return "input open failed: %s" % exc
 
     def _calibrate_pedals(self):
-        """Learn where 'released' is. **The first read after opening is a lie** -- SDL reports 0 for every
-        axis until it has actually polled, and believing that made a released pedal look fully pressed, with
-        the virtual pad holding full throttle and full brake at once."""
+        """Rest positions are learned during detection; this only reports them and covers the case where SDL
+        never answered at all."""
         if self.pedals is None:
             return
-        sdl2 = self.sdl
-        count = sdl2.SDL_JoystickNumAxes(self.pedals.handle)
-        deadline = time.monotonic() + 2.0
-        values = [0] * count
-        while time.monotonic() < deadline:
-            sdl2.SDL_JoystickUpdate()
-            values = [sdl2.SDL_JoystickGetAxis(self.pedals.handle, a) for a in range(count)]
-            if any(v != 0 for v in values):
-                break
-            time.sleep(0.02)
-        if all(v == 0 for v in values):
+        if not self.pedals.polled:
             fallback = int(self.pedals.profile.get("released", -32768))
-            values = [fallback] * count
+            for axis in self.pedal_axes.values():
+                self.pedals.rest[axis] = fallback
             print("[in ] pedal rest: SDL never reported; assuming %d released" % fallback, flush=True)
-        else:
-            print("[in ] pedal rest: %s (feet off while this starts)" % (values,), flush=True)
-        for a in range(count):
-            self.pedals.rest[a] = values[a]
+            return
+        print("[in ] pedal rest: %s (feet off while this starts)"
+              % ({k: self.pedals.rest.get(v) for k, v in sorted(self.pedal_axes.items())},), flush=True)
 
     # ---------------------------------------------------------------- reading
     def _pedal(self, which):
         if self.pedals is None:
             return 0.0
-        axis = self.pedals.profile.get("axes", {}).get(which)
-        if axis is None:
-            axis = {"throttle": 0, "brake": 1, "clutch": 2}.get(which)
+        axis = self.pedal_axes.get(which)
         if axis is None or axis not in self.pedals.rest:
             return 0.0
         v = self.sdl.SDL_JoystickGetAxis(self.pedals.handle, axis)
@@ -482,8 +517,7 @@ class Input:
     def _steer(self):
         if self.steering is None:
             return 0.0
-        axis = self.steering.profile.get("axes", {}).get("steer", 0)
-        raw = self.sdl.SDL_JoystickGetAxis(self.steering.handle, axis) / 32767.0
+        raw = self.sdl.SDL_JoystickGetAxis(self.steering.handle, self.steer_axis) / 32767.0
         value = max(-1.0, min(1.0, raw * self.scale))
         if abs(value) < self.steer_deadzone:
             return 0.0
@@ -619,6 +653,8 @@ class Input:
             "steerDegrees": self.steer_degrees,
             "wheelRange": self.wheel_range,
             "rigLive": self.seated is not False,
+            "pedalAxes": dict(self.pedal_axes),
+            "steerAxis": self.steer_axis,
         }
 
     def stop(self):
@@ -1148,6 +1184,25 @@ def serve(conn: socket.socket, addr, mixer: Mixer, port: int) -> None:
             if settings.get("rung") is not None:
                 rung = mixer.set_rung(settings["rung"])
                 print("[ffb] rung -> %.2f (%s)" % (rung, mixer.device_class), flush=True)
+            if settings.get("armed") is not None:
+                want = bool(settings["armed"])
+                if want and mixer.out is None:
+                    out = Output(mixer.device_class)
+                    why = out.open()
+                    if why:
+                        print("[ffb] arm refused: %s" % why, flush=True)
+                    else:
+                        mixer.out, mixer.armed = out, True
+                        if out.name:
+                            mixer.device_name, mixer.caps = out.name, out.caps
+                        for kind in ("spring", "damper"):
+                            out.set_condition(kind, mixer.tune[kind])
+                        print("[ffb] ARMED from the panel via %s" % out.mode, flush=True)
+                elif not want and mixer.out is not None:
+                    mixer.silence()
+                    mixer.out.close()
+                    mixer.out, mixer.armed = None, False
+                    print("[ffb] disarmed from the panel; wheel released", flush=True)
             for key in ("spring", "damper", "texture", "engine", "road"):
                 if settings.get(key) is not None:
                     try:

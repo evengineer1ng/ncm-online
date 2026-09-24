@@ -1368,6 +1368,13 @@
         }
 
         const acts = document.createElement("div"); acts.className = "wheel-actions";
+        // Force output is off until someone deliberately turns it on -- but that decision has to live
+        // somewhere a person can reach. A companion started at login gets no command line, so a flag was
+        // never going to work for the people most likely to be running it.
+        const arm = document.createElement("button");
+        arm.textContent = dev.armed ? "DISARM FORCE" : "ARM FORCE OUTPUT";
+        arm.addEventListener("click", () => wheelCmd("settings", { armed: !dev.armed }));
+        acts.append(arm);
         const test = document.createElement("button");
         test.textContent = "TEST PULSE";
         test.addEventListener("click", () => wheelCmd("test", {}));
