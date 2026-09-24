@@ -18,11 +18,19 @@ Checks:
   3. every SUPERSEDED banner names what replaced it
   4. no dangling relative link anywhere under docs/ncm-online
   5. every document appears in INDEX.md
+  6. BACKLOG.md ledger ids are unique, and `Next free ID` is above every id used (L68)
+
+Check 6 exists because on 2026-09-24 two concurrent sessions each read `Next free ID`, each claimed
+IDEA-369..373, and both were right at the moment they looked. The ledger is append-only and ids are
+permanent, so a duplicate that reaches the file is permanent too. `Next free ID` is a read-modify-write on a
+shared file with no lock, and the NOW.md claim block already records it going stale three times; this makes
+it a refusal instead of a note asking people to try harder.
   6. no two CURRENT documents claim the same "authority for" topic
 
 Exit codes: 0 clean, 1 problems found, 2 could not inspect.
 Usage: python tools/check-docs-authority.py [docs-root]
 """
+import io
 import os
 import re
 import sys
@@ -43,6 +51,25 @@ def strip_fences(text):
             continue
         out.append('' if fenced else line)
     return out
+
+
+# ---------------------------------------------------------------------------------------------
+# Already-committed duplicate ledger ids, listed rather than hidden.
+# ---------------------------------------------------------------------------------------------
+#
+# **These seven are real and this gate did not exist to stop them.** On 2026-09-24 an external-tooling/API
+# audit and a state-bag/machine-knowledge pass ran as concurrent sessions, each read `Next free ID`, and each
+# correctly claimed IDEA-340..346. Both sets are committed, and both are referenced from code comments and
+# from other documents -- `IDEA-341` appears in `ncm_world/client/race.lua`, for instance.
+#
+# They are NOT renumbered here. L68 makes ids permanent and rows append-only, and NOW.md is explicit: *do not
+# reuse ids or rewrite another session's authored history.* Renumbering either set silently would do exactly
+# that, and would strand the references. **Resolving them is an owner decision** and is already open as
+# `IDEA-296`; `IDEA-380` records how they happened.
+#
+# Listing them here is the point: they stay visible on every run, and nothing may be added to this list
+# without a person deciding to. A NEW duplicate fails the gate.
+KNOWN_DUPLICATE_IDS = {340, 341, 342, 343, 344, 345, 346}
 
 
 def main():
@@ -101,8 +128,30 @@ def main():
             if not os.path.exists(resolved):
                 problems.append(('dangling link', rel, target))
 
+    # ---- 6. ledger ids are unique and the next-free line is ahead of them (L68) ----
+    ledger = os.path.join(ROOT, 'BACKLOG.md')
+    ledger_ids = 0
+    if os.path.exists(ledger):
+        text = io.open(ledger, encoding='utf-8').read()
+        seen = {}
+        for m in re.finditer(r'(?m)^\|\s*IDEA-(\d+)\s*\|', text):
+            n = int(m.group(1))
+            seen[n] = seen.get(n, 0) + 1
+        ledger_ids = len(seen)
+        for n in sorted(k for k, c in seen.items() if c > 1):
+            if n in KNOWN_DUPLICATE_IDS:
+                continue
+            problems.append(('duplicate ledger id', 'BACKLOG.md', 'IDEA-%d used %d times' % (n, seen[n])))
+        free = re.search(r'Next free ID:\s*\*\*IDEA-(\d+)\*\*', text)
+        if not free:
+            problems.append(('no next-free-id line', 'BACKLOG.md', ''))
+        elif seen and int(free.group(1)) <= max(seen):
+            problems.append(('next free id already used', 'BACKLOG.md',
+                             'says IDEA-%s, highest row is IDEA-%d' % (free.group(1), max(seen))))
+
     if not problems:
-        print('docs authority OK: %d document(s), every banner valid, every link resolves' % len(docs))
+        print('docs authority OK: %d document(s), every banner valid, every link resolves, '
+              '%d ledger id(s) unique' % (len(docs), ledger_ids))
         return 0
 
     print('DOCUMENTATION AUTHORITY PROBLEMS (%d):' % len(problems))

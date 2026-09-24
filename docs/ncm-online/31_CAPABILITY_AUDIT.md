@@ -43,6 +43,30 @@ says plainly *"no index published for 2.31.13+op77.84; serving 2.31.13+op77.78, 
 **Development and Online both run `.87`**, nine builds ahead. So the field lists here are a floor, not a
 ceiling: a field may have been added since and no card would show it.
 
+### 2.1 The gap is now CLOSED, and the runtime exceeded the cards
+
+**Captured live from `.87` on 2026-09-24** (`red4ext/logs/open77-*.log`, one line per session):
+
+```
+input surface: throttle=number brake=number steering=number rpm=number rpmMax=number
+               gear=number suspensionLongitudinal=number suspensionTransversal=number
+               speed=number onGround=boolean
+driver inputs resolved: brake=brake steering=steering throttle=throttle
+```
+
+Every field the `op77.78` card promised is present on `.87`, under the same names. **And the snapshot carries
+five things the card did not list**, which is exactly the "floor, not a ceiling" this section warned about:
+
+| Field | Why it matters |
+|---|---|
+| `lateralSlip`, `longitudinalSlip`, `totalSlip` | **Slip is measured, not derived.** §4 classified it *D*; it is *O*. The engine already computes the signal the drivetrain guide describes, and hands it over. |
+| `packetAgeMs`, `extrapolating`, `interpolationDelayMs`, `bufferedSamples` | **How stale or interpolated this snapshot is.** Directly relevant to `client_attested` evidence: an observation taken while `extrapolating = true` is a guess about someone else's car, and the runtime says so. |
+| `wheelRotation` | as documented. |
+| `record` | `Vehicle.v_standard2_archer_hella` — identity confirmed on the client snapshot. |
+| `physicsOwner`, `locallyOwned`, `authorityEpoch` | the ownership check §7 requires, available client-side too. |
+
+**The remaining paragraph is kept as written, because it was the argument for building the line.**
+
 **The empirical check already exists and has never been run.** `client/telemetry.lua` logs the field names of
 the first vehicle snapshot it reads, once per session, precisely as the E4/L57 record of *what this build
 exposes*. `wp/MASTER_TEST.md` §103 asks for that line to be pasted in. **It never has been.** One line of a
@@ -96,7 +120,7 @@ candidate · **X** unsupported. Several classes per row is expected and normal.
 | Lateral acceleration | **D** | `speed × angularVelocity` (server), or the rotation of the `velocity` vector. Server-only and clean. |
 | Yaw behaviour, stability | **O/D** | `angularVelocity` is measured directly; stability is its variance. Server-only. |
 | **Understeer ↔ oversteer** | **D**, split | Needs `steering` (client) against `angularVelocity` (server). **The one characteristic no single side can measure.** |
-| Traction, slip | **D** | Slip angle = angle between `velocity` and `heading` (server). Plus `burnout`, `onGround` and suspension forces (client). The drivetrain guide confirms the engine derives its own slip signal the same way. |
+| Traction, slip | **O** *(corrected from D, §2.1)* | **`lateralSlip`, `longitudinalSlip` and `totalSlip` are on the client snapshot** and were simply absent from the `op77.78` card. No derivation needed. Slip angle from `velocity` vs `heading` remains available server-side as an independent cross-check. |
 | Speed retention through corners | **D** | Minimum speed across a curvature window, from server samples alone. |
 | Uphill / downhill performance | **D** | Pitch from the `orientation` quaternion, plus Δz. Both sides carry orientation. |
 | Cornering, as a rated quality | **D** | A composite of the four rows above; not a primitive. Do not introduce it as one. |

@@ -124,8 +124,10 @@
   <div id="inputs" class="hidden">
     <div class="wheel" id="inWheel"><svg viewBox="-24 -24 48 48" width="40" height="40" aria-hidden="true"><g id="inWheelG"><circle r="20" fill="none" stroke="currentColor" stroke-width="3.2"/><line x1="-19.5" y1="-3" x2="19.5" y2="-3" stroke="currentColor" stroke-width="2.8"/><line x1="0" y1="-3" x2="0" y2="19.5" stroke="currentColor" stroke-width="2.8"/><circle r="3.2" fill="currentColor"/></g></svg></div>
     <div class="peds">
-      <div class="ped" id="inThrPed"><div class="bar t"><i id="inThr"></i></div><b>THR</b><em id="inThrPct">--</em></div>
+      <!-- Brake LEFT of throttle: pedal-box order, so the panel reads the way the feet are arranged
+           (owner QA, 2026-09-24). -->
       <div class="ped" id="inBrkPed"><div class="bar b"><i id="inBrk"></i></div><b>BRK</b><em id="inBrkPct">--</em></div>
+      <div class="ped" id="inThrPed"><div class="bar t"><i id="inThr"></i></div><b>THR</b><em id="inThrPct">--</em></div>
     </div>
   </div>
   <div id="instr" class="hidden"><div class="who" id="instrWho"></div><div class="odo" id="instrOdo"></div></div>
@@ -290,11 +292,13 @@
         inputs.classList.remove("hidden");
         setPedal(pedEls.throttle, v.throttle);
         setPedal(pedEls.brake, v.brake);
-        // Full lock is drawn at 120 degrees: enough that small corrections are visible without the spokes
-        // spinning past the point where the eye can read which way they went.
+        // Full lock is drawn at LOCK_DEG. Started at 120 and came down to 90 on owner QA: driving a real rig
+        // mapped to a controller axis, 120 swung visibly further than the hands did. One constant, so it is
+        // trivial to re-tune against a physical wheel.
+        const LOCK_DEG = 90;
         const st = typeof v.steering === "number" && isFinite(v.steering) ? v.steering : null;
         inWheel.classList.toggle("na", st === null);
-        const deg = (st === null ? 0 : Math.max(-1, Math.min(1, st)) * 120).toFixed(1);
+        const deg = (st === null ? 0 : Math.max(-1, Math.min(1, st)) * LOCK_DEG).toFixed(1);
         const tf = "rotate(" + deg + "deg)";
         if (inWheelG.style.transform !== tf) inWheelG.style.transform = tf;
       });
