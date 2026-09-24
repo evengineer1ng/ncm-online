@@ -788,3 +788,86 @@ unrelated jobs today and Q6 abolishes one of them), **A2** whether team machines
 sequences, **A4** whether "owned exactly one asset at the time" counts as authoritative attribution for the 29
 legacy results, **A5** whether a player-visible condition with no mechanical effect is acceptable in the interim,
 and the Q18/Q19 architecture-profile representation the owner asked to see first.
+
+## L124 — the A-series rulings: A2 and A5 locked, A1 and A4 explained and awaiting judgement
+
+Owner review response, 2026-09-24. **Stop remains in effect; nothing implemented.**
+
+### A2 — LOCKED. Team machines use the same serial sequences.
+
+> *"A team machine is a machine… The exclusivity belongs upstream in access and distribution, not in the identity
+> of the resulting asset."*
+
+An NCX machine consumes the same global/maker/model ordinals as any other machine from that manufacturer. There
+is no NCX serial universe and no NCX asset exception. The owner path is:
+
+```
+qualify / control organization → gain market + distribution access → organization purchases →
+manufacturer supply consumed → ordinary machine asset minted → organization principal owns it
+```
+
+**Consequence, and it is a real one: exclusivity now has to be carried by market access**, because it is no
+longer carried by identity. That makes restricted/qualified market access a *requirement* rather than a
+flavour feature, and it lands on `IDEA-254` (distribution scopes) and `IDEA-251` (discovery). Filed as
+`IDEA-298`. Encouragingly, `player_market_knowledge` already carries an unused `access_state` column — the seam
+was cut in migration 017 and never used.
+
+### A5 — LOCKED. Interim visible conditions are acceptable; the interim must not become the model.
+
+A condition may be determined, persisted and surfaced through supported presentation (glyph, warning state,
+diagnostic readout) **before** its mechanical consequence is enabled. The distinction that matters is
+**authoritative condition state** vs **downstream mechanical/presentation effects of that state**.
+
+Two guards the owner attached, both recorded as binding: **do not invent fake effects** to make an interim
+condition feel complete, and **do not let information-only become the permanent product model** — the intended
+mechanical consequence stays explicitly represented as gated and unimplemented. This amends the softer reading in
+`24_FOUNDATION_RECONCILIATION.md` §9 stage 11: conditions are not "information-only", they are
+*consequence-pending*.
+
+### A1 — explained, not ruled. The field is emptier than either of us assumed.
+
+Measured, not inferred:
+
+- `origin` holds `production` or `grant`, added by migration 023 with **`NOT NULL DEFAULT 'production'`**.
+- **Production contains 19 assets, all `origin = 'production'`. `grant` has never been used in the live world.**
+- **Nothing in the codebase branches on `origin`.** Its only reads are one `SELECT` and one log line in
+  `provenance.lua`. It is effectively write-only.
+- `Identity.consumesOrdinals()` exists to express the serialisation gate and **is never called outside tests**.
+  The real gate is `local origin = ord and PRODUCTION or GRANT` — origin is *derived from* whether an ordinal was
+  allocated, not the thing that decides it.
+
+**So my "two unrelated jobs" framing in `24` was wrong and is corrected here.** `origin` does not gate
+serialisation. It is a **redundant, write-only restatement of a decision already recorded by the presence or
+absence of `production_ordinal`**. Meanwhile `acquired_via ENUM('grant','progression','prize','purchase','seed')`
+already carries the "how did this driver come by it" meaning a player-visible provenance field would want.
+
+Ruling deferred to the owner with the full explanation in the session record.
+
+### A4 — evidence gathered; attribution is strong but not airtight. Recommendation: do not backfill.
+
+Authoritative facts from production:
+
+1. **Exactly one ownership transfer has ever occurred** — `primary_purchase`, the MaiMai, 2026-09-23 14:02:12.
+   No grants, no trades, ever. No driver other than `baremetaleven` has ever owned an asset.
+2. Driver **A**'s two results (2026-09-22) **predate all ownership** — definitively unattributable.
+3. Of `baremetaleven`'s 27 results, **8 fall after the purchase, and all 8 were non-team entries.**
+4. Entry requires owning an eligible machine (`competition.eligibility.check` → `no_eligible_car`), and L83
+   forbids substitution.
+5. **The MaiMai is the only asset in the world with any odometer distance at all** — 26,606 m — last checkpoint
+   2026-09-24 00:53:46,about 3.5 minutes after the final race.
+
+**The gap:** NCM never stored the eligible record on the entry, and **never verifies at the grid which vehicle the
+driver is actually in.** A driver could be made eligible by an owned machine and physically drive a `/ncm car`
+loaner. Nothing recorded would contradict that.
+
+So attribution to asset `10000000-…-0001` for those 8 results is **strong inference, not record**. Under the
+owner's own rule — *"do not manufacture certainty to eliminate NULLs"* — the recommendation is to **leave them
+unknown**, and instead record *why* they are unknown. A middle path is offered (`IDEA-300`): an explicit
+`attribution_basis` of `recorded` / `derived` / `unknown`, so a derived attribution could be stored while being
+permanently legible as derived. That remains the owner's call.
+
+### Also delivered for review
+
+`25_MACHINE_ARCHITECTURE_PROFILE.md` (Q18/Q19 representation) and `26_DOCUMENT_AUTHORITY.md` (documentation
+authority/lifecycle system plus a one-time classification pass). Both are PROPOSAL status; nothing moved,
+nothing rewritten.

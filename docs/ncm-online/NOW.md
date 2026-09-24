@@ -7,7 +7,7 @@ Last rewritten: **2026-09-24 — version control, and NCM Development is standin
 engineering/wear proposals accepted with one reconciliation (L120); before that KB-87 incident detection, built
 locally and still not deployed.
 
-> **Claim before writing:** decisions through **L123**; MASTER_TEST through **2.18** / **§AG**; next QA
+> **Claim before writing:** decisions through **L124**; MASTER_TEST through **2.18** / **§AG**; next QA
 > letter **§AH**. BACKLOG next free **IDEA-295**; known issues through **KB-93**.
 > *(This block was stale until 2026-09-24 — it still claimed L119 / IDEA-241 / KB-87 while 172 BACKLOG rows,
 > L120 and KB-91 already existed. It is the only guard against reusing an ID, so correct it every session.)*
@@ -41,7 +41,26 @@ All three are **invisible in production**, which is always already migrated and 
 
 **Standing rule (L121): Lightsail changes are instrumented on Windows first.**
 
-## STOPPED FOR REVIEW -- reconciliation delivered, nothing implemented (L123)
+## Awaiting two rulings; two proposals up for review (L124)
+
+**A2 LOCKED** -- team machines use the same serial sequences; exclusivity moves upstream into market/distribution
+access (`IDEA-298`). **A5 LOCKED** -- interim visible conditions are fine, effects stay gated, and the interim
+must never become the product model.
+
+**A1 awaiting ruling.** Measured: `origin` is `production` on all 19 live assets, `grant` has never been used,
+**nothing in the codebase branches on it**, and `consumesOrdinals()` is never called outside tests. It is a
+write-only restatement of what `production_ordinal` already records. My earlier "two unrelated jobs" framing was
+wrong and is corrected in L124.
+
+**A4 awaiting ruling.** Evidence gathered. Exactly one ownership transfer has ever occurred; 8 of 27 results fall
+after it, all non-team; the MaiMai is the only asset in the world with odometer distance. **But NCM never
+verified the fielded vehicle at the grid**, so attribution is strong inference, not record. Recommendation: leave
+unknown, or adopt `IDEA-300` (`attribution_basis`) so a derived attribution stays legible as derived.
+
+**Up for review:** `25_MACHINE_ARCHITECTURE_PROFILE.md` (Q18/Q19) and `26_DOCUMENT_AUTHORITY.md` (the
+documentation pass, `IDEA-299`). Both PROPOSAL; nothing moved or rewritten.
+
+## Earlier: STOPPED FOR REVIEW -- reconciliation delivered, nothing implemented (L123)
 
 All 70 questions answered by the owner 2026-09-24. `24_FOUNDATION_RECONCILIATION.md` reconciles them against the
 schema, code, production data and the full 297-row ledger.
