@@ -951,3 +951,49 @@ lesson taken is that a manual step repeated by humans and agents needs a machine
    fixer must treat `/`-absolute targets as external and leave captured third-party material alone.
 
 All three were found by the dangling-link check and a diff review, not by inspection of intent.
+
+## L126 — LOCKED — team machines ARE assets. Recording a ruling the owner already gave.
+
+The owner asked on 2026-09-24 whether "team cars name no machine" was a legacy assumption creeping in.
+**It was, and the reason it survived is that I never recorded their own answer.**
+
+### The ruling, from the Q1–Q70 pass (Q4)
+
+> *"Yes, absolutely. They are persistent machine assets. They are owned by the **team**."*
+
+Plus the future-facing half, which matters for L92/L93: NCX teams must themselves become player-owned and
+managed while retaining league-level governance. Spunky Monkey, Rayfield and Herrera are not permanently
+protected NPC institutions.
+
+**L123 failed to capture this.** The only mention of team cars anywhere near it reads *"NCX team cars are not
+assets at all (`IDEA-238`)"* — which describes the state of the data as a supporting fact, and reads exactly like
+an open question. `IDEA-238`'s ledger row was left at `raw (owner decision)` for the same reason.
+
+So a coder — including me, four days later — would have found a settled decision presented as undecided. That is
+precisely the failure L125's authority pass exists to prevent, reappearing one level down: **not a stale
+document, but a stale row and an unrecorded decision.**
+
+### What is therefore true
+
+- A team machine is an **ordinary machine asset** (L123: *"do not preserve exceptions created by obsolete
+  prototypes as permanent ontology"*), drawing the same serial sequences (L124 A2).
+- Its owner is an **organization principal** — which migration 025 made expressible three hours before this was
+  written, and which `IDEA-168` specified long before that: *"assignment grants access, not title."*
+- `team_car` and `issued_vehicle` are the **migration source**, not a permanent species. Converting them is M6
+  in `24_FOUNDATION_RECONCILIATION.md` §9, still unbuilt.
+
+### The latent bug this exposes
+
+`NcmCompetition.enterMachine` resolves an entry's machine from `NcmOwnership.list(driverId)` — **what the driver
+OWNS**. A team car will be owned by the organization, so a team driver will not find their seat machine in that
+list, and will be refused an entry they are entitled to make.
+
+**Owning and being-entitled-to-field are different questions**, and `IDEA-168` named the distinction before the
+code existed. Filed as `IDEA-314`. It is latent today only because team cars are not yet assets; **M6 turns it
+into a live defect the moment it lands**, which is the worst possible time to discover it.
+
+### Corrected in code
+
+`enforceEnteredMachine`'s comment said a team entry *"names no machine and is untouched"*, framing a temporary
+gap as a permanent carve-out. Rewritten to say what is actually true: it names no machine **until M6**, and the
+rule needs no change when it does.

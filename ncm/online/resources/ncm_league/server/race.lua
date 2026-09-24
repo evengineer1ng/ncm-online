@@ -934,8 +934,11 @@ local forfeitAsked = {}          -- driverId -> server-clock deadline of the pen
 ---
 --- Refuses only on an EXPLICIT contradiction: an entry that named a machine, and a driver demonstrably sitting
 --- in a different one. An unknown seat is not a violation -- absence is not evidence, which is the lesson
---- KB-72 cost us when two gates demanded exact values from fields that might not exist. A team car or a legacy
---- entry names no machine and is untouched.
+--- KB-72 cost us when two gates demanded exact values from fields that might not exist.
+---
+--- A team entry names no machine **until M6 converts team cars into assets** -- that is a migration that has not
+--- run yet, NOT a carve-out. Team machines are ordinary machine assets owned by an organization principal
+--- (L126, L124 A2, IDEA-168), and when they carry an `assetId` this rule covers them unchanged.
 function NcmRace.enforceEnteredMachine(rec, t)
     if not rec or not rec.machineOf or not rec.slotOf then return 0 end
     local out = 0
