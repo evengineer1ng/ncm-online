@@ -52,9 +52,12 @@ CRLF = chr(13) + chr(10)
 FRAME_VERSION = 1
 
 # Mirror of driver.feedback. The Lua is authoritative.
-CEILING = {"gear": 0.60, "belt": 0.50, "direct_drive": 0.15, "unknown": 0.10}
-FLOOR = 0.05
-STEP = 0.05
+# Measured 2026-09-24 on a G29: the previous set was reasoned rather than tested, and a full-ladder run with
+# the constant centring effect was "fairly strong from first rung to too strong by the end". Lower floor,
+# finer steps, ceilings down by roughly 60%. Mirrors driver.feedback, which is authoritative.
+CEILING = {"gear": 0.24, "belt": 0.20, "direct_drive": 0.06, "unknown": 0.04}
+FLOOR = 0.02
+STEP = 0.02
 MAX_SLEW_PER_SECOND = 1.5
 
 

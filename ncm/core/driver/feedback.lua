@@ -43,10 +43,22 @@ Core.define("driver.feedback", function(C)
     --   * `direct_drive` -- untested by anyone here, and the class where a mistake hurts. Deliberately a
     --     third of the belt ceiling; it is a starting point for recruited testers, not a tuned value.
     --   * `unknown` -- we could not identify the device, so we assume the most dangerous thing it could be.
-    M.CEILING = { gear = 0.60, belt = 0.50, direct_drive = 0.15, unknown = 0.10 }
+    --
+    -- **MEASURED 2026-09-24, and the numbers moved a long way.** The first set were reasoned, not tested.
+    -- Then a G29 ran the full ladder with the constant centring effect in play and the owner reported it
+    -- *"fairly strong from first rung to too strong by the end"* -- so the floor was already past useful and
+    -- the ceiling was well past comfortable. A directional torque is enormously more forceful than the sine
+    -- the first numbers were guessed against, which is exactly the kind of thing measurement catches and
+    -- reasoning does not.
+    --
+    -- The ladder therefore starts LOWER and steps FINER, and the ceilings come down by roughly 60%. Relative
+    -- order is unchanged and deliberate: a belt drive is stronger than a gear drive for the same normalised
+    -- magnitude, so it is capped lower; direct drive is capped far below both; an unrecognised device is
+    -- assumed to be the most powerful thing it could be.
+    M.CEILING = { gear = 0.24, belt = 0.20, direct_drive = 0.06, unknown = 0.04 }
 
-    M.FLOOR = 0.05
-    M.STEP = 0.05
+    M.FLOOR = 0.02
+    M.STEP = 0.02
 
     --- Every permitted setting for a class, lowest first. **A tuning session starts at `[1]` and stops the
     --- moment another rung adds nothing** -- the owner's method, encoded so it survives being forgotten.
