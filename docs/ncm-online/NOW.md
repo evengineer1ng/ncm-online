@@ -8,7 +8,9 @@ engineering/wear proposals accepted with one reconciliation (L120); before that 
 locally and still not deployed.
 
 > **Claim before writing:** decisions through **L124**; MASTER_TEST through **2.18** / **§AG**; next QA
-> letter **§AH**. BACKLOG next free **IDEA-295**; known issues through **KB-93**.
+> letter **§AH**. BACKLOG next free **IDEA-301**; known issues through **KB-93**.
+> *(Stale a THIRD time on 2026-09-24 — it read IDEA-295 while the ledger ran to IDEA-300. Three strikes is an
+> argument for the automated assertion proposed in `26_DOCUMENT_AUTHORITY.md` §8, not for trying harder.)*
 > *(This block was stale until 2026-09-24 — it still claimed L119 / IDEA-241 / KB-87 while 172 BACKLOG rows,
 > L120 and KB-91 already existed. It is the only guard against reusing an ID, so correct it every session.)*
 > Historical §Z collision remains: qualify it by section (2.14 Machine Index vs 2.16 Help).
