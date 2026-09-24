@@ -768,3 +768,47 @@ Two defects were found by the live supply capture and fixed before the identity 
 - **Throttle/brake/steering meters are not feasible** (IDEA-231) — see the report; steering was checked this
   time too, with the same answer.
 - **Terminal mechanical failure is architecture only and switched off**, and a test asserts it stays off.
+
+## §AH — Machine attribution, entry-bound machines, owner principal (2026-09-24, NCM Development)
+
+Deployed to **NCM Development only** (migrations 024-027, restart 08:57). Online is untouched.
+**Today changed the race settlement path, the entry path and two live tables**, so the regression half matters
+more than the new-feature half. Run §AH1-§AH9 first; if any of those fail, stop and say so.
+
+Rows marked **[me]** I verify in the database afterwards — you do not need to check them.
+
+| # | What to do | Expect |
+|---|---|---|
+| **REGRESSION — most changed, check first** |||
+| §AH1 | Join the dev server. | You get in. No error spam. Identity mints under `ncm-devbox`. |
+| §AH2 | **F6 -> MARKET.** | Loads, three offerings, cards open. (KB-94 fix) |
+| §AH3 | **Machine Index.** | Loads; your discovered models and your owned car are listed. (KB-94 fix) |
+| §AH4 | **Race Guide.** | Loads, correct date, races listed. (KB-86 regression guard) |
+| §AH5 | `/ncm help`. | Answers. |
+| §AH6 | **F10 Collection.** | Loads. |
+| §AH7 | **CALL your car** from Machine Index. | It arrives; you can drive it. |
+| §AH8 | Look at the **odometer panel**, bottom-left. | Shows machine name/serial + lifetime distance, **and no longer covers the vanilla health HUD** (KB-90, raised 56px -> 184px). **If it now covers something else, say what.** |
+| §AH9 | Drive a few hundred metres. | The distance climbs. Leave the car and re-enter: it persists. |
+| **ENTRY BINDS A MACHINE + A NUMBER (new)** |||
+| §AH10 | Sitting **in your car**, enter a race from the venue. | Entry accepted as before. |
+| §AH11 | **[me]** | `entry.asset_id` = the car you were sitting in; `entry.car_number` assigned. |
+| §AH12 | Enter a second race **on foot**, away from your car. | Still accepted — you own an eligible machine. |
+| §AH13 | **[me]** | `asset_id` still bound (your only eligible car), and the **same car number** reused because it was free. |
+| **THE GRID RULE — you race the car you entered (new, riskiest)** |||
+| §AH14 | Enter a race in your car, **stay in it**, let it go green. | **Starts normally. No refusal, no toast.** This is the one that must not misfire. |
+| §AH15 | Watch the server log at green. | One line: `machines at green: 1 attributed, 0 unknown`. |
+| §AH16 | **Deliberate violation.** From the server console: `ncm.car <yourPlayerId> Sport` to get a loaner, enter a race in your OWN car, then get into the loaner before green. | Refused the start: chat line + **WRONG MACHINE** toast, classified DNS. Log shows `WRONG MACHINE ... -> refused start`. |
+| §AH17 | Same as §AH14 but **get out of the car on foot** just before green. | **Still starts.** An unknown seat is not a violation (KB-72 rule). |
+| **ATTRIBUTION (new)** |||
+| §AH18 | **Finish a race.** | Normal result. |
+| §AH19 | **[me]** | `session_result.asset_id` = your car, `attribution_basis = 'recorded'`. |
+| §AH20 | During that race, **hit a wall or a barrier** hard enough to register an incident. | Incident toast as usual. |
+| §AH21 | **[me]** | `incident.asset_id` = your car (this was writing nothing until today). |
+| §AH22 | Run a **practice / time trial** and set a best lap. | Normal. |
+| §AH23 | **[me]** | That result row is attributed too — it was the third unwired write site. |
+| **OWNER PRINCIPAL — no visible change expected** |||
+| §AH24 | Everything involving your car and money still works: CALL, Market browse, purchase if you have funds. | Unchanged. Migration 025 added columns beside the old ones; nothing reads them yet. |
+| §AH25 | **[me]** | `vehicle_asset` and `ledger` principal columns stay in step with `ncm_driver_id`. |
+| **WATCH FOR ANYTHING** |||
+| §AH26 | Any `[ERR]` line in the server log during the session. | There should be none. **One known and expected:** a single `SQL 1146` at boot ONLY if the schema was behind, which it is not any more (KB-92). |
+| §AH27 | A wrong-machine refusal you did not deliberately cause. | Should never happen. **Tell me immediately if it does** — that is the rule misfiring and I will make it log-only. |
