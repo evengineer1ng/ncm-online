@@ -152,6 +152,13 @@ AddEventHandler("onClientResourceStart", function(name)
     })
     if not page then log("race HUD WebUI failed: %s", tostring(reason)); return end
     page:on("race:ready", function() pageReady = true; lastSent = nil; log("race HUD ready") end)
+    -- IDEA-387: the probe's verdict, logged so it lands in the client log rather than only in a console.
+    page:on("race:wsprobe.result", function(r)
+        if type(r) ~= "table" then log("wsprobe: malformed result"); return end
+        log("wsprobe: %s | origin=%s secureContext=%s protocol=%s | %s (%sms)",
+            tostring(r.verdict), tostring(r.origin), tostring(r.secureContext),
+            tostring(r.protocol), tostring(r.detail), tostring(r.elapsedMs))
+    end)
 end)
 
 local function clearAll(instr)
@@ -353,6 +360,31 @@ CreateThread(function()
         Wait(lastInputs ~= "off" and 50 or 500)
     end
 end)
+
+-- ---------------------------------------------------------------------------------------------
+-- `/ncm.wsprobe` -- can this page reach a local companion? (IDEA-387)
+-- ---------------------------------------------------------------------------------------------
+--
+-- Official OPEN//77 docs say a bundled page may use fetch/XHR and WS/WSS, and that localhost is the player's
+-- PC and not the game server. That settles the PLATFORM. It does not settle the BROWSER: a page served from
+-- an `https://` origin may not open a `ws://` connection. Chromium treats `127.0.0.1` as potentially
+-- trustworthy, which normally exempts it -- but that carve-out has shifted across releases and interacts with
+-- Private Network Access, so it is a question about the build in front of us.
+--
+-- **Inert unless invoked.** No thread, no tick, nothing sent until someone types the command. It also reports
+-- the page's own `origin` and `isSecureContext`, which is the bundled-virtual-HTTPS question answered by the
+-- client instead of guessed.
+--
+-- Run `python tools/ws-probe-server.py` first, then `/ncm.wsprobe` in game.
+RegisterCommand("ncm.wsprobe", function(_, args)
+    local url = (args and args[1]) and tostring(args[1]) or "ws://127.0.0.1:38480"
+    if not page or not pageReady then
+        log("wsprobe: race HUD page is not ready; cannot probe")
+        return
+    end
+    log("wsprobe: asking the HUD page to open %s", url)
+    page:send("race:wsprobe", { url = url })
+end, false)
 
 local function present()
     local instr = instrumentState()

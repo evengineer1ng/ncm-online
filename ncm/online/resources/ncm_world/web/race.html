@@ -303,6 +303,61 @@
         if (inWheelG.style.transform !== tf) inWheelG.style.transform = tf;
       });
 
+      // ---------------------------------------------------------------------------------------------
+      // IDEA-387 probe: can this bundled page open a WebSocket to the player's own machine?
+      // ---------------------------------------------------------------------------------------------
+      //
+      // The platform allows it (OPEN//77 resource-runtime, "Remote pages, external content and hot reload":
+      // bundled and remote pages may use fetch/XHR and WS/WSS, and localhost means the player's PC). The
+      // browser is the open question -- an https:// page may not open ws://, and although Chromium treats
+      // 127.0.0.1 as potentially trustworthy, that carve-out has moved across releases.
+      //
+      // So the probe reports `origin` and `isSecureContext` alongside the verdict. Those two fields are worth
+      // as much as the connection result: they say whether the bundled page is a secure origin at all, which
+      // is what decides whether ws:// was ever going to be allowed.
+      //
+      // `error` gives a script no detail by design (cross-origin information leak), so a refusal and a policy
+      // block look alike from here. That is why `elapsedMs` is reported and why the listener prints its own
+      // side: a handshake the server SAW is unambiguous, and the two logs together tell the whole story.
+      Open77.on("race:wsprobe", (req) => {
+        const url = (req && req.url) || "ws://127.0.0.1:38480";
+        const t0 = (performance && performance.now) ? performance.now() : Date.now();
+        const env = {
+          origin: (location && location.origin) || "(none)",
+          secureContext: (typeof isSecureContext === "boolean") ? isSecureContext : "unknown",
+          protocol: (location && location.protocol) || "(none)",
+        };
+        const report = (verdict, detail) => {
+          const now = (performance && performance.now) ? performance.now() : Date.now();
+          Open77.emit("race:wsprobe.result", Object.assign({
+            verdict: verdict, detail: String(detail), elapsedMs: Math.round(now - t0),
+          }, env));
+        };
+        let ws;
+        try {
+          ws = new WebSocket(url);
+        } catch (e) {
+          // A synchronous throw is the signature of a policy refusal rather than a failed connection.
+          report("BLOCKED-SYNC", e && e.message ? e.message : e);
+          return;
+        }
+        const timer = setTimeout(() => { try { ws.close(); } catch (e) {} report("TIMEOUT", "no open in 4s"); }, 4000);
+        ws.onopen = () => {
+          clearTimeout(timer);
+          // Send one realistic frame, so this proves the payload path and not merely the handshake.
+          try {
+            ws.send(JSON.stringify({
+              probe: "ncm", origin: env.origin, secureContext: env.secureContext,
+              sample: { throttle: 0.5, brake: 0, steering: -0.25, rpm: 3200, rpmMax: 5300, gear: 3 },
+            }));
+          } catch (e) {}
+          report("OPEN", "handshake completed and one frame sent");
+          setTimeout(() => { try { ws.close(1000, "probe done"); } catch (e) {} }, 500);
+        };
+        ws.onerror = () => { clearTimeout(timer); report("ERROR", "connection failed (refused or blocked -- check the listener's own log)"); };
+        ws.onclose = (ev) => { clearTimeout(timer); };
+      });
+
       Open77.on("race:state", apply);
       Open77.ready();
       Open77.emit("race:ready", {});
