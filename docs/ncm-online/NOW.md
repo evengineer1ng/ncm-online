@@ -8,7 +8,7 @@ engineering/wear proposals accepted with one reconciliation (L120); before that 
 locally and still not deployed.
 
 > **Claim before writing:** decisions through **L124**; MASTER_TEST through **2.18** / **§AG**; next QA
-> letter **§AH**. BACKLOG next free **IDEA-301**; known issues through **KB-93**.
+> letter **§AH**. BACKLOG next free **IDEA-302**; known issues through **KB-93**.
 > *(Stale a THIRD time on 2026-09-24 — it read IDEA-295 while the ledger ran to IDEA-300. Three strikes is an
 > argument for the automated assertion proposed in `26_DOCUMENT_AUTHORITY.md` §8, not for trying harder.)*
 > *(This block was stale until 2026-09-24 — it still claimed L119 / IDEA-241 / KB-87 while 172 BACKLOG rows,
@@ -42,6 +42,18 @@ All three are **invisible in production**, which is always already migrated and 
 - **KB-92** — a `SQL 1146` that only fires when the schema is behind the code, i.e. on every fresh install.
 
 **Standing rule (L121): Lightsail changes are instrumented on Windows first.**
+
+## NEXT SESSION STARTS HERE -> `HANDOFF_2026-09-25.md`
+
+A cold-start prompt for the next Coder 1 was written on 2026-09-24 and is preserved at
+`HANDOFF_2026-09-25.md`. **Today's objective is the documentation-authority pass** (`26_DOCUMENT_AUTHORITY.md`,
+`IDEA-299`) -- *not* AG5/AG6, which the owner deliberately redirected away from, and *not* foundation
+implementation.
+
+**One discrepancy needs an owner ruling before `bricks/` can be classified:** Race Tags (`IDEA-089`) exists only
+as an unadmitted brick -- absent from `ncm/core/MANIFEST.lua`, absent from `ncm/core/competition/`, its
+vocabulary nowhere in live code, ledger state "specified", no decision entry. The owner believes it is a shipped
+post-race feature. Recorded as `IDEA-301`.
 
 ## Awaiting two rulings; two proposals up for review (L124)
 
