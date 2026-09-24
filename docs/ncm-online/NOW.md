@@ -6,8 +6,8 @@
 Last rewritten: **2026-09-24 — Driver Identity / Nameplate recovery audit.** No runtime, schema,
 configuration, deployment, save, API or gameplay behaviour changed.
 
-> **Claim before writing:** decisions through **L129**; MASTER_TEST through **2.18 / §AI**; next QA letter
-> **§AJ**. BACKLOG next free **IDEA-375**; known issues through **KB-96** plus the existing duplicate KB-87.
+> **Claim before writing:** decisions through **L129**; MASTER_TEST through **2.18 / §AJ**; next QA letter
+> **§AK**. BACKLOG next free **IDEA-394**; known issues through **KB-96** plus the existing duplicate KB-87.
 > Historical §Z collision remains: qualify by section (2.14 Machine Index vs 2.16 Help).
 
 ## Next action: restart NCM Development, then drive §AI
