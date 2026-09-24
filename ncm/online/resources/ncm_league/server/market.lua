@@ -391,17 +391,36 @@ end
 --- the whole shelf" -- exactly what packet section 11 forbids. Discovery now happens when a player selects
 --- an offering and looks at it (`ncm:market.inspect`), which works identically whether it is stocked or
 --- sold out.
+--- **The market list used to be the literal `base_market`** (IDEA-251). It is now what this Driver has
+--- learned of: every universally-known market plus their own grants, which is precisely the pair of arguments
+--- `Markets.known(markets, grants)` has taken since it was written and never been passed. The shelf follows
+--- the list, so a market this Driver has not reached contributes no offerings rather than being filtered out
+--- of a payload that already built it.
+---
+--- Behaviour is unchanged today: Base Market is universally known, it is the only authored market, and
+--- `Production.linesFor` returns nothing for anything else. What changes is that a second market becomes a
+--- data question rather than an edit to this function.
 function NcmMarket.payload(pid)
     local d = driver(pid)
     if not d then return nil, "no_driver" end
     ensureStarter(d.ncmDriverId)
+    NcmMarketKnowledge.ensureUniversal(d.ncmDriverId)
     local balance = balanceOf(d.ncmDriverId)
-    local offerings = NcmMarket.offerings(Markets.BASE_ID)
+    local known = Markets.known(Markets.MARKETS, NcmMarketKnowledge.grants(d.ncmDriverId))
+    local markets, offerings = {}, {}
+    for _, market in ipairs(known) do
+        markets[#markets + 1] = { marketId = market.marketId, displayName = market.displayName }
+        for _, o in ipairs(NcmMarket.offerings(market.marketId)) do
+            -- The display name comes from the market that carries the offering. It used to be the string
+            -- "Base Market" regardless, which would have mislabelled every line of the second market.
+            o.marketName = market.displayName
+            offerings[#offerings + 1] = o
+        end
+    end
     -- `items` is retained for one purpose: it is the flat list of individually purchasable assets, which is
     -- still what a purchase names (L99). It is derived from the offerings so the two can never disagree.
     local items = {}
     for _, o in ipairs(offerings) do
-        o.marketName = "Base Market"
         o.affordable = balance >= o.price
         o.eligible = true
         for _, assetId in ipairs(o.assetIds or {}) do
@@ -410,9 +429,8 @@ function NcmMarket.payload(pid)
                 manufacturer = o.manufacturer, displayName = o.displayName, available = true, eligible = true }
         end
     end
-    return { markets = { { marketId = Markets.BASE_ID, displayName = "Base Market" } },
-        offerings = offerings, items = items, balance = balance, currency = "eddies",
-        serverNow = now() }
+    return { markets = markets, offerings = offerings, items = items, balance = balance,
+        currency = "eddies", serverNow = now() }
 end
 
 --- A player selected an offering and looked at it. That is a legitimate encounter with information about
@@ -424,6 +442,11 @@ end
 function NcmMarket.inspect(pid, marketId, vehicleKey)
     local d = driver(pid)
     if not d then return nil, "no_driver" end
+    -- "A market this player can see" was a comment rather than a check: any authored line discovered its
+    -- model, whether or not the Driver had reached that market. Now it is the check (IDEA-251).
+    local access = NcmMarketKnowledge.state(d.ncmDriverId, tostring(marketId or ""))
+    if not access then return nil, "market_unknown" end
+    if not Markets.accessible(access.accessState) then return nil, "market_inaccessible" end
     local line = Production.line(tostring(marketId or ""), tostring(vehicleKey or ""))
     -- Only an authored offering of a market this player can see. Canonical catalogue membership alone
     -- discovers nothing (packet section 11, L).
@@ -443,8 +466,18 @@ end
 function NcmMarket.purchase(pid, marketId, assetId)
     local d = driver(pid)
     if not d then return nil, "no_driver" end
-    if marketId ~= Markets.BASE_ID or type(assetId) ~= "string" then return nil, "market_unknown" end
+    if type(assetId) ~= "string" or assetId == "" then return nil, "market_unknown" end
+    -- **Knowledge and access are asked here; everything else stays inside the transaction.** The single
+    -- statement below is the authority on visible / available / affordable precisely so those three cannot be
+    -- read, then change, then acted on. Knowledge has no such race -- it is a durable per-Driver fact -- so it
+    -- is the one gate that belongs in front. The refusal strings are `purchaseDecision`'s own; that function
+    -- is deliberately still not called, because calling it would mean reading balance and stock out here and
+    -- reintroducing the race the transaction exists to remove.
+    local access = NcmMarketKnowledge.state(d.ncmDriverId, marketId)
+    if not access then return nil, "market_unknown" end
+    if not Markets.accessible(access.accessState) then return nil, "market_inaccessible" end
     ensureStarter(d.ncmDriverId)
+    NcmMarketKnowledge.ensureUniversal(d.ncmDriverId)
     local t = now()
     local idem = "purchase:" .. serverId() .. ":" .. assetId
     local transferId = ids.uuid4(hostRng)

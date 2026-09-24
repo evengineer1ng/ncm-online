@@ -1038,3 +1038,38 @@ migration 025 already made expressible.
 `IDEA-315`: no enum under `ncm/core/vocabulary/` may contain a value naming a **use** rather than a **fact** —
 `team_equipment`, `loaner`, `grid_car`, `league_car`. Mechanically checkable, and the third time this session
 that a rule kept in prose failed where a gate assertion would have held (see also L125 §8, `IDEA-313`).
+
+---
+
+## L128 — LOCKED — a gate goes in front of the transaction only when the fact it reads cannot change
+
+Built with `IDEA-251`, 2026-09-24.
+
+### The rule
+
+**Durable per-Driver facts are checked before the transaction. Contested world facts are checked inside it.**
+
+`NcmMarket.purchase` settles stock, money, title and the transfer record in **one** MySQL transaction, and that
+is not tidiness — it is what makes "visible, available, affordable" unraceable. Reading any of those out in
+front, deciding on them, and then acting is a time-of-check/time-of-use race with real money and a unique
+serialised machine on the other side of it.
+
+Market **knowledge and access** are different in kind: they are durable per-Driver rows that no concurrent
+buyer can move. So they are asked in front, where a clear refusal (`market_unknown`, `market_inaccessible`)
+can be returned before anything is attempted.
+
+### The consequence that must not be "tidied up" later
+
+`economy.markets.purchaseDecision` validates six facts and has **never been called** since it was written. It
+looks like an oversight and it is not. Wiring it would mean hoisting the balance and stock reads back out in
+front of the transaction purely to populate its arguments — **reintroducing precisely the race the transaction
+exists to remove**, in exchange for the appearance of using a helper.
+
+The purchase gate therefore reuses `purchaseDecision`'s **refusal strings** and not its control flow. That is
+recorded here, and in `IDEA-357`, so the next reader finds a decision rather than dead code.
+
+### Related
+
+Extends L127's lesson one step. L127 says a vocabulary value with no producer is a guess with a schema behind
+it; this says a validator with no safe caller is a guess with a function behind it. In both cases the honest
+move is to leave the seam visible and say why.

@@ -26,4 +26,35 @@ return {
         base.balance=2499
         T.eq(M.purchaseDecision(base).reason, "unaffordable")
     end,
+    ["market discovery records a first sight and refuses unwritable vocabulary"] = function(T)
+        local M = T.Core.get("economy.markets")
+        local ok = M.discovery({ driverId = "d1", serverId = "ncm-dev", marketId = M.BASE_ID,
+            firstKnownAt = 1000, sourceKind = "universal", accessState = "open" })
+        T.eq(ok.marketId, M.BASE_ID)
+        T.eq(ok.sourceRef, nil)
+        T.eq(M.accessible(ok.accessState), true)
+        -- One value per table until IDEA-298 brings its own producer (L127).
+        local _, why = M.discovery({ driverId = "d1", serverId = "ncm-dev", marketId = M.BASE_ID,
+            firstKnownAt = 1000, sourceKind = "granted", accessState = "open" })
+        T.eq(why, "unknown_source:granted")
+        local _, why2 = M.discovery({ driverId = "d1", serverId = "ncm-dev", marketId = M.BASE_ID,
+            firstKnownAt = 1000, sourceKind = "universal", accessState = "restricted" })
+        T.eq(why2, "unknown_access:restricted")
+        T.eq(M.accessible("restricted"), false)
+        T.eq(M.accessible(nil), false)
+    end,
+    ["market discovery refuses a market that does not exist and a bad timestamp"] = function(T)
+        local M = T.Core.get("economy.markets")
+        local base = { driverId = "d1", serverId = "ncm-dev", marketId = M.BASE_ID,
+            firstKnownAt = 1000, sourceKind = "universal", accessState = "open" }
+        local function with(k, v)
+            local f = {}; for a,b in pairs(base) do f[a]=b end; f[k]=v
+            local _, why = M.discovery(f); return why
+        end
+        T.eq(with("marketId", "ncx_channel"), "unknown_market:ncx_channel")
+        T.eq(with("driverId", ""), "no_driver")
+        T.eq(with("serverId", nil), "no_server")
+        T.eq(with("firstKnownAt", 1000.5), "bad_first_known_at")
+        T.eq(with("sourceRef", string.rep("x", 161)), "bad_source_ref")
+    end,
 }

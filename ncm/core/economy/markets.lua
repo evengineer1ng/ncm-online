@@ -33,6 +33,49 @@ Core.define("economy.markets", function(C)
         return out
     end
 
+    -- ---------------------------------------------------------------------------------------------
+    -- Market discovery: which markets a Driver has learned of, and on what footing (IDEA-251).
+    -- ---------------------------------------------------------------------------------------------
+    --
+    -- **Exactly one value in each table, because exactly one producer exists.** L127 is the reason: the
+    -- `machine_source` enum declared `team_equipment` ahead of any code that wrote it, on a misreading of the
+    -- design, and migration 027 had to drop the column. `IDEA-298` introduces restricted and granted access,
+    -- and it introduces the vocabulary in the same change as the code that produces it.
+    --
+    -- `open` is what `purchaseDecision` already calls `marketAccessible`. The two questions stay separate on
+    -- purpose: a Driver may know a market exists and still not be able to source from it, which is the whole
+    -- mechanism A2 left exclusivity to (`IDEA-298`).
+    M.DISCOVERY_SOURCES = { universal = true }
+    M.ACCESS_STATES = { open = true }
+
+    function M.accessible(state) return state == "open" end
+
+    --- Validate one durable record of "this Driver knows this market exists". `firstKnownAt` is a first-sight
+    --- fact: hosts write it once and never update it, exactly as `vehicle_discovery.first_discovered_at` is
+    --- written once. `sourceRef` is optional because a universal market has nothing to point at.
+    function M.discovery(fact)
+        if type(fact) ~= "table" then return nil, "no_fact" end
+        if type(fact.driverId) ~= "string" or fact.driverId == "" then return nil, "no_driver" end
+        if type(fact.serverId) ~= "string" or fact.serverId == "" then return nil, "no_server" end
+        if type(fact.marketId) ~= "string" or not M.byId(fact.marketId) then
+            return nil, "unknown_market:" .. tostring(fact.marketId)
+        end
+        if not M.DISCOVERY_SOURCES[fact.sourceKind] then
+            return nil, "unknown_source:" .. tostring(fact.sourceKind)
+        end
+        if not M.ACCESS_STATES[fact.accessState] then
+            return nil, "unknown_access:" .. tostring(fact.accessState)
+        end
+        if fact.sourceRef ~= nil and (type(fact.sourceRef) ~= "string" or #fact.sourceRef > 160) then
+            return nil, "bad_source_ref"
+        end
+        local at = tonumber(fact.firstKnownAt)
+        if at == nil or at < 0 or math.floor(at) ~= at then return nil, "bad_first_known_at" end
+        return { driverId = fact.driverId, serverId = fact.serverId, marketId = fact.marketId,
+                 firstKnownAt = at, sourceKind = fact.sourceKind, sourceRef = fact.sourceRef,
+                 accessState = fact.accessState }
+    end
+
     function M.validate()
         local marketIds, assets, slots = {}, {}, {}
         for _, market in ipairs(M.MARKETS) do

@@ -10,8 +10,8 @@ Last rewritten: **2026-09-24 — the NCM Single Player <-> Online convergence au
 tooling/API audit and the documentation-authority pass (L125). No runtime, schema, save, API, server configuration,
 deployment or gameplay behavior changed in this audit.
 
-> **Claim before writing:** decisions through **L127**; MASTER_TEST through **2.18** / **§AG**; next QA
-> letter **§AH**. BACKLOG next free **IDEA-356**; known issues through **KB-96**.
+> **Claim before writing:** decisions through **L128**; MASTER_TEST through **2.18** / **§AG**; next QA
+> letter **§AH**. BACKLOG next free **IDEA-359**; known issues through **KB-96**.
 > *(Stale a THIRD time on 2026-09-24 — it read IDEA-295 while the ledger ran to IDEA-300. Three strikes is an
 > argument for the automated assertion proposed in `26_DOCUMENT_AUTHORITY.md` §8, not for trying harder.)*
 > *(This block was stale until 2026-09-24 — it still claimed L119 / IDEA-241 / KB-87 while 172 BACKLOG rows,
@@ -20,6 +20,32 @@ deployment or gameplay behavior changed in this audit.
 > `KB-87` is used **twice** (incident detection, and the odometer forensic) — an existing collision, not a typo.
 > L106 is the Market/access meaning (acquisition vs access); the probe-evidence corollary is **L109**.
 > Do not reuse IDs or rewrite another session's authored history.
+
+## Next action: restart `ncm_league` on Development and open the Market
+
+`IDEA-251` is **built and gate-green, not yet PASSed.** The dev server has been running since 12:59 and was
+not restarted from here -- the resources directory is a junction, so the new Lua is already on disk and one
+`restart ncm_league` picks it up.
+
+**What to look for:** the Market opens with the same three offerings and the same balance (behaviour is
+deliberately unchanged), and `player_market_knowledge` -- **0 rows since migration 017** -- gains exactly one
+row per driver: `base_market`, `source_kind = universal`, `access_state = open`, `first_known_at` set once and
+never rewritten. Buy something and inspect an offering; neither should behave differently.
+
+```sql
+SELECT ncm_driver_id, market_id, first_known_at, source_kind, access_state FROM player_market_knowledge;
+```
+
+**What was built.** The market list in the payload is now `Markets.known(MARKETS, grants)` -- the function that
+has taken a `grants` argument since it was written and never been passed -- instead of the literal
+`base_market`. The shelf follows the list, so an unreached market contributes no offerings rather than being
+filtered out of a payload that already built it. `inspect` and `purchase` gate on knowledge and access first
+(`IDEA-356`). Vocabulary is **one value wide on purpose** (`IDEA-358`, L127).
+
+**This is the channel `IDEA-298` needs.** A2 ruled exclusivity out of asset identity, which left access as the
+only place it can live; `access_state` is that place, and it is now written rather than reserved.
+
+Then `IDEA-339` (capability audit), then the estimator as its own reviewed proposal.
 
 ## The work now has a repository, and a workshop to happen in
 
