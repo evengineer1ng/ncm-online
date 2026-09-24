@@ -7,7 +7,7 @@ Last rewritten: **2026-09-24 — version control, and NCM Development is standin
 engineering/wear proposals accepted with one reconciliation (L120); before that KB-87 incident detection, built
 locally and still not deployed.
 
-> **Claim before writing:** decisions through **L121**; MASTER_TEST through **2.18** / **§AG**; next QA
+> **Claim before writing:** decisions through **L121** (+ addendum); MASTER_TEST through **2.18** / **§AG**; next QA
 > letter **§AH**. BACKLOG next free **IDEA-295**; known issues through **KB-93**.
 > *(This block was stale until 2026-09-24 — it still claimed L119 / IDEA-241 / KB-87 while 172 BACKLOG rows,
 > L120 and KB-91 already existed. It is the only guard against reusing an ID, so correct it every session.)*
@@ -43,8 +43,9 @@ All three are **invisible in production**, which is always already migrated and 
 
 ### Next, in order
 
-1. **`IDEA-292` needs one word from the owner** — the dev database still holds 57 `event` rows keyed `ncm-dev`,
-   the live world's identity. Relabel or delete? Not touched without instruction.
+1. ~~`IDEA-292`~~ **done** — 110 legacy rows relabelled `ncm-devbox-legacy`. Nothing on the dev box wears
+   production's identity any more. Relabel beat deletion because 69 child rows hang off those events through
+   tables with no `server_id` column of their own (L121 addendum).
 2. **The owed live QA is now the blocker it was always going to be.** §AD1–AD7, §AE8–AE13, §AF4–AF6, §AG5–AG8
    are all NOT RUN, and `IDEA-287` already promoted §AG5/§AG6 to a **prerequisite** for wear carrying any
    economic weight. The dev box can now run the console-driven and destructive half of these without touching

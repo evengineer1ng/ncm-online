@@ -643,3 +643,37 @@ long-running, already-migrated server.
 **Lightsail changes are instrumented on Windows first.** Not ceremony: the point is that a change is *tested
 somewhere* before it reaches a world with durable player property in it. The promotion procedure is the one
 already written in `16_ENVIRONMENTS.md`; it now has a real environment behind it.
+
+### L121 addendum — the legacy dev rows were relabelled, not deleted (2026-09-24)
+
+The development database still held 110 rows keyed `ncm-dev` — the live world's identity — from the
+2026-09-19/20 sessions. Owner: *"whats your take on the rows? relabel? whatever is safest."*
+
+**Relabelled to `ncm-devbox-legacy`.** The label is not a fiction invented for tidiness: those rows were
+always written by *this box*, during the period when it happened to share the serverId production had also
+chosen. `ncm-devbox-legacy` states what is true — this machine, earlier. The old label's collision with
+production was the inaccuracy, not the fix.
+
+Checked before deciding, because "safest" turns on what the rows can actually reach:
+
+- **They were already inert.** The money guard (`market.lua:455`) filters `l.server_id=?` inside the
+  purchase transaction, and the identity binding (`identity.lua:77`) filters `b.server_id = ?` and joins
+  `p.server_id = b.server_id`. A legacy balance could not have funded a purchase and a legacy binding could
+  not have resurfaced as an identity.
+- **Deletion was the more dangerous operation, not the safer one.** 69 child rows — `entry` 21, `seat` 20,
+  `session` 13, `session_result` 15 — hang off those 57 events, and **none of those tables carry
+  `server_id`**; they are scoped transitively through `event_id`. Deleting therefore meant cascading 179
+  rows across 10 tables in foreign-key order, and the FKs would have failed a naive attempt partway. The
+  relabel touches no foreign key, collides with nothing (checked against every unique index on the six
+  tables — `driver_profile` and `ncm_driver_binding` and `team` all key on `server_id`, and the target value
+  did not exist), and leaves every child correctly attached because `event_id` never changes.
+
+Targeted restorable backup taken first: `ncm-devbox-legacy-rows-<stamp>.sql` under the NCM backups folder,
+`--complete-insert`, restorable against the current 023 schema rather than the older pre-migration full dump.
+
+Result: **zero rows anywhere on the development box now wear production's identity**, in the database or in
+any dump taken from it. The running server did not notice — same single boot error, scheduler unaffected.
+
+**The general rule this establishes:** when a `server_id` relabel is on the table, check for child tables
+that lack the column. Scoping by transitive join is invisible to a `WHERE server_id=` survey, and it is what
+decides whether relabel or delete is the smaller operation.
