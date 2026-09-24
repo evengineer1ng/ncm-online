@@ -55,6 +55,12 @@ run before any production. Fix is ordering, not renumbering.
 
 Deep dive on whatever spec is captured after this lands.
 
+## Captured, parked for deep dive after `IDEA-319`
+
+`28_MACHINE_KNOWLEDGE.md` - machine knowledge, discovery, documentation, empirical observation and
+estimation envelopes. **SPEC status: captured, not authorised.** `IDEA-320` to `IDEA-339`.
+Owner instruction: capture only, deep dive after the ordinal fix lands.
+
 ## START HERE -> [INDEX.md](INDEX.md)
 
 **The documentation corpus is now classified (L125).** `INDEX.md` is the entry point and says which document

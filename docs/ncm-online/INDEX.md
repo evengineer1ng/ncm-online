@@ -89,7 +89,7 @@ unbuilt) while the brick methodology itself is HISTORICAL (a closed experiment).
 - [OPS_STAGING.md](OPS_STAGING.md) - day-to-day operation of NCM Online
 - [wp/QA_INSTRUMENTATION.md](wp/QA_INSTRUMENTATION.md) - mapping the QA corpus to instrumentation
 
-## Spec - owner intent, not authorised (9)
+## Spec - owner intent, not authorised (10)
 
 - [06_CHROME_ROSTER.md](06_CHROME_ROSTER.md) - vehicle cyberware / quickhack roster
 - [09_APPAREL.md](09_APPAREL.md) - apparel entitlement
@@ -99,6 +99,7 @@ unbuilt) while the brick methodology itself is HISTORICAL (a closed experiment).
 - [18_PARTS_ECOSYSTEM.md](18_PARTS_ECOSYSTEM.md) - the procedural component/parts ecosystem
 - [19_ENGINEERING.md](19_ENGINEERING.md) - engineering as a career
 - [20_WEAR_LIFECYCLE.md](20_WEAR_LIFECYCLE.md) - wear, condition and component lifecycle
+- [28_MACHINE_KNOWLEDGE.md](28_MACHINE_KNOWLEDGE.md) - machine knowledge, discovery, documentation, observation and estimation envelopes
 - [bricks/assignments/B-089-race-tags.v1.md](bricks/assignments/B-089-race-tags.v1.md) - Race Tags - owner wants it integrated eventually; NOT yet integrated (IDEA-301)
 
 ## Proposal - no authority until ruled (5)
