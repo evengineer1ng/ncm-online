@@ -26,7 +26,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
-$source = Join-Path $root 'tools\ffb-dev-companion.py'
+$source = Join-Path $root 'tools\ncm-wheel.py'
 $name = 'NCM Wheel Support'
 $exe = Join-Path $root "dist\$name.exe"
 

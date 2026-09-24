@@ -243,6 +243,162 @@ def _read_frame(conn: socket.socket):
     return opcode, bytes(b ^ mask[i % 4] for i, b in enumerate(payload))
 
 
+# --------------------------------------------------------------------------------------------------
+# Input: wheel and pedals -> one virtual Xbox 360 pad.
+# --------------------------------------------------------------------------------------------------
+#
+# **This is what makes the support native rather than a companion hack.** Cyberpunk reads an ordinary Xbox
+# controller; ViGEmBus lets us present one; SDL reads the real hardware. Nothing about it is NCM-specific,
+# which is the point -- the wheel steers the car in menus, in free roam and in someone else's gamemode, not
+# only while NCM is looking.
+#
+# Observed on this machine, game and JoyMoCo both closed:
+#     joystick 0  "Sim Pedals"                                   3 axes, all resting at -32768
+#     joystick 1  "Logitech G HUB G29 ... Racing Wheel USB"       4 axes, wheel centred at 0
+# So pedals are a SEPARATE device from the wheel, and a pedal at rest reads minimum rather than centre.
+
+WHEEL_HINTS = ("wheel", "g29", "g920", "g923", "g27", "racing", "base", "moza", "simucube", "simagic",
+               "fanatec", "thrustmaster")
+PEDAL_HINTS = ("pedal", "pedals")
+
+
+class Input:
+    """Reads the rig and drives a virtual Xbox 360 pad.
+
+    **Steering range is the headline setting.** A wheel with 900 degrees of lock-to-lock travel that is
+    mapped one-to-one onto a thumbstick gives a car that barely turns: full stick deflection would need half
+    a turn of the wheel. So only the middle of the travel is used -- `--steer-degrees` per side maps to full
+    deflection, and everything beyond it is clamped. The owner's 45 degrees comes from what already worked
+    for them in JoyMoCo, which is a better starting point than anything derived from first principles.
+    """
+
+    def __init__(self, steer_degrees: float = 45.0, wheel_range: float = 900.0,
+                 throttle_axis: int = 0, brake_axis: int = 1, deadzone: float = 0.01):
+        self.steer_degrees = max(5.0, steer_degrees)
+        self.wheel_range = max(90.0, wheel_range)
+        self.throttle_axis, self.brake_axis = throttle_axis, brake_axis
+        self.deadzone = deadzone
+        self.sdl = None
+        self.pad = None
+        self.wheel = self.pedals = None
+        self.wheel_name = self.pedal_name = None
+        self.rest = {}
+        self.running = False
+        self.thread = None
+        self.last = {}
+
+    @property
+    def scale(self) -> float:
+        """Full stick deflection per unit of raw axis. 900 deg lock-to-lock and 45 per side gives 10."""
+        return (self.wheel_range / 2.0) / self.steer_degrees
+
+    def open(self) -> str:
+        try:
+            import sdl2
+            import vgamepad as vg
+        except Exception as exc:                                # noqa: BLE001 - diagnostic path
+            return "input unavailable: %s (is ViGEmBus installed?)" % exc
+        self.sdl = sdl2
+        try:
+            sdl2.SDL_Init(sdl2.SDL_INIT_JOYSTICK)
+            sdl2.SDL_JoystickEventState(sdl2.SDL_IGNORE)        # we poll; no event queue to drain
+            for i in range(sdl2.SDL_NumJoysticks()):
+                raw = sdl2.SDL_JoystickNameForIndex(i)
+                nm = (raw.decode(errors="replace") if isinstance(raw, bytes) else str(raw))
+                low = nm.lower()
+                if self.pedals is None and any(h in low for h in PEDAL_HINTS):
+                    self.pedals, self.pedal_name = sdl2.SDL_JoystickOpen(i), nm
+                    print("[in ] pedals : %d %s" % (i, nm), flush=True)
+                elif self.wheel is None and any(h in low for h in WHEEL_HINTS):
+                    self.wheel, self.wheel_name = sdl2.SDL_JoystickOpen(i), nm
+                    print("[in ] wheel  : %d %s" % (i, nm), flush=True)
+            if self.wheel is None:
+                return "no wheel found among the attached joysticks"
+            self.pad = vg.VX360Gamepad()
+            # A pedal rests at one END of its travel, not at centre, and which end differs by hardware. Learn
+            # it once instead of assuming: whatever it reads with feet off is zero.
+            #
+            # **The first read after opening is a lie.** SDL reports 0 for every axis until it has actually
+            # polled the device, so calibrating immediately captured 0 as "released" -- and a real pedal
+            # resting at -32768 then read as FULLY PRESSED. The virtual pad sat holding full throttle and
+            # full brake at once. Settle first, and sanity-check the result.
+            if self.pedals is not None:
+                for _ in range(15):
+                    sdl2.SDL_JoystickUpdate()
+                    time.sleep(0.02)
+                for a in range(sdl2.SDL_JoystickNumAxes(self.pedals)):
+                    self.rest[a] = sdl2.SDL_JoystickGetAxis(self.pedals, a)
+                values = [self.rest[a] for a in sorted(self.rest)]
+                print("[in ] pedal rest: %s  (feet off -- press nothing while this starts)" % (values,),
+                      flush=True)
+                # A pedal set that rests at dead centre on every axis is the signature of the bug above, not
+                # of real hardware. Say so rather than driving a car with the throttle buried.
+                if all(v == 0 for v in values):
+                    print("[in ] WARNING: every pedal axis reads exactly 0 at rest. That is usually SDL not "
+                          "having polled yet, and it would make a released pedal look fully pressed.",
+                          flush=True)
+            return ""
+        except Exception as exc:                                # noqa: BLE001 - diagnostic path
+            return "input open failed: %s" % exc
+
+    def _pedal(self, axis: int) -> float:
+        """0.0 released, 1.0 fully pressed, whichever direction the hardware travels."""
+        if self.pedals is None or axis not in self.rest:
+            return 0.0
+        v = self.sdl.SDL_JoystickGetAxis(self.pedals, axis)
+        rest = self.rest[axis]
+        span = 65535.0 - abs(rest) if abs(rest) > 16384 else 32767.0
+        travel = abs(v - rest) / max(1.0, span)
+        return max(0.0, min(1.0, travel))
+
+    def _tick(self) -> None:
+        sdl2 = self.sdl
+        sdl2.SDL_JoystickUpdate()
+        raw = sdl2.SDL_JoystickGetAxis(self.wheel, 0) / 32767.0
+        steer = max(-1.0, min(1.0, raw * self.scale))
+        if abs(steer) < self.deadzone:
+            steer = 0.0
+        throttle = self._pedal(self.throttle_axis)
+        brake = self._pedal(self.brake_axis)
+
+        self.pad.left_joystick_float(x_value_float=steer, y_value_float=0.0)
+        self.pad.right_trigger_float(value_float=throttle)
+        self.pad.left_trigger_float(value_float=brake)
+        self.pad.update()
+        self.last = {"steer": steer, "throttle": throttle, "brake": brake, "raw": raw}
+
+    def start(self) -> None:
+        if self.running or self.wheel is None:
+            return
+        self.running = True
+
+        def loop():
+            # 120 Hz. Steering is the one signal a driver feels the latency of directly, and the cost of
+            # polling three axes is nothing next to that.
+            while self.running:
+                try:
+                    self._tick()
+                except Exception:                               # noqa: BLE001 - never let input die silently
+                    pass
+                time.sleep(1.0 / 120.0)
+
+        self.thread = threading.Thread(target=loop, daemon=True)
+        self.thread.start()
+        print("[in ] steering %.0f deg per side (wheel range %.0f, scale x%.1f) | throttle axis %d | brake axis %d"
+              % (self.steer_degrees, self.wheel_range, self.scale, self.throttle_axis, self.brake_axis),
+              flush=True)
+
+    def stop(self) -> None:
+        """Release everything. A virtual pad left holding a trigger is a car left accelerating."""
+        self.running = False
+        try:
+            if self.pad is not None:
+                self.pad.reset()
+                self.pad.update()
+        except Exception:                                       # noqa: BLE001
+            pass
+
+
 class Output:
     """The only thing in this program that can move a wheel.
 
@@ -318,9 +474,30 @@ class Output:
                 nm = raw.decode(errors="replace") if isinstance(raw, bytes) else str(raw)
                 dev = haptic.SDL_HapticOpen(i)
                 if dev:
-                    self.name, self.dev, self.opened_index = nm, dev, i
-                    print("[ffb] haptic %d: %s -- OPENED" % (i, nm), flush=True)
-                    break
+                    # **Opening is not the test; creating an effect is.** The G29 enumerates three times on
+                    # this machine: index 0 refuses outright, index 1 OPENS and then cannot create an effect
+                    # of any shape, and only index 2 -- the `... USB` entry -- actually works. A handle that
+                    # opens and does nothing is worse than one that refuses, because it looks like success.
+                    probe = haptic.SDL_HapticEffect()
+                    probe.type = haptic.SDL_HAPTIC_SINE
+                    probe.periodic.type = haptic.SDL_HAPTIC_SINE
+                    probe.periodic.direction = haptic.SDL_HapticDirection(
+                        haptic.SDL_HAPTIC_CARTESIAN, (c_long * 3)(0, 0, 0))
+                    probe.periodic.length = 0xFFFFFFFF
+                    probe.periodic.period = 40
+                    probe.periodic.magnitude = 0
+                    pid = haptic.SDL_HapticNewEffect(dev, probe)
+                    if pid >= 0:
+                        haptic.SDL_HapticDestroyEffect(dev, pid)
+                        self.name, self.dev, self.opened_index = nm, dev, i
+                        print("[ffb] haptic %d: %s -- USABLE" % (i, nm), flush=True)
+                        break
+                    haptic.SDL_HapticClose(dev)
+                    attempts.append("%d:%s (opens, cannot create effects)" % (i, nm))
+                    print("[ffb] haptic %d: %s -- opens but creates nothing" % (i, nm), flush=True)
+                    if not self.name:
+                        self.name = nm
+                    continue
                 err = sdl2.SDL_GetError()
                 err = err.decode(errors="replace") if isinstance(err, bytes) else str(err)
                 attempts.append("%d:%s (%s)" % (i, nm, err.strip()))
@@ -628,6 +805,16 @@ def main() -> int:
     ap.add_argument("--class", dest="device_class", default=None, choices=sorted(CEILING),
                     help="override the detected class. Only ever use this to go LOWER than detection.")
     ap.add_argument("--rung", type=int, default=1, help="1-based rung on this class's ladder (default: lowest)")
+    ap.add_argument("--no-input", action="store_true",
+                    help="force feedback only; do not present a virtual pad or read the rig.")
+    ap.add_argument("--steer-degrees", type=float, default=45.0,
+                    help="wheel degrees per side mapped to full stick deflection (default 45).")
+    ap.add_argument("--wheel-range", type=float, default=900.0,
+                    help="the wheel's physical lock-to-lock range in degrees (default 900).")
+    ap.add_argument("--throttle-axis", type=int, default=0)
+    ap.add_argument("--brake-axis", type=int, default=1)
+    ap.add_argument("--monitor", action="store_true",
+                    help="print live steering and pedal values. Use it to confirm which axis is which.")
     ap.add_argument("--device", type=int, default=None,
                     help="force a specific SDL haptic index. Default: try every one until one opens.")
     ap.add_argument("--arm", action="store_true",
@@ -655,6 +842,19 @@ def main() -> int:
     if args.device_class in ("unknown", "direct_drive"):
         print("[ffb] NOTE: this class is untested by the authors. The ceiling is deliberately low and is a"
               " starting point for testing, not a tuned value.", flush=True)
+
+    # Input first, and independent of everything else: steering and pedals must work whether or not NCM is
+    # running, whether or not force feedback armed, and whether or not the telemetry bridge ever connects.
+    rig = None
+    if not args.no_input:
+        rig = Input(steer_degrees=args.steer_degrees, wheel_range=args.wheel_range,
+                    throttle_axis=args.throttle_axis, brake_axis=args.brake_axis)
+        why_in = rig.open()
+        if why_in:
+            print("[in ] INPUT UNAVAILABLE: %s" % why_in, flush=True)
+            rig = None
+        else:
+            rig.start()
 
     mixer = Mixer(args.device_class, rung, armed=args.arm)
     mixer.device_name, mixer.caps = name, caps
@@ -694,6 +894,17 @@ def main() -> int:
     srv.listen(4)
     print("[ffb] listening on http://127.0.0.1:%d/bridge.html  --  now run /ncm.ffb on in game"
           % args.port, flush=True)
+    if args.monitor and rig is not None:
+        def watch():
+            while True:
+                time.sleep(0.25)
+                d = rig.last
+                if d:
+                    print("[in ] raw=%+.3f -> steer=%+.3f | throttle=%.2f | brake=%.2f"
+                          % (d.get("raw", 0), d.get("steer", 0), d.get("throttle", 0), d.get("brake", 0)),
+                          flush=True)
+        threading.Thread(target=watch, daemon=True).start()
+
     try:
         while True:
             conn, addr = srv.accept()
@@ -706,6 +917,8 @@ def main() -> int:
         mixer.silence()
         if mixer.out is not None:
             mixer.out.close()
+        if rig is not None:
+            rig.stop()
         srv.close()
     return 0
 
