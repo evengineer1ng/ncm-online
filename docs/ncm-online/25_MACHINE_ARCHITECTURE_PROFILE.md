@@ -202,16 +202,81 @@ rather than a code diff. Mount names are permanent identity of a sort — a typo
 
 ---
 
-## 10. What I need ruled before authoring
+## 10. What I need ruled before authoring — now with evidence
 
-1. **`size` and `demand` as 1–5 ordinals** — or continuous numbers? Ordinals are legible, authorable by hand and
-   comparable; numbers are more expressive and much harder to author consistently across 27 machines. ▸ *ordinals.*
-2. **Shared platforms** — should any of the current 27 share a `platform` string? That makes them share parts
-   automatically. I would author platforms as genuinely distinct until a real case appears.
-3. **Tires** — `18_PARTS_ECOSYSTEM.md` explicitly leaves the abstraction open (set? axle pair? specification?).
-   The profile above treats tires as one interface; if tires are a *set* rather than a serialised component, that
-   is a component-model question, not an architecture-profile one, and can be answered later without changing
-   this representation.
-4. **Does `facets` earn its place?** `drive`, `axles`, `driven`, `layout` are descriptive and no rule above reads
-   them. They are useful for *display* and for future rules. ▸ *Keep, but mark explicitly as non-binding metadata
-   so nobody writes a compatibility rule against them by accident.*
+Updated 2026-09-24. Three of the four are no longer open questions of taste: the catalogue answers them.
+
+### (a) `size` and `demand` — ordinals, and the source data already agrees
+
+**▸ 1–5 ordinals.** Not merely because they are easier to author: **the domain already arrives in discrete
+tiers.** Every record in the pool is named by CDPR's own class tier, and the 27 entries fall into exactly seven
+of them:
+
+| tier | n | examples |
+|---|---|---|
+| `standard2` | 6 | Galena, Colby, MaiMai, Hella, Cortes, Thrax |
+| `standard25` | 3 | Colby Pickup, Columbus, Supron |
+| `standard3` | 2 | Emperor, Mackinaw |
+| `sport2` | 6 | Type-66, Alvarado, Deleon, Shion (+2 Nomads) |
+| `sport1` | 5 | Outlaw, Turbo-R, Caliburn, Aerondight, RB15 |
+| `sportbike3` | 3 | Apollo ×3 |
+| `sportbike1` | 2 | Kusanagi ×2 |
+
+Continuous values would invent precision the source data does not have, and would have to be hand-tuned across
+27 machines with no principle to appeal to. Ordinals can be derived from the tier as a **starting point** and
+then corrected by hand where a machine is genuinely unusual.
+
+### (b) Shared platforms — **yes, emphatically. 4 groups covering 9 of 27 entries.**
+
+This was the question I could not answer abstractly, and the catalogue answers it outright:
+
+| platform group | vehicleKeys |
+|---|---|
+| Quadra Type-66 | `quadra_type66`, `quadra_type66_nomad` |
+| Mizutani Shion | `mizutani_shion`, `mizutani_shion_nomad` |
+| Brennan Apollo | `brennan_apollo`, `brennan_apollo_sport`, `brennan_apollo_nomad` |
+| Yaiba Kusanagi | `yaiba_kusanagi_tyger`, `yaiba_kusanagi_animal` |
+
+These are not "similar" machines. A Type-66 Nomad **is** a Type-66 with different trim. Without a shared
+`platform`, the Apollo's suspension interface would be authored **three times** and could silently drift — three
+rows that must stay equal forever with nothing enforcing it.
+
+**The catalogue already has the same instinct one level down:** it collapses eleven runtime records (ten NCM team
+liveries plus base and player) into the single `ncx_rb15` vehicleKey. `platform` is that idea applied to
+mechanical architecture rather than to runtime identity.
+
+**▸ Author 23 platforms for 27 machines**, and let a core test assert that vehicleKeys sharing a platform declare
+identical interface maps — so the sharing is enforced rather than merely intended.
+
+### (c) Tires — **not an architecture-profile question, and the profile should stop pretending it is**
+
+`18_PARTS_ECOSYSTEM.md` deliberately leaves the abstraction open (set / axle pair / specification). The relevant
+fact the catalogue supplies: **5 of 27 machines are motorcycles.** A "set of four" is wrong for a fifth of the
+roster on day one.
+
+**▸ The profile should declare the fitment interface only** — `mount`, `size`, `demand` as for any family — and
+say nothing about how many tires there are or how they are grouped. `axles` already lives in `facets`. Whether a
+tire asset is a set, an axle pair or a single is a **component-model** decision that can be made later without
+touching a single profile. Deciding it here would be the profile claiming authority it should not have.
+
+### (d) `facets` — **keep, but make it structurally non-binding**
+
+`drive`, `axles`, `driven`, `layout` are read by **no rule in this proposal**. They are display and future-rule
+material. The owner's concern is exactly right: descriptive metadata that sits beside compatibility data will
+eventually be read as compatibility data by someone in a hurry.
+
+Three ways to prevent that, in increasing strength:
+
+1. name it `descriptive` rather than `facets`, so the field says what it is;
+2. **a core test asserting the resolver never reads it** — grep the resolver module for `descriptive` and fail
+   if found;
+3. keep it in a separate table entirely, away from `interfaces`.
+
+**▸ (1) + (2).** (3) is tidier but splits one authored thing across two places, which costs more than it saves at
+27 machines. (2) is the part that actually holds, because it fails the gate rather than relying on discipline —
+the same reasoning as the documentation assertion in L125.
+
+### Still genuinely open
+
+Nothing structural. On approval of (a)–(d) the remaining work is authoring: the closed `mount` vocabulary first,
+then 23 platforms and 27 profiles, presented as a reviewable table rather than a code diff.

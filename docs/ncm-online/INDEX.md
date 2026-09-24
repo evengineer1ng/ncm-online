@@ -101,12 +101,13 @@ unbuilt) while the brick methodology itself is HISTORICAL (a closed experiment).
 - [20_WEAR_LIFECYCLE.md](20_WEAR_LIFECYCLE.md) - wear, condition and component lifecycle
 - [bricks/assignments/B-089-race-tags.v1.md](bricks/assignments/B-089-race-tags.v1.md) - Race Tags - owner wants it integrated eventually; NOT yet integrated (IDEA-301)
 
-## Proposal - no authority until ruled (4)
+## Proposal - no authority until ruled (5)
 
 - [21_ENGINEERING_PROPOSAL.md](21_ENGINEERING_PROPOSAL.md) - engineering architecture - ACCEPTED; decisions live in L120
 - [22_WEAR_PROPOSAL.md](22_WEAR_PROPOSAL.md) - wear architecture - ACCEPTED; decisions live in L120
 - [25_MACHINE_ARCHITECTURE_PROFILE.md](25_MACHINE_ARCHITECTURE_PROFILE.md) - machine architecture profile - awaiting Q18/Q19; section 10 undecided
 - [26_DOCUMENT_AUTHORITY.md](26_DOCUMENT_AUTHORITY.md) - this scheme - directionally accepted, executed as L125
+- [27_ATTRIBUTION_AND_ORIGIN.md](27_ATTRIBUTION_AND_ORIGIN.md) - Stage 0 machine attribution and the origin retirement mechanics - awaiting a ruling
 
 ## Ledgers - living records (6)
 
