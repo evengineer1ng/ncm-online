@@ -7,7 +7,7 @@ Last rewritten: **2026-09-24 — version control, and NCM Development is standin
 engineering/wear proposals accepted with one reconciliation (L120); before that KB-87 incident detection, built
 locally and still not deployed.
 
-> **Claim before writing:** decisions through **L121** (+ addendum); MASTER_TEST through **2.18** / **§AG**; next QA
+> **Claim before writing:** decisions through **L122**; MASTER_TEST through **2.18** / **§AG**; next QA
 > letter **§AH**. BACKLOG next free **IDEA-295**; known issues through **KB-93**.
 > *(This block was stale until 2026-09-24 — it still claimed L119 / IDEA-241 / KB-87 while 172 BACKLOG rows,
 > L120 and KB-91 already existed. It is the only guard against reusing an ID, so correct it every session.)*
@@ -40,6 +40,20 @@ All three are **invisible in production**, which is always already migrated and 
 - **KB-92** — a `SQL 1146` that only fires when the schema is behind the code, i.e. on every fresh install.
 
 **Standing rule (L121): Lightsail changes are instrumented on Windows first.**
+
+## The ledger is classified now — and one foundation is already leaking (L122)
+
+All 177 BACKLOG rows carry a **`Class`**: F0 / F1 / INV / GATE / SYS / UI / OPS / UP / DSN, with `·LIVE` where
+production already stores that shape. Nothing pruned; the 14 done rows moved to `## Completed` at the bottom under
+their original headings. Read the **foundation register** at the top of `BACKLOG.md` before scheduling anything.
+
+Of 163 open rows: **35 data-model/schema**, **14 invariants**, **6 gates**, **28 UI that can wait indefinitely**.
+
+**`IDEA-236` is P0 and is a present loss, not a future risk.** Production holds **29 completed results, none
+attributable to a machine, and not reconstructible** — `session_result`, `entry` and `seat` all lack any vehicle
+reference, so the car fielded was never written down. Every further race adds another anonymous result. Forward-only
+and cheap; impossible to backfill. Two owner decisions sit beside it: `IDEA-233` (do admin grants carry serials?)
+and `IDEA-238` (are NCX team cars assets?) — both hold open holes in the serial space.
 
 ### Next, in order
 

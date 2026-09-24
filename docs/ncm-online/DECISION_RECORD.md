@@ -677,3 +677,54 @@ any dump taken from it. The running server did not notice — same single boot e
 **The general rule this establishes:** when a `server_id` relabel is on the table, check for child tables
 that lack the column. Scoping by transitive join is invisible to a `WHERE server_id=` survey, and it is what
 decides whether relabel or delete is the smaller operation.
+
+## L122 — LOCKED — the ledger is classified by cost-of-being-wrong, and one foundation is already leaking
+
+Owner direction, 2026-09-24: *"organize it and classify what has been started, finished… and of things that
+havent been started or finished, tag the ones that are high priority foundational, data, schema, etc type of work
+that the server / future server ambitions hinge on… we cant slip up on things like serialized cars… those
+serializations need to exist in their relative final form before touching production anymore… id rather be parked
+at the door for design work later than find out after building on weak foundation."*
+
+### The organising axis
+
+`State` already said how far along a row is. What was missing was **what kind of thing it is**, because that is
+what decides how expensive it is to get wrong. Every one of the 177 rows now carries a `Class`:
+**F0 / F1 / INV / GATE / SYS / UI / OPS / UP / DSN**, with `·LIVE` marking a shape production already stores.
+
+Nothing was pruned (L68 holds). 177 IDs in, 177 out; no ID lost, invented or duplicated; every row's original
+content byte-identical apart from the added column. The 14 **done** rows moved to a `## Completed` section at the
+bottom under their original headings — a row is not done because it is built, only when a live PASS sits beside it
+(L69), so *built, pending live validation* stays above.
+
+### The split is real, not a feeling
+
+Of 163 open rows: **35 are data-model or schema** (F0/F1), **14 are invariants** that constrain that model, **6 are
+gates**, and **28 are UI that can wait indefinitely**. The owner's suspicion that "there's a decent amount of this"
+was an understatement.
+
+### The finding that justifies the whole exercise
+
+**`IDEA-236` is not a future risk. It is a present loss, measured against production on 2026-09-24.**
+
+Production holds **29 completed race results, none attributable to a machine — and not reconstructible.** The whole
+chain was checked rather than the one table: `session_result` has no `asset_id`, and neither does `entry`, nor
+`seat`. The car actually fielded is recorded **nowhere**. It cannot be inferred from ownership afterwards, because
+a driver may own several machines and NCX team cars are not assets at all (`IDEA-238`).
+
+So every race run between now and that column existing is a permanently anonymous result. It is forward-only and
+cheap to add, and impossible to backfill — the exact shape of mistake the owner was describing, already happening.
+
+This also sharpens *why* the serialisation work (`IDEA-226`/`227`, live-verified) matters: ordinals give a machine
+an identity, but without `IDEA-236` that identity has no competition history to attach to. The Machine Profile
+(`IDEA-237`) is blocked on it, and wear and engineering both need to know **which machine** did the distance.
+
+### The rule this sets
+
+**Before production takes more data of a given shape, the F0 items for that shape must be settled.** Presentation
+is explicitly exempt — the model does not need the UI, the UI needs the model. Standing at the door for design work
+is cheaper than discovering the foundation after building on it.
+
+Corollary, learned twice now: **the "next free ID" line has been stale twice** (left at IDEA-127 while the ledger
+ran to 183, then at 205 while it ran to 294). It is the only guard against reusing a permanent ID. Checking it
+against the last row is now part of appending.
