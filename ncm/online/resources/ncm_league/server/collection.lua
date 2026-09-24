@@ -187,14 +187,34 @@ function NcmCollection.revealIdentity(pid, vehicleKey, opts)
     -- for a CHAR column and never for a numeric one -- so this one is 0, matched by `NULLIF(?, 0)` below.
     local lastEncounter, encounterCount = physical and t or 0, physical and 1 or 0
 
+    -- IDEA-329/IDEA-344: WHERE the observation happened. Irrecoverable afterwards, and the whole research
+    -- layer of `28_MACHINE_KNOWLEDGE.md` sections 9-10 rests on it. The caller may supply a position it has
+    -- already validated (the proximity path has one in hand); otherwise read the authoritative snapshot, the
+    -- same source the anti-spoof bucket/distance checks use. `fresh` is respected because a stale snapshot is
+    -- a position from somewhere the driver no longer is, and a wrong coordinate is worse than none.
+    local obs = opts.pos
+    if type(obs) ~= "table" then
+        local okP, ps = pcall(Open77.players.get, tonumber(pid) or 0)
+        if okP and ps and ps.fresh and ps.position then obs = ps.position end
+    end
+    -- **A nil in a MySQL params array truncates the sequence**, so three unknown coordinates would silently
+    -- shorten the value list and fail the whole insert -- the same trap that cost migration 021 a `NULLIF(?, '')`
+    -- sentinel and cost this very function a live identity-reveal outage (SQL 1292, above). A sentinel is
+    -- required. It cannot be 0 or -1: both are legitimate world coordinates. NO_POS is far outside Night City.
+    local NO_POS = -999999
+    local ox = (type(obs) == "table" and tonumber(obs.x)) or NO_POS
+    local oy = (type(obs) == "table" and tonumber(obs.y)) or NO_POS
+    local oz = (type(obs) == "table" and tonumber(obs.z)) or NO_POS
+
     local ok, err = pcall(function()
         local committed = MySQL.transaction.await({
             { query = [[INSERT IGNORE INTO vehicle_knowledge_evidence
                 (evidence_id, evidence_key, ncm_driver_id, server_id, vehicle_key, asset_id,
-                 knowledge_kind, source_kind, epistemic_kind, observed_at)
-                VALUES (?, ?, ?, ?, ?, NULLIF(?, ''), ?, ?, ?, ?)]],
+                 knowledge_kind, source_kind, epistemic_kind, observed_at, obs_x, obs_y, obs_z)
+                VALUES (?, ?, ?, ?, ?, NULLIF(?, ''), ?, ?, ?, ?, NULLIF(?, -999999), NULLIF(?, -999999), NULLIF(?, -999999))]],
               values = { ids.uuid4(hostRng), evidence.evidenceKey, evidence.driverId, serverId(), evidence.vehicleKey,
-                  assetId, evidence.kind, evidence.source, evidence.epistemic or "", evidence.observedAt } },
+                  assetId, evidence.kind, evidence.source, evidence.epistemic or "", evidence.observedAt,
+                  ox, oy, oz } },
             { query = [[INSERT INTO vehicle_discovery
                 (ncm_driver_id, server_id, vehicle_key, first_discovered_at, last_encounter_at, encounter_count,
                  discovery_method, first_runtime_record, source_driver_id, source_holding, source_asset_id)
