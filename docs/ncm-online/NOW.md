@@ -46,6 +46,15 @@ All three are **invisible in production**, which is always already migrated and 
 
 **Standing rule (L121): Lightsail changes are instrumented on Windows first.**
 
+## NEXT FIX, SCHEDULED: `IDEA-319` — production ordinal ordering
+
+Founding/bootstrap stock is backfilled **after** production has already minted, so on a fresh world the first
+machines that existed get the highest serials. Verified on Development: the three founding market machines carry
+NCM #16/#17/#18 and the last model ordinal in each line. Online is correct only because its backfill happened to
+run before any production. Fix is ordering, not renumbering.
+
+Deep dive on whatever spec is captured after this lands.
+
 ## START HERE -> [INDEX.md](INDEX.md)
 
 **The documentation corpus is now classified (L125).** `INDEX.md` is the entry point and says which document
