@@ -655,10 +655,10 @@ render assertions** (77 before). Migration 021 applied cleanly to the live world
 
 | Row | What must be observed | State |
 |---|---|---|
-| §AE8 | Open F6 -> MARKET and confirm **MaiMai is back on the shelf** with `AVAILABLE 8 / 8`, alongside Galena and Hella. | NOT RUN |
+| §AE8 | Open F6 -> MARKET and confirm **MaiMai is back on the shelf** with `AVAILABLE 8 / 8`, alongside Galena and Hella. | **PARTIAL (Development 2026-09-24):** the Market panel loads and lists all three offerings with openable cards. The `8 / 8` figure is an **Online** assertion -- the dev world seeded `stock=3` -- so the count half of this row remains NOT RUN and is not claimed. |
 | §AE9 | Buy one. Confirm the exact asset transfers, availability drops by one, and **the offering stays on the shelf**. Then buy a second of the same model and confirm a **different** assetId transfers (acceptance E/F). | NOT RUN |
 | §AE10 | Confirm the detail pane states price, available/ceiling, state, next production time and next batch, with one purchase action per individual asset (acceptance D). | NOT RUN |
-| §AE11 | Select a stocked offering and confirm the Machine Index records the discovery (acceptance J). | NOT RUN |
+| §AE11 | Select a stocked offering and confirm the Machine Index records the discovery (acceptance J). | **LIVE PASS (NCM DEVELOPMENT, 2026-09-24)** -- owner opened the card for all three stocked offerings, then opened Machine Index: **three discovered, all corresponding.** This is the first live evidence that discovery fires on player-facing inspection rather than on payload build (`IDEA-215`). Online confirmation still owed (L121: Development proves, Online confirms). |
 | §AE12 | Drive a model to `0` available, confirm the offering **remains visible** as SOLD OUT with its next-production information, and confirm selecting it still discovers the model (acceptance D/K). | NOT RUN |
 | §AE13 | Race graph (acceptance M/N/O): solo shows one driver and no fabricated company, the strip is vertical and compact, and **the speedometer is visible**. | NOT RUN |
 
