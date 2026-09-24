@@ -45,6 +45,24 @@ AddEventHandler("onResourceStart", function(name)
             if NcmMarket and NcmMarket.seed then
                 local marketOk, marketWhy = NcmMarket.seed()
                 if not marketOk then log("market unavailable: %s", tostring(marketWhy)) end
+                -- **IDEA-319: number the founding stock BEFORE production can tick.**
+                --
+                -- The backfill above runs before the seed, so on a first-ever boot it finds nothing: the
+                -- bootstrap machines do not exist yet. They are then inserted with NULL ordinals, production
+                -- mints with ordinals taken at mint time, and only a LATER boot numbers the founding stock --
+                -- after the machines built on top of it. Measured on Development: the three founding market
+                -- machines carry NCM #16/#17/#18 and the LAST model ordinal in each line, despite being the
+                -- first machines that ever existed. Online is correct only by accident of ordering.
+                --
+                -- Numbering here is idempotent (`backfill` touches only `production_ordinal IS NULL`) and
+                -- costs one no-op query on every later boot. It does NOT renumber anything: ordinals are
+                -- append-only and immutable (IDEA-226/L119), so worlds that already mis-ordered keep what
+                -- they were given. This fixes the next fresh world, not the past.
+                if marketOk and NcmProvenance and NcmProvenance.backfill then
+                    local n, why = NcmProvenance.backfill()
+                    if n == nil then log("founding-stock numbering refused: %s", tostring(why))
+                    elseif n > 0 then log("founding stock numbered before first production: %d asset(s)", n) end
+                end
                 -- Production starts only after the seed, so a first-ever boot establishes the bootstrap
                 -- shelf before the first tick measures it. Starting them the other way round would have the
                 -- first tick see an empty market and manufacture stock the seed was about to insert.
