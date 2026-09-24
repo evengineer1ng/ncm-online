@@ -787,23 +787,23 @@ Rows marked **[me]** I verify in the database afterwards — you do not need to 
 | §AH5 | `/ncm help`. | Answers. |
 | §AH6 | **F10 Collection.** | Loads. |
 | §AH7 | **CALL your car** from Machine Index. | It arrives; you can drive it. |
-| §AH8 | Look at the **odometer panel**, bottom-left. | Shows machine name/serial + lifetime distance, **and no longer covers the vanilla health HUD** (KB-90, raised 56px -> 184px). **If it now covers something else, say what.** |
+| §AH8 | Look at the **odometer panel**, bottom-left. | **PASS on position** (no complaint about the health HUD after three races). **New finding: the serial it shows is unlabelled** -- see KB-96. |
 | §AH9 | Drive a few hundred metres. | The distance climbs. Leave the car and re-enter: it persists. |
 | **ENTRY BINDS A MACHINE + A NUMBER (new)** |||
 | §AH10 | Sitting **in your car**, enter a race from the venue. | Entry accepted as before. |
-| §AH11 | **[me]** | `entry.asset_id` = the car you were sitting in; `entry.car_number` assigned. |
+| §AH11 | **[me]** | **LIVE PASS.** Three entries, each bound to the Hella. |
 | §AH12 | Enter a second race **on foot**, away from your car. | Still accepted — you own an eligible machine. |
-| §AH13 | **[me]** | `asset_id` still bound (your only eligible car), and the **same car number** reused because it was free. |
+| §AH13 | **[me]** | **LIVE PASS.** All three entries carry `car_number = 1` -- the number was reused across events exactly as designed. |
 | **THE GRID RULE — you race the car you entered (new, riskiest)** |||
-| §AH14 | Enter a race in your car, **stay in it**, let it go green. | **Starts normally. No refusal, no toast.** This is the one that must not misfire. |
+| §AH14 | Enter a race in your car, **stay in it**, let it go green. | **LIVE PASS (Development, 2026-09-24).** Three races, no misfire, no spurious refusal. The riskiest rule shipped today behaved. |
 | §AH15 | Watch the server log at green. | One line: `machines at green: 1 attributed, 0 unknown`. |
 | §AH16 | **Deliberate violation.** From the server console: `ncm.car <yourPlayerId> Sport` to get a loaner, enter a race in your OWN car, then get into the loaner before green. | Refused the start: chat line + **WRONG MACHINE** toast, classified DNS. Log shows `WRONG MACHINE ... -> refused start`. |
 | §AH17 | Same as §AH14 but **get out of the car on foot** just before green. | **Still starts.** An unknown seat is not a violation (KB-72 rule). |
 | **ATTRIBUTION (new)** |||
-| §AH18 | **Finish a race.** | Normal result. |
-| §AH19 | **[me]** | `session_result.asset_id` = your car, `attribution_basis = 'recorded'`. |
+| §AH18 | **Finish a race.** | **LIVE PASS.** Three finished: Hold Your Breath 27.375, Snake in the Grass 192.804, Ukulele 305.387. |
+| §AH19 | **[me]** | **LIVE PASS.** All three rows carry `asset_id = 10000000-...` and `attribution_basis = 'recorded'`. Older B-line rows correctly stay NULL -- they predate the column. **The 29-result leak is closed on Development.** |
 | §AH20 | During that race, **hit a wall or a barrier** hard enough to register an incident. | Incident toast as usual. |
-| §AH21 | **[me]** | `incident.asset_id` = your car (this was writing nothing until today). |
+| §AH21 | **[me]** | **NOT RUN -- zero incidents recorded in the session**, so there was nothing to attribute. Needs a deliberate wall or barrier hit. |
 | §AH22 | Run a **practice / time trial** and set a best lap. | Normal. |
 | §AH23 | **[me]** | That result row is attributed too — it was the third unwired write site. |
 | **OWNER PRINCIPAL — no visible change expected** |||
