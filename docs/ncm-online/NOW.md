@@ -6,12 +6,12 @@
 **Rewritten at the end of every working session.** Read this first, then BACKLOG.md, KNOWN_BUGS.md,
 DECISION_RECORD.md and the referenced QA rows.
 
-Last rewritten: **2026-09-24 — the documentation-authority pass (L125).** Earlier: the
-engineering/wear proposals accepted with one reconciliation (L120); before that KB-87 incident detection, built
-locally and still not deployed.
+Last rewritten: **2026-09-24 — the NCM Single Player <-> Online convergence audit.** Earlier: the external
+tooling/API audit and the documentation-authority pass (L125). No runtime, schema, save, API, server configuration,
+deployment or gameplay behavior changed in this audit.
 
-> **Claim before writing:** decisions through **L124**; MASTER_TEST through **2.18** / **§AG**; next QA
-> letter **§AH**. BACKLOG next free **IDEA-302**; known issues through **KB-93**.
+> **Claim before writing:** decisions through **L127**; MASTER_TEST through **2.18** / **§AG**; next QA
+> letter **§AH**. BACKLOG next free **IDEA-356**; known issues through **KB-96**.
 > *(Stale a THIRD time on 2026-09-24 — it read IDEA-295 while the ledger ran to IDEA-300. Three strikes is an
 > argument for the automated assertion proposed in `26_DOCUMENT_AUTHORITY.md` §8, not for trying harder.)*
 > *(This block was stale until 2026-09-24 — it still claimed L119 / IDEA-241 / KB-87 while 172 BACKLOG rows,
@@ -54,6 +54,40 @@ NCM #16/#17/#18 and the last model ordinal in each line. Online is correct only 
 run before any production. Fix is ordering, not renumbering.
 
 Deep dive on whatever spec is captured after this lands.
+
+## SP <-> Online convergence audit — completed, research only
+
+`docs/research/open77/NCM_SP_ONLINE_CONVERGENCE_AUDIT.md` audits the actual released SP payload, current Online
+resources/schema and current OPEN//77 platform behavior. Its conclusion is **one motorsport vocabulary and content
+lineage, multiple execution contexts, multiple sovereign ledgers, and explicit evidence provenance** — not one
+synchronized save, economy, authority, physics implementation or mod list.
+
+The existing code already has shared lineage: Online roots were copied from the SP v1.2.0 root pack, the vehicle
+catalogue descends from the same TweakDB vocabulary, and Online core already distinguishes result origin and
+entrant provenance. The dangerous gaps are historical interpretation: route direction/revision/geometry,
+machine/configuration attribution, execution/settlement/asset-world namespaces, trust and content/physics profile.
+SP's local physical AI remains a valuable execution backend; current OPEN//77 physical AI is client-simulated and
+explicitly capped at 55 m/s, so the two implementations are not interchangeable.
+
+Nine option-preservation ideas are captured as `IDEA-347`–`IDEA-355`. They are **raw research findings, not
+decisions, migrations or scheduled work**. The scheduled next action remains `IDEA-319`.
+
+## External tooling/API audit — completed, documentation only
+
+`docs/research/open77/EXTERNAL_TOOLING_API_AUDIT.md` records the current answer. OPEN//77 can host small
+resource-scoped inbound HTTP routes on its opt-in listener and can make allow-listed outbound requests; NCM
+registers **no HTTP routes** today. Its present surfaces are in-game net events, state bags, WebUI, console
+commands, local cross-resource events, SQL and logs — none is a public API.
+
+The expensive risks are substrate, not endpoint syntax: state-bag audience/privacy, world and machine identity,
+result/configuration provenance, live versus settled history, correction semantics, telemetry trust/retention and
+incremental publication. Captured as `IDEA-340`–`IDEA-346`. Endpoint paths, JSON contracts, OAuth, public-site
+hosting, WebSockets and cross-world federation remain deliberately deferred until a real consumer exists.
+
+One immediate finding: an OPEN//77 `player(id)` bag is visible to the player's whole routing bucket. The small
+`ncm` profile is deliberately public, but personalized bag mirrors (`ncmEntry`, `ncmHistory`, `ncmGuide`,
+`ncmPractice`, `ncmVenue`, onboarding) need an audience classification before any external surface is added.
+No bag or transport was changed during this audit.
 
 ## Captured, parked for deep dive after `IDEA-319`
 
