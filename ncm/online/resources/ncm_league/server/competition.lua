@@ -131,6 +131,27 @@ function NcmCompetition.carRefusal(e, driverId)
     return decision.reason, decision.admits
 end
 
+--- WHICH machine this driver is entering, not merely whether they own a legal one (IDEA-312).
+--- `carRefusal` answers the yes/no and throws the winning record away; this returns the physical example, so
+--- the entry can name it and the grid can check it.
+---
+--- Preference order matters: **the machine they are sitting in wins** if it is eligible. A driver who drives up
+--- to the venue in a car has already told us which car they mean, and picking a different one out of their
+--- garage because it sorts first would be both surprising and wrong.
+--- Returns assetId, record -- or nil when they own nothing the spec admits.
+function NcmCompetition.enterMachine(e, driverId, preferAssetId)
+    if not driverId or not NcmOwnership then return nil end
+    local spec = NcmCompetition.eligibilityFor(e)
+    local first, firstRecord
+    for _, a in ipairs(NcmOwnership.list(driverId) or {}) do
+        if a.record and Eligibility.matches(spec, a.record) then
+            if preferAssetId and a.assetId == preferAssetId then return a.assetId, a.record end
+            if not first then first, firstRecord = a.assetId, a.record end
+        end
+    end
+    return first, firstRecord
+end
+
 --- The performance ceiling to apply at issue time for an event's class (nil = none).
 function NcmCompetition.performanceFor(e)
     return Class.performance(e and e.classId or "street_open")

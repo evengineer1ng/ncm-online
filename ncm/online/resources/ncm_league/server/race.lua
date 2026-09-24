@@ -51,6 +51,13 @@ AddEventHandler("onPlayerDisconnected", function()
     if pid then seatedByPid[pid] = nil end
 end)
 
+--- The machine this player is sitting in right now, or nil. Read by the ENTER gate so a driver who walks up
+--- in a car enters THAT car rather than whichever of their machines happens to sort first (IDEA-312).
+function NcmRace.seatedAsset(pid)
+    pid = tonumber(pid)
+    return pid and seatedByPid[pid] or nil
+end
+
 local sessions = {}      -- sessionId -> rec { s, kernel, kind, spec, plan, eventId, playerOf, slots, lastPos, toNext, progressM, doneAt, machineOf, ... }
 local plans = {}         -- eventId -> { formatId, specs, i, sessionIds = {}, results = {}, done, e }
 local byEvent = {}       -- eventId -> live sessionId | "done"
@@ -315,7 +322,11 @@ local function formSession(plan, spec, t, startsAt)
     for _, sl in ipairs(slots) do
         local team = sl.teamId and Teams.byId(sl.teamId)
         local car = sl.teamId and Teams.carForSeat(sl.teamId, sl.seatIndex)
-        sl.colour = team and team.colour; sl.number = car and car.number; sl.teamName = team and team.name; sl.teamShort = team and team.short
+        local en = e.entries and e.entries[sl.driverId] or nil
+        sl.colour = team and team.colour; sl.teamName = team and team.name; sl.teamShort = team and team.short
+        -- A team seat carries the team car's number; a privateer carries the one their entry was given.
+        sl.number = (car and car.number) or (en and en.carNumber) or nil
+        sl.enteredAsset = en and en.assetId or nil          -- IDEA-312: the machine this entry named
         slotOf[sl.driverId] = sl
         specEntrants[#specEntrants + 1] = { driverId = sl.driverId, entryId = sl.entryId, slot = sl.slot, display = sl.display, teamId = sl.teamId, seatIndex = sl.seatIndex }
     end
@@ -584,6 +595,8 @@ local function handle(rec, events, t)
                 if assetId then named = named + 1 else anon = anon + 1 end
             end
             log("session=%s machines at green: %d attributed, %d unknown", s.sessionId, named, anon)
+            -- Deferred by one tick so the kernel is not re-entered while it is still emitting green.
+            CreateThread(function() Wait(0); pcall(NcmRace.enforceEnteredMachine, rec, t) end)
         elseif e.type == "dns" then
             log("session=%s DNS driver=%s reason=%s", s.sessionId, e.driverId, tostring(e.reason))
             tell(rec.playerOf[e.driverId], "You did not start: " .. tostring(e.reason) .. ".")
@@ -913,6 +926,45 @@ local forfeitAsked = {}          -- driverId -> server-clock deadline of the pen
 
 --- Retire this driver from the session they are in. `confirmed` skips the two-step prompt (console/host use).
 --- Returns true, or nil + reason ("not_racing" | "confirm" | kernel reason).
+-- NOTE ON PLACEMENT: this lives below `local function handle` deliberately. Defined earlier it would
+-- capture a GLOBAL `handle` (nil) instead of the local, fail at runtime, and be swallowed by the pcall
+-- that calls it -- the fourth-plus instance of the Lua local-ordering defect in this codebase (KB-81a),
+-- and one `luac -p` cannot see.
+--- **You race the car you entered** (IDEA-312). Checked once, just after green.
+---
+--- Refuses only on an EXPLICIT contradiction: an entry that named a machine, and a driver demonstrably sitting
+--- in a different one. An unknown seat is not a violation -- absence is not evidence, which is the lesson
+--- KB-72 cost us when two gates demanded exact values from fields that might not exist. A team car or a legacy
+--- entry names no machine and is untouched.
+function NcmRace.enforceEnteredMachine(rec, t)
+    if not rec or not rec.machineOf or not rec.slotOf then return 0 end
+    local out = 0
+    for driverId, pid in pairs(rec.playerOf or {}) do
+        local sl = rec.slotOf[driverId]
+        local entered = sl and sl.enteredAsset or nil
+        local fielded = rec.machineOf[driverId]
+        if entered and fielded and entered ~= fielded then
+            log("session=%s WRONG MACHINE driver=%s entered=%s fielded=%s -> refused start",
+                rec.s.sessionId, driverId:sub(1, 8), entered:sub(1, 8), fielded:sub(1, 8))
+            local events = rec.kernel.leave(rec.s, driverId, t, "wrong_machine")
+            if events then
+                handle(rec, events, t)
+                out = out + 1
+                if pid then
+                    tell(pid, "You entered a different machine. A race is entered with one car, and that is the car that starts it.")
+                    toast(pid, { type = "error", title = "WRONG MACHINE", message = "You did not start in the machine you entered.", icon = "NCM", durationMs = 9000 })
+                end
+            end
+        end
+    end
+    if out > 0 then
+        local more = rec.kernel.step(rec.s, t)
+        if #more > 0 then handle(rec, more, t) end
+        publish(rec, t)
+    end
+    return out
+end
+
 function NcmRace.forfeit(driverId, reason, confirmed)
     if not driverId then return nil, "not_racing" end
     local sid, eventId, kind = NcmRace.busySession(driverId)

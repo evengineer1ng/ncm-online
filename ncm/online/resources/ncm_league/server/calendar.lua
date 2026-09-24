@@ -48,6 +48,23 @@ local settings = Open77.tunables.declare({
 })
 NcmCalendar.settings = settings
 
+--- A car number for this entry, unique WITHIN THE EVENT (IDEA-312). A driver keeps the number they last
+--- raced under when it is free, because a number people recognise is half the point of having one; otherwise
+--- the lowest free number. Returns nil only if all 99 are taken, which would be a very good problem.
+local function assignNumber(eventId, driverId)
+    local taken = {}
+    for _, r in ipairs(MySQL.query.await(
+        "SELECT car_number FROM entry WHERE event_id = ? AND car_number IS NOT NULL", { eventId }) or {}) do
+        taken[tonumber(r.car_number) or 0] = true
+    end
+    local prev = tonumber(MySQL.scalar.await(
+        "SELECT car_number FROM entry WHERE ncm_driver_id = ? AND car_number IS NOT NULL " ..
+        "ORDER BY COALESCE(checked_in_at, registered_at, 0) DESC LIMIT 1", { driverId }))
+    if prev and not taken[prev] then return prev end
+    for n = 1, 99 do if not taken[n] then return n end end
+    return nil
+end
+
 local function serverId()
     local v = tostring(settings.serverId or "ncm-dev")
     return ids.isSlug(v) and v or "ncm-dev"
@@ -438,6 +455,11 @@ local function enterPlayer(pid, eventId)
                 return
             end
         end
+        -- IDEA-312: an entry names a MACHINE, not just a driver who owns something legal. The car they drove
+        -- up in wins if it is eligible.
+        local seated = NcmRace and NcmRace.seatedAsset and NcmRace.seatedAsset(pid) or nil
+        local enteredAsset = NcmCompetition and NcmCompetition.enterMachine
+            and NcmCompetition.enterMachine(e, driver.ncmDriverId, seated) or nil
         local p = Open77.players.get(pid)
         local decision = Entry.checkIn({
             event = e, now = now(), driverId = driver.ncmDriverId,
@@ -460,14 +482,19 @@ local function enterPlayer(pid, eventId)
             return
         end
         local en = decision.entry
+        -- Set BEFORE the write: the insert below persists these, and an entry that names no machine is the
+        -- gap IDEA-312 exists to close.
+        en.assetId = enteredAsset
+        if enteredAsset and not en.carNumber then en.carNumber = assignNumber(e.eventId, driver.ncmDriverId) end
         local okDb, err = pcall(function()
             if decision.upgraded then
                 -- interest from the Race Guide becomes the physical entry (P52/L48): same row, new state
-                MySQL.update.await("UPDATE entry SET state = 'checked_in', checked_in_at = ? WHERE entry_id = ?", { math.floor(en.checkedInAt), en.entryId })
+                MySQL.update.await("UPDATE entry SET state = 'checked_in', checked_in_at = ?, asset_id = NULLIF(?, ''), car_number = NULLIF(?, 0) WHERE entry_id = ?",
+                    { math.floor(en.checkedInAt), en.assetId or "", en.carNumber or 0, en.entryId })
             else
                 MySQL.insert.await(
-                    "INSERT INTO entry (entry_id, event_id, ncm_driver_id, state, fee, checked_in_at) VALUES (?, ?, ?, 'checked_in', ?, ?)",
-                    { en.entryId, e.eventId, driver.ncmDriverId, en.fee, math.floor(en.checkedInAt) })
+                    "INSERT INTO entry (entry_id, event_id, ncm_driver_id, state, fee, checked_in_at, asset_id, car_number) VALUES (?, ?, ?, 'checked_in', ?, ?, NULLIF(?, ''), NULLIF(?, 0))",
+                    { en.entryId, e.eventId, driver.ncmDriverId, en.fee, math.floor(en.checkedInAt), en.assetId or "", en.carNumber or 0 })
             end
         end)
         if not okDb then tell(pid, "Entry could not be recorded: " .. tostring(err)); return end
