@@ -130,7 +130,9 @@ local function pushInbox(pid, driverId)
     if not pid then return end
     local items, unread = messageList(driverId)
     pcall(function()
-        Open77.state.player(pid):set("ncmInbox", { items = items, unread = unread, at = math.floor(now()) })
+        -- KB-97: message and seat-offer BODIES. This was the widest gap in the audit -- a `player(id)` bag
+        -- reaches every player in the routing bucket, and NCM puts everyone in bucket 0.
+        TriggerClientEvent("ncm:inbox.payload", pid, { items = items, unread = unread, at = math.floor(now()) })
     end)
     return items, unread
 end

@@ -271,8 +271,12 @@ local function pushGuide(pid)
             "silently dropped before it reaches the panel", pid, #slim, size, PAYLOAD_WARN_BYTES)
     end
 
+    -- KB-97: the targeted event is the whole delivery. The `ncmGuide` bag alongside it carried the SAME
+    -- payload to every player in the routing bucket, including `iOwn` (how many eligible machines this driver
+    -- owns) and `carRefusal`. The client already handled this event identically, so the bag was pure
+    -- duplication with a wider audience, and deleting it changes nothing the subject sees.
     TriggerClientEvent("ncm:guide.payload", pid, payload)
-    local okSet, err = pcall(function() Open77.state.player(pid):set("ncmGuide", payload) end)
+    local okSet, err = true, nil
     if not okSet then
         log("GUIDE PUBLISH FAILED player=%d rows=%d bytes=%d: %s", pid, #slim, size, tostring(err))
     elseif #slim ~= (lastGuideRows[pid] or -1) then
@@ -412,7 +416,6 @@ RegisterNetEvent("ncm:venue.option", function(optionId)
         local driver = NcmCalendar.resolveDriver(pid)
         if driver and NcmRace and NcmRace.practiceLeave then
             NcmRace.practiceLeave(e.eventId, driver.ncmDriverId, now(), "left_practice")
-            pcall(function() Open77.state.player(pid):clear("ncmPractice") end)
             tell(pid, ("Practice ended: %s."):format(e.routeName))
         end
     elseif id == "withdraw" or id == "leave_list" then
@@ -436,7 +439,9 @@ function NcmGuide.pushPractice(pid, e)
     for i, r in ipairs(rows) do r.rank = i; r.driverId = nil end   -- ranks and times only: no driver ids to the client
     local open = Guide.practiceOpen(e, now(), setting("raceFormAtSec", 60))
     pcall(function()
-        Open77.state.player(pid):set("ncmPractice", {
+        -- Migrated with history (KB-97): not itself private, but leaving one of the two request-driven
+        -- panels on a persisted bag would mean the client kept two different rules for the same interaction.
+        TriggerClientEvent("ncm:venue.practice", pid, {
             eventId = e.eventId, route = e.routeName, open = open and true or false,
             -- L67/KB-31: practice runs until the race forms. It is NOT a registration deadline and must never
             -- be worded as one, so the client gets the fact and not a countdown to "entries close".
@@ -481,7 +486,11 @@ function NcmGuide.pushHistory(pid, routeId, routeName)
             end
         end
         pcall(function()
-            Open77.state.player(pid):set("ncmHistory", {
+            -- KB-97: `mine` and `myBestMs` are this driver's own runs and personal best. Pushed only when
+            -- the driver picks HISTORY, so a targeted event is both private AND a truer fit than a persisted
+            -- bag: an event cannot be mistaken for a request that survived into the next session, which is
+            -- exactly what made the history panel reopen itself (KB-67).
+            TriggerClientEvent("ncm:venue.history", pid, {
                 routeId = routeId, route = routeName, mine = mine, myBestMs = best,
                 board = board, updatedAt = updatedAt, at = math.floor(now()),
             })

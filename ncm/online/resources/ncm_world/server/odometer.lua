@@ -194,9 +194,12 @@ local function publish(pid, assetId)
     end
     shown[pid] = assetId
     pcall(function()
-        if not assetId then Open77.state.player(pid):clear("ncmOdo"); return end
+        -- KB-97 / IDEA-341: this is the serialised identity, serial and lifetime distance of the machine the
+        -- driver is sitting in. On a bag it reached every player in the bucket continuously -- precisely the
+        -- facts `28_MACHINE_KNOWLEDGE.md` intends players to EARN through discovery and observation. Targeted.
+        if not assetId then TriggerClientEvent("ncm:odo", pid, false); return end
         local c = card[assetId] or {}
-        Open77.state.player(pid):set("ncmOdo", {
+        TriggerClientEvent("ncm:odo", pid, {
             assetId = assetId,
             m = NcmOdometer.readingFor(assetId, stored[assetId] or 0),
             name = c.name, ord = c.ordinal,

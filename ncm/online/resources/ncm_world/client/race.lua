@@ -253,10 +253,17 @@ end
 ---
 --- It shows accumulated distance and NOTHING about any future lifespan: no engine health, no remaining
 --- kilometres, no prediction. That threshold, if it ever exists, stays private server state.
+-- KB-97 / IDEA-341: the odometer used to ride a `player(id)` bag, so every client in the routing bucket
+-- received the serialised identity, serial and lifetime distance of the machine every other driver occupied --
+-- precisely the facts 28_MACHINE_KNOWLEDGE.md intends players to earn. Declared BEFORE the handler on purpose:
+-- a `local` referenced from a function defined above it captures a nil global instead, the defect class that
+-- has bitten this codebase five times and that `luac -p` cannot see.
+local odoState = nil
+RegisterNetEvent("ncm:odo", function(v) odoState = (type(v) == "table") and v or nil end)
+
 local function instrumentState()
-    local ok, bag = pcall(Open77.state.localPlayer)
-    if not ok or type(bag) ~= "table" or type(bag.ncmOdo) ~= "table" then return nil end
-    local o = bag.ncmOdo
+    local o = odoState
+    if type(o) ~= "table" then return nil end
     if type(o.m) ~= "number" then return nil end
     return { odo = Identity.formatOdometer(o.m), name = o.name,
              serial = o.ord and Identity.formatOrdinal(o.ord) or nil }

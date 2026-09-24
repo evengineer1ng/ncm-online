@@ -219,34 +219,28 @@ local function readVenueBags()
         end
     end
     venueBag = nv
-    -- **A persisted bag is not a request.**
-    --
-    -- `ncmHistory` and `ncmPractice` are set when the player chooses that option and are never cleared, so
-    -- they survive into the next session. This used to compare table IDENTITY -- exactly the bug the comment
-    -- above describes for `ncmVenue` -- so on a fresh join `historyBag` was nil, the check fired, and the
-    -- history panel opened by itself. `sendVenue()` hides the option list whenever `panelOpen` is set, so the
-    -- driver got a ring and **no way to register**: owner QA, 2026-09-23, *"there is no race panel to enter the
-    -- race when i am at race venue"*, on time and in the right place, having pressed HISTORY in an earlier
-    -- session. It also explains KB-67's unclosable panel: it was reopening itself.
-    --
-    -- Both payloads already carry `at`, the moment the server pushed them. First sight of a bag adopts its
-    -- stamp silently; only a NEWER stamp is a request this session, which is the same rule `ncmHelp.seq` uses.
-    local function panelRequest(nv, seenAt, kind, current)
-        if type(nv) ~= "table" then return seenAt, current end
-        local at = tonumber(nv.at) or 0
-        if seenAt == nil then return at, nv end                 -- adopted, deliberately not opened
-        if at <= seenAt then return seenAt, nv end
-        if vpage and vpageReady then
-            panelOpen = kind
-            vpage:send("venue:" .. kind, nv)
-            vpage:send("venue:hide", {})
-            lastDrawn = "hidden"
-        end
-        return at, nv
-    end
-    historyAt, historyBag = panelRequest(bag.ncmHistory, historyAt, "history", historyBag)
-    practiceAt, practiceBag = panelRequest(bag.ncmPractice, practiceAt, "practice", practiceBag)
 end
+
+-- **A request is an event, not a persisted bag** (KB-97).
+--
+-- History and practice are pushed ONLY when the driver picks that option, so an event is both the private
+-- channel and the honest one. The bag version needed an `at`-stamp adoption rule purely because a bag survives
+-- into the next session and would otherwise read as a fresh request -- which is what made the history panel
+-- reopen itself and hide the option list (KB-67, and the owner QA "there is no race panel to enter the race
+-- when i am at race venue"). An event cannot arrive twice, so that whole class of bug is gone rather than
+-- guarded against.
+local function openVenuePanel(kind, v)
+    if type(v) ~= "table" then return end
+    if vpage and vpageReady then
+        panelOpen = kind
+        vpage:send("venue:" .. kind, v)
+        vpage:send("venue:hide", {})
+        lastDrawn = "hidden"
+    end
+end
+
+RegisterNetEvent("ncm:venue.history", function(v) historyBag = v; openVenuePanel("history", v) end)
+RegisterNetEvent("ncm:venue.practice", function(v) practiceBag = v; openVenuePanel("practice", v) end)
 
 -- One key, polled: tap cycles, hold engages. Pad X does the same job for a controller.
 CreateThread(function()

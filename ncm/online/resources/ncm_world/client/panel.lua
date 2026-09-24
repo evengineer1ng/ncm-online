@@ -354,6 +354,13 @@ RegisterNetEvent("ncm:guide.results.payload", function(value)
     if page and pageReady and open == "guide" then sendBig("panel:guideResults", value, "results") end
 end)
 
+-- KB-97: inbox moved off the `player(id)` bag, which reached every player in the routing bucket. Message and
+-- seat-offer bodies now arrive only here, at the driver they belong to.
+RegisterNetEvent("ncm:inbox.payload", function(value)
+    if type(value) ~= "table" then return end
+    onBag("ncmInbox", value)
+end)
+
 RegisterNetEvent("ncm:guide.payload", function(value)
     if type(value) ~= "table" then return end
     lastGuide = value
@@ -405,8 +412,8 @@ CreateThread(function()
         -- notification only and always read our own bag: correct whatever shape the selector takes, and it
         -- matches the polling fallback below, which was right all along.
         Open77.state.onChange("player", "ncmOnboarding", function() onLocalBag("ncmOnboarding") end)
-        Open77.state.onChange("player", "ncmInbox", function() onLocalBag("ncmInbox") end)
-        Open77.state.onChange("player", "ncmGuide", function() onLocalBag("ncmGuide") end)
+        -- KB-97: `ncmInbox` and `ncmGuide` are no longer bags. Onboarding stays -- it is a harmless
+        -- completion flag, and the join race the poll below guards against is real for it.
     end)
     if not okWatch then log("state.onChange unavailable: %s", tostring(err)) end
     -- poll as well: a bag written before the watcher existed (join) must still open the questionnaire
@@ -414,8 +421,6 @@ CreateThread(function()
         local ok, bag = pcall(Open77.state.localPlayer)
         if ok and type(bag) == "table" then
             if type(bag.ncmOnboarding) == "table" and bag.ncmOnboarding.pending and open ~= "questionnaire" and not pendingQuestionnaire then showQuestionnaire() end
-            if type(bag.ncmInbox) == "table" and bag.ncmInbox ~= lastInbox then onBag("ncmInbox", bag.ncmInbox) end
-            if type(bag.ncmGuide) == "table" and bag.ncmGuide ~= lastGuide then onBag("ncmGuide", bag.ncmGuide) end
             if type(bag.ncmHelp) == "table" then onBag("ncmHelp", bag.ncmHelp) end
         end
         Wait(2000)
