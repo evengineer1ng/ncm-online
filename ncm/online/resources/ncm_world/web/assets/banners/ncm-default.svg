@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="240" viewBox="0 0 1200 240">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#03121d"/>
+      <stop offset=".56" stop-color="#073344"/>
+      <stop offset="1" stop-color="#3a062d"/>
+    </linearGradient>
+    <linearGradient id="road" x1="0" y1="0" x2="1" y2="0">
+      <stop stop-color="#56edff" stop-opacity="0"/>
+      <stop offset=".52" stop-color="#56edff" stop-opacity=".85"/>
+      <stop offset="1" stop-color="#ff2f96" stop-opacity=".2"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="240" fill="url(#bg)"/>
+  <g fill="#071720" stroke="#48dff1" stroke-opacity=".25">
+    <path d="M0 178V99h45v79h30V66h62v112h34V120h49v58h29V43h76v135h42v-94h51v94h38V109h68v69h31V51h92v127h43v-63h57v63h39V75h74v103h40V114h48v64h40V58h88v120h76V240H0z"/>
+  </g>
+  <path d="M-40 231 443 167l798 20" fill="none" stroke="url(#road)" stroke-width="8"/>
+  <path d="M-20 222 470 169l760 12" fill="none" stroke="#ff2f96" stroke-opacity=".48" stroke-width="2"/>
+  <g fill="none" stroke="#68f2ff" stroke-opacity=".25">
+    <path d="M84 16h240M735 28h310M568 203h424"/>
+    <path d="m338 13 21 21-21 21M1040 192l21 21-21 21"/>
+  </g>
+</svg>

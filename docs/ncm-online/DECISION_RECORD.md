@@ -7,7 +7,7 @@ Maintained during the orientation/interview phase. Every entry cites its basis. 
 
 Legend: **LOCKED** — owner-approved or forced by verified platform facts · **PROVISIONAL** — recommended, not yet approved · **OPEN** — needs the owner · **EXPERIMENT** — needs a measured result.
 
-Last updated: 2026-09-23 — L104 records the Market Network boundary. Previous entries remain authoritative.
+Last updated: 2026-09-24 — L130 records the Driver Card and Fingerprint owner rulings. Previous entries remain authoritative.
 
 ## Guiding principle (owner, 2026-09-19)
 
@@ -1112,3 +1112,47 @@ should be able to dial out. It cannot. **The documentation is not wrong — the 
 applies to pages that have a network stack, and the bundled virtual origin does not.** That distinction is
 invisible in the docs and cost three probe rounds to establish, so it belongs somewhere a reader will find it
 before spending the same three rounds.
+
+---
+
+## L130 — LOCKED — Driver Card expression and Fingerprint authority stay separate
+
+Owner ruling, 2026-09-24. This is new design authority following the historical recovery audit; it does not
+rewrite that audit as though these details had been recovered.
+
+### The compact in-world Driver Card
+
+- A card displays the platform-verified current presentation name, one selected/default banner, **zero to
+  three displayed badges**, and one fixed standardized high-contrast Fingerprint region.
+- Earned badge collection, entitlement and displayed selection are separate facts. Selecting or hiding a
+  badge changes no accomplishment. The first slice may bridge only the existing `first_finish`, `first_win`
+  and `first_time_trial` accomplishments plus an explicitly Development-only preview fixture.
+- The Fingerprint region is not player-curated. Banner artwork may style the card around it but may not
+  camouflage, replace, distort or make it illegible.
+- The first card says **Fingerprint unavailable / insufficient data**. Unknown is never six zeroes and no
+  polygon is fabricated.
+- The bucket-public player bag carries only the bounded public card projection. It is not a Driver Profile,
+  global directory or permission to publish earned collections, history, telemetry, machines, Machine
+  Knowledge, market or engineering knowledge, onboarding, biography, eligibility or other private state.
+
+### Modern Fingerprint direction — not a calculation definition
+
+The six current dimension names are **Competition, Street, Engineering, Commerce, Culture and Intensity**.
+They describe what a Driver tends to do in that NCM world. They are behavioral/activity dimensions, not XP,
+skill, competence, quality, morality, wealth, reputation, player-selected personality or an admin rating.
+
+The intended future pipeline is authoritative activity evidence → independently defined dimension measure →
+eligible world-population distribution → percentile → displayed vertex. A percentile is a derived,
+versioned presentation and may move when the surrounding population moves; the authoritative evidence and
+aggregates remain historical truth. Competition means sanctioned participation rather than success; Street
+means open-world automotive participation; Engineering, Commerce and Culture mean legitimate participation
+in their respective ecosystems; Intensity may combine legitimately measured dangerous, combative,
+disruptive or incident-rich participation but never asserts fault, intent or “bad driving.”
+
+**Fingerprint = tendency. Badges = accomplishments. Competency = capability. History/provenance = what
+happened. Reputation = what other people think.** They must not be collapsed.
+
+Fingerprint V1 remains separately gated. No values ship until evidence inputs, eligible population,
+independent measures, minimum sample, window, cadence, anti-farming implications and definition version are
+deliberately ruled. The public contract reserves the version and unavailable state now; it does not invent
+formulas.

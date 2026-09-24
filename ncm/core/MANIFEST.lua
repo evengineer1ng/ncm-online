@@ -42,6 +42,7 @@ return {
     "economy/production.lua",
     "economy/supply_profiles.lua",
     "driver/progression.lua",
+    "driver/presentation.lua",
     "onboarding/questionnaire.lua",
     "qa/rules.lua",
     "player/help.lua",

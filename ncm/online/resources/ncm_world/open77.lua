@@ -9,13 +9,14 @@ auto_start true
 -- network.events: state-bag writes (public driver view) and server-sent notifications.
 -- world.vehicles: issued cars are canonical vehicles created by the server (M2.2).
 -- ui.vanilla.map: /ncm.gps waypoint to the next venue (client).
-permissions { "database.access", "network.events", "state.write", "world.vehicles", "ui.vanilla.map", "input.actions", "map.control", "players.teleport", "world.props", "world.npcs", "vehicles.read", "world.query" }
+permissions { "database.access", "network.events", "state.write", "world.vehicles", "ui.vanilla.map", "ui.nameplates", "input.actions", "map.control", "players.teleport", "world.props", "world.npcs", "vehicles.read", "world.query" }
 
 -- Race HUD (M3.2): light tree, banner and race strip as our own WebUI page.
 web_ui_page "web/race.html"
 web_ui_auto_create false
 web_files { "web/**" }
 dependency "open77_notifications"
+dependency "open77_nameplates"
 dependency "open77_worldui"
 dependency "open77_appearance"
 dependency "open77_equipment"
@@ -64,12 +65,14 @@ shared_script "shared/core/economy/markets.lua"
 shared_script "shared/core/economy/production.lua"
 shared_script "shared/core/economy/supply_profiles.lua"
 shared_script "shared/core/driver/progression.lua"
+shared_script "shared/core/driver/presentation.lua"
 shared_script "shared/core/onboarding/questionnaire.lua"
 shared_script "shared/core/qa/rules.lua"
 shared_script "shared/core/player/help.lua"
 -- ncm-core:end
 
 server_script "server/identity.lua"
+server_script "server/presentation.lua"
 server_script "server/garage.lua"
 server_script "server/vehicle_access.lua"
 server_script "server/odometer.lua"
@@ -77,6 +80,7 @@ server_script "server/pickup.lua"
 server_script "server/venue.lua"
 server_script "server/main.lua"
 client_script "client/main.lua"
+client_script "client/nameplates.lua"
 -- nav owns every waypoint NCM sets; it loads before the two files that ask for one.
 client_script "client/nav.lua"
 client_script "client/landmarks.lua"

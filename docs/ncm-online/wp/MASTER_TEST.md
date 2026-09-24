@@ -873,3 +873,35 @@ already has rows. That case stays owed (`IDEA-319`).
 
 **Conclusion:** the FFB/companion bridge is viable, via the remote-entry inversion rather than the bundled page.
 Constraint recorded as `IDEA-393`: **the race HUD stays bundled**; only the bridge surface is remote.
+
+---
+
+## §AK — Driver Card/nameplate first live pass (2026-09-24, NCM Development) — **OWED**
+
+Offline only: 278 core tests per interpreter, 162 resource Lua files, five WebUI scripts, 94 existing panel
+assertions and 21 Driver Card assertions pass. This section requires **two live clients** and claims no live
+result yet. Restart Development once so migration 030 applies, join both clients in the same bucket, and note
+their player IDs. Client A observes Client B unless a row says otherwise.
+
+Use the server console command `ncm.card.preview <B-id> <0|1|2|3> [default|selected]`. `selected` is the
+explicit Development-only alternate; the command changes no accomplishment or persisted entitlement.
+
+| # | Smallest live proof | PASS condition | State |
+|---|---|---|---|
+| §AK1 | Put B in front of A after both are gameplay-ready. | One compact NCM card appears over B and **no native text plate appears beside it**. | **OWED — two clients** |
+| §AK2 | Compare B's card name with B's current platform name. | Exact current verified presentation name; no UUID/session ID. | **OWED — two clients** |
+| §AK3 | Run preview with `0 default`, then `0 selected`. | Baseline and selected banner treatments are visibly distinct, crop cleanly, and both remain readable. | **OWED — two clients** |
+| §AK4 | Run preview with `0`, `1`, `2`, then `3 selected`. | All four badge layouts look intentional; never more than three slots render. | **OWED — two clients** |
+| §AK5 | Inspect the right-hand instrument region in every variant. | It remains fixed/high-contrast and says **Fingerprint / Unavailable / Insufficient data**; no zero polygon. | **OWED — two clients** |
+| §AK6 | Walk/drive B across A's view and toward the ordinary nameplate range limit. | Card tracks B without obvious extra Lua lag; existing fade/distance/visibility policy is not widened. | **OWED — two clients** |
+| §AK7 | Turn A's camera until B is behind it, then return; move B out of stream range and back. | Card disappears when not projected/streamed, returns once, and leaves no stranded DOM card. | **OWED — two clients** |
+| §AK8 | Have B leave and rejoin; if practical, force one normal body recreation. | Old card disappears; the new streamed body gets exactly one current card, including late presentation state. | **OWED — two clients** |
+| §AK9 | If practical, move B to another routing bucket and back. | A loses the card with the bucket-public bag mirror and regains one after return. | **OWED — two clients / bucket command** |
+| §AK10 | `reload ncm_world` once with both connected. | No duplicate/stranded cards; handoff re-establishes. If KB-2/KB-5 fires, record that exact platform failure instead of passing. | **OWED — two clients** |
+| §AK11 | Stop `ncm_world` while B remains visible, then start it again. | Native text renderer returns while NCM is stopped; after recovery the NCM card returns and native text is suppressed only after it is ready. | **OWED — two clients** |
+| §AK12 | Repeat with a genuinely long and/or non-ASCII platform name when an account is available. | Text remains literal (never markup), Unicode survives, and visual ellipsis keeps the card bounded. | **OWED — suitable account** |
+| §AK13 | Check server/client logs during the pass. | Migration 030 is applied; publication reports only banner/badge count/unavailable state; no `[ERR]`, heartbeat timeout or repeated handoff loop. | **OWED — live logs** |
+
+Invalid/missing asset fallback, public-schema privacy, three-badge bound, unavailable Fingerprint, text escaping,
+stream cleanup logic and native restoration ordering are already deterministic offline assertions. Do not mutate
+a live state bag merely to re-prove malformed input handling.

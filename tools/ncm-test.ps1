@@ -76,6 +76,11 @@ if ($luac -and (Test-Path $resRoot)) {
 $node = Get-Command node -ErrorAction SilentlyContinue
 if ($node -and (Test-Path $resRoot)) {
     $jsBad = 0; $jsN = 0
+    foreach ($f in Get-ChildItem $resRoot -Recurse -Filter *.js) {
+        $jsN++
+        $out = & node --check $f.FullName 2>&1
+        if ($LASTEXITCODE -ne 0) { $jsBad++; Write-Host ("  JS SYNTAX {0}" -f $f.FullName); $out | Select-Object -First 5 }
+    }
     foreach ($f in Get-ChildItem $resRoot -Recurse -Include *.html) {
         $html = Get-Content $f.FullName -Raw
         $blocks = [regex]::Matches($html, '(?s)<script>(.*?)</script>')
@@ -107,6 +112,19 @@ if ($node -and (Test-Path $resRoot)) {
         } else {
             $passes = ($rc | Select-String -Pattern '  PASS ').Count
             Write-Host ("=== panel render check: {0} assertion(s), 0 bad" -f $passes)
+        }
+    }
+    $nameplateCheck = Join-Path $here 'nameplate-render-check.js'
+    if ((Test-Path $nameplateCheck) -and (Test-Path $webRoot)) {
+        $nc = & node $nameplateCheck $webRoot 2>&1
+        $summary = $nc | Select-String -Pattern 'nameplate render:' | Select-Object -Last 1
+        if ($LASTEXITCODE -ne 0) {
+            $overall = 1
+            Write-Host '=== nameplate render check FAILED'
+            $nc | Select-String -Pattern 'FAIL' | Select-Object -First 12 | ForEach-Object { Write-Host ("  {0}" -f $_) }
+        } else {
+            $passes = ($nc | Select-String -Pattern '  PASS ').Count
+            Write-Host ("=== nameplate render check: {0} assertion(s), 0 bad" -f $passes)
         }
     }
 } else {

@@ -49,6 +49,7 @@ corpus claiming migrations 001-007 while the schema was at 023.
 | Vehicle artwork | [15_GENERATION_1_VEHICLE_ARTWORK_MANIFEST.md](15_GENERATION_1_VEHICLE_ARTWORK_MANIFEST.md) | - |
 | Day-to-day operation of NCM Online | [OPS_STAGING.md](OPS_STAGING.md) | - |
 | QA instrumentation mapping | [wp/QA_INSTRUMENTATION.md](wp/QA_INSTRUMENTATION.md) | - |
+| Driver Card and Fingerprint direction | [DECISION_RECORD.md](DECISION_RECORD.md#l130--locked--driver-card-expression-and-fingerprint-authority-stay-separate) | L130 |
 
 ---
 

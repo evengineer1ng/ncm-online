@@ -123,6 +123,13 @@ function NcmIdentity.resolve(playerId)
     if not okBag then reason = setOk end
     if not okBag or setOk ~= true then log("state bag write failed for player %d: %s", id, tostring(reason)) end
 
+    -- The Driver Card is a second, deliberately narrower public projection. Presentation owns its own
+    -- selection/entitlement validation; identity supplies only the resolved durable driver.
+    if NcmPresentation and NcmPresentation.publish then
+        local okPresentation, presentationReason = NcmPresentation.publish(id, profile)
+        if not okPresentation then log("presentation unavailable for player %d: %s", id, tostring(presentationReason)) end
+    end
+
     log("%s player=%d user=%s -> driver=%s display=%s server=%s", minted and "MINTED" or "loaded",
         id, userId, profile.ncmDriverId, profile.display, sid)
     return profile

@@ -24,6 +24,19 @@ Research date: **2026-09-18**. Documentation-only assessment; no production beha
 
 Also: [adjacent projects](LANDSCAPE.md), [evidence provenance](evidence/README.md), [future-agent instructions](../../../AGENTS.md).
 
+Current follow-up: [external tooling and API audit](EXTERNAL_TOOLING_API_AUDIT.md) — HTTP/network surfaces,
+existing NCM exposure, internal-only data, telemetry, identity/auth/privacy/rate boundaries, and cheap substrate
+decisions to preserve before any endpoint design.
+
+Current convergence research: [NCM Single Player <-> Online convergence audit](NCM_SP_ONLINE_CONVERGENCE_AUDIT.md)
+— code-level archaeology of both implementations; shared definitions versus sovereign state; AI racing,
+machine proxies, mod/content availability, results/trust, Machine Knowledge, framework seams, a concept matrix,
+and the cheap identity/provenance decisions that preserve a future "one NCM, multiple execution contexts" model.
+
+Current identity recovery: [Driver Identity / Nameplate recovery audit](DRIVER_IDENTITY_NAMEPLATE_RECOVERY_AUDIT.md)
+— recovered three-layer Driver Card, provisional Fingerprint axes, banners/badges/profile history, present
+telemetry feasibility, OPEN//77 nameplate/WebUI/state-bag readiness, missing assets and the smallest honest Phase 2.
+
 Evidence labels: **code verified** means static execution-path inspection, not a gameplay test; **documented** means an official external source; **proposal** means engineering judgment; **unknown** is not proof of absence. External capabilities must be rechecked against a pinned preview before implementation.
 
 ## Discrepancies worth knowing immediately

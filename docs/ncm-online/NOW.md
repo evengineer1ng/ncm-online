@@ -1,82 +1,83 @@
 # NOW — the single next-action index
 
-> **STATUS: LEDGER** — living session memory, rewritten at the end of each working session.
+> **STATUS: LEDGER** — living session memory, rewritten at the end of every working session.
 > Authority map: [INDEX.md](INDEX.md) — classified 2026-09-24 (L125).
 
-Last rewritten: **2026-09-24 — Driver Identity / Nameplate recovery audit.** No runtime, schema,
-configuration, deployment, save, API or gameplay behaviour changed.
+Last rewritten: **2026-09-24 — first NCM Driver Card/nameplate implementation.** Code and migration are built
+and offline-green; nothing in this pass was deployed or claimed live.
 
-> **Claim before writing:** decisions through **L129**; MASTER_TEST through **2.18 / §AJ**; next QA letter
-> **§AK**. BACKLOG next free **IDEA-394**; known issues through **KB-96** plus the existing duplicate KB-87.
+> **Claim before writing:** decisions through **L130**; MASTER_TEST through **2.18 / §AK**; next QA letter
+> **§AL**. BACKLOG next free **IDEA-395**; known issues through **KB-96** plus the existing duplicate KB-87.
 > Historical §Z collision remains: qualify by section (2.14 Machine Index vs 2.16 Help).
 
-## Next action: restart NCM Development, then drive §AI
+## Next action: deploy/restart NCM Development, then drive §AK with two clients
 
-Migration 029 and the driver-input HUD are built and gate-green but have no live PASS. The same restart can
-complete the Market checks still owed by IDEA-251. The immediate evidence to capture is:
+The first transparent Driver Card is ready for its live pass. Restart once so migration 030 applies, join two
+clients in the same bucket, and run the compact procedure in `wp/MASTER_TEST.md` §AK. It proves the remote
+card, exactly-one-renderer handoff, verified name, default/selected banner, 0–3 badge layout, unavailable
+Fingerprint, projection/distance cleanup, join/leave/body/bucket lifecycle, reload and native fallback.
 
-- §AI1–AI10: throttle/brake/steering HUD and the emitted `.87` field-resolution line;
-- §AI12–AI16: evidence provenance, discovery coordinates and zero-versus-unknown sampling;
-- §AI17–AI18: Market discovery remains behaviourally unchanged;
-- §AH21: incident attribution;
-- a genuinely fresh-world migration-028 case (IDEA-319), which the populated Development world cannot prove.
+Do not call the nameplate done until live PASS evidence sits beside §AK (L69). Existing live work remains owed:
 
-Do not call these done until the live PASS is written beside them in `wp/MASTER_TEST.md` (L69).
+- §AI1–AI10 and §AI12–AI18 (input HUD, evidence provenance and Market discovery);
+- §AH21 (incident attribution);
+- migration 028 on a genuinely fresh world (IDEA-319).
 
-## What this session established
+## What this session built
 
-The targeted recovery report is
-[`docs/research/open77/DRIVER_IDENTITY_NAMEPLATE_RECOVERY_AUDIT.md`](../research/open77/DRIVER_IDENTITY_NAMEPLATE_RECOVERY_AUDIT.md).
-It ends at the implementation starting line and changes no authority.
+- `driver.presentation` is the shared public contract: stable banner definitions, accomplishment-derived badge
+  entitlements, a separate persisted displayed selection bounded to three, safe asset fallback and an honest
+  unavailable/version-0 Fingerprint.
+- Migration 030 adds only `driver_presentation` selection state. It stores no Fingerprint values and does not
+  duplicate earned accomplishments.
+- `ncm_world` publishes one deliberately small bucket-public `ncmPresentation` bag value. It contains only
+  schema version, banner ID, up to three displayed badge IDs and unavailable Fingerprint state. Private profile,
+  history, telemetry, machines, knowledge, onboarding and eligibility are absent by construction and test.
+- A 1920×1080 transparent WebUI uses OPEN//77's native per-frame streamed-player projection, so names and
+  world attachment stay on the platform path. Names come only from its verified current `label`, are assigned
+  with `textContent`, bounded by Unicode code point and visually ellipsized.
+- Handoff is reversible: page ready → custom stream established → native text disabled. Page fault, heartbeat
+  loss, world transition, dependency reload and NCM stop all restore or reacquire the platform renderer. No
+  nameplate policy/distance setting is changed.
+- One code-native baseline and one explicit Development-only alternate prove selection/crop/fallback without
+  inventing a banner economy. Three Development-only preview badges are ephemeral fixtures; the only real badge
+  bridge is the existing first-finish/win/time-trial accomplishment set.
 
-Recovered historical design:
+## Owner rulings now authoritative
 
-- The Driver Card has three layers: platform-verified readable name; player-curated banner and a **few**
-  displayed badges; immutable behavioural Fingerprint.
-- The compact Fingerprint is an unlabeled radar/spider silhouette; the labelled receipts belong in the full
-  Driver Profile. It describes history, never morality, power or competence.
-- The only recovered axes are six explicit **candidate placeholders**: Competition, Street, Craft, Chrome,
-  Contact/aggression and Experience.
-- The remembered maximum of three badges and fixed far-right Fingerprint region are not in the repository.
-  External concept art may recover them.
+L130 records the new rulings without altering the historical recovery audit: maximum three displayed badges;
+fixed non-customizable high-contrast Fingerprint region; first card may say unavailable/insufficient data;
+modern direction Competition / Street / Engineering / Commerce / Culture / Intensity; population-relative
+world percentiles as derived presentation; behavior rather than competency; evidence remains historical truth;
+definition versioning is mandatory; formulas, evidence, population, minimum sample, cadence/window and
+anti-farming remain separately gated.
 
-Current feasibility:
+The separation is explicit: Fingerprint = tendency; badges = accomplishments; competency = capability;
+history/provenance = what happened; reputation = what humans think.
 
-- OPEN//77 already supplies streamed players, verified names, native per-frame projection into an owned WebUI
-  page, and server-written bucket-public state bags. There is no platform capability blocker to a first card.
-- Today’s NCM has ingredients for Competition, Street, contact tendency and race experience; it has no Craft or
-  Chrome activity ledger. Aggression cannot be inferred from zero-fault incident data.
-- No surviving source defines Fingerprint formulas, normalization/window, minimum sample, update cadence or
-  anti-gaming. Unknown must not be rendered as zero.
-- No banner/badge catalogue, selection state or artwork exists. Generic accomplishments and system glyphs are
-  useful substrate, not that system.
-- The shipped `.87` nameplate resource prefers a native text renderer. A rich card needs a bounded coexistence
-  probe proving disable/stream/fallback restoration while preserving its visibility policy and default distance.
+## Offline verification
 
-New ledger rows are IDEA-369–374: recovered card shape; versioned Fingerprint definition; narrow public
-presentation projection; settlement-time activity classification; renderer coexistence probe; live verified
-display identity.
+Full repository gate is green under Lua 5.4 and LuaJIT: **278 core tests per interpreter**, cross-scope and
+host harnesses green, **162 resource Lua files** parse, five WebUI scripts parse, **94** existing panel-render
+assertions and **21** focused Driver Card assertions pass, and documentation authority is green. The focused
+checks cover public schema/privacy, badge bound/deduplication, invalid asset fallback, unavailable Fingerprint,
+Unicode/long/hostile names, streamed-entry cleanup, page readiness, and native restoration/handoff order.
 
-## Owner inputs before Driver Nameplate Phase 2
+## External art
 
-Supply the old Driver Card/banner concepts and any badge/Fingerprint source. The only immediate rulings that
-recovery could not answer are:
-
-1. displayed badge maximum;
-2. whether the Fingerprint owns a fixed standardized right-hand region;
-3. whether to ship the card initially with Fingerprint “unavailable / insufficient data,” or first lock a
-   version-1 Fingerprint definition.
-
-The first honest nameplate does not need the full Driver Profile, Machine Profile, prestige system, Chrome,
-driving ledger or a global directory.
+The supplied `2720.png` collection sheet was used as the neon/hex/banner visual reference. The working first
+card intentionally uses code-native art so dynamic names, badges and Fingerprint state stay functional and no
+unapproved launch catalogue is invented. A rights-cleared production banner crop/source is still needed only
+if the owner wants to replace the baseline treatment; it does not block §AK.
 
 ## Workspace state to preserve
 
-Research/documentation work from the three audits remains uncommitted. Do not discard or overwrite it:
+Three research documents remain part of this same uncommitted work and must ship with the implementation
+commit rather than be discarded:
 
 - `docs/research/open77/EXTERNAL_TOOLING_API_AUDIT.md`
 - `docs/research/open77/NCM_SP_ONLINE_CONVERGENCE_AUDIT.md`
 - `docs/research/open77/DRIVER_IDENTITY_NAMEPLATE_RECOVERY_AUDIT.md`
-- corresponding `README.md`, `BACKLOG.md` and this `NOW.md` updates.
 
-`DECISION_RECORD.md`, `KNOWN_BUGS.md`, runtime code, schemas and configuration were not changed by this session.
+The companion/WebUI probe completed in the intervening session remains authoritative as L129 and §AJ; this
+nameplate pass does not modify or depend on that optional companion architecture.
