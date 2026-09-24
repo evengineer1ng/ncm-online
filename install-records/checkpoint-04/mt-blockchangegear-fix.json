@@ -1,0 +1,13 @@
+{
+  "date": "2026-09-19",
+  "mod": "MANUAL TRANSMISSION V10 (CET mod, game copy)",
+  "problem": "GameOptions.Toggle(\"Vehicle\",\"BlockChangeGear\",\"true\"/\"false\") FLIPS the option and ignores the value argument. Every SetLock/enter/exit call therefore alternated the engine gear lock instead of setting it, so the game's automatic gearbox fought MT's forced gear (SyncEngineState re-forces the gear each frame). Symptoms: inconsistent upshifts, wheel/display gear mismatch, 'toggle' not yielding automatic, RB15 capped ~300 km/h (held in 5th/6th; 7th is 105 m/s = 378 km/h). Most visible on the RB15 because its gear spread is widest.",
+  "fix": {
+    "modules/gearbox.lua": "BaseGearbox.ReadBlockChangeGear()/SetBlockChangeGear(flag): GameOptions.SetBool, verified by GameOptions.Get, fallback GameOptions.Set(string), last-resort single Toggle; SetLock always writes the engine option (no stale-flag shortcut).",
+    "modules/stateManager.lua": "SetupVehicleState / ResetVehicleState use BaseGearbox.SetLock(false|true) instead of raw Toggle.",
+    "init.lua": "onShutdown uses SetLock(false); onUpdate: when settings.enabled == false the lock is released and throttle/clutch handed back (real automatic); when enabled, a 1 s watchdog re-asserts BlockChangeGear == isManualMode and logs '[MT/diag] BlockChangeGear drift detected' if anything else flipped it."
+  },
+  "backup": "install-records/checkpoint-04/mt-blockchangegear-fix-backup/ (sha256.txt)",
+  "patched_copies": "install-records/checkpoint-04/mt-blockchangegear-fix/ (sha256.txt); workspace: manual-transmission-init.mount-fallback.lua, manual-transmission-stateManager.patched.lua, manual-transmission-gearbox.patched.lua",
+  "verify": "drive RB15 in manual: [MT/diag] lines should show BlockChangeGear == locked at all times; 'Enable Mod' off -> car shifts itself; 7th gear reaches >300 km/h"
+}

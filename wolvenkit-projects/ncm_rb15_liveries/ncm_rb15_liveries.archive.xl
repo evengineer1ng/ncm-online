@@ -1,0 +1,6 @@
+resource:
+  patch:
+    ncm\rb15_liveries\meshes\rb15_body_liveries.mesh:
+      - fable5\rb15\meshes\rb15_body.mesh
+    ncm\rb15_liveries\rb15_ent_patch.ent:
+      - fable5\rb15\rb15.ent

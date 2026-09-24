@@ -1,0 +1,10 @@
+﻿9 events under open77:hacking â answering for build 2.31.13+op77.78 (no index published for 2.31.13+op77.84; serving 2.31.13+op77.78, the newest at or below it)
+- open77:hacking:cancel [resource-client, server]
+- open77:hacking:evidence [resource-client, server]
+- open77:hacking:purge [resource-client, server]
+- open77:hacking:request [resource-client, server]
+- open77:hacking:result [resource-client]
+- open77:hacking:start [resource-client, server]
+- open77:hacking:startReport [resource-client, server]
+- open77:hacking:state [resource-client]
+- open77:hacking:transition [resource-client] â hacking#configurable-outcome-the-effects-block, hacking#hack-kinds-overheat-cyberware-malfunction-and-cripple-movement

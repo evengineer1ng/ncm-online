@@ -1,0 +1,22 @@
+﻿{
+    "deployed_at":  "2026-09-18T15:54:30.2962402-04:00",
+    "game":  "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Cyberpunk 2077",
+    "game_version":  "2.31",
+    "mods":  {
+                 "value":  [
+                               {
+                                   "mod_id":  31543,
+                                   "file_id":  158486,
+                                   "name":  "RB15 F1 Car Mod Demo",
+                                   "version":  "10",
+                                   "archive":  "RB15_F1_31543_10_2026-08-30T14-37Z_sHlUHDoAD.zip",
+                                   "bytes":  38597617,
+                                   "sha256":  "65A45B231048DE6F9F145C95D484B3D0FE4C3CDADAB55C6257126BC905E0001A",
+                                   "uploaded":  "2026-08-30T14:37:56.000+00:00",
+                                   "source":  "manual browser download (Nexus API key not available this session)"
+                               }
+                           ],
+                 "Count":  1
+             },
+    "file_events":  13
+}

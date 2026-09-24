@@ -1,0 +1,6 @@
+5 natives in Open77.ready — answering for build 2.31.13+op77.78
+- server Open77.ready.hold(playerId: integer|string, reason?: string) — Takes or refreshes this resource's hold on a player. (since 2.31.13+op77.45)
+- server Open77.ready.isReady(playerId: integer|string) — Whether anything is still holding a player. (since 2.31.13+op77.45)
+- server Open77.ready.participate(options?: table { timeoutMs?, reason? }) — Declares that this resource holds joining players until it is finished with them. (since 2.31.13+op77.45)
+- server Open77.ready.release(playerId: integer|string, session?: session token, note?: string) — Clears this resource's hold on a player. (since 2.31.13+op77.45)
+- server Open77.ready.status(playerId: integer|string) — Who is holding a player, and for how long. (since 2.31.13+op77.45)

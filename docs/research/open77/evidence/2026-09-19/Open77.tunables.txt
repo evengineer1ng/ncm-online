@@ -1,0 +1,7 @@
+6 natives in Open77.tunables — answering for build 2.31.13+op77.78
+- server Open77.tunables.capture() — A frozen plain table of every current value. (since 2.31.13+op77.45)
+- server Open77.tunables.declare(declaration: table) — Declares this resource's operator-tunable settings and returns a live proxy. (since 2.31.13+op77.45)
+- server Open77.tunables.get(key: string) — The current value of one tunable. (since 2.31.13+op77.45)
+- server Open77.tunables.pending() — The changes waiting on a round or match boundary. (since 2.31.13+op77.45)
+- server Open77.tunables.promote() — Adopts every pending change and returns the keys that moved. (since 2.31.13+op77.45)
+- server Open77.tunables.set(key: string, value: number|integer|boolean|string) — Writes one tunable, with the same validation as the admin panel. (since 2.31.13+op77.45)

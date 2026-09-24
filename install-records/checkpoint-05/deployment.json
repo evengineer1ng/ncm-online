@@ -1,0 +1,22 @@
+﻿{
+    "deployed_at":  "2026-09-18T17:17:18.4655137-04:00",
+    "game":  "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Cyberpunk 2077",
+    "game_version":  "2.31",
+    "mods":  {
+                 "value":  [
+                               {
+                                   "mod_id":  900001,
+                                   "file_id":  0,
+                                   "name":  "NCM RB15 Liveries - milestone 1 test build (local, not from Nexus)",
+                                   "version":  "0.1-test",
+                                   "archive":  "NCM_RB15_Liveries_test_build_20260918.zip",
+                                   "bytes":  126142,
+                                   "sha256":  "0EFC7EF6FFF584EA74767C1C4AEDD33728C066E98F41E26BA83D65BADE3D1C3C",
+                                   "uploaded":  "2026-09-18",
+                                   "source":  "built locally with WolvenKit CLI 8.20.0 from wolvenkit-projects/ncm_rb15_liveries; requires RB15 (31543)"
+                               }
+                           ],
+                 "Count":  1
+             },
+    "file_events":  4
+}

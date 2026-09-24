@@ -1,0 +1,22 @@
+﻿{
+    "deployed_at":  "2026-09-19T10:43:26.6578858-04:00",
+    "game":  "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Cyberpunk 2077",
+    "game_version":  "2.31",
+    "mods":  {
+                 "value":  [
+                               {
+                                   "mod_id":  4583,
+                                   "file_id":  0,
+                                   "name":  "In-World Navigation",
+                                   "version":  "0.1.20",
+                                   "archive":  "in_world_navigation_v0.1.20.zip-4583-0-1-20-1752806764.zip",
+                                   "bytes":  551795,
+                                   "sha256":  "C302B10B73E0EE54016CAE8F57215CF662FBB11E3BEE9A4F8F4FDE660B26B79E",
+                                   "uploaded":  "2025-07-18",
+                                   "source":  "manual browser download; MIT licensed (license.md in package)"
+                               }
+                           ],
+                 "Count":  1
+             },
+    "file_events":  6
+}

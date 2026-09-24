@@ -1,0 +1,825 @@
+{
+  "Header": {
+    "WolvenKitVersion": "8.20.0",
+    "WKitJsonVersion": "0.0.9",
+    "GameVersion": 2310,
+    "ExportedDateTime": "2026-09-02T21:47:15.8736811Z",
+    "DataType": "CR2W",
+    "ArchiveFileName": "C:\\Users\\eveng\\OneDrive\\Documents\\cyberpunk2077\\wolvenkit-projects\\mt_ecosystem\\source\\archive\\mt_ecosystem\\localization\\en-us\\onscreens\\mt_ecosystem.json"
+  },
+  "Data": {
+    "Version": 195,
+    "BuildVersion": 0,
+    "RootChunk": {
+      "$type": "JsonResource",
+      "cookingPlatform": "PLATFORM_PC",
+      "root": {
+        "HandleId": "0",
+        "Data": {
+          "$type": "localizationPersistenceOnScreenEntries",
+          "entries": [
+            {
+              "$type": "localizationPersistenceOnScreenEntry",
+              "femaleVariant": "Dex - NCM Dispatch",
+              "maleVariant": "",
+              "primaryKey": "9000001",
+              "secondaryKey": "NCM_contact_dex"
+            },
+            {
+              "$type": "localizationPersistenceOnScreenEntry",
+              "femaleVariant": "You\u0027re through to NCM. What are you looking for?",
+              "maleVariant": "",
+              "primaryKey": "9000002",
+              "secondaryKey": "NCM_msg_dex_intro"
+            },
+            {
+              "$type": "localizationPersistenceOnScreenEntry",
+              "femaleVariant": "Quickie Quinn",
+              "maleVariant": "",
+              "primaryKey": "9000003",
+              "secondaryKey": "NCM_contact_quickie"
+            },
+            {
+              "$type": "localizationPersistenceOnScreenEntry",
+              "femaleVariant": "{NCM_QUICKIE_MESSAGE}",
+              "maleVariant": "",
+              "primaryKey": "9000004",
+              "secondaryKey": "NCM_msg_quickie_intro"
+            },
+            {
+              "$type": "localizationPersistenceOnScreenEntry",
+              "femaleVariant": "Setup Stu",
+              "maleVariant": "",
+              "primaryKey": "9000005",
+              "secondaryKey": "NCM_contact_stu"
+            },
+            {
+              "$type": "localizationPersistenceOnScreenEntry",
+              "femaleVariant": "{NCM_SETUP_MESSAGE}",
+              "maleVariant": "",
+              "primaryKey": "9000006",
+              "secondaryKey": "NCM_msg_stu_intro"
+            },
+            {
+              "$type": "localizationPersistenceOnScreenEntry",
+              "femaleVariant": "Foreman",
+              "maleVariant": "",
+              "primaryKey": "9000007",
+              "secondaryKey": "NCM_contact_control"
+            },
+            {
+              "$type": "localizationPersistenceOnScreenEntry",
+              "femaleVariant": "{NCM_CONTROL_MESSAGE}",
+              "maleVariant": "",
+              "primaryKey": "9000008",
+              "secondaryKey": "NCM_msg_control_intro"
+            },
+            {
+              "$type": "localizationPersistenceOnScreenEntry",
+              "femaleVariant": "#1 Fan",
+              "maleVariant": "",
+              "primaryKey": "9000009",
+              "secondaryKey": "NCM_contact_ledger"
+            },
+            {
+              "$type": "localizationPersistenceOnScreenEntry",
+              "femaleVariant": "{NCM_LEDGER_MESSAGE}",
+              "maleVariant": "",
+              "primaryKey": "9000010",
+              "secondaryKey": "NCM_msg_ledger_intro"
+            },
+            {
+              "$type": "localizationPersistenceOnScreenEntry",
+              "femaleVariant": "Race Start",
+              "maleVariant": "",
+              "primaryKey": "9000011",
+              "secondaryKey": "NCM_mappin_race_start"
+            },
+            {
+              "$type": "localizationPersistenceOnScreenEntry",
+              "femaleVariant": "Race Finish",
+              "maleVariant": "",
+              "primaryKey": "9000012",
+              "secondaryKey": "NCM_mappin_race_finish"
+            },
+            {
+              "$type": "localizationPersistenceOnScreenEntry",
+              "femaleVariant": "Rico",
+              "maleVariant": "",
+              "primaryKey": "9000013",
+              "secondaryKey": "NCM_contact_scout"
+            },
+            {
+              "$type": "localizationPersistenceOnScreenEntry",
+              "femaleVariant": "{NCM_SCOUT_MESSAGE}",
+              "maleVariant": "",
+              "primaryKey": "9000014",
+              "secondaryKey": "NCM_msg_scout_intro"
+            },
+            {
+              "$type": "localizationPersistenceOnScreenEntry",
+              "femaleVariant": "BookQueen Billie",
+              "maleVariant": "",
+              "primaryKey": "9000015",
+              "secondaryKey": "NCM_contact_bookie"
+            },
+            {
+              "$type": "localizationPersistenceOnScreenEntry",
+              "femaleVariant": "{NCM_BOOKIE_MESSAGE}",
+              "maleVariant": "",
+              "primaryKey": "9000016",
+              "secondaryKey": "NCM_msg_bookie_intro"
+            },
+            {
+              "$type": "localizationPersistenceOnScreenEntry",
+              "femaleVariant": "{NCM_PHONE_RESPONSE}",
+              "maleVariant": "",
+              "primaryKey": "9000017",
+              "secondaryKey": "NCM_msg_phone_response"
+            },
+            {
+              "$type": "localizationPersistenceOnScreenEntry",
+              "femaleVariant": "Quick Race",
+              "maleVariant": "",
+              "primaryKey": "9000100",
+              "secondaryKey": "NCM_choice_route_quickie"
+            },
+            {
+              "$type": "localizationPersistenceOnScreenEntry",
+              "femaleVariant": "Setup Tuning",
+              "maleVariant": "",
+              "primaryKey": "9000101",
+              "secondaryKey": "NCM_choice_route_stu"
+            },
+            {
+              "$type": "localizationPersistenceOnScreenEntry",
+              "femaleVariant": "Grid Control",
+              "maleVariant": "",
+              "primaryKey": "9000102",
+              "secondaryKey": "NCM_choice_route_control"
+            },
+            {
+              "$type": "localizationPersistenceOnScreenEntry",
+              "femaleVariant": "Stats/History",
+              "maleVariant": "",
+              "primaryKey": "9000103",
+              "secondaryKey": "NCM_choice_route_ledger"
+            },
+            {
+              "$type": "localizationPersistenceOnScreenEntry",
+              "femaleVariant": "Scouting and Management",
+              "maleVariant": "",
+              "primaryKey": "9000104",
+              "secondaryKey": "NCM_choice_route_scout"
+            },
+            {
+              "$type": "localizationPersistenceOnScreenEntry",
+              "femaleVariant": "Betting",
+              "maleVariant": "",
+              "primaryKey": "9000105",
+              "secondaryKey": "NCM_choice_route_bookie"
+            },
+            {
+              "$type": "localizationPersistenceOnScreenEntry",
+              "femaleVariant": "Line me one up",
+              "maleVariant": "",
+              "primaryKey": "9000110",
+              "secondaryKey": "NCM_choice_quick_race"
+            },
+            {
+              "$type": "localizationPersistenceOnScreenEntry",
+              "femaleVariant": "Line up a knockout",
+              "maleVariant": "",
+              "primaryKey": "9000111",
+              "secondaryKey": "NCM_choice_knockout_setup"
+            },
+            {
+              "$type": "localizationPersistenceOnScreenEntry",
+              "femaleVariant": "Back to Dex",
+              "maleVariant": "",
+              "primaryKey": "9000112",
+              "secondaryKey": "NCM_choice_back_dex_quickie"
+            },
+            {
+              "$type": "localizationPersistenceOnScreenEntry",
+              "femaleVariant": "You\u0027re on, choom",
+              "maleVariant": "",
+              "primaryKey": "9000113",
+              "secondaryKey": "NCM_choice_quickie_confirm_preview"
+            },
+            {
+              "$type": "localizationPersistenceOnScreenEntry",
+              "femaleVariant": "Got anything else?",
+              "maleVariant": "",
+              "primaryKey": "9000114",
+              "secondaryKey": "NCM_choice_quickie_refresh_offer"
+            },
+            {
+              "$type": "localizationPersistenceOnScreenEntry",
+              "femaleVariant": "Read the car",
+              "maleVariant": "",
+              "primaryKey": "9000120",
+              "secondaryKey": "NCM_choice_setup_scheduled"
+            },
+            {
+              "$type": "localizationPersistenceOnScreenEntry",
+              "femaleVariant": "What\u0027s wrong with it?",
+              "maleVariant": "",
+              "primaryKey": "9000121",
+              "secondaryKey": "NCM_choice_confirm_preview"
+            },
+            {
+              "$type": "localizationPersistenceOnScreenEntry",
+              "femaleVariant": "Fit the best part",
+              "maleVariant": "",
+              "primaryKey": "9000122",
+              "secondaryKey": "NCM_choice_cancel_setup"
+            },
+            {
+              "$type": "localizationPersistenceOnScreenEntry",
+              "femaleVariant": "Set and save a tune",
+              "maleVariant": "",
+              "primaryKey": "9000123",
+              "secondaryKey": "NCM_choice_back_dex_stu"
+            },
+            {
+              "$type": "localizationPersistenceOnScreenEntry",
+              "femaleVariant": "Stage next career race",
+              "maleVariant": "",
+              "primaryKey": "9000130",
+              "secondaryKey": "NCM_choice_track_start"
+            },
+            {
+              "$type": "localizationPersistenceOnScreenEntry",
+              "femaleVariant": "Create a custom race",
+              "maleVariant": "",
+              "primaryKey": "9000131",
+              "secondaryKey": "NCM_choice_start_quali"
+            },
+            {
+              "$type": "localizationPersistenceOnScreenEntry",
+              "femaleVariant": "Confirm current race",
+              "maleVariant": "",
+              "primaryKey": "9000132",
+              "secondaryKey": "NCM_choice_start_race"
+            },
+            {
+              "$type": "localizationPersistenceOnScreenEntry",
+              "femaleVariant": "Cancel race",
+              "maleVariant": "",
+              "primaryKey": "9000133",
+              "secondaryKey": "NCM_choice_abort_race"
+            },
+            {
+              "$type": "localizationPersistenceOnScreenEntry",
+              "femaleVariant": "Forfeit / DNF",
+              "maleVariant": "",
+              "primaryKey": "9000139",
+              "secondaryKey": "NCM_choice_control_forfeit"
+            },
+            {
+              "$type": "localizationPersistenceOnScreenEntry",
+              "femaleVariant": "Route me to the race",
+              "maleVariant": "",
+              "primaryKey": "9000134",
+              "secondaryKey": "NCM_choice_close_results"
+            },
+            {
+              "$type": "localizationPersistenceOnScreenEntry",
+              "femaleVariant": "Run qualifying",
+              "maleVariant": "",
+              "primaryKey": "9000135",
+              "secondaryKey": "NCM_choice_restart_race"
+            },
+            {
+              "$type": "localizationPersistenceOnScreenEntry",
+              "femaleVariant": "Start race",
+              "maleVariant": "",
+              "primaryKey": "9000136",
+              "secondaryKey": "NCM_choice_back_dex_control"
+            },
+            {
+              "$type": "localizationPersistenceOnScreenEntry",
+              "femaleVariant": "Clear results",
+              "maleVariant": "",
+              "primaryKey": "9000137",
+              "secondaryKey": "NCM_choice_control_close_results"
+            },
+            {
+              "$type": "localizationPersistenceOnScreenEntry",
+              "femaleVariant": "Run it back",
+              "maleVariant": "",
+              "primaryKey": "9000138",
+              "secondaryKey": "NCM_choice_control_restart"
+            },
+            {
+              "$type": "localizationPersistenceOnScreenEntry",
+              "femaleVariant": "Show me the receipts",
+              "maleVariant": "",
+              "primaryKey": "9000140",
+              "secondaryKey": "NCM_choice_status"
+            },
+            {
+              "$type": "localizationPersistenceOnScreenEntry",
+              "femaleVariant": "Tell me what that meant",
+              "maleVariant": "",
+              "primaryKey": "9000141",
+              "secondaryKey": "NCM_choice_standings"
+            },
+            {
+              "$type": "localizationPersistenceOnScreenEntry",
+              "femaleVariant": "Pull my stats",
+              "maleVariant": "",
+              "primaryKey": "9000142",
+              "secondaryKey": "NCM_choice_stats"
+            },
+            {
+              "$type": "localizationPersistenceOnScreenEntry",
+              "femaleVariant": "Back to Dex",
+              "maleVariant": "",
+              "primaryKey": "9000143",
+              "secondaryKey": "NCM_choice_back_dex_ledger"
+            },
+            {
+              "$type": "localizationPersistenceOnScreenEntry",
+              "femaleVariant": "What\u0027s happening out there?",
+              "maleVariant": "",
+              "primaryKey": "9000150",
+              "secondaryKey": "NCM_choice_scout_status"
+            },
+            {
+              "$type": "localizationPersistenceOnScreenEntry",
+              "femaleVariant": "Back to Dex",
+              "maleVariant": "",
+              "primaryKey": "9000151",
+              "secondaryKey": "NCM_choice_back_dex_scout"
+            },
+            {
+              "$type": "localizationPersistenceOnScreenEntry",
+              "femaleVariant": "Who\u0027s in this race?",
+              "maleVariant": "",
+              "primaryKey": "9000152",
+              "secondaryKey": "NCM_choice_scout_current_grid"
+            },
+            {
+              "$type": "localizationPersistenceOnScreenEntry",
+              "femaleVariant": "What am I up against?",
+              "maleVariant": "",
+              "primaryKey": "9000153",
+              "secondaryKey": "NCM_choice_scout_field_read"
+            },
+            {
+              "$type": "localizationPersistenceOnScreenEntry",
+              "femaleVariant": "Who should I watch?",
+              "maleVariant": "",
+              "primaryKey": "9000154",
+              "secondaryKey": "NCM_choice_scout_watchlist"
+            },
+            {
+              "$type": "localizationPersistenceOnScreenEntry",
+              "femaleVariant": "Light contract",
+              "maleVariant": "",
+              "primaryKey": "9000160",
+              "secondaryKey": "NCM_choice_wager_max"
+            },
+            {
+              "$type": "localizationPersistenceOnScreenEntry",
+              "femaleVariant": "Standard contract",
+              "maleVariant": "",
+              "primaryKey": "9000161",
+              "secondaryKey": "NCM_choice_wager_clear"
+            },
+            {
+              "$type": "localizationPersistenceOnScreenEntry",
+              "femaleVariant": "Heavy contract",
+              "maleVariant": "",
+              "primaryKey": "9000162",
+              "secondaryKey": "NCM_choice_wager_earnings"
+            },
+            {
+              "$type": "localizationPersistenceOnScreenEntry",
+              "femaleVariant": "Void the slip",
+              "maleVariant": "",
+              "primaryKey": "9000163",
+              "secondaryKey": "NCM_choice_back_dex_bookie"
+            },
+            {
+              "$type": "localizationPersistenceOnScreenEntry",
+              "femaleVariant": "Open the books",
+              "maleVariant": "",
+              "primaryKey": "9000164",
+              "secondaryKey": "NCM_choice_wager_earnings_books"
+            },
+            {
+              "$type": "localizationPersistenceOnScreenEntry",
+              "femaleVariant": "Any streak slips?",
+              "maleVariant": "",
+              "primaryKey": "9000165",
+              "secondaryKey": "NCM_choice_wager_streak"
+            },
+            {
+              "$type": "localizationPersistenceOnScreenEntry",
+              "femaleVariant": "3-race streak",
+              "maleVariant": "",
+              "primaryKey": "9000166",
+              "secondaryKey": "NCM_choice_wager_streak_three"
+            },
+            {
+              "$type": "localizationPersistenceOnScreenEntry",
+              "femaleVariant": "5-race streak",
+              "maleVariant": "",
+              "primaryKey": "9000167",
+              "secondaryKey": "NCM_choice_wager_streak_five"
+            },
+            {
+              "$type": "localizationPersistenceOnScreenEntry",
+              "femaleVariant": "Line me up for this race",
+              "maleVariant": "",
+              "primaryKey": "9000207",
+              "secondaryKey": "NCM_choice_wager_board"
+            },
+            {
+              "$type": "localizationPersistenceOnScreenEntry",
+              "femaleVariant": "Who\u0027s the favorite?",
+              "maleVariant": "",
+              "primaryKey": "9000208",
+              "secondaryKey": "NCM_choice_wager_favorite"
+            },
+            {
+              "$type": "localizationPersistenceOnScreenEntry",
+              "femaleVariant": "Where\u0027s the value?",
+              "maleVariant": "",
+              "primaryKey": "9000209",
+              "secondaryKey": "NCM_choice_wager_value"
+            },
+            {
+              "$type": "localizationPersistenceOnScreenEntry",
+              "femaleVariant": "Back me",
+              "maleVariant": "",
+              "primaryKey": "9000210",
+              "secondaryKey": "NCM_choice_wager_pick_self"
+            },
+            {
+              "$type": "localizationPersistenceOnScreenEntry",
+              "femaleVariant": "Back the favorite",
+              "maleVariant": "",
+              "primaryKey": "9000211",
+              "secondaryKey": "NCM_choice_wager_pick_favorite"
+            },
+            {
+              "$type": "localizationPersistenceOnScreenEntry",
+              "femaleVariant": "Back the value",
+              "maleVariant": "",
+              "primaryKey": "9000212",
+              "secondaryKey": "NCM_choice_wager_pick_value"
+            },
+            {
+              "$type": "localizationPersistenceOnScreenEntry",
+              "femaleVariant": "Where\u0027s the heat?",
+              "maleVariant": "",
+              "primaryKey": "9000213",
+              "secondaryKey": "NCM_choice_scout_ambient_heat"
+            },
+            {
+              "$type": "localizationPersistenceOnScreenEntry",
+              "femaleVariant": "Show management targets",
+              "maleVariant": "",
+              "primaryKey": "9000214",
+              "secondaryKey": "NCM_choice_scout_management_targets"
+            },
+            {
+              "$type": "localizationPersistenceOnScreenEntry",
+              "femaleVariant": "Sign target one",
+              "maleVariant": "",
+              "primaryKey": "9000215",
+              "secondaryKey": "NCM_choice_scout_sign_target_one"
+            },
+            {
+              "$type": "localizationPersistenceOnScreenEntry",
+              "femaleVariant": "Sign target two",
+              "maleVariant": "",
+              "primaryKey": "9000216",
+              "secondaryKey": "NCM_choice_scout_sign_target_two"
+            },
+            {
+              "$type": "localizationPersistenceOnScreenEntry",
+              "femaleVariant": "Sign target three",
+              "maleVariant": "",
+              "primaryKey": "9000217",
+              "secondaryKey": "NCM_choice_scout_sign_target_three"
+            },
+            {
+              "$type": "localizationPersistenceOnScreenEntry",
+              "femaleVariant": "Show ambient board",
+              "maleVariant": "",
+              "primaryKey": "9000218",
+              "secondaryKey": "NCM_choice_control_ambient_status"
+            },
+            {
+              "$type": "localizationPersistenceOnScreenEntry",
+              "femaleVariant": "Stage live ambient heat",
+              "maleVariant": "",
+              "primaryKey": "9000219",
+              "secondaryKey": "NCM_choice_control_stage_live_ambient"
+            },
+            {
+              "$type": "localizationPersistenceOnScreenEntry",
+              "femaleVariant": "Queue managed sim",
+              "maleVariant": "",
+              "primaryKey": "9000220",
+              "secondaryKey": "NCM_choice_control_queue_managed_sim"
+            },
+            {
+              "$type": "localizationPersistenceOnScreenEntry",
+              "femaleVariant": "Queue managed spectate",
+              "maleVariant": "",
+              "primaryKey": "9000221",
+              "secondaryKey": "NCM_choice_control_queue_managed_spectate"
+            },
+            {
+              "$type": "localizationPersistenceOnScreenEntry",
+              "femaleVariant": "Simulate managed run",
+              "maleVariant": "",
+              "primaryKey": "9000222",
+              "secondaryKey": "NCM_choice_control_simulate_managed_run"
+            },
+            {
+              "$type": "localizationPersistenceOnScreenEntry",
+              "femaleVariant": "NCM Dispatch",
+              "maleVariant": "",
+              "primaryKey": "9000170",
+              "secondaryKey": "NCM_subject_dex_menu"
+            },
+            {
+              "$type": "localizationPersistenceOnScreenEntry",
+              "femaleVariant": "Dispatch Update",
+              "maleVariant": "",
+              "primaryKey": "9000171",
+              "secondaryKey": "NCM_subject_dex_response"
+            },
+            {
+              "$type": "localizationPersistenceOnScreenEntry",
+              "femaleVariant": "Quick Runs",
+              "maleVariant": "",
+              "primaryKey": "9000172",
+              "secondaryKey": "NCM_subject_quickie_menu"
+            },
+            {
+              "$type": "localizationPersistenceOnScreenEntry",
+              "femaleVariant": "Quickie Reply",
+              "maleVariant": "",
+              "primaryKey": "9000173",
+              "secondaryKey": "NCM_subject_quickie_response"
+            },
+            {
+              "$type": "localizationPersistenceOnScreenEntry",
+              "femaleVariant": "Setup Shop",
+              "maleVariant": "",
+              "primaryKey": "9000174",
+              "secondaryKey": "NCM_subject_setup_menu"
+            },
+            {
+              "$type": "localizationPersistenceOnScreenEntry",
+              "femaleVariant": "Stu Notes",
+              "maleVariant": "",
+              "primaryKey": "9000175",
+              "secondaryKey": "NCM_subject_setup_response"
+            },
+            {
+              "$type": "localizationPersistenceOnScreenEntry",
+              "femaleVariant": "Foreman",
+              "maleVariant": "",
+              "primaryKey": "9000176",
+              "secondaryKey": "NCM_subject_control_menu"
+            },
+            {
+              "$type": "localizationPersistenceOnScreenEntry",
+              "femaleVariant": "Foreman Update",
+              "maleVariant": "",
+              "primaryKey": "9000177",
+              "secondaryKey": "NCM_subject_control_response"
+            },
+            {
+              "$type": "localizationPersistenceOnScreenEntry",
+              "femaleVariant": "Fan Mail",
+              "maleVariant": "",
+              "primaryKey": "9000178",
+              "secondaryKey": "NCM_subject_ledger_menu"
+            },
+            {
+              "$type": "localizationPersistenceOnScreenEntry",
+              "femaleVariant": "Hype Drop",
+              "maleVariant": "",
+              "primaryKey": "9000179",
+              "secondaryKey": "NCM_subject_ledger_response"
+            },
+            {
+              "$type": "localizationPersistenceOnScreenEntry",
+              "femaleVariant": "Rico Line",
+              "maleVariant": "",
+              "primaryKey": "9000180",
+              "secondaryKey": "NCM_subject_scout_menu"
+            },
+            {
+              "$type": "localizationPersistenceOnScreenEntry",
+              "femaleVariant": "Scout Ping",
+              "maleVariant": "",
+              "primaryKey": "9000181",
+              "secondaryKey": "NCM_subject_scout_response"
+            },
+            {
+              "$type": "localizationPersistenceOnScreenEntry",
+              "femaleVariant": "Bet Window",
+              "maleVariant": "",
+              "primaryKey": "9000182",
+              "secondaryKey": "NCM_subject_bookie_menu"
+            },
+            {
+              "$type": "localizationPersistenceOnScreenEntry",
+              "femaleVariant": "Slip Update",
+              "maleVariant": "",
+              "primaryKey": "9000183",
+              "secondaryKey": "NCM_subject_bookie_response"
+            },
+            {
+              "$type": "localizationPersistenceOnScreenEntry",
+              "femaleVariant": "Sprint",
+              "maleVariant": "",
+              "primaryKey": "9000184",
+              "secondaryKey": "NCM_choice_custom_type_sprint"
+            },
+            {
+              "$type": "localizationPersistenceOnScreenEntry",
+              "femaleVariant": "Drag",
+              "maleVariant": "",
+              "primaryKey": "9000185",
+              "secondaryKey": "NCM_choice_custom_type_drag"
+            },
+            {
+              "$type": "localizationPersistenceOnScreenEntry",
+              "femaleVariant": "Knockout",
+              "maleVariant": "",
+              "primaryKey": "9000186",
+              "secondaryKey": "NCM_choice_custom_type_knockout"
+            },
+            {
+              "$type": "localizationPersistenceOnScreenEntry",
+              "femaleVariant": "4-car field",
+              "maleVariant": "",
+              "primaryKey": "9000187",
+              "secondaryKey": "NCM_choice_custom_field_four"
+            },
+            {
+              "$type": "localizationPersistenceOnScreenEntry",
+              "femaleVariant": "6-car field",
+              "maleVariant": "",
+              "primaryKey": "9000188",
+              "secondaryKey": "NCM_choice_custom_field_six"
+            },
+            {
+              "$type": "localizationPersistenceOnScreenEntry",
+              "femaleVariant": "8-car field",
+              "maleVariant": "",
+              "primaryKey": "9000189",
+              "secondaryKey": "NCM_choice_custom_field_eight"
+            },
+            {
+              "$type": "localizationPersistenceOnScreenEntry",
+              "femaleVariant": "10-car field",
+              "maleVariant": "",
+              "primaryKey": "9000190",
+              "secondaryKey": "NCM_choice_custom_field_ten"
+            },
+            {
+              "$type": "localizationPersistenceOnScreenEntry",
+              "femaleVariant": "Grid start",
+              "maleVariant": "",
+              "primaryKey": "9000191",
+              "secondaryKey": "NCM_choice_custom_start_grid"
+            },
+            {
+              "$type": "localizationPersistenceOnScreenEntry",
+              "femaleVariant": "Rolling start",
+              "maleVariant": "",
+              "primaryKey": "9000192",
+              "secondaryKey": "NCM_choice_custom_start_rolling"
+            },
+            {
+              "$type": "localizationPersistenceOnScreenEntry",
+              "femaleVariant": "Side-by-side start",
+              "maleVariant": "",
+              "primaryKey": "9000193",
+              "secondaryKey": "NCM_choice_custom_start_sidebyside"
+            },
+            {
+              "$type": "localizationPersistenceOnScreenEntry",
+              "femaleVariant": "Street pace",
+              "maleVariant": "",
+              "primaryKey": "9000194",
+              "secondaryKey": "NCM_choice_custom_difficulty_street"
+            },
+            {
+              "$type": "localizationPersistenceOnScreenEntry",
+              "femaleVariant": "Serious heat",
+              "maleVariant": "",
+              "primaryKey": "9000195",
+              "secondaryKey": "NCM_choice_custom_difficulty_serious"
+            },
+            {
+              "$type": "localizationPersistenceOnScreenEntry",
+              "femaleVariant": "Elite killers",
+              "maleVariant": "",
+              "primaryKey": "9000196",
+              "secondaryKey": "NCM_choice_custom_difficulty_elite"
+            },
+            {
+              "$type": "localizationPersistenceOnScreenEntry",
+              "femaleVariant": "Anywhere",
+              "maleVariant": "",
+              "primaryKey": "9000197",
+              "secondaryKey": "NCM_choice_custom_location_any"
+            },
+            {
+              "$type": "localizationPersistenceOnScreenEntry",
+              "femaleVariant": "Watson",
+              "maleVariant": "",
+              "primaryKey": "9000198",
+              "secondaryKey": "NCM_choice_custom_location_watson"
+            },
+            {
+              "$type": "localizationPersistenceOnScreenEntry",
+              "femaleVariant": "Westbrook",
+              "maleVariant": "",
+              "primaryKey": "9000199",
+              "secondaryKey": "NCM_choice_custom_location_westbrook"
+            },
+            {
+              "$type": "localizationPersistenceOnScreenEntry",
+              "femaleVariant": "Heywood",
+              "maleVariant": "",
+              "primaryKey": "9000200",
+              "secondaryKey": "NCM_choice_custom_location_heywood"
+            },
+            {
+              "$type": "localizationPersistenceOnScreenEntry",
+              "femaleVariant": "Pacifica",
+              "maleVariant": "",
+              "primaryKey": "9000201",
+              "secondaryKey": "NCM_choice_custom_location_pacifica"
+            },
+            {
+              "$type": "localizationPersistenceOnScreenEntry",
+              "femaleVariant": "Santo Domingo",
+              "maleVariant": "",
+              "primaryKey": "9000202",
+              "secondaryKey": "NCM_choice_custom_location_santo_domingo"
+            },
+            {
+              "$type": "localizationPersistenceOnScreenEntry",
+              "femaleVariant": "City Center",
+              "maleVariant": "",
+              "primaryKey": "9000203",
+              "secondaryKey": "NCM_choice_custom_location_city_center"
+            },
+            {
+              "$type": "localizationPersistenceOnScreenEntry",
+              "femaleVariant": "Badlands",
+              "maleVariant": "",
+              "primaryKey": "9000204",
+              "secondaryKey": "NCM_choice_custom_location_badlands"
+            },
+            {
+              "$type": "localizationPersistenceOnScreenEntry",
+              "femaleVariant": "Confirm this race",
+              "maleVariant": "",
+              "primaryKey": "9000205",
+              "secondaryKey": "NCM_choice_custom_confirm"
+            },
+            {
+              "$type": "localizationPersistenceOnScreenEntry",
+              "femaleVariant": "Scrap this build",
+              "maleVariant": "",
+              "primaryKey": "9000206",
+              "secondaryKey": "NCM_choice_custom_scrap"
+            },
+            {
+              "$type": "localizationPersistenceOnScreenEntry",
+              "femaleVariant": "Night City Motorsports",
+              "maleVariant": "",
+              "primaryKey": "9000300",
+              "secondaryKey": "NCM_quest_onboarding_title"
+            },
+            {
+              "$type": "localizationPersistenceOnScreenEntry",
+              "femaleVariant": "Contact Dex",
+              "maleVariant": "",
+              "primaryKey": "9000301",
+              "secondaryKey": "NCM_quest_contact_dex"
+            }
+          ]
+        }
+      }
+    },
+    "EmbeddedFiles": []
+  }
+}

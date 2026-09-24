@@ -1,0 +1,111 @@
+﻿{
+    "deployed_at":  "2026-09-01T17:36:08.5071000-04:00",
+    "game":  "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Cyberpunk 2077",
+    "game_version":  "2.31",
+    "mods":  {
+                 "value":  [
+                               {
+                                   "mod_id":  107,
+                                   "file_id":  123169,
+                                   "name":  "CET 1.37.1 - Scripting fixes",
+                                   "version":  "1.37.1",
+                                   "archive":  "CET_1.37.1_-_Scripting_fixes-107-1-37-1-1759193708.zip",
+                                   "bytes":  35227011,
+                                   "sha256":  "1855017796A27F518199F5B7D7210EF1DB7A5C5F0AF468C68E04E6E666AD248C",
+                                   "uploaded":  "2025-09-30T00:55:08.000+00:00"
+                               },
+                               {
+                                   "mod_id":  2380,
+                                   "file_id":  139049,
+                                   "name":  "RED4ext",
+                                   "version":  "1.30.0",
+                                   "archive":  "RED4ext-2380-1-30-0-1773082858.zip",
+                                   "bytes":  575834,
+                                   "sha256":  "3A72225C9D2C46C99F4A4159D952B9D24366357C2423EB7EA255C84E9E11C0B0",
+                                   "uploaded":  "2026-03-09T19:00:58.000+00:00"
+                               },
+                               {
+                                   "mod_id":  1511,
+                                   "file_id":  120421,
+                                   "name":  "redscript",
+                                   "version":  "0.5.31",
+                                   "archive":  "redscript-1511-0-5-31-1757113888.zip",
+                                   "bytes":  948910,
+                                   "sha256":  "799BBD88863F6728616F8D723C941EA15DFF71ED5BBFD50C525F0D39EA0BF46B",
+                                   "uploaded":  "2025-09-05T23:11:28.000+00:00"
+                               },
+                               {
+                                   "mod_id":  7780,
+                                   "file_id":  144164,
+                                   "name":  "Codeware",
+                                   "version":  "1.20.3",
+                                   "archive":  "Codeware-7780-1-20-3-1777845006.zip",
+                                   "bytes":  1960546,
+                                   "sha256":  "9A53E9B368F1603013985ECB6A8D8715501E46D4C2955832446A658A746E3A0E",
+                                   "uploaded":  "2026-05-03T21:50:06.000+00:00"
+                               },
+                               {
+                                   "mod_id":  4198,
+                                   "file_id":  154093,
+                                   "name":  "ArchiveXL",
+                                   "version":  "1.27.1",
+                                   "archive":  "ArchiveXL_4198_1.27.1_2026-07-30T19-32Z_k8Iw8mCEv.zip",
+                                   "bytes":  1037774,
+                                   "sha256":  "608B7B2FED4C35751CD264A87DCFE9D9074FB6D48458D29BDE955F1C03DC0D5C",
+                                   "uploaded":  "2026-07-30T19:32:47.000+00:00"
+                               },
+                               {
+                                   "mod_id":  4197,
+                                   "file_id":  154092,
+                                   "name":  "TweakXL",
+                                   "version":  "1.11.4",
+                                   "archive":  "TweakXL_4197_1.11.4_2026-07-30T19-32Z_FKtYKrJzt.zip",
+                                   "bytes":  1046349,
+                                   "sha256":  "13033A1F10CB1DBFA534964B22E3405AA33E8F29145F17164D318B021402883F",
+                                   "uploaded":  "2026-07-30T19:32:01.000+00:00"
+                               },
+                               {
+                                   "mod_id":  3518,
+                                   "file_id":  63684,
+                                   "name":  "Native Settings UI 1.96",
+                                   "version":  "1.96",
+                                   "archive":  "Native_Settings_UI_1.96-3518-1-96-1704576025.zip",
+                                   "bytes":  15792,
+                                   "sha256":  "A965C9878C291F082E9714B770AECE565572C613AE33F89FBF10548CA731081A",
+                                   "uploaded":  "2024-01-06T21:20:25.000+00:00"
+                               },
+                               {
+                                   "mod_id":  4885,
+                                   "file_id":  114228,
+                                   "name":  "mod_settings_v0.2.21.zip",
+                                   "version":  "0.2.21",
+                                   "archive":  "mod_settings_v0.2.21.zip-4885-0-2-21-1752938049.zip",
+                                   "bytes":  389792,
+                                   "sha256":  "7EFA862A688E61002979DE06ED0E7DCF0205F8D480C28AA91D8063721F27CE1F",
+                                   "uploaded":  "2025-07-19T15:14:09.000+00:00"
+                               },
+                               {
+                                   "mod_id":  4575,
+                                   "file_id":  114235,
+                                   "name":  "input_loader_v0.2.3.zip",
+                                   "version":  "0.2.3",
+                                   "archive":  "input_loader_v0.2.3.zip-4575-0-2-3-1752939429.zip",
+                                   "bytes":  462039,
+                                   "sha256":  "6011515264BFB582591BF2CE66E956AC9C7993DFB5046590BA3EE7625AF603EE",
+                                   "uploaded":  "2025-07-19T15:37:09.000+00:00"
+                               },
+                               {
+                                   "mod_id":  3819,
+                                   "file_id":  154406,
+                                   "name":  "Custom Map Markers",
+                                   "version":  "2.6.3",
+                                   "archive":  "Custom_Map_Markers_3819_2.6.3_2026-08-01T19-36Z_mPgaPVet3.zip",
+                                   "bytes":  24991,
+                                   "sha256":  "D777A4570D265C92BD04231584D8852DADF7A369B6F164C54EA29C9AC0248225",
+                                   "uploaded":  "2026-08-01T19:36:53.000+00:00"
+                               }
+                           ],
+                 "Count":  10
+             },
+    "file_events":  111
+}

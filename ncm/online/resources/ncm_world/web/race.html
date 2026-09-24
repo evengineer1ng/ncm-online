@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>NCM Race HUD</title>
+  <style>
+    :root {
+      --panel: rgba(10, 18, 32, 0.94);
+      --line: rgba(174, 211, 224, 0.30);
+      --text: #f2f6f8;
+      --dim: #8d99a8;
+      --accent: #22d8e2;
+      --red: #ff2a3c;
+      --red-glow: rgba(255, 42, 60, 0.75);
+      --ok: #4fe3a9;
+      --warn: #f5c95c;
+      --display: "Rajdhani", "Bahnschrift Condensed", "Bahnschrift SemiCondensed", "Arial Narrow", "Segoe UI", sans-serif;
+      --mono: "IBM Plex Mono", "Cascadia Mono", "Consolas", ui-monospace, monospace;
+    }
+    html, body { margin: 0; width: 1920px; height: 1080px; overflow: hidden; background: transparent; pointer-events: none; font-family: var(--display); color: var(--text); }
+    .hidden { display: none !important; }
+    .ncm-glyph { width: 1em; height: 1em; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+    .ncm-glyph .accent { stroke: var(--glyph-accent, var(--accent)); }
+    .ncm-glyph .fill { fill: currentColor; stroke: none; }
+
+    /* Light tree: five red lamps in a dark gantry, top centre. */
+    #tree { position: absolute; top: 64px; left: 50%; transform: translateX(-50%); display: flex; gap: 22px; padding: 22px 30px; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; }
+    .lamp { width: 92px; height: 92px; border-radius: 50%; background: #2a0d12; border: 3px solid #4a141c; box-shadow: inset 0 0 22px rgba(0,0,0,0.8); transition: background 60ms linear, box-shadow 60ms linear; }
+    .lamp.on { background: var(--red); border-color: #ff6b78; box-shadow: 0 0 34px 10px var(--red-glow), inset 0 0 18px rgba(255,255,255,0.35); }
+    #tree.out .lamp { background: #1a1014; border-color: #3a1a20; box-shadow: none; }
+
+    /* Big centre banner: GO / FINISH / JUMP START / result. */
+    #banner { position: absolute; top: 300px; left: 0; right: 0; text-align: center; font-weight: 800; font-size: 168px; line-height: 1; letter-spacing: 0.06em; text-transform: uppercase; text-shadow: 0 0 28px rgba(0,0,0,0.9), 0 4px 0 rgba(0,0,0,0.6); color: var(--text); }
+    #banner.go { color: var(--ok); text-shadow: 0 0 60px rgba(79,227,169,0.9), 0 4px 0 rgba(0,0,0,0.6); }
+    #banner.bad { color: var(--red); text-shadow: 0 0 60px var(--red-glow), 0 4px 0 rgba(0,0,0,0.6); }
+    #banner.warn { color: var(--warn); }
+    #banner .sub { display: block; font-size: 56px; font-weight: 600; letter-spacing: 0.08em; margin-top: 12px; color: var(--text); }
+    #banner .ncm-glyph { display: block; width: 112px; height: 112px; margin: 0 auto 18px; }
+
+    /* Race strip: top centre under the tree, or where the tree was. */
+    #strip { position: absolute; top: 210px; left: 50%; transform: translateX(-50%); min-width: 720px; padding: 12px 26px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; display: flex; gap: 20px; align-items: center; justify-content: center; }
+    #stripIcon { width: 30px; height: 30px; color: var(--accent); }
+    #stripIcon .ncm-glyph { width: 30px; height: 30px; }
+    #strip.noTree { top: 64px; }
+    #strip .eyebrow { font: 700 16px/1 var(--mono); letter-spacing: 0.2em; color: var(--accent); text-transform: uppercase; }
+    #strip .big { font-size: 54px; font-weight: 800; line-height: 1; letter-spacing: 0.04em; }
+    #strip .mid { font-size: 30px; font-weight: 600; color: var(--text); }
+    #strip .dim { font-size: 24px; font-weight: 600; color: var(--dim); }
+    #strip.grid .eyebrow { color: var(--warn); }
+    #strip.done .eyebrow { color: var(--ok); }
+
+    /* Results board: every entrant, centre of the screen after the flag. */
+    #board { position: absolute; top: 340px; left: 50%; transform: translateX(-50%); min-width: 760px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 22px; }
+    #board .title { display: flex; align-items: center; gap: 8px; font: 700 16px/1 var(--mono); letter-spacing: 0.2em; color: var(--ok); text-transform: uppercase; margin-bottom: 10px; }
+    #board .title .ncm-glyph { width: 22px; height: 22px; }
+    #board table { border-collapse: collapse; width: 100%; }
+    #board td { padding: 6px 14px; font-size: 30px; font-weight: 600; line-height: 1.1; white-space: nowrap; }
+    #board td.pos { font-size: 34px; font-weight: 800; color: var(--accent); width: 70px; }
+    #board td.time { font-family: var(--mono); font-size: 26px; text-align: right; }
+    #board td.gap { font-family: var(--mono); font-size: 22px; color: var(--dim); text-align: right; }
+    #board tr.me td { color: var(--warn); }
+    #board tr.me td.pos { color: var(--warn); }
+
+    /* Driver's instrument cluster. Bottom LEFT, small and quiet: it must not touch the vanilla speedometer
+       (bottom centre/right) and must not compete with the race strip (top centre). Persistent machine
+       information, so it is visible in freeroam and during a race alike. */
+    #instr { position: absolute; left: 44px; bottom: 56px; padding: 8px 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; min-width: 152px; }
+    #instr .who { font: 700 10px/1.2 var(--mono); letter-spacing: 0.14em; color: var(--dim); text-transform: uppercase; white-space: nowrap; }
+    #instr .odo { font: 700 19px/1.1 var(--mono); letter-spacing: 0.03em; color: var(--text); margin-top: 3px; }
+    #instr .odo small { font-size: 11px; color: var(--dim); letter-spacing: 0.14em; margin-right: 6px; }
+
+    /* Live race graph (P40). VERTICAL, and deliberately small.
+       It used to be a 1240px bar across the bottom of the screen, which sat on top of the speedometer. It now
+       stands on the left edge, clear of the vanilla driving HUD (bottom-centre speed, bottom-right minimap)
+       and clear of NCM's own strip/board/banner, all of which are top-centre. Finish at the top, start at the
+       bottom, because that is the direction the race is going. */
+    #graph { position: absolute; left: 44px; top: 50%; transform: translateY(-50%); width: 152px; height: 430px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; }
+    #graph .line { position: absolute; left: 34px; top: 46px; bottom: 40px; width: 3px; background: var(--line); border-radius: 2px; }
+    #graph .flag { position: absolute; left: 0; right: 0; top: 14px; display: flex; align-items: center; justify-content: center; gap: 5px; font: 700 11px/1 var(--mono); letter-spacing: 0.16em; color: var(--ok); }
+    #graph .flag .ncm-glyph { width: 14px; height: 14px; }
+    #graph .lbl { position: absolute; left: 0; right: 0; bottom: 14px; text-align: center; font: 700 11px/1 var(--mono); letter-spacing: 0.16em; color: var(--dim); }
+    /* A dot sits on the line at its progress; its label reads outward to the right, so several close
+       together stay legible instead of stacking on top of each other. */
+    #graph .dot { position: absolute; left: 35px; width: 16px; height: 16px; margin-left: -8px; margin-top: -8px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.85); box-shadow: 0 0 8px rgba(0,0,0,0.8); transition: top 300ms linear; }
+    #graph .dot .tag { position: absolute; left: 22px; top: 50%; transform: translateY(-50%); font: 700 12px/1 var(--mono); letter-spacing: 0.06em; color: var(--text); white-space: nowrap; text-shadow: 0 0 6px rgba(0,0,0,0.9); }
+    #graph .dot.me { width: 22px; height: 22px; margin-left: -11px; margin-top: -11px; border-color: var(--warn); box-shadow: 0 0 14px rgba(245,201,92,0.9); z-index: 2; }
+    #graph .dot.me .tag { color: var(--warn); }
+    #graph .dot .inc { position: absolute; left: 22px; top: 14px; font: 700 10px/1 var(--mono); color: var(--red); white-space: nowrap; }
+  </style>
+</head>
+<body>
+  <div id="tree" class="hidden">
+    <div class="lamp"></div><div class="lamp"></div><div class="lamp"></div><div class="lamp"></div><div class="lamp"></div>
+  </div>
+  <div id="strip" class="hidden">
+    <span id="stripIcon"></span>
+    <span class="eyebrow" id="eyebrow"></span>
+    <span class="big" id="big"></span>
+    <span class="mid" id="mid"></span>
+    <span class="dim" id="dim"></span>
+  </div>
+  <div id="banner" class="hidden"></div>
+  <div id="board" class="hidden"><div class="title"><span id="boardIcon"></span><span id="boardTitle"></span></div><table><tbody id="rows"></tbody></table></div>
+  <div id="instr" class="hidden"><div class="who" id="instrWho"></div><div class="odo" id="instrOdo"></div></div>
+  <div id="graph" class="hidden"><span class="flag" id="graphFlag"></span><div class="line"></div><div id="dots"></div><span class="lbl">START</span></div>
+  <script src="glyphs.js"></script>
+  <script>
+    (() => {
+      "use strict";
+      const tree = document.getElementById("tree");
+      const lamps = Array.from(tree.querySelectorAll(".lamp"));
+      const strip = document.getElementById("strip");
+      const stripIcon = document.getElementById("stripIcon");
+      const eyebrow = document.getElementById("eyebrow");
+      const big = document.getElementById("big");
+      const mid = document.getElementById("mid");
+      const dim = document.getElementById("dim");
+      const banner = document.getElementById("banner");
+      const board = document.getElementById("board");
+      const boardTitle = document.getElementById("boardTitle");
+      const rows = document.getElementById("rows");
+      const instr = document.getElementById("instr");
+      const instrWho = document.getElementById("instrWho");
+      const instrOdo = document.getElementById("instrOdo");
+      const graph = document.getElementById("graph");
+      const graphFlag = document.getElementById("graphFlag");
+      const dots = document.getElementById("dots");
+      const dotEls = new Map();
+      let boardKey = "";
+      const text = (el, v) => { const s = String(v == null ? "" : v); if (el.textContent !== s) el.textContent = s; };
+      const setGlyph = (el, name) => { const key = name || ""; if (el.dataset.glyph === key) return; el.dataset.glyph = key; if (key) el.replaceChildren(NcmGlyph.create(key)); else el.replaceChildren(); };
+      const stripGlyph = (s) => {
+        const words = ((s.kind || "") + " " + (s.eyebrow || "")).toLowerCase();
+        if (words.includes("formation") || words.includes("grid")) return "formation";
+        if (words.includes("practice")) return "practice";
+        if (words.includes("incident")) return "incident";
+        if (words.includes("finish") || words.includes("done") || words.includes("result")) return "finish";
+        if (words.includes("time")) return "timer";
+        return "circuit";
+      };
+      setGlyph(graphFlag, "finish"); graphFlag.append(document.createTextNode("FINISH"));
+
+      function apply(s) {
+        s = s || {};
+        // Tree: visible during countdown and for a moment after lights-out.
+        if (s.tree) {
+          tree.classList.remove("hidden");
+          tree.classList.toggle("out", s.lights === 0 && s.out === true);
+          lamps.forEach((l, i) => l.classList.toggle("on", i < (s.lights || 0)));
+        } else {
+          tree.classList.add("hidden");
+        }
+        // Strip
+        if (s.strip) {
+          strip.classList.remove("hidden");
+          strip.classList.toggle("noTree", !s.tree);
+          strip.className = "" + (s.tree ? "" : "noTree ") + (s.strip.kind || "");
+          setGlyph(stripIcon, stripGlyph(s.strip));
+          text(eyebrow, s.strip.eyebrow); text(big, s.strip.big); text(mid, s.strip.mid); text(dim, s.strip.dim);
+        } else {
+          strip.classList.add("hidden");
+        }
+        // Board
+        if (s.board && Array.isArray(s.board.rows) && s.board.rows.length) {
+          const key = JSON.stringify(s.board);
+          if (key !== boardKey) {
+            boardKey = key;
+            text(boardTitle, s.board.title || "RESULT");
+            setGlyph(document.getElementById("boardIcon"), "completed");
+            rows.innerHTML = "";
+            for (const r of s.board.rows) {
+              const tr = document.createElement("tr");
+              if (r.me) tr.className = "me";
+              for (const [cls, v] of [["pos", "P" + r.pos], ["name", r.name], ["time", r.time], ["gap", r.gap || ""]]) {
+                const td = document.createElement("td"); td.className = cls; td.textContent = String(v == null ? "" : v); tr.append(td);
+              }
+              rows.append(tr);
+            }
+          }
+          board.classList.remove("hidden");
+        } else {
+          boardKey = "";
+          board.classList.add("hidden");
+        }
+        // Instrument cluster: this machine, and how far it has been. Shown whenever the driver is in an
+        // identified NCM asset, race or no race.
+        if (s.instrument && s.instrument.odo) {
+          instr.classList.remove("hidden");
+          const who = [s.instrument.serial, s.instrument.name].filter(Boolean).join("  ");
+          text(instrWho, who || "NCM MACHINE");
+          instrOdo.innerHTML = "";
+          const lab = document.createElement("small"); lab.textContent = "ODO";
+          instrOdo.append(lab, document.createTextNode(String(s.instrument.odo)));
+        } else {
+          instr.classList.add("hidden");
+        }
+        // Graph: dots move UP the line as progress increases. The server sends at most four drivers
+        // (session.standings picks them), so nothing here caps or filters -- it only draws what it was given
+        // and never invents a row to fill the strip.
+        if (s.graph && s.graph.on && Array.isArray(s.graph.dots) && s.graph.dots.length) {
+          graph.classList.remove("hidden");
+          const seen = new Set();
+          const top = 46, bottom = 430 - 40;            // the line's endpoints inside the panel
+          const span = bottom - top;
+          for (const d of s.graph.dots) {
+            const key = (d.tag || "?") + "|" + (d.number || "");
+            seen.add(key);
+            let el = dotEls.get(key);
+            if (!el) {
+              el = document.createElement("div"); el.className = "dot";
+              const tag = document.createElement("span"); tag.className = "tag"; el.append(tag);
+              const inc = document.createElement("span"); inc.className = "inc"; el.append(inc);
+              dots.append(el); dotEls.set(key, el);
+            }
+            // 0 progress is the bottom of the strip, 1 is the finish at the top.
+            el.style.top = (bottom - span * Math.max(0, Math.min(1, d.frac || 0))) + "px";
+            el.style.background = d.colour || "#22d8e2";
+            el.classList.toggle("me", !!d.me);
+            const label = (d.pos ? "P" + d.pos + " " : "") + (d.number ? "#" + d.number + " " : "") + (d.tag || "");
+            text(el.querySelector(".tag"), label);
+            // An incident already costs corrected progress, so the dot has moved; this names the cost.
+            text(el.querySelector(".inc"), d.inc > 0 ? "+" + Math.round(d.inc) + "s" : "");
+          }
+          for (const [key, el] of dotEls) { if (!seen.has(key)) { el.remove(); dotEls.delete(key); } }
+        } else {
+          graph.classList.add("hidden");
+        }
+        // Banner
+        if (s.banner && s.banner.text) {
+          banner.classList.remove("hidden");
+          banner.className = s.banner.kind || "";
+          banner.innerHTML = "";
+          const bannerWords = (String(s.banner.text) + " " + String(s.banner.kind || "")).toLowerCase();
+          banner.append(NcmGlyph.create(bannerWords.includes("finish") || bannerWords.includes("complete") ? "finish" : (bannerWords.includes("jump") || bannerWords.includes("incident") || bannerWords.includes("penalty") ? "incident" : "live")));
+          banner.append(document.createTextNode(String(s.banner.text)));
+          if (s.banner.sub) { const sub = document.createElement("span"); sub.className = "sub"; sub.textContent = String(s.banner.sub); banner.append(sub); }
+        } else {
+          banner.classList.add("hidden");
+        }
+      }
+
+      Open77.on("race:state", apply);
+      Open77.ready();
+      Open77.emit("race:ready", {});
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,20 @@
+return {
+    session = { sessionId = "fx-race-4", kind = "race", timeTrial = false, fieldSize = 4, disciplineId = "street_sprint",
+                tier = "street", gatesTotal = 3, greenAt = 1000.0, routeId = "tip_trench", routeName = "Tip to Trench" },
+    results = {
+        { driverId = "a", display = "A", position = 1, state = "finished", slot = 3, totalSec = 120.0, correctedSec = 120.0,
+          penaltySec = 0, incidentSec = 0, incidentCount = 0, incidents = {}, penalties = {}, jumpStart = false, progress = 3,
+          crossings = { [1] = 1004.0, [2] = 1060.0, [3] = 1120.0 }, previousBestSec = 125.0 },
+        { driverId = "b", display = "B", position = 2, state = "finished", slot = 1, totalSec = 120.4, correctedSec = 120.4,
+          penaltySec = 0, incidentSec = 0, incidentCount = 0, incidents = {}, penalties = {}, jumpStart = false, progress = 3, gapSec = 0.4,
+          crossings = { [1] = 1003.5, [2] = 1061.0, [3] = 1120.4 } },
+        { driverId = "c", display = "C", position = 3, state = "finished", slot = 2, totalSec = 131.0, correctedSec = 139.0,
+          penaltySec = 0, incidentSec = 8.0, incidentCount = 1,
+          incidents = { { kind = "object", band = 3, dv = 14.2, t = 1090.0, attributed = "self" } }, penalties = {}, jumpStart = false,
+          progress = 3, gapSec = 19.0, crossings = { [1] = 1003.8, [2] = 1065.0, [3] = 1131.0 } },
+        { driverId = "d", display = "D", position = 4, state = "dnf", slot = 4, penaltySec = 0, incidentSec = 0, incidentCount = 0,
+          incidents = {}, penalties = {}, jumpStart = false, progress = 2, dnfReason = "left",
+          crossings = { [1] = 1005.0, [2] = 1070.0 } },
+    },
+    routeRecordSec = 118.9,
+}

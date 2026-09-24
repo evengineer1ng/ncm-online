@@ -1,0 +1,903 @@
+﻿# MT_Ecosystem Named Rivals - Auto-generated
+# Roster ID: 1776881178
+
+Character.mt_ecosystem_rival_1776881178_stre_014:
+  $base: Character.adelcaldos_grunt2_ranged2_copperhead_ma
+  displayName: mt_ecosystem_rival_1776881178_stre_014_name
+
+Character.mt_ecosystem_rival_1776881178_gonk_114:
+  $base: Character.valentinos_grunt2_ranged2_ajax_ma
+  displayName: mt_ecosystem_rival_1776881178_gonk_114_name
+
+Character.mt_ecosystem_rival_1776881178_solo_009:
+  $base: Character.sixthstreet_hooligan_ranged1_nova_wa
+  displayName: mt_ecosystem_rival_1776881178_solo_009_name
+
+Character.mt_ecosystem_rival_1776881178_gonk_045:
+  $base: Character.tyger_claws_biker2_ranged2_shingen_ma
+  displayName: mt_ecosystem_rival_1776881178_gonk_045_name
+
+Character.mt_ecosystem_rival_1776881178_gonk_083:
+  $base: Character.valentinos_grunt2_ranged2_ajax_ma
+  displayName: mt_ecosystem_rival_1776881178_gonk_083_name
+
+Character.mt_ecosystem_rival_1776881178_gonk_012:
+  $base: Character.tyger_claws_biker1_ranged1_nue_ma
+  displayName: mt_ecosystem_rival_1776881178_gonk_012_name
+
+Character.mt_ecosystem_rival_1776881178_stre_001:
+  $base: Character.CorpoManCorporatDriver
+  displayName: mt_ecosystem_rival_1776881178_stre_001_name
+
+Character.mt_ecosystem_rival_1776881178_gonk_087:
+  $base: Character.CorpoManArasakaDriver
+  displayName: mt_ecosystem_rival_1776881178_gonk_087_name
+
+Character.mt_ecosystem_rival_1776881178_gonk_113:
+  $base: Character.valentinos_grunt1_ranged1_nova_ma
+  displayName: mt_ecosystem_rival_1776881178_gonk_113_name
+
+Character.mt_ecosystem_rival_1776881178_gonk_021:
+  $base: Character.wraiths_ghost2_sniper2_achilles_ma_rare
+  displayName: mt_ecosystem_rival_1776881178_gonk_021_name
+
+Character.mt_ecosystem_rival_1776881178_gonk_085:
+  $base: Character.wraiths_grunt2_ranged2_copperhead_wa
+  displayName: mt_ecosystem_rival_1776881178_gonk_085_name
+
+Character.mt_ecosystem_rival_1776881178_stre_007:
+  $base: Character.NightlifeFemaleDriver
+  displayName: mt_ecosystem_rival_1776881178_stre_007_name
+
+Character.mt_ecosystem_rival_1776881178_gonk_063:
+  $base: Character.CorpoWomanCorporatDriver
+  displayName: mt_ecosystem_rival_1776881178_gonk_063_name
+
+Character.mt_ecosystem_rival_1776881178_gonk_033:
+  $base: Character.CorpoWomanCorporatDriver
+  displayName: mt_ecosystem_rival_1776881178_gonk_033_name
+
+Character.mt_ecosystem_rival_1776881178_stre_037:
+  $base: Character.CorpoManCorporatDriver
+  displayName: mt_ecosystem_rival_1776881178_stre_037_name
+
+Character.mt_ecosystem_rival_1776881178_gonk_046:
+  $base: Character.sixthstreet_hooligan_ranged1_nova_wa
+  displayName: mt_ecosystem_rival_1776881178_gonk_046_name
+
+Character.mt_ecosystem_rival_1776881178_gonk_016:
+  $base: Character.sixthstreet_hooligan_ranged1_nova_wa
+  displayName: mt_ecosystem_rival_1776881178_gonk_016_name
+
+Character.mt_ecosystem_rival_1776881178_fixe_013:
+  $base: Character.CorpoManArasakaDriver
+  displayName: mt_ecosystem_rival_1776881178_fixe_013_name
+
+Character.mt_ecosystem_rival_1776881178_gonk_069:
+  $base: Character.NightlifeMaleDriver
+  displayName: mt_ecosystem_rival_1776881178_gonk_069_name
+
+Character.mt_ecosystem_rival_1776881178_stre_000:
+  $base: Character.CorpoManArasakaDriver
+  displayName: mt_ecosystem_rival_1776881178_stre_000_name
+
+Character.mt_ecosystem_rival_1776881178_solo_001:
+  $base: Character.CitizenRichFemaleDriver
+  displayName: mt_ecosystem_rival_1776881178_solo_001_name
+
+Character.mt_ecosystem_rival_1776881178_gonk_068:
+  $base: Character.NightlifeMaleDriver
+  displayName: mt_ecosystem_rival_1776881178_gonk_068_name
+
+Character.mt_ecosystem_rival_1776881178_gonk_010:
+  $base: Character.adelcaldos_grunt1_ranged1_pulsar_ma
+  displayName: mt_ecosystem_rival_1776881178_gonk_010_name
+
+Character.mt_ecosystem_rival_1776881178_gonk_111:
+  $base: Character.sixthstreet_hooligan_ranged1_nova_wa
+  displayName: mt_ecosystem_rival_1776881178_gonk_111_name
+
+Character.mt_ecosystem_rival_1776881178_gonk_054:
+  $base: Character.wraiths_strong_gunner3_hmg_mb_elite
+  displayName: mt_ecosystem_rival_1776881178_gonk_054_name
+
+Character.mt_ecosystem_rival_1776881178_gonk_092:
+  $base: Character.CorpoManCorporatDriver
+  displayName: mt_ecosystem_rival_1776881178_gonk_092_name
+
+Character.mt_ecosystem_rival_1776881178_gonk_081:
+  $base: Character.valentinos_grunt2_ranged2_ajax_ma
+  displayName: mt_ecosystem_rival_1776881178_gonk_081_name
+
+Character.mt_ecosystem_rival_1776881178_solo_002:
+  $base: Character.CitizenRichFemaleDriver
+  displayName: mt_ecosystem_rival_1776881178_solo_002_name
+
+Character.mt_ecosystem_rival_1776881178_stre_028:
+  $base: Character.wraiths_grunt2_ranged2_copperhead_wa
+  displayName: mt_ecosystem_rival_1776881178_stre_028_name
+
+Character.mt_ecosystem_rival_1776881178_gonk_084:
+  $base: Character.wraiths_strong_gunner3_hmg_mb_elite
+  displayName: mt_ecosystem_rival_1776881178_gonk_084_name
+
+Character.mt_ecosystem_rival_1776881178_solo_022:
+  $base: Character.CorpoManCorporatDriver
+  displayName: mt_ecosystem_rival_1776881178_solo_022_name
+
+Character.mt_ecosystem_rival_1776881178_fixe_003:
+  $base: Character.sixthstreet_hooligan_ranged1_nova_wa
+  displayName: mt_ecosystem_rival_1776881178_fixe_003_name
+
+Character.mt_ecosystem_rival_1776881178_stre_029:
+  $base: Character.CorpoWomanArasakaDriver
+  displayName: mt_ecosystem_rival_1776881178_stre_029_name
+
+Character.mt_ecosystem_rival_1776881178_gonk_040:
+  $base: Character.adelcaldos_grunt1_ranged1_pulsar_ma
+  displayName: mt_ecosystem_rival_1776881178_gonk_040_name
+
+Character.mt_ecosystem_rival_1776881178_stre_002:
+  $base: Character.CorpoManCorporatDriver
+  displayName: mt_ecosystem_rival_1776881178_stre_002_name
+
+Character.mt_ecosystem_rival_1776881178_gonk_026:
+  $base: Character.CorpoManArasakaDriver
+  displayName: mt_ecosystem_rival_1776881178_gonk_026_name
+
+Character.mt_ecosystem_rival_1776881178_gonk_106:
+  $base: Character.tyger_claws_biker2_ranged2_shingen_ma
+  displayName: mt_ecosystem_rival_1776881178_gonk_106_name
+
+Character.mt_ecosystem_rival_1776881178_gonk_055:
+  $base: Character.wraiths_grunt2_ranged2_copperhead_wa
+  displayName: mt_ecosystem_rival_1776881178_gonk_055_name
+
+Character.mt_ecosystem_rival_1776881178_gonk_022:
+  $base: Character.wraiths_strong_gunner3_hmg_mb_elite
+  displayName: mt_ecosystem_rival_1776881178_gonk_022_name
+
+Character.mt_ecosystem_rival_1776881178_stre_031:
+  $base: Character.CorpoManArasakaDriver
+  displayName: mt_ecosystem_rival_1776881178_stre_031_name
+
+Character.mt_ecosystem_rival_1776881178_gonk_058:
+  $base: Character.CorpoManArasakaDriver
+  displayName: mt_ecosystem_rival_1776881178_gonk_058_name
+
+Character.mt_ecosystem_rival_1776881178_gonk_057:
+  $base: Character.CorpoManArasakaDriver
+  displayName: mt_ecosystem_rival_1776881178_gonk_057_name
+
+Character.mt_ecosystem_rival_1776881178_stre_025:
+  $base: Character.valentinos_grunt2_ranged2_ajax_ma
+  displayName: mt_ecosystem_rival_1776881178_stre_025_name
+
+Character.mt_ecosystem_rival_1776881178_fixe_011:
+  $base: Character.wraiths_ghost2_sniper2_achilles_ma_rare
+  displayName: mt_ecosystem_rival_1776881178_fixe_011_name
+
+Character.mt_ecosystem_rival_1776881178_stre_008:
+  $base: Character.NightlifeFemaleDriver
+  displayName: mt_ecosystem_rival_1776881178_stre_008_name
+
+Character.mt_ecosystem_rival_1776881178_edge_000:
+  $base: Character.CorpoManCorporatDriver
+  displayName: mt_ecosystem_rival_1776881178_edge_000_name
+
+Character.mt_ecosystem_rival_1776881178_gonk_018:
+  $base: Character.valentinos_grunt1_ranged1_nova_ma
+  displayName: mt_ecosystem_rival_1776881178_gonk_018_name
+
+Character.mt_ecosystem_rival_1776881178_edge_008:
+  $base: Character.NightlifeMaleDriver
+  displayName: mt_ecosystem_rival_1776881178_edge_008_name
+
+Character.mt_ecosystem_rival_1776881178_gonk_024:
+  $base: Character.CorpoWomanArasakaDriver
+  displayName: mt_ecosystem_rival_1776881178_gonk_024_name
+
+Character.mt_ecosystem_rival_1776881178_solo_020:
+  $base: Character.CorpoManArasakaDriver
+  displayName: mt_ecosystem_rival_1776881178_solo_020_name
+
+Character.mt_ecosystem_rival_1776881178_gonk_066:
+  $base: Character.NightlifeFemaleDriver
+  displayName: mt_ecosystem_rival_1776881178_gonk_066_name
+
+Character.mt_ecosystem_rival_1776881178_solo_000:
+  $base: Character.CitizenRichMaleDriver
+  displayName: mt_ecosystem_rival_1776881178_solo_000_name
+
+Character.mt_ecosystem_rival_1776881178_stre_022:
+  $base: Character.sixthstreet_hooligan_ranged1_nova_wa
+  displayName: mt_ecosystem_rival_1776881178_stre_022_name
+
+Character.mt_ecosystem_rival_1776881178_gonk_086:
+  $base: Character.wraiths_grunt2_ranged2_copperhead_wa
+  displayName: mt_ecosystem_rival_1776881178_gonk_086_name
+
+Character.mt_ecosystem_rival_1776881178_edge_001:
+  $base: Character.CorpoManCorporatDriver
+  displayName: mt_ecosystem_rival_1776881178_edge_001_name
+
+Character.mt_ecosystem_rival_1776881178_solo_017:
+  $base: Character.wraiths_grunt2_ranged2_copperhead_wa
+  displayName: mt_ecosystem_rival_1776881178_solo_017_name
+
+Character.mt_ecosystem_rival_1776881178_fixe_017:
+  $base: Character.CorpoManCorporatDriver
+  displayName: mt_ecosystem_rival_1776881178_fixe_017_name
+
+Character.mt_ecosystem_rival_1776881178_edge_012:
+  $base: Character.adelcaldos_grunt1_ranged1_pulsar_ma
+  displayName: mt_ecosystem_rival_1776881178_edge_012_name
+
+Character.mt_ecosystem_rival_1776881178_gonk_023:
+  $base: Character.wraiths_strong_gunner3_hmg_mb_elite
+  displayName: mt_ecosystem_rival_1776881178_gonk_023_name
+
+Character.mt_ecosystem_rival_1776881178_gonk_035:
+  $base: Character.NightlifeFemaleDriver
+  displayName: mt_ecosystem_rival_1776881178_gonk_035_name
+
+Character.mt_ecosystem_rival_1776881178_edge_002:
+  $base: Character.CorpoManCorporatDriver
+  displayName: mt_ecosystem_rival_1776881178_edge_002_name
+
+Character.mt_ecosystem_rival_1776881178_fixe_012:
+  $base: Character.wraiths_ghost2_sniper2_achilles_ma_rare
+  displayName: mt_ecosystem_rival_1776881178_fixe_012_name
+
+Character.mt_ecosystem_rival_1776881178_fixe_018:
+  $base: Character.CorpoWomanCorporatDriver
+  displayName: mt_ecosystem_rival_1776881178_fixe_018_name
+
+Character.mt_ecosystem_rival_1776881178_gonk_067:
+  $base: Character.NightlifeMaleDriver
+  displayName: mt_ecosystem_rival_1776881178_gonk_067_name
+
+Character.mt_ecosystem_rival_1776881178_gonk_105:
+  $base: Character.adelcaldos_grunt2_ranged2_copperhead_ma
+  displayName: mt_ecosystem_rival_1776881178_gonk_105_name
+
+Character.mt_ecosystem_rival_1776881178_gonk_001:
+  $base: Character.CorpoManCorporatDriver
+  displayName: mt_ecosystem_rival_1776881178_gonk_001_name
+
+Character.mt_ecosystem_rival_1776881178_gonk_100:
+  $base: Character.NightlifeMaleDriver
+  displayName: mt_ecosystem_rival_1776881178_gonk_100_name
+
+Character.mt_ecosystem_rival_1776881178_edge_017:
+  $base: Character.sixthstreet_hooligan_ranged1_nova_ma
+  displayName: mt_ecosystem_rival_1776881178_edge_017_name
+
+Character.mt_ecosystem_rival_1776881178_gonk_032:
+  $base: Character.CorpoWomanCorporatDriver
+  displayName: mt_ecosystem_rival_1776881178_gonk_032_name
+
+Character.mt_ecosystem_rival_1776881178_gonk_108:
+  $base: Character.tyger_claws_biker1_ranged1_nue_wa
+  displayName: mt_ecosystem_rival_1776881178_gonk_108_name
+
+Character.mt_ecosystem_rival_1776881178_stre_027:
+  $base: Character.wraiths_grunt2_ranged2_copperhead_wa
+  displayName: mt_ecosystem_rival_1776881178_stre_027_name
+
+Character.mt_ecosystem_rival_1776881178_solo_019:
+  $base: Character.CorpoManArasakaDriver
+  displayName: mt_ecosystem_rival_1776881178_solo_019_name
+
+Character.mt_ecosystem_rival_1776881178_stre_032:
+  $base: Character.CorpoManCorporatDriver
+  displayName: mt_ecosystem_rival_1776881178_stre_032_name
+
+Character.mt_ecosystem_rival_1776881178_solo_006:
+  $base: Character.tyger_claws_biker1_ranged1_nue_ma
+  displayName: mt_ecosystem_rival_1776881178_solo_006_name
+
+Character.mt_ecosystem_rival_1776881178_edge_006:
+  $base: Character.NightlifeFemaleDriver
+  displayName: mt_ecosystem_rival_1776881178_edge_006_name
+
+Character.mt_ecosystem_rival_1776881178_gonk_065:
+  $base: Character.NightlifeFemaleDriver
+  displayName: mt_ecosystem_rival_1776881178_gonk_065_name
+
+Character.mt_ecosystem_rival_1776881178_gonk_110:
+  $base: Character.sixthstreet_hooligan_ranged1_nova_wa
+  displayName: mt_ecosystem_rival_1776881178_gonk_110_name
+
+Character.mt_ecosystem_rival_1776881178_gonk_074:
+  $base: Character.adelcaldos_grunt2_ranged2_copperhead_ma
+  displayName: mt_ecosystem_rival_1776881178_gonk_074_name
+
+Character.mt_ecosystem_rival_1776881178_solo_015:
+  $base: Character.wraiths_strong_gunner3_hmg_mb_elite
+  displayName: mt_ecosystem_rival_1776881178_solo_015_name
+
+Character.mt_ecosystem_rival_1776881178_edge_014:
+  $base: Character.tyger_claws_biker1_ranged1_nue_ma
+  displayName: mt_ecosystem_rival_1776881178_edge_014_name
+
+Character.mt_ecosystem_rival_1776881178_gonk_089:
+  $base: Character.CorpoManArasakaDriver
+  displayName: mt_ecosystem_rival_1776881178_gonk_089_name
+
+Character.mt_ecosystem_rival_1776881178_edge_005:
+  $base: Character.LowlifeWomanRedneckDriver
+  displayName: mt_ecosystem_rival_1776881178_edge_005_name
+
+Character.mt_ecosystem_rival_1776881178_gonk_109:
+  $base: Character.sixthstreet_hooligan_ranged1_nova_ma
+  displayName: mt_ecosystem_rival_1776881178_gonk_109_name
+
+Character.mt_ecosystem_rival_1776881178_gonk_072:
+  $base: Character.adelcaldos_grunt1_ranged1_pulsar_ma
+  displayName: mt_ecosystem_rival_1776881178_gonk_072_name
+
+Character.mt_ecosystem_rival_1776881178_gonk_025:
+  $base: Character.CorpoWomanArasakaDriver
+  displayName: mt_ecosystem_rival_1776881178_gonk_025_name
+
+Character.mt_ecosystem_rival_1776881178_stre_020:
+  $base: Character.sixthstreet_hooligan_ranged1_nova_ma
+  displayName: mt_ecosystem_rival_1776881178_stre_020_name
+
+Character.mt_ecosystem_rival_1776881178_gonk_037:
+  $base: Character.NightlifeMaleDriver
+  displayName: mt_ecosystem_rival_1776881178_gonk_037_name
+
+Character.mt_ecosystem_rival_1776881178_gonk_071:
+  $base: Character.CitizenRichMaleDriver
+  displayName: mt_ecosystem_rival_1776881178_gonk_071_name
+
+Character.mt_ecosystem_rival_1776881178_gonk_004:
+  $base: Character.NightlifeFemaleDriver
+  displayName: mt_ecosystem_rival_1776881178_gonk_004_name
+
+Character.mt_ecosystem_rival_1776881178_fixe_010:
+  $base: Character.wraiths_grunt2_ranged2_copperhead_wa
+  displayName: mt_ecosystem_rival_1776881178_fixe_010_name
+
+Character.mt_ecosystem_rival_1776881178_stre_013:
+  $base: Character.adelcaldos_grunt2_ranged2_copperhead_ma
+  displayName: mt_ecosystem_rival_1776881178_stre_013_name
+
+Character.mt_ecosystem_rival_1776881178_fixe_001:
+  $base: Character.tyger_claws_biker1_ranged1_nue_wa
+  displayName: mt_ecosystem_rival_1776881178_fixe_001_name
+
+Character.mt_ecosystem_rival_1776881178_gonk_015:
+  $base: Character.sixthstreet_hooligan_ranged1_nova_ma
+  displayName: mt_ecosystem_rival_1776881178_gonk_015_name
+
+Character.mt_ecosystem_rival_1776881178_gonk_003:
+  $base: Character.LowlifeWomanRedneckDriver
+  displayName: mt_ecosystem_rival_1776881178_gonk_003_name
+
+Character.mt_ecosystem_rival_1776881178_gonk_020:
+  $base: Character.valentinos_grunt1_ranged1_nova_ma
+  displayName: mt_ecosystem_rival_1776881178_gonk_020_name
+
+Character.mt_ecosystem_rival_1776881178_gonk_043:
+  $base: Character.tyger_claws_biker1_ranged1_nue_ma
+  displayName: mt_ecosystem_rival_1776881178_gonk_043_name
+
+Character.mt_ecosystem_rival_1776881178_fixe_028:
+  $base: Character.NightlifeMaleDriver
+  displayName: mt_ecosystem_rival_1776881178_fixe_028_name
+
+Character.mt_ecosystem_rival_1776881178_stre_012:
+  $base: Character.CitizenRichMaleDriver
+  displayName: mt_ecosystem_rival_1776881178_stre_012_name
+
+Character.mt_ecosystem_rival_1776881178_gonk_006:
+  $base: Character.CitizenRichMaleDriver
+  displayName: mt_ecosystem_rival_1776881178_gonk_006_name
+
+Character.mt_ecosystem_rival_1776881178_gonk_053:
+  $base: Character.wraiths_strong_gunner3_hmg_mb_elite
+  displayName: mt_ecosystem_rival_1776881178_gonk_053_name
+
+Character.mt_ecosystem_rival_1776881178_edge_011:
+  $base: Character.adelcaldos_grunt2_ranged2_sidewinder_ma
+  displayName: mt_ecosystem_rival_1776881178_edge_011_name
+
+Character.mt_ecosystem_rival_1776881178_gonk_028:
+  $base: Character.CorpoManCorporatDriver
+  displayName: mt_ecosystem_rival_1776881178_gonk_028_name
+
+Character.mt_ecosystem_rival_1776881178_gonk_088:
+  $base: Character.CorpoManArasakaDriver
+  displayName: mt_ecosystem_rival_1776881178_gonk_088_name
+
+Character.mt_ecosystem_rival_1776881178_solo_008:
+  $base: Character.tyger_claws_biker2_ranged2_shingen_ma
+  displayName: mt_ecosystem_rival_1776881178_solo_008_name
+
+Character.mt_ecosystem_rival_1776881178_stre_035:
+  $base: Character.CorpoWomanCorporatDriver
+  displayName: mt_ecosystem_rival_1776881178_stre_035_name
+
+Character.mt_ecosystem_rival_1776881178_gonk_049:
+  $base: Character.sixthstreet_hooligan_ranged1_nova_wa
+  displayName: mt_ecosystem_rival_1776881178_gonk_049_name
+
+Character.mt_ecosystem_rival_1776881178_solo_004:
+  $base: Character.adelcaldos_grunt1_ranged1_pulsar_ma
+  displayName: mt_ecosystem_rival_1776881178_solo_004_name
+
+Character.mt_ecosystem_rival_1776881178_edge_003:
+  $base: Character.CorpoManCorporatDriver
+  displayName: mt_ecosystem_rival_1776881178_edge_003_name
+
+Character.mt_ecosystem_rival_1776881178_solo_011:
+  $base: Character.sixthstreet_hooligan_ranged1_nova_ma
+  displayName: mt_ecosystem_rival_1776881178_solo_011_name
+
+Character.mt_ecosystem_rival_1776881178_gonk_104:
+  $base: Character.adelcaldos_grunt2_ranged2_copperhead_ma
+  displayName: mt_ecosystem_rival_1776881178_gonk_104_name
+
+Character.mt_ecosystem_rival_1776881178_gonk_079:
+  $base: Character.sixthstreet_hooligan_ranged1_nova_ma
+  displayName: mt_ecosystem_rival_1776881178_gonk_079_name
+
+Character.mt_ecosystem_rival_1776881178_gonk_090:
+  $base: Character.CorpoManArasakaDriver
+  displayName: mt_ecosystem_rival_1776881178_gonk_090_name
+
+Character.mt_ecosystem_rival_1776881178_gonk_013:
+  $base: Character.tyger_claws_biker1_ranged1_nue_ma
+  displayName: mt_ecosystem_rival_1776881178_gonk_013_name
+
+Character.mt_ecosystem_rival_1776881178_gonk_030:
+  $base: Character.CorpoManCorporatDriver
+  displayName: mt_ecosystem_rival_1776881178_gonk_030_name
+
+Character.mt_ecosystem_rival_1776881178_fixe_047:
+  $base: Character.CorpoWomanArasakaDriver
+  displayName: mt_ecosystem_rival_1776881178_fixe_047_name
+
+Character.mt_ecosystem_rival_1776881178_gonk_044:
+  $base: Character.tyger_claws_biker1_ranged1_nue_ma
+  displayName: mt_ecosystem_rival_1776881178_gonk_044_name
+
+Character.mt_ecosystem_rival_1776881178_solo_024:
+  $base: Character.CorpoWomanCorporatDriver
+  displayName: mt_ecosystem_rival_1776881178_solo_024_name
+
+Character.mt_ecosystem_rival_1776881178_stre_018:
+  $base: Character.tyger_claws_biker2_ranged2_shingen_ma
+  displayName: mt_ecosystem_rival_1776881178_stre_018_name
+
+Character.mt_ecosystem_rival_1776881178_gonk_103:
+  $base: Character.adelcaldos_grunt1_ranged1_pulsar_ma
+  displayName: mt_ecosystem_rival_1776881178_gonk_103_name
+
+Character.mt_ecosystem_rival_1776881178_stre_023:
+  $base: Character.valentinos_grunt1_ranged1_nova_ma
+  displayName: mt_ecosystem_rival_1776881178_stre_023_name
+
+Character.mt_ecosystem_rival_1776881178_solo_023:
+  $base: Character.CorpoWomanCorporatDriver
+  displayName: mt_ecosystem_rival_1776881178_solo_023_name
+
+Character.mt_ecosystem_rival_1776881178_gonk_061:
+  $base: Character.CorpoManCorporatDriver
+  displayName: mt_ecosystem_rival_1776881178_gonk_061_name
+
+Character.mt_ecosystem_rival_1776881178_stre_026:
+  $base: Character.wraiths_grunt2_ranged2_copperhead_wa
+  displayName: mt_ecosystem_rival_1776881178_stre_026_name
+
+Character.mt_ecosystem_rival_1776881178_gonk_098:
+  $base: Character.NightlifeMaleDriver
+  displayName: mt_ecosystem_rival_1776881178_gonk_098_name
+
+Character.mt_ecosystem_rival_1776881178_stre_016:
+  $base: Character.tyger_claws_biker2_ranged2_shingen_ma
+  displayName: mt_ecosystem_rival_1776881178_stre_016_name
+
+Character.mt_ecosystem_rival_1776881178_fixe_042:
+  $base: Character.wraiths_ghost2_sniper2_achilles_ma_rare
+  displayName: mt_ecosystem_rival_1776881178_fixe_042_name
+
+Character.mt_ecosystem_rival_1776881178_edge_010:
+  $base: Character.adelcaldos_grunt2_ranged2_sidewinder_ma
+  displayName: mt_ecosystem_rival_1776881178_edge_010_name
+
+Character.mt_ecosystem_rival_1776881178_gonk_102:
+  $base: Character.NightlifeMaleDriver
+  displayName: mt_ecosystem_rival_1776881178_gonk_102_name
+
+Character.mt_ecosystem_rival_1776881178_gonk_042:
+  $base: Character.adelcaldos_grunt1_ranged1_pulsar_ma
+  displayName: mt_ecosystem_rival_1776881178_gonk_042_name
+
+Character.mt_ecosystem_rival_1776881178_fixe_002:
+  $base: Character.tyger_claws_biker1_ranged1_nue_wa
+  displayName: mt_ecosystem_rival_1776881178_fixe_002_name
+
+Character.mt_ecosystem_rival_1776881178_fixe_021:
+  $base: Character.CorpoManCorporatDriver
+  displayName: mt_ecosystem_rival_1776881178_fixe_021_name
+
+Character.mt_ecosystem_rival_1776881178_edge_019:
+  $base: Character.sixthstreet_hooligan_ranged1_nova_wa
+  displayName: mt_ecosystem_rival_1776881178_edge_019_name
+
+Character.mt_ecosystem_rival_1776881178_stre_006:
+  $base: Character.CorpoManCorporatDriver
+  displayName: mt_ecosystem_rival_1776881178_stre_006_name
+
+Character.mt_ecosystem_rival_1776881178_gonk_007:
+  $base: Character.CitizenRichMaleDriver
+  displayName: mt_ecosystem_rival_1776881178_gonk_007_name
+
+Character.mt_ecosystem_rival_1776881178_gonk_076:
+  $base: Character.tyger_claws_biker2_ranged2_shingen_ma
+  displayName: mt_ecosystem_rival_1776881178_gonk_076_name
+
+Character.mt_ecosystem_rival_1776881178_gonk_029:
+  $base: Character.CorpoManCorporatDriver
+  displayName: mt_ecosystem_rival_1776881178_gonk_029_name
+
+Character.mt_ecosystem_rival_1776881178_stre_033:
+  $base: Character.CorpoManCorporatDriver
+  displayName: mt_ecosystem_rival_1776881178_stre_033_name
+
+Character.mt_ecosystem_rival_1776881178_solo_018:
+  $base: Character.CorpoWomanArasakaDriver
+  displayName: mt_ecosystem_rival_1776881178_solo_018_name
+
+Character.mt_ecosystem_rival_1776881178_gonk_014:
+  $base: Character.tyger_claws_biker2_ranged2_shingen_ma
+  displayName: mt_ecosystem_rival_1776881178_gonk_014_name
+
+Character.mt_ecosystem_rival_1776881178_gonk_094:
+  $base: Character.CorpoWomanCorporatDriver
+  displayName: mt_ecosystem_rival_1776881178_gonk_094_name
+
+Character.mt_ecosystem_rival_1776881178_solo_016:
+  $base: Character.wraiths_strong_gunner3_hmg_mb_elite
+  displayName: mt_ecosystem_rival_1776881178_solo_016_name
+
+Character.mt_ecosystem_rival_1776881178_stre_011:
+  $base: Character.CitizenRichMaleDriver
+  displayName: mt_ecosystem_rival_1776881178_stre_011_name
+
+Character.mt_ecosystem_rival_1776881178_gonk_091:
+  $base: Character.CorpoManCorporatDriver
+  displayName: mt_ecosystem_rival_1776881178_gonk_091_name
+
+Character.mt_ecosystem_rival_1776881178_gonk_056:
+  $base: Character.CorpoWomanArasakaDriver
+  displayName: mt_ecosystem_rival_1776881178_gonk_056_name
+
+Character.mt_ecosystem_rival_1776881178_gonk_096:
+  $base: Character.CorpoManCorporatDriver
+  displayName: mt_ecosystem_rival_1776881178_gonk_096_name
+
+Character.mt_ecosystem_rival_1776881178_stre_039:
+  $base: Character.NightlifeFemaleDriver
+  displayName: mt_ecosystem_rival_1776881178_stre_039_name
+
+Character.mt_ecosystem_rival_1776881178_gonk_059:
+  $base: Character.CorpoManCorporatDriver
+  displayName: mt_ecosystem_rival_1776881178_gonk_059_name
+
+Character.mt_ecosystem_rival_1776881178_solo_012:
+  $base: Character.valentinos_grunt1_ranged1_nova_ma
+  displayName: mt_ecosystem_rival_1776881178_solo_012_name
+
+Character.mt_ecosystem_rival_1776881178_edge_007:
+  $base: Character.CitizenRichFemaleDriver
+  displayName: mt_ecosystem_rival_1776881178_edge_007_name
+
+Character.mt_ecosystem_rival_1776881178_gonk_095:
+  $base: Character.CorpoWomanCorporatDriver
+  displayName: mt_ecosystem_rival_1776881178_gonk_095_name
+
+Character.mt_ecosystem_rival_1776881178_stre_005:
+  $base: Character.CorpoManCorporatDriver
+  displayName: mt_ecosystem_rival_1776881178_stre_005_name
+
+Character.mt_ecosystem_rival_1776881178_stre_024:
+  $base: Character.valentinos_grunt2_ranged2_ajax_ma
+  displayName: mt_ecosystem_rival_1776881178_stre_024_name
+
+Character.mt_ecosystem_rival_1776881178_gonk_041:
+  $base: Character.adelcaldos_grunt1_ranged1_pulsar_ma
+  displayName: mt_ecosystem_rival_1776881178_gonk_041_name
+
+Character.mt_ecosystem_rival_1776881178_gonk_075:
+  $base: Character.tyger_claws_biker2_ranged2_shingen_ma
+  displayName: mt_ecosystem_rival_1776881178_gonk_075_name
+
+Character.mt_ecosystem_rival_1776881178_gonk_047:
+  $base: Character.sixthstreet_hooligan_ranged1_nova_ma
+  displayName: mt_ecosystem_rival_1776881178_gonk_047_name
+
+Character.mt_ecosystem_rival_1776881178_gonk_062:
+  $base: Character.CorpoManCorporatDriver
+  displayName: mt_ecosystem_rival_1776881178_gonk_062_name
+
+Character.mt_ecosystem_rival_1776881178_edge_013:
+  $base: Character.tyger_claws_biker1_ranged1_nue_wa
+  displayName: mt_ecosystem_rival_1776881178_edge_013_name
+
+Character.mt_ecosystem_rival_1776881178_gonk_060:
+  $base: Character.CorpoManCorporatDriver
+  displayName: mt_ecosystem_rival_1776881178_gonk_060_name
+
+Character.mt_ecosystem_rival_1776881178_stre_003:
+  $base: Character.CorpoWomanCorporatDriver
+  displayName: mt_ecosystem_rival_1776881178_stre_003_name
+
+Character.mt_ecosystem_rival_1776881178_gonk_002:
+  $base: Character.LowlifeWomanRedneckDriver
+  displayName: mt_ecosystem_rival_1776881178_gonk_002_name
+
+Character.mt_ecosystem_rival_1776881178_fixe_000:
+  $base: Character.tyger_claws_biker2_ranged2_shingen_ma
+  displayName: mt_ecosystem_rival_1776881178_fixe_000_name
+
+Character.mt_ecosystem_rival_1776881178_gonk_077:
+  $base: Character.tyger_claws_biker1_ranged1_nue_wa
+  displayName: mt_ecosystem_rival_1776881178_gonk_077_name
+
+Character.mt_ecosystem_rival_1776881178_edge_015:
+  $base: Character.tyger_claws_biker1_ranged1_nue_ma
+  displayName: mt_ecosystem_rival_1776881178_edge_015_name
+
+Character.mt_ecosystem_rival_1776881178_fixe_016:
+  $base: Character.CorpoWomanCorporatDriver
+  displayName: mt_ecosystem_rival_1776881178_fixe_016_name
+
+Character.mt_ecosystem_rival_1776881178_stre_019:
+  $base: Character.tyger_claws_biker1_ranged1_nue_wa
+  displayName: mt_ecosystem_rival_1776881178_stre_019_name
+
+Character.mt_ecosystem_rival_1776881178_gonk_017:
+  $base: Character.sixthstreet_hooligan_ranged1_nova_wa
+  displayName: mt_ecosystem_rival_1776881178_gonk_017_name
+
+Character.mt_ecosystem_rival_1776881178_solo_014:
+  $base: Character.valentinos_grunt1_ranged1_nova_ma
+  displayName: mt_ecosystem_rival_1776881178_solo_014_name
+
+Character.mt_ecosystem_rival_1776881178_solo_007:
+  $base: Character.tyger_claws_biker2_ranged2_shingen_ma
+  displayName: mt_ecosystem_rival_1776881178_solo_007_name
+
+Character.mt_ecosystem_rival_1776881178_gonk_064:
+  $base: Character.CorpoWomanCorporatDriver
+  displayName: mt_ecosystem_rival_1776881178_gonk_064_name
+
+Character.mt_ecosystem_rival_1776881178_gonk_093:
+  $base: Character.CorpoManCorporatDriver
+  displayName: mt_ecosystem_rival_1776881178_gonk_093_name
+
+Character.mt_ecosystem_rival_1776881178_gonk_112:
+  $base: Character.sixthstreet_hooligan_ranged1_nova_ma
+  displayName: mt_ecosystem_rival_1776881178_gonk_112_name
+
+Character.mt_ecosystem_rival_1776881178_gonk_052:
+  $base: Character.valentinos_grunt1_ranged1_nova_ma
+  displayName: mt_ecosystem_rival_1776881178_gonk_052_name
+
+Character.mt_ecosystem_rival_1776881178_gonk_027:
+  $base: Character.CorpoManCorporatDriver
+  displayName: mt_ecosystem_rival_1776881178_gonk_027_name
+
+Character.mt_ecosystem_rival_1776881178_stre_004:
+  $base: Character.CorpoWomanCorporatDriver
+  displayName: mt_ecosystem_rival_1776881178_stre_004_name
+
+Character.mt_ecosystem_rival_1776881178_fixe_019:
+  $base: Character.CorpoManCorporatDriver
+  displayName: mt_ecosystem_rival_1776881178_fixe_019_name
+
+Character.mt_ecosystem_rival_1776881178_stre_021:
+  $base: Character.sixthstreet_hooligan_ranged1_nova_ma
+  displayName: mt_ecosystem_rival_1776881178_stre_021_name
+
+Character.mt_ecosystem_rival_1776881178_gonk_005:
+  $base: Character.NightlifeMaleDriver
+  displayName: mt_ecosystem_rival_1776881178_gonk_005_name
+
+Character.mt_ecosystem_rival_1776881178_gonk_039:
+  $base: Character.CitizenRichMaleDriver
+  displayName: mt_ecosystem_rival_1776881178_gonk_039_name
+
+Character.mt_ecosystem_rival_1776881178_stre_009:
+  $base: Character.NightlifeMaleDriver
+  displayName: mt_ecosystem_rival_1776881178_stre_009_name
+
+Character.mt_ecosystem_rival_1776881178_edge_018:
+  $base: Character.sixthstreet_hooligan_ranged1_nova_wa
+  displayName: mt_ecosystem_rival_1776881178_edge_018_name
+
+Character.mt_ecosystem_rival_1776881178_stre_015:
+  $base: Character.adelcaldos_grunt2_ranged2_sidewinder_ma
+  displayName: mt_ecosystem_rival_1776881178_stre_015_name
+
+Character.mt_ecosystem_rival_1776881178_edge_016:
+  $base: Character.tyger_claws_biker2_ranged2_shingen_ma
+  displayName: mt_ecosystem_rival_1776881178_edge_016_name
+
+Character.mt_ecosystem_rival_1776881178_solo_010:
+  $base: Character.sixthstreet_hooligan_ranged1_nova_wa
+  displayName: mt_ecosystem_rival_1776881178_solo_010_name
+
+Character.mt_ecosystem_rival_1776881178_stre_010:
+  $base: Character.NightlifeMaleDriver
+  displayName: mt_ecosystem_rival_1776881178_stre_010_name
+
+Character.mt_ecosystem_rival_1776881178_gonk_078:
+  $base: Character.sixthstreet_hooligan_ranged1_nova_wa
+  displayName: mt_ecosystem_rival_1776881178_gonk_078_name
+
+Character.mt_ecosystem_rival_1776881178_gonk_048:
+  $base: Character.sixthstreet_hooligan_ranged1_nova_ma
+  displayName: mt_ecosystem_rival_1776881178_gonk_048_name
+
+Character.mt_ecosystem_rival_1776881178_gonk_034:
+  $base: Character.LowlifeWomanRedneckDriver
+  displayName: mt_ecosystem_rival_1776881178_gonk_034_name
+
+Character.mt_ecosystem_rival_1776881178_gonk_000:
+  $base: Character.CorpoManCorporatDriver
+  displayName: mt_ecosystem_rival_1776881178_gonk_000_name
+
+Character.mt_ecosystem_rival_1776881178_solo_003:
+  $base: Character.adelcaldos_grunt2_ranged2_copperhead_ma
+  displayName: mt_ecosystem_rival_1776881178_solo_003_name
+
+Character.mt_ecosystem_rival_1776881178_fixe_007:
+  $base: Character.valentinos_grunt2_ranged2_ajax_ma
+  displayName: mt_ecosystem_rival_1776881178_fixe_007_name
+
+Character.mt_ecosystem_rival_1776881178_stre_038:
+  $base: Character.NightlifeFemaleDriver
+  displayName: mt_ecosystem_rival_1776881178_stre_038_name
+
+Character.mt_ecosystem_rival_1776881178_gonk_107:
+  $base: Character.tyger_claws_biker2_ranged2_shingen_ma
+  displayName: mt_ecosystem_rival_1776881178_gonk_107_name
+
+Character.mt_ecosystem_rival_1776881178_gonk_070:
+  $base: Character.NightlifeMaleDriver
+  displayName: mt_ecosystem_rival_1776881178_gonk_070_name
+
+Character.mt_ecosystem_rival_1776881178_gonk_008:
+  $base: Character.CitizenRichFemaleDriver
+  displayName: mt_ecosystem_rival_1776881178_gonk_008_name
+
+Character.mt_ecosystem_rival_1776881178_gonk_009:
+  $base: Character.adelcaldos_grunt2_ranged2_sidewinder_ma
+  displayName: mt_ecosystem_rival_1776881178_gonk_009_name
+
+Character.mt_ecosystem_rival_1776881178_fixe_006:
+  $base: Character.sixthstreet_hooligan_ranged1_nova_ma
+  displayName: mt_ecosystem_rival_1776881178_fixe_006_name
+
+Character.mt_ecosystem_rival_1776881178_gonk_036:
+  $base: Character.NightlifeFemaleDriver
+  displayName: mt_ecosystem_rival_1776881178_gonk_036_name
+
+Character.mt_ecosystem_rival_1776881178_stre_034:
+  $base: Character.CorpoWomanCorporatDriver
+  displayName: mt_ecosystem_rival_1776881178_stre_034_name
+
+Character.mt_ecosystem_rival_1776881178_gonk_031:
+  $base: Character.CorpoManCorporatDriver
+  displayName: mt_ecosystem_rival_1776881178_gonk_031_name
+
+Character.mt_ecosystem_rival_1776881178_gonk_101:
+  $base: Character.NightlifeMaleDriver
+  displayName: mt_ecosystem_rival_1776881178_gonk_101_name
+
+Character.mt_ecosystem_rival_1776881178_gonk_011:
+  $base: Character.adelcaldos_grunt1_ranged1_pulsar_ma
+  displayName: mt_ecosystem_rival_1776881178_gonk_011_name
+
+Character.mt_ecosystem_rival_1776881178_fixe_015:
+  $base: Character.CorpoWomanArasakaDriver
+  displayName: mt_ecosystem_rival_1776881178_fixe_015_name
+
+Character.mt_ecosystem_rival_1776881178_gonk_019:
+  $base: Character.valentinos_grunt1_ranged1_nova_ma
+  displayName: mt_ecosystem_rival_1776881178_gonk_019_name
+
+Character.mt_ecosystem_rival_1776881178_gonk_050:
+  $base: Character.valentinos_grunt1_ranged1_nova_ma
+  displayName: mt_ecosystem_rival_1776881178_gonk_050_name
+
+Character.mt_ecosystem_rival_1776881178_gonk_099:
+  $base: Character.NightlifeMaleDriver
+  displayName: mt_ecosystem_rival_1776881178_gonk_099_name
+
+Character.mt_ecosystem_rival_1776881178_gonk_082:
+  $base: Character.valentinos_grunt1_ranged1_nova_ma
+  displayName: mt_ecosystem_rival_1776881178_gonk_082_name
+
+Character.mt_ecosystem_rival_1776881178_fixe_004:
+  $base: Character.sixthstreet_hooligan_ranged1_nova_wa
+  displayName: mt_ecosystem_rival_1776881178_fixe_004_name
+
+Character.mt_ecosystem_rival_1776881178_stre_017:
+  $base: Character.tyger_claws_biker2_ranged2_shingen_ma
+  displayName: mt_ecosystem_rival_1776881178_stre_017_name
+
+Character.mt_ecosystem_rival_1776881178_edge_009:
+  $base: Character.NightlifeMaleDriver
+  displayName: mt_ecosystem_rival_1776881178_edge_009_name
+
+Character.mt_ecosystem_rival_1776881178_fixe_008:
+  $base: Character.valentinos_grunt2_ranged2_ajax_ma
+  displayName: mt_ecosystem_rival_1776881178_fixe_008_name
+
+Character.mt_ecosystem_rival_1776881178_gonk_038:
+  $base: Character.NightlifeMaleDriver
+  displayName: mt_ecosystem_rival_1776881178_gonk_038_name
+
+Character.mt_ecosystem_rival_1776881178_gonk_051:
+  $base: Character.valentinos_grunt1_ranged1_nova_ma
+  displayName: mt_ecosystem_rival_1776881178_gonk_051_name
+
+Character.mt_ecosystem_rival_1776881178_solo_021:
+  $base: Character.CorpoManCorporatDriver
+  displayName: mt_ecosystem_rival_1776881178_solo_021_name
+
+Character.mt_ecosystem_rival_1776881178_solo_013:
+  $base: Character.valentinos_grunt2_ranged2_ajax_ma
+  displayName: mt_ecosystem_rival_1776881178_solo_013_name
+
+Character.mt_ecosystem_rival_1776881178_edge_004:
+  $base: Character.LowlifeWomanRedneckDriver
+  displayName: mt_ecosystem_rival_1776881178_edge_004_name
+
+Character.mt_ecosystem_rival_1776881178_solo_005:
+  $base: Character.adelcaldos_grunt2_ranged2_copperhead_ma
+  displayName: mt_ecosystem_rival_1776881178_solo_005_name
+
+Character.mt_ecosystem_rival_1776881178_fixe_009:
+  $base: Character.valentinos_grunt1_ranged1_nue_wa
+  displayName: mt_ecosystem_rival_1776881178_fixe_009_name
+
+Character.mt_ecosystem_rival_1776881178_fixe_005:
+  $base: Character.sixthstreet_hooligan_ranged1_nova_ma
+  displayName: mt_ecosystem_rival_1776881178_fixe_005_name
+
+Character.mt_ecosystem_rival_1776881178_gonk_097:
+  $base: Character.NightlifeFemaleDriver
+  displayName: mt_ecosystem_rival_1776881178_gonk_097_name
+
+Character.mt_ecosystem_rival_1776881178_fixe_029:
+  $base: Character.adelcaldos_grunt2_ranged2_sidewinder_ma
+  displayName: mt_ecosystem_rival_1776881178_fixe_029_name
+
+Character.mt_ecosystem_rival_1776881178_gonk_080:
+  $base: Character.sixthstreet_hooligan_ranged1_nova_ma
+  displayName: mt_ecosystem_rival_1776881178_gonk_080_name
+
+Character.mt_ecosystem_rival_1776881178_fixe_014:
+  $base: Character.CorpoManArasakaDriver
+  displayName: mt_ecosystem_rival_1776881178_fixe_014_name
+
+Character.mt_ecosystem_rival_1776881178_stre_030:
+  $base: Character.CorpoManArasakaDriver
+  displayName: mt_ecosystem_rival_1776881178_stre_030_name
+
+Character.mt_ecosystem_rival_1776881178_gonk_073:
+  $base: Character.adelcaldos_grunt2_ranged2_copperhead_ma
+  displayName: mt_ecosystem_rival_1776881178_gonk_073_name
+
+Character.mt_ecosystem_rival_1776881178_stre_036:
+  $base: Character.CorpoManCorporatDriver
+  displayName: mt_ecosystem_rival_1776881178_stre_036_name
+

@@ -1,0 +1,60 @@
+﻿== open77_search
+   Lexical search over the Open77 Lua natives, guides, open77:* events, manifest permissions and FiveM equivalents. Use it first; then open77_api / open77_guide for the full text. Returns the build it answers for. Pass runtime=server (or client) when writing one side: several names (RegisterCommand, TriggerEvent, Open77.vehicles.get) exist on both with different contracts; a query containing the word server or client applies that filter itself.
+   args: query, kind, runtime, limit
+   required: query
+
+== open77_api
+   The full card of one Lua native: signature, description, permissions the manifest must declare, reasons it can return, the first build that has it, example, related guides. Accepts a qualified name (Open77.map.getWaypoint, TriggerClientEvent) or a route id (server:Open77.vehicles.spawn).
+   args: name, runtime
+   required: name
+
+== open77_namespace
+   Every native under a namespace (Open77.vehicles, Open77.players, _G for globals), one line each with permissions and since. Omit the namespace to list the namespaces.
+   args: namespace, runtime
+   required: 
+
+== open77_guide
+   A guide or one of its sections, as Markdown. Slugs come from open77_search (guide results) or the list returned when slug is omitted.
+   args: slug, section
+   required: 
+
+== open77_events
+   Events by prefix (open77:map, open77:chat) or all of them; each with its sides, documented payload and guide. Host lifecycle and bus events without a prefix are included: onResourceStart, onPlayerReady, onPlayerDisconnected, playerDropped, chat:ready... (pass prefix=lifecycle for just those). Also lists the reserved prefixes a resource may not raise.
+   args: prefix, documentedOnly
+   required: 
+
+== open77_permissions
+   One permission (what it gates, which natives, which guides declare it) or the whole list. These are the strings a manifest's permissions { } block declares.
+   args: name
+   required: 
+
+== open77_data
+   Look up spawnable names: vehicles, weapons, items (clothing), npc-templates, props, vfx, sfx, animations, animsets. Query matches the record/path/name; returns the fields the server itself answers Open77.data.* from.
+   args: catalogue, query, limit, offset
+   required: catalogue
+
+== open77_fivem_equivalent
+   What an Open77 resource uses in place of a FiveM native or Citizen call, and what is deliberately absent. Falls back to a search when the name is not in the alias table.
+   args: name
+   required: name
+
+== open77_manifest_schema
+   Every directive of the resource manifest with its form, default and rule, plus a complete example.
+   args: 
+   required: 
+
+== open77_server_config_schema
+   The JSON schema the dedicated server validates server.jsonc with. Pass a top-level key (network, resources, warden, voice...) for that section only.
+   args: key
+   required: 
+
+== open77_changes
+   Which natives a newer server build adds compared to an older one, from the since field. Useful to answer 'what do I gain by updating' or 'why does this work on my dev box and not on the owner's server'.
+   args: from, to
+   required: from
+
+== open77_build
+   The index build, where it came from (CDN cache, embedded snapshot), the newest published server build, and the package version.
+   args: 
+   required: 
+

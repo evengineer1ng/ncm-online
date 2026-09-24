@@ -1,0 +1,1238 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>NCM Panel</title>
+  <style>
+    :root {
+      --panel: rgba(8, 14, 26, 0.96);
+      --line: rgba(174, 211, 224, 0.28);
+      --text: #f2f6f8;
+      --dim: #8d99a8;
+      --accent: #22d8e2;
+      --ok: #4fe3a9;
+      --warn: #f5c95c;
+      --red: #ff2a3c;
+      --display: "Rajdhani", "Bahnschrift Condensed", "Bahnschrift SemiCondensed", "Arial Narrow", "Segoe UI", sans-serif;
+      --mono: "IBM Plex Mono", "Cascadia Mono", "Consolas", ui-monospace, monospace;
+    }
+    html, body { margin: 0; width: 1920px; height: 1080px; overflow: hidden; background: transparent; font-family: var(--display); color: var(--text); }
+    body.closed { pointer-events: none; }
+    .hidden { display: none !important; }
+    .ncm-glyph { width: 1em; height: 1em; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+    .ncm-glyph .accent { stroke: var(--glyph-accent, var(--accent)); }
+    .ncm-glyph .fill { fill: currentColor; stroke: none; }
+    #shade { position: absolute; inset: 0; background: rgba(0, 0, 0, 0.45); }
+    .card { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 980px; max-height: 900px; overflow: auto; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 28px 36px 32px; box-shadow: 0 20px 80px rgba(0,0,0,0.7); }
+    .eyebrow { font: 700 14px/1 var(--mono); letter-spacing: 0.24em; color: var(--accent); text-transform: uppercase; }
+    h1 { margin: 10px 0 4px; font-size: 44px; font-weight: 800; letter-spacing: 0.03em; line-height: 1; }
+    .sub { color: var(--dim); font-size: 20px; margin-bottom: 18px; }
+    .q { margin: 22px 0 8px; font-size: 28px; font-weight: 700; }
+    .opts { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    button { font-family: var(--display); font-size: 22px; font-weight: 600; color: var(--text); background: rgba(255,255,255,0.05); border: 1px solid var(--line); border-radius: 10px; padding: 14px 18px; text-align: left; cursor: pointer; }
+    button:hover, button:focus { border-color: var(--accent); background: rgba(34,216,226,0.12); outline: none; }
+    button.key::before { content: attr(data-key) ")"; font-family: var(--mono); color: var(--accent); margin-right: 10px; }
+    .progress { font: 600 14px/1 var(--mono); letter-spacing: 0.18em; color: var(--dim); margin-top: 18px; }
+    .bar { height: 4px; background: var(--line); border-radius: 2px; margin-top: 8px; overflow: hidden; }
+    .bar > div { height: 100%; background: var(--accent); width: 0; transition: width 200ms; }
+    .hint { color: var(--dim); font-size: 16px; margin-top: 14px; font-family: var(--mono); }
+    /* inbox */
+    /* a phone thread, not a menu (owner QA): incoming bubbles on the left, sender line above, time + state below */
+    #inbox { width: 760px; }
+    #inboxList { display: flex; flex-direction: column-reverse; gap: 14px; }
+    .msg { position: relative; max-width: 86%; align-self: flex-start; background: rgba(255,255,255,0.06); border: 1px solid var(--line); border-radius: 18px 18px 18px 4px; padding: 12px 16px 10px; margin: 0; }
+    .msg.unread { border-color: var(--warn); box-shadow: 0 0 0 1px rgba(245,201,92,0.25); }
+    .msg .from { font: 700 12px/1 var(--mono); letter-spacing: 0.2em; color: var(--warn); text-transform: uppercase; margin-bottom: 6px; }
+    .msg .subject { font-size: 20px; font-weight: 700; margin: 0 0 4px; }
+    .msg .body { color: var(--text); font-size: 19px; line-height: 1.35; }
+    .msg .state { font: 600 12px/1 var(--mono); color: var(--dim); letter-spacing: 0.16em; margin-top: 8px; text-transform: uppercase; text-align: right; }
+    .msg .actions { display: flex; gap: 10px; margin-top: 12px; }
+    .msg .actions button { padding: 10px 18px; font-size: 20px; }
+    .msg .actions button.accept { border-color: var(--ok); color: var(--ok); }
+    .msg .actions button.decline { border-color: var(--red); color: var(--red); }
+    .empty { color: var(--dim); font-size: 22px; padding: 30px 0; text-align: center; }
+    .close { position: absolute; top: 20px; right: 24px; font: 600 14px/1 var(--mono); color: var(--dim); }
+    /* Race Guide: a schedule, not a list. */
+    #guide { width: 1820px; height: 960px; max-height: 960px; overflow: hidden; padding: 24px 28px;
+             display: flex; flex-direction: column; }
+    .guide-head { display: flex; align-items: end; justify-content: space-between; margin-bottom: 12px; }
+    .guide-head h1 { font-size: 54px; margin: 4px 0; }
+    .guide-clock { font: 700 20px/1.2 var(--mono); color: var(--text); text-align: right; }
+    .guide-clock small { display: block; color: var(--dim); font-size: 12px; letter-spacing: .14em; }
+    .guide-tabs { display: flex; gap: 10px; margin-bottom: 14px; }
+    .guide-tabs button { min-width: 180px; text-align: center; padding: 10px 18px; font: 700 16px/1 var(--mono); letter-spacing: .12em; }
+    .guide-tabs button.active { color: var(--accent); border-color: var(--accent); box-shadow: inset 0 -3px var(--accent); }
+    .guide-tabs button[disabled] { opacity: .42; cursor: default; }
+    /* flex rather than a fixed 790px: the bottom nav is then always inside the card (owner, 2026-09-23) */
+    .guide-layout { display: grid; grid-template-columns: minmax(0, 1fr) 390px; gap: 18px; flex: 1; min-height: 0; }
+    .schedule { min-width: 0; border: 1px solid var(--line); border-radius: 10px; overflow: auto; background: rgba(2,10,18,.48); }
+    .time-head, .region-row { display: grid; grid-template-columns: 190px repeat(6, minmax(130px, 1fr)); min-width: 1060px; }
+    .time-head { position: sticky; top: 0; z-index: 6; background: #0b1725; border-bottom: 1px solid var(--line); }
+    .time-head > div { padding: 10px 8px; border-right: 1px solid var(--line); text-align: center; font: 700 14px/1 var(--mono); color: var(--dim); }
+    .time-head .corner { text-align: left; color: var(--text); letter-spacing: .12em; }
+    .region-row { min-height: 108px; border-bottom: 1px solid var(--line); }
+    .region-label { padding: 15px 14px; border-right: 1px solid var(--line); display: flex; align-items: center; gap: 12px; background: linear-gradient(90deg, color-mix(in srgb, var(--region) 24%, transparent), transparent); }
+    .region-sigil { width: 48px; height: 64px; border-left: 4px solid var(--region); background: color-mix(in srgb, var(--region) 16%, transparent); display: grid; place-items: center; color: var(--region); }
+    .region-sigil .ncm-glyph { width: 30px; height: 30px; }
+    .region-name { font: 800 18px/1.1 var(--display); letter-spacing: .06em; text-transform: uppercase; }
+    .region-code { margin-top: 5px; font: 700 12px/1 var(--mono); color: var(--region); letter-spacing: .14em; }
+    .slot { position: relative; border-right: 1px solid rgba(174,211,224,.16); min-height: 108px; padding: 7px; }
+    .event-card { width: 100%; min-height: 58px; color: var(--text); border: 1px solid var(--line); border-left: 5px solid var(--event); background: rgba(12,27,42,.94); border-radius: 4px; padding: 8px 9px; text-align: left; }
+    .event-card:hover, .event-card.selected { border-color: var(--event); background: color-mix(in srgb, var(--event) 13%, #0c1b2a); }
+    .event-card.mine { box-shadow: inset 0 0 0 1px var(--ok); }
+    .event-title { display: flex; align-items: center; gap: 6px; font: 800 14px/1.1 var(--display); letter-spacing: .04em; text-transform: uppercase; }
+    .event-title .ncm-glyph { width: 18px; height: 18px; color: var(--event); }
+    .event-series { color: var(--dim); font: 700 10px/1.1 var(--mono); letter-spacing: .08em; margin-top: 4px; text-transform: uppercase; }
+    .event-meta { margin-top: 5px; font: 600 12px/1.2 var(--mono); color: var(--dim); }
+    /* NCM Help: a real scrollable page, not a modal with six commands. */
+    #help { width: 1180px; height: 900px; max-height: 900px; display: flex; flex-direction: column; padding: 26px 32px 18px; }
+    .help-scroll { flex: 1; overflow-y: auto; overflow-x: hidden; padding-right: 14px; margin-top: 12px; }
+    .help-scroll::-webkit-scrollbar { width: 10px; }
+    .help-scroll::-webkit-scrollbar-thumb { background: var(--line); border-radius: 5px; }
+    .help-lede { font-size: 20px; line-height: 1.45; color: var(--text); margin: 0 0 14px; max-width: 74ch; }
+    .help-alpha { border-left: 3px solid var(--warn); background: rgba(245,201,92,.08); padding: 10px 14px; margin: 0 0 18px; font-size: 17px; line-height: 1.4; }
+    .help-alpha b { color: var(--warn); letter-spacing: .06em; }
+    .help-sec { margin: 22px 0 0; }
+    .help-sec > h2 { font: 700 13px/1 var(--mono); letter-spacing: .2em; color: var(--dim); margin: 0 0 12px; text-transform: uppercase; }
+    .help-row { display: grid; grid-template-columns: 150px minmax(0,1fr); gap: 14px; padding: 9px 0; border-top: 1px solid var(--line); align-items: baseline; }
+    .help-row:first-of-type { border-top: 0; }
+    .help-how { display: flex; flex-wrap: wrap; gap: 6px; }
+    .help-key { font: 700 14px/1 var(--mono); border: 1px solid var(--accent); color: var(--accent); padding: 4px 8px; }
+    .help-cmd { font: 600 13px/1 var(--mono); color: var(--dim); padding: 4px 0; }
+    .help-what b { display: block; font-size: 17px; margin-bottom: 2px; }
+    .help-what span { color: var(--dim); font-size: 15px; line-height: 1.35; }
+    .help-notice { border-left: 3px solid var(--red); padding: 8px 14px; margin-bottom: 10px; }
+    .help-notice b { display: block; font-size: 17px; }
+    .help-notice span { color: var(--dim); font-size: 15px; }
+    .help-notice em { display: block; color: var(--ok); font-style: normal; font-size: 15px; margin-top: 4px; }
+    .help-change { padding: 6px 0; border-top: 1px solid var(--line); font-size: 16px; }
+    .help-change small { color: var(--dim); font: 600 12px/1 var(--mono); margin-right: 10px; }
+    /* report */
+    .help-report { border: 1px solid var(--accent); padding: 16px 18px; margin: 24px 0 8px; background: rgba(34,216,226,.05); }
+    .help-report h2 { color: var(--accent); }
+    .help-report textarea { width: 100%; box-sizing: border-box; height: 120px; resize: none; background: rgba(0,0,0,.35); border: 1px solid var(--line); color: var(--text); font: 400 17px/1.4 var(--display); padding: 10px 12px; }
+    .help-report textarea:focus { outline: none; border-color: var(--accent); }
+    .help-disclose { color: var(--dim); font-size: 14px; line-height: 1.4; margin: 8px 0 12px; }
+    .help-actions { display: flex; align-items: center; gap: 14px; }
+    .help-actions button { padding: 11px 26px; font: 700 16px/1 var(--mono); letter-spacing: .1em; }
+    .help-state { font: 600 14px/1.3 var(--mono); }
+    .help-state.ok { color: var(--ok); }
+    .help-state.bad { color: var(--red); }
+    .help-count { margin-left: auto; color: var(--dim); font: 600 13px/1 var(--mono); }
+    /* CALL VEHICLE must acknowledge its own press. Owner QA: it "barely registers as a click" because every
+       outcome was a toast, and a toast is behind the panel you are looking at. */
+    .call-btn { transition: color 120ms, border-color 120ms, background 120ms; }
+    .call-btn.pending { color: var(--warn); border-color: var(--warn); }
+    .call-btn.ok { color: var(--ok); border-color: var(--ok); background: rgba(79,227,169,.12); }
+    .call-btn.fail { color: var(--red); border-color: var(--red); background: rgba(255,42,60,.10); }
+    .call-note { margin-top: 8px; font: 600 14px/1.35 var(--mono); min-height: 19px; }
+    .call-note.ok { color: var(--ok); }
+    .call-note.fail { color: var(--red); }
+    .call-note.pending { color: var(--warn); }
+    .guide-empty { padding: 60px 24px; text-align: center; color: var(--dim); font-size: 22px; }
+
+    /* Weather ribbon (11_WEATHER.md presentation seam). Sits beside the clock: it is world state, not an
+       event fact. Hidden outright when the service is not ready -- never an empty ribbon, never a fake icon. */
+    .wx-ribbon { display: flex; align-items: center; gap: 12px; padding: 8px 16px; border: 1px solid var(--line); background: rgba(12, 22, 38, .6); }
+    .wx-ribbon.hidden { display: none; }
+    .wx-ribbon .ncm-glyph { width: 30px; height: 30px; }
+    .wx-now { font: 700 21px/1 var(--mono); letter-spacing: .06em; }
+    .wx-scope { display: block; font: 600 11px/1.5 var(--mono); letter-spacing: .16em; color: var(--dim); }
+    .wx-fam-dry { color: var(--warn); }
+    .wx-fam-wet { color: var(--accent); }
+    .wx-fam-obscured { color: var(--dim); }
+    .wx-fam-hazardous { color: var(--red); }
+    .wx-unavailable { font: 600 12px/1.4 var(--mono); letter-spacing: .12em; color: var(--dim); }
+
+    /* Per-row cue on a schedule card: a small mark only. Absent weather draws nothing at all. */
+    .event-wx { display: inline-flex; align-items: center; gap: 4px; margin-left: 6px; vertical-align: -2px; }
+    .event-wx .ncm-glyph { width: 14px; height: 14px; }
+    .event-wx b { font: 700 10px/1 var(--mono); letter-spacing: .08em; color: var(--warn); }
+
+    /* Detail blocks: what to bring (IDEA-124), the regs (IDEA-125), the forecast (11_WEATHER.md). */
+    .detail-block { border: 1px solid var(--line); padding: 10px 12px; margin: 10px 0; }
+    .detail-block > h4 { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; font: 700 12px/1 var(--mono); letter-spacing: .18em; color: var(--dim); }
+    .detail-block > h4 .ncm-glyph { width: 16px; height: 16px; }
+    .detail-block .line { font-size: 17px; line-height: 1.35; margin: 3px 0; }
+    .detail-block .muted { color: var(--dim); font: 600 12px/1.5 var(--mono); letter-spacing: .1em; }
+    .own-yes { color: var(--ok); font-weight: 700; }
+    .own-no { color: var(--red); font-weight: 700; }
+    .regs-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 14px; }
+    .regs-grid b { display: block; font: 600 10px/1.4 var(--mono); letter-spacing: .14em; color: var(--dim); }
+    .regs-grid span { font: 700 15px/1.2 var(--mono); }
+    /* Ordinal confidence ONLY. 11_WEATHER.md defers numeric probability calibration, and a percentage here
+       would imply a calibrated model that does not exist. */
+    .wx-conf { font: 700 11px/1 var(--mono); letter-spacing: .12em; padding: 3px 7px; border: 1px solid currentColor; }
+    .wx-conf-HIGH { color: var(--ok); }
+    .wx-conf-MED { color: var(--warn); }
+    .wx-conf-LOW { color: var(--dim); }
+    .wx-change { color: var(--warn); }
+    .event-detail { border: 1px solid var(--line); border-radius: 10px; padding: 18px; background: rgba(5,13,23,.95); overflow: auto; }
+    .detail-kicker { font: 700 13px/1 var(--mono); color: var(--event, var(--accent)); letter-spacing: .16em; text-transform: uppercase; }
+    .detail-title { font-size: 34px; font-weight: 800; line-height: 1; margin: 8px 0 4px; text-transform: uppercase; }
+    .detail-region { color: var(--event, var(--accent)); font: 700 14px/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; }
+    .detail-hero { height: 150px; margin: 16px 0; border: 1px solid var(--line); display: grid; place-items: center; background: radial-gradient(circle at 70% 25%, color-mix(in srgb, var(--event) 24%, transparent), transparent 55%), #07121e; }
+    .detail-hero .ncm-glyph { width: 84px; height: 84px; color: var(--event); }
+    .detail-facts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 12px 0; }
+    .fact { border: 1px solid var(--line); padding: 8px 10px; }
+    .fact b { display: block; font: 700 11px/1 var(--mono); color: var(--dim); letter-spacing: .12em; text-transform: uppercase; }
+    .fact span { display: block; margin-top: 5px; font-size: 18px; }
+    .detail-description { font-size: 18px; line-height: 1.4; color: var(--text); margin: 14px 0; }
+    .detail-action { width: 100%; display: flex; justify-content: center; align-items: center; gap: 10px; color: #031014; background: var(--accent); border-color: var(--accent); text-align: center; }
+    .detail-action.on { background: transparent; color: var(--ok); border-color: var(--ok); }
+    .detail-action[disabled] { background: rgba(255,255,255,.04); color: var(--dim); border-color: var(--line); }
+    .detail-action .ncm-glyph { width: 22px; height: 22px; }
+    .future-slot { margin-top: 10px; border: 1px dashed var(--line); padding: 11px; color: var(--dim); font: 600 12px/1.4 var(--mono); }
+    /* Vehicle Collection: the wall is primary; filters/details support it. */
+    #collection { width: 1820px; height: 960px; max-height: 960px; overflow: hidden; padding: 24px 28px; }
+    .collection-head { display:flex; justify-content:space-between; align-items:end; margin-bottom:14px; }
+    .collection-head h1 { font-size:54px; margin:4px 0; }
+    .collection-count { text-align:right; font:700 22px/1.35 var(--mono); color:var(--accent); }
+    .collection-count small { display:block; color:var(--dim); font-size:13px; letter-spacing:.14em; }
+    .collection-layout { display:grid; grid-template-columns:minmax(0,1fr) 390px; gap:18px; flex:1; min-height:0; }
+    #collection { display:flex; flex-direction:column; }
+    #guide, #market, #collection, #help { box-sizing:border-box; }
+    .guide-head, .guide-tabs, .collection-head, .market-head { flex-shrink:0; }
+    .schedule, .event-detail, .collection-wall, .vehicle-dossier, .help-scroll { min-height:0; }
+    .asset-id { overflow-wrap:anywhere; font:13px/1.5 var(--mono); }
+    .ncm-bottom { display:flex; justify-content:center; gap:12px; margin-top:10px; flex:none; }
+    .ncm-bottom button.active { color:var(--accent); border-color:var(--accent); box-shadow:inset 0 -3px var(--accent); }
+    #market { width:1820px; height:960px; max-height:960px; overflow:hidden; padding:24px 28px;
+              display:flex; flex-direction:column; }
+    .market-head { display:flex; justify-content:space-between; align-items:end; margin-bottom:18px; }
+    .market-head h1 { font-size:54px; margin:4px 0; }
+    .market-balance { font:700 28px/1 var(--mono); color:var(--accent); }
+    .market-body { flex:1; min-height:0; display:grid; grid-template-columns:minmax(0,1.15fr) minmax(0,1fr); gap:16px; }
+    .market-grid { min-height:0; overflow:auto; display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; align-content:start; }
+    .market-detail { min-height:0; overflow:auto; border:1px solid var(--line); border-radius:10px; padding:18px; }
+    .market-item.selected { border-color:var(--accent); box-shadow:inset 0 0 0 1px var(--accent); }
+    .market-item .stock { font:700 13px/1 var(--mono); letter-spacing:.1em; margin-top:6px; }
+    .market-item .stock.out { color:var(--warn); }
+    .market-detail h2 { font-size:30px; margin:2px 0 2px; }
+    .market-spec { display:grid; grid-template-columns:auto 1fr; gap:6px 16px; margin:14px 0; font:500 14px/1.35 var(--mono); }
+    .market-spec b { color:var(--dim); font-weight:700; letter-spacing:.08em; }
+    .market-assets { margin-top:10px; display:flex; flex-direction:column; gap:8px; }
+    .market-assets .asset-row { display:flex; justify-content:space-between; align-items:center; gap:10px; border:1px solid var(--line); border-radius:8px; padding:8px 10px; }
+    .market-assets .asset-row .aid { font:500 11px/1 var(--mono); color:var(--dim); overflow:hidden; text-overflow:ellipsis; }
+    .market-item { border:1px solid var(--line); background:rgba(2,10,18,.72); padding:22px; min-height:250px; }
+    .market-item h2 { margin:8px 0; font-size:32px; }
+    .market-item .price { color:var(--accent); font:700 28px/1 var(--mono); margin:24px 0 14px; }
+    .market-item button { width:100%; }
+    .collection-wall { overflow:auto; display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); grid-auto-rows:150px; gap:10px; padding:10px; border:1px solid var(--line); background:rgba(2,10,18,.56); }
+    .vehicle-tile { position:relative; overflow:hidden; padding:14px; text-align:left; border-radius:4px; background:linear-gradient(145deg,rgba(34,216,226,.09),rgba(255,255,255,.025)); }
+    .vehicle-tile::after { content:""; position:absolute; right:-20px; bottom:-28px; width:130px; height:75px; border:2px solid currentColor; border-radius:70% 20% 22% 28%; opacity:.10; transform:skewX(-13deg); }
+    .vehicle-tile.unknown { color:#617080; background:repeating-linear-gradient(135deg,rgba(255,255,255,.025) 0 8px,transparent 8px 18px); }
+    .vehicle-tile.selected { border-color:var(--accent); box-shadow:inset 0 -3px var(--accent); }
+    .vehicle-maker { font:700 11px/1 var(--mono); letter-spacing:.13em; color:var(--accent); text-transform:uppercase; }
+    .vehicle-name { margin-top:8px; font-size:23px; font-weight:800; line-height:1; text-transform:uppercase; }
+    .vehicle-meta { position:absolute; left:14px; bottom:12px; font:600 11px/1 var(--mono); color:var(--dim); letter-spacing:.1em; text-transform:uppercase; }
+    .vehicle-unknown { font:800 34px/1 var(--mono); letter-spacing:.16em; margin-top:27px; }
+    .vehicle-owned { position:absolute; top:10px; right:10px; color:var(--ok); font:700 10px/1 var(--mono); letter-spacing:.1em; }
+    .vehicle-dossier { border:1px solid var(--line); background:rgba(3,11,20,.8); padding:22px; overflow:auto; }
+    .dossier-silhouette { height:210px; margin:18px 0; border:1px solid var(--line); display:grid; place-items:center; color:var(--accent); font-size:72px; background:radial-gradient(circle at 50% 60%,rgba(34,216,226,.15),transparent 58%); }
+    .dossier-label { font:700 11px/1 var(--mono); color:var(--dim); letter-spacing:.14em; text-transform:uppercase; margin-top:16px; }
+    .dossier-value { font-size:20px; margin-top:5px; }
+  </style>
+</head>
+<body class="closed">
+  <div id="root" class="hidden">
+    <div id="shade"></div>
+    <div id="questionnaire" class="card hidden">
+      <div class="eyebrow">Night City Motorsports · Driver Profile</div>
+      <h1 id="qTitle">Before we put you in a car.</h1>
+      <div class="sub">Six quick ones. There are no wrong answers; there is a file.</div>
+      <div class="q" id="qText"></div>
+      <div class="opts" id="qOpts"></div>
+      <div class="progress" id="qProgress"></div>
+      <div class="bar"><div id="qBar"></div></div>
+      <div class="hint">Click an answer, or press A / B / C / D. Chat works too: /ncm.q a</div>
+    </div>
+    <div id="guide" class="card hidden">
+      <div class="close">ESC · close</div>
+      <div class="guide-head"><div><div class="eyebrow">Night City Motorsports</div><h1>Race Guide</h1><div class="sub">Find a race. Hit the road.</div></div><div style="display:flex;align-items:center;gap:18px"><div class="wx-ribbon hidden" id="guideWx"></div><div class="guide-clock" id="guideClock"></div></div></div>
+      <div class="guide-tabs"><button data-guide-tab="schedule" class="active">SCHEDULE</button><button data-guide-tab="mine">MY RACES</button><button data-guide-tab="past">PAST RESULTS</button></div>
+      <div class="guide-layout"><div class="schedule" id="guideList"></div><aside class="event-detail" id="guideDetail"></aside></div>
+      <div class="ncm-bottom" id="guideNav"></div>
+    </div>
+    <div id="inbox" class="card hidden">
+      <div class="close">ESC · close</div>
+      <div class="eyebrow">Night City Motorsports · Messages</div>
+      <h1 id="inboxTitle">Messages</h1>
+      <div class="sub" id="inboxSub"></div>
+      <div id="inboxList"></div>
+    </div>
+    <div id="collection" class="card hidden">
+      <div class="close">ESC · close</div>
+      <div class="collection-head"><div><div class="eyebrow">Night City Motorsports</div><h1 id="collectionTitle">Vehicle Collection</h1><div class="sub">The machines inhabiting our Night City.</div></div><div class="collection-count" id="collectionCount"></div></div>
+      <div class="collection-layout"><div class="collection-wall" id="collectionWall"></div><aside class="vehicle-dossier" id="collectionDetail"></aside></div>
+      <div class="ncm-bottom" id="collectionNav"></div>
+    </div>
+    <div id="market" class="card hidden">
+      <div class="close">ESC · close</div>
+      <div class="market-head"><div><div class="eyebrow">Night City Motorsports · Commercial Network</div><h1>Base Market</h1><div class="sub">Real stock. Every machine is an individual.</div></div><div class="market-balance" id="marketBalance"></div></div>
+      <div class="market-body"><div class="market-grid" id="marketGrid"></div><div class="market-detail" id="marketDetail"></div></div>
+      <div class="ncm-bottom" id="marketNav"></div>
+    </div>
+    <div id="help" class="card hidden">
+      <div class="close">ESC · close</div>
+      <div><div class="eyebrow">Night City Motorsports</div><h1>Help</h1><div class="sub" id="helpBuild"></div></div>
+      <div class="help-scroll" id="helpScroll"></div>
+      <div class="ncm-bottom" id="helpNav"></div>
+    </div>
+  </div>
+  <script src="glyphs.js"></script>
+  <script>
+    (() => {
+      "use strict";
+      const root = document.getElementById("root");
+      const qCard = document.getElementById("questionnaire");
+      const inboxCard = document.getElementById("inbox");
+      const qText = document.getElementById("qText");
+      const qOpts = document.getElementById("qOpts");
+      const qProgress = document.getElementById("qProgress");
+      const qBar = document.getElementById("qBar");
+      const inboxList = document.getElementById("inboxList");
+      const inboxSub = document.getElementById("inboxSub");
+      const guideCard = document.getElementById("guide");
+      const guideList = document.getElementById("guideList");
+      const guideDetail = document.getElementById("guideDetail");
+      const guideClock = document.getElementById("guideClock");
+      const guideWx = document.getElementById("guideWx");
+      const collectionCard = document.getElementById("collection");
+      const collectionWall = document.getElementById("collectionWall");
+      const collectionDetail = document.getElementById("collectionDetail");
+      const collectionCount = document.getElementById("collectionCount");
+      const collectionTitle = document.getElementById("collectionTitle");
+      const marketCard = document.getElementById("market");
+      const helpCard = document.getElementById("help");
+      const helpScroll = document.getElementById("helpScroll");
+      const helpBuild = document.getElementById("helpBuild");
+      const helpNav = document.getElementById("helpNav");
+      const guideNav = document.getElementById("guideNav");
+      const marketNav = document.getElementById("marketNav");
+      const marketGrid = document.getElementById("marketGrid");
+      const marketBalance = document.getElementById("marketBalance");
+      let mode = null;          // "questionnaire" | "inbox" | "guide" | "market" | "collection" | null
+      let guideTick = null;
+      let questions = [], version = 1, index = 0, answers = [];
+      let pointerSeen = false;
+
+      const text = (el, v) => { el.textContent = String(v == null ? "" : v); };
+      const glyph = (name, label) => NcmGlyph.create(name, label);
+      const routeGlyph = (r) => /circuit|oval|lap/i.test((r.discipline || "") + " " + (r.format || "")) ? "circuit" : "point_to_point";
+
+
+      // The NCM shell nav. ONE definition, rendered into whichever panel is open, so a surface can never be
+      // present in one panel's tab strip and missing from another's. Add a surface here and it appears
+      // everywhere at once; that is the whole point.
+      const SHELL_TABS = [["guide", "RACE GUIDE"], ["market", "MARKET"], ["collection", "MACHINE INDEX"], ["help", "HELP"]];
+      function renderNav(container, current) {
+        if (!container) return;
+        container.innerHTML = "";
+        for (const pair of SHELL_TABS) {
+          const b = document.createElement("button");
+          b.textContent = pair[1];
+          b.dataset.panelNav = pair[0];
+          if (pair[0] === current) { b.classList.add("active"); b.disabled = true; }
+          else b.addEventListener("click", () => Open77.emit("panel:navigate", { panel: pair[0] }));
+          container.append(b);
+        }
+      }
+
+      function show(which) {
+        mode = which;
+        root.classList.toggle("hidden", !which);
+        document.body.classList.toggle("closed", !which);
+        qCard.classList.toggle("hidden", which !== "questionnaire");
+        inboxCard.classList.toggle("hidden", which !== "inbox");
+        guideCard.classList.toggle("hidden", which !== "guide");
+        collectionCard.classList.toggle("hidden", which !== "collection");
+        marketCard.classList.toggle("hidden", which !== "market");
+        helpCard.classList.toggle("hidden", which !== "help");
+        if (SHELL_TABS.some(tab => tab[0] === which)) renderNav(document.getElementById(which + "Nav"), which);
+        if (which !== "guide" && guideTick) { clearInterval(guideTick); guideTick = null; }
+      }
+
+      // ---- race guide
+      let guideData = { rows: [], serverNow: 0, loading: true }, guideOffset = null, guideTab = "schedule", selectedEventId = null;
+      let lastInboxData = null;
+      const REGIONS = [
+        ["Watson","WTS","#ff405f"], ["Westbrook","WBR","#e6b63e"], ["City Center","CTR","#6da8ff"],
+        ["Heywood","HEY","#32e1bd"], ["Santo Domingo","SDO","#b777e9"], ["Pacifica","PAC","#d35ee8"],
+        ["Badlands","BAD","#ff842e"], ["Dogtown","DOG","#9ca6bd"], ["Unknown","???","#8d99a8"]
+      ];
+      // KB-25, second attempt. Every snapshot's `serverNow` is already STALE when it arrives (publish cadence +
+      // latency), and staleness is a one-directional BIAS, not noise: a snapshot can only ever make the server
+      // look older than it is, never newer. The first fix re-seeded whenever |drift| > 5 s, which did not remove
+      // the sawtooth -- it just let the error grow to ~7-8 s before snapping back.
+      //
+      // The estimator has to be monotonic. offset = serverNow - localNow is understated by exactly the staleness,
+      // so the LEAST stale sample seen is the MAXIMUM offset, and keeping the running maximum both converges on
+      // the truth and can never step the displayed clock backwards. A large negative jump means the server itself
+      // restarted, which is the one case where re-seeding down is correct.
+      const guideNow = () => guideOffset === null ? 0 : (Date.now() / 1000) + guideOffset;
+      function seedGuideClock(serverNow) {
+        const t = Number(serverNow) || 0;
+        if (!t) return;
+        const sample = t - (Date.now() / 1000);
+        if (guideOffset === null || sample > guideOffset) { guideOffset = sample; return; }
+        if (sample < guideOffset - 30) { guideOffset = sample; }   // server restarted: follow it down
+      }
+      const fmtCountdown = (s) => { s = Math.max(0, Math.floor(s)); const m = Math.floor(s / 60); return m + ":" + String(s - m * 60).padStart(2, "0"); };
+      const fmtSec = (s) => { const m = Math.floor(s / 60); return m + ":" + (s - m * 60).toFixed(1).padStart(4, "0"); };
+      const fmtTime = (t) => new Date(t * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
+      const adapterName = (r) => ({ p2p: "POINT TO POINT", laps: "CIRCUIT", lanes: "LANES", eliminations: "ELIMINATION" })[r.courseAdapter] || "COURSE";
+      const eventColour = (r) => r.tier === "sanctioned" ? "#f5c95c" : (r.discipline === "drift" ? "#b777e9" : "#22d8e2");
+      const routeIcon = (r) => r.courseAdapter === "laps" ? "circuit" : "point_to_point";
+
+      // ---- the information layer (IDEA-124 car, IDEA-125 regs, 11_WEATHER.md forecast)
+      //
+      // All three have ridden in the payload since deploy 12 with nothing drawing them. Everything below reads
+      // fields that are ALREADY on the wire: nothing here adds a byte to the net payload (KB-59) or to a
+      // `page:send` batch (KB-63), and no Lua runs, so the script budget is untouched.
+      //
+      // The rule that keeps this safe is `guard()`: it emits `panel:drawn` only if the render does NOT throw,
+      // and a missing `panel:drawn` is the KB-61 close. Every field below is therefore optional by assumption.
+      // `car`, `regs` and per-row `weather` can all be absent, and an empty Lua table arrives as `[]`, not `{}`.
+      const WX_WORDS = { sunny: "SUNNY", lightclouds: "LIGHT CLOUD", cloudy: "CLOUDY", rain: "RAIN",
+                         heavyclouds: "HEAVY CLOUD", fog: "FOG", pollution: "POLLUTION", sandstorm: "SANDSTORM" };
+      const wxWord = (w) => WX_WORDS[String(w || "").toLowerCase()] || String(w || "").toUpperCase();
+      // Families are the four the core defines; anything unknown draws NOTHING rather than a wrong mark.
+      const WX_FAMS = { dry: "wx_dry", wet: "wx_wet", obscured: "wx_obscured", hazardous: "wx_hazardous" };
+      const wxGlyphName = (family) => WX_FAMS[String(family || "").toLowerCase()] || null;
+      const KINDS = { OBSERVED: "OBSERVED", FORECAST: "FORECAST", OUTLOOK: "OUTLOOK" };
+
+      function blockEl(title, glyphName) {
+        const b = document.createElement("div"); b.className = "detail-block";
+        const h = document.createElement("h4");
+        if (glyphName && NcmGlyph.has(glyphName)) h.append(glyph(glyphName));
+        h.append(document.createTextNode(title)); b.append(h); return b;
+      }
+      function lineEl(parent, cls) {
+        const d = document.createElement("div"); d.className = cls || "line"; parent.append(d); return d;
+      }
+
+      // The top-level bounded read model, once, beside the clock.
+      //
+      // `capabilities.weather` exists precisely so the client can HIDE the ribbon rather than render an empty
+      // one (11_WEATHER.md). Nothing read that flag until now; this is the first consumer of it.
+      function renderWeatherRibbon() {
+        const caps = guideData.capabilities || {};
+        const wx = guideData.weather || null;
+        const ready = wx && wx.state === "ready" && caps.weather !== false;
+        guideWx.innerHTML = "";
+        if (!ready) {
+          // Honest unavailable, and only when we positively know the service is down -- not while the first
+          // payload is still in flight, which would flash "unavailable" on every open.
+          if (wx && wx.state && wx.state !== "ready") {
+            guideWx.classList.remove("hidden");
+            const u = document.createElement("div"); u.className = "wx-unavailable";
+            u.textContent = "WEATHER · UNAVAILABLE";
+            guideWx.append(u);
+          } else { guideWx.classList.add("hidden"); }
+          return;
+        }
+        guideWx.classList.remove("hidden");
+        const now = wx.now || {};
+        const g = wxGlyphName(now.family);
+        if (g) guideWx.append(glyph(g, wxWord(now.w)));
+        const words = document.createElement("div");
+        const big = document.createElement("div");
+        big.className = "wx-now" + (now.family ? " wx-fam-" + now.family : "");
+        // `now.w` absent is not "sunny" -- say we do not know rather than invent a condition.
+        big.textContent = now.w ? wxWord(now.w) : "—";
+        const scope = document.createElement("small"); scope.className = "wx-scope";
+        scope.textContent = String(wx.scope || "NIGHT CITY").toUpperCase() + " · OBSERVED";
+        words.append(big, scope); guideWx.append(words);
+      }
+
+      // Per-row cue on a schedule card. Absent forecast draws nothing at all (guide.lua: eventWeather returns
+      // nil past the horizon, and "absent is not sunny").
+      function eventWxCue(r) {
+        const w = r && r.weather;
+        if (!w || !w.w) return null;
+        const g = wxGlyphName(w.family);
+        if (!g) return null;
+        const span = document.createElement("span"); span.className = "event-wx";
+        span.append(glyph(g, wxWord(w.w)));
+        if (w.changes) { const b = document.createElement("b"); b.textContent = "CHG"; span.append(b); }
+        return span;
+      }
+
+      // IDEA-124: what car to bring, and the driver's own answer. `carFacts` already computes both server-side.
+      function carBlock(r) {
+        const c = r && r.car;
+        if (!c || typeof c !== "object" || c.summary == null) return null;
+        const b = blockEl("WHAT TO BRING", "car_req");
+        lineEl(b).textContent = String(c.summary);
+        const mine = lineEl(b);
+        const n = Number(c.iOwn) || 0;
+        if (n > 0) {
+          const s = document.createElement("span"); s.className = "own-yes";
+          s.textContent = "YOU OWN " + n + " OF THESE"; mine.append(s);
+        } else {
+          const s = document.createElement("span"); s.className = "own-no";
+          // L83 refuses rather than substitutes, so say so HERE rather than at the venue.
+          s.textContent = "YOU OWN NONE"; mine.append(s);
+          lineEl(b, "muted").textContent = "ENTER RACE WILL NOT BE OFFERED";
+        }
+        if (Number(c.admits) > 0) lineEl(b, "muted").textContent = Number(c.admits) + " ELIGIBLE MACHINE(S) IN THE POOL";
+        return b;
+      }
+
+      // IDEA-125: the regs, from data rather than prose per series.
+      function regsBlock(r) {
+        const g = r && r.regs;
+        if (!g || typeof g !== "object") return null;
+        const pairs = [];
+        if (g.tier) pairs.push(["TIER", String(g.tier).toUpperCase()]);
+        if (g.discipline) pairs.push(["DISCIPLINE", String(g.discipline).replaceAll("_", " ").toUpperCase()]);
+        if (g.format) pairs.push(["FORMAT", String(g.format).replaceAll("_", " ").toUpperCase()]);
+        if (g.startType) pairs.push(["START", String(g.startType).toUpperCase()]);
+        if (g.laps) pairs.push(["LAPS", String(g.laps)]);
+        if (g.capacity) pairs.push(["FIELD CAP", String(g.capacity)]);
+        if (!pairs.length) return null;
+        const b = blockEl("REGULATIONS", "regs");
+        const grid = document.createElement("div"); grid.className = "regs-grid";
+        for (const [k, v] of pairs) {
+          const cell = document.createElement("div");
+          const lab = document.createElement("b"); lab.textContent = k;
+          const val = document.createElement("span"); val.textContent = v;
+          cell.append(lab, val); grid.append(cell);
+        }
+        b.append(grid);
+        // `rulesetId` is only a NAME today; the ruleset table's sporting rules are not exposed yet (IDEA-125).
+        // Show the name and say that is what it is, rather than implying the rules are on screen.
+        if (g.rulesetId) lineEl(b, "muted").textContent = "RULESET · " + String(g.rulesetId).toUpperCase() + " (sporting rules not yet published)";
+        return b;
+      }
+
+      // 11_WEATHER.md: the detail-card forecast block. Ordinal confidence, never a percentage.
+      function weatherBlock(r, now) {
+        const w = r && r.weather;
+        if (!w || !w.w) return null;
+        const b = blockEl("CONDITIONS AT START", wxGlyphName(w.family) || "timer");
+        const head = lineEl(b);
+        const cond = document.createElement("span");
+        cond.className = w.family ? "wx-fam-" + w.family : "";
+        cond.style.fontWeight = "700";
+        cond.textContent = wxWord(w.w);
+        head.append(cond);
+        if (w.conf) {
+          const c = document.createElement("span");
+          c.className = "wx-conf wx-conf-" + String(w.conf);
+          c.style.marginLeft = "10px";
+          c.textContent = String(w.conf) + " CONFIDENCE";
+          head.append(c);
+        }
+        if (w.kind && KINDS[w.kind]) lineEl(b, "muted").textContent = KINDS[w.kind];
+        if (w.changes) {
+          const l = lineEl(b); l.className = "line wx-change";
+          l.textContent = "Conditions change during this race.";
+        }
+        // A transition landing within ten minutes of the start is the one thing worth a countdown.
+        const soon = Number(w.soonAt) || 0;
+        if (soon && now) {
+          const dt = soon - now;
+          if (dt > 0) { const l = lineEl(b); l.className = "line wx-change"; l.textContent = "Change due in " + fmtCountdown(dt) + " — near the start."; }
+        }
+        return b;
+      }
+
+      function addFact(root, label, value) {
+        const f = document.createElement("div"); f.className = "fact";
+        const b = document.createElement("b"); b.textContent = label; const s = document.createElement("span"); s.textContent = value;
+        f.append(b, s); root.append(f);
+      }
+
+      function renderDetail(r, now) {
+        guideDetail.innerHTML = "";
+        if (!r) { guideDetail.innerHTML = '<div class="guide-empty">Select an event to inspect its entry, route and session facts.</div>'; return; }
+        guideDetail.style.setProperty("--event", eventColour(r));
+        const kicker = document.createElement("div"); kicker.className = "detail-kicker"; kicker.textContent = (r.tier || "") + " · " + adapterName(r);
+        const title = document.createElement("div"); title.className = "detail-title"; title.textContent = r.route || "Race";
+        const series = document.createElement("div"); series.className = "detail-region"; series.textContent = r.series || "Independent event";
+        const region = document.createElement("div"); region.className = "detail-region"; region.textContent = r.region || "Unknown";
+        const hero = document.createElement("div"); hero.className = "detail-hero"; hero.append(glyph(routeIcon(r)));
+        const facts = document.createElement("div"); facts.className = "detail-facts";
+        addFact(facts, "Starts", fmtTime(r.startsAt || now));
+        addFact(facts, "Start", (r.startType || "standing").toUpperCase());
+        addFact(facts, r.courseAdapter === "laps" ? "Laps" : "Distance", r.courseAdapter === "laps" ? String(r.laps || 1) : (Math.round((r.distanceM || 0) / 100) / 10) + " km");
+        addFact(facts, "Drivers", (r.entered || 0) + (r.seatsTotal ? " / " + r.seatsTotal : " entered"));
+        const desc = document.createElement("div"); desc.className = "detail-description"; desc.textContent = r.description || ((r.venue || "Start") + " to " + (r.finish || "finish") + ".");
+        const practice = document.createElement("div"); practice.className = "future-slot";
+        practice.textContent = r.practice === "open" ? (r.myPracticeBest ? "PRACTICE BEST · " + fmtSec(r.myPracticeBest) : "PRACTICE OPEN · cross the start line") : "PRACTICE · " + String(r.practice || "closed").replaceAll("_", " ");
+        const action = document.createElement("button"); action.className = "detail-action";
+        const on = r.myState === "interested";
+        if (r.invitation) { action.disabled = true; action.append(glyph("private"), document.createTextNode(r.myState !== "none" ? r.myState.toUpperCase() : "BY INVITATION")); }
+        else if (on || r.myState === "none") {
+          action.classList.toggle("on", on); action.append(glyph(on ? "withdraw" : "signup"), document.createTextNode(on ? "LEAVE LIST" : "EXPRESS INTEREST"));
+          action.addEventListener("click", () => { action.disabled = true; Open77.emit("panel:interest", { eventId: r.eventId, action: on ? "withdraw" : "interest" }); });
+        } else { action.disabled = true; action.append(glyph("registered"), document.createTextNode(String(r.myState).toUpperCase())); }
+        const future = document.createElement("div"); future.className = "future-slot";
+        future.textContent = "ROUTE PREVIEW · REMINDERS · EVENT ARCHIVE — reserved in the Guide contract; not online yet.";
+        // The information layer, in the order a driver decides in: can I enter, what are the rules, what will
+        // it be like. Each returns null when its data is absent, and null entries are dropped rather than
+        // rendered as empty boxes.
+        const blocks = [carBlock(r), regsBlock(r), weatherBlock(r, now)].filter(Boolean);
+        guideDetail.append(kicker, title, series, region, hero, facts, desc, ...blocks, practice, action, future);
+      }
+
+      // PAST RESULTS. Authoritative completed results for this driver, whatever the activity was classified
+      // as: a race against a field, or a time trial (a field of one, L67). The server sends `timeTrial` per row
+      // so this never has to guess from a count -- and never claims a position that was not raced for.
+      //
+      // History is read-only here by design (L74c). A slow early run is a fact about NCM's first week and is
+      // worth more than a tidy list; nothing in this view hides, merges or supersedes one.
+      const RESULT_WORD = { finished: "CLASSIFIED", dnf: "DNF", dns: "DNS", dsq: "DSQ" };
+      // Results arrive in their own message, not on `guideData`: putting them in the Guide payload made it
+      // too large to arrive at all (2026-09-23). `null` means "not asked yet", `[]` means "asked, none".
+      let guideResults = null;
+      Open77.on("panel:guideResults", (d) => {
+        guideResults = (d && Array.isArray(d.results)) ? d.results : [];
+        if (mode === "guide" && guideTab === "past") guard("guide", () => renderGuide(null));
+      });
+
+      function renderPastResults(now) {
+        if (guideResults === null) {
+          Open77.emit("panel:guide.results", {});
+          const e = document.createElement("div"); e.className = "guide-empty";
+          e.textContent = "Loading your results…";
+          guideList.append(e); return;
+        }
+        const rows = guideResults;
+        if (!rows.length) {
+          const e = document.createElement("div"); e.className = "guide-empty";
+          e.textContent = "No results yet. Enter a race from the schedule and finish it — every official run is kept here.";
+          guideList.append(e); return;
+        }
+        for (const r of rows) {
+          const card = document.createElement("button");
+          card.className = "event-card"; card.style.setProperty("--event", r.state === "finished" ? "#3be28a" : "#f5c95c");
+          card.style.width = "100%"; card.style.textAlign = "left"; card.style.marginBottom = "8px";
+          const title = document.createElement("div"); title.className = "event-title";
+          title.append(glyph(r.kind === "race" ? "point_to_point" : "timer"),
+                       document.createTextNode(r.route || r.series || "Session"));
+          const series = document.createElement("div"); series.className = "event-series";
+          series.textContent = (r.series || "Independent event") + " · " +
+            (r.timeTrial ? "TIME TRIAL" : (r.kind || "race").toUpperCase());
+          // The hero value: a time when there is one, otherwise what happened instead.
+          const meta = document.createElement("div"); meta.className = "event-meta";
+          const parts = [];
+          const when = new Date((r.at || 0) * 1000);
+          parts.push(when.toLocaleDateString([], { month: "short", day: "numeric" }).toUpperCase() + " " + fmtTime(r.at));
+          if (r.state === "finished" && (r.totalSec || r.bestSec)) {
+            parts.push(fmtSec(r.totalSec || r.bestSec));
+            if (!r.timeTrial && r.position) parts.push("P" + r.position + " of " + (r.fieldSize || 1));
+          } else {
+            parts.push(RESULT_WORD[r.state] || String(r.state || "").toUpperCase());
+            if (r.state === "dnf" && r.gatesTotal) parts.push(r.gates + "/" + r.gatesTotal + " gates");
+            if (r.why) parts.push(String(r.why).replaceAll("_", " "));
+          }
+          if (r.penaltySec) parts.push("+" + r.penaltySec.toFixed(0) + "s penalty");
+          meta.textContent = parts.join(" · ");
+          card.append(title, series, meta);
+          guideList.append(card);
+        }
+      }
+
+      function renderGuide(d) {
+        if (d) { guideData = d; seedGuideClock(d.serverNow); }
+        const now = guideNow();
+        guideList.innerHTML = "";
+        const all = Array.isArray(guideData.rows) ? guideData.rows : [];
+        if (guideTab === "past") {
+          renderWeatherRibbon();
+          const dtp = new Date(now * 1000);
+          guideClock.innerHTML = dtp.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric", year: "numeric" }).toUpperCase()
+            + " · " + fmtTime(now) + "<small>YOUR OFFICIAL RESULTS</small>";
+          renderPastResults(now);
+          renderDetail(all.find(r => r.eventId === selectedEventId), now);
+          return;
+        }
+        const rows = guideTab === "mine" ? all.filter(r => r.myState && r.myState !== "none") : all;
+        if (!selectedEventId || !all.some(r => r.eventId === selectedEventId)) selectedEventId = (rows[0] || all[0] || {}).eventId || null;
+        const selected = all.find(r => r.eventId === selectedEventId) || rows[0];
+        renderWeatherRibbon();
+        const dt = new Date(now * 1000); guideClock.innerHTML = dt.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric", year: "numeric" }).toUpperCase() + " · " + fmtTime(now) + '<small>LOCAL TIME · LIVE SCHEDULE</small>';
+        if (!rows.length) { const e = document.createElement("div"); e.className = "guide-empty"; e.textContent = guideData.loading ? "Loading live schedule…" : (guideTab === "mine" ? "No races in your file yet. Express interest from the schedule." : "Nothing posted right now."); guideList.append(e); renderDetail(selected, now); return; }
+        const base = Math.floor(now / 1800) * 1800;
+        const head = document.createElement("div"); head.className = "time-head";
+        const corner = document.createElement("div"); corner.className = "corner"; corner.textContent = "REGION / CHANNEL"; head.append(corner);
+        for (let i = 0; i < 6; i++) { const h = document.createElement("div"); h.textContent = fmtTime(base + i * 1800); if (i === 0) h.style.color = "var(--accent)"; head.append(h); }
+        guideList.append(head);
+        for (const [name, code, colour] of REGIONS) {
+          const inRegion = rows.filter(r => (r.region || "Unknown") === name);
+          if (!inRegion.length && name === "Unknown") continue;
+          const row = document.createElement("div"); row.className = "region-row"; row.style.setProperty("--region", colour);
+          const label = document.createElement("div"); label.className = "region-label"; const sig = document.createElement("div"); sig.className = "region-sigil"; sig.append(glyph("point_to_point"));
+          const words = document.createElement("div"); words.innerHTML = '<div class="region-name"></div><div class="region-code"></div>'; words.querySelector(".region-name").textContent = name; words.querySelector(".region-code").textContent = code; label.append(sig, words); row.append(label);
+          const slots = [];
+          for (let i = 0; i < 6; i++) { const slot = document.createElement("div"); slot.className = "slot"; slots.push(slot); row.append(slot); }
+          for (const r of inRegion) {
+            const idx = Math.max(0, Math.min(5, Math.floor(((r.startsAt || base) - base) / 1800)));
+            const card = document.createElement("button"); card.className = "event-card" + (r.eventId === selectedEventId ? " selected" : "") + (r.myState !== "none" ? " mine" : ""); card.style.setProperty("--event", eventColour(r));
+            const title = document.createElement("div"); title.className = "event-title"; title.append(glyph(routeIcon(r)), document.createTextNode(r.route || r.series || "Race"));
+            const series = document.createElement("div"); series.className = "event-series"; series.textContent = r.series || "Independent event";
+            const meta = document.createElement("div"); meta.className = "event-meta"; meta.textContent = fmtTime(r.startsAt) + " · " + (r.courseAdapter === "laps" ? (r.laps || 1) + " LAPS" : Math.round((r.distanceM || 0) / 100) / 10 + " KM");
+            const cue = eventWxCue(r); if (cue) meta.append(cue);
+            card.append(title, series, meta); card.addEventListener("click", () => { selectedEventId = r.eventId; renderGuide(null); }); slots[idx].append(card);
+          }
+          guideList.append(row);
+        }
+        renderDetail(selected, now);
+      }
+      for (const tab of document.querySelectorAll("[data-guide-tab]")) tab.addEventListener("click", () => { if (tab.disabled) return; guideTab = tab.dataset.guideTab; for (const x of document.querySelectorAll("[data-guide-tab]")) x.classList.toggle("active", x === tab); renderGuide(null); });
+      Open77.on("panel:guide", (d) => { if (mode === "guide") guard("guide", () => renderGuide(d)); });
+
+
+      // CALL VEHICLE button state. One button at a time: the detail pane only ever shows the selected asset.
+      let callBtn = null, callNote = null, callTimer = null;
+      function setCallState(state, message) {
+        if (callTimer && state !== "pending") { clearTimeout(callTimer); callTimer = null; }
+        if (!callBtn) return;
+        callBtn.className = "call-btn " + (state || "");
+        callBtn.disabled = (state === "pending");
+        callBtn.textContent = state === "pending" ? "CALLING\u2026" : "CALL VEHICLE";
+        if (callNote) {
+          callNote.className = "call-note " + (state || "");
+          callNote.textContent = message || "";
+        }
+      }
+      Open77.on("panel:vehicle.result", (d) => {
+        d = d || {};
+        // "pending" is the server confirming it is looking; it is NOT success, so the button stays amber.
+        setCallState(d.state === "ok" ? "ok" : (d.state === "pending" ? "pending" : "fail"), d.message || "");
+      });
+
+      // ---- vehicle collection
+      let collectionData = { slots: [], discovered: 0, total: 0, owned: 0 }, selectedCollectionSlot = null;
+      function renderCollectionDetail(v) {
+        collectionDetail.innerHTML = "";
+        if (!v || !v.discovered) {
+          collectionDetail.innerHTML = '<div class="eyebrow">UNDISCOVERED MACHINE</div><div class="detail-title">???</div><div class="dossier-silhouette">?</div><div class="detail-description">Encounter this machine in the shared world to add it to your Collection.</div>';
+          return;
+        }
+        const eyebrow = document.createElement("div"); eyebrow.className="eyebrow"; eyebrow.textContent=v.manufacturer || "Unknown manufacturer";
+        const title = document.createElement("div"); title.className="detail-title"; title.textContent=v.displayName || "Machine";
+        const visual = document.createElement("div"); visual.className="dossier-silhouette"; visual.textContent="NCM";
+        collectionDetail.append(eyebrow,title,visual);
+        for (const asset of (Array.isArray(v.assets) ? v.assets : [])) {
+          const id=document.createElement("div"); id.className="asset-id"; id.textContent="ASSET " + asset.assetId;
+          const call=document.createElement("button"); call.textContent="CALL VEHICLE"; call.className="call-btn";
+          const note=document.createElement("div"); note.className="call-note";
+          // React on the press itself. The server's answer arrives later over `panel:vehicle.result`; until
+          // then the button must look busy rather than dead, or the player presses it again.
+          call.addEventListener("click",()=>{
+            if(call.disabled) return;
+            callBtn=call; callNote=note;
+            call.disabled=true; call.className="call-btn pending"; call.textContent="CALLING\u2026";
+            note.className="call-note pending"; note.textContent="Checking nearby space\u2026";
+            Open77.emit("panel:vehicle.call",{assetId:asset.assetId});
+            // The server answers, or times out at 10 s; never leave the button stuck.
+            if(callTimer) clearTimeout(callTimer);
+            callTimer=setTimeout(()=>{ if(callBtn===call) setCallState("fail","No answer from the server. Try again."); },12000);
+          });
+          collectionDetail.append(id,call,note);
+        }
+        for (const pair of [["Category",(v.categories||[v.category]).filter(Boolean).join(" / ")],["Status",v.owned?"OWNED · DISCOVERED":"DISCOVERED"],["Source",String(v.source||"native").toUpperCase()],["First encounter",v.firstDiscoveredAt?new Date(v.firstDiscoveredAt*1000).toLocaleString():"—"],["Encounters",v.encounterCount||1]]) {
+          const l=document.createElement("div"); l.className="dossier-label"; l.textContent=pair[0]; const x=document.createElement("div"); x.className="dossier-value"; x.textContent=pair[1]; collectionDetail.append(l,x);
+        }
+      }
+      function renderCollection(d) {
+        if (d) collectionData=d;
+        collectionTitle.textContent=collectionData.label||"Vehicle Collection";
+        const slots=Array.isArray(collectionData.slots)?collectionData.slots:[];
+        collectionCount.innerHTML=(collectionData.discovered||0)+" / "+(collectionData.total||slots.length)+" DISCOVERED<small>"+(collectionData.owned||0)+" OWNED · GENERATION "+(collectionData.generation||1)+"</small>";
+        collectionWall.innerHTML="";
+        if (!selectedCollectionSlot && slots.length) selectedCollectionSlot=slots[0].slot;
+        for (const v of slots) {
+          const b=document.createElement("button"); b.className="vehicle-tile "+(v.discovered?"discovered":"unknown")+(v.slot===selectedCollectionSlot?" selected":"");
+          if (v.discovered) {
+            const maker=document.createElement("div"); maker.className="vehicle-maker"; maker.textContent=v.manufacturer||"NCM";
+            const name=document.createElement("div"); name.className="vehicle-name"; name.textContent=v.displayName||"Machine";
+            const meta=document.createElement("div"); meta.className="vehicle-meta"; meta.textContent=v.category||"Vehicle"; b.append(maker,name,meta);
+            if(v.owned){const o=document.createElement("div");o.className="vehicle-owned";o.textContent="OWNED";b.append(o);}
+          } else { const q=document.createElement("div"); q.className="vehicle-unknown"; q.textContent="???"; const m=document.createElement("div");m.className="vehicle-meta";m.textContent="UNDISCOVERED";b.append(q,m); }
+          b.addEventListener("click",()=>{selectedCollectionSlot=v.slot;renderCollection(null);}); collectionWall.append(b);
+        }
+        renderCollectionDetail(slots.find(v=>v.slot===selectedCollectionSlot)||slots[0]);
+      }
+      Open77.on("panel:collection", (d) => { if (mode === "collection") renderCollection(d); });
+
+      // ---- market network (Base Market is the first source, never a global catalogue)
+      // ---- Base Market.
+      //
+      // An OFFERING is a persistent shelf position for a model. An ASSET is one individually identified car
+      // standing on it. The old renderer drew assets, so selling the only MaiMai removed the MaiMai from the
+      // Market instead of selling it out. Cards are offerings now and never disappear; the detail pane is
+      // where the individual assets live, because an assetId is still what a purchase names.
+      let marketData = { markets: [], offerings: [], items: [], balance: 0, currency: "eddies", loading: true };
+      let selectedOffering = null;
+      const eddies = (n) => "€$" + Number(n || 0).toLocaleString();
+      // Whole minutes, then hours. Never a countdown to the second: production is an authored cadence, not a
+      // promise precise enough to justify one.
+      function untilText(at, now) {
+        const dt = Math.floor(Number(at || 0) - Number(now || 0));
+        if (!Number.isFinite(dt) || dt <= 0) return "due now";
+        if (dt < 3600) return "in " + Math.max(1, Math.round(dt / 60)) + " min";
+        const h = Math.floor(dt / 3600), m = Math.round((dt - h * 3600) / 60);
+        return "in " + h + " h" + (m ? " " + m + " min" : "");
+      }
+
+      // Deliberately vague ("about every 2 h"): the cadence is real, but stating it to the second would
+      // invite treating it as a contract rather than a current intention.
+      function cadenceText(sec) {
+        const s = Math.max(1, Math.floor(Number(sec) || 0));
+        if (s < 5400) return Math.max(1, Math.round(s / 60)) + " min";
+        const h = s / 3600;
+        if (h < 48) return (h < 10 ? Math.round(h * 10) / 10 : Math.round(h)) + " h";
+        return Math.round(h / 24) + " days";
+      }
+
+      function marketNow() { return Number(marketData.serverNow || 0) || Math.floor(Date.now() / 1000); }
+
+      function renderMarketDetail() {
+        const box = document.getElementById("marketDetail");
+        box.innerHTML = "";
+        const offers = Array.isArray(marketData.offerings) ? marketData.offerings : [];
+        const o = offers.find(x => x.vehicleKey === selectedOffering);
+        if (!o) {
+          const e = document.createElement("div"); e.className = "guide-empty";
+          e.textContent = offers.length ? "Select a machine." : "";
+          box.append(e); return;
+        }
+        const now = marketNow();
+        const maker = document.createElement("div"); maker.className = "vehicle-maker"; maker.textContent = o.manufacturer || "NCM";
+        const name = document.createElement("h2"); name.textContent = o.displayName || o.vehicleKey;
+        const cat = document.createElement("div"); cat.className = "sub"; cat.textContent = o.category || "Vehicle";
+        const spec = document.createElement("div"); spec.className = "market-spec";
+        const pairs = [["PRICE", eddies(o.price)],
+                       ["AVAILABLE", Number(o.available || 0) + " / " + Number(o.ceiling || 0)],
+                       ["STATE", o.soldOut ? "SOLD OUT" : "IN STOCK"]];
+        // Supply is stated, not implied. The batch is what the next event MAY make -- capped by whatever
+        // capacity is free at that moment, and by whoever buys in the meantime. Never phrased as a promise.
+        pairs.push(["NEXT PRODUCTION", untilText(o.nextProductionAt, now)]);
+        pairs.push(["NEXT BATCH", "up to " + Number(o.nextBatch || 0) + ", to a maximum of " + Number(o.ceiling || 0) + " in stock"]);
+        // The manufacturer's CURRENT cadence. A live fact about this market, and one a player can act on --
+        // unlike the profile that chose it, the envelope it moves inside, or the signals it read, none of
+        // which are on the wire at all.
+        if (o.cadenceSec) pairs.push(["PRODUCTION RUNS", "about every " + cadenceText(o.cadenceSec)]);
+        for (const [k, v] of pairs) {
+          const b = document.createElement("b"); b.textContent = k;
+          const val = document.createElement("span"); val.textContent = v;
+          spec.append(b, val);
+        }
+        box.append(maker, name, cat, spec);
+        // Section 29: a changing schedule must read as the manufacturer responding to its market, never as
+        // the operator interfering. Say THAT it moves. Never say how.
+        if (o.scheduleDynamic) {
+          const note = document.createElement("div"); note.className = "line muted";
+          note.style.marginTop = "2px";
+          note.textContent = "Manufacturers set their own production. Schedules respond to market conditions and may change.";
+          box.append(note);
+        }
+        const ids = Array.isArray(o.assetIds) ? o.assetIds : [];
+        if (!ids.length) {
+          const note = document.createElement("div"); note.className = "guide-empty";
+          note.textContent = "No unsold examples on the shelf right now. Production continues.";
+          box.append(note); return;
+        }
+        const list = document.createElement("div"); list.className = "market-assets";
+        const afford = Number(marketData.balance || 0) >= Number(o.price || 0);
+        // One row per individual car. Several rows means several cars: there is no one-per-player rule and
+        // nothing here enforces one.
+        for (const assetId of ids) {
+          const row = document.createElement("div"); row.className = "asset-row";
+          const aid = document.createElement("span"); aid.className = "aid"; aid.textContent = "ASSET " + String(assetId);
+          const buy = document.createElement("button");
+          buy.textContent = afford ? "PURCHASE" : "INSUFFICIENT FUNDS";
+          buy.disabled = !afford;
+          buy.addEventListener("click", () => { buy.disabled = true; buy.textContent = "PURCHASING…";
+            Open77.emit("panel:market.purchase", { marketId: o.marketId, assetId: assetId }); });
+          row.append(aid, buy); list.append(row);
+        }
+        box.append(list);
+      }
+
+      function selectOffering(key) {
+        selectedOffering = key;
+        // Selecting an offering and looking at it is a legitimate encounter with the model, stocked or not.
+        // The server decides whether that is a discovery; this only reports what the player did.
+        Open77.emit("panel:market.inspect", { marketId: "base_market", vehicleKey: key });
+        renderMarket(null);
+      }
+
+      function renderMarket(d) {
+        if (d) marketData=d;
+        marketBalance.textContent=eddies(marketData.balance);
+        marketGrid.innerHTML="";
+        const offers=Array.isArray(marketData.offerings)?marketData.offerings:[];
+        if(!offers.length){const e=document.createElement("div");e.className="guide-empty";e.textContent=marketData.loading?"Loading current stock…":"Base Market carries nothing right now.";marketGrid.append(e);renderMarketDetail();return;}
+        if(!offers.some(o=>o.vehicleKey===selectedOffering)) selectedOffering=offers[0].vehicleKey;
+        for(const o of offers){
+          const card=document.createElement("div");card.className="market-item"+(o.vehicleKey===selectedOffering?" selected":"");
+          const source=document.createElement("div");source.className="eyebrow";source.textContent=o.marketName||o.marketId;
+          const maker=document.createElement("div");maker.className="vehicle-maker";maker.textContent=o.manufacturer||"NCM";
+          const name=document.createElement("h2");name.textContent=o.displayName||o.vehicleKey;
+          const meta=document.createElement("div");meta.className="sub";meta.textContent=o.category||"Vehicle";
+          const stock=document.createElement("div");stock.className="stock"+(o.soldOut?" out":"");
+          // A sold-out model says so and stays on the shelf. Temporary shortage is information; a vanished
+          // offering is an apparently broken market.
+          stock.textContent=o.soldOut?("SOLD OUT · 0 / "+Number(o.ceiling||0)):("AVAILABLE "+Number(o.available||0)+" / "+Number(o.ceiling||0));
+          const price=document.createElement("div");price.className="price";price.textContent=eddies(o.price);
+          card.append(source,maker,name,meta,stock,price);
+          card.addEventListener("click",()=>selectOffering(o.vehicleKey));
+          marketGrid.append(card);
+        }
+        renderMarketDetail();
+      }
+      Open77.on("panel:market", (d) => { if (mode === "market") guard("market", () => renderMarket(d)); });
+      for(const tab of document.querySelectorAll("[data-panel-nav]")) tab.addEventListener("click",()=>{
+        const target=tab.dataset.panelNav;if(target===mode)return;Open77.emit("panel:navigate",{panel:target});
+      });
+
+
+      // ---- NCM Help (scrollable page + in-game problem report)
+      //
+      // The governing idea: the server is the support channel. A player who can open this can tell us what
+      // broke without leaving the game, and everything NCM already knows is attached for them.
+      //
+      // Every section renders only if the payload carries it. An absent notices/changes list draws NOTHING --
+      // no empty heading, no "nothing here yet" -- which is what keeps authored content optional rather than
+      // an obligation that rots.
+      let helpData = null, helpReportBox = null;
+      let reportId = null, reportBusy = false;
+
+      const uuid4 = () => (window.crypto && window.crypto.randomUUID) ? window.crypto.randomUUID()
+        : "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+            const r = Math.random() * 16 | 0; return (c === "x" ? r : (r & 0x3 | 0x8)).toString(16); });
+
+      function helpSection(title) {
+        const sec = document.createElement("div"); sec.className = "help-sec";
+        const h = document.createElement("h2"); h.textContent = title; sec.append(h);
+        return sec;
+      }
+
+      const REPORT_FAIL = {
+        empty: "Please describe what happened.",
+        too_short: "A few more words would help us find it.",
+        invalid: "That could not be sent. Try again.",
+        too_fast: "Just a moment before sending another.",
+        unavailable: "The server could not store that right now. Press submit again in a moment — it will not create a duplicate."
+      };
+
+      function reportBlock(h) {
+        const box = document.createElement("div"); box.className = "help-sec help-report";
+        const title = document.createElement("h2"); title.textContent = "Report a problem"; box.append(title);
+
+        const intro = document.createElement("div"); intro.className = "help-lede";
+        intro.style.fontSize = "17px";
+        intro.textContent = "Something in NCM not working? Tell us here. It goes straight to the server, so it reaches us even if you leave.";
+        box.append(intro);
+
+        const ta = document.createElement("textarea");
+        ta.placeholder = "What happened? What were you trying to do?";
+        ta.maxLength = Number(h.textMax) || 1200;
+        box.append(ta);
+
+        const disclose = document.createElement("div"); disclose.className = "help-disclose";
+        disclose.textContent = "Sent with your report: who you are on this server, where you were, what you own, the race you were looking at and which NCM screen was open, plus the build version and the time. Nothing else.";
+        box.append(disclose);
+
+        const actions = document.createElement("div"); actions.className = "help-actions";
+        const submit = document.createElement("button"); submit.textContent = "SUBMIT REPORT";
+        const state = document.createElement("div"); state.className = "help-state";
+        const count = document.createElement("div"); count.className = "help-count";
+        const updateCount = () => { count.textContent = ta.value.length + " / " + ta.maxLength; };
+        updateCount();
+        ta.addEventListener("input", () => {
+          updateCount();
+          if (state.textContent) { state.textContent = ""; state.className = "help-state"; }
+        });
+
+        submit.addEventListener("click", () => {
+          if (reportBusy) return;
+          const text = ta.value.trim();
+          if (text.length < 4) { state.className = "help-state bad"; state.textContent = REPORT_FAIL.too_short; return; }
+          // One id per attempt, REUSED on retry: the server keys on it, so a resend cannot duplicate.
+          if (!reportId) reportId = uuid4();
+          reportBusy = true; submit.disabled = true;
+          state.className = "help-state"; state.textContent = "Sending…";
+          Open77.emit("panel:report.submit", { reportId: reportId, text: text, panel: mode, ms: Date.now() });
+          // Nothing is called received until the server says it stored it (section 9).
+          setTimeout(() => {
+            if (!reportBusy) return;
+            reportBusy = false; submit.disabled = false;
+            state.className = "help-state bad";
+            state.textContent = "No answer from the server. Press submit again — it will not create a duplicate.";
+          }, 8000);
+        });
+
+        actions.append(submit, state, count); box.append(actions);
+        box._ta = ta; box._state = state; box._submit = submit; box._updateCount = updateCount;
+        helpReportBox = box;
+        return box;
+      }
+
+      function renderHelp(d) {
+        if (d) helpData = d;
+        const h = helpData || {};
+        helpBuild.textContent = h.build ? ("Build " + h.build) : "";
+        helpScroll.innerHTML = "";
+
+        const lede = document.createElement("p"); lede.className = "help-lede";
+        lede.textContent = "Night City Motorsports is a persistent racing world running on this server. Races are scheduled and run for real, the weather is real, and the machines you find and own are recorded against your driver.";
+        helpScroll.append(lede);
+
+        // Confident and factual, not a wall of disclaimer (section 3).
+        const alpha = document.createElement("div"); alpha.className = "help-alpha";
+        const ab = document.createElement("b"); ab.textContent = "BEING BUILT LIVE.";
+        alpha.append(ab, document.createTextNode(" NCM is under active development. Systems, interfaces and balance change often, things occasionally break, and the server may restart while you are here. If something goes wrong, tell us using the form below — that is the fastest route we have."));
+        helpScroll.append(alpha);
+        const access = helpSection("I bought a car. Where is it?");
+        const accessText=document.createElement("p");
+        accessText.textContent="Purchase records persistent ownership. Open MACHINE INDEX from F6 (or press F10), select your machine, then CALL VEHICLE beside the specific owned asset. Stand still on foot in an open roadway or parking area. If no clear nearby space is found, move and try again. Your ownership is unchanged if a call fails.";
+        access.append(accessText); helpScroll.append(access);
+
+        const controls = Array.isArray(h.controls) ? h.controls : [];
+        if (controls.length) {
+          const sec = helpSection("What you can do right now");
+          for (const c of controls) {
+            const row = document.createElement("div"); row.className = "help-row";
+            const how = document.createElement("div"); how.className = "help-how";
+            if (c.key) { const k = document.createElement("span"); k.className = "help-key"; k.textContent = c.key; how.append(k); }
+            if (c.cmd) { const m = document.createElement("span"); m.className = "help-cmd"; m.textContent = c.cmd; how.append(m); }
+            const what = document.createElement("div"); what.className = "help-what";
+            const b = document.createElement("b"); b.textContent = c.title || "";
+            const sp = document.createElement("span"); sp.textContent = c.text || "";
+            what.append(b, sp); row.append(how, what); sec.append(row);
+          }
+          helpScroll.append(sec);
+        }
+
+        if (Array.isArray(h.notices) && h.notices.length) {
+          const sec = helpSection("Known problems");
+          for (const n of h.notices) {
+            const box = document.createElement("div"); box.className = "help-notice";
+            const b = document.createElement("b"); b.textContent = n.title; box.append(b);
+            if (n.text) { const sp = document.createElement("span"); sp.textContent = n.text; box.append(sp); }
+            if (n.workaround) { const em = document.createElement("em"); em.textContent = "Workaround: " + n.workaround; box.append(em); }
+            sec.append(box);
+          }
+          helpScroll.append(sec);
+        }
+
+        if (Array.isArray(h.changes) && h.changes.length) {
+          const sec = helpSection("Recently changed");
+          for (const c of h.changes) {
+            const row = document.createElement("div"); row.className = "help-change";
+            if (c.at) { const sm = document.createElement("small"); sm.textContent = c.at; row.append(sm); }
+            row.append(document.createTextNode(c.title + (c.text ? " — " + c.text : "")));
+            sec.append(row);
+          }
+          helpScroll.append(sec);
+        }
+
+        if (h.canReport !== false) helpScroll.append(reportBlock(h));
+
+        renderNav(helpNav, "help");
+      }
+
+      Open77.on("panel:report.result", (d) => {
+        d = d || {};
+        reportBusy = false;
+        const box = helpReportBox; if (!box) return;
+        box._submit.disabled = false;
+        if (d.ok) {
+          // Only now is it true.
+          box._state.className = "help-state ok";
+          box._state.textContent = "Report received" + (d.reportId ? " · " + String(d.reportId).slice(0, 8) : "") + ". Thank you.";
+          // Clear the box WITHOUT dispatching `input`: that handler wipes the state line whenever the text
+          // changes, so dispatching here erased the acknowledgement the player needed to see. Caught by the
+          // render harness, which is exactly the class of bug that is invisible until someone reports twice.
+          box._ta.value = "";
+          if (box._updateCount) box._updateCount();
+          reportId = null;   // the next report is a new one
+        } else {
+          box._state.className = "help-state bad";
+          box._state.textContent = REPORT_FAIL[d.state] || REPORT_FAIL.invalid;
+        }
+      });
+
+      Open77.on("panel:help", (d) => { if (mode === "help") guard("help", () => renderHelp(d)); else helpData = d; });
+
+      // ---- questionnaire
+      function renderQuestion() {
+        const q = questions[index];
+        if (!q) return;
+        text(qText, q.text);
+        qOpts.innerHTML = "";
+        for (const o of q.options) {
+          const b = document.createElement("button");
+          b.className = "key"; b.dataset.key = o.key; b.textContent = o.text;
+          b.addEventListener("click", () => answer(o.key));
+          qOpts.append(b);
+        }
+        text(qProgress, "QUESTION " + (index + 1) + " OF " + questions.length);
+        qBar.style.width = Math.round(100 * index / questions.length) + "%";
+      }
+      function answer(key) {
+        answers[index] = key;
+        index += 1;
+        if (index >= questions.length) {
+          Open77.emit("panel:answer", { version, answers });
+          show(null);
+          Open77.emit("panel:closed", { panel: "questionnaire" });
+        } else {
+          renderQuestion();
+        }
+      }
+
+      // ---- inbox
+      function renderInbox(data) {
+        const items = (data && data.items) || [];
+        text(inboxSub, items.length ? ((data.unread || 0) + " unread · " + items.length + " total") : "No messages yet.");
+        inboxList.innerHTML = "";
+        if (!items.length) { const e = document.createElement("div"); e.className = "empty"; e.textContent = "Nothing in your file yet."; inboxList.append(e); return; }
+        for (const m of items) {
+          const el = document.createElement("div");
+          el.className = "msg " + (m.state || "");
+          const from = document.createElement("div"); from.className = "from"; from.textContent = (m.fromKind === "team" ? "TEAM · " : "") + (m.fromId || m.fromKind || "NCM"); el.append(from);
+          const subject = document.createElement("div"); subject.className = "subject"; subject.textContent = m.subject || ""; el.append(subject);
+          const body = document.createElement("div"); body.className = "body"; body.textContent = m.body || ""; el.append(body);
+          const state = document.createElement("div"); state.className = "state"; state.textContent = m.state || ""; el.append(state);
+          if ((m.state === "unread" || m.state === "read") && Array.isArray(m.actions) && m.actions.length) {
+            const actions = document.createElement("div"); actions.className = "actions";
+            for (const a of m.actions) {
+              const b = document.createElement("button"); b.className = a; b.textContent = a.toUpperCase();
+              b.addEventListener("click", () => {
+                for (const other of actions.querySelectorAll("button")) other.disabled = true;   // one shot: a double click reached the server twice
+                Open77.emit("panel:act", { id: m.id, action: a });
+              });
+              actions.append(b);
+            }
+            el.append(actions);
+          }
+          el.addEventListener("click", () => { if (m.state === "unread") Open77.emit("panel:read", { id: m.id }); });
+          inboxList.append(el);
+        }
+      }
+
+      // ---- bridge
+      // KB-61 / KB-59. Two jobs.
+      //
+      // 1. The Lua side does not take mouse and keyboard focus until `panel:drawn` says a panel actually drew.
+      //    Taking focus on the REQUEST is what soft-locked a player out of their own game: the panel held the
+      //    cursor, the page had failed, and both ways out (F6, and ESC handled in here) ran through the page.
+      // 2. A render fault is reported rather than thrown away. An exception in here used to vanish into the CEF
+      //    surface, leaving a blank panel and no way to learn why.
+      // KB-65 instrumentation. Only FAILURES were ever reported, so nobody could say whether a panel that
+      // did not draw was one open in five or one in fifty -- there was no successful baseline to compare
+      // against. The page is the only party that knows what it actually received, so it says so on EVERY
+      // draw, and the numbers are deliberately counts rather than anything requiring serialisation.
+      let shownAt = 0, partsSeen = 0, headSeen = 0, partsExpected = 0;
+      function heldCount(what) {
+        try {
+          if (what === "guide") return (guideData.rows || []).length;
+          if (what === "collection") return (collectionData.slots || []).length;
+          if (what === "market") return (marketData.items || []).length;
+          if (what === "inbox") return ((lastInboxData || {}).items || []).length;
+        } catch (_) {}
+        return -1;
+      }
+      // Never let instrumentation be the thing that breaks the render: a throw in here would skip
+      // `panel:drawn` and cause the very fault it exists to measure.
+      function drawnReport(what) {
+        try {
+          return { panel: what, ms: shownAt ? (Date.now() - shownAt) : -1,
+                   held: heldCount(what), parts: partsSeen, want: partsExpected, head: headSeen };
+        } catch (_) { return { panel: what }; }
+      }
+
+      function guard(what, fn) {
+        try {
+          fn();
+          Open77.emit("panel:drawn", drawnReport(what));
+        } catch (e) {
+          try { show(null); } catch (_) {}
+          Open77.emit("panel:error", {
+            panel: what,
+            message: String((e && e.message) || e),
+            where: String((e && e.stack ? e.stack.split("\n")[1] : "") || "").trim()
+          });
+        }
+      }
+
+      Open77.on("panel:show", (d) => {
+        d = d || {};
+        shownAt = Date.now(); partsSeen = 0; headSeen = 0; partsExpected = 0;
+        if (d.panel === "questionnaire") {
+          questions = d.questions || []; version = d.version || 1; index = 0; answers = [];
+          show("questionnaire"); renderQuestion();
+        } else if (d.panel === "inbox") {
+          guard("inbox", () => { show("inbox"); renderInbox(d.inbox || lastInboxData || { items: [], unread: 0 }); });
+        } else if (d.panel === "guide") {
+          guard("guide", () => {
+            // the data arrives separately now (KB-63), so draw from whatever we already hold
+            show("guide"); renderGuide(null);
+            // the tick must not be able to throw once a second forever, so it guards too
+            if (!guideTick) guideTick = setInterval(() => { try { renderGuide(null); } catch (e) {
+              clearInterval(guideTick); guideTick = null;
+              Open77.emit("panel:error", { panel: "guide", message: "tick: " + String((e && e.message) || e), where: "guideTick" });
+            } }, 1000);
+          });
+        } else if (d.panel === "collection") {
+          guard("collection", () => { show("collection"); renderCollection(d.collection || collectionData || {}); });
+        } else if (d.panel === "help") {
+          guard("help", () => { show("help"); renderHelp(null); });
+        } else if (d.panel === "market") {
+          guard("market", () => { show("market"); renderMarket(d.market || marketData || {}); });
+        } else {
+          show(null);
+        }
+      });
+      Open77.on("panel:inbox", (d) => { lastInboxData = d; if (mode === "inbox") guard("inbox", () => renderInbox(d)); });
+      Open77.on("panel:hide", () => { show(null); });
+
+      // KB-63: the Lua side sends a long list in small batches, because `page:send` drops big messages
+      // without a word and encoding them in Lua first blows the client script budget. Reassemble here, where
+      // the work is free, then dispatch as if the payload had arrived whole.
+      const pending = {};
+      Open77.on("panel:list.begin", (d) => {
+        if (!d || !d.id) return;
+        pending[d.id] = { name: d.name, listKey: d.listKey, n: d.n, head: d.head || {}, items: [], got: 0 };
+        headSeen = 1; partsExpected = Number(d.n) || 0;   // KB-65: what we were promised
+      });
+      Open77.on("panel:list.part", (d) => {
+        if (!d || !d.id) return;
+        const p = pending[d.id];
+        if (!p) return;
+        for (const it of (d.items || [])) p.items.push(it);
+        p.got++; partsSeen++;   // KB-65: what actually arrived
+
+        if (p.got !== p.n) return;
+        delete pending[d.id];
+        const value = Object.assign({}, p.head);
+        value[p.listKey] = p.items;
+        if (p.name === "panel:guide") { if (mode === "guide") guard("guide", () => renderGuide(value)); }
+        else if (p.name === "panel:collection") { if (mode === "collection") guard("collection", () => renderCollection(value)); }
+        else if (p.name === "panel:market") { if (mode === "market") guard("market", () => renderMarket(value)); }
+        else if (p.name === "panel:inbox") { lastInboxData = value; if (mode === "inbox") guard("inbox", () => renderInbox(value)); }
+      });
+
+      document.addEventListener("keydown", (e) => {
+        if (!mode) return;
+        const k = e.key.toLowerCase();
+        if (k === "escape") { show(null); Open77.emit("panel:closed", { panel: mode }); return; }
+        if (mode === "questionnaire" && ["a", "b", "c", "d"].includes(k)) answer(k);
+      });
+      document.addEventListener("pointermove", () => { if (!pointerSeen) { pointerSeen = true; Open77.emit("panel:pointer", {}); } }, { once: false });
+
+      Open77.ready();
+      Open77.emit("panel:ready", {});
+    })();
+  </script>
+</body>
+</html>

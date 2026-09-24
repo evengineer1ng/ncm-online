@@ -1,0 +1,25 @@
+﻿# server Open77.vehicles.ai.followRoute(vehicleId: integer, options: table)
+
+Drives an ordered route of world points.
+
+Requires world.vehicles and controller ownership. options.points is an array of 1..64 {x,y,z} positions. Supports loop, speed, behavior, arrivalRadius and timeoutMilliseconds. Emits waypointReached at each point and arrived once at a non-looping route's end. This is a destination sequence, not an exact authored racing spline.
+
+- runtime: server (network)
+- permissions: world.vehicles
+- since: 2.31.13+op77.57
+- reasons it can return: none found in the handler; a refusal it forwards from a callee may still reach you as a second return value
+- returns: state, or nil, reason
+
+```lua
+-- A bus loops its three stops forever
+Open77.vehicles.ai.followRoute(busId, {
+    points = {
+        { x = -1442.2, y = 127.4, z = 18.0 },
+        { x = -1448.2, y = 96.1, z = 17.5 },
+        { x = -1460.2, y = 99.9, z = 14.8 },
+    },
+    loop = true, speed = 10,
+})
+```
+
+_answering for build 2.31.13+op77.78_

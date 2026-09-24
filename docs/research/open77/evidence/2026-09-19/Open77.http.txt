@@ -1,0 +1,5 @@
+4 natives in Open77.http — answering for build 2.31.13+op77.78
+- server Open77.http.listen(prefix: string (path under the resource's own segment; `/` for everything), handler: function(req, res)) — Serves inbound HTTP under `/<resource>/<prefix>` on the server's opt-in listener. (since 2.31.13+op77.73)
+- server Open77.http.request(url: string (absolute http/https, host on the allow-list), callback?: function(status, body, headers, err), method?: string (GET default, POST, PUT, PATCH, DELETE, HEAD), body?: string|table (JSON-encoded for you; 256 KiB maximum), headers?: table (at most 32, no CR/LF)) — Makes an outbound HTTP request; the same function as `PerformHttpRequest`. [http.request] (since 2.31.13+op77.45)
+- server Open77.http.routes() — Lists the public routes this resource is serving. (since 2.31.13+op77.73)
+- server Open77.http.unlisten(prefix: string) — Removes one of this resource's inbound HTTP routes. (since 2.31.13+op77.73)

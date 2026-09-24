@@ -1,0 +1,1355 @@
+﻿{
+    "$type":  "localizationPersistenceOnScreenEntries",
+    "entries":  [
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_gonk_072_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Scar Zane"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_gonk_060_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Grim Grant"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_gonk_035_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Jax Cruz"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_fixe_007_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Rache Carr"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_gonk_051_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Slate Doyle"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_gonk_073_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Piper Huxley"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_gonk_102_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Akira Hawke"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_stre_018_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Dusk Maddox"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_edge_015_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Cipher Beck"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_solo_006_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Vector Brooks"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_gonk_005_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Pixel Corvin"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_stre_021_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Volt Muller"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_gonk_086_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Relic Al-Rashid"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_gonk_050_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Vanta Cole"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_edge_014_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Dante Sloan"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_gonk_038_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Cairo Shaw"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_gonk_076_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Jax Vireo"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_stre_001_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Vector Kincaid"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_solo_024_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Nyx Zorin"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_edge_018_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Dex Byrne"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_gonk_054_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Lazar Rex"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_edge_019_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Zephyr Wolfe"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_fixe_018_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Aero Rowan"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_gonk_109_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Ghost Darrow"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_fixe_013_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Koda Morrow"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_stre_004_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Nyra Hamilton"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_gonk_080_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Jade Dax"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_gonk_014_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Kael Beck"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_stre_026_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Kestrel Al-Rashid"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_gonk_092_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Slate Cassidy"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_fixe_001_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Nova Quill"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_stre_005_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Lex Ward"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_edge_013_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Knox Diaz"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_fixe_000_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Thorn Vale"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_fixe_002_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Havoc Wade"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_edge_008_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Cass Lord"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_edge_010_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Edge Todd"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_gonk_069_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Ziv Volkov"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_gonk_025_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Arc Riven"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_gonk_011_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Rook Nakamura"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_stre_035_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Jin North"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_edge_009_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Aero Pryce"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_edge_005_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Jet Stone"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_gonk_010_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Slate Fenn"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_gonk_024_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Storm Frost"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_fixe_029_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Vector Lord"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_stre_039_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Brix Mori"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_gonk_018_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Basil Wolfe"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_stre_020_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Rache Darrow"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_gonk_009_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Vanta Todd"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_solo_021_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Ash Kincaid"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_edge_001_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Shade Blythe"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_stre_038_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Pixel Okonkwo"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_stre_014_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Nova Delgado"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_stre_008_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Delta Farrow"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_gonk_049_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Yara Marlowe"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_gonk_095_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Lazar Novak"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_solo_017_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Akira Al-Rashid"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_edge_006_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Falcon Corvin"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_solo_014_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Clove Rex"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_gonk_030_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Styx Vega"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_gonk_062_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Sera Webb"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_stre_013_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Thorn Hawke"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_gonk_099_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Cinder Mori"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_gonk_061_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Akira Knoll"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_fixe_017_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Camber Ace"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_stre_015_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Glitch Brooks"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_stre_009_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Cinder Volkov"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_fixe_019_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Edge Ray"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_gonk_066_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Arc Novak"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_solo_008_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Rune Moore"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_gonk_003_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Cruz Kross"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_stre_031_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Aero Andersen"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_stre_011_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Hex Salazar"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_gonk_065_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Storm Ward"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_gonk_047_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Kira Warden"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_solo_010_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Lex Fox"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_gonk_052_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Rook Reyes"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_gonk_110_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Ziv Tanaka"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_fixe_014_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Jax Lane"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_gonk_041_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Vale Diaz"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_gonk_008_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Yara Pryce"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_gonk_081_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Daze Muller"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_edge_017_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Brix Patel"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_gonk_082_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Wick Steele"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_stre_028_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Falcon Thorne"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_gonk_107_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Arc Maddox"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_gonk_028_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Ziv KovaÄ"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_solo_020_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Glitch Grant"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_solo_001_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Cipher Park"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_gonk_113_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Scar Holt"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_gonk_022_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Mace Doyle"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_stre_000_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Yara Grant"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_solo_002_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Wire Salazar"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_gonk_021_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Sera Cole"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_gonk_039_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Jade Fenn"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_fixe_004_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Kai Chen"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_gonk_056_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Gage Glass"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_gonk_090_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Yara Kincaid"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_gonk_103_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Sera Delgado"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_gonk_046_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Pixel Byrne"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_solo_000_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Dante Volkov"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_gonk_079_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Camber Fox"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_solo_018_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Thorn Black"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_gonk_098_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Daxton Okonkwo"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_gonk_104_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Mace Briar"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_gonk_016_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Daxton Patel"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_stre_022_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Talon Steele"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_gonk_006_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Kira Kasinski"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_fixe_008_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Wren Kaine"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_gonk_015_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Gage Ives"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_fixe_006_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Nyx Stroud"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_gonk_037_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Corin Ortega"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_gonk_034_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Kestrel Corvin"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_stre_030_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Camber Keegan"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_gonk_058_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Cinder Blake"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_gonk_078_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Corin Marlowe"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_stre_006_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Kael Novak"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_solo_013_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Delta Steele"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_gonk_053_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Nika Graves"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_fixe_021_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Quinn Nkosi"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_gonk_084_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Jin Kerr"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_solo_007_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Sol Vireo"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_gonk_059_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Basil Valez"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_solo_004_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Dex Huxley"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_gonk_007_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Mox Lord"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_gonk_087_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Pixel Black"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_stre_003_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Rook Cassidy"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_gonk_033_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Lux Webb"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_edge_016_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Wire Ives"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_gonk_094_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Nika Voss"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_stre_029_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Corin Flint"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_gonk_074_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Lux Svensson"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_gonk_040_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Daze Nakamura"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_gonk_012_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Nika Finn"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_fixe_011_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Piper Wren"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_stre_024_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Piper Holt"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_gonk_017_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Cinder Calder"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_fixe_005_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Kaze Archer"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_stre_007_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Halo Reid"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_edge_011_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Wick Fenn"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_stre_027_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Jax Black"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_fixe_012_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Mira Rook"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_fixe_016_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Crow Kim"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_fixe_028_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Zephyr Kasinski"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_edge_012_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Quinn Nakamura"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_fixe_003_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Ash Gallow"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_solo_022_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Kai Kowalski"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_gonk_068_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Ghost Fenix"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_edge_002_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Quade Vesper"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_edge_000_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Talon KovaÄ"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_stre_012_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Akira Wolf"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_gonk_013_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Lazar Sloan"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_gonk_108_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Dusk Sharp"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_gonk_029_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Volt Blythe"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_edge_007_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Crow Cruz"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_gonk_026_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Dusk Moss"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_fixe_010_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Shade Callow"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_fixe_047_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Nyx Rowan"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_gonk_027_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Ghost Glass"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_gonk_085_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Dante Gideon"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_stre_034_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Quinn Voss"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_stre_016_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Ash Vireo"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_stre_002_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Sol Kowalski"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_solo_023_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Dusk Cassidy"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_gonk_048_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Mox Night"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_edge_003_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Mira Irons"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_gonk_088_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Kira Thorne"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_solo_016_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Hex Gideon"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_gonk_055_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Kael Kerr"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_gonk_070_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Volt Park"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_solo_015_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Bishop Kerr"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_gonk_042_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Pyre Scorn"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_stre_032_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Daze Cassidy"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_stre_025_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Mira Gant"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_gonk_023_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Glitch Petrov"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_gonk_063_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Mace Cline"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_gonk_019_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Grim Pierce"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_gonk_093_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Rook Zorin"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_fixe_015_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Falcon Emberlane"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_gonk_000_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Vale Blythe"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_stre_036_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Dante Nash"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_gonk_077_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Ember Moore"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_gonk_100_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Basil Salazar"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_solo_012_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Halo Muller"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_stre_017_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Kai Moore"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_solo_011_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Kato Dax"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_stre_010_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Bishop Park"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_gonk_097_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Gage Farrow"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_gonk_001_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Pyre Vesper"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_gonk_067_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Dusk Shaw"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_solo_009_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Nyra Marlowe"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_gonk_002_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Jin Irons"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_gonk_064_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Glitch Hamilton"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_gonk_057_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Daxton Larson"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_gonk_036_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Ember Wyatt"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_stre_033_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Wick Zorin"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_edge_004_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Koda Kross"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_gonk_075_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Kestrel Brooks"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_gonk_105_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Glitch Vigil"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_gonk_043_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Jin Zane"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_gonk_032_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Piper Knoll"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_gonk_083_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Pyre Raine"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_solo_005_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Zephyr Svensson"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_gonk_111_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Volt Steele"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_gonk_031_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Scar Hayes"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_solo_003_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Brix Zane"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_gonk_089_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Mox Grant"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_gonk_112_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Styx Raine"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_stre_037_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Cipher Farrow"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_gonk_071_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Styx Salazar"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_gonk_101_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Grim Wolf"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_gonk_044_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Cruz Huxley"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_gonk_091_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Vanta Kowalski"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_stre_019_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Nyx Sharp"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_gonk_004_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Relic Stone"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_gonk_045_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Relic Patel"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_stre_023_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Scar Raine"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_solo_019_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Nova Thorne"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_gonk_020_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Akira Mercer"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_gonk_096_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Kael Reid"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_fixe_009_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Talon Fischer"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_gonk_106_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Storm Moore"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_gonk_114_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Piper Gant"
+                    },
+                    {
+                        "maleVariant":  "",
+                        "secondaryKey":  "mt_ecosystem_rival_1776881178_fixe_042_name",
+                        "primaryKey":  0,
+                        "femaleVariant":  "Nova Morrow"
+                    }
+                ]
+}

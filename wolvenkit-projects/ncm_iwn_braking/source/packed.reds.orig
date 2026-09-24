@@ -1,0 +1,729 @@
+// In-World Navigation 0.1.20
+// Copyright (c) 2023 Jack Humbert. All rights reserved.
+// Licensed under the MIT license. See the license.md in the root project for details.
+// https://github.com/jackhumbert/in_world_navigation
+
+// This file was automatically generated on 2025-07-18 02:44:10 UTC
+
+// in_world_navigation/Extensions.reds
+
+
+// BaseMappinBaseController: Default
+
+// @wrapMethod(BaseWorldMapMappinController)
+// protected func ComputeRootState() -> CName {
+//   let state = wrappedMethod();
+//   LogChannel(n"DEBUG", "BaseWorldMapMappinController " + NameToString(state));
+//   return state;
+// }
+//   let mappinsGroup: wref<MappinsGroup_Record>;
+//   let stateName: CName;
+//   let variant: gamedataMappinVariant;
+//   if this.m_isCompletedPhase {
+//     stateName = n"QuestComplete";
+//   };
+//   if Equals(this.m_mappin.GetVariant(), gamedataMappinVariant.Zzz17_NCARTVariant) {
+//     stateName = n"FastTravelMetro";
+//   } else {
+//     if this.m_mappin != null {
+//       mappinsGroup = MappinUtils.GetMappinsGroup(this.m_mappin.GetVariant());
+//       variant = this.m_mappin.GetVariant();
+//       if Equals(variant, gamedataMappinVariant.Zzz16_RelicDeviceBasicVariant) {
+//         stateName = n"Relic";
+//       } else {
+//         if IsDefined(mappinsGroup) {
+//           stateName = mappinsGroup.WidgetState();
+//         };
+//       };
+//     };
+//   };
+//   if Equals(stateName, n"None") {
+//     stateName = n"Quest";
+//   };
+//   return stateName;
+// }
+
+// WorldMapPlayerMappinController : Player
+
+// WATCH for QUEST
+
+@wrapMethod(QuestMappinController)
+protected func ComputeRootState() -> CName {
+  let state = wrappedMethod();
+  if IsDefined(InWorldNavigation.GetInstance().questMappin) && this.m_mappin == InWorldNavigation.GetInstance().questMappin {
+    // LogChannel(n"DEBUG", "Quest: " + NameToString(state));
+    InWorldNavigation.GetInstance().questState = state;
+  }
+  if IsDefined(InWorldNavigation.GetInstance().poiMappin) && this.m_mappin == InWorldNavigation.GetInstance().poiMappin {
+    // LogChannel(n"DEBUG", "POI: " + NameToString(state));
+    InWorldNavigation.GetInstance().poiState = state;
+  }
+  return state;
+}
+
+// private func ComputeRootState() -> CName {
+//   let grenadeData: ref<GrenadeMappinData>;
+//   let grenadeType: EGrenadeType;
+//   let mappinsGroup: wref<MappinsGroup_Record>;
+//   let stateName: CName;
+//   let variant: gamedataMappinVariant;
+//   if this.m_isCompletedPhase {
+//     stateName = n"QuestComplete";
+//   } else {
+//     if this.m_mappin != null {
+//       variant = this.m_mappin.GetVariant();
+//       if this.m_mappin.IsExactlyA(n"gamemappinsGrenadeMappin") {
+//         grenadeData = this.m_mappin.GetScriptData() as GrenadeMappinData;
+//         grenadeType = grenadeData.m_grenadeType;
+//         switch grenadeType {
+//           case EGrenadeType.Frag:
+//             stateName = n"FragGrenade";
+//             break;
+//           case EGrenadeType.Flash:
+//             stateName = n"FlashGrenade";
+//             break;
+//           case EGrenadeType.Piercing:
+//             stateName = n"PiercingGrenade";
+//             break;
+//           case EGrenadeType.EMP:
+//             stateName = n"EMPGrenade";
+//             break;
+//           case EGrenadeType.Biohazard:
+//             stateName = n"BiohazardGrenade";
+//             break;
+//           case EGrenadeType.Incendiary:
+//             stateName = n"IncendiaryGrenade";
+//             break;
+//           case EGrenadeType.Recon:
+//             stateName = n"ReconGrenade";
+//             break;
+//           case EGrenadeType.Cutting:
+//             stateName = n"CuttingGrenade";
+//             break;
+//           case EGrenadeType.Sonic:
+//             stateName = n"SonicGrenade";
+//             break;
+//           default:
+//             stateName = n"FragGrenade";
+//         };
+//       } else {
+//         if this.m_mappin.IsExactlyA(n"gamemappinsInteractionMappin") {
+//           stateName = this.m_mappin.IsQuestImportant() ? n"Quest" : n"InteractionDefault";
+//         } else {
+//           if Equals(variant, gamedataMappinVariant.Zzz10_RemoteControlDrivingVariant) {
+//             stateName = n"RemoteControlDriving";
+//           } else {
+//             if Equals(variant, gamedataMappinVariant.Zzz17_NCARTVariant) {
+//               stateName = n"FastTravelMetro";
+//             } else {
+//               if Equals(variant, gamedataMappinVariant.Zzz16_RelicDeviceBasicVariant) {
+//                 stateName = n"Relic";
+//               } else {
+//                 mappinsGroup = MappinUtils.GetMappinsGroup(this.m_mappin.GetVariant());
+//                 if IsDefined(mappinsGroup) {
+//                   stateName = mappinsGroup.WidgetState();
+//                 };
+//               };
+//             };
+//           };
+//         };
+//       };
+//     };
+//   };
+//   if Equals(stateName, n"None") {
+//     stateName = n"Quest";
+//   };
+//   return stateName;
+// }
+
+// @wrapMethod(GameplayMappinController)
+// protected func ComputeRootState() -> CName {
+//   let state = wrappedMethod();
+//   LogChannel(n"DEBUG", "GameplayMappinController " + NameToString(state));
+//   return state;
+// }
+// private func ComputeRootState() -> CName {
+//   let returnValue: CName;
+//   let visualState: EMappinVisualState = this.GetMappinVisualState();
+//   let quality: gamedataQuality = this.GetQuality();
+//   if this.IsShardRead() {
+//     returnValue = n"ShardRead";
+//   } else {
+//     if this.IsQuest() {
+//       returnValue = n"Quest";
+//     } else {
+//       if NotEquals(quality, gamedataQuality.Invalid) && NotEquals(quality, gamedataQuality.Random) {
+//         if this.IsIconic() {
+//           returnValue = n"Iconic";
+//         } else {
+//           switch quality {
+//             case gamedataQuality.Common:
+//               returnValue = n"Common";
+//               break;
+//             case gamedataQuality.Epic:
+//               returnValue = n"Epic";
+//               break;
+//             case gamedataQuality.Legendary:
+//               returnValue = n"Legendary";
+//               break;
+//             case gamedataQuality.Rare:
+//               returnValue = n"Rare";
+//               break;
+//             case gamedataQuality.Uncommon:
+//               returnValue = n"Uncommon";
+//               break;
+//             case gamedataQuality.Iconic:
+//               returnValue = n"Iconic";
+//               break;
+//             default:
+//               returnValue = n"Default";
+//           };
+//         };
+//       } else {
+//         switch visualState {
+//           case EMappinVisualState.Inactive:
+//             returnValue = n"Inactive";
+//             break;
+//           case EMappinVisualState.Available:
+//             returnValue = n"Available";
+//             break;
+//           case EMappinVisualState.Unavailable:
+//             returnValue = n"Unavailable";
+//             break;
+//           case EMappinVisualState.Default:
+//             returnValue = n"Default";
+//         };
+//       };
+//     };
+//   };
+//   if this.ShouldBeClamped() {
+//     returnValue = n"Distraction";
+//   };
+//   this.UpdateVisibilityThroughWalls();
+//   return returnValue;
+// }
+
+// @wrapMethod(MinimapStealthMappinController)
+// protected func ComputeRootState() -> CName {
+//   let state = wrappedMethod();
+//   LogChannel(n"DEBUG", "MinimapStealthMappinController " + NameToString(state));
+//   return state;
+// }
+// protected func ComputeRootState() -> CName {
+//   return this.m_mappinState;
+// }
+
+  // protected final func GetPreventionMapinState() -> CName {
+  //   let puppet: ref<ScriptedPuppet> = this.m_stealthMappin.GetGameObject() as ScriptedPuppet;
+  //   let isInCombatWithPlayer: Bool = IsDefined(puppet) ? NPCPuppet.IsInCombatWithTarget(puppet, GetPlayerObject(puppet.GetGame())) : this.m_stealthMappin.IsInCombat();
+  //   if this.m_isAlive && IsDefined(this.m_stealthMappin) {
+  //     if isInCombatWithPlayer {
+  //       return n"Prevention_Red";
+  //     };
+  //     return n"Prevention_LightBlue";
+  //   };
+  //   return n"Prevention_Blue";
+  // }
+
+// MinimapQuestMappinController: Quest
+// MinimapQuestAreaMappinController: Quest
+
+// @wrapMethod(MinimapDeviceMappinController)
+// protected func ComputeRootState() -> CName {
+//   let state = wrappedMethod();
+//   LogChannel(n"DEBUG", "MinimapDeviceMappinController " + NameToString(state));
+//   return state;
+// }
+// private func ComputeRootState() -> CName {
+//   let quality: gamedataQuality;
+//   let returnValue: CName;
+//   let visualState: EMappinVisualState;
+//   let gameplayRoleData: ref<GameplayRoleMappinData> = this.GetVisualData();
+//   if IsDefined(gameplayRoleData) {
+//     visualState = gameplayRoleData.m_mappinVisualState;
+//     quality = gameplayRoleData.m_quality;
+//     if gameplayRoleData.m_isQuest {
+//       returnValue = n"Quest";
+//     } else {
+//       if Equals(gameplayRoleData.m_gameplayRole, EGameplayRole.ExplodeLethal) {
+//         returnValue = n"Explosion";
+//       } else {
+//         if NotEquals(quality, gamedataQuality.Invalid) && NotEquals(quality, gamedataQuality.Random) {
+//           switch quality {
+//             case gamedataQuality.Common:
+//               returnValue = n"Common";
+//               break;
+//             case gamedataQuality.Epic:
+//               returnValue = n"Epic";
+//               break;
+//             case gamedataQuality.Legendary:
+//               returnValue = n"Legendary";
+//               break;
+//             case gamedataQuality.Rare:
+//               returnValue = n"Rare";
+//               break;
+//             case gamedataQuality.Uncommon:
+//               returnValue = n"Uncommon";
+//               break;
+//             default:
+//               returnValue = n"Default";
+//           };
+//         } else {
+//           switch visualState {
+//             case EMappinVisualState.Inactive:
+//               returnValue = n"Inactive";
+//               break;
+//             case EMappinVisualState.Available:
+//               returnValue = n"Available";
+//               break;
+//             case EMappinVisualState.Unavailable:
+//               returnValue = n"Unavailable";
+//               break;
+//             case EMappinVisualState.Default:
+//               returnValue = n"Default";
+//           };
+//         };
+//       };
+//     };
+//   };
+//   return returnValue;
+// }
+
+// WATCH for POI
+
+// @wrapMethod(MinimapPOIMappinController)
+// protected func ComputeRootState() -> CName {
+//   let state = wrappedMethod();
+//   LogChannel(n"DEBUG", "MinimapPOIMappinController " + NameToString(state));
+//   return state;
+// }
+// protected func ComputeRootState() -> CName {
+//   let mappinsGroup: wref<MappinsGroup_Record>;
+//   let stateName: CName;
+//   let variant: gamedataMappinVariant;
+//   if this.m_isCompletedPhase {
+//     stateName = n"QuestComplete";
+//   } else {
+//     if this.m_mappin != null {
+//       variant = this.m_mappin.GetVariant();
+//       if Equals(variant, gamedataMappinVariant.Zzz17_NCARTVariant) {
+//         stateName = n"FastTravelMetro";
+//       } else {
+//         if Equals(variant, gamedataMappinVariant.Zzz16_RelicDeviceBasicVariant) {
+//           stateName = n"Relic";
+//         } else {
+//           mappinsGroup = MappinUtils.GetMappinsGroup(this.m_mappin.GetVariant());
+//           if IsDefined(mappinsGroup) {
+//             stateName = mappinsGroup.WidgetState();
+//           };
+//         };
+//       };
+//     };
+//   };
+//   if Equals(stateName, n"None") {
+//     stateName = n"Quest";
+//   };
+//   return stateName;
+// }
+
+
+// @wrapMethod(MinimapPreventionVehicleMappinController)
+// protected func ComputeRootState() -> CName {
+//   let state = wrappedMethod();
+//   LogChannel(n"DEBUG", "MinimapPreventionVehicleMappinController " + NameToString(state));
+//   return state;
+// }
+// protected func ComputeRootState() -> CName {
+//   return this.m_mappinState;
+// }
+
+    // if this.m_isMaxTacAV || this.m_playerWanted && VehicleComponent.HasPassengersWithThreatOnPlayer(this.m_vehicle.GetGame(), this.m_vehicle.GetEntityID()) {
+    //   this.m_mappinState = n"Prevention_Red";
+    // } else {
+    //   this.m_mappinState = n"Prevention_LightBlue";
+    // };
+
+// @wrapMethod(MinimapDynamicEventMappinController)
+// protected func ComputeRootState() -> CName {
+//   let state = wrappedMethod();
+//   LogChannel(n"DEBUG", "MinimapDynamicEventMappinController " + NameToString(state));
+//   return state;
+// }
+// protected func ComputeRootState() -> CName {
+//   return Equals(this.m_mappin.GetVariant(), gamedataMappinVariant.Zzz09_CourierSandboxActivityVariant) ? n"Gigs" : n"Default";
+// }
+
+// @wrapMethod(MinimapStubMappinController)
+// protected func ComputeRootState() -> CName {
+//   let state = wrappedMethod();
+//   LogChannel(n"DEBUG", "MinimapStubMappinController " + NameToString(state));
+//   return state;
+// }
+// protected func ComputeRootState() -> CName {
+//   return this.m_state;
+// }
+
+  // private final func SetupStubWidget() -> Void {
+  //   let type: gameStubMappinType = this.m_stubMappin.GetStubMappinType();
+  //   if Equals(type, gameStubMappinType.Police) {
+  //     this.m_state = n"Prevention_LightBlue";
+  //     inkImageRef.SetTexturePart(this.iconWidget, n"enemyMappin-1");
+  //     this.PlayLibraryAnimation(n"Show");
+  //   } else {
+  //     if Equals(type, gameStubMappinType.PoliceVehicle) {
+  //       this.m_state = n"Prevention_LightBlue";
+  //       inkWidgetRef.SetVisible(this.m_regularIconContainer, false);
+  //       inkWidgetRef.SetVisible(this.m_preventionVehicleIconContainer, true);
+  //       this.m_aboveWidget.SetMargin(0.00, 0.00, 0.00, 48.00);
+  //       this.m_belowWidget.SetMargin(0.00, 48.00, 0.00, 0.00);
+  //       this.PlayLibraryAnimation(n"Show");
+  //     } else {
+  //       if Equals(type, gameStubMappinType.Vehicle) {
+  //         this.m_state = n"Neutral_Aggressive";
+  //         inkImageRef.SetTexturePart(this.iconWidget, n"enemyMappin-1");
+  //         this.PlayLibraryAnimation(n"Show");
+  //       } else {
+  //         this.m_state = n"Neutral_Aggressive";
+  //         inkImageRef.SetTexturePart(this.iconWidget, n"enemyMappin");
+  //       };
+  //     };
+  //   };
+  // }
+
+// in_world_navigation/InWorldNavigation.reds
+
+enum InWorldNavigationMode {
+  Always = 0,
+  Driving = 1,
+  Walking = 2
+}
+
+public native class InWorldNavigation extends IScriptable {
+  public static native func GetInstance() -> ref<InWorldNavigation>;
+
+  public let mmcc: ref<MinimapContainerController>;
+  public let player: ref<GameObject>;
+  
+  @runtimeProperty("ModSettings.mod", "In-World Navigation")
+  @runtimeProperty("ModSettings.displayName", "Enabled")
+  let enabled: Bool = true;
+
+  @runtimeProperty("ModSettings.mod", "In-World Navigation")
+  @runtimeProperty("ModSettings.displayName", "Display mode")
+  @runtimeProperty("ModSettings.displayValues", "\"Always\", \"When Driving\", \"When Walking\"")
+  @runtimeProperty("ModSettings.dependency", "enabled")
+  let mode: InWorldNavigationMode = InWorldNavigationMode.Driving;
+
+  @runtimeProperty("ModSettings.mod", "In-World Navigation")
+  @runtimeProperty("ModSettings.displayName", "Arrow spacing")
+  @runtimeProperty("ModSettings.description", "In-game units between arrows")
+  @runtimeProperty("ModSettings.step", "0.5")
+  @runtimeProperty("ModSettings.min", "0.5")
+  @runtimeProperty("ModSettings.max", "20.0")
+  @runtimeProperty("ModSettings.dependency", "enabled")
+  let spacing: Float = 5.0;
+
+  @runtimeProperty("ModSettings.mod", "In-World Navigation")
+  @runtimeProperty("ModSettings.displayName", "Max number of arrows")
+  @runtimeProperty("ModSettings.step", "5")
+  @runtimeProperty("ModSettings.min", "10")
+  @runtimeProperty("ModSettings.max", "2000")
+  @runtimeProperty("ModSettings.dependency", "enabled")
+  let maxPoints: Int32 = 200;
+
+  @runtimeProperty("ModSettings.mod", "In-World Navigation")
+  @runtimeProperty("ModSettings.displayName", "Distance within arrows will fade")
+  @runtimeProperty("ModSettings.description", "Measures from player")
+  @runtimeProperty("ModSettings.step", "1.0")
+  @runtimeProperty("ModSettings.min", "0.0")
+  @runtimeProperty("ModSettings.max", "100.0")
+  @runtimeProperty("ModSettings.dependency", "enabled")
+  let distanceToFade: Float = 25.0;
+
+  let navPathFXs: array<array<ref<FxInstance>>>;
+  let navPathTransforms: array<array<Transform>>;
+
+  let navPathYellowResource: FxResource;
+  let navPathBlueResource: FxResource;
+  let navPathWhiteResource: FxResource;
+  let navPathTealResource: FxResource;
+  let navPathCyanResource: FxResource;
+  let navPathFastTravelMetroResource: FxResource;
+
+  let distanceToAnimate: Float;
+
+  let questMappin: wref<IMappin>;
+  let poiMappin: wref<IMappin>;
+
+  let questState: CName;
+  let poiState: CName;
+
+  let currentQuestState: CName;
+  let currentPoiState: CName;
+
+  public func Setup(player: ref<GameObject>) -> Void {
+    this.player = player;
+    this.distanceToAnimate = 50.0;
+    
+    this.navPathYellowResource = Cast<FxResource>(r"user\\jackhumbert\\effects\\world_navigation_yellow.effect");
+    this.navPathBlueResource = Cast<FxResource>(r"user\\jackhumbert\\effects\\world_navigation_blue.effect");
+    this.navPathWhiteResource = Cast<FxResource>(r"user\\jackhumbert\\effects\\world_navigation_white.effect");
+    this.navPathTealResource = Cast<FxResource>(r"user\\jackhumbert\\effects\\world_navigation_teal.effect");
+    this.navPathCyanResource = Cast<FxResource>(r"user\\jackhumbert\\effects\\world_navigation_cyan.effect");
+    this.navPathFastTravelMetroResource = Cast<FxResource>(r"user\\jackhumbert\\effects\\fast_travel_metro.effect");
+
+    let questFx: array<ref<FxInstance>>;
+    let poiFx: array<ref<FxInstance>>;
+    ArrayPush(this.navPathFXs, questFx);
+    ArrayPush(this.navPathFXs, poiFx);
+
+    this.questState = n"Quest";
+    this.poiState = n"Gigs";
+
+    let questTransforms: array<Transform>;
+    let poisTransforms: array<Transform>;
+    ArrayPush(this.navPathTransforms, questTransforms);
+    ArrayPush(this.navPathTransforms, poisTransforms);
+    ModSettings.RegisterListenerToClass(this);
+  }
+
+  // use the state the game uses to determine the color
+  public func GetResourceForState(state: CName) -> FxResource {
+    switch (state) {
+      case n"Quest":
+      case n"IncendiaryGrenade":
+        // ActiveYellow
+        return this.navPathYellowResource; 
+      case n"QuestUntracked":
+        // DarkGold
+        return this.navPathYellowResource; 
+      case n"QuestComplete":
+        // QuestComplete
+        return this.navPathYellowResource; 
+      case n"Gigs":
+        // StreetCred
+        return this.navPathTealResource;
+      case n"FastTravel":
+        // StrongFastTravel
+        return this.navPathBlueResource;
+      case n"FastTravelMetro":
+        // FastTravelMetro
+        return this.navPathFastTravelMetroResource;
+      case n"InteractionDefault":
+      case n"EMPGrenade":
+      case n"RemoteControlDriving":
+        // ActiveBlue
+        return this.navPathCyanResource;
+      case n"Story":
+        // Blue
+        return this.navPathBlueResource;
+      case n"Default":
+      case n"Impossible":
+      case n"Available":
+      case n"FragGrenade":
+      case n"CuttingGrenade":
+        // ActiveRed
+        return this.navPathWhiteResource;
+      case n"Player":
+      case n"BiohazardGrenade":
+        // ActiveGreen
+        return this.navPathWhiteResource;
+      case n"Vehicle":
+      case n"VehicleForPurchase":
+      case n"ServicePoint":
+        // White
+        return this.navPathWhiteResource;
+      case n"Relic":
+        // Relic
+        return this.navPathTealResource;
+      case n"Shard":
+        // Shared
+        return this.navPathWhiteResource;
+      case n"ShardRead":
+        // DarkGrey
+        return this.navPathWhiteResource;
+      case n"PlayerTracked":
+        // DamageTypeChemical_Critical
+        return this.navPathWhiteResource;
+    }
+    return this.navPathWhiteResource;
+  }
+
+  public func Update(canUpdate: Int32) {
+    if IsDefined(this.mmcc) {
+      let isMounted = VehicleComponent.IsMountedToVehicle(this.player.GetGame(), this.player);
+      if this.enabled && 
+        ((isMounted && NotEquals(this.mode, InWorldNavigationMode.Walking)) ||
+         (!isMounted && NotEquals(this.mode, InWorldNavigationMode.Driving))
+        ) { 
+        this.questMappin = this.mmcc.GetQuestMappin();
+        if IsDefined(this.questMappin) {
+          if !Equals(this.currentQuestState, this.questState) {
+            this.currentQuestState = this.questState;
+            this.UpdateNavPath(0, this.mmcc.questPoints, this.GetResourceForState(this.currentQuestState), true);
+          } else {
+            this.UpdateNavPath(0, this.mmcc.questPoints, this.GetResourceForState(this.currentQuestState), false);
+          }
+        } else {     
+          for fx in this.navPathFXs[0] {
+            fx.BreakLoop();
+          }
+        }
+        this.poiMappin = this.mmcc.GetPOIMappin();
+        if IsDefined(this.poiMappin) {
+          if !Equals(this.currentPoiState, this.poiState) {
+            this.currentPoiState = this.poiState;
+            this.UpdateNavPath(1, this.mmcc.poiPoints, this.GetResourceForState(this.currentPoiState), true);
+          } else {
+            this.UpdateNavPath(1, this.mmcc.poiPoints, this.GetResourceForState(this.currentPoiState), false);
+          }
+        } else {
+          for fx in this.navPathFXs[1] {
+            fx.BreakLoop();
+          }
+        }
+      } else {
+        this.Stop();
+      }
+    }
+  }
+
+  public func Stop() {
+    for fx in this.navPathFXs[0] {
+      fx.BreakLoop();
+    }
+    for fx in this.navPathFXs[1] {
+      fx.BreakLoop();
+    }
+  }
+
+  let timer: Float;
+
+  private func UpdateNavPath(type: Int32, points: array<Vector4>, resource: FxResource, force: Bool) -> Void {
+    let pointDrawnCount: Int32 = 0;
+    let dots: array<Transform>;
+    let i = ArraySize(points) - 1;
+    let lastDrawnPoint: Vector4 = points[i];
+
+    // let firstDistance = Vector4.Distance( points[i],points[i-1]);
+    // let lastDrawnPoint: Vector4 = Vector4.Interpolate(points[i], points[i-1], this.timer / firstDistance);
+    // this.timer += 0.01;
+    // if this.timer > this.spacing {
+    //   this.timer -= this.spacing;
+    //   ArrayRemove(this.navPathFXs[type], this.navPathFXs[type][0]);
+    // }
+
+    while i > 0 {
+      let tweenPointDistance = Vector4.Distance(points[i-1], lastDrawnPoint);
+      if i == 1 {
+        tweenPointDistance += this.spacing;
+      }
+      if tweenPointDistance >= this.spacing {
+        // let rounded = Cast<Float>(RoundF(tweenPointDistance / this.spacing));
+        // let tweenPointSpacing = this.spacing + (tweenPointDistance - rounded * this.spacing) / rounded;
+        let lastDrawnPointInLastGroup = lastDrawnPoint;
+        let distance = this.spacing;
+        while distance <= tweenPointDistance {
+          let ratio: Float = distance / tweenPointDistance;
+          let position = Vector4.Interpolate(lastDrawnPointInLastGroup, points[i-1], ratio);
+          let orientation = Quaternion.BuildFromDirectionVector(lastDrawnPoint - position);
+          distance += this.spacing;
+          ArrayPush(dots, Transform.Create(position, orientation));
+          lastDrawnPoint = position;
+        }
+      }
+      i -= 1;
+    }
+
+    i = 0;
+    while i < ArraySize(dots) {
+      if ArraySize(this.navPathTransforms[type]) <= i {
+        ArrayPush(this.navPathTransforms[type], dots[i]);
+      } else {
+        if Vector4.Distance(this.navPathTransforms[type][i].position, dots[i].position) < this.distanceToAnimate {
+          this.navPathTransforms[type][i].position = Vector4.Interpolate(this.navPathTransforms[type][i].position, dots[i].position, 0.1);
+          this.navPathTransforms[type][i].orientation = Quaternion.Slerp(this.navPathTransforms[type][i].orientation, dots[i].orientation, 0.1);
+        } else {
+          this.navPathTransforms[type][i].position = dots[i].position;
+          this.navPathTransforms[type][i].orientation = dots[i].orientation;
+        }
+      }
+      i += 1;
+    }
+
+    ArrayResize(this.navPathTransforms[type], ArraySize(dots));
+
+    i = ArraySize(dots) - 1;
+
+    while pointDrawnCount < this.maxPoints && i >= 0 {
+      let p = this.navPathTransforms[type][i].position;
+      let q = this.navPathTransforms[type][i].orientation;
+      this.UpdateFxInstance(type, pointDrawnCount, p, q, resource, force);
+      pointDrawnCount += 1;
+      i -= 1;
+    }
+
+    while pointDrawnCount < this.maxPoints && pointDrawnCount < ArraySize(this.navPathFXs[type]) {   
+      this.navPathFXs[type][pointDrawnCount].SetBlackboardValue(n"alpha", 0.0);
+      this.navPathFXs[type][pointDrawnCount].BreakLoop();
+      this.navPathFXs[type][pointDrawnCount].Kill();
+      pointDrawnCount += 1;
+    }
+  }
+
+  private func UpdateFxInstance(type: Int32, i: Int32, p: Vector4, q: Quaternion, resource: FxResource, force: Bool) {
+    let wt: WorldTransform;
+    WorldTransform.SetPosition(wt, p);
+    WorldTransform.SetOrientation(wt, q);
+    if i >= ArraySize(this.navPathFXs[type]) {
+      ArrayPush(this.navPathFXs[type], GameInstance.GetFxSystem(this.player.GetGame()).SpawnEffect(resource, wt));
+    } else { 
+      if IsDefined(this.navPathFXs[type][i]) && this.navPathFXs[type][i].IsValid() && !force {
+        this.navPathFXs[type][i].UpdateTransform(wt);
+      } else {
+        if IsDefined(this.navPathFXs[type][i]) {
+          this.navPathFXs[type][i].BreakLoop();
+          this.navPathFXs[type][i].Kill();
+        }
+        this.navPathFXs[type][i] = GameInstance.GetFxSystem(this.player.GetGame()).SpawnEffect(resource, wt);
+      }
+    }
+    this.navPathFXs[type][i].SetBlackboardValue(n"alpha", MinF(Vector4.Distance2D(this.player.GetWorldPosition(), p) / this.distanceToFade, 1.0));
+  }
+}
+
+// in_world_navigation/OperatorHelpers.reds
+
+// FxResource
+
+public static native func Cast(a: ResRef) -> FxResource;
+
+
+// in_world_navigation/_MinimapContainerController.reds
+
+@wrapMethod(MinimapContainerController)
+protected final func InitializePlayer(playerPuppet: ref<GameObject>) -> Void {
+  wrappedMethod(playerPuppet);
+  let iwn = InWorldNavigation.GetInstance();
+  iwn.Setup(playerPuppet);
+  iwn.mmcc = this;
+}
+
+@addMethod(MinimapContainerController)
+public native func GetQuestMappin() -> ref<QuestMappin>;
+
+@addField(MinimapContainerController)
+public native let questPoints: array<Vector4>;
+
+@addMethod(MinimapContainerController)
+public native func GetPOIMappin() -> ref<IMappin>;
+
+@addField(MinimapContainerController)
+public native let poiPoints: array<Vector4>;
+
+@addField(MinimapContainerController)
+public native let hasPoiMappin: Bool;
+
+@addField(MinimapContainerController)
+public native let hasQuestMappin: Bool;
+

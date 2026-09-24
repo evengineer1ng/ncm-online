@@ -1,0 +1,26 @@
+﻿# server Open77.players.teleport(playerId: integer|string, position: table { x, y, z }, options?: table { heading?, bucket?, fade?, fadeOutMs?, fadeInMs?, dismount?, timeoutMs? })
+
+Moves a living player, with no life transition.
+
+Requires `players.teleport`. Returns a **Promise** that resolves when the client reports the body settled at the destination, or `nil, reason` when the request was refused outright. Health, inventory, weapons and vehicle occupancy are untouched -- this is not `respawn`, which refuses unless the player is already dead and costs a death to work around. `options`: `heading`, `bucket` (changed before the move, so no observer left in the origin bucket ever sees the destination; restored if the move fails), `fade` (default true, with `fadeOutMs`/`fadeInMs` default 400), `dismount` (default false) and `timeoutMs` (1000..30000, default 12000). Resolves with `{ x, y, z, state }` where `state` is `settled` or `near`. Rejects with `player_not_ready` (no life record -- the continue screen, where acting on a client crashes it), `player_not_alive`, `player_in_vehicle`, `invalid_position` or `settle_timeout`. A player in a vehicle is refused rather than ejected: pass `dismount = true` to accept losing the vehicle, which unmounts behind the fade and refuses with `dismount_failed` if the body is still seated after 750 ms.
+
+- runtime: server (network)
+- permissions: none checked in the handler
+- since: 2.31.13+op77.67
+- reasons it can return: bucket_change_failed, invalid_argument, invalid_bucket, invalid_heading, invalid_player, invalid_position
+- returns: Promise, or nil; reason
+- guides: cameras#move-the-ghost-to-the-target, server-api#moving-a-player, server-api#a-player-in-a-vehicle
+
+```lua
+-- /tp <x> <y> <z>, waiting until the body has really landed
+RegisterCommand("tp", function(source, args)
+    local x, y, z = tonumber(args[1]), tonumber(args[2]), tonumber(args[3])
+    if not x or not y or not z then return end
+    local pending, reason = Open77.players.teleport(source, { x = x, y = y, z = z }, { dismount = true })
+    if not pending then return Open77.chat.send(source, "Teleport refused: " .. reason) end
+    local landed, err = pending:await()
+    Open77.chat.send(source, landed and ("Arrived (%s)"):format(landed.state) or ("Failed: " .. err))
+end, true)
+```
+
+_answering for build 2.31.13+op77.78_

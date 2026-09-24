@@ -1,0 +1,20 @@
+﻿# server Open77.vehicles.ai.attachDriver(vehicleId: integer, options?: table)
+
+Attaches a server-owned vehicle AI controller.
+
+options.npcId optionally mounts an existing NPC owned by this resource; omission means driverless operation. Reserves the driver seat. Requires world.vehicles. Refuses occupied driver seats, destroyed vehicles, unsupported AV/Basilisk records and conflicting controllers. The NPC must be alive, in the same bucket and without active tasks. No NPC is created automatically.
+
+- runtime: server (network)
+- permissions: world.vehicles
+- since: 2.31.13+op77.57
+- reasons it can return: none found in the handler; a refusal it forwards from a callee may still reach you as a second return value
+- returns: state, or nil, reason
+- guides: npcs#driving, vehicle-ai#autonomous-vehicle
+
+```lua
+-- Put a spawned NPC at the wheel of the taxi
+local state, reason = Open77.vehicles.ai.attachDriver(taxiId, { npcId = driverId })
+if not state then print("no driver: " .. reason) end
+```
+
+_answering for build 2.31.13+op77.78 (no index published for 2.31.13+op77.84; serving 2.31.13+op77.78, the newest at or below it)_

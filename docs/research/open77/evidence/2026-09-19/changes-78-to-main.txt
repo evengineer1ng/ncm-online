@@ -1,0 +1,44 @@
+43 natives on main and in no published build (unusable on any server today), 0 released after op77.78
+- client WebUI.Page.setConsumedKeys(keys: string[]) — Consume selected navigation keys while preserving gameplay input.
+- client GetPlayerModel(playerId?: integer) — Read this client's NPC presentation state for a player.
+- client IsPlayerModelReady(playerId?: integer) — Check whether the model is ready on this client.
+- client IsPlayerModelValid(record: string) — Validate a Character record in the client's installed game data.
+- client Open77.players.getModel(playerId?: integer) — Read this client's NPC presentation state for a player.
+- client Open77.players.isModelReady(playerId?: integer) — Check whether the model is ready on this client.
+- client Open77.players.isModelValid(record: string) — Validate a Character record in the client's installed game data.
+- server GetPlayerModel(playerId: integer) — Read the authoritative model selection and owner's readiness.
+- server IsPlayerModelReady(playerId: integer) — Read the model owner's native presentation acknowledgement.
+- server ResetPlayerModel(playerId: integer) — Release this resource's model override and restore the original character.
+- server SetPlayerModel(playerId: integer, record: string, options?: table) — Select a server-owned NPC body for a connected player.
+- server Open77.players.getModel(playerId: integer) — Read the authoritative model selection and owner's readiness.
+- server Open77.players.isModelReady(playerId: integer) — Read the model owner's native presentation acknowledgement.
+- server Open77.players.resetModel(playerId: integer) — Release this resource's model override and restore the original character.
+- server Open77.players.setModel(playerId: integer, record: string, options?: table) — Select a server-owned NPC body for a connected player.
+- client Open77.map.addTab(options: table) — Add a resource WebUI tab beside the native Map tab.
+- client Open77.map.focus(position: table) — Focus an owned map on a world position without moving the player.
+- client Open77.map.getScreen() — Read the native map shell, appearance and registered tabs.
+- client Open77.map.getView() — Read the native map camera and readiness snapshot.
+- client Open77.map.recenter() — Recenter an owned native map on the local player.
+- client Open77.map.removeTab(id: string) — Unregister this resource's map shell tab.
+- client Open77.map.resetAppearance() — Release this resource's map title and accent overrides.
+- client Open77.map.selectTab(id: string) — Select an owned WebUI tab or the native Map on an open shell.
+- client Open77.map.setAccentColor(color: string) — Set the native map shell's resource-owned accent color.
+- client Open77.map.setCameraMode(mode: string) — Select the native top-down or perspective map camera.
+- client Open77.map.setTabLabel(id: string, label: string) — Rename this resource's native map shell tab.
+- client Open77.map.setTitle(text: string) — Customize the upper-left native map shell title.
+- client Open77.map.setZoomLevel(level: integer) — Select a native discrete zoom level on an owned map.
+- client Open77.remoteCamera.bindHud(cameraId: string, rect: table) — Shows one source in a native HUD rectangle and returns the binding id.
+- client Open77.remoteCamera.bindWebUI(cameraId: string, page: userdata, rect: table) — Shows one source under a resource-owned transparent page and returns the binding id.
+- client Open77.remoteCamera.bindWorld(cameraId: string, placement: table) — Shows one source on a depth-tested world panel and returns the binding id.
+- client Open77.remoteCamera.bindings(cameraId?: string) — This resource's bindings, optionally only those of one source.
+- client Open77.remoteCamera.budget() — The effective admission limits and current usage, read-only.
+- client Open77.remoteCamera.capabilities() — Reports output, presentation support, admission limits and asset requirements.
+- client Open77.remoteCamera.create(view: table) — Queues one independent capture source and returns its opaque id.
+- client Open77.remoteCamera.destroy(cameraId: string) — Retires a source and its bindings.
+- client Open77.remoteCamera.get(cameraId: string) — Snapshot of one owned source: requested pose, asynchronous state and demand.
+- client Open77.remoteCamera.getBinding(bindingId: string) — Snapshot of one binding: source, kind, requested options, state and reason.
+- client Open77.remoteCamera.list() — Every capture source this resource owns.
+- client Open77.remoteCamera.unbind(bindingId: string) — Retires one presentation and keeps its source alive.
+- client Open77.remoteCamera.update(cameraId: string, patch: table) — Applies a sparse pose, FOV or range patch to one owned source.
+- client Open77.remoteCamera.updateBinding(bindingId: string, patch: table) — Changes what a binding shows or where, without changing its identity.
+- client Open77.remoteCamera.worldModels() — Lists supported world-display profiles, dimensions and placement bases.

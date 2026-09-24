@@ -1,0 +1,13 @@
+# NCM RB15 livery add-on - TEST BUILD. Requires RB15 F1 Car Mod Demo (Nexus 31543).
+# Records inherit everything (physics, drivetrain, entity template) from the RB15 record;
+# only appearanceName differs. Not added to Vehicle.vehicle_list (AI/spawn use only).
+Vehicle.v_sport1_rb15_f1_ncm_test:
+  $base: Vehicle.v_sport1_rb15_f1
+  appearanceName: ncm_test
+
+# Fallback used only if the .ent patch does not register the new appearance.
+# Points at a local copy of the RB15 entity template with the extra appearance entry. LOCAL TEST ONLY - do not ship.
+Vehicle.v_sport1_rb15_f1_ncm_test_fb:
+  $base: Vehicle.v_sport1_rb15_f1
+  appearanceName: ncm_test
+  entityTemplatePath: ncm\rb15_liveries\rb15_ncm_fallback.ent

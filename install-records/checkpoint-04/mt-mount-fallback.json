@@ -1,0 +1,8 @@
+{
+  "applied_at": "2026-09-18T16:17:44-04:00",
+  "relative_path": "bin\x64\plugins\cyber_engine_tweaks\mods\MANUAL TRANSMISSION V10\init.lua",
+  "backup": "install-records/checkpoint-04/mt-init.lua.pre-diag.bak (also init.lua.pre-diag.bak next to the file)",
+  "workspace_copy": "manual-transmission-init.mount-fallback.lua",
+  "change": "Diagnostic [MT/diag] prints (VehicleEnter, setup result, no-gear-data bailout, toggle) + onUpdate fallback that calls SetupVehicleState when the player is driving but GameUI VehicleEnter was missed. Also added temporary CET mod MT_Diag (hotkey dump); remove mods/MT_Diag when done.",
+  "reason": "Manual mode silently stuck in automatic after apartment trip on 2026-09-18; persisted across restart."
+}

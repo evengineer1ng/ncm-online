@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>NCM Venue</title>
+  <style>
+    :root {
+      --panel: rgba(10, 18, 32, 0.94);
+      --line: rgba(174, 211, 224, 0.30);
+      --text: #f2f6f8;
+      --dim: #8d99a8;
+      --accent: #22d8e2;
+      --ok: #4fe3a9;
+      --warn: #f5c95c;
+      --display: "Rajdhani", "Bahnschrift Condensed", "Bahnschrift SemiCondensed", "Arial Narrow", "Segoe UI", sans-serif;
+      --mono: "IBM Plex Mono", "Cascadia Mono", "Consolas", ui-monospace, monospace;
+    }
+    html, body { margin: 0; width: 1920px; height: 1080px; overflow: hidden; background: transparent; pointer-events: none; font-family: var(--display); color: var(--text); }
+    .hidden { display: none !important; }
+    .ncm-glyph { width: 1em; height: 1em; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+    .ncm-glyph .accent { stroke: var(--glyph-accent, var(--accent)); }
+    .ncm-glyph .fill { fill: currentColor; stroke: none; }
+
+    /* The option list: bottom centre, clear of the race strip (top 210px) and the vanilla minimap. */
+    #venue { position: absolute; left: 50%; bottom: 150px; transform: translateX(-50%); min-width: 460px;
+             background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px 20px 14px; }
+    #head { border-bottom: 1px solid var(--line); padding-bottom: 10px; margin-bottom: 10px; }
+    #series { font-size: 19px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--accent); }
+    #route { font-size: 30px; font-weight: 600; line-height: 1.1; }
+    #sub { font-size: 18px; color: var(--dim); font-family: var(--mono); margin-top: 3px; }
+
+    ul { list-style: none; margin: 0; padding: 0; }
+    li { display: flex; align-items: center; gap: 14px; padding: 9px 12px; border-radius: 8px; border: 1px solid transparent; }
+    li .mark { width: 28px; height: 28px; color: var(--dim); flex: none; }
+    li .mark .ncm-glyph { width: 28px; height: 28px; }
+    li .label { font-size: 26px; letter-spacing: 0.10em; text-transform: uppercase; color: var(--dim); }
+    li.sel { background: rgba(34, 216, 226, 0.12); border-color: rgba(34, 216, 226, 0.55); }
+    li.sel .mark { color: var(--accent); filter: drop-shadow(0 0 7px rgba(34, 216, 226, 0.75)); }
+    li.sel .label { color: var(--text); }
+
+    /* Hold-to-engage: the bar fills the selected row while the key is down. */
+    #holdWrap { margin-top: 12px; height: 4px; background: rgba(255,255,255,0.08); border-radius: 2px; overflow: hidden; }
+    #hold { height: 100%; width: 0%; background: var(--accent); transition: width 80ms linear; }
+    #keys { margin-top: 9px; font-size: 17px; color: var(--dim); font-family: var(--mono); display: flex; justify-content: space-between; }
+    kbd { font-family: var(--mono); color: var(--text); border: 1px solid var(--line); border-radius: 4px; padding: 0 5px; }
+
+    /* A panel opened by an option (practice / history), above the list. */
+    #panel { position: absolute; left: 50%; bottom: 150px; transform: translateX(-50%); min-width: 720px; max-width: 980px;
+             background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px 22px 14px; }
+    #panelTitle { font-size: 19px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--accent); }
+    #panelSub { font-size: 24px; font-weight: 600; margin-bottom: 4px; }
+    #panelNote { font-size: 19px; color: var(--warn); margin: 8px 0 4px; }
+    table { border-collapse: collapse; width: 100%; margin-top: 8px; }
+    th { font-size: 15px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--dim); text-align: left; font-weight: 400; padding: 4px 8px; border-bottom: 1px solid var(--line); }
+    td { font-size: 21px; padding: 5px 8px; }
+    td.t { font-family: var(--mono); text-align: right; }
+    td.r { font-family: var(--mono); color: var(--dim); width: 54px; }
+    tr.me td { color: var(--accent); }
+    .empty { font-size: 20px; color: var(--dim); padding: 10px 8px; }
+    .sect { font-size: 15px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--dim); margin: 14px 0 2px; }
+    #panelKeys { margin-top: 10px; font-size: 17px; color: var(--dim); font-family: var(--mono); }
+    li.off { opacity: .42; }
+    li.off .label { text-decoration: none; }
+    li .why { margin-left: auto; padding-left: 10px; font: 600 11px/1.2 var(--mono, monospace); opacity: .85; text-align: right; }
+  </style>
+</head>
+<body>
+  <div id="venue" class="hidden">
+    <div id="head">
+      <div id="series"></div>
+      <div id="route"></div>
+      <div id="sub"></div>
+    </div>
+    <ul id="list"></ul>
+    <div id="holdWrap"><div id="hold"></div></div>
+    <div id="keys"><span>tap <kbd>E</kbd> to choose</span><span>hold <kbd>E</kbd> to engage</span></div>
+  </div>
+
+  <div id="panel" class="hidden">
+    <div id="panelTitle"></div>
+    <div id="panelSub"></div>
+    <div id="panelNote"></div>
+    <div id="panelBody"></div>
+    <div id="panelKeys">tap <kbd>E</kbd> to close</div>
+  </div>
+
+  <script src="glyphs.js"></script>
+  <script>
+    var $ = function (id) { return document.getElementById(id); };
+    function text(el, v) { el.textContent = (v === undefined || v === null) ? "" : String(v); }
+    function show(el, on) { el.classList.toggle("hidden", !on); }
+    function optionGlyph(id) {
+      return ({ enter_race: "enter", practice: "practice", leave_practice: "withdraw", withdraw: "withdraw", leave_list: "withdraw", history: "history" })[id] || "incident";
+    }
+
+    function fmtMs(ms) {
+      if (ms === undefined || ms === null) return "--";
+      var s = ms / 1000, m = Math.floor(s / 60), r = s - m * 60;
+      return m + ":" + (r < 10 ? "0" : "") + r.toFixed(3);
+    }
+    function fmtSec(sec) {
+      if (sec === undefined || sec === null) return "--";
+      return fmtMs(sec * 1000);
+    }
+
+    // The option list. `sel` is the highlighted index; `hold` is 0..1.
+    function renderVenue(v) {
+      if (!v || !v.options || !v.options.length) { show($("venue"), false); return; }
+      show($("venue"), true);
+      text($("series"), v.series || "");
+      text($("route"), v.route || "");
+      text($("sub"), v.sub || "");
+      var ul = $("list");
+      ul.innerHTML = "";
+      for (var i = 0; i < v.options.length; i++) {
+        var o = v.options[i];
+        var li = document.createElement("li");
+        if (i === v.sel) li.className = "sel";
+        var mark = document.createElement("span"); mark.className = "mark"; mark.appendChild(NcmGlyph.create(optionGlyph(o.id)));
+        var lab = document.createElement("span"); lab.className = "label"; lab.textContent = o.label || o.id;
+        li.appendChild(mark); li.appendChild(lab);
+        // Inapplicable options are shown greyed WITH THE REASON, never omitted: a card offering only HISTORY
+        // is indistinguishable from a broken one, and the player learns nothing from an absent control.
+        if (o.enabled === false) {
+          li.className = (li.className ? li.className + " " : "") + "off";
+          if (o.why) { var w = document.createElement("span"); w.className = "why"; w.textContent = o.why; li.appendChild(w); }
+        }
+        ul.appendChild(li);
+      }
+      $("hold").style.width = Math.round((v.hold || 0) * 100) + "%";
+    }
+
+    function row(cells, me) {
+      var tr = document.createElement("tr");
+      if (me) tr.className = "me";
+      for (var i = 0; i < cells.length; i++) {
+        var td = document.createElement("td");
+        if (cells[i].cls) td.className = cells[i].cls;
+        td.textContent = cells[i].v;
+        tr.appendChild(td);
+      }
+      return tr;
+    }
+    function table(headers, rows) {
+      var t = document.createElement("table"), thead = document.createElement("thead"), tr = document.createElement("tr");
+      for (var i = 0; i < headers.length; i++) { var th = document.createElement("th"); th.textContent = headers[i]; tr.appendChild(th); }
+      thead.appendChild(tr); t.appendChild(thead);
+      var tb = document.createElement("tbody");
+      for (var j = 0; j < rows.length; j++) tb.appendChild(rows[j]);
+      t.appendChild(tb);
+      return t;
+    }
+    function sect(label) { var d = document.createElement("div"); d.className = "sect"; d.textContent = label; return d; }
+    function empty(msg) { var d = document.createElement("div"); d.className = "empty"; d.textContent = msg; return d; }
+
+    // HISTORY: one panel, both readings -- this driver's runs here, and the server's larger history for the route.
+    function renderHistory(h) {
+      text($("panelTitle"), "History");
+      text($("panelSub"), h.route || "");
+      text($("panelNote"), "");
+      var body = $("panelBody");
+      body.innerHTML = "";
+      body.appendChild(sect("Your runs here"));
+      if (h.mine && h.mine.length) {
+        var rows = [];
+        for (var i = 0; i < h.mine.length; i++) {
+          var m = h.mine[i];
+          var what = m.state === "finished" ? fmtMs(m.correctedMs || m.totalMs) : String(m.state || "").toUpperCase();
+          var place = m.state === "finished" ? ("P" + m.position + (m.entrants > 1 ? " of " + m.entrants : " · time trial")) : "—";
+          rows.push(row([{ v: place }, { v: what, cls: "t" }, { v: m.incidents ? m.incidents + " inc" : "clean", cls: "r" }]));
+        }
+        body.appendChild(table(["Result", "Time", ""], rows));
+        if (h.myBestMs) {
+          var b = document.createElement("div"); b.className = "sect";
+          b.textContent = "Your best here: " + fmtMs(h.myBestMs);
+          body.appendChild(b);
+        }
+      } else {
+        body.appendChild(empty("You have not finished a run on this route yet."));
+      }
+      body.appendChild(sect("Route record"));
+      if (h.board && h.board.length) {
+        var brows = [];
+        for (var k = 0; k < h.board.length; k++) {
+          var b2 = h.board[k];
+          brows.push(row([{ v: "#" + b2.rank, cls: "r" }, { v: b2.display }, { v: fmtMs(b2.bestMs), cls: "t" }], b2.me));
+        }
+        body.appendChild(table(["", "Driver", "Best"], brows));
+      } else {
+        body.appendChild(empty("Nobody has set a time on this route yet."));
+      }
+      show($("panel"), true);
+    }
+
+    // PRACTICE: the board, and above all how to start a run (KB-28).
+    function renderPractice(p) {
+      text($("panelTitle"), "Practice");
+      text($("panelSub"), p.route || "");
+      // KB-31: this is never worded as a registration deadline.
+      text($("panelNote"), p.open ? p.howToStart : "Practice has closed for this event — the session is forming.");
+      var body = $("panelBody");
+      body.innerHTML = "";
+      if (p.open) body.appendChild(sect("Open until the race forms"));
+      if (p.board && p.board.length) {
+        var rows = [];
+        for (var i = 0; i < p.board.length; i++) {
+          var r = p.board[i];
+          rows.push(row([{ v: "#" + r.rank, cls: "r" }, { v: r.me ? "You" : "Driver " + r.rank }, { v: fmtSec(r.bestSec), cls: "t" }], r.me));
+        }
+        body.appendChild(table(["", "", "Best run"], rows));
+      } else {
+        body.appendChild(empty("No timed runs yet. Be the first."));
+      }
+      show($("panel"), true);
+    }
+
+    Open77.on("venue:list", renderVenue);
+    Open77.on("venue:hide", function () { show($("venue"), false); });
+    Open77.on("venue:history", renderHistory);
+    Open77.on("venue:practice", renderPractice);
+    Open77.on("venue:closePanel", function () { show($("panel"), false); });
+    Open77.ready();
+    Open77.emit("venue:ready", {});
+  </script>
+</body>
+</html>

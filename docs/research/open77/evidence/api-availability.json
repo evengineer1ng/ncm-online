@@ -1,0 +1,212 @@
+﻿[
+    {
+        "qualified":  "TriggerEvent",
+        "runtime":  "client",
+        "since":  "2.31.0+op77.3",
+        "permissions":  [
+
+                        ],
+        "source":  "ResourceHost.cpp",
+        "source_line":  22108
+    },
+    {
+        "qualified":  "require",
+        "runtime":  "client",
+        "since":  "2.31.0+op77.3",
+        "permissions":  [
+
+                        ],
+        "source":  "ResourceHost.cpp",
+        "source_line":  22101
+    },
+    {
+        "qualified":  "Open77.exports.call",
+        "runtime":  "client",
+        "since":  "2.31.0+op77.3",
+        "permissions":  [
+
+                        ],
+        "source":  "ResourceHost.cpp",
+        "source_line":  22327
+    },
+    {
+        "qualified":  "Open77.kvp.set",
+        "runtime":  "client",
+        "since":  "2.31.0+op77.3",
+        "permissions":  [
+
+                        ],
+        "source":  "ResourceHost.cpp",
+        "source_line":  22232
+    },
+    {
+        "qualified":  "Open77.players.all",
+        "runtime":  "client",
+        "since":  "2.31.13+op77.67",
+        "permissions":  [
+
+                        ],
+        "source":  "ResourceHost.cpp",
+        "source_line":  22760
+    },
+    {
+        "qualified":  "Open77.vehicles.get",
+        "runtime":  "client",
+        "since":  "2.31.0+op77.3",
+        "permissions":  [
+                            "vehicles.read"
+                        ],
+        "source":  "ResourceHost.cpp",
+        "source_line":  22670
+    },
+    {
+        "qualified":  "Open77.vehicles.setControlLock",
+        "runtime":  "client",
+        "since":  "2.31.7+op77.16",
+        "permissions":  [
+                            "vehicles.performance"
+                        ],
+        "source":  "ResourceHost.cpp",
+        "source_line":  22699
+    },
+    {
+        "qualified":  "Open77.vehicles.setFrozen",
+        "runtime":  "client",
+        "since":  "2.31.7+op77.16",
+        "permissions":  [
+                            "vehicles.performance"
+                        ],
+        "source":  "ResourceHost.cpp",
+        "source_line":  22700
+    },
+    {
+        "qualified":  "Open77.vehicles.setPerformance",
+        "runtime":  "client",
+        "since":  "2.31.1+op77.9",
+        "permissions":  [
+                            "vehicles.performance"
+                        ],
+        "source":  "ResourceHost.cpp",
+        "source_line":  22694
+    },
+    {
+        "qualified":  "TriggerEvent",
+        "runtime":  "server",
+        "since":  "2.31.13+op77.45",
+        "permissions":  [
+
+                        ],
+        "source":  "LuaResourceRuntime.Events.cs",
+        "source_line":  186
+    },
+    {
+        "qualified":  "Open77.database.transaction",
+        "runtime":  "server",
+        "since":  "2.31.13+op77.45",
+        "permissions":  [
+                            "database.access"
+                        ],
+        "source":  "LuaResourceRuntime.cs",
+        "source_line":  6436
+    },
+    {
+        "qualified":  "Open77.exports.call",
+        "runtime":  "server",
+        "since":  "2.31.13+op77.45",
+        "permissions":  [
+
+                        ],
+        "source":  "LuaResourceRuntime.Exports.cs",
+        "source_line":  413
+    },
+    {
+        "qualified":  "Open77.io.writeJson",
+        "runtime":  "server",
+        "since":  "2.31.13+op77.45",
+        "permissions":  [
+                            "filesystem.write"
+                        ],
+        "source":  "LuaResourceRuntime.cs",
+        "source_line":  7853
+    },
+    {
+        "qualified":  "Open77.kvp.set",
+        "runtime":  "server",
+        "since":  "2.31.13+op77.67",
+        "permissions":  [
+
+                        ],
+        "source":  "LuaResourceRuntime.Kvp.cs",
+        "source_line":  299
+    },
+    {
+        "qualified":  "Open77.players.all",
+        "runtime":  "server",
+        "since":  "2.31.13+op77.45",
+        "permissions":  [
+
+                        ],
+        "source":  "LuaResourceRuntime.cs",
+        "source_line":  8420
+    },
+    {
+        "qualified":  "Open77.players.identifier",
+        "runtime":  "server",
+        "since":  "2.31.13+op77.45",
+        "permissions":  [
+
+                        ],
+        "source":  "LuaResourceRuntime.cs",
+        "source_line":  8418
+    },
+    {
+        "qualified":  "Open77.players.teleport",
+        "runtime":  "server",
+        "since":  "2.31.13+op77.67",
+        "permissions":  [
+
+                        ],
+        "source":  "LuaResourceRuntime.cs",
+        "source_line":  8480
+    },
+    {
+        "qualified":  "Open77.vehicles.get",
+        "runtime":  "server",
+        "since":  "2.31.13+op77.45",
+        "permissions":  [
+                            "world.vehicles"
+                        ],
+        "source":  "LuaResourceRuntime.cs",
+        "source_line":  8875
+    },
+    {
+        "qualified":  "Open77.vehicles.setFrozen",
+        "runtime":  "server",
+        "since":  "2.31.13+op77.73",
+        "permissions":  [
+                            "world.vehicles"
+                        ],
+        "source":  "LuaResourceRuntime.cs",
+        "source_line":  8683
+    },
+    {
+        "qualified":  "Open77.vehicles.setPerformance",
+        "runtime":  "server",
+        "since":  "2.31.13+op77.67",
+        "permissions":  [
+                            "world.vehicles"
+                        ],
+        "source":  "LuaResourceRuntime.cs",
+        "source_line":  8683
+    },
+    {
+        "qualified":  "Open77.vehicles.ai.followRoute",
+        "runtime":  "server",
+        "since":  "2.31.13+op77.57",
+        "permissions":  [
+                            "world.vehicles"
+                        ],
+        "source":  "LuaResourceRuntime.cs",
+        "source_line":  8689
+    }
+]

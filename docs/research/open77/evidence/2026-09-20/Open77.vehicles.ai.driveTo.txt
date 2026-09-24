@@ -1,0 +1,23 @@
+﻿# server Open77.vehicles.ai.driveTo(vehicleId: integer, options: table)
+
+Starts native autonomous driving to a world position.
+
+Requires world.vehicles and this resource's attached controller. options.position={x,y,z} is required. Optional speed (0.5..55 m/s), arrivalRadius (1..20 m), timeoutMilliseconds (1000..3600000) and behavior. Returns a task state, or nil, reason. Acceptance is not arrival: subscribe to arrived, blocked or failed.
+
+- runtime: server (network)
+- permissions: world.vehicles
+- since: 2.31.13+op77.57
+- reasons it can return: none found in the handler; a refusal it forwards from a callee may still reach you as a second return value
+- returns: state, or nil, reason
+- guides: vehicle-ai#autonomous-vehicle
+
+```lua
+-- The taxi drives to the customer's destination
+Open77.vehicles.ai.driveTo(taxiId, {
+    position = { x = -1442.2, y = 127.4, z = 18.0 },
+    speed = 15,
+    arrivalRadius = 4,
+})
+```
+
+_answering for build 2.31.13+op77.78 (no index published for 2.31.13+op77.84; serving 2.31.13+op77.78, the newest at or below it)_

@@ -1,0 +1,1825 @@
+{
+  "Header": {
+    "WolvenKitVersion": "8.20.0",
+    "WKitJsonVersion": "0.0.9",
+    "GameVersion": 2310,
+    "ExportedDateTime": "2026-09-02T21:32:50.9790267Z",
+    "DataType": "CR2W",
+    "ArchiveFileName": "C:\\Users\\eveng\\OneDrive\\Documents\\cyberpunk2077\\recovery\\mt_ecosystem-2.0\\mt_ecosystem\\journal\\mt_ecosystem.journal"
+  },
+  "Data": {
+    "Version": 195,
+    "BuildVersion": 0,
+    "RootChunk": {
+      "$type": "gameJournalResource",
+      "cookingPlatform": "PLATFORM_PC",
+      "entry": {
+        "HandleId": "0",
+        "Data": {
+          "$type": "gameJournalRootFolderEntry",
+          "descriptor": {
+            "DepotPath": {
+              "$type": "ResourcePath",
+              "$storage": "uint64",
+              "$value": "0"
+            },
+            "Flags": "Soft"
+          },
+          "entries": [
+            {
+              "HandleId": "1",
+              "Data": {
+                "$type": "gameJournalPrimaryFolderEntry",
+                "entries": [
+                  {
+                    "HandleId": "2",
+                    "Data": {
+                      "$type": "gameJournalContact",
+                      "avatarID": {
+                        "$type": "TweakDBID",
+                        "$storage": "uint64",
+                        "$value": "111767369204"
+                      },
+                      "entries": [
+                        {
+                          "HandleId": "3",
+                          "Data": {
+                            "$type": "gameJournalPhoneConversation",
+                            "entries": [
+                              {
+                                "HandleId": "4",
+                                "Data": {
+                                  "$type": "gameJournalPhoneMessage",
+                                  "attachment": null,
+                                  "delay": 1,
+                                  "id": "msg_welcome",
+                                  "imageId": {
+                                    "$type": "TweakDBID",
+                                    "$storage": "uint64",
+                                    "$value": "0"
+                                  },
+                                  "isQuestImportant": 0,
+                                  "journalEntryOverrideDataList": [],
+                                  "sender": "NPC",
+                                  "text": {
+                                    "unk1": "0",
+                                    "value": "LocKey#9000002"
+                                  }
+                                }
+                              },
+                              {
+                                "HandleId": "5",
+                                "Data": {
+                                  "$type": "gameJournalPhoneChoiceGroup",
+                                  "entries": [
+                                    {
+                                      "HandleId": "6",
+                                      "Data": {
+                                        "$type": "gameJournalPhoneChoiceEntry",
+                                        "id": "ncm_route_quickie",
+                                        "isQuestImportant": 0,
+                                        "journalEntryOverrideDataList": [],
+                                        "questCondition": null,
+                                        "text": {
+                                          "unk1": "0",
+                                          "value": "LocKey#9000100"
+                                        }
+                                      }
+                                    },
+                                    {
+                                      "HandleId": "7",
+                                      "Data": {
+                                        "$type": "gameJournalPhoneChoiceEntry",
+                                        "id": "ncm_route_setup_stu",
+                                        "isQuestImportant": 0,
+                                        "journalEntryOverrideDataList": [],
+                                        "questCondition": null,
+                                        "text": {
+                                          "unk1": "0",
+                                          "value": "LocKey#9000101"
+                                        }
+                                      }
+                                    },
+                                    {
+                                      "HandleId": "8",
+                                      "Data": {
+                                        "$type": "gameJournalPhoneChoiceEntry",
+                                        "id": "ncm_route_control",
+                                        "isQuestImportant": 0,
+                                        "journalEntryOverrideDataList": [],
+                                        "questCondition": null,
+                                        "text": {
+                                          "unk1": "0",
+                                          "value": "LocKey#9000102"
+                                        }
+                                      }
+                                    },
+                                    {
+                                      "HandleId": "9",
+                                      "Data": {
+                                        "$type": "gameJournalPhoneChoiceEntry",
+                                        "id": "ncm_route_ledger",
+                                        "isQuestImportant": 0,
+                                        "journalEntryOverrideDataList": [],
+                                        "questCondition": null,
+                                        "text": {
+                                          "unk1": "0",
+                                          "value": "LocKey#9000103"
+                                        }
+                                      }
+                                    },
+                                    {
+                                      "HandleId": "10",
+                                      "Data": {
+                                        "$type": "gameJournalPhoneChoiceEntry",
+                                        "id": "ncm_route_scout",
+                                        "isQuestImportant": 0,
+                                        "journalEntryOverrideDataList": [],
+                                        "questCondition": null,
+                                        "text": {
+                                          "unk1": "0",
+                                          "value": "LocKey#9000104"
+                                        }
+                                      }
+                                    },
+                                    {
+                                      "HandleId": "11",
+                                      "Data": {
+                                        "$type": "gameJournalPhoneChoiceEntry",
+                                        "id": "ncm_route_bookie",
+                                        "isQuestImportant": 0,
+                                        "journalEntryOverrideDataList": [],
+                                        "questCondition": null,
+                                        "text": {
+                                          "unk1": "0",
+                                          "value": "LocKey#9000105"
+                                        }
+                                      }
+                                    }
+                                  ],
+                                  "id": "main_menu",
+                                  "journalEntryOverrideDataList": []
+                                }
+                              }
+                            ],
+                            "id": "race_setup",
+                            "journalEntryOverrideDataList": [],
+                            "title": {
+                              "unk1": "0",
+                              "value": "LocKey#9000170"
+                            }
+                          }
+                        },
+                        {
+                          "HandleId": "12",
+                          "Data": {
+                            "$type": "gameJournalPhoneConversation",
+                            "entries": [
+                              {
+                                "HandleId": "13",
+                                "Data": {
+                                  "$type": "gameJournalPhoneMessage",
+                                  "attachment": null,
+                                  "delay": 1,
+                                  "id": "msg_phone_response",
+                                  "imageId": {
+                                    "$type": "TweakDBID",
+                                    "$storage": "uint64",
+                                    "$value": "0"
+                                  },
+                                  "isQuestImportant": 0,
+                                  "journalEntryOverrideDataList": [],
+                                  "sender": "NPC",
+                                  "text": {
+                                    "unk1": "0",
+                                    "value": "LocKey#9000017"
+                                  }
+                                }
+                              }
+                            ],
+                            "id": "phone_response",
+                            "journalEntryOverrideDataList": [],
+                            "title": {
+                              "unk1": "0",
+                              "value": "LocKey#9000171"
+                            }
+                          }
+                        }
+                      ],
+                      "id": "ncm_motorsports",
+                      "isCallableDefault": 0,
+                      "journalEntryOverrideDataList": [],
+                      "name": {
+                        "unk1": "0",
+                        "value": "LocKey#9000001"
+                      },
+                      "type": "Texter",
+                      "useFlatMessageLayout": 0
+                    }
+                  },
+                  {
+                    "HandleId": "14",
+                    "Data": {
+                      "$type": "gameJournalContact",
+                      "avatarID": {
+                        "$type": "TweakDBID",
+                        "$storage": "uint64",
+                        "$value": "111767369204"
+                      },
+                      "entries": [
+                        {
+                          "HandleId": "15",
+                          "Data": {
+                            "$type": "gameJournalPhoneConversation",
+                            "entries": [
+                              {
+                                "HandleId": "16",
+                                "Data": {
+                                  "$type": "gameJournalPhoneMessage",
+                                  "attachment": null,
+                                  "delay": 1,
+                                  "id": "msg_quickie_intro",
+                                  "imageId": {
+                                    "$type": "TweakDBID",
+                                    "$storage": "uint64",
+                                    "$value": "0"
+                                  },
+                                  "isQuestImportant": 0,
+                                  "journalEntryOverrideDataList": [],
+                                  "sender": "NPC",
+                                  "text": {
+                                    "unk1": "0",
+                                    "value": "LocKey#9000004"
+                                  }
+                                }
+                              },
+                              {
+                                "HandleId": "17",
+                                "Data": {
+                                  "$type": "gameJournalPhoneChoiceGroup",
+                                  "entries": [
+                                    {
+                                      "HandleId": "18",
+                                      "Data": {
+                                        "$type": "gameJournalPhoneChoiceEntry",
+                                        "id": "ncm_quick_race",
+                                        "isQuestImportant": 0,
+                                        "journalEntryOverrideDataList": [],
+                                        "questCondition": null,
+                                        "text": {
+                                          "unk1": "0",
+                                          "value": "LocKey#9000110"
+                                        }
+                                      }
+                                    },
+                                    {
+                                      "HandleId": "19",
+                                      "Data": {
+                                        "$type": "gameJournalPhoneChoiceEntry",
+                                        "id": "ncm_quickie_confirm_preview",
+                                        "isQuestImportant": 0,
+                                        "journalEntryOverrideDataList": [],
+                                        "questCondition": null,
+                                        "text": {
+                                          "unk1": "0",
+                                          "value": "LocKey#9000113"
+                                        }
+                                      }
+                                    },
+                                    {
+                                      "HandleId": "20",
+                                      "Data": {
+                                        "$type": "gameJournalPhoneChoiceEntry",
+                                        "id": "ncm_quickie_refresh_offer",
+                                        "isQuestImportant": 0,
+                                        "journalEntryOverrideDataList": [],
+                                        "questCondition": null,
+                                        "text": {
+                                          "unk1": "0",
+                                          "value": "LocKey#9000114"
+                                        }
+                                      }
+                                    },
+                                    {
+                                      "HandleId": "21",
+                                      "Data": {
+                                        "$type": "gameJournalPhoneChoiceEntry",
+                                        "id": "ncm_knockout_setup",
+                                        "isQuestImportant": 0,
+                                        "journalEntryOverrideDataList": [],
+                                        "questCondition": null,
+                                        "text": {
+                                          "unk1": "0",
+                                          "value": "LocKey#9000111"
+                                        }
+                                      }
+                                    }
+                                  ],
+                                  "id": "quickie_choices",
+                                  "journalEntryOverrideDataList": []
+                                }
+                              }
+                            ],
+                            "id": "quickie_menu",
+                            "journalEntryOverrideDataList": [],
+                            "title": {
+                              "unk1": "0",
+                              "value": "LocKey#9000172"
+                            }
+                          }
+                        },
+                        {
+                          "HandleId": "22",
+                          "Data": {
+                            "$type": "gameJournalPhoneConversation",
+                            "entries": [
+                              {
+                                "HandleId": "23",
+                                "Data": {
+                                  "$type": "gameJournalPhoneMessage",
+                                  "attachment": null,
+                                  "delay": 1,
+                                  "id": "msg_phone_response",
+                                  "imageId": {
+                                    "$type": "TweakDBID",
+                                    "$storage": "uint64",
+                                    "$value": "0"
+                                  },
+                                  "isQuestImportant": 0,
+                                  "journalEntryOverrideDataList": [],
+                                  "sender": "NPC",
+                                  "text": {
+                                    "unk1": "0",
+                                    "value": "LocKey#9000017"
+                                  }
+                                }
+                              }
+                            ],
+                            "id": "phone_response",
+                            "journalEntryOverrideDataList": [],
+                            "title": {
+                              "unk1": "0",
+                              "value": "LocKey#9000173"
+                            }
+                          }
+                        }
+                      ],
+                      "id": "ncm_quickie",
+                      "isCallableDefault": 0,
+                      "journalEntryOverrideDataList": [],
+                      "name": {
+                        "unk1": "0",
+                        "value": "LocKey#9000003"
+                      },
+                      "type": "Texter",
+                      "useFlatMessageLayout": 0
+                    }
+                  },
+                  {
+                    "HandleId": "24",
+                    "Data": {
+                      "$type": "gameJournalContact",
+                      "avatarID": {
+                        "$type": "TweakDBID",
+                        "$storage": "uint64",
+                        "$value": "111767369204"
+                      },
+                      "entries": [
+                        {
+                          "HandleId": "25",
+                          "Data": {
+                            "$type": "gameJournalPhoneConversation",
+                            "entries": [
+                              {
+                                "HandleId": "26",
+                                "Data": {
+                                  "$type": "gameJournalPhoneMessage",
+                                  "attachment": null,
+                                  "delay": 1,
+                                  "id": "msg_setup_intro",
+                                  "imageId": {
+                                    "$type": "TweakDBID",
+                                    "$storage": "uint64",
+                                    "$value": "0"
+                                  },
+                                  "isQuestImportant": 0,
+                                  "journalEntryOverrideDataList": [],
+                                  "sender": "NPC",
+                                  "text": {
+                                    "unk1": "0",
+                                    "value": "LocKey#9000006"
+                                  }
+                                }
+                              },
+                              {
+                                "HandleId": "27",
+                                "Data": {
+                                  "$type": "gameJournalPhoneChoiceGroup",
+                                  "entries": [
+                                    {
+                                      "HandleId": "28",
+                                      "Data": {
+                                        "$type": "gameJournalPhoneChoiceEntry",
+                                        "id": "ncm_view_car_status",
+                                        "isQuestImportant": 0,
+                                        "journalEntryOverrideDataList": [],
+                                        "questCondition": null,
+                                        "text": {
+                                          "unk1": "0",
+                                          "value": "LocKey#9000120"
+                                        }
+                                      }
+                                    },
+                                    {
+                                      "HandleId": "29",
+                                      "Data": {
+                                        "$type": "gameJournalPhoneChoiceEntry",
+                                        "id": "ncm_get_setup_suggestion",
+                                        "isQuestImportant": 0,
+                                        "journalEntryOverrideDataList": [],
+                                        "questCondition": null,
+                                        "text": {
+                                          "unk1": "0",
+                                          "value": "LocKey#9000121"
+                                        }
+                                      }
+                                    },
+                                    {
+                                      "HandleId": "30",
+                                      "Data": {
+                                        "$type": "gameJournalPhoneChoiceEntry",
+                                        "id": "ncm_open_parts_source",
+                                        "isQuestImportant": 0,
+                                        "journalEntryOverrideDataList": [],
+                                        "questCondition": null,
+                                        "text": {
+                                          "unk1": "0",
+                                          "value": "LocKey#9000122"
+                                        }
+                                      }
+                                    },
+                                    {
+                                      "HandleId": "31",
+                                      "Data": {
+                                        "$type": "gameJournalPhoneChoiceEntry",
+                                        "id": "ncm_open_tuning",
+                                        "isQuestImportant": 0,
+                                        "journalEntryOverrideDataList": [],
+                                        "questCondition": null,
+                                        "text": {
+                                          "unk1": "0",
+                                          "value": "LocKey#9000123"
+                                        }
+                                      }
+                                    }
+                                  ],
+                                  "id": "setup_choices",
+                                  "journalEntryOverrideDataList": []
+                                }
+                              }
+                            ],
+                            "id": "setup_menu",
+                            "journalEntryOverrideDataList": [],
+                            "title": {
+                              "unk1": "0",
+                              "value": "LocKey#9000174"
+                            }
+                          }
+                        },
+                        {
+                          "HandleId": "32",
+                          "Data": {
+                            "$type": "gameJournalPhoneConversation",
+                            "entries": [
+                              {
+                                "HandleId": "33",
+                                "Data": {
+                                  "$type": "gameJournalPhoneMessage",
+                                  "attachment": null,
+                                  "delay": 1,
+                                  "id": "msg_phone_response",
+                                  "imageId": {
+                                    "$type": "TweakDBID",
+                                    "$storage": "uint64",
+                                    "$value": "0"
+                                  },
+                                  "isQuestImportant": 0,
+                                  "journalEntryOverrideDataList": [],
+                                  "sender": "NPC",
+                                  "text": {
+                                    "unk1": "0",
+                                    "value": "LocKey#9000017"
+                                  }
+                                }
+                              }
+                            ],
+                            "id": "phone_response",
+                            "journalEntryOverrideDataList": [],
+                            "title": {
+                              "unk1": "0",
+                              "value": "LocKey#9000175"
+                            }
+                          }
+                        }
+                      ],
+                      "id": "ncm_setup_stu",
+                      "isCallableDefault": 0,
+                      "journalEntryOverrideDataList": [],
+                      "name": {
+                        "unk1": "0",
+                        "value": "LocKey#9000005"
+                      },
+                      "type": "Texter",
+                      "useFlatMessageLayout": 0
+                    }
+                  },
+                  {
+                    "HandleId": "34",
+                    "Data": {
+                      "$type": "gameJournalContact",
+                      "avatarID": {
+                        "$type": "TweakDBID",
+                        "$storage": "uint64",
+                        "$value": "111767369204"
+                      },
+                      "entries": [
+                        {
+                          "HandleId": "35",
+                          "Data": {
+                            "$type": "gameJournalPhoneConversation",
+                            "entries": [
+                              {
+                                "HandleId": "36",
+                                "Data": {
+                                  "$type": "gameJournalPhoneMessage",
+                                  "attachment": null,
+                                  "delay": 1,
+                                  "id": "msg_control_intro",
+                                  "imageId": {
+                                    "$type": "TweakDBID",
+                                    "$storage": "uint64",
+                                    "$value": "0"
+                                  },
+                                  "isQuestImportant": 0,
+                                  "journalEntryOverrideDataList": [],
+                                  "sender": "NPC",
+                                  "text": {
+                                    "unk1": "0",
+                                    "value": "LocKey#9000008"
+                                  }
+                                }
+                              },
+                              {
+                                "HandleId": "37",
+                                "Data": {
+                                  "$type": "gameJournalPhoneChoiceGroup",
+                                  "entries": [
+                                    {
+                                      "HandleId": "38",
+                                      "Data": {
+                                        "$type": "gameJournalPhoneChoiceEntry",
+                                        "id": "ncm_start_career_race",
+                                        "isQuestImportant": 0,
+                                        "journalEntryOverrideDataList": [],
+                                        "questCondition": null,
+                                        "text": {
+                                          "unk1": "0",
+                                          "value": "LocKey#9000130"
+                                        }
+                                      }
+                                    },
+                                    {
+                                      "HandleId": "39",
+                                      "Data": {
+                                        "$type": "gameJournalPhoneChoiceEntry",
+                                        "id": "ncm_open_custom_race_flow",
+                                        "isQuestImportant": 0,
+                                        "journalEntryOverrideDataList": [],
+                                        "questCondition": null,
+                                        "text": {
+                                          "unk1": "0",
+                                          "value": "LocKey#9000131"
+                                        }
+                                      }
+                                    },
+                                    {
+                                      "HandleId": "40",
+                                      "Data": {
+                                        "$type": "gameJournalPhoneChoiceEntry",
+                                        "id": "ncm_control_ambient_status",
+                                        "isQuestImportant": 0,
+                                        "journalEntryOverrideDataList": [],
+                                        "questCondition": null,
+                                        "text": {
+                                          "unk1": "0",
+                                          "value": "LocKey#9000218"
+                                        }
+                                      }
+                                    },
+                                    {
+                                      "HandleId": "41",
+                                      "Data": {
+                                        "$type": "gameJournalPhoneChoiceEntry",
+                                        "id": "ncm_control_stage_live_ambient",
+                                        "isQuestImportant": 0,
+                                        "journalEntryOverrideDataList": [],
+                                        "questCondition": null,
+                                        "text": {
+                                          "unk1": "0",
+                                          "value": "LocKey#9000219"
+                                        }
+                                      }
+                                    },
+                                    {
+                                      "HandleId": "42",
+                                      "Data": {
+                                        "$type": "gameJournalPhoneChoiceEntry",
+                                        "id": "ncm_control_queue_managed_sim",
+                                        "isQuestImportant": 0,
+                                        "journalEntryOverrideDataList": [],
+                                        "questCondition": null,
+                                        "text": {
+                                          "unk1": "0",
+                                          "value": "LocKey#9000220"
+                                        }
+                                      }
+                                    },
+                                    {
+                                      "HandleId": "43",
+                                      "Data": {
+                                        "$type": "gameJournalPhoneChoiceEntry",
+                                        "id": "ncm_control_queue_managed_spectate",
+                                        "isQuestImportant": 0,
+                                        "journalEntryOverrideDataList": [],
+                                        "questCondition": null,
+                                        "text": {
+                                          "unk1": "0",
+                                          "value": "LocKey#9000221"
+                                        }
+                                      }
+                                    },
+                                    {
+                                      "HandleId": "44",
+                                      "Data": {
+                                        "$type": "gameJournalPhoneChoiceEntry",
+                                        "id": "ncm_control_simulate_managed_run",
+                                        "isQuestImportant": 0,
+                                        "journalEntryOverrideDataList": [],
+                                        "questCondition": null,
+                                        "text": {
+                                          "unk1": "0",
+                                          "value": "LocKey#9000222"
+                                        }
+                                      }
+                                    },
+                                    {
+                                      "HandleId": "45",
+                                      "Data": {
+                                        "$type": "gameJournalPhoneChoiceEntry",
+                                        "id": "ncm_custom_type_sprint",
+                                        "isQuestImportant": 0,
+                                        "journalEntryOverrideDataList": [],
+                                        "questCondition": null,
+                                        "text": {
+                                          "unk1": "0",
+                                          "value": "LocKey#9000184"
+                                        }
+                                      }
+                                    },
+                                    {
+                                      "HandleId": "46",
+                                      "Data": {
+                                        "$type": "gameJournalPhoneChoiceEntry",
+                                        "id": "ncm_custom_type_drag",
+                                        "isQuestImportant": 0,
+                                        "journalEntryOverrideDataList": [],
+                                        "questCondition": null,
+                                        "text": {
+                                          "unk1": "0",
+                                          "value": "LocKey#9000185"
+                                        }
+                                      }
+                                    },
+                                    {
+                                      "HandleId": "47",
+                                      "Data": {
+                                        "$type": "gameJournalPhoneChoiceEntry",
+                                        "id": "ncm_custom_type_knockout",
+                                        "isQuestImportant": 0,
+                                        "journalEntryOverrideDataList": [],
+                                        "questCondition": null,
+                                        "text": {
+                                          "unk1": "0",
+                                          "value": "LocKey#9000186"
+                                        }
+                                      }
+                                    },
+                                    {
+                                      "HandleId": "48",
+                                      "Data": {
+                                        "$type": "gameJournalPhoneChoiceEntry",
+                                        "id": "ncm_custom_field_four",
+                                        "isQuestImportant": 0,
+                                        "journalEntryOverrideDataList": [],
+                                        "questCondition": null,
+                                        "text": {
+                                          "unk1": "0",
+                                          "value": "LocKey#9000187"
+                                        }
+                                      }
+                                    },
+                                    {
+                                      "HandleId": "49",
+                                      "Data": {
+                                        "$type": "gameJournalPhoneChoiceEntry",
+                                        "id": "ncm_custom_field_six",
+                                        "isQuestImportant": 0,
+                                        "journalEntryOverrideDataList": [],
+                                        "questCondition": null,
+                                        "text": {
+                                          "unk1": "0",
+                                          "value": "LocKey#9000188"
+                                        }
+                                      }
+                                    },
+                                    {
+                                      "HandleId": "50",
+                                      "Data": {
+                                        "$type": "gameJournalPhoneChoiceEntry",
+                                        "id": "ncm_custom_field_eight",
+                                        "isQuestImportant": 0,
+                                        "journalEntryOverrideDataList": [],
+                                        "questCondition": null,
+                                        "text": {
+                                          "unk1": "0",
+                                          "value": "LocKey#9000189"
+                                        }
+                                      }
+                                    },
+                                    {
+                                      "HandleId": "51",
+                                      "Data": {
+                                        "$type": "gameJournalPhoneChoiceEntry",
+                                        "id": "ncm_custom_field_ten",
+                                        "isQuestImportant": 0,
+                                        "journalEntryOverrideDataList": [],
+                                        "questCondition": null,
+                                        "text": {
+                                          "unk1": "0",
+                                          "value": "LocKey#9000190"
+                                        }
+                                      }
+                                    },
+                                    {
+                                      "HandleId": "52",
+                                      "Data": {
+                                        "$type": "gameJournalPhoneChoiceEntry",
+                                        "id": "ncm_custom_start_grid",
+                                        "isQuestImportant": 0,
+                                        "journalEntryOverrideDataList": [],
+                                        "questCondition": null,
+                                        "text": {
+                                          "unk1": "0",
+                                          "value": "LocKey#9000191"
+                                        }
+                                      }
+                                    },
+                                    {
+                                      "HandleId": "53",
+                                      "Data": {
+                                        "$type": "gameJournalPhoneChoiceEntry",
+                                        "id": "ncm_custom_start_rolling",
+                                        "isQuestImportant": 0,
+                                        "journalEntryOverrideDataList": [],
+                                        "questCondition": null,
+                                        "text": {
+                                          "unk1": "0",
+                                          "value": "LocKey#9000192"
+                                        }
+                                      }
+                                    },
+                                    {
+                                      "HandleId": "54",
+                                      "Data": {
+                                        "$type": "gameJournalPhoneChoiceEntry",
+                                        "id": "ncm_custom_start_sidebyside",
+                                        "isQuestImportant": 0,
+                                        "journalEntryOverrideDataList": [],
+                                        "questCondition": null,
+                                        "text": {
+                                          "unk1": "0",
+                                          "value": "LocKey#9000193"
+                                        }
+                                      }
+                                    },
+                                    {
+                                      "HandleId": "55",
+                                      "Data": {
+                                        "$type": "gameJournalPhoneChoiceEntry",
+                                        "id": "ncm_custom_difficulty_street",
+                                        "isQuestImportant": 0,
+                                        "journalEntryOverrideDataList": [],
+                                        "questCondition": null,
+                                        "text": {
+                                          "unk1": "0",
+                                          "value": "LocKey#9000194"
+                                        }
+                                      }
+                                    },
+                                    {
+                                      "HandleId": "56",
+                                      "Data": {
+                                        "$type": "gameJournalPhoneChoiceEntry",
+                                        "id": "ncm_custom_difficulty_serious",
+                                        "isQuestImportant": 0,
+                                        "journalEntryOverrideDataList": [],
+                                        "questCondition": null,
+                                        "text": {
+                                          "unk1": "0",
+                                          "value": "LocKey#9000195"
+                                        }
+                                      }
+                                    },
+                                    {
+                                      "HandleId": "57",
+                                      "Data": {
+                                        "$type": "gameJournalPhoneChoiceEntry",
+                                        "id": "ncm_custom_difficulty_elite",
+                                        "isQuestImportant": 0,
+                                        "journalEntryOverrideDataList": [],
+                                        "questCondition": null,
+                                        "text": {
+                                          "unk1": "0",
+                                          "value": "LocKey#9000196"
+                                        }
+                                      }
+                                    },
+                                    {
+                                      "HandleId": "58",
+                                      "Data": {
+                                        "$type": "gameJournalPhoneChoiceEntry",
+                                        "id": "ncm_custom_location_any",
+                                        "isQuestImportant": 0,
+                                        "journalEntryOverrideDataList": [],
+                                        "questCondition": null,
+                                        "text": {
+                                          "unk1": "0",
+                                          "value": "LocKey#9000197"
+                                        }
+                                      }
+                                    },
+                                    {
+                                      "HandleId": "59",
+                                      "Data": {
+                                        "$type": "gameJournalPhoneChoiceEntry",
+                                        "id": "ncm_custom_location_watson",
+                                        "isQuestImportant": 0,
+                                        "journalEntryOverrideDataList": [],
+                                        "questCondition": null,
+                                        "text": {
+                                          "unk1": "0",
+                                          "value": "LocKey#9000198"
+                                        }
+                                      }
+                                    },
+                                    {
+                                      "HandleId": "60",
+                                      "Data": {
+                                        "$type": "gameJournalPhoneChoiceEntry",
+                                        "id": "ncm_custom_location_westbrook",
+                                        "isQuestImportant": 0,
+                                        "journalEntryOverrideDataList": [],
+                                        "questCondition": null,
+                                        "text": {
+                                          "unk1": "0",
+                                          "value": "LocKey#9000199"
+                                        }
+                                      }
+                                    },
+                                    {
+                                      "HandleId": "61",
+                                      "Data": {
+                                        "$type": "gameJournalPhoneChoiceEntry",
+                                        "id": "ncm_custom_location_heywood",
+                                        "isQuestImportant": 0,
+                                        "journalEntryOverrideDataList": [],
+                                        "questCondition": null,
+                                        "text": {
+                                          "unk1": "0",
+                                          "value": "LocKey#9000200"
+                                        }
+                                      }
+                                    },
+                                    {
+                                      "HandleId": "62",
+                                      "Data": {
+                                        "$type": "gameJournalPhoneChoiceEntry",
+                                        "id": "ncm_custom_location_pacifica",
+                                        "isQuestImportant": 0,
+                                        "journalEntryOverrideDataList": [],
+                                        "questCondition": null,
+                                        "text": {
+                                          "unk1": "0",
+                                          "value": "LocKey#9000201"
+                                        }
+                                      }
+                                    },
+                                    {
+                                      "HandleId": "63",
+                                      "Data": {
+                                        "$type": "gameJournalPhoneChoiceEntry",
+                                        "id": "ncm_custom_location_santo_domingo",
+                                        "isQuestImportant": 0,
+                                        "journalEntryOverrideDataList": [],
+                                        "questCondition": null,
+                                        "text": {
+                                          "unk1": "0",
+                                          "value": "LocKey#9000202"
+                                        }
+                                      }
+                                    },
+                                    {
+                                      "HandleId": "64",
+                                      "Data": {
+                                        "$type": "gameJournalPhoneChoiceEntry",
+                                        "id": "ncm_custom_location_city_center",
+                                        "isQuestImportant": 0,
+                                        "journalEntryOverrideDataList": [],
+                                        "questCondition": null,
+                                        "text": {
+                                          "unk1": "0",
+                                          "value": "LocKey#9000203"
+                                        }
+                                      }
+                                    },
+                                    {
+                                      "HandleId": "65",
+                                      "Data": {
+                                        "$type": "gameJournalPhoneChoiceEntry",
+                                        "id": "ncm_custom_location_badlands",
+                                        "isQuestImportant": 0,
+                                        "journalEntryOverrideDataList": [],
+                                        "questCondition": null,
+                                        "text": {
+                                          "unk1": "0",
+                                          "value": "LocKey#9000204"
+                                        }
+                                      }
+                                    },
+                                    {
+                                      "HandleId": "66",
+                                      "Data": {
+                                        "$type": "gameJournalPhoneChoiceEntry",
+                                        "id": "ncm_custom_confirm",
+                                        "isQuestImportant": 0,
+                                        "journalEntryOverrideDataList": [],
+                                        "questCondition": null,
+                                        "text": {
+                                          "unk1": "0",
+                                          "value": "LocKey#9000205"
+                                        }
+                                      }
+                                    },
+                                    {
+                                      "HandleId": "67",
+                                      "Data": {
+                                        "$type": "gameJournalPhoneChoiceEntry",
+                                        "id": "ncm_custom_scrap",
+                                        "isQuestImportant": 0,
+                                        "journalEntryOverrideDataList": [],
+                                        "questCondition": null,
+                                        "text": {
+                                          "unk1": "0",
+                                          "value": "LocKey#9000206"
+                                        }
+                                      }
+                                    },
+                                    {
+                                      "HandleId": "68",
+                                      "Data": {
+                                        "$type": "gameJournalPhoneChoiceEntry",
+                                        "id": "ncm_confirm_preview",
+                                        "isQuestImportant": 0,
+                                        "journalEntryOverrideDataList": [],
+                                        "questCondition": null,
+                                        "text": {
+                                          "unk1": "0",
+                                          "value": "LocKey#9000132"
+                                        }
+                                      }
+                                    },
+                                    {
+                                      "HandleId": "69",
+                                      "Data": {
+                                        "$type": "gameJournalPhoneChoiceEntry",
+                                        "id": "ncm_abort",
+                                        "isQuestImportant": 0,
+                                        "journalEntryOverrideDataList": [],
+                                        "questCondition": null,
+                                        "text": {
+                                          "unk1": "0",
+                                          "value": "LocKey#9000133"
+                                        }
+                                      }
+                                    },
+                                    {
+                                      "HandleId": "70",
+                                      "Data": {
+                                        "$type": "gameJournalPhoneChoiceEntry",
+                                        "id": "ncm_track_start",
+                                        "isQuestImportant": 0,
+                                        "journalEntryOverrideDataList": [],
+                                        "questCondition": null,
+                                        "text": {
+                                          "unk1": "0",
+                                          "value": "LocKey#9000134"
+                                        }
+                                      }
+                                    },
+                                    {
+                                      "HandleId": "71",
+                                      "Data": {
+                                        "$type": "gameJournalPhoneChoiceEntry",
+                                        "id": "ncm_start_quali",
+                                        "isQuestImportant": 0,
+                                        "journalEntryOverrideDataList": [],
+                                        "questCondition": null,
+                                        "text": {
+                                          "unk1": "0",
+                                          "value": "LocKey#9000135"
+                                        }
+                                      }
+                                    },
+                                    {
+                                      "HandleId": "72",
+                                      "Data": {
+                                        "$type": "gameJournalPhoneChoiceEntry",
+                                        "id": "ncm_start_race",
+                                        "isQuestImportant": 0,
+                                        "journalEntryOverrideDataList": [],
+                                        "questCondition": null,
+                                        "text": {
+                                          "unk1": "0",
+                                          "value": "LocKey#9000136"
+                                        }
+                                      }
+                                    },
+                                    {
+                                      "HandleId": "73",
+                                      "Data": {
+                                        "$type": "gameJournalPhoneChoiceEntry",
+                                        "id": "ncm_forfeit_dnf",
+                                        "isQuestImportant": 0,
+                                        "journalEntryOverrideDataList": [],
+                                        "questCondition": null,
+                                        "text": {
+                                          "unk1": "0",
+                                          "value": "LocKey#9000139"
+                                        }
+                                      }
+                                    },
+                                    {
+                                      "HandleId": "74",
+                                      "Data": {
+                                        "$type": "gameJournalPhoneChoiceEntry",
+                                        "id": "ncm_close_results",
+                                        "isQuestImportant": 0,
+                                        "journalEntryOverrideDataList": [],
+                                        "questCondition": null,
+                                        "text": {
+                                          "unk1": "0",
+                                          "value": "LocKey#9000137"
+                                        }
+                                      }
+                                    },
+                                    {
+                                      "HandleId": "75",
+                                      "Data": {
+                                        "$type": "gameJournalPhoneChoiceEntry",
+                                        "id": "ncm_restart",
+                                        "isQuestImportant": 0,
+                                        "journalEntryOverrideDataList": [],
+                                        "questCondition": null,
+                                        "text": {
+                                          "unk1": "0",
+                                          "value": "LocKey#9000138"
+                                        }
+                                      }
+                                    }
+                                  ],
+                                  "id": "control_choices",
+                                  "journalEntryOverrideDataList": []
+                                }
+                              }
+                            ],
+                            "id": "control_menu",
+                            "journalEntryOverrideDataList": [],
+                            "title": {
+                              "unk1": "0",
+                              "value": "LocKey#9000176"
+                            }
+                          }
+                        },
+                        {
+                          "HandleId": "76",
+                          "Data": {
+                            "$type": "gameJournalPhoneConversation",
+                            "entries": [
+                              {
+                                "HandleId": "77",
+                                "Data": {
+                                  "$type": "gameJournalPhoneMessage",
+                                  "attachment": null,
+                                  "delay": 1,
+                                  "id": "msg_phone_response",
+                                  "imageId": {
+                                    "$type": "TweakDBID",
+                                    "$storage": "uint64",
+                                    "$value": "0"
+                                  },
+                                  "isQuestImportant": 0,
+                                  "journalEntryOverrideDataList": [],
+                                  "sender": "NPC",
+                                  "text": {
+                                    "unk1": "0",
+                                    "value": "LocKey#9000017"
+                                  }
+                                }
+                              }
+                            ],
+                            "id": "phone_response",
+                            "journalEntryOverrideDataList": [],
+                            "title": {
+                              "unk1": "0",
+                              "value": "LocKey#9000177"
+                            }
+                          }
+                        }
+                      ],
+                      "id": "ncm_control",
+                      "isCallableDefault": 0,
+                      "journalEntryOverrideDataList": [],
+                      "name": {
+                        "unk1": "0",
+                        "value": "LocKey#9000007"
+                      },
+                      "type": "Texter",
+                      "useFlatMessageLayout": 0
+                    }
+                  },
+                  {
+                    "HandleId": "78",
+                    "Data": {
+                      "$type": "gameJournalContact",
+                      "avatarID": {
+                        "$type": "TweakDBID",
+                        "$storage": "uint64",
+                        "$value": "111767369204"
+                      },
+                      "entries": [
+                        {
+                          "HandleId": "79",
+                          "Data": {
+                            "$type": "gameJournalPhoneConversation",
+                            "entries": [
+                              {
+                                "HandleId": "80",
+                                "Data": {
+                                  "$type": "gameJournalPhoneMessage",
+                                  "attachment": null,
+                                  "delay": 1,
+                                  "id": "msg_ledger_intro",
+                                  "imageId": {
+                                    "$type": "TweakDBID",
+                                    "$storage": "uint64",
+                                    "$value": "0"
+                                  },
+                                  "isQuestImportant": 0,
+                                  "journalEntryOverrideDataList": [],
+                                  "sender": "NPC",
+                                  "text": {
+                                    "unk1": "0",
+                                    "value": "LocKey#9000010"
+                                  }
+                                }
+                              },
+                              {
+                                "HandleId": "81",
+                                "Data": {
+                                  "$type": "gameJournalPhoneChoiceGroup",
+                                  "entries": [
+                                    {
+                                      "HandleId": "82",
+                                      "Data": {
+                                        "$type": "gameJournalPhoneChoiceEntry",
+                                        "id": "ncm_view_player_stats",
+                                        "isQuestImportant": 0,
+                                        "journalEntryOverrideDataList": [],
+                                        "questCondition": null,
+                                        "text": {
+                                          "unk1": "0",
+                                          "value": "LocKey#9000140"
+                                        }
+                                      }
+                                    },
+                                    {
+                                      "HandleId": "83",
+                                      "Data": {
+                                        "$type": "gameJournalPhoneChoiceEntry",
+                                        "id": "ncm_reroll_fan_message",
+                                        "isQuestImportant": 0,
+                                        "journalEntryOverrideDataList": [],
+                                        "questCondition": null,
+                                        "text": {
+                                          "unk1": "0",
+                                          "value": "LocKey#9000141"
+                                        }
+                                      }
+                                    }
+                                  ],
+                                  "id": "ledger_choices",
+                                  "journalEntryOverrideDataList": []
+                                }
+                              }
+                            ],
+                            "id": "ledger_menu",
+                            "journalEntryOverrideDataList": [],
+                            "title": {
+                              "unk1": "0",
+                              "value": "LocKey#9000178"
+                            }
+                          }
+                        },
+                        {
+                          "HandleId": "84",
+                          "Data": {
+                            "$type": "gameJournalPhoneConversation",
+                            "entries": [
+                              {
+                                "HandleId": "85",
+                                "Data": {
+                                  "$type": "gameJournalPhoneMessage",
+                                  "attachment": null,
+                                  "delay": 1,
+                                  "id": "msg_phone_response",
+                                  "imageId": {
+                                    "$type": "TweakDBID",
+                                    "$storage": "uint64",
+                                    "$value": "0"
+                                  },
+                                  "isQuestImportant": 0,
+                                  "journalEntryOverrideDataList": [],
+                                  "sender": "NPC",
+                                  "text": {
+                                    "unk1": "0",
+                                    "value": "LocKey#9000017"
+                                  }
+                                }
+                              }
+                            ],
+                            "id": "phone_response",
+                            "journalEntryOverrideDataList": [],
+                            "title": {
+                              "unk1": "0",
+                              "value": "LocKey#9000179"
+                            }
+                          }
+                        }
+                      ],
+                      "id": "ncm_ledger",
+                      "isCallableDefault": 0,
+                      "journalEntryOverrideDataList": [],
+                      "name": {
+                        "unk1": "0",
+                        "value": "LocKey#9000009"
+                      },
+                      "type": "Texter",
+                      "useFlatMessageLayout": 0
+                    }
+                  },
+                  {
+                    "HandleId": "86",
+                    "Data": {
+                      "$type": "gameJournalContact",
+                      "avatarID": {
+                        "$type": "TweakDBID",
+                        "$storage": "uint64",
+                        "$value": "111767369204"
+                      },
+                      "entries": [
+                        {
+                          "HandleId": "87",
+                          "Data": {
+                            "$type": "gameJournalPhoneConversation",
+                            "entries": [
+                              {
+                                "HandleId": "88",
+                                "Data": {
+                                  "$type": "gameJournalPhoneMessage",
+                                  "attachment": null,
+                                  "delay": 1,
+                                  "id": "msg_scout_intro",
+                                  "imageId": {
+                                    "$type": "TweakDBID",
+                                    "$storage": "uint64",
+                                    "$value": "0"
+                                  },
+                                  "isQuestImportant": 0,
+                                  "journalEntryOverrideDataList": [],
+                                  "sender": "NPC",
+                                  "text": {
+                                    "unk1": "0",
+                                    "value": "LocKey#9000014"
+                                  }
+                                }
+                              },
+                              {
+                                "HandleId": "89",
+                                "Data": {
+                                  "$type": "gameJournalPhoneChoiceGroup",
+                                  "entries": [
+                                    {
+                                      "HandleId": "90",
+                                      "Data": {
+                                        "$type": "gameJournalPhoneChoiceEntry",
+                                        "id": "ncm_scout_status",
+                                        "isQuestImportant": 0,
+                                        "journalEntryOverrideDataList": [],
+                                        "questCondition": null,
+                                        "text": {
+                                          "unk1": "0",
+                                          "value": "LocKey#9000150"
+                                        }
+                                      }
+                                    },
+                                    {
+                                      "HandleId": "91",
+                                      "Data": {
+                                        "$type": "gameJournalPhoneChoiceEntry",
+                                        "id": "ncm_scout_current_grid",
+                                        "isQuestImportant": 0,
+                                        "journalEntryOverrideDataList": [],
+                                        "questCondition": null,
+                                        "text": {
+                                          "unk1": "0",
+                                          "value": "LocKey#9000152"
+                                        }
+                                      }
+                                    },
+                                    {
+                                      "HandleId": "92",
+                                      "Data": {
+                                        "$type": "gameJournalPhoneChoiceEntry",
+                                        "id": "ncm_scout_field_read",
+                                        "isQuestImportant": 0,
+                                        "journalEntryOverrideDataList": [],
+                                        "questCondition": null,
+                                        "text": {
+                                          "unk1": "0",
+                                          "value": "LocKey#9000153"
+                                        }
+                                      }
+                                    },
+                                    {
+                                      "HandleId": "93",
+                                      "Data": {
+                                        "$type": "gameJournalPhoneChoiceEntry",
+                                        "id": "ncm_scout_watchlist",
+                                        "isQuestImportant": 0,
+                                        "journalEntryOverrideDataList": [],
+                                        "questCondition": null,
+                                        "text": {
+                                          "unk1": "0",
+                                          "value": "LocKey#9000154"
+                                        }
+                                      }
+                                    },
+                                    {
+                                      "HandleId": "94",
+                                      "Data": {
+                                        "$type": "gameJournalPhoneChoiceEntry",
+                                        "id": "ncm_scout_ambient_heat",
+                                        "isQuestImportant": 0,
+                                        "journalEntryOverrideDataList": [],
+                                        "questCondition": null,
+                                        "text": {
+                                          "unk1": "0",
+                                          "value": "LocKey#9000213"
+                                        }
+                                      }
+                                    },
+                                    {
+                                      "HandleId": "95",
+                                      "Data": {
+                                        "$type": "gameJournalPhoneChoiceEntry",
+                                        "id": "ncm_scout_management_targets",
+                                        "isQuestImportant": 0,
+                                        "journalEntryOverrideDataList": [],
+                                        "questCondition": null,
+                                        "text": {
+                                          "unk1": "0",
+                                          "value": "LocKey#9000214"
+                                        }
+                                      }
+                                    },
+                                    {
+                                      "HandleId": "96",
+                                      "Data": {
+                                        "$type": "gameJournalPhoneChoiceEntry",
+                                        "id": "ncm_scout_sign_target_one",
+                                        "isQuestImportant": 0,
+                                        "journalEntryOverrideDataList": [],
+                                        "questCondition": null,
+                                        "text": {
+                                          "unk1": "0",
+                                          "value": "LocKey#9000215"
+                                        }
+                                      }
+                                    },
+                                    {
+                                      "HandleId": "97",
+                                      "Data": {
+                                        "$type": "gameJournalPhoneChoiceEntry",
+                                        "id": "ncm_scout_sign_target_two",
+                                        "isQuestImportant": 0,
+                                        "journalEntryOverrideDataList": [],
+                                        "questCondition": null,
+                                        "text": {
+                                          "unk1": "0",
+                                          "value": "LocKey#9000216"
+                                        }
+                                      }
+                                    },
+                                    {
+                                      "HandleId": "98",
+                                      "Data": {
+                                        "$type": "gameJournalPhoneChoiceEntry",
+                                        "id": "ncm_scout_sign_target_three",
+                                        "isQuestImportant": 0,
+                                        "journalEntryOverrideDataList": [],
+                                        "questCondition": null,
+                                        "text": {
+                                          "unk1": "0",
+                                          "value": "LocKey#9000217"
+                                        }
+                                      }
+                                    }
+                                  ],
+                                  "id": "scout_choices",
+                                  "journalEntryOverrideDataList": []
+                                }
+                              }
+                            ],
+                            "id": "scout_menu",
+                            "journalEntryOverrideDataList": [],
+                            "title": {
+                              "unk1": "0",
+                              "value": "LocKey#9000180"
+                            }
+                          }
+                        },
+                        {
+                          "HandleId": "99",
+                          "Data": {
+                            "$type": "gameJournalPhoneConversation",
+                            "entries": [
+                              {
+                                "HandleId": "100",
+                                "Data": {
+                                  "$type": "gameJournalPhoneMessage",
+                                  "attachment": null,
+                                  "delay": 1,
+                                  "id": "msg_phone_response",
+                                  "imageId": {
+                                    "$type": "TweakDBID",
+                                    "$storage": "uint64",
+                                    "$value": "0"
+                                  },
+                                  "isQuestImportant": 0,
+                                  "journalEntryOverrideDataList": [],
+                                  "sender": "NPC",
+                                  "text": {
+                                    "unk1": "0",
+                                    "value": "LocKey#9000017"
+                                  }
+                                }
+                              }
+                            ],
+                            "id": "phone_response",
+                            "journalEntryOverrideDataList": [],
+                            "title": {
+                              "unk1": "0",
+                              "value": "LocKey#9000181"
+                            }
+                          }
+                        }
+                      ],
+                      "id": "ncm_scout",
+                      "isCallableDefault": 0,
+                      "journalEntryOverrideDataList": [],
+                      "name": {
+                        "unk1": "0",
+                        "value": "LocKey#9000013"
+                      },
+                      "type": "Texter",
+                      "useFlatMessageLayout": 0
+                    }
+                  },
+                  {
+                    "HandleId": "101",
+                    "Data": {
+                      "$type": "gameJournalContact",
+                      "avatarID": {
+                        "$type": "TweakDBID",
+                        "$storage": "uint64",
+                        "$value": "111767369204"
+                      },
+                      "entries": [
+                        {
+                          "HandleId": "102",
+                          "Data": {
+                            "$type": "gameJournalPhoneConversation",
+                            "entries": [
+                              {
+                                "HandleId": "103",
+                                "Data": {
+                                  "$type": "gameJournalPhoneMessage",
+                                  "attachment": null,
+                                  "delay": 1,
+                                  "id": "msg_bookie_intro",
+                                  "imageId": {
+                                    "$type": "TweakDBID",
+                                    "$storage": "uint64",
+                                    "$value": "0"
+                                  },
+                                  "isQuestImportant": 0,
+                                  "journalEntryOverrideDataList": [],
+                                  "sender": "NPC",
+                                  "text": {
+                                    "unk1": "0",
+                                    "value": "LocKey#9000016"
+                                  }
+                                }
+                              },
+                              {
+                                "HandleId": "104",
+                                "Data": {
+                                  "$type": "gameJournalPhoneChoiceGroup",
+                                  "entries": [
+                                    {
+                                      "HandleId": "105",
+                                      "Data": {
+                                        "$type": "gameJournalPhoneChoiceEntry",
+                                        "id": "ncm_wager_low",
+                                        "isQuestImportant": 0,
+                                        "journalEntryOverrideDataList": [],
+                                        "questCondition": null,
+                                        "text": {
+                                          "unk1": "0",
+                                          "value": "LocKey#9000160"
+                                        }
+                                      }
+                                    },
+                                    {
+                                      "HandleId": "106",
+                                      "Data": {
+                                        "$type": "gameJournalPhoneChoiceEntry",
+                                        "id": "ncm_wager_medium",
+                                        "isQuestImportant": 0,
+                                        "journalEntryOverrideDataList": [],
+                                        "questCondition": null,
+                                        "text": {
+                                          "unk1": "0",
+                                          "value": "LocKey#9000161"
+                                        }
+                                      }
+                                    },
+                                    {
+                                      "HandleId": "107",
+                                      "Data": {
+                                        "$type": "gameJournalPhoneChoiceEntry",
+                                        "id": "ncm_wager_high",
+                                        "isQuestImportant": 0,
+                                        "journalEntryOverrideDataList": [],
+                                        "questCondition": null,
+                                        "text": {
+                                          "unk1": "0",
+                                          "value": "LocKey#9000162"
+                                        }
+                                      }
+                                    },
+                                    {
+                                      "HandleId": "108",
+                                      "Data": {
+                                        "$type": "gameJournalPhoneChoiceEntry",
+                                        "id": "ncm_wager_clear",
+                                        "isQuestImportant": 0,
+                                        "journalEntryOverrideDataList": [],
+                                        "questCondition": null,
+                                        "text": {
+                                          "unk1": "0",
+                                          "value": "LocKey#9000163"
+                                        }
+                                      }
+                                    },
+                                    {
+                                      "HandleId": "109",
+                                      "Data": {
+                                        "$type": "gameJournalPhoneChoiceEntry",
+                                        "id": "ncm_wager_earnings",
+                                        "isQuestImportant": 0,
+                                        "journalEntryOverrideDataList": [],
+                                        "questCondition": null,
+                                        "text": {
+                                          "unk1": "0",
+                                          "value": "LocKey#9000164"
+                                        }
+                                      }
+                                    },
+                                    {
+                                      "HandleId": "110",
+                                      "Data": {
+                                        "$type": "gameJournalPhoneChoiceEntry",
+                                        "id": "ncm_wager_board",
+                                        "isQuestImportant": 0,
+                                        "journalEntryOverrideDataList": [],
+                                        "questCondition": null,
+                                        "text": {
+                                          "unk1": "0",
+                                          "value": "LocKey#9000207"
+                                        }
+                                      }
+                                    },
+                                    {
+                                      "HandleId": "111",
+                                      "Data": {
+                                        "$type": "gameJournalPhoneChoiceEntry",
+                                        "id": "ncm_wager_favorite",
+                                        "isQuestImportant": 0,
+                                        "journalEntryOverrideDataList": [],
+                                        "questCondition": null,
+                                        "text": {
+                                          "unk1": "0",
+                                          "value": "LocKey#9000208"
+                                        }
+                                      }
+                                    },
+                                    {
+                                      "HandleId": "112",
+                                      "Data": {
+                                        "$type": "gameJournalPhoneChoiceEntry",
+                                        "id": "ncm_wager_value",
+                                        "isQuestImportant": 0,
+                                        "journalEntryOverrideDataList": [],
+                                        "questCondition": null,
+                                        "text": {
+                                          "unk1": "0",
+                                          "value": "LocKey#9000209"
+                                        }
+                                      }
+                                    },
+                                    {
+                                      "HandleId": "113",
+                                      "Data": {
+                                        "$type": "gameJournalPhoneChoiceEntry",
+                                        "id": "ncm_wager_pick_self",
+                                        "isQuestImportant": 0,
+                                        "journalEntryOverrideDataList": [],
+                                        "questCondition": null,
+                                        "text": {
+                                          "unk1": "0",
+                                          "value": "LocKey#9000210"
+                                        }
+                                      }
+                                    },
+                                    {
+                                      "HandleId": "114",
+                                      "Data": {
+                                        "$type": "gameJournalPhoneChoiceEntry",
+                                        "id": "ncm_wager_pick_favorite",
+                                        "isQuestImportant": 0,
+                                        "journalEntryOverrideDataList": [],
+                                        "questCondition": null,
+                                        "text": {
+                                          "unk1": "0",
+                                          "value": "LocKey#9000211"
+                                        }
+                                      }
+                                    },
+                                    {
+                                      "HandleId": "115",
+                                      "Data": {
+                                        "$type": "gameJournalPhoneChoiceEntry",
+                                        "id": "ncm_wager_pick_value",
+                                        "isQuestImportant": 0,
+                                        "journalEntryOverrideDataList": [],
+                                        "questCondition": null,
+                                        "text": {
+                                          "unk1": "0",
+                                          "value": "LocKey#9000212"
+                                        }
+                                      }
+                                    },
+                                    {
+                                      "HandleId": "116",
+                                      "Data": {
+                                        "$type": "gameJournalPhoneChoiceEntry",
+                                        "id": "ncm_wager_streak_three",
+                                        "isQuestImportant": 0,
+                                        "journalEntryOverrideDataList": [],
+                                        "questCondition": null,
+                                        "text": {
+                                          "unk1": "0",
+                                          "value": "LocKey#9000166"
+                                        }
+                                      }
+                                    },
+                                    {
+                                      "HandleId": "117",
+                                      "Data": {
+                                        "$type": "gameJournalPhoneChoiceEntry",
+                                        "id": "ncm_wager_streak_five",
+                                        "isQuestImportant": 0,
+                                        "journalEntryOverrideDataList": [],
+                                        "questCondition": null,
+                                        "text": {
+                                          "unk1": "0",
+                                          "value": "LocKey#9000167"
+                                        }
+                                      }
+                                    }
+                                  ],
+                                  "id": "bookie_choices",
+                                  "journalEntryOverrideDataList": []
+                                }
+                              }
+                            ],
+                            "id": "bookie_menu",
+                            "journalEntryOverrideDataList": [],
+                            "title": {
+                              "unk1": "0",
+                              "value": "LocKey#9000182"
+                            }
+                          }
+                        },
+                        {
+                          "HandleId": "118",
+                          "Data": {
+                            "$type": "gameJournalPhoneConversation",
+                            "entries": [
+                              {
+                                "HandleId": "119",
+                                "Data": {
+                                  "$type": "gameJournalPhoneMessage",
+                                  "attachment": null,
+                                  "delay": 1,
+                                  "id": "msg_phone_response",
+                                  "imageId": {
+                                    "$type": "TweakDBID",
+                                    "$storage": "uint64",
+                                    "$value": "0"
+                                  },
+                                  "isQuestImportant": 0,
+                                  "journalEntryOverrideDataList": [],
+                                  "sender": "NPC",
+                                  "text": {
+                                    "unk1": "0",
+                                    "value": "LocKey#9000017"
+                                  }
+                                }
+                              }
+                            ],
+                            "id": "phone_response",
+                            "journalEntryOverrideDataList": [],
+                            "title": {
+                              "unk1": "0",
+                              "value": "LocKey#9000183"
+                            }
+                          }
+                        }
+                      ],
+                      "id": "ncm_bookie",
+                      "isCallableDefault": 0,
+                      "journalEntryOverrideDataList": [],
+                      "name": {
+                        "unk1": "0",
+                        "value": "LocKey#9000015"
+                      },
+                      "type": "Texter",
+                      "useFlatMessageLayout": 0
+                    }
+                  }
+                ],
+                "id": "contacts",
+                "journalEntryOverrideDataList": []
+              }
+            }
+          ],
+          "id": "",
+          "journalEntryOverrideDataList": []
+        }
+      }
+    },
+    "EmbeddedFiles": []
+  }
+}

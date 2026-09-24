@@ -1,0 +1,26 @@
+# server Open77.npcs.create(def: table)
+
+Creates an authoritative NPC.
+
+Requires `world.npcs`. Build one from `record = "Character.*"` directly -- no catalogue entry is needed -- or from the legacy `template` alias. Definition fields are `record`, `template`, `position`, `yaw`, `bucket`, `appearance`, `loadout`, `behavior`, `aiMode`, `damagePolicy`, `health`, `maxHealth`, `streamingRadius`, `streamingHysteresis`, `despawnWhenUnobserved` and `persistent`. The id comes back at once, but engine readiness is asynchronous: a freshly created NPC is not yet a body in the world. See [NPCs](npcs.md).
+
+- runtime: server (network)
+- permissions: world.npcs
+- since: 2.31.13+op77.45
+- reasons it can return: npc_record_invalid, npc_template_invalid, npcs_unavailable, permission_denied:world.npcs
+- returns: NPC id, or nil; reason
+- guides: npc-behavior#spawn-a-passive-silent-npc, npc-behavior#speech-one-line-on-demand, npc-catalogue#use-a-record, npcs#create-and-inspect, npcs#equipment-dressing-an-npc, npcs#events
+
+```lua
+-- A shopkeeper standing behind the counter, who never fights back
+local shopkeeper, reason = Open77.npcs.create({
+    record = "Character.Judy",
+    position = { x = -1442.2, y = 127.4, z = 18.0 },
+    yaw = 180.0,
+    damagePolicy = "invulnerable",
+    persistent = true,
+})
+if not shopkeeper then print("could not spawn the shopkeeper: " .. reason) end
+```
+
+_answering for build 2.31.13+op77.78_

@@ -1,0 +1,538 @@
+-- ncm_world / client / calendar — the heartbeat and the venue prompt (M3.1; L34, L35, P19).
+--
+-- Reads GlobalState.ncmCalendar (server-published), shows a persistent "NEXT RACE" hint with a
+-- countdown and the distance to the start, places a world marker with the prompt
+-- "Pay entry fee and enter?" at the venue, and asks the server to enter on confirmation.
+-- The client never decides anything sporting: the server re-validates window and position.
+local Core = NcmCore
+local Entry = Core.get("competition.entry")
+local Routes = Core.get("course.routes")
+
+local function log(fmt, ...)
+    print(("[ncm_world/client/calendar] " .. fmt):format(...))
+end
+
+local function call(resource, name, ...)
+    local promise, reason = Open77.exports.call(resource, name, ...)
+    if not promise then return nil, reason end
+    return promise:await()
+end
+
+local cal = nil                 -- last GlobalState.ncmCalendar
+local base = { offset = nil }    -- KB-25: serverNow - monotonic, kept at its RUNNING MAXIMUM (see seedClock)
+local poi = { eventId = nil, handle = nil, venue = nil }
+local lastHint = { text = nil, title = nil }
+local gps = { eventId = nil, blipId = nil }
+local autoRouted = {}            -- eventId -> true once we set the venue route for it
+local routeTo                    -- defined below (used by the heartbeat and /ncm.gps)
+local VENUE_RADIUS_M = 6.0        -- the ring; the option list only acts inside it
+local VENUE_SHOW_M = 15.0         -- ring visible from here (tight on purpose; GPS does the approach)
+local PAD_KEY = "padX"            -- vanilla "interact" on a pad; same tap/hold job as E
+local holdFraction = 0            -- 0..1 while the engage key is held, for the list's progress bar
+
+-- KB-25: every published `serverNow` is already stale when it lands (publish cadence + latency), and staleness
+-- is a one-directional BIAS: a snapshot can only make the server look older than it is, never newer. Re-seeding
+-- the clock from each snapshot therefore walks the countdown forward and snaps it back. `serverNow - monotonic`
+-- is understated by exactly the staleness, so the least-stale sample is the MAXIMUM offset: keeping the running
+-- maximum converges on the truth and can never step the displayed clock backwards. A large drop means the server
+-- restarted, which is the one case where following it down is right.
+local function serverNow()
+    if not base.offset then return 0 end
+    return Open77.time.monotonic() + base.offset
+end
+
+local function seedClock(published)
+    local t = tonumber(published) or 0
+    if t <= 0 then return end
+    local sample = t - Open77.time.monotonic()
+    if not base.offset or sample > base.offset then
+        base.offset = sample
+    elseif sample < base.offset - 30 then
+        base.offset = sample
+    end
+end
+
+local function localPosition()
+    local ok, x, y, z = pcall(Open77.character.position)
+    if ok and type(x) == "number" then return { x = x, y = y, z = z } end
+    return nil
+end
+
+local function myEntry()
+    local ok, bag = pcall(Open77.state.localPlayer)
+    if ok and type(bag) == "table" then return bag.ncmEntry end
+    return nil
+end
+
+local function km(m)
+    if m >= 1000 then return string.format("%.1f km", m / 1000) end
+    return string.format("%d m", math.floor(m))
+end
+
+local function removePoi()
+    if poi.handle then
+        pcall(function() call("open77_worldui", "remove", poi.handle) end)
+    end
+    poi = { eventId = nil, handle = nil, venue = nil }
+end
+
+local function ensurePoi(next)
+    if not next then removePoi(); return end
+    if poi.eventId == next.eventId and poi.handle then return end
+    -- A refused create is retried every 10 s, not every tick (one log line per attempt).
+    if poi.failedAt and Open77.time.monotonic() - poi.failedAt < 10 then return end
+    removePoi()
+    -- IDEA-095: the marker is now a RING ONLY. It carries no label, key, holdSeconds or event, because a labelled
+    -- worldui marker always makes the platform facade draw its own E card (KB-3, KB-16) -- and that card can offer
+    -- exactly one action, which is the whole reason a single key was doing three jobs (KB-32). NCM draws the option
+    -- list itself (web/venue.html) and owns the key. **Unverified live: whether an unlabelled marker still renders
+    -- the ring.** Owner accepted that risk 2026-09-22; if the ring vanishes, put a label back and hide the facade
+    -- card some other way.
+    local result, err = call("open77_worldui", "create", {
+        id = "ncm_venue",
+        position = { x = next.venue.x, y = next.venue.y, z = next.venue.z },
+        radius = VENUE_RADIUS_M,
+        style = "objective",
+        maxDistance = VENUE_SHOW_M,          -- (interactions caps a prompt's show distance at 250 anyway)
+        promptDistance = VENUE_RADIUS_M,
+        groundOffset = 0.25,
+        color = "#00E5FF",
+    })
+    if result and result.ok then
+        -- Keep the exact event/venue that owns this ring. `cal.next[1]` is merely the
+        -- soonest server-wide event and can differ from the driver's selected event.
+        poi = { eventId = next.eventId, handle = result.handle, venue = next.venue }
+        log("venue marker at %s for %s", next.venue.name, next.eventId)
+    else
+        poi.failedAt = Open77.time.monotonic()
+        log("venue marker failed: %s", tostring(err or (result and result.error)))
+    end
+end
+
+-- ---------------------------------------------------------------------------------------------
+-- The venue option list (IDEA-095)
+--
+-- One marker, a short FLAT list of final acts, and ONE key. Tap E to move the highlight, hold E to engage the
+-- highlighted option. A second key was the obvious design and is the wrong one here: every spare key at a venue
+-- is already a movement key, and the owner asked for one button and a list, not two buttons. Tapping to cycle
+-- costs nothing and keeps `hold E` meaning exactly what it means everywhere else in the game.
+--
+-- The list itself is decided by the server (competition.venue_options) and arrives on the `ncmVenue` bag. The
+-- client never decides what is available -- it draws what it was given and sends back the id it drew, and the
+-- server refuses anything no longer on the list.
+-- ---------------------------------------------------------------------------------------------
+local ENGAGE_KEY = "E"
+local HOLD_S = 0.6           -- hold this long to engage; below it, a release is a tap
+local vpage, vpageReady = nil, false
+local venueBag, historyBag, practiceBag = nil, nil, nil
+-- The server's `at` stamp last acted on, per panel. See `readVenueBags`: a persisted bag must be
+-- adopted silently, never treated as a fresh request.
+local historyAt, practiceAt = nil, nil
+local venueSig = nil                 -- I4: content signature of the list, so a republish is not a change
+local selId, panelOpen = nil, nil    -- I4: the highlight is remembered by option ID, never by row index
+local lastDrawn = nil
+
+--- Index of the remembered option, or 1 when it is gone (the list is contextual, so options come and go).
+local function selIndex(options)
+    for i, o in ipairs(options) do if o.id == selId then return i end end
+    return 1
+end
+
+local function sendVenue()
+    if not (vpage and vpageReady) then return end
+    local v = venueBag
+    if not v or type(v.options) ~= "table" or #v.options == 0 or panelOpen then
+        if lastDrawn ~= "hidden" then lastDrawn = "hidden"; vpage:send("venue:hide", {}) end
+        return
+    end
+    local i = selIndex(v.options)
+    selId = v.options[i].id
+    lastDrawn = "list"
+    vpage:send("venue:list", {
+        series = v.series, route = v.route, sub = v.venue, options = v.options, sel = i - 1, hold = holdFraction or 0,
+    })
+end
+
+local function closePanel()
+    if not panelOpen then return end
+    panelOpen = nil
+    if vpage and vpageReady then vpage:send("venue:closePanel", {}) end
+    lastDrawn = nil
+    sendVenue()
+end
+
+local function engage()
+    local v = venueBag
+    if not v or type(v.options) ~= "table" then return end
+    local o = v.options[selIndex(v.options)]
+    if not o then return end
+    -- Disabled options are shown so the player can see what exists (owner, 2026-09-23), but pressing one must
+    -- do nothing except explain itself. The server re-checks regardless; this stops a pointless round trip.
+    if o.enabled == false then
+        log("venue option refused: %s (%s)", tostring(o.id), tostring(o.why))
+        pcall(function()
+            call("open77_notifications", "show", { id = "ncm_venue_why", replace = true, type = "warning",
+                title = tostring(o.label or o.id):upper(), message = tostring(o.why or "Not available right now."),
+                icon = "NCM", durationMs = 4000 })
+        end)
+        return
+    end
+    log("venue option engaged: %s (%s)", tostring(o.id), tostring(v.eventId))
+    TriggerServerEvent("ncm:venue.option", o.id)
+end
+
+AddEventHandler("onClientResourceStart", function(name)
+    if name ~= GetCurrentResourceName() then return end
+    local reason
+    vpage, reason = WebUI.create({
+        entry = "web/venue.html", layer = "hud", width = 1920, height = 1080,
+        fps = 20, zIndex = 720, transparent = true, visible = true,
+    })
+    if not vpage then log("venue WebUI failed: %s", tostring(reason)); return end
+    vpage:on("venue:ready", function() vpageReady = true; lastDrawn = nil; log("venue list ready") end)
+end)
+
+-- The three bags the server writes for this surface. KB-41: the watcher carries no payload; we always read our own.
+local function readVenueBags()
+    local ok, bag = pcall(Open77.state.localPlayer)
+    if not ok or type(bag) ~= "table" then return end
+    -- I4 (live QA 2026-09-22: "tapping e moves to the second row briefly, then back to the top without any user
+    -- input"). The old test was `bag.ncmVenue ~= venueBag` -- a table IDENTITY check. The server republishes this
+    -- bag on every guide refresh and calendar publish, so a fresh table arrived every few seconds with identical
+    -- contents, the check fired, and the highlight was reset to row 1. Rows 2 and 3 were unreachable in practice.
+    -- Compare what the list SAYS instead, and remember the highlight by option id so it survives a republish --
+    -- and so it still points at the right thing when the list itself changes (ENTER RACE -> WITHDRAW).
+    local nv = bag.ncmVenue
+    local sig = nil
+    if type(nv) == "table" and type(nv.options) == "table" then
+        local ids = {}
+        for i, o in ipairs(nv.options) do ids[i] = tostring(o.id) end
+        sig = tostring(nv.eventId) .. "|" .. table.concat(ids, ",")
+    end
+    if sig ~= venueSig then
+        venueSig = sig
+        lastDrawn = nil
+        if selId then
+            local still = false
+            for _, o in ipairs((type(nv) == "table" and nv.options) or {}) do if o.id == selId then still = true end end
+            if not still then selId = nil end
+        end
+    end
+    venueBag = nv
+    -- **A persisted bag is not a request.**
+    --
+    -- `ncmHistory` and `ncmPractice` are set when the player chooses that option and are never cleared, so
+    -- they survive into the next session. This used to compare table IDENTITY -- exactly the bug the comment
+    -- above describes for `ncmVenue` -- so on a fresh join `historyBag` was nil, the check fired, and the
+    -- history panel opened by itself. `sendVenue()` hides the option list whenever `panelOpen` is set, so the
+    -- driver got a ring and **no way to register**: owner QA, 2026-09-23, *"there is no race panel to enter the
+    -- race when i am at race venue"*, on time and in the right place, having pressed HISTORY in an earlier
+    -- session. It also explains KB-67's unclosable panel: it was reopening itself.
+    --
+    -- Both payloads already carry `at`, the moment the server pushed them. First sight of a bag adopts its
+    -- stamp silently; only a NEWER stamp is a request this session, which is the same rule `ncmHelp.seq` uses.
+    local function panelRequest(nv, seenAt, kind, current)
+        if type(nv) ~= "table" then return seenAt, current end
+        local at = tonumber(nv.at) or 0
+        if seenAt == nil then return at, nv end                 -- adopted, deliberately not opened
+        if at <= seenAt then return seenAt, nv end
+        if vpage and vpageReady then
+            panelOpen = kind
+            vpage:send("venue:" .. kind, nv)
+            vpage:send("venue:hide", {})
+            lastDrawn = "hidden"
+        end
+        return at, nv
+    end
+    historyAt, historyBag = panelRequest(bag.ncmHistory, historyAt, "history", historyBag)
+    practiceAt, practiceBag = panelRequest(bag.ncmPractice, practiceAt, "practice", practiceBag)
+end
+
+-- One key, polled: tap cycles, hold engages. Pad X does the same job for a controller.
+CreateThread(function()
+    local heldSince, fired = nil, false
+    while true do
+        local pos = poi.handle and poi.venue and localPosition() or nil
+        local near = pos and Routes.planarDistance(pos, poi.venue) <= VENUE_RADIUS_M + 0.5
+        -- while racing, race.lua owns the HUD and the venue list must not sit under it
+        if near and not NcmClientRaceActive then
+            readVenueBags()
+            local captured = false
+            pcall(function() captured = Open77.input.isCaptured() == true end)
+            local down = false
+            if not captured then
+                local okK, k = pcall(Open77.input.isDown, ENGAGE_KEY)
+                local okP, pk = pcall(Open77.input.isDown, PAD_KEY)
+                down = (okK and k == true) or (okP and pk == true)
+            end
+            if down then
+                heldSince = heldSince or Open77.time.monotonic()
+                local held = Open77.time.monotonic() - heldSince
+                holdFraction = math.min(1, held / HOLD_S)
+                if held >= HOLD_S and not fired then
+                    fired = true
+                    holdFraction = 0
+                    if panelOpen then closePanel() else engage() end
+                end
+            else
+                if heldSince and not fired then
+                    -- a release below the hold time is a tap: move the highlight, or close an open panel
+                    if panelOpen then
+                        closePanel()
+                    elseif venueBag and type(venueBag.options) == "table" and #venueBag.options > 0 then
+                        local opts = venueBag.options
+                        -- step to the next PRESSABLE option; fall back to the next one if none are
+                        local start, pick = selIndex(opts), nil
+                        for step = 1, #opts do
+                            local cand = opts[((start + step - 1) % #opts) + 1]
+                            if cand and cand.enabled ~= false then pick = cand; break end
+                        end
+                        selId = (pick or opts[(start % #opts) + 1]).id
+                        lastDrawn = nil
+                    end
+                end
+                heldSince, fired, holdFraction = nil, false, 0
+            end
+            sendVenue()
+            Wait(50)
+        else
+            -- KB-67. This teardown used to be guarded by `lastDrawn ~= "hidden"` alone, and opening a panel
+            -- sets `lastDrawn = "hidden"` (it hides the option LIST). So the one state that most needed
+            -- cleaning up was the one state that skipped it: start a race or walk out of radius with the
+            -- history panel open and `venue:closePanel` was never sent, while `panelOpen` was cleared in this
+            -- same line -- which also killed the tap-to-close path, because that needs `panelOpen` truthy.
+            -- A dead overlay then sat on top of a screen `race.lua` owns, with nothing able to dismiss it.
+            --
+            -- The panel and the list are two different things and now get two different tests.
+            if panelOpen and vpage and vpageReady then
+                vpage:send("venue:closePanel", {})
+                log("venue: closed a left-open %s panel (KB-67)", tostring(panelOpen))
+            end
+            if lastDrawn ~= "hidden" and vpage and vpageReady then lastDrawn = "hidden"; vpage:send("venue:hide", {}) end
+            -- cleared only AFTER the close has gone out
+            heldSince, fired, holdFraction, panelOpen = nil, false, 0, nil
+            Wait(400)
+        end
+    end
+end)
+
+local function refreshHint()
+    -- While the local driver is in a race session, race.lua owns the card and the markers.
+    if NcmClientRaceActive then
+        if lastHint.text then
+            lastHint = { text = nil, title = nil }
+            pcall(function() call("open77_notifications", "clear") end)   -- do not leave a frozen card behind the race HUD
+        end
+        ensurePoi(nil)
+        return
+    end
+    local entry = myEntry()
+    local entryState = entry and tostring(entry.state or "") or nil
+    local activeEntry = entry and entry.eventId and entryState ~= "withdrawn" and entryState ~= "cancelled"
+    local next = nil
+    if activeEntry and cal and type(cal.next) == "table" then
+        for _, candidate in ipairs(cal.next) do
+            if candidate.eventId == entry.eventId then next = candidate; break end
+        end
+    end
+    -- The calendar is discovered through F6. Until the driver expresses interest, do not advertise a named
+    -- race, place its venue ring, or take over their waypoint. Once interested/entered, follow THEIR event --
+    -- not cal.next[1], which may be an unrelated championship that happens to start sooner.
+    if not activeEntry then
+        ensurePoi(nil)
+        -- This card is the one instruction that persists. It MUST name the repeatable recovery command;
+        -- otherwise a missed first-join toast leaves a visitor stranded for the rest of their session.
+        local text, title = "Races are running tonight · F6 Race Guide · New here? /ncm help", "NCM · RACE GUIDE"
+        if text ~= lastHint.text or title ~= lastHint.title then
+            lastHint = { text = text, title = title }
+            pcall(function()
+                call("open77_notifications", "show", {
+                    id = "ncm_heartbeat", replace = true, type = "info", title = title, message = text,
+                    icon = "NCM", position = "middle_left", durationMs = 0, color = "#22D8E2",
+                })
+            end)
+        end
+        return
+    end
+    if not next then
+        if lastHint.text then
+            lastHint = { text = nil, title = nil }
+            pcall(function() call("open77_notifications", "clear") end)
+        end
+        ensurePoi(nil)
+        return
+    end
+    -- A driver with a seat in an organized event is routed by the race HUD, never by the street cadence (a
+    -- cadence pin sent the owner to Vista Del Drag mid-weekend, Batch 1 live 2026-09-21).
+    local interested = entryState == "interested"
+    local entered = not interested
+    if interested and next.state == "entry_open" and not next.invitation and not autoRouted[next.eventId] and not NcmClientRaceActive then
+        autoRouted[next.eventId] = true
+        local okWp, wp = pcall(Open77.blips.waypoint)
+        if not (okWp and wp) then
+            CreateThread(function() routeTo(next.venue, next.eventId, "entries open") end)
+        else
+            log("entries open for %s; keeping the player's own waypoint", next.eventId)
+        end
+    end
+    local remaining = next.startsAt - serverNow()
+    local pos = localPosition()
+    local dist = pos and Routes.planarDistance(pos, next.venue) or nil
+    -- KB-27: an entry in state `interested` is NOT an entry. Interest is a soft list (L35/P21/P52): it reserves
+    -- nothing, forms no grid, and the driver must still enter physically at the line. Conflating the two told the
+    -- player he was racing AND removed the venue marker he needed in order to actually enter.
+    local n = tonumber(next.entries) or 0
+    local onList = tonumber(next.interested) or 0
+    local field
+    if next.invitation then
+        field = entered and entry.teamName and ("you drive for " .. entry.teamName .. " (car " .. tostring(entry.seatIndex or 1) .. ")")
+            or (("%d/%d seats taken · invited drivers only"):format(tonumber(next.seatsTaken) or 0, tonumber(next.seatsTotal) or 0))
+    else
+        if interested then
+            field = "you're on the list · drive to the line to enter"
+                .. (n > 0 and ("  ·  " .. n .. " entered") or "")
+        else
+            field = entered and (n <= 1 and "you alone so far" or ("you + " .. (n - 1) .. " other" .. (n > 2 and "s" or "")))
+                or (n == 0 and (onList > 0 and (onList .. " on the list · nobody entered yet") or "nobody entered yet")
+                or (n .. " entered"))
+        end
+    end
+    local text
+    if remaining <= 0 then
+        text = ("%s · %s · starting · %s"):format(next.seriesName, next.routeName, field)
+    else
+        text = ("%s · %s · %s%s · %s"):format(next.seriesName, next.routeName, Entry.countdown(remaining),
+            dist and ("  ·  " .. km(dist) .. " to " .. next.venue.name) or "", field)
+    end
+    local title
+    if next.invitation then
+        title = entered and ("NCX · " .. string.upper(tostring(entry.teamShort or "SEAT"))) or "NCX · INVITATIONAL"
+    else
+        title = (entered and "NCM · ENTERED")
+            or (interested and "NCM · ON THE LIST")
+            or (next.state == "entry_open" and "NCM · NEXT RACE · ENTRIES OPEN")
+            or "NCM · NEXT RACE"
+    end
+    if text ~= lastHint.text or title ~= lastHint.title then
+        lastHint = { text = text, title = title }
+        local okShow, res, why = pcall(function()
+            return call("open77_notifications", "show", {
+                id = "ncm_heartbeat", replace = true,
+                type = entered and "success" or "info",
+                title = title, message = text, icon = "NCM",
+                position = "middle_left", durationMs = 0,
+                -- three visibly distinct states: entered (green) / on the list (amber) / just upcoming (cyan)
+                color = (entered and "#3BE28A") or (interested and "#E2B93B") or "#22D8E2",
+            })
+        end)
+        local failure = (not okShow and tostring(res)) or (type(res) == "table" and not res.ok and tostring(res.error)) or (res == nil and tostring(why)) or nil
+        if failure and failure ~= lastHint.failure then
+            lastHint.failure = failure
+            log("hint show failed: %s", failure)
+        elseif not failure and lastHint.failure then
+            lastHint.failure = nil
+            log("hint show recovered")
+        end
+    end
+    -- I9 (live QA 2026-09-22: "entrance ring disappears upon race entry ... no options panel available").
+    -- This used to read `if entered or next.invitation`, from when the marker's only job was to enter the race --
+    -- once you were in, it had nothing left to say. IDEA-095 changed what the marker IS: it is now the way to
+    -- reach WITHDRAW, PRACTICE and HISTORY, all of which matter most *after* you are entered. Taking it down on
+    -- entry deletes the surface at the moment it becomes useful. Only invitation events hide it now.
+    if next.invitation then ensurePoi(nil) else ensurePoi(next) end
+end
+
+CreateThread(function()
+    Wait(2000)
+    while true do
+        local g = GlobalState and GlobalState.ncmCalendar or nil
+        if type(g) == "table" then
+            if not cal or g.signature ~= cal.signature then
+                log("calendar: %d upcoming (%s)", g.next and #g.next or 0, tostring(g.signature))
+            end
+            if not cal or g.serverNow ~= cal.serverNow or g.signature ~= cal.signature then
+                seedClock(g.serverNow)
+                cal = g
+            end
+        elseif not cal and (Open77.time.monotonic() % 10) < 1 then
+            log("calendar: GlobalState.ncmCalendar not present yet")
+        end
+        local ok, err = pcall(refreshHint)
+        if not ok then log("hint error: %s", tostring(err)) end
+        Wait(1000)
+    end
+end)
+
+local function clearGps()
+    NcmNav.clear()
+    gps = { eventId = nil }
+end
+
+-- Set the waypoint. NCM never opens the player's map for them (L70, owner 2026-09-21): the old KB-1 "kick"
+-- (open then close the native map to force the engine to compute the road line) was jarring, fired while the
+-- player was driving, and was unreliable anyway.
+--
+-- IDEA-052 assumed the missing road line was a platform limitation. It is not: `client/nav.lua` now uses the
+-- routable-blip recipe the platform's own race gamemode uses, and re-selects it when the driver's seat context
+-- changes. This function is kept as the calendar's spelling of "point me at a venue".
+routeTo = function(p, eventId, why)
+    gps = { eventId = eventId }
+    NcmNav.to(p, why)
+end
+
+-- /ncm.gps — a calculated road route to the next start venue.
+-- Verified 2026-09-19 (E17): a routable blip that is created and tracked gets a pin but the engine
+-- does not compute the road path until tracking is cleared and re-set (opening the map does the
+-- same). clearWaypoint -> setWaypoint routes immediately, so that is the whole recipe.
+RegisterCommand("ncm.gps", function()
+    -- In a session, the HUD's target (grid, start line, next gate) wins over the street cadence. `/ncm.gps` is
+    -- a RECOVERY tool, not part of racing: what it does here is re-select the existing target against the
+    -- driver's current seat context, which is precisely what opening and closing the map used to do by hand.
+    local target = NcmClientRaceTarget and NcmClientRaceTarget() or nil
+    if target then
+        NcmNav.refresh("command")
+        log("gps: refreshed the live target (%s)", tostring(target.why))
+        return
+    end
+    -- Your own race first. `cal.next[1]` is merely the soonest race ON THE SERVER, usually one you have
+    -- never heard of -- the same trap the heartbeat card warns about above. It also never checked whether
+    -- that race had already STARTED, so /ncm.gps routed to elapsed events one after another before ever
+    -- reaching the one the driver had actually entered (owner, 2026-09-23).
+    local entry = myEntry()
+    local state = entry and tostring(entry.state or "") or nil
+    if entry and entry.venue and state ~= "withdrawn" and state ~= "cancelled" then
+        CreateThread(function() routeTo(entry.venue, entry.eventId, "command:my entry") end)
+        return
+    end
+    local soonest, at = nil, serverNow()
+    for _, candidate in ipairs((cal and cal.next) or {}) do
+        if (candidate.startsAt or 0) > at and (not soonest or candidate.startsAt < soonest.startsAt) then
+            soonest = candidate
+        end
+    end
+    if not soonest then return end
+    CreateThread(function() routeTo(soonest.venue, soonest.eventId, "command") end)
+end, false)
+
+-- /ncm.gps.echo — diagnostic (E17): take the waypoint the player set by hand on the map, clear it,
+-- and re-set the SAME coordinates through the scripted API. If the route line comes back, scripted
+-- pins route and our venue coordinates are the problem; if it does not, scripted pins never route.
+RegisterCommand("ncm.gps.echo", function()
+    CreateThread(function()
+        local wp, reason = Open77.blips.waypoint()
+        if not wp then log("gps.echo: no hand waypoint (%s)", tostring(reason)); return end
+        log("gps.echo: hand waypoint at %.1f %.1f %.1f", wp.x, wp.y, wp.z)
+        Open77.blips.clearWaypoint()
+        Wait(1000)
+        local ok, r = Open77.blips.setWaypoint({ x = wp.x, y = wp.y, z = wp.z })
+        log("gps.echo: scripted setWaypoint -> %s %s", tostring(ok), tostring(r))
+    end)
+end, false)
+
+AddEventHandler("onClientResourceStop", function(name)
+    if name == "ncm_world" then
+        removePoi()
+        clearGps()
+        pcall(function() call("open77_notifications", "clear") end)
+    end
+end)

@@ -1,0 +1,26 @@
+﻿12 results for "street racing race mode checkpoints /race command" â answering for build 2.31.13+op77.78 (no index published for 2.31.13+op77.84; serving 2.31.13+op77.78, the newest at or below it)
+
+- (card) **GetRegisteredCommands** [client Â· since 2.31.13+op77.67] â FiveM-style alias for `Open77.runtime.commands`.
+  ref: GetRegisteredCommands
+- (guide) **Deathmatch â running the Kabuki Arena PvP mode âº Commands and access control** â Available to any player: | Command | Effect | |---|---| | `/dm` | Opens the panel. | | `/deathmatch.join` | Registers for the next match. | | `/deathmatch.leave` | Leaves the queue, the instance or the match. | | `/death
+  ref: deathmatch#commands-and-access-control
+- (card) **Open77.environment.setTimeRate** [server Â· world.environment Â· since 2.31.13+op77.67] â Sets how many game seconds pass per real second.
+  ref: server:Open77.environment.setTimeRate
+- (guide) **Server-owned world props âº Models: aliases and raw depot paths** â `model` accepts a **curated alias** or a **raw cooked depot path**. This is deliberately the same split as the VFX catalogue, and it carries the same warning. A curated alias is the supported surface. It has been reviewe
+  ref: props#models-aliases-and-raw-depot-paths
+- (card) **Open77.remoteCamera.worldModels** [client Â· camera.capture Â· unreleased] â Lists supported world-display profiles, dimensions and placement bases. â NOT AVAILABLE on 2.31.13+op77.78: this native is not in any published build
+  ref: Open77.remoteCamera.worldModels
+- (guide) **FiveM compatibility aliases âº Commands on the client** â `RegisterCommand` exists on **both** runtimes now, with the same handler shape `(source, args, rawCommand)`. The client passes `source = 0`, because on the client there is no other party to attribute a command to; a reso
+  ref: fivem-compatibility#commands-on-the-client
+- (card) **Open77.runtime.commands** [client Â· since 2.31.13+op77.67] â Every client command registered across every running resource.
+  ref: Open77.runtime.commands
+- (guide) **The gamemode kernel and shared server services âº The contract every gamemode's server should implement** â Apply these lifecycle and authority conventions to each gamemode. See [Writing a gamemode](writing-a-gamemode.md) for examples. | Convention | Why | Where it lives | |---|---|---| | **Reload-safe roster adoption.** Use `
+  ref: gamemode-kernel#the-contract-every-gamemodes-server-should-implement
+- (card) **Open77.runtime.commands** [server Â· since 2.31.13+op77.67] â Every command registered across every running resource, plus the built-in verbs.
+  ref: server:Open77.runtime.commands
+- (fivem) **Citizen.Trace** â alias: the resource log at debug level â `DBG` on both sides. (Until A17 landed the server wrote it as `INF`; `Open77.log.debug/info/warn/error` now reach the server log as `DBG/INF/WRN/ERR`, with ANSI escapes and FiveM `^N` colour codes stripped)
+  ref: Citizen.Trace
+- (card) **GetRegisteredCommands** [server Â· since 2.31.13+op77.67] â FiveM-style alias for `Open77.runtime.commands`.
+  ref: server:GetRegisteredCommands
+- (guide) **Cordon â battle royale âº Commands and editor** â | Command | Use | |---|---| | `/br.status` | Match phase, roster, format, map, bot/rating and cordon state. | | `/br.where [playerId]` | Server-side position, state, squad, cell and kit; players inspect themselves, opera
+  ref: cordon#commands-and-editor

@@ -1,0 +1,31 @@
+﻿{
+    "deployed_at":  "2026-09-02T10:23:51.9790850-04:00",
+    "game":  "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Cyberpunk 2077",
+    "game_version":  "2.31",
+    "mods":  {
+                 "value":  [
+                               {
+                                   "mod_id":  28713,
+                                   "file_id":  142764,
+                                   "name":  "Night City Motorsports",
+                                   "version":  "2.0",
+                                   "archive":  "Night_City_Motorsports-28713-2-0-1776645682.zip",
+                                   "bytes":  531190,
+                                   "sha256":  "285B556BDEA0311265FAC3BFDF03E80F851E34DF567C430F2A5A41B075A99B57",
+                                   "uploaded":  "2026-04-20T00:41:22.000+00:00"
+                               },
+                               {
+                                   "mod_id":  28342,
+                                   "file_id":  154987,
+                                   "name":  "MANUAL TRANSMISSION V10 - IMMERSIVE GEAR SHIFTING",
+                                   "version":  "4.1",
+                                   "archive":  "MANUAL_TRANSMISSION_V10_-_IMMERSIVE_GEAR_SHIFTING_28342_4.1_2026-08-06T04-53Z_hF7PF41fA.zip",
+                                   "bytes":  183662,
+                                   "sha256":  "969BFEC313E13CE73827F1BB9DCAF29693D296285BB58532D9F18F2430627C4B",
+                                   "uploaded":  "2026-08-06T04:53:20.000+00:00"
+                               }
+                           ],
+                 "Count":  2
+             },
+    "file_events":  93
+}

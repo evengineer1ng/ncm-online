@@ -1,0 +1,9 @@
+﻿# players.hacking.define
+
+Enforced by the server; gates 0 natives.
+- enforced by: server
+- natives: none in the catalogue
+- guides declaring it: hacking.md
+- manifest line: permissions { "players.hacking.define" }
+
+_answering for build 2.31.13+op77.78 (no index published for 2.31.13+op77.84; serving 2.31.13+op77.78, the newest at or below it)_

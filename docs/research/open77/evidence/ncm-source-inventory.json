@@ -1,0 +1,322 @@
+﻿[
+    {
+        "path":  "ncm-localized/bin/x64/plugins/cyber_engine_tweaks/mods/MT_Ecosystem/init.lua",
+        "lines":  721,
+        "sha256":  "E25FA693EACD7B5A3A56A2EA315111D7A1FA35168707E4A951D85E695340D4B5"
+    },
+    {
+        "path":  "ncm-localized/bin/x64/plugins/cyber_engine_tweaks/mods/MT_Ecosystem/data/circuits.lua",
+        "lines":  97,
+        "sha256":  "FAEABA9338E02E5F3B47DBFD3B5C598C3DEA6BA63C9824FDD81A4A017342E5DA"
+    },
+    {
+        "path":  "ncm-localized/bin/x64/plugins/cyber_engine_tweaks/mods/MT_Ecosystem/data/contact_event_archetypes.lua",
+        "lines":  251,
+        "sha256":  "3B2852FD0872D32EBC16305F5F1822DCF7819D9EA3F5AB666450732D8A233918"
+    },
+    {
+        "path":  "ncm-localized/bin/x64/plugins/cyber_engine_tweaks/mods/MT_Ecosystem/data/courier_nodes.lua",
+        "lines":  167,
+        "sha256":  "7D4E4A56EB62231242E60B71F85CA54B26CA042EBF86311D4A48B05BFD98267A"
+    },
+    {
+        "path":  "ncm-localized/bin/x64/plugins/cyber_engine_tweaks/mods/MT_Ecosystem/data/default_roots_pack.lua",
+        "lines":  265,
+        "sha256":  "25548530E619B6271CE7A88DF6AB6B564E2EA2666A67DE9DDF0AF02D66D5E9CE"
+    },
+    {
+        "path":  "ncm-localized/bin/x64/plugins/cyber_engine_tweaks/mods/MT_Ecosystem/data/factions.lua",
+        "lines":  121,
+        "sha256":  "7A1D1BFBE4A6076CF9F2D7C67A7BE009F97C892802EEAB07CCA743941D74C136"
+    },
+    {
+        "path":  "ncm-localized/bin/x64/plugins/cyber_engine_tweaks/mods/MT_Ecosystem/data/nodes.lua",
+        "lines":  44,
+        "sha256":  "E2EF6EE003E63EC411749E9FF47D0295FC1A28C1E7C65FE59D48033A88CD0F99"
+    },
+    {
+        "path":  "ncm-localized/bin/x64/plugins/cyber_engine_tweaks/mods/MT_Ecosystem/data/nodes_curated.lua",
+        "lines":  70,
+        "sha256":  "8679D8781CD72B6582EC055DA982ACDE20F066C5B117C6A18A1E371823C6DB7E"
+    },
+    {
+        "path":  "ncm-localized/bin/x64/plugins/cyber_engine_tweaks/mods/MT_Ecosystem/data/parts.lua",
+        "lines":  522,
+        "sha256":  "7E9486C46252E9D537AC450D1B0333D75E8D284490622071E269872992C4236D"
+    },
+    {
+        "path":  "ncm-localized/bin/x64/plugins/cyber_engine_tweaks/mods/MT_Ecosystem/data/tracks.lua",
+        "lines":  112,
+        "sha256":  "DF1D98F1C6362F1BF8DFF9F742075156BF86E7C0967B472E07B2574F7449AFE6"
+    },
+    {
+        "path":  "ncm-localized/bin/x64/plugins/cyber_engine_tweaks/mods/MT_Ecosystem/data/vehicle_pool.lua",
+        "lines":  736,
+        "sha256":  "848684014985843A675BD0E24224BFA92BC738ED03F59DD6781379922B099D61"
+    },
+    {
+        "path":  "ncm-localized/bin/x64/plugins/cyber_engine_tweaks/mods/MT_Ecosystem/data/vehicle_slot_profiles.lua",
+        "lines":  264,
+        "sha256":  "4465088EF78D647B70D1B96EED77315CCE480FF1B0A5EC076CA38EE544347425"
+    },
+    {
+        "path":  "ncm-localized/bin/x64/plugins/cyber_engine_tweaks/mods/MT_Ecosystem/locales/reverse_index.lua",
+        "lines":  1310,
+        "sha256":  "482553D875C69DE505CE2897009426DCB5AF94B11D0D3162F440D884A7BC08B5"
+    },
+    {
+        "path":  "ncm-localized/bin/x64/plugins/cyber_engine_tweaks/mods/MT_Ecosystem/modules/ai_vehicles.lua",
+        "lines":  6600,
+        "sha256":  "1177F3BEC059C08230BD339AE249BB072ADAA3DF3BE8CAAFD462BF12412DF846"
+    },
+    {
+        "path":  "ncm-localized/bin/x64/plugins/cyber_engine_tweaks/mods/MT_Ecosystem/modules/ambient_races.lua",
+        "lines":  1407,
+        "sha256":  "CFF2D75DBA8D7DC944059DAE611CEB2D23324510525955EE73D1DC9F8B5DC75B"
+    },
+    {
+        "path":  "ncm-localized/bin/x64/plugins/cyber_engine_tweaks/mods/MT_Ecosystem/modules/betting.lua",
+        "lines":  1227,
+        "sha256":  "50408AC33878C96A9EC430517D898DFC1162DCF62C82EEAAA6D09792E32CBB14"
+    },
+    {
+        "path":  "ncm-localized/bin/x64/plugins/cyber_engine_tweaks/mods/MT_Ecosystem/modules/careers.lua",
+        "lines":  853,
+        "sha256":  "7E3C280031BE1FA024751719A6DD309AB2097E9BB2190422D421EC8D9B453C9D"
+    },
+    {
+        "path":  "ncm-localized/bin/x64/plugins/cyber_engine_tweaks/mods/MT_Ecosystem/modules/championships.lua",
+        "lines":  1631,
+        "sha256":  "776DB3C882467B262305BE23C196F58C4C2543FDB4650B87DCAA1F891125C104"
+    },
+    {
+        "path":  "ncm-localized/bin/x64/plugins/cyber_engine_tweaks/mods/MT_Ecosystem/modules/checkpoint.lua",
+        "lines":  152,
+        "sha256":  "2C9B02017BDF385044ACD4203A994B24D0755F1DA8D4DBA26BE094520D50DC35"
+    },
+    {
+        "path":  "ncm-localized/bin/x64/plugins/cyber_engine_tweaks/mods/MT_Ecosystem/modules/contact_events.lua",
+        "lines":  1092,
+        "sha256":  "AD9DA5F347CC99193FE77FC4DF1FCA522D4A982A0CAD11091DCFE80CE3350FDD"
+    },
+    {
+        "path":  "ncm-localized/bin/x64/plugins/cyber_engine_tweaks/mods/MT_Ecosystem/modules/events.lua",
+        "lines":  60,
+        "sha256":  "1365AC07BD433D8E0691768006C7461B930B7344BED2B9FF13D927B8DECE467F"
+    },
+    {
+        "path":  "ncm-localized/bin/x64/plugins/cyber_engine_tweaks/mods/MT_Ecosystem/modules/event_definitions.lua",
+        "lines":  276,
+        "sha256":  "A0E2F52F7DFDEE6E011E7AC1CD2BA903F9E2CA87F39F30507FB6CE416452D22F"
+    },
+    {
+        "path":  "ncm-localized/bin/x64/plugins/cyber_engine_tweaks/mods/MT_Ecosystem/modules/event_listeners.lua",
+        "lines":  759,
+        "sha256":  "30634AE1F511BC100B57C6BAF62DB679B4BDDD81F620252DFE457158F0E4E512"
+    },
+    {
+        "path":  "ncm-localized/bin/x64/plugins/cyber_engine_tweaks/mods/MT_Ecosystem/modules/fan_engine.lua",
+        "lines":  881,
+        "sha256":  "E72F75ACE56E4C0AA1D4FF576729C8F17DF33573C27B101EECA5D1C7FA50A4EB"
+    },
+    {
+        "path":  "ncm-localized/bin/x64/plugins/cyber_engine_tweaks/mods/MT_Ecosystem/modules/fast_travel_nodes.lua",
+        "lines":  156,
+        "sha256":  "CFE28AD06A56BDB82DDC12F56188AA2645635ECF2304916CA9E4D408AE1599C6"
+    },
+    {
+        "path":  "ncm-localized/bin/x64/plugins/cyber_engine_tweaks/mods/MT_Ecosystem/modules/grid_solver.lua",
+        "lines":  893,
+        "sha256":  "48D5A8EF0DFAC41C3B72306F9C931D88AE13D7FD743D1EC9C3F8E6174610B714"
+    },
+    {
+        "path":  "ncm-localized/bin/x64/plugins/cyber_engine_tweaks/mods/MT_Ecosystem/modules/heat.lua",
+        "lines":  246,
+        "sha256":  "17DC31E13B454AE697DBAD65E188F319B128361545F7629ABBFCA5B95FA7AE46"
+    },
+    {
+        "path":  "ncm-localized/bin/x64/plugins/cyber_engine_tweaks/mods/MT_Ecosystem/modules/hype.lua",
+        "lines":  310,
+        "sha256":  "17DEE685F0F3152F22793FA179B4F15D62824A4DE50849C874D6BF7919BBE876"
+    },
+    {
+        "path":  "ncm-localized/bin/x64/plugins/cyber_engine_tweaks/mods/MT_Ecosystem/modules/i18n.lua",
+        "lines":  178,
+        "sha256":  "482EA9B8C6AAFB7CE6E273DC57CD152B605202ACD2372EAE8A51013C00C05DAC"
+    },
+    {
+        "path":  "ncm-localized/bin/x64/plugins/cyber_engine_tweaks/mods/MT_Ecosystem/modules/ink_hud.lua",
+        "lines":  524,
+        "sha256":  "30A1947E14444C8810B7F74DBE4018A2E79D037D2CFCD093FCC6AAFB0CF3BA09"
+    },
+    {
+        "path":  "ncm-localized/bin/x64/plugins/cyber_engine_tweaks/mods/MT_Ecosystem/modules/knockout.lua",
+        "lines":  1168,
+        "sha256":  "FC2AA1E7D254C8D93BCF97B7B44C8565172FF04CBA075305969F16B12CF2858E"
+    },
+    {
+        "path":  "ncm-localized/bin/x64/plugins/cyber_engine_tweaks/mods/MT_Ecosystem/modules/knockout_circuits.lua",
+        "lines":  354,
+        "sha256":  "2836C7BBC80ED5E5E5415D5B1482B7095EBDA133D4C29D65CF2BF68CC29EC329"
+    },
+    {
+        "path":  "ncm-localized/bin/x64/plugins/cyber_engine_tweaks/mods/MT_Ecosystem/modules/management.lua",
+        "lines":  629,
+        "sha256":  "055310679E9B7FF0FDF561158B45E6B48345546CD1A39201622B44416890FEF8"
+    },
+    {
+        "path":  "ncm-localized/bin/x64/plugins/cyber_engine_tweaks/mods/MT_Ecosystem/modules/manual_nodes.lua",
+        "lines":  104,
+        "sha256":  "0C1118BCEEC0127A1C48D9D28C9752601AF652A5E76B3C0FB1DF418A5A324B36"
+    },
+    {
+        "path":  "ncm-localized/bin/x64/plugins/cyber_engine_tweaks/mods/MT_Ecosystem/modules/mappins.lua",
+        "lines":  140,
+        "sha256":  "01C8ED6DAE1EE8295BC8798CEF415FB937F3800E109D35A2CC43C71951858242"
+    },
+    {
+        "path":  "ncm-localized/bin/x64/plugins/cyber_engine_tweaks/mods/MT_Ecosystem/modules/metrics.lua",
+        "lines":  395,
+        "sha256":  "44699FDA92E9F4DC3356690298BA9BB0D3B946F8B4E1B3D7C3475738815F6D5A"
+    },
+    {
+        "path":  "ncm-localized/bin/x64/plugins/cyber_engine_tweaks/mods/MT_Ecosystem/modules/named_rivals.lua",
+        "lines":  273,
+        "sha256":  "27295538CBB3F4AB5E2374EDE0BA6DEAB28AE31FA03A68CE487F3DEA16B18B92"
+    },
+    {
+        "path":  "ncm-localized/bin/x64/plugins/cyber_engine_tweaks/mods/MT_Ecosystem/modules/onboarding.lua",
+        "lines":  320,
+        "sha256":  "E3C0B24E9768F8E30799E3A9C4658B01F2C67FA7BBA8DEAD767EAE205B2452ED"
+    },
+    {
+        "path":  "ncm-localized/bin/x64/plugins/cyber_engine_tweaks/mods/MT_Ecosystem/modules/parts.lua",
+        "lines":  2054,
+        "sha256":  "242486E9767CF1138BAB5084C81B3AC39325493D014536F45DB3540B8E6A3044"
+    },
+    {
+        "path":  "ncm-localized/bin/x64/plugins/cyber_engine_tweaks/mods/MT_Ecosystem/modules/persistence.lua",
+        "lines":  268,
+        "sha256":  "44F164F04D325DB64EEEFB04EBFDFAA22232F75949D898F863BC24FA3871C9B6"
+    },
+    {
+        "path":  "ncm-localized/bin/x64/plugins/cyber_engine_tweaks/mods/MT_Ecosystem/modules/phone_bridge.lua",
+        "lines":  469,
+        "sha256":  "70BD2569112EC200CFEFA7E690810BBF7622BE4CE02BBEF3D41E45E62BA481BE"
+    },
+    {
+        "path":  "ncm-localized/bin/x64/plugins/cyber_engine_tweaks/mods/MT_Ecosystem/modules/race_commands.lua",
+        "lines":  3882,
+        "sha256":  "85A6D067ADAD14436315D4EACC023C842EC30B7E3CB05AC043BE7718708C8A67"
+    },
+    {
+        "path":  "ncm-localized/bin/x64/plugins/cyber_engine_tweaks/mods/MT_Ecosystem/modules/race_telemetry.lua",
+        "lines":  1442,
+        "sha256":  "C50894BE3A14CCEB124A6FDF139B6E3AD15B22A2812607A1C13E02A1B2B506CD"
+    },
+    {
+        "path":  "ncm-localized/bin/x64/plugins/cyber_engine_tweaks/mods/MT_Ecosystem/modules/racing.lua",
+        "lines":  7644,
+        "sha256":  "BD11ADEF4CB076694AAB8DEF2B7B7CAAE1B09C16A84FD6842D1099473D577A86"
+    },
+    {
+        "path":  "ncm-localized/bin/x64/plugins/cyber_engine_tweaks/mods/MT_Ecosystem/modules/radioos_bridge.lua",
+        "lines":  609,
+        "sha256":  "9827EAF60D1840CF9038BFBEE49368F48BF9491A093AD3F8BD3847B018CCC20D"
+    },
+    {
+        "path":  "ncm-localized/bin/x64/plugins/cyber_engine_tweaks/mods/MT_Ecosystem/modules/records.lua",
+        "lines":  166,
+        "sha256":  "198C7650715E7B9D69D2E3A9D44FE3A0E1C49F7D9399C85B3549E677DCD5938C"
+    },
+    {
+        "path":  "ncm-localized/bin/x64/plugins/cyber_engine_tweaks/mods/MT_Ecosystem/modules/roots.lua",
+        "lines":  702,
+        "sha256":  "6AD4CDDC35DBBC6BE6FC965040EB87B78F19E9B30A664354E8FFD49D511BB8CF"
+    },
+    {
+        "path":  "ncm-localized/bin/x64/plugins/cyber_engine_tweaks/mods/MT_Ecosystem/modules/roster.lua",
+        "lines":  1769,
+        "sha256":  "BB81FE85259224603C7F547FC9C4FFD9BDB09D74A4F01ACA51AE6DB351C3CA88"
+    },
+    {
+        "path":  "ncm-localized/bin/x64/plugins/cyber_engine_tweaks/mods/MT_Ecosystem/modules/routes.lua",
+        "lines":  539,
+        "sha256":  "E178A96B8F5D9CEDA6C28A04CAEF2561C994E44B71FF0F99387A2177A1348CDA"
+    },
+    {
+        "path":  "ncm-localized/bin/x64/plugins/cyber_engine_tweaks/mods/MT_Ecosystem/modules/safety_rating.lua",
+        "lines":  417,
+        "sha256":  "FE046C6CB392CE60AAB18F66599EF8ECED789B09304AF7D2959D38C4BD56512D"
+    },
+    {
+        "path":  "ncm-localized/bin/x64/plugins/cyber_engine_tweaks/mods/MT_Ecosystem/modules/settings.lua",
+        "lines":  560,
+        "sha256":  "E97EFC6E350DAC02FF8B48B93CE52BE3EAACBC2CAE27E0E1FB5412E04FE2616F"
+    },
+    {
+        "path":  "ncm-localized/bin/x64/plugins/cyber_engine_tweaks/mods/MT_Ecosystem/modules/telemetry.lua",
+        "lines":  528,
+        "sha256":  "03FE85C658E4DE963492EB67EC83E59077AB83C30F42329BB09142FA34000C44"
+    },
+    {
+        "path":  "ncm-localized/bin/x64/plugins/cyber_engine_tweaks/mods/MT_Ecosystem/modules/tuning.lua",
+        "lines":  708,
+        "sha256":  "A043741B3CDD3FE8209B9BF9F4EF0F8832780A72A9794B0F161691DBB7BFDFE7"
+    },
+    {
+        "path":  "ncm-localized/bin/x64/plugins/cyber_engine_tweaks/mods/MT_Ecosystem/modules/ui.lua",
+        "lines":  910,
+        "sha256":  "2B19DBBF971574F26428909E27FF84A09ABB2127D8858FDD552EB957D3FCC60F"
+    },
+    {
+        "path":  "ncm-localized/bin/x64/plugins/cyber_engine_tweaks/mods/MT_Ecosystem/modules/ui_championships.lua",
+        "lines":  728,
+        "sha256":  "07D411A56A7432F43146E01FCA0A06B42736963A85E2F784483F13BC61DE11AC"
+    },
+    {
+        "path":  "ncm-localized/bin/x64/plugins/cyber_engine_tweaks/mods/MT_Ecosystem/modules/ui_garage.lua",
+        "lines":  576,
+        "sha256":  "9958DF263BD01B828338204C83FD9AF1CD928AEFCBD9DFDABF49D879AED499BF"
+    },
+    {
+        "path":  "ncm-localized/bin/x64/plugins/cyber_engine_tweaks/mods/MT_Ecosystem/modules/ui_knockout.lua",
+        "lines":  583,
+        "sha256":  "55D7089112D0781BF432D8039A97CF2E9969329B27C5473DB1744BC2D514F872"
+    },
+    {
+        "path":  "ncm-localized/bin/x64/plugins/cyber_engine_tweaks/mods/MT_Ecosystem/modules/ui_knockout_circuits.lua",
+        "lines":  327,
+        "sha256":  "A237CB257360028BC63A238AFE0691F597689E040DDECA72152E2307935AFED1"
+    },
+    {
+        "path":  "ncm-localized/bin/x64/plugins/cyber_engine_tweaks/mods/MT_Ecosystem/modules/ui_racing.lua",
+        "lines":  2265,
+        "sha256":  "2A4CD7F2EF7707D396F003B028D3680219E16261892B1F3DCF83D7F1CBC0AD78"
+    },
+    {
+        "path":  "ncm-localized/bin/x64/plugins/cyber_engine_tweaks/mods/MT_Ecosystem/modules/ui_routes.lua",
+        "lines":  541,
+        "sha256":  "8C36ACC97ACD9572C4106CA1305FB89692E7612C8829A67FA24B47B4A2C39B86"
+    },
+    {
+        "path":  "ncm-localized/bin/x64/plugins/cyber_engine_tweaks/mods/MT_Ecosystem/modules/ui_tuning.lua",
+        "lines":  241,
+        "sha256":  "84EDBD5467DA7E69F935CB24F4BFCFCA7306D16603101D41D1C33F48E525386F"
+    },
+    {
+        "path":  "ncm-localized/bin/x64/plugins/cyber_engine_tweaks/mods/MT_Ecosystem/modules/ui_vehicle_pool.lua",
+        "lines":  231,
+        "sha256":  "BB638E77DE694154DE000A370C2E9BBEC03C50A755BA5F4E827956ED346B27E3"
+    },
+    {
+        "path":  "ncm-localized/bin/x64/plugins/cyber_engine_tweaks/mods/MT_Ecosystem/modules/user_nodes.lua",
+        "lines":  201,
+        "sha256":  "89797F0D1ECF8B50BD28DF0C77CC950DB9BBDDB331EA2D9FC0FB20C39C54B836"
+    },
+    {
+        "path":  "ncm-localized/bin/x64/plugins/cyber_engine_tweaks/mods/MT_Ecosystem/modules/voice_harness.lua",
+        "lines":  429,
+        "sha256":  "4698E0B30E2A2308194FC391CB921962D157DCE840EABEA5DB90E52617441B86"
+    }
+]

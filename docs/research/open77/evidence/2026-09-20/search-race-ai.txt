@@ -1,0 +1,26 @@
+﻿12 results for "freeroam race AI racers opponents bots ghost" â answering for build 2.31.13+op77.78 (no index published for 2.31.13+op77.84; serving 2.31.13+op77.78, the newest at or below it)
+
+- (card) **Open77.character.aimedEntity** [client Â· player.aim.read,world.query Â· since 2.31.13+op77.67] â What the local player is aiming at, if it is a thing rather than scenery.
+  ref: Open77.character.aimedEntity
+- (guide) **Deathmatch â running the Kabuki Arena PvP mode âº Bots** â | Key | Type | Default | Range | What it does | |---|---|---|---|---| | `fillWithBots` | boolean | **`false`** | â | Fill underpopulated free-for-all instances with bots. Disabled by default. | | `botFillTarget` | intege
+  ref: deathmatch#bots
+- (card) **Open77.character.aimState** [client Â· player.aim.read Â· since 2.31.13+op77.67] â One coherent aim snapshot, with the staleness counter that makes it honest.
+  ref: Open77.character.aimState
+- (guide) **Deathmatch â running the Kabuki Arena PvP mode âº Bots â what they are and are not** â Bots exist because the sizes this mode is built for cannot be tested with real clients on one workstation: roughly 2.7 GiB of VRAM per client at the menu rising to 4.2 GiB in play, and a fourth client on a 12 GiB card di
+  ref: deathmatch#bots-what-they-are-and-are-not
+- (card) **Open77.vehicles.ai.stop** [server Â· world.vehicles Â· since 2.31.13+op77.57] â Cancels the active task and stops the vehicle.
+  ref: server:Open77.vehicles.ai.stop
+- (guide) **Cordon â battle royale âº Bots, holdouts and unfinished world work** â Bot contestants use engine AI, occupy the match roster, are labelled **BOT**, and can win. Any match containing a contestant bot is unrateable. Default fill policy is `threshold`: below 24 humans, fill toward 40 contesta
+  ref: cordon#bots-holdouts-and-unfinished-world-work
+- (card) **Open77.vehicles.ai.on** [server Â· since 2.31.13+op77.57] â Subscribes to this resource's vehicle AI lifecycle events.
+  ref: server:Open77.vehicles.ai.on
+- (guide) **Mods: the complete guide âº Worked example: a Nexus vehicle on the freeroam server** â Adding *Lamborghini Aventador SVJ* (Nexus 11176) to the development world, spawnable with `/car`. The mod requires ArchiveXL, TweakXL, RED4ext, redscript and the author's *Vehicle manufacturer fix* (Nexus 28744); CET is 
+  ref: mods#worked-example-a-nexus-vehicle-on-the-freeroam-server
+- (card) **Open77.vehicles.ai.state** [server Â· world.vehicles Â· since 2.31.13+op77.57] â Reads authoritative vehicle AI state.
+  ref: server:Open77.vehicles.ai.state
+- (guide) **NPC AI, combat and voice control âº NPC AI, combat and voice control** â Control individual spawned NPCs from server Lua with `Open77.npcs`. Behavior settings apply to the selected NPC, not its gang, other NPCs using the same record, player characters or global audio. Available in client and 
+  ref: npc-behavior#npc-ai-combat-and-voice-control
+- (card) **Open77.npcs.setAiMode** [server Â· world.npcs Â· since 2.31.13+op77.45] â Chooses who drives an NPC.
+  ref: server:Open77.npcs.setAiMode
+- (guide) **Third person âº What `aimedEntity()` answers with** â The engine's own look-at target, not a physics ray â a physics ray answers with geometry and carries no entity reference at all. Three outcomes, kept apart on purpose: | Result | Meaning | |---|---| | a table | Something
+  ref: perspective#what-aimedentity-answers-with

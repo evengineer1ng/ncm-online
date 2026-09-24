@@ -1,0 +1,23 @@
+﻿# server Open77.hacking.start(playerId: integer, targetId: integer, definitionId: string, gradeId: string, options: table { operationId })
+
+Starts an entitled hack upload from one player against a target.
+
+Requires `players.hacking.activate`. The actor must own the matching installed implant grade; the server checks range, visibility evidence, stamina, cooldown, Self-ICE and protection scopes, then runs the warned upload. `options.operationId` is REQUIRED and must be stable across retries of the same operation -- the same id with different arguments is rejected. Progress arrives on `onHackingTransition`.
+
+- runtime: server (network)
+- permissions: none checked in the handler
+- since: 2.31.13+op77.67
+- reasons it can return: action_owned, definition_owned, hacking_unavailable, invalid_action, invalid_definition, invalid_json, invalid_operation, invalid_options, invalid_player, invalid_request, invalid_target, json_too_large, operation_id_required, request_too_large, resource_stopping
+- returns: { ok = true, actionId }, or nil; reason on failure
+
+```lua
+-- A scripted hack from the player against the target they aimed at
+RegisterNetEvent("hack:request", function(targetId)
+    local result, reason = Open77.hacking.start(source, targetId, "myserver.short_circuit", "training",
+        { operationId = ("hack:%d:%d"):format(source, GetGameTimer()) })
+    if not result then return Open77.chat.send(source, "Hack refused: " .. reason) end
+    activeUploads[source] = result.actionId
+end)
+```
+
+_answering for build 2.31.13+op77.78 (no index published for 2.31.13+op77.84; serving 2.31.13+op77.78, the newest at or below it)_

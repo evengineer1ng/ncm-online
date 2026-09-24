@@ -1,0 +1,6 @@
+index build: 2.31.13+op77.78 (cache)
+requested build: latest
+newest published server build in the index: 2.31.13+op77.78 (2026-09-17T00:05:51Z)
+docs synced: 2026-09-17T02:23:59.652Z; index generated: 2026-09-19T08:05:33.609Z
+cards: 1622; guides: 91; events: 445; permissions: 135
+package: @open2077/mcp 0.1.2

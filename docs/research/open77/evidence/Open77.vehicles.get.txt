@@ -1,0 +1,29 @@
+﻿# server Open77.vehicles.get(id: integer)
+
+Returns one authoritative server vehicle snapshot.
+
+Reads canonical identity, transform, motion, flags, colors, all damage channels including detached parts, openings, occupants, lifetime, any performance ceiling, and authority state. Returns `nil` for an unknown ID. The transform half is `position` (a vector3), `heading` and `yaw` (one value, both names), `orientation` as `{ x, y, z, w }`, and the unchanged `x`/`y`/`z`. The motion half is `velocity`, `angularVelocity`, `speed` (m/s), `speedKph`, `onGround`, `reversing`, `moving` and `driverPlayerId` -- all of it the last thing the physics owner reported, and all of it zeroed when the vehicle has no owner, because nobody is simulating it then. `exploded` and `destroyed` are derived booleans over the same flags; `persistent`, `despawnWhenUnobserved` and `ttlMs` report the lifetime policy, `ttlMs` counted from now and absent when there is no deadline.
+
+- runtime: server (network)
+- permissions: world.vehicles
+- since: 2.31.13+op77.45
+- reasons it can return: none found in the handler; a refusal it forwards from a callee may still reach you as a second return value
+- returns: vehicle table, or `nil`
+- guides: state-bags#recipe-a-number-plate, vehicles#other-server-calls, vehicles#server-events, vehicles#client-api
+
+```lua
+-- Speed camera: check every car's speed once a second
+CreateThread(function()
+    while true do
+        Wait(1000)
+        for _, entry in ipairs(Open77.vehicles.all()) do
+            local car = Open77.vehicles.get(entry.id)
+            if car and car.speedKph > 120 and car.driverPlayerId then
+                Open77.chat.send(car.driverPlayerId, ("Slow down! %.0f km/h"):format(car.speedKph))
+            end
+        end
+    end
+end)
+```
+
+_answering for build 2.31.13+op77.78_

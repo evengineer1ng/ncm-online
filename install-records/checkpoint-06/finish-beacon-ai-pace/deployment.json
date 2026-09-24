@@ -1,0 +1,12 @@
+{
+  "date": "2026-09-19",
+  "scope": "NCM race finish/start pins made robust + spec-field AI pace raised for the RB15 field",
+  "files": {
+    "r6/scripts/MT_Ecosystem/MTERaceBeacon.reds": "NEW. NcmRaceBeaconSystem (ScriptableSystem): PlaceStart/PlaceFinish (Custom Map Markers recipe: Mappins.CustomMapMarkersMappinDefinition + CPO_PingGoHereVariant + GameplayRoleMappinData.m_isMappinCustom, icons stopwatch/racing), PlaceWaypoint (CustomPositionVariant = game map waypoint -> minimap route + IWN POI line), ClearPins/ClearWaypoint/Clear, Status(). Offline scc compile OK against the full script set.",
+    "MT_Ecosystem/modules/mappins.lua": "showRaceMarkers/setGpsWaypoint/clearRaceMarkers call the beacon system first (logged: '[NCM/Mappins] beacon START/FINISH true', 'GPS waypoint placed via beacon', 'beacon status: ...'), legacy MTEPlaceMappinEvent path kept as second layer. New diagnostic MTE.Mappins.testHere().",
+    "MT_Ecosystem/modules/racing.lua": "SPEC_FIELD_FORMULA_TUNING: aiBaseSpeedMps 55->82, aiRaceMaxSpeedMps 100->95, aiProjectedBaseSpeedMps 55->78. Reason: live AI command speed = base x pace x urgency x hardware (~1.05-1.20), so base 55 capped the field at ~200 km/h regardless of the 100 m/s cap.",
+    "MT_Ecosystem/modules/ui_racing.lua": "Formula tuning checkbox label updated."
+  },
+  "backup": "backup/ (game copies before deploy)",
+  "verify": "CET console: MTE.Mappins.testHere() -> pins on map/minimap + waypoint route 60 m ahead; race: log lines above; AI straight-line speed ~300-340 km/h"
+}

@@ -1,0 +1,20 @@
+﻿# server Open77.vehicles.setPerformance(id: vehicle id, profile: table { topSpeedKph?, accelerationScale?, taperKph? }|nil)
+
+Caps one vehicle's top speed and pickup, from the server.
+
+Requires `world.vehicles`. The profile is `{ topSpeedKph, accelerationScale, taperKph }`: a speed ceiling in km/h in `0..1000` (zero means none), throttle authority at every speed in `(0, 1]`, and how many km/h below the ceiling the throttle starts easing off, `3..200` with a default of `12`. **The taper is never zero**: below about 3 km/h the roll-off is short enough that the limiter hunts around the ceiling and it reads as stutter, which is why the client-local governor has refused that band since it shipped -- the server form enforces the identical envelope on the Lua boundary, in the registry and on both sides of the wire, so a server cap cannot be a way around a rule somebody measured. `nil` clears the ceiling, and so does a profile that asks for nothing -- no ceiling and full throttle authority. The taper is not part of that test: a roll-off width around a ceiling that does not exist changes nothing, which is how the native profile decides it too. This is the server-authoritative form of the client-local governor -- the same three numbers, decided by the server instead, which is what a tuning shop or a speed limit inside an instance needs. The ceiling is replicated to **every viewer**, not only to the client that currently owns the physics: ownership changes on every driver entry and exit, and a ceiling chased across those transitions would be missing for exactly the first second of every drive. It survives the physics owner's twice-a-second durable report by construction -- that report carries no performance field, so the merge has nothing to overwrite -- and it survives a projection that has not attached yet, because the client holds the intent on the replica and applies it when the entity appears. **Only server-spawned vehicles are in the registry.** A player standing next to a vanilla traffic car is standing next to something REDengine population spawned on their own client: it has no canonical id and this call cannot see it. Adopting vanilla traffic is a separate capability that does not exist yet.
+
+- runtime: server (network)
+- permissions: world.vehicles
+- since: 2.31.13+op77.67
+- reasons it can return: none found in the handler; a refusal it forwards from a callee may still reach you as a second return value
+- returns: true, or false; reason: invalid_argument, invalid_top_speed, invalid_acceleration, invalid_taper, vehicle_not_found, vehicles_unavailable, permission_denied:world.vehicles
+- guides: server-api#performance-ceilings, vehicles#performance-ceilings, vehicles#performance-decided-by-the-server
+
+```lua
+Open77.vehicles.setPerformance(id, {
+  topSpeedKph = 60.0, accelerationScale = 0.5, taperKph = 10.0,
+})
+```
+
+_answering for build 2.31.13+op77.78_

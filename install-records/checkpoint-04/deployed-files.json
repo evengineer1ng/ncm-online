@@ -1,0 +1,106 @@
+﻿[
+    {
+        "mod_id":  31543,
+        "version":  "10",
+        "relative_path":  "archive\\pc\\mod\\fable5.archive",
+        "sha256":  "5BD5915BA222218FBAEA1F7656C4FAD2431B336086EA97361CAF503CFE35A25E",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  31543,
+        "version":  "10",
+        "relative_path":  "archive\\pc\\mod\\fable5.archive.xl",
+        "sha256":  "73B70A87040E39F296EB4DE3EB10B70350D54460CB705C765257FD81E75036FA",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  31543,
+        "version":  "10",
+        "relative_path":  "bin\\x64\\plugins\\cyber_engine_tweaks\\mods\\RB15_ERS_RUNTIME\\init.lua",
+        "sha256":  "4CF4ED961D7D136AFA8C7ED5411F3D728586F4545DF3042417D5682019634AB1",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  31543,
+        "version":  "10",
+        "relative_path":  "bin\\x64\\plugins\\cyber_engine_tweaks\\mods\\RB15_SHIFT_LIGHTS\\init.lua",
+        "sha256":  "468F3727F2064AE717390E929E068DBB76E0BE69C979C391B81AC45DBF44ED93",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  31543,
+        "version":  "10",
+        "relative_path":  "r6\\scripts\\rb15\\RB15ERSNative.reds",
+        "sha256":  "EE60C0C9FE2302D5480D860F48A2A44E2C86C7C3FEDD8D59060465793AAFDF12",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  31543,
+        "version":  "10",
+        "relative_path":  "r6\\scripts\\rb15\\RB15LCDRuntime.reds",
+        "sha256":  "1FC89CEA92F1FAEF75CB0D732F22AC2C923E5B0328B3B54192FAC85C42937EB7",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  31543,
+        "version":  "10",
+        "relative_path":  "r6\\scripts\\rb15\\RB15ShiftLightsNative.reds",
+        "sha256":  "B047B4562E03C96F19D3EE94AC0142B9511DAA6C71924D0DE907ED57694F57AB",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  31543,
+        "version":  "10",
+        "relative_path":  "r6\\tweaks\\rb15_f1_standalone.yaml",
+        "sha256":  "4B1859F3D45F418E3C4408CB563E61F7E69B6B323B5F9FA83BA2E9599EA47432",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  31543,
+        "version":  "10",
+        "relative_path":  "r6\\tweaks\\rb15_f1_ui.yaml",
+        "sha256":  "6C2A9341059C9A5144A5425A6E0D75E2F9812E1ECFAC3074667FBE5571F500EE",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  31543,
+        "version":  "10",
+        "relative_path":  "r6\\tweaks\\rb15_f1_virtual_car_dealer.yaml",
+        "sha256":  "1319DC7AD6188912B4BF05F7B353BF64F9F7D159E578D4769E4B93C51696C7CC",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  31543,
+        "version":  "10",
+        "relative_path":  "r6\\tweaks\\zzz_rb15_f1_realistic_race_trim.yaml",
+        "sha256":  "B9B5068994DE0B0D95FC56A2D0813C836742BF4789051538120260CB925D915B",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  31543,
+        "version":  "10",
+        "relative_path":  "r6\\tweaks\\zz_rb15_f1_performance.yaml",
+        "sha256":  "CF0B5A2FBD02D83B2E8993A0A7CDB4A294AC6739AB1C53E4719701D95E55A1A4",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  31543,
+        "version":  "10",
+        "relative_path":  "red4ext\\plugins\\RB15ERSNative\\RB15ERSNative.dll",
+        "sha256":  "D8994298679E62CD99B22CD702DBA717E4C25349711D101D027B019B913D4507",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    }
+]

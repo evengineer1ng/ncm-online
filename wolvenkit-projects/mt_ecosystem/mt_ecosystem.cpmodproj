@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<CP77Mod xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:xsd="http://www.w3.org/2001/XMLSchema">
+  <Name>Night City Motorsports 2.0</Name>
+  <ModName>mt_ecosystem</ModName>
+  <Description>Canonical WolvenKit project recovered losslessly from the NCM 2.0 cooked archive.</Description>
+  <Version>2.0</Version>
+  <OpenProjectFiles />
+</CP77Mod>

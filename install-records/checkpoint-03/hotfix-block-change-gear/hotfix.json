@@ -1,0 +1,8 @@
+﻿{
+    "applied_at":  "2026-09-02T12:39:31.2187168-04:00",
+    "relative_path":  "bin\\x64\\plugins\\cyber_engine_tweaks\\mods\\MANUAL TRANSMISSION V10\\modules\\stateManager.lua",
+    "original_sha256":  "1F2BCA4E462317F043BD711179A8103CCBD967E2ED267F9D7F2B94BCAC528C71",
+    "patched_sha256":  "5BC89E922B563961610101A00C6B0C13E99823D673C11ECF075EFBD8FB2EB0C1",
+    "backup":  "C:\\Users\\eveng\\OneDrive\\Documents\\cyberpunk2077\\tools\\..\\install-records\\checkpoint-03\\hotfix-block-change-gear\\bin\\x64\\plugins\\cyber_engine_tweaks\\mods\\MANUAL TRANSMISSION V10\\modules\\stateManager.lua",
+    "change":  "Clear Vehicle/BlockChangeGear explicitly when vehicle state initializes in automatic mode."
+}

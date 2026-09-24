@@ -1,0 +1,19 @@
+# server Open77.vehicles.setAdoptPolicy(policy: string, options?: table)
+
+Opens or closes one routing bucket to vehicle adoption.
+
+Requires `world.vehicles` and `world.vehicles.adopt`. `"none"` is the default and every bucket starts there: nothing is adoptable until a resource says so. `"driver"` accepts only a car the proposing player is standing at, within six metres — the car-theft shape, where you make canonical the car you are about to take and nothing else. `"any"` widens that to sixty metres; it does not remove the check. `options.bucket` selects the routing bucket (default `0`). The policy is server-side only: a client never learns it, and a proposal into a closed bucket is simply refused.
+
+- runtime: server (network)
+- permissions: world.vehicles
+- since: 2.31.13+op77.67
+- reasons it can return: none found in the handler; a refusal it forwards from a callee may still reach you as a second return value
+- returns: true on success, otherwise false; reason
+- guides: vehicles#the-three-calls
+
+```lua
+-- Street cars may be stolen in the free-roam bucket, but only the one you stand at
+Open77.vehicles.setAdoptPolicy("driver", { bucket = 0 })
+```
+
+_answering for build 2.31.13+op77.78_

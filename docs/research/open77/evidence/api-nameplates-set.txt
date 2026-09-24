@@ -1,0 +1,20 @@
+﻿# client Open77.nameplates.set(playerId: integer|string, options: table)
+
+Creates or updates the calling resource's nameplate override for a remote player.
+
+Requires `ui.nameplates`. Options accept `label`, `color`, `maxDistance`, and `visible`. Overrides are owner-scoped and cleaned up with the resource.
+
+- runtime: client (game)
+- permissions: ui.nameplates
+- since: 2.31.0+op77.3
+- reasons it can return: none found in the handler; a refusal it forwards from a callee may still reach you as a second return value
+- returns: true on success, otherwise false; reason
+
+```lua
+-- Team-mates get a blue plate visible from further away
+RegisterNetEvent("team:joined", function(playerId, name)
+    Open77.nameplates.set(playerId, { label = "[TEAM] " .. name, color = "#3399FF", maxDistance = 60 })
+end)
+```
+
+_answering for build 2.31.13+op77.78 (no index published for 2.31.13+op77.84; serving 2.31.13+op77.78, the newest at or below it)_

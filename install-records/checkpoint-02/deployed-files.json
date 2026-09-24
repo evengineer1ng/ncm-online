@@ -1,0 +1,890 @@
+﻿[
+    {
+        "mod_id":  107,
+        "version":  "1.37.1",
+        "relative_path":  "bin\\x64\\global.ini",
+        "sha256":  "C02B09B2CF2CFAB32527EE1A88EE311500C1C2F4C95D20FE0898C9E0407A4D86",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  107,
+        "version":  "1.37.1",
+        "relative_path":  "bin\\x64\\LICENSE",
+        "sha256":  "98C3B6D063066AD2DDDC1A716D6CE5DF8ED63497B0084B248D8D05516C57DBC7",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  107,
+        "version":  "1.37.1",
+        "relative_path":  "bin\\x64\\version.dll",
+        "sha256":  "67565DD7F899C0E4EE3903B1CC8078FF20CA80B8100497C6AC813392E431D443",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  107,
+        "version":  "1.37.1",
+        "relative_path":  "bin\\x64\\plugins\\cyber_engine_tweaks.asi",
+        "sha256":  "43A7B94698979703F9DFA2B0950607C9A88F53B84BBF09A8E593C7E218D41059",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  107,
+        "version":  "1.37.1",
+        "relative_path":  "bin\\x64\\plugins\\cyber_engine_tweaks\\ThirdParty_LICENSES",
+        "sha256":  "83B9AF1FFCC13F5822AE9BA561969BFFCB8967A05EDFF6F41BF497E6C232FFF0",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  107,
+        "version":  "1.37.1",
+        "relative_path":  "bin\\x64\\plugins\\cyber_engine_tweaks\\fonts\\materialdesignicons.ttf",
+        "sha256":  "BD725A7A38939E5B59904E1B7A7265919ECEC256166ECE69D515C21005165907",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  107,
+        "version":  "1.37.1",
+        "relative_path":  "bin\\x64\\plugins\\cyber_engine_tweaks\\fonts\\NotoSans-Regular.ttf",
+        "sha256":  "4C8D67001D3C2977E5D6BF0A4F8ADD80CD564BD1DF60B7569FD23751E7DDA02A",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  107,
+        "version":  "1.37.1",
+        "relative_path":  "bin\\x64\\plugins\\cyber_engine_tweaks\\fonts\\NotoSansJP-Regular.otf",
+        "sha256":  "34B41DE3F65166440EA2CE40121EB1C9B9C2BB92D188BD32A8E6091CD92316DB",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  107,
+        "version":  "1.37.1",
+        "relative_path":  "bin\\x64\\plugins\\cyber_engine_tweaks\\fonts\\NotoSansKR-Regular.otf",
+        "sha256":  "29445948E432137E0DE104DEC389E956D72633AA0E4CB04CA572BB8E378E3D35",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  107,
+        "version":  "1.37.1",
+        "relative_path":  "bin\\x64\\plugins\\cyber_engine_tweaks\\fonts\\NotoSansMono-Regular.ttf",
+        "sha256":  "97B31969BFE7EBF894C12AFDF6A5DCB6E87E64114697782802FE933E693EACD8",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  107,
+        "version":  "1.37.1",
+        "relative_path":  "bin\\x64\\plugins\\cyber_engine_tweaks\\fonts\\NotoSansSC-Regular.otf",
+        "sha256":  "A2B93E6C2DB05D6BBBF6F27D413EC73269735B7B679019C8A5AA9670FF0FFBF2",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  107,
+        "version":  "1.37.1",
+        "relative_path":  "bin\\x64\\plugins\\cyber_engine_tweaks\\fonts\\NotoSansTC-Regular.otf",
+        "sha256":  "8D9CD5F210C0204D2A1DDAEAF82DB1071E242126F4E18B9C350D8B1680BAE400",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  107,
+        "version":  "1.37.1",
+        "relative_path":  "bin\\x64\\plugins\\cyber_engine_tweaks\\fonts\\NotoSansThai-Regular.ttf",
+        "sha256":  "F73BE376B0E1704DA118312E202BE49E8AC04A6B2E19B588CDFC2707C7F3E25D",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  107,
+        "version":  "1.37.1",
+        "relative_path":  "bin\\x64\\plugins\\cyber_engine_tweaks\\scripts\\IconGlyphs\\icons.lua",
+        "sha256":  "F52AA193FE7FC562C82FACB18261834BDB30E61CFCA0FEB2EFFBA758F8A2CF80",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  107,
+        "version":  "1.37.1",
+        "relative_path":  "bin\\x64\\plugins\\cyber_engine_tweaks\\scripts\\json\\json.lua",
+        "sha256":  "23031288E528880354D3D4651A9DC299B4C85E28889D9F5AE1DCCA76B3CDC8B1",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  107,
+        "version":  "1.37.1",
+        "relative_path":  "bin\\x64\\plugins\\cyber_engine_tweaks\\scripts\\json\\LICENSE",
+        "sha256":  "F2C7E5EA921F2D0514E229E88AC39E51B3DB50698B270B3A9290B610B7015FDC",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  107,
+        "version":  "1.37.1",
+        "relative_path":  "bin\\x64\\plugins\\cyber_engine_tweaks\\scripts\\json\\README.md",
+        "sha256":  "E71E8C5FA757699655D0D48843EC98B8A777C78819C1EEC623F61027AC4BC5D0",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  107,
+        "version":  "1.37.1",
+        "relative_path":  "bin\\x64\\plugins\\cyber_engine_tweaks\\tweakdb\\tweakdbstr.kark",
+        "sha256":  "1EFF27BACBAC8BB55A632C8E393BC046E2C991A6F987B9A78A8ED3FC41EB1DB9",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  107,
+        "version":  "1.37.1",
+        "relative_path":  "bin\\x64\\plugins\\cyber_engine_tweaks\\tweakdb\\usedhashes.kark",
+        "sha256":  "5D27963EC0DBC606074586134C6BA44CADCF3754E95991240CB8E9E11268835F",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  2380,
+        "version":  "1.30.0",
+        "relative_path":  "bin\\x64\\winmm.dll",
+        "sha256":  "22690F3AC5EFBFA825B758028F114D0E7D83833160716F199C56056DB01FC8BE",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  2380,
+        "version":  "1.30.0",
+        "relative_path":  "red4ext\\LICENSE.txt",
+        "sha256":  "A0B08B28AE3931A5A41A1788AAC6C7A391513BFC3599272021EA5B2C1AF2F6F6",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  2380,
+        "version":  "1.30.0",
+        "relative_path":  "red4ext\\RED4ext.dll",
+        "sha256":  "59309A78A9606481D13F87E8FBF9EA9C0B735115389DED0295537180C9E52511",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  2380,
+        "version":  "1.30.0",
+        "relative_path":  "red4ext\\THIRD_PARTY_LICENSES.txt",
+        "sha256":  "B49E3D32F961C21E0B15F4C9B11DA9455D7C9905A457B1DFA88504F6592220FF",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  1511,
+        "version":  "0.5.31",
+        "relative_path":  "engine\\config\\base\\scripts.ini",
+        "sha256":  "EA8281682D4130F872E1703B25AA989A823F136FA1D886077AF24AEDB08B0D4C",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  1511,
+        "version":  "0.5.31",
+        "relative_path":  "engine\\tools\\scc.exe",
+        "sha256":  "DA2C0DE580173010C907A05FDD2F3CD2430D6E62BF748339D65060118AE32EDD",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  1511,
+        "version":  "0.5.31",
+        "relative_path":  "engine\\tools\\scc_lib.dll",
+        "sha256":  "49EB60A3613C990CD13B6136E827A74F9F64AD68E2F911D8C93E4E3D3F53C100",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  1511,
+        "version":  "0.5.31",
+        "relative_path":  "r6\\config\\cybercmd\\scc.toml",
+        "sha256":  "05802A334D72E87194D49765B7B852C2A983F8849851ABCF3FD1366F64D4A934",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  7780,
+        "version":  "1.20.3",
+        "relative_path":  "red4ext\\plugins\\Codeware\\Codeware.dll",
+        "sha256":  "E5884D3A739B1F5A0C36059C15A53465C88507B2FB1A7B8F0AB9BD920FC7467C",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  7780,
+        "version":  "1.20.3",
+        "relative_path":  "red4ext\\plugins\\Codeware\\LICENSE",
+        "sha256":  "DCD5CFC3E620A938B674B5B74A18BBA24AC1D8C1353271DAC8599B0620238629",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  7780,
+        "version":  "1.20.3",
+        "relative_path":  "red4ext\\plugins\\Codeware\\THIRD_PARTY_LICENSES",
+        "sha256":  "56E48489D42CE6EBBC4EBA4228EBFB422D82D57C79D8FEC84763C3889026020E",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  7780,
+        "version":  "1.20.3",
+        "relative_path":  "red4ext\\plugins\\Codeware\\Data\\KnownHashes.txt",
+        "sha256":  "392E48A8B26154F8D34AA3C1268506D84A2B0BCD3DB1B374DFB9C212383A1C20",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  7780,
+        "version":  "1.20.3",
+        "relative_path":  "red4ext\\plugins\\Codeware\\Scripts\\Codeware.Global.reds",
+        "sha256":  "A773C5DD5D2BCC599BF2748F0BA59094A18286AB85B13F1F1DF9D7C640CE8340",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  7780,
+        "version":  "1.20.3",
+        "relative_path":  "red4ext\\plugins\\Codeware\\Scripts\\Codeware.Localization.reds",
+        "sha256":  "3433210C3798A74E22497C53C6641B1E87464EBF8E49FE4A1B05ADF5B15DFBDE",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  7780,
+        "version":  "1.20.3",
+        "relative_path":  "red4ext\\plugins\\Codeware\\Scripts\\Codeware.reds",
+        "sha256":  "6E7403E74914E1226D181A83C6BFA0C525E90C9DE115EC06B05CB33F7847BABD",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  7780,
+        "version":  "1.20.3",
+        "relative_path":  "red4ext\\plugins\\Codeware\\Scripts\\Codeware.UI.reds",
+        "sha256":  "F95D440D0B477BFC54F3036BA9AEF1F5C14D0AA568D7D1DD32D8ACBE7F473112",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  7780,
+        "version":  "1.20.3",
+        "relative_path":  "red4ext\\plugins\\Codeware\\Scripts\\Codeware.UI.TextInput.reds",
+        "sha256":  "B8D310DFB14786202E948C71F842E0C1132719CD6334B79C25D83A0635610BCC",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  4198,
+        "version":  "1.27.1",
+        "relative_path":  "r6\\config\\redsUserHints\\ArchiveXL.toml",
+        "sha256":  "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  4198,
+        "version":  "1.27.1",
+        "relative_path":  "red4ext\\plugins\\ArchiveXL\\ArchiveXL.dll",
+        "sha256":  "CEE7AACCFEAA19AE2F865BB80E08AFDD63FA1F14968C44C0A0538BF0B8D931B2",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  4198,
+        "version":  "1.27.1",
+        "relative_path":  "red4ext\\plugins\\ArchiveXL\\LICENSE",
+        "sha256":  "DCD5CFC3E620A938B674B5B74A18BBA24AC1D8C1353271DAC8599B0620238629",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  4198,
+        "version":  "1.27.1",
+        "relative_path":  "red4ext\\plugins\\ArchiveXL\\THIRD_PARTY_LICENSES",
+        "sha256":  "ED196638202F571F23E55DF2A51B160273F10235FE5AC2573920A1F234C6A2CF",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  4198,
+        "version":  "1.27.1",
+        "relative_path":  "red4ext\\plugins\\ArchiveXL\\Bundle\\ArchiveXL.archive",
+        "sha256":  "70B2967832555292712CC583753DA4823113DC7A3F388030B45C6966909241D3",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  4198,
+        "version":  "1.27.1",
+        "relative_path":  "red4ext\\plugins\\ArchiveXL\\Bundle\\Migration.xl",
+        "sha256":  "830883EA3D5E50746EA698429DC51F5971E079A588C48E8FE097E90C6C25CA68",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  4198,
+        "version":  "1.27.1",
+        "relative_path":  "red4ext\\plugins\\ArchiveXL\\Bundle\\PhotoModeScope.xl",
+        "sha256":  "77C10D76A8AE8CA696B63E3930FD1D4B3B14FA410CE90E4F95AB665826A82264",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  4198,
+        "version":  "1.27.1",
+        "relative_path":  "red4ext\\plugins\\ArchiveXL\\Bundle\\PlayerBaseScope.xl",
+        "sha256":  "FAC81F0618A074B06472B5574AEEFA4DDE16BC935ABE0416AC23121EC7A3EE2F",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  4198,
+        "version":  "1.27.1",
+        "relative_path":  "red4ext\\plugins\\ArchiveXL\\Bundle\\PlayerCustomizationBeardFix.xl",
+        "sha256":  "C3145023B30C0D0D2533AF4C9D48C306AA4D868016E3DE54ECE46509BA40FF39",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  4198,
+        "version":  "1.27.1",
+        "relative_path":  "red4ext\\plugins\\ArchiveXL\\Bundle\\PlayerCustomizationBeardScope.xl",
+        "sha256":  "E65CFCDC09CE84768FC59A0646B6F90DF5CB2B07637903BB57B834159494E94E",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  4198,
+        "version":  "1.27.1",
+        "relative_path":  "red4ext\\plugins\\ArchiveXL\\Bundle\\PlayerCustomizationBrowsFix.xl",
+        "sha256":  "458FC4337FF99EFE58D3BD69AB5FD0AED7A35006B8FF65BFF97C948CBA11C856",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  4198,
+        "version":  "1.27.1",
+        "relative_path":  "red4ext\\plugins\\ArchiveXL\\Bundle\\PlayerCustomizationBrowsPatch.xl",
+        "sha256":  "482A99C243BC49196E356615F3EB9BCC4F29458496940E600891E03F75337595",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  4198,
+        "version":  "1.27.1",
+        "relative_path":  "red4ext\\plugins\\ArchiveXL\\Bundle\\PlayerCustomizationBrowsScope.xl",
+        "sha256":  "AFD084003D5BFCF147026CFC6F115D41153BE7D982642372859CE19CD951D2C5",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  4198,
+        "version":  "1.27.1",
+        "relative_path":  "red4ext\\plugins\\ArchiveXL\\Bundle\\PlayerCustomizationEyesFix.xl",
+        "sha256":  "F2FC3657F8620F81FE58049BC2DBCA13534C8A8A6DA299BDA70914B070854C39",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  4198,
+        "version":  "1.27.1",
+        "relative_path":  "red4ext\\plugins\\ArchiveXL\\Bundle\\PlayerCustomizationEyesPatch.xl",
+        "sha256":  "2B1E3736764B4DE5AEA6D55120703FCF5BC0249441851FC8DBEE489DF013C527",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  4198,
+        "version":  "1.27.1",
+        "relative_path":  "red4ext\\plugins\\ArchiveXL\\Bundle\\PlayerCustomizationEyesScope.xl",
+        "sha256":  "58D06E94151CB49DE1004BEE265F3DBF7E189A3A15DE495A01129740BC06DBD6",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  4198,
+        "version":  "1.27.1",
+        "relative_path":  "red4ext\\plugins\\ArchiveXL\\Bundle\\PlayerCustomizationHairFix.xl",
+        "sha256":  "89B1AA14295F189E342B8CE69A8A533C43BC724299998F9B7B86A8CEECD20E73",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  4198,
+        "version":  "1.27.1",
+        "relative_path":  "red4ext\\plugins\\ArchiveXL\\Bundle\\PlayerCustomizationHairPatch.xl",
+        "sha256":  "FD7807F3F244BE977AAC3D4296108619743E04EF80652DA75702810E5A7377B9",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  4198,
+        "version":  "1.27.1",
+        "relative_path":  "red4ext\\plugins\\ArchiveXL\\Bundle\\PlayerCustomizationHairScope.xl",
+        "sha256":  "DDA4815B94CFDC17A99A6D25F54AB79F650551589C4B282DD093B54B51B26946",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  4198,
+        "version":  "1.27.1",
+        "relative_path":  "red4ext\\plugins\\ArchiveXL\\Bundle\\PlayerCustomizationLashesFix.xl",
+        "sha256":  "6D2B14F747E1F99544AE9DE68DCB16424AE046399A71FC810A2725891CAB7E70",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  4198,
+        "version":  "1.27.1",
+        "relative_path":  "red4ext\\plugins\\ArchiveXL\\Bundle\\PlayerCustomizationLashesPatch.xl",
+        "sha256":  "F762902023EEBBB44005525AE6D290D6A28AF92F784192C04DAD97C373BBB79B",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  4198,
+        "version":  "1.27.1",
+        "relative_path":  "red4ext\\plugins\\ArchiveXL\\Bundle\\PlayerCustomizationLashesScope.xl",
+        "sha256":  "C299CC8843FB8ADEFD471E202C53452C3F6E9087F521F27C7F9153C66928E990",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  4198,
+        "version":  "1.27.1",
+        "relative_path":  "red4ext\\plugins\\ArchiveXL\\Bundle\\PlayerCustomizationScope.xl",
+        "sha256":  "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  4198,
+        "version":  "1.27.1",
+        "relative_path":  "red4ext\\plugins\\ArchiveXL\\Bundle\\QuestBaseScope.xl",
+        "sha256":  "F56CEACAFDF303062913E5CFF589D27098A67CDF0C874D11269DA4887AE23789",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  4198,
+        "version":  "1.27.1",
+        "relative_path":  "red4ext\\plugins\\ArchiveXL\\Scripts\\ArchiveXL.DynamicAppearance.reds",
+        "sha256":  "FF3A03A28D90100B55D83E9CC781BB3A7651F190EDECE95B30787C6A79FE7532",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  4198,
+        "version":  "1.27.1",
+        "relative_path":  "red4ext\\plugins\\ArchiveXL\\Scripts\\ArchiveXL.Global.reds",
+        "sha256":  "17919E5D9A324A2B4279285178825E7F070CF29B8175DFD4CCC95B191FCC17B5",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  4198,
+        "version":  "1.27.1",
+        "relative_path":  "red4ext\\plugins\\ArchiveXL\\Scripts\\ArchiveXL.reds",
+        "sha256":  "120599A671013A5D04643292969AB126829C7FE5922BA53E983CC4D5CB2E63D2",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  4197,
+        "version":  "1.11.4",
+        "relative_path":  "red4ext\\plugins\\TweakXL\\LICENSE",
+        "sha256":  "DCD5CFC3E620A938B674B5B74A18BBA24AC1D8C1353271DAC8599B0620238629",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  4197,
+        "version":  "1.11.4",
+        "relative_path":  "red4ext\\plugins\\TweakXL\\THIRD_PARTY_LICENSES",
+        "sha256":  "0B7EC160E8F8882C384023D879A3F76F5B197F22C496473BFBA96D09E9B0A3E3",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  4197,
+        "version":  "1.11.4",
+        "relative_path":  "red4ext\\plugins\\TweakXL\\TweakXL.dll",
+        "sha256":  "92AB8134835D83F76BCF38FCD72A76FCC65325D2443063EA87A68252730B3794",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  4197,
+        "version":  "1.11.4",
+        "relative_path":  "red4ext\\plugins\\TweakXL\\Data\\ExtraFlats.dat",
+        "sha256":  "58A1DF4C83FEEDC3BDA63E22230E6D8A088321AA832C76B0203BC3538F1A0417",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  4197,
+        "version":  "1.11.4",
+        "relative_path":  "red4ext\\plugins\\TweakXL\\Data\\InheritanceMap.dat",
+        "sha256":  "46315FE35BAB47FA047BC0DC6B8E027032406E3F92CB9BD22B01BD96153E544B",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  4197,
+        "version":  "1.11.4",
+        "relative_path":  "red4ext\\plugins\\TweakXL\\Scripts\\TweakXL.Global.reds",
+        "sha256":  "73E5F41C6409C5B8733B279EE3059590C63DBE85F3904E2BF02387323BDD1B37",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  4197,
+        "version":  "1.11.4",
+        "relative_path":  "red4ext\\plugins\\TweakXL\\Scripts\\TweakXL.reds",
+        "sha256":  "6C0213CDBB68EC79CA7BD2A21500D6B0CDD744D91F8C0F1DC543A6325201AE05",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  3518,
+        "version":  "1.96",
+        "relative_path":  "bin\\x64\\plugins\\cyber_engine_tweaks\\mods\\nativeSettings\\Cron.lua",
+        "sha256":  "26F9685C60A86CC5624EABD0A2AEC9796C4BBA020156E05FAD7E4648BD1938D6",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  3518,
+        "version":  "1.96",
+        "relative_path":  "bin\\x64\\plugins\\cyber_engine_tweaks\\mods\\nativeSettings\\EventProxy.lua",
+        "sha256":  "12EDDC9B754AD409E9C10227C2BFB3976E0ECB0EA47035AEA0B5C2A32AC141B2",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  3518,
+        "version":  "1.96",
+        "relative_path":  "bin\\x64\\plugins\\cyber_engine_tweaks\\mods\\nativeSettings\\init.lua",
+        "sha256":  "6AABC09C744D3EC0B3FE447F6A7B67A718F1471552264BA8CC8DCB689F8D753A",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  3518,
+        "version":  "1.96",
+        "relative_path":  "bin\\x64\\plugins\\cyber_engine_tweaks\\mods\\nativeSettings\\Ref.lua",
+        "sha256":  "6AE5A3C3E470AD970C0DE72D0A82E39A644CE65FC257701A958CC781E2DD9627",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  3518,
+        "version":  "1.96",
+        "relative_path":  "bin\\x64\\plugins\\cyber_engine_tweaks\\mods\\nativeSettings\\UIButton.lua",
+        "sha256":  "163A11919B723B06ED35D3B1739081FA7BA2A2268B7FADA71C77C71D30D7D487",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  4885,
+        "version":  "0.2.21",
+        "relative_path":  "red4ext\\plugins\\mod_settings\\license.md",
+        "sha256":  "9284F10A3EBE703A61C9C8AB0C1C889FDDF8276405D2AC33C7377537D1CDE448",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  4885,
+        "version":  "0.2.21",
+        "relative_path":  "red4ext\\plugins\\mod_settings\\ModSettings.archive",
+        "sha256":  "DC858B9E746E7B3DF4D5FA0527E150FEFA49CD4FB721DDD0FAF5F4E21528D08C",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  4885,
+        "version":  "0.2.21",
+        "relative_path":  "red4ext\\plugins\\mod_settings\\ModSettings.archive.xl",
+        "sha256":  "8742606FF6CDE630CA05D2BD03E763156A7814FBF5909A534F2D0F117E0B2B87",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  4885,
+        "version":  "0.2.21",
+        "relative_path":  "red4ext\\plugins\\mod_settings\\module.reds",
+        "sha256":  "E6A1B4CD06253BBE77F91F78D470125C3E62D3319033D9890786FCBF178C8BF9",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  4885,
+        "version":  "0.2.21",
+        "relative_path":  "red4ext\\plugins\\mod_settings\\mod_settings.dll",
+        "sha256":  "6BE425177778A3857A392251BBBCD1AAB450DDA600C1A56B0F4DD4EAC9C3A9CC",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  4885,
+        "version":  "0.2.21",
+        "relative_path":  "red4ext\\plugins\\mod_settings\\packed.reds",
+        "sha256":  "DF637D56B3FAFF393830BEFCFA9D6EF7FF33567557060729A4B80D2A10782CF9",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  4885,
+        "version":  "0.2.21",
+        "relative_path":  "red4ext\\plugins\\mod_settings\\readme.md",
+        "sha256":  "E46A7BAC11719ABC5358C82DCC2C257586989A6E486C21F95B4101DEDF1AFDF7",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  4575,
+        "version":  "0.2.3",
+        "relative_path":  "engine\\config\\platform\\pc\\input_loader.ini",
+        "sha256":  "5DA4C3350381E5CC07B74EE3EAFAD7E705B64C11EFD1DF0769D95F6A7D442ACD",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  4575,
+        "version":  "0.2.3",
+        "relative_path":  "r6\\cache\\inputContexts.xml",
+        "sha256":  "9130124230E53D5D1CA094795C4794904F041B275EF2A8CFDD65EB2D6A43C6F3",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  4575,
+        "version":  "0.2.3",
+        "relative_path":  "r6\\cache\\inputUserMappings.xml",
+        "sha256":  "A57BD58879F3846F300EC9C30FC8111890B9D3AEB6B82842DC4070930E0FF48E",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  4575,
+        "version":  "0.2.3",
+        "relative_path":  "red4ext\\plugins\\input_loader\\inputUserMappings.xml",
+        "sha256":  "A57BD58879F3846F300EC9C30FC8111890B9D3AEB6B82842DC4070930E0FF48E",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  4575,
+        "version":  "0.2.3",
+        "relative_path":  "red4ext\\plugins\\input_loader\\input_loader.dll",
+        "sha256":  "33A57A4BACFE8A677DE98B8FE338E0D9DDB184B851B6BD48587641D3423C9394",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  4575,
+        "version":  "0.2.3",
+        "relative_path":  "red4ext\\plugins\\input_loader\\license.md",
+        "sha256":  "9284F10A3EBE703A61C9C8AB0C1C889FDDF8276405D2AC33C7377537D1CDE448",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  4575,
+        "version":  "0.2.3",
+        "relative_path":  "red4ext\\plugins\\input_loader\\readme.md",
+        "sha256":  "F7861E5F41342D90F3AB8FE365C45D5644500CEB0E9EC0643F575F0A3ED2475B",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  3819,
+        "version":  "2.6.3",
+        "relative_path":  "archive\\pc\\mod\\CustomMapMarkers.archive",
+        "sha256":  "37D0AE476D565441D2D291EDD05FA6BA30B6EC873E559D694941A2C141D55903",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  3819,
+        "version":  "2.6.3",
+        "relative_path":  "archive\\pc\\mod\\CustomMapMarkers.archive.xl",
+        "sha256":  "4773236A3A1B99905681DA48DDC60AB41B47B8AB37BF0E9D8EEBB9C84DADFF50",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  3819,
+        "version":  "2.6.3",
+        "relative_path":  "r6\\input\\CustomMapMarkers.xml",
+        "sha256":  "8FE014907A1DCCA3934F6BCC8CFD5ECD6302A126A3D4D71FBFA1383AB1AE0469",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  3819,
+        "version":  "2.6.3",
+        "relative_path":  "r6\\scripts\\CustomMapMarkers\\config.reds",
+        "sha256":  "267137B9E5327FFAF490B9657851C6D4D35B416B52018404F9C1B3C6D12AD9EB",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  3819,
+        "version":  "2.6.3",
+        "relative_path":  "r6\\scripts\\CustomMapMarkers\\additions\\BaseMappinBaseController.reds",
+        "sha256":  "B5A8DA1048BAB511E33F53F3AAF4CA7730E6450C721874AFF2AFF0A014BD8AD5",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  3819,
+        "version":  "2.6.3",
+        "relative_path":  "r6\\scripts\\CustomMapMarkers\\additions\\GameplayMappinController.reds",
+        "sha256":  "72359530CA5D543E15FFC3E13519834C0D3902090B628EFC1AB366A53E3E98C2",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  3819,
+        "version":  "2.6.3",
+        "relative_path":  "r6\\scripts\\CustomMapMarkers\\additions\\GameplayRoleMappinData.reds",
+        "sha256":  "41F9D04283D901642E484001A92D9C604A8A17D5343DAA062F1D22D2ABB8341F",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  3819,
+        "version":  "2.6.3",
+        "relative_path":  "r6\\scripts\\CustomMapMarkers\\additions\\MappinProfiles.reds",
+        "sha256":  "55E9D77EBEB81A62784140458AA157E707FAC8143678AC6385377AEB231D1FB0",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  3819,
+        "version":  "2.6.3",
+        "relative_path":  "r6\\scripts\\CustomMapMarkers\\additions\\MenuScenario_HubMenu.reds",
+        "sha256":  "0B78C9C94C5F8B5BFCD7073A7F6AF9531A17EFC65229177DE2BFD9A858D9BB35",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  3819,
+        "version":  "2.6.3",
+        "relative_path":  "r6\\scripts\\CustomMapMarkers\\additions\\MinimapContainerController.reds",
+        "sha256":  "E0591234D9B29A2CD63072CEEEEC71C75697B274C5D806D07AE2D82E391C6C17",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  3819,
+        "version":  "2.6.3",
+        "relative_path":  "r6\\scripts\\CustomMapMarkers\\additions\\UIInGameNotification.reds",
+        "sha256":  "4228BDC833479A868592B6AD04FAFC5BBA16EFA4BC0A5BB4DFD2106F71E5CB1B",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  3819,
+        "version":  "2.6.3",
+        "relative_path":  "r6\\scripts\\CustomMapMarkers\\additions\\WorldMapMenuGameController.reds",
+        "sha256":  "6E26FC4BB2DFE8CD24008F7FEB952253250C7DE83DE1B0CF0B7C0A20980CE659",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  3819,
+        "version":  "2.6.3",
+        "relative_path":  "r6\\scripts\\CustomMapMarkers\\additions\\WorldMapTooltipController.reds",
+        "sha256":  "7A72CC6BDC198CD96F87EBD213DC9168AB847585AF392921DA4B41EDFD7B6A5F",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  3819,
+        "version":  "2.6.3",
+        "relative_path":  "r6\\scripts\\CustomMapMarkers\\common\\Colors.reds",
+        "sha256":  "7999274DAC45C478C966C1C054AB1A27FE63C6389B7F0944D64713FB3028C3ED",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  3819,
+        "version":  "2.6.3",
+        "relative_path":  "r6\\scripts\\CustomMapMarkers\\common\\Events.reds",
+        "sha256":  "4DAC24499DD586278714CC482CD530C29D5E779E0EDBE993659E023A5D960A7F",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  3819,
+        "version":  "2.6.3",
+        "relative_path":  "r6\\scripts\\CustomMapMarkers\\common\\Icons.reds",
+        "sha256":  "823FAB7FD8D6C9D6CA6FD2C3D4D0ACC95682F0BC6290337BC9A55A9567E6386F",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  3819,
+        "version":  "2.6.3",
+        "relative_path":  "r6\\scripts\\CustomMapMarkers\\common\\Utils.reds",
+        "sha256":  "2D8ED63003951A06BA89425521A5F17348D1F886876AC082A9E76DD8E3DF10C9",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  3819,
+        "version":  "2.6.3",
+        "relative_path":  "r6\\scripts\\CustomMapMarkers\\system\\CustomMarkerSystem.reds",
+        "sha256":  "C66612953469D14777C63F4E8C006CB31CBFE2B37ECD840C39C5896DD031B755",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  3819,
+        "version":  "2.6.3",
+        "relative_path":  "r6\\scripts\\CustomMapMarkers\\ui\\CustomMarkerPopup.reds",
+        "sha256":  "6FFA12A470F27D1AFF4C8D98688ECCB4CBAF98EB18C4308CF4A3C0D5FD64A8EC",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  3819,
+        "version":  "2.6.3",
+        "relative_path":  "r6\\scripts\\CustomMapMarkers\\ui\\IconPreviewItem.reds",
+        "sha256":  "82900CECE9D5D7431353C1AD0C2A4304F5DFEA6BB54FC4CA2222B62114FA90DD",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  3819,
+        "version":  "2.6.3",
+        "relative_path":  "r6\\scripts\\CustomMapMarkers\\ui\\MakerPopupButton.reds",
+        "sha256":  "ECD7FE8A5E9F69921D422BF86E33462C2FBEF9B3FF85A8F86D8933B7ACAAF749",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  3819,
+        "version":  "2.6.3",
+        "relative_path":  "r6\\tweaks\\CustomMapMarkers\\NewFilterItem.yaml",
+        "sha256":  "D9DC5A23CB1D362E4E5440623325CA8BCECCB24F5B037CCD0D15401CDE4FED03",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    }
+]

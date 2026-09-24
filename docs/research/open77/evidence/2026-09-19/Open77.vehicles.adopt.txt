@@ -1,0 +1,27 @@
+# server Open77.vehicles.adopt(playerId: integer, description: table)
+
+Turns a client's description of a vanilla car into a canonical vehicle.
+
+Requires `world.vehicles` **and** `world.vehicles.adopt`, which is its own string because this is the one vehicle call that creates world state from something a client wrote. `playerId` must be the player the server believes sent the description — inside a net event handler that is `source`, and it must never be read out of the payload, because the placement checks are the entire defence. The description is what the client's `Open77.vehicles.adoptable()` hands back: `engineEntity`, `record`, `position`, and optionally `orientation`, `health`, `flags`, `primaryColor`, `secondaryColor`, `doors`, `windows`, `tires`, `brokenGlass`, `brokenLights` and `detachedParts`.
+
+**Adoption takes the car's identity, not the engine's entity.** A traffic car is spawned, owned and despawned by REDengine population on one client, and the plugin has no notification it can rely on for a despawn it did not start — a canonical vehicle bound to such an entity would quietly become a ghost. So nothing is bound: the server creates an ordinary canonical vehicle from the description, with the same lifetime, the same reaper and the same projection path as one a garage spawned, and the client then hands its vanilla chassis back with `Open77.vehicles.releaseAdopted`.
+
+Refusals are `adopt_policy_closed` (the player's bucket is not open), `too_far`, `player_unavailable` (no position for them), `duplicate_adoption` (a car of the same record is already adopted within three metres of that spot, because traffic is spawned per client and two players on one corner each describe their own), `vehicle_limit`, and the `invalid_*` family. `already_adopted` is not a failure: it answers with the id of the vehicle the first proposal created, because a retry after a dropped acknowledgement is the ordinary way a client proposes the same chassis twice.
+
+- runtime: server (network)
+- permissions: world.vehicles
+- since: 2.31.13+op77.67
+- reasons it can return: none found in the handler; a refusal it forwards from a callee may still reach you as a second return value
+- returns: vehicle id, or nil; reason
+- guides: vehicles#end-to-end
+
+```lua
+RegisterNetEvent("garage:adopt", function(description)
+  local id, reason = Open77.vehicles.adopt(source, description)
+  if not id then return print(reason) end
+  -- Tell the proposing client to hand its vanilla chassis back.
+  TriggerClientEvent("garage:adopted", source, description.engineEntity, id)
+end)
+```
+
+_answering for build 2.31.13+op77.78_

@@ -1,0 +1,73 @@
+# ==============================================================================
+# NCM workspace — what belongs in version control
+#
+# This workspace is not one package. It is authored source, third-party tooling,
+# downloaded runtimes, release snapshots and recovered game assets sharing a
+# folder. The repo tracks ONLY what we wrote. Three reasons a path is excluded:
+#
+#   (B) binary/runtime we can re-download and that would bloat history
+#   (L) third-party content we have no right to redistribute
+#   (S) machine-local state that must never be shared (secrets, saves, caches)
+#
+# Secrets note: NCM keeps credentials in DPAPI under %LOCALAPPDATA%\NCM\secrets,
+# OUTSIDE this workspace, and server.jsonc lives in an ignored path. Nothing in
+# the tracked set has ever held a licence key, DB password or SSH key. Keep it
+# that way: no server.jsonc, no *.pem, no *.env, ever.
+# ==============================================================================
+
+# --- Downloaded runtimes and vendored tooling (B) -----------------------------
+tools/WolvenKit-8.20.0/
+tools/WolvenKit.Console-8.20.0/
+tools/downloads/
+tools/open77/
+open77-server-*.zip
+open77-server-*.tar.gz
+
+# --- Release snapshots and reference material (B, L) --------------------------
+# staging/ holds extracted published releases; references/ holds third-party
+# source read for research. Neither is an editing target (AGENTS.md).
+staging/
+references/
+
+# --- Recovered / third-party game assets (L, B) -------------------------------
+# The liveries project is 353 MB of textures, including a 112 MB zip that
+# exceeds GitHub's hard per-file limit, and a stock-reference folder explicitly
+# marked do-not-redistribute. We keep the AUTHORED parts (see un-ignores below)
+# and back the artwork up separately -- it is NOT covered by this repo.
+wolvenkit-projects/ncm_rb15_liveries/*
+!wolvenkit-projects/ncm_rb15_liveries/source/
+!wolvenkit-projects/ncm_rb15_liveries/tools/
+!wolvenkit-projects/ncm_rb15_liveries/liveries/
+!wolvenkit-projects/ncm_rb15_liveries/liveries-parked/
+!wolvenkit-projects/ncm_rb15_liveries/*.yaml
+!wolvenkit-projects/ncm_rb15_liveries/*.xl
+!wolvenkit-projects/ncm_rb15_liveries/*.md
+
+# Built payloads and packaged output of any WolvenKit project (B)
+wolvenkit-projects/*/out/
+wolvenkit-projects/*/packed/
+*.archive
+# ...except the shipped payload's own archive: ncm-localized/ is the working
+# release and must stay complete and deployable straight out of a clone.
+!ncm-localized/archive/pc/mod/*.archive
+
+# --- Machine-local state and secrets (S) --------------------------------------
+*.pem
+*.key
+*.env
+server.jsonc
+*.dpapi
+.open77/
+save-backups/
+**/master-identity.json
+**/*signing-key*
+
+# --- Caches, crash dumps, editor noise (B) ------------------------------------
+.uv-cache/
+__pycache__/
+*.pyc
+Cyberpunk2077.exe-*.txt
+Thumbs.db
+desktop.ini
+.vs/
+.idea/

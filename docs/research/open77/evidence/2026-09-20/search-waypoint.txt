@@ -1,0 +1,26 @@
+﻿12 results for "read player waypoint position getWaypoint" â answering for build 2.31.13+op77.78 (no index published for 2.31.13+op77.84; serving 2.31.13+op77.78, the newest at or below it)
+
+- (card) **Open77.map.getWaypoint** [client Â· map.read Â· since 2.31.13+op77.57] â Reads the player's manual vanilla waypoint.
+  ref: Open77.map.getWaypoint
+- (guide) **Native map and player waypoints âº Read a destination** â  No waypoint returns `nil` without an error. Missing/stale world data returns `nil, "map_unavailable"`. Reading never changes a quest or moves the player. `getSelectedMarker()` reads the highlighted map marker, not the n
+  ref: native-map#read-a-destination
+- (card) **Open77.blips.setWaypoint** [client Â· ui.vanilla.map Â· since 2.31.13+op77.67] â Places the player's map waypoint, replacing whatever was tracked.
+  ref: Open77.blips.setWaypoint
+- (guide) **Vanilla blips and mappins âº The player's waypoint** â `track` and `untrack` above act on **your** blip. The waypoint is the other half: the destination the player chose, which until now no resource could see or move. In this engine a waypoint is not a separate thing: **it i
+  ref: blips#the-players-waypoint
+- (card) **Open77.blips.waypoint** [client Â· ui.vanilla.map Â· since 2.31.13+op77.67] â Where the player's map waypoint is, or nil when there is none.
+  ref: Open77.blips.waypoint
+- (guide) **Native map and player waypoints âº Native map and player waypoints** â `Open77.map` is a **client-side** API for the native world map: read player waypoints, pick destinations, control the map camera and add resource-owned WebUI tabs. Pair it with [vehicle AI](vehicle-ai.md) to use a waypoi
+  ref: native-map#native-map-and-player-waypoints
+- (card) **Open77.map.getSelectedMarker** [client Â· map.read Â· since 2.31.13+op77.57] â Reads the marker highlighted in the vanilla map.
+  ref: Open77.map.getSelectedMarker
+- (guide) **Native map and player waypoints âº Resource blips and GPS** â The existing [blip APIs](blips.md) create and update resource markers, labels, tracking and GPS. They require `ui.vanilla.map`, independently of map-session ownership. `Open77.blips.setWaypoint(position)` sets a scripted
+  ref: native-map#resource-blips-and-gps
+- (card) **Open77.blips.clearWaypoint** [client Â· ui.vanilla.map Â· since 2.31.13+op77.67] â Clears the player's map waypoint, whoever set it.
+  ref: Open77.blips.clearWaypoint
+- (guide) **Native map and player waypoints âº Taxi destination sharing** â  On the server, validate finite/bounded coordinates, rate-limit requests and verify that `source` is the taxi's passenger. Do not trust a supplied driver ID, bucket or fare. Forward the validated point to the authorized 
+  ref: native-map#taxi-destination-sharing
+- (card) **GetPlayersPositions** [server Â· since 2.31.13+op77.45] â `{ [playerId] = { x, y, z, bucket } }` for every player with a snapshot younger than two seconds.
+  ref: server:GetPlayersPositions
+- (guide) **Native map and player waypoints âº View controls** â `open()` and `pickPoint()` reserve a map session for their resource. Wait for `open77:map:viewChanged` with `ready=true`, or inspect `getView().ready`, before controlling its camera. Camera mutations require `map.control
+  ref: native-map#view-controls

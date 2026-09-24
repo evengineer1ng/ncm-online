@@ -1,0 +1,50 @@
+﻿[
+    {
+        "mod_id":  4583,
+        "version":  "0.1.20",
+        "relative_path":  "red4ext\\plugins\\in_world_navigation\\in_world_navigation.archive",
+        "sha256":  "EEF2B210337CF3975DD252A9F1B4E54FAE42A5AF3AD7B6187D086FA853B53C72",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  4583,
+        "version":  "0.1.20",
+        "relative_path":  "red4ext\\plugins\\in_world_navigation\\in_world_navigation.dll",
+        "sha256":  "93DC4FC14DFCBD59E03DA8C8FAA9ED870908251E50E45A686B15ADE9BE0B5873",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  4583,
+        "version":  "0.1.20",
+        "relative_path":  "red4ext\\plugins\\in_world_navigation\\license.md",
+        "sha256":  "9284F10A3EBE703A61C9C8AB0C1C889FDDF8276405D2AC33C7377537D1CDE448",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  4583,
+        "version":  "0.1.20",
+        "relative_path":  "red4ext\\plugins\\in_world_navigation\\module.reds",
+        "sha256":  "F6237F4AFE8D4581B8471EAC7CF9499FDCE55F64ED41869FAB8B8CF4DF006BF7",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  4583,
+        "version":  "0.1.20",
+        "relative_path":  "red4ext\\plugins\\in_world_navigation\\packed.reds",
+        "sha256":  "1AE637535F0DDBC4BAE5D5CCAE0D9BF19BC805B499FEAA8C4E24F72AB79A52A9",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  4583,
+        "version":  "0.1.20",
+        "relative_path":  "red4ext\\plugins\\in_world_navigation\\readme.md",
+        "sha256":  "E662AB9ADDEECD031B9470897459BD3715058F4AFF95390314580F3FDA537308",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    }
+]

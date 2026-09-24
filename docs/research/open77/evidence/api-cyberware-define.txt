@@ -1,0 +1,24 @@
+﻿# server Open77.cyberware.define(definition: table)
+
+Register resource-owned Gorilla Arms grades.
+
+Requires players.cyberware.define. definition={id,version,slot="arms",profile="gorilla_arms",grades={...}}. IDs use1..96 ASCII alphanumeric/_.:- characters; version positive;1..32 unique grades. Required grade fields: id,normalDamage/chargedDamage(0..300),knockbackMeters(0..6),cooldownMs(100..600000),chargeMs(100..10000). Optional normalKnockbackMeters defaults to35% of charged, maxChargeMs defaults10000 and must be>=chargeMs and<=60000; nullable normalStaminaCost/chargedStaminaCost0..300 retain native price when omitted. nonlethal/cosmetic defaultfalse; blockDamageMultiplier0..1 default0 and blockAngleDegrees0..180 default45. Stop unregisters the provider and disables its grants without deleting paid records.
+
+- runtime: server (network)
+- permissions: none checked in the handler
+- since: 2.31.13+op77.63
+- reasons it can return: cyberware_storage_unavailable, invalid_definition, invalid_json, invalid_operation, invalid_options, invalid_player, invalid_request, json_too_large, player_unavailable, request_too_large, resource_stopping
+- returns: {ok=true,error=nil,ticket=nil,lease=nil}; nil, reason on rejection
+- guides: cyberware#minimal-example, gorilla-arms#minimal-example, hacking#minimal-example
+
+```lua
+local result, err = Open77.cyberware.define({
+ id="myrp.gorilla",version=1,slot="arms",profile="gorilla_arms",
+ grades={{id="training",normalDamage=15,chargedDamage=35,
+   knockbackMeters=2,cooldownMs=650,chargeMs=700,nonlethal=true,
+   normalStaminaCost=10,chargedStaminaCost=20,maxChargeMs=3000}}
+})
+if not result then print(err) end
+```
+
+_answering for build 2.31.13+op77.78 (no index published for 2.31.13+op77.84; serving 2.31.13+op77.78, the newest at or below it)_

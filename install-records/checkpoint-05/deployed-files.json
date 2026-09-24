@@ -1,0 +1,34 @@
+﻿[
+    {
+        "mod_id":  900001,
+        "version":  "0.1-test",
+        "relative_path":  "archive\\pc\\mod\\ncm_rb15_liveries.archive",
+        "sha256":  "89EC18E907F67DCBBF9CAADC8FECA490278C7AE08A0089EB7376F977FA2B786C",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  900001,
+        "version":  "0.1-test",
+        "relative_path":  "archive\\pc\\mod\\ncm_rb15_liveries.archive.xl",
+        "sha256":  "04568536055397375DDF812C27DD5F2395A3CDC42EF33EC34135DDDCE94E58BB",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  900001,
+        "version":  "0.1-test",
+        "relative_path":  "bin\\x64\\plugins\\cyber_engine_tweaks\\mods\\NCM_RB15_LiveryTest\\init.lua",
+        "sha256":  "5BC44A39CBFB4BD81E21960E6249258B51C062AB2EC670554189E296F00951AB",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  900001,
+        "version":  "0.1-test",
+        "relative_path":  "r6\\tweaks\\ncm_rb15_liveries.yaml",
+        "sha256":  "0405E18FAFFB11D8B9A17DF2DBFAEAD02AC666A265AC7FD2609543BB7A78D633",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    }
+]

@@ -1,0 +1,14 @@
+{
+  "deployed_at": "2026-09-19T00:57:43",
+  "what": "NCM Spec Field (one-make lineup) feature: per-rival vehicle record + appearance, tunable maxAiCars, formula tuning overrides via rootProfileSettings, overlay editor + RB15 20-car preset, livery manifest loader.",
+  "source_of_truth": "ncm-localized/bin/x64/plugins/cyber_engine_tweaks/mods/MT_Ecosystem (workspace payload); telemetry.lua synced game->workspace first.",
+  "backups": "install-records/checkpoint-06/ncm-specfield-backup/",
+  "files": {
+    "init.lua": "5B84C613692F6D42F72DFC3268065DBB1A78459ECEEBFF11CD82AECC1FB3FB61",
+    "modules/liveries.lua": "91E6F5C3C802BC393357BDCEAAC58DC1714E2214A4AC1D0F0D82B5407CEE37E9",
+    "modules/ai_vehicles.lua": "CBFB843D7161FE73B0D20015895372D3B3771E06E47DF48B6DEABB3EDB582C59",
+    "modules/racing.lua": "488C72E5778B95CA9D78F1DCB3FC6C64E6063DDC52FD65E815C9ECC52D2DCF93",
+    "modules/ui_racing.lua": "C5F5D83B2FFC90B8FC94BD0618FDEE4476D7BFBB3C6CB477E0328097E65BE7E9",
+    "modules/settings.lua": "881F499EB261B8B8E2BF2115582425ABD96D923090E9C51FA1FC37ED30D4C7F3"
+  }
+}

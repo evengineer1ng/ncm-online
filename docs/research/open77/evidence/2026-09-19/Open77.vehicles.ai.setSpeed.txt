@@ -1,0 +1,18 @@
+# server Open77.vehicles.ai.setSpeed(vehicleId: integer, speed: number)
+
+Updates the native driving speed limit.
+
+Requires world.vehicles and controller ownership. speed is finite, 0.5..55 m/s; default 12. Changes the active command without restarting it each frame. Actual speed remains subject to road geometry, obstacles and the vehicle. Cautious behavior applies 75% of the configured ceiling.
+
+- runtime: server (network)
+- permissions: world.vehicles
+- since: 2.31.13+op77.57
+- reasons it can return: none found in the handler; a refusal it forwards from a callee may still reach you as a second return value
+- returns: state, or nil, reason
+
+```lua
+-- Slow the bus down in the school zone
+Open77.vehicles.ai.setSpeed(busId, 6)
+```
+
+_answering for build 2.31.13+op77.78_

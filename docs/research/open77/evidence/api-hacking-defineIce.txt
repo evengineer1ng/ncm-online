@@ -1,0 +1,22 @@
+﻿# server Open77.hacking.defineIce(definition: table)
+
+Registers this resource's Self-ICE definition and its grades.
+
+Requires `players.hacking.define`. Grades carry `charges` and `rechargeMs`; a victim whose Self-ICE has a charge blocks an incoming upload and spends it. The matching implant lives in the `self_ice` slot, profile `self_ice`.
+
+- runtime: server (network)
+- permissions: none checked in the handler
+- since: 2.31.13+op77.67
+- reasons it can return: action_owned, definition_owned, hacking_unavailable, invalid_action, invalid_definition, invalid_json, invalid_operation, invalid_options, invalid_player, invalid_request, invalid_target, json_too_large, operation_id_required, request_too_large, resource_stopping
+- returns: { ok = true }, or nil; reason on failure
+- guides: hacking#minimal-example
+
+```lua
+-- A Self-ICE that blocks one upload every 15 seconds
+assert(Open77.hacking.defineIce({
+    id = "myserver.self_ice", version = 1,
+    grades = { { id = "training", charges = 1, rechargeMs = 15000 } },
+}))
+```
+
+_answering for build 2.31.13+op77.78 (no index published for 2.31.13+op77.84; serving 2.31.13+op77.78, the newest at or below it)_

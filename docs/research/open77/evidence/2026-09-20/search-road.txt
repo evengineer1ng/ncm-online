@@ -1,0 +1,26 @@
+﻿12 results for "nearest road point navigation snap to road lane" â answering for build 2.31.13+op77.78 (no index published for 2.31.13+op77.84; serving 2.31.13+op77.78, the newest at or below it)
+
+- (card) **Open77.map.pickPoint** [client Â· map.control Â· since 2.31.13+op77.57] â Lets the player select a native map point without travel.
+  ref: Open77.map.pickPoint
+- (guide) **Native map and player waypoints âº Native point picking without travel** â  Use the vanilla **place/track waypoint** action to select a world point or marker. The map then closes. Fast travel, native taxi confirmation and Open77 admin double-click teleport are suppressed during picking. An empt
+  ref: native-map#native-point-picking-without-travel
+- (card) **Screen2DPointTo3DSpace** [client Â· world.query Â· since 2.31.13+op77.63] â Unproject a normalized screen point into a world-space ray.
+  ref: Screen2DPointTo3DSpace
+- (guide) **Network elevators âº Read snapshots** â  Server snapshots contain: - `id`, `resource`, `engineEntity`, `bucket`, `chunkX`, `chunkY`, `floorCount`; - `x`, `y`, `z`, `phase`, `activeFloor`, `originFloor`, `targetFloor`; - `travelMs`, `pausedRemainingMs`, `flags`
+  ref: elevators#read-snapshots
+- (card) **Open77.io.read** [server Â· filesystem.read Â· since 2.31.13+op77.45] â Reads a UTF-8 text file from this resource's data directory.
+  ref: server:Open77.io.read
+- (guide) **Server-owned world props âº Finding the prop next to you** â `Open77.props.list()` gives you every prop this resource owns and leaves the distance maths to you. When the question is "what am I standing next to?", `nearest` answers it directly: It returns the prop snapshot and its 
+  ref: props#finding-the-prop-next-to-you
+- (card) **print** [client Â· since 2.31.0+op77.3] â Writes to the Open77 log, prefixed with the resource name.
+  ref: print
+- (guide) **3D world markers âº Functions and snapshots** â All functions below are in `Open77.markers`. Except for `shapes()`, they require `world.markers` and operate on the calling resource's markers. | Function | Result | | --- | --- | | `create(options)` | Decimal-string han
+  ref: markers#functions-and-snapshots
+- (card) **Open77.input.pointer** [client Â· input.actions Â· since 2.31.13+op77.67] â Where the pointer is, as 0..1 across the rendered image -- the overlay's own pointer when a WebUI holds the cursor.
+  ref: Open77.input.pointer
+- (guide) **Autonomous agent testing âº The tools** â The authoritative list is the `$script:Tools` table in `scripts/agent-mcp.ps1`, which also carries the full input schema of every tool. | Tool | Role | |---|---| | `open77_status` | Stack state: master (8090), dev server
+  ref: agent-testing#the-tools
+- (card) **Open77.npcs.tasks.driveWander** [server Â· world.npcs Â· since 2.31.13+op77.67] â Drives an NPC's vehicle along the road network indefinitely.
+  ref: server:Open77.npcs.tasks.driveWander
+- (guide) **Blocking player input âº Already enforced â nothing to claim** â These are blocked by Open77 for the whole session. `isActionBlocked` reports them as blocked; `setActionBlocked` refuses with `action_already_enforced`. | Action | Why | |---|---| | `PhotoMode` | the stock activation req
+  ref: input-blocking#already-enforced-nothing-to-claim

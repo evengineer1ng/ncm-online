@@ -1,0 +1,746 @@
+﻿[
+    {
+        "mod_id":  28713,
+        "version":  "2.0",
+        "relative_path":  "archive\\pc\\mod\\mt_ecosystem.archive",
+        "sha256":  "B83BAF9DAC4428ACF9BEC2597E03F898C9C9E8880D763C535375C0DFCA074ED7",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  28713,
+        "version":  "2.0",
+        "relative_path":  "archive\\pc\\mod\\mt_ecosystem.xl",
+        "sha256":  "E8147EBADB589B77E8FAF329700ED748C200866618894CFD8D80F2D77EFC6F61",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  28713,
+        "version":  "2.0",
+        "relative_path":  "archive\\pc\\mod\\mt_ecosystem_localization.xl",
+        "sha256":  "969D752FDB7ADC847F25AD973DB2FE7E20B421E674D3BF95B914D78982F99F8F",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  28713,
+        "version":  "2.0",
+        "relative_path":  "archive\\pc\\mod\\mt_ecosystem_named_rivals.xl",
+        "sha256":  "ADADED2956C4FA4FA2DDF443E4CAD837DC8D3EE7934FE148103CD5051FBBF38F",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  28713,
+        "version":  "2.0",
+        "relative_path":  "archive\\pc\\mod\\mt_ecosystem_named_rivals\\localization\\en-us\\onscreens\\mt_ecosystem_named_rivals.json",
+        "sha256":  "1D721640C3C6A7885821A54C5327A60B82379C391C011CEA80469B6A61E88682",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  28713,
+        "version":  "2.0",
+        "relative_path":  "bin\\x64\\plugins\\cyber_engine_tweaks\\mods\\MT_Ecosystem\\init.lua",
+        "sha256":  "1E575014C6F930347C24E23872F072DBFFC7A88E715F06C480AAB6B0099543A6",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  28713,
+        "version":  "2.0",
+        "relative_path":  "bin\\x64\\plugins\\cyber_engine_tweaks\\mods\\MT_Ecosystem\\NCM_2_0_SYSTEMS.md",
+        "sha256":  "F1E5CD95B77238BDC24EE606EC23F1A30FFB8557AE0AC61FB0BA6DAB07329A1F",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  28713,
+        "version":  "2.0",
+        "relative_path":  "bin\\x64\\plugins\\cyber_engine_tweaks\\mods\\MT_Ecosystem\\README.md",
+        "sha256":  "1747A59D14A88CDC21EF2A1C845FF6AA01F55F90E2EF9CBCADE5095C09FA1259",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  28713,
+        "version":  "2.0",
+        "relative_path":  "bin\\x64\\plugins\\cyber_engine_tweaks\\mods\\MT_Ecosystem\\VOICE_GUIDE.md",
+        "sha256":  "3431B888418D2787CC339DC1E22966D0C1642EAA1718C90EE115DE036FAA13A3",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  28713,
+        "version":  "2.0",
+        "relative_path":  "bin\\x64\\plugins\\cyber_engine_tweaks\\mods\\MT_Ecosystem\\data\\circuits.lua",
+        "sha256":  "FAEABA9338E02E5F3B47DBFD3B5C598C3DEA6BA63C9824FDD81A4A017342E5DA",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  28713,
+        "version":  "2.0",
+        "relative_path":  "bin\\x64\\plugins\\cyber_engine_tweaks\\mods\\MT_Ecosystem\\data\\contact_event_archetypes.lua",
+        "sha256":  "3B2852FD0872D32EBC16305F5F1822DCF7819D9EA3F5AB666450732D8A233918",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  28713,
+        "version":  "2.0",
+        "relative_path":  "bin\\x64\\plugins\\cyber_engine_tweaks\\mods\\MT_Ecosystem\\data\\courier_nodes.lua",
+        "sha256":  "7D4E4A56EB62231242E60B71F85CA54B26CA042EBF86311D4A48B05BFD98267A",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  28713,
+        "version":  "2.0",
+        "relative_path":  "bin\\x64\\plugins\\cyber_engine_tweaks\\mods\\MT_Ecosystem\\data\\default_roots_pack.lua",
+        "sha256":  "25548530E619B6271CE7A88DF6AB6B564E2EA2666A67DE9DDF0AF02D66D5E9CE",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  28713,
+        "version":  "2.0",
+        "relative_path":  "bin\\x64\\plugins\\cyber_engine_tweaks\\mods\\MT_Ecosystem\\data\\factions.lua",
+        "sha256":  "7A1D1BFBE4A6076CF9F2D7C67A7BE009F97C892802EEAB07CCA743941D74C136",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  28713,
+        "version":  "2.0",
+        "relative_path":  "bin\\x64\\plugins\\cyber_engine_tweaks\\mods\\MT_Ecosystem\\data\\nodes.lua",
+        "sha256":  "E2EF6EE003E63EC411749E9FF47D0295FC1A28C1E7C65FE59D48033A88CD0F99",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  28713,
+        "version":  "2.0",
+        "relative_path":  "bin\\x64\\plugins\\cyber_engine_tweaks\\mods\\MT_Ecosystem\\data\\nodes_curated.lua",
+        "sha256":  "8679D8781CD72B6582EC055DA982ACDE20F066C5B117C6A18A1E371823C6DB7E",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  28713,
+        "version":  "2.0",
+        "relative_path":  "bin\\x64\\plugins\\cyber_engine_tweaks\\mods\\MT_Ecosystem\\data\\parts.lua",
+        "sha256":  "7E9486C46252E9D537AC450D1B0333D75E8D284490622071E269872992C4236D",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  28713,
+        "version":  "2.0",
+        "relative_path":  "bin\\x64\\plugins\\cyber_engine_tweaks\\mods\\MT_Ecosystem\\data\\tracks.lua",
+        "sha256":  "DF1D98F1C6362F1BF8DFF9F742075156BF86E7C0967B472E07B2574F7449AFE6",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  28713,
+        "version":  "2.0",
+        "relative_path":  "bin\\x64\\plugins\\cyber_engine_tweaks\\mods\\MT_Ecosystem\\data\\vehicle_pool.lua",
+        "sha256":  "848684014985843A675BD0E24224BFA92BC738ED03F59DD6781379922B099D61",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  28713,
+        "version":  "2.0",
+        "relative_path":  "bin\\x64\\plugins\\cyber_engine_tweaks\\mods\\MT_Ecosystem\\data\\vehicle_slot_profiles.lua",
+        "sha256":  "4465088EF78D647B70D1B96EED77315CCE480FF1B0A5EC076CA38EE544347425",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  28713,
+        "version":  "2.0",
+        "relative_path":  "bin\\x64\\plugins\\cyber_engine_tweaks\\mods\\MT_Ecosystem\\modules\\ai_vehicles.lua",
+        "sha256":  "1177F3BEC059C08230BD339AE249BB072ADAA3DF3BE8CAAFD462BF12412DF846",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  28713,
+        "version":  "2.0",
+        "relative_path":  "bin\\x64\\plugins\\cyber_engine_tweaks\\mods\\MT_Ecosystem\\modules\\ambient_races.lua",
+        "sha256":  "CFF2D75DBA8D7DC944059DAE611CEB2D23324510525955EE73D1DC9F8B5DC75B",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  28713,
+        "version":  "2.0",
+        "relative_path":  "bin\\x64\\plugins\\cyber_engine_tweaks\\mods\\MT_Ecosystem\\modules\\betting.lua",
+        "sha256":  "1D3C86644CDBE3F7537C24AF1320030DFED0E2EECF54E1825EC77BDBC28D9237",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  28713,
+        "version":  "2.0",
+        "relative_path":  "bin\\x64\\plugins\\cyber_engine_tweaks\\mods\\MT_Ecosystem\\modules\\careers.lua",
+        "sha256":  "7E3C280031BE1FA024751719A6DD309AB2097E9BB2190422D421EC8D9B453C9D",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  28713,
+        "version":  "2.0",
+        "relative_path":  "bin\\x64\\plugins\\cyber_engine_tweaks\\mods\\MT_Ecosystem\\modules\\championships.lua",
+        "sha256":  "776DB3C882467B262305BE23C196F58C4C2543FDB4650B87DCAA1F891125C104",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  28713,
+        "version":  "2.0",
+        "relative_path":  "bin\\x64\\plugins\\cyber_engine_tweaks\\mods\\MT_Ecosystem\\modules\\checkpoint.lua",
+        "sha256":  "2841037EED4C53CB0E7E29CA5B11F71AA39C683CD0DC55B3EB42D080178F9CE4",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  28713,
+        "version":  "2.0",
+        "relative_path":  "bin\\x64\\plugins\\cyber_engine_tweaks\\mods\\MT_Ecosystem\\modules\\contact_events.lua",
+        "sha256":  "51B24D389DF0615A5A7C1D0B9C1D4CFCF8D26B3350AEDF8E21834799F24AD7FE",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  28713,
+        "version":  "2.0",
+        "relative_path":  "bin\\x64\\plugins\\cyber_engine_tweaks\\mods\\MT_Ecosystem\\modules\\events.lua",
+        "sha256":  "1365AC07BD433D8E0691768006C7461B930B7344BED2B9FF13D927B8DECE467F",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  28713,
+        "version":  "2.0",
+        "relative_path":  "bin\\x64\\plugins\\cyber_engine_tweaks\\mods\\MT_Ecosystem\\modules\\event_definitions.lua",
+        "sha256":  "A0E2F52F7DFDEE6E011E7AC1CD2BA903F9E2CA87F39F30507FB6CE416452D22F",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  28713,
+        "version":  "2.0",
+        "relative_path":  "bin\\x64\\plugins\\cyber_engine_tweaks\\mods\\MT_Ecosystem\\modules\\event_listeners.lua",
+        "sha256":  "30634AE1F511BC100B57C6BAF62DB679B4BDDD81F620252DFE457158F0E4E512",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  28713,
+        "version":  "2.0",
+        "relative_path":  "bin\\x64\\plugins\\cyber_engine_tweaks\\mods\\MT_Ecosystem\\modules\\fan_engine.lua",
+        "sha256":  "BF07039CE4FD27554A9E2863F8D2825CE2B086AD576DCA4327BB494E2B6837F2",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  28713,
+        "version":  "2.0",
+        "relative_path":  "bin\\x64\\plugins\\cyber_engine_tweaks\\mods\\MT_Ecosystem\\modules\\fast_travel_nodes.lua",
+        "sha256":  "CFE28AD06A56BDB82DDC12F56188AA2645635ECF2304916CA9E4D408AE1599C6",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  28713,
+        "version":  "2.0",
+        "relative_path":  "bin\\x64\\plugins\\cyber_engine_tweaks\\mods\\MT_Ecosystem\\modules\\grid_solver.lua",
+        "sha256":  "48D5A8EF0DFAC41C3B72306F9C931D88AE13D7FD743D1EC9C3F8E6174610B714",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  28713,
+        "version":  "2.0",
+        "relative_path":  "bin\\x64\\plugins\\cyber_engine_tweaks\\mods\\MT_Ecosystem\\modules\\heat.lua",
+        "sha256":  "17DC31E13B454AE697DBAD65E188F319B128361545F7629ABBFCA5B95FA7AE46",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  28713,
+        "version":  "2.0",
+        "relative_path":  "bin\\x64\\plugins\\cyber_engine_tweaks\\mods\\MT_Ecosystem\\modules\\hype.lua",
+        "sha256":  "17DEE685F0F3152F22793FA179B4F15D62824A4DE50849C874D6BF7919BBE876",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  28713,
+        "version":  "2.0",
+        "relative_path":  "bin\\x64\\plugins\\cyber_engine_tweaks\\mods\\MT_Ecosystem\\modules\\ink_hud.lua",
+        "sha256":  "01FF5DF0E954D141782D83106CCE1DAC155EBAB871AAEE98799D92CDECBA42DC",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  28713,
+        "version":  "2.0",
+        "relative_path":  "bin\\x64\\plugins\\cyber_engine_tweaks\\mods\\MT_Ecosystem\\modules\\knockout.lua",
+        "sha256":  "FC2AA1E7D254C8D93BCF97B7B44C8565172FF04CBA075305969F16B12CF2858E",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  28713,
+        "version":  "2.0",
+        "relative_path":  "bin\\x64\\plugins\\cyber_engine_tweaks\\mods\\MT_Ecosystem\\modules\\knockout_circuits.lua",
+        "sha256":  "2836C7BBC80ED5E5E5415D5B1482B7095EBDA133D4C29D65CF2BF68CC29EC329",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  28713,
+        "version":  "2.0",
+        "relative_path":  "bin\\x64\\plugins\\cyber_engine_tweaks\\mods\\MT_Ecosystem\\modules\\management.lua",
+        "sha256":  "5B83DF61E752B4479B06EBAC23471CE2DCD3E204F251595E35D0BC295EC3EA44",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  28713,
+        "version":  "2.0",
+        "relative_path":  "bin\\x64\\plugins\\cyber_engine_tweaks\\mods\\MT_Ecosystem\\modules\\manual_nodes.lua",
+        "sha256":  "0C1118BCEEC0127A1C48D9D28C9752601AF652A5E76B3C0FB1DF418A5A324B36",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  28713,
+        "version":  "2.0",
+        "relative_path":  "bin\\x64\\plugins\\cyber_engine_tweaks\\mods\\MT_Ecosystem\\modules\\mappins.lua",
+        "sha256":  "EDF69C284301D252BA9C1C868D5E52BF7D7493ED5017B6191566A19512DCA1CD",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  28713,
+        "version":  "2.0",
+        "relative_path":  "bin\\x64\\plugins\\cyber_engine_tweaks\\mods\\MT_Ecosystem\\modules\\metrics.lua",
+        "sha256":  "44699FDA92E9F4DC3356690298BA9BB0D3B946F8B4E1B3D7C3475738815F6D5A",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  28713,
+        "version":  "2.0",
+        "relative_path":  "bin\\x64\\plugins\\cyber_engine_tweaks\\mods\\MT_Ecosystem\\modules\\named_rivals.lua",
+        "sha256":  "27295538CBB3F4AB5E2374EDE0BA6DEAB28AE31FA03A68CE487F3DEA16B18B92",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  28713,
+        "version":  "2.0",
+        "relative_path":  "bin\\x64\\plugins\\cyber_engine_tweaks\\mods\\MT_Ecosystem\\modules\\parts.lua",
+        "sha256":  "242486E9767CF1138BAB5084C81B3AC39325493D014536F45DB3540B8E6A3044",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  28713,
+        "version":  "2.0",
+        "relative_path":  "bin\\x64\\plugins\\cyber_engine_tweaks\\mods\\MT_Ecosystem\\modules\\persistence.lua",
+        "sha256":  "44F164F04D325DB64EEEFB04EBFDFAA22232F75949D898F863BC24FA3871C9B6",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  28713,
+        "version":  "2.0",
+        "relative_path":  "bin\\x64\\plugins\\cyber_engine_tweaks\\mods\\MT_Ecosystem\\modules\\phone_bridge.lua",
+        "sha256":  "D9673F7B6129E3C79B7C024465654914014AD9F2AA81C4DF907F5BD6782DEBF6",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  28713,
+        "version":  "2.0",
+        "relative_path":  "bin\\x64\\plugins\\cyber_engine_tweaks\\mods\\MT_Ecosystem\\modules\\race_commands.lua",
+        "sha256":  "AC0A2668475395CBA39AE782CA34965251DCC30297AA3E628E0C3B7D5CD33601",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  28713,
+        "version":  "2.0",
+        "relative_path":  "bin\\x64\\plugins\\cyber_engine_tweaks\\mods\\MT_Ecosystem\\modules\\race_telemetry.lua",
+        "sha256":  "C50894BE3A14CCEB124A6FDF139B6E3AD15B22A2812607A1C13E02A1B2B506CD",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  28713,
+        "version":  "2.0",
+        "relative_path":  "bin\\x64\\plugins\\cyber_engine_tweaks\\mods\\MT_Ecosystem\\modules\\racing.lua",
+        "sha256":  "801F8E665219FCE88403EB155D7BA376EA74C829A918F9C3BABD42C059BAD3D3",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  28713,
+        "version":  "2.0",
+        "relative_path":  "bin\\x64\\plugins\\cyber_engine_tweaks\\mods\\MT_Ecosystem\\modules\\radioos_bridge.lua",
+        "sha256":  "9827EAF60D1840CF9038BFBEE49368F48BF9491A093AD3F8BD3847B018CCC20D",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  28713,
+        "version":  "2.0",
+        "relative_path":  "bin\\x64\\plugins\\cyber_engine_tweaks\\mods\\MT_Ecosystem\\modules\\records.lua",
+        "sha256":  "198C7650715E7B9D69D2E3A9D44FE3A0E1C49F7D9399C85B3549E677DCD5938C",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  28713,
+        "version":  "2.0",
+        "relative_path":  "bin\\x64\\plugins\\cyber_engine_tweaks\\mods\\MT_Ecosystem\\modules\\roots.lua",
+        "sha256":  "6AD4CDDC35DBBC6BE6FC965040EB87B78F19E9B30A664354E8FFD49D511BB8CF",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  28713,
+        "version":  "2.0",
+        "relative_path":  "bin\\x64\\plugins\\cyber_engine_tweaks\\mods\\MT_Ecosystem\\modules\\roster.lua",
+        "sha256":  "BB81FE85259224603C7F547FC9C4FFD9BDB09D74A4F01ACA51AE6DB351C3CA88",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  28713,
+        "version":  "2.0",
+        "relative_path":  "bin\\x64\\plugins\\cyber_engine_tweaks\\mods\\MT_Ecosystem\\modules\\routes.lua",
+        "sha256":  "E178A96B8F5D9CEDA6C28A04CAEF2561C994E44B71FF0F99387A2177A1348CDA",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  28713,
+        "version":  "2.0",
+        "relative_path":  "bin\\x64\\plugins\\cyber_engine_tweaks\\mods\\MT_Ecosystem\\modules\\safety_rating.lua",
+        "sha256":  "FE046C6CB392CE60AAB18F66599EF8ECED789B09304AF7D2959D38C4BD56512D",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  28713,
+        "version":  "2.0",
+        "relative_path":  "bin\\x64\\plugins\\cyber_engine_tweaks\\mods\\MT_Ecosystem\\modules\\settings.lua",
+        "sha256":  "C227616D22A8F88236431B7BDDA53747903F889BAFB2EFD89DE677D782090FFF",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  28713,
+        "version":  "2.0",
+        "relative_path":  "bin\\x64\\plugins\\cyber_engine_tweaks\\mods\\MT_Ecosystem\\modules\\telemetry.lua",
+        "sha256":  "03FE85C658E4DE963492EB67EC83E59077AB83C30F42329BB09142FA34000C44",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  28713,
+        "version":  "2.0",
+        "relative_path":  "bin\\x64\\plugins\\cyber_engine_tweaks\\mods\\MT_Ecosystem\\modules\\tuning.lua",
+        "sha256":  "DC7A500CFAF3AB57DF2478C47C4A47809246998CA43BAE9C76B0859AE1ECE00A",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  28713,
+        "version":  "2.0",
+        "relative_path":  "bin\\x64\\plugins\\cyber_engine_tweaks\\mods\\MT_Ecosystem\\modules\\ui.lua",
+        "sha256":  "39023AA7BE37FFC4506D79A7636CD9EEDAAACEE786B115A9C5894ADC76969A23",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  28713,
+        "version":  "2.0",
+        "relative_path":  "bin\\x64\\plugins\\cyber_engine_tweaks\\mods\\MT_Ecosystem\\modules\\ui_championships.lua",
+        "sha256":  "238126DCEE78CA169566BA2FB4B1C7EF91EEA5F960EF0E5A7EB1ED878A6B8A27",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  28713,
+        "version":  "2.0",
+        "relative_path":  "bin\\x64\\plugins\\cyber_engine_tweaks\\mods\\MT_Ecosystem\\modules\\ui_garage.lua",
+        "sha256":  "6F4F686D160DEF8214866D46B7E9B9B6E2272A13AC9F9258D80ABBE4A843D6D7",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  28713,
+        "version":  "2.0",
+        "relative_path":  "bin\\x64\\plugins\\cyber_engine_tweaks\\mods\\MT_Ecosystem\\modules\\ui_knockout.lua",
+        "sha256":  "B240E7A7071FA73FF70BDA3B7E730AECD480B1BE18D28CA1C45ABA0C20029A3E",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  28713,
+        "version":  "2.0",
+        "relative_path":  "bin\\x64\\plugins\\cyber_engine_tweaks\\mods\\MT_Ecosystem\\modules\\ui_knockout_circuits.lua",
+        "sha256":  "3283F9F14378C25102CE8500A3FF5E266E14656A76DF9FAC7A468E37DB693A6F",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  28713,
+        "version":  "2.0",
+        "relative_path":  "bin\\x64\\plugins\\cyber_engine_tweaks\\mods\\MT_Ecosystem\\modules\\ui_racing.lua",
+        "sha256":  "4FB6B7C8751D86D9345900D8CC2D35379E21DB8199D900752E375711C4BD92E2",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  28713,
+        "version":  "2.0",
+        "relative_path":  "bin\\x64\\plugins\\cyber_engine_tweaks\\mods\\MT_Ecosystem\\modules\\ui_routes.lua",
+        "sha256":  "8BA898950341B6768E047086A67EA346DE36B42090811865B33DB8F82DA295C9",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  28713,
+        "version":  "2.0",
+        "relative_path":  "bin\\x64\\plugins\\cyber_engine_tweaks\\mods\\MT_Ecosystem\\modules\\ui_tuning.lua",
+        "sha256":  "A7819724C6C5E351EF53D4C066FFEF90B58A1950F1C8288A5463B46C0706E0F6",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  28713,
+        "version":  "2.0",
+        "relative_path":  "bin\\x64\\plugins\\cyber_engine_tweaks\\mods\\MT_Ecosystem\\modules\\ui_vehicle_pool.lua",
+        "sha256":  "A083537AD2A96C7D61D64F3857997CA9EFF0E2C52F36904D2B1D2BAB41060ED4",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  28713,
+        "version":  "2.0",
+        "relative_path":  "bin\\x64\\plugins\\cyber_engine_tweaks\\mods\\MT_Ecosystem\\modules\\user_nodes.lua",
+        "sha256":  "89797F0D1ECF8B50BD28DF0C77CC950DB9BBDDB331EA2D9FC0FB20C39C54B836",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  28713,
+        "version":  "2.0",
+        "relative_path":  "bin\\x64\\plugins\\cyber_engine_tweaks\\mods\\MT_Ecosystem\\modules\\voice_harness.lua",
+        "sha256":  "4698E0B30E2A2308194FC391CB921962D157DCE840EABEA5DB90E52617441B86",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  28713,
+        "version":  "2.0",
+        "relative_path":  "bin\\x64\\plugins\\cyber_engine_tweaks\\mods\\MT_Ecosystem\\save\\user_nodes.json",
+        "sha256":  "4467A6AF6543392D281C928B8B10B4AB2C017D2C8E59991EF1D90FC46347ECE9",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  28713,
+        "version":  "2.0",
+        "relative_path":  "r6\\scripts\\MT_Ecosystem\\MTEcosystemHUD.reds",
+        "sha256":  "D094800383135425D9F9BF921FD7BBAF3C652B58997CA3974751866700E6C2F5",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  28713,
+        "version":  "2.0",
+        "relative_path":  "r6\\scripts\\MT_Ecosystem\\MTEJournalHandler.reds",
+        "sha256":  "C5C5B664D03DD4DEE62FFD50FFF333D8D659EC59700E969EE81F247C22D78AA7",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  28713,
+        "version":  "2.0",
+        "relative_path":  "r6\\scripts\\MT_Ecosystem\\MTEMappins.reds",
+        "sha256":  "43456BFDC95F227D35A029F08DFEFA8BF8A5876D03363197795A5D2747C04C71",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  28713,
+        "version":  "2.0",
+        "relative_path":  "r6\\scripts\\MT_Ecosystem\\MTEQuestNav.reds",
+        "sha256":  "5DE766ADEDC117304A23CF7151B929F5B1B98CB5A0DD360FD07A5DC7F16F6B8C",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  28713,
+        "version":  "2.0",
+        "relative_path":  "r6\\scripts\\MT_Ecosystem\\MTERaceRuntime.reds",
+        "sha256":  "50AF6539E4D5C45DD1951F592F269959A005446F623C982ED9CEAF895591D225",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  28713,
+        "version":  "2.0",
+        "relative_path":  "r6\\tweaks\\MT_Ecosystem\\mt_ecosystem_named_rivals.yaml",
+        "sha256":  "026BD90A7B66D4D6DE2294D6E823677F34E340BC158A03A001942045C8DAABD2",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  28342,
+        "version":  "4.1",
+        "relative_path":  "bin\\x64\\plugins\\cyber_engine_tweaks\\mods\\MANUAL TRANSMISSION V10\\init.lua",
+        "sha256":  "D494635900E0862F84E7A7CDDBACBED700A72A6DC14C96F7F17F79F1845FF621",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  28342,
+        "version":  "4.1",
+        "relative_path":  "bin\\x64\\plugins\\cyber_engine_tweaks\\mods\\MANUAL TRANSMISSION V10\\modules\\Bike.gearbox.lua",
+        "sha256":  "8C44DFA3C2B7069734CCBADE5A6D02602B8E103F70A7563F210B98B5E143CFBC",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  28342,
+        "version":  "4.1",
+        "relative_path":  "bin\\x64\\plugins\\cyber_engine_tweaks\\mods\\MANUAL TRANSMISSION V10\\modules\\cache.lua",
+        "sha256":  "74ABA44B2C200239063B7E2F9D2F6972FBCF8FB500BC08A060D1B660549404BE",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  28342,
+        "version":  "4.1",
+        "relative_path":  "bin\\x64\\plugins\\cyber_engine_tweaks\\mods\\MANUAL TRANSMISSION V10\\modules\\clutch.lua",
+        "sha256":  "B7FA04F353973E5DC7B6403F397AB196A0CF456DFA75198620987E82CE1E6ACC",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  28342,
+        "version":  "4.1",
+        "relative_path":  "bin\\x64\\plugins\\cyber_engine_tweaks\\mods\\MANUAL TRANSMISSION V10\\modules\\gearbox.lua",
+        "sha256":  "0AF6ACB334818EE609916BA6D8CF47783ADC70582944FD0A1AA417E82690989D",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  28342,
+        "version":  "4.1",
+        "relative_path":  "bin\\x64\\plugins\\cyber_engine_tweaks\\mods\\MANUAL TRANSMISSION V10\\modules\\inputController.lua",
+        "sha256":  "65CE456644988D8091F961939260F3EE648F5825519A83D8CD141434728956C9",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  28342,
+        "version":  "4.1",
+        "relative_path":  "bin\\x64\\plugins\\cyber_engine_tweaks\\mods\\MANUAL TRANSMISSION V10\\modules\\menu.lua",
+        "sha256":  "477A651CDA608B8291DD37464E25159A23CB10D6C68665A688C57A8EFEEFE9C2",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  28342,
+        "version":  "4.1",
+        "relative_path":  "bin\\x64\\plugins\\cyber_engine_tweaks\\mods\\MANUAL TRANSMISSION V10\\modules\\stateManager.lua",
+        "sha256":  "1F2BCA4E462317F043BD711179A8103CCBD967E2ED267F9D7F2B94BCAC528C71",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  28342,
+        "version":  "4.1",
+        "relative_path":  "bin\\x64\\plugins\\cyber_engine_tweaks\\mods\\MANUAL TRANSMISSION V10\\modules\\ui.lua",
+        "sha256":  "431C6F9F2FF013AC96A5C3081C4D4E30736AF63584A8B24650B15F63C93DF36E",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  28342,
+        "version":  "4.1",
+        "relative_path":  "bin\\x64\\plugins\\cyber_engine_tweaks\\mods\\MANUAL TRANSMISSION V10\\modules\\utils.lua",
+        "sha256":  "46E7EE7BE4290836538BD4129FFB5B2521E6079D7C641C3B252C8811ADCB2C82",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  28342,
+        "version":  "4.1",
+        "relative_path":  "bin\\x64\\plugins\\cyber_engine_tweaks\\mods\\MANUAL TRANSMISSION V10\\modules\\Vehicle.gearbox.lua",
+        "sha256":  "4DC4C6405ACD7476E747D16EB79CCB9A9876982FD93669D7E3EACDCA78D8EE5B",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  28342,
+        "version":  "4.1",
+        "relative_path":  "bin\\x64\\plugins\\cyber_engine_tweaks\\mods\\MANUAL TRANSMISSION V10\\modules\\keanuWheeze\\config.lua",
+        "sha256":  "3584BE7F103BCE18E29F91391095A83CA5A91A0B56D7B4CDC1875CCCD03419DA",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  28342,
+        "version":  "4.1",
+        "relative_path":  "bin\\x64\\plugins\\cyber_engine_tweaks\\mods\\MANUAL TRANSMISSION V10\\modules\\keanuWheeze\\inputManager.lua",
+        "sha256":  "1682606B607CDCC94E976E9DDB9426151E511B381238C47946AB93811FABD69B",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  28342,
+        "version":  "4.1",
+        "relative_path":  "bin\\x64\\plugins\\cyber_engine_tweaks\\mods\\MANUAL TRANSMISSION V10\\modules\\psiberx\\GameUI.lua",
+        "sha256":  "8421D05B7DFB5E42095753FF12706BDEDCE7ED93C8AF57839D00F75A63F65F77",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  28342,
+        "version":  "4.1",
+        "relative_path":  "bin\\x64\\plugins\\cyber_engine_tweaks\\mods\\MANUAL TRANSMISSION V10\\modules\\utils\\cron.lua",
+        "sha256":  "E0AE71416892D39EBEA88EC2490A0E9E66E38BD2560719C3C4214872FD227FD7",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  28342,
+        "version":  "4.1",
+        "relative_path":  "r6\\input\\mt_remaps.xml",
+        "sha256":  "AF8CD1282785FDCB69C2F7016AFCC8A87650FFE6A49BDCCA6451CEB250B7F3CA",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    },
+    {
+        "mod_id":  28342,
+        "version":  "4.1",
+        "relative_path":  "red4ext\\plugins\\ManualTransmission\\ManualClutch.dll",
+        "sha256":  "00B89D3636532735A738BBB83842AE40B0E18E0E1AD5ED4F438B2E1C723893AF",
+        "preexisting_sha256":  null,
+        "backup_created":  false
+    }
+]

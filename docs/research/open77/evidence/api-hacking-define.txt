@@ -1,0 +1,25 @@
+﻿# server Open77.hacking.define(definition: table)
+
+Registers this resource's hack definition and its grades.
+
+Requires `players.hacking.define`. `definition` is `{ id, version, grades = { { id, range, uploadMs, staminaCost, cooldownMs, damage, statusMs, recoveryMs, lockHacking, nonlethal, kind? } } }`; `kind` selects Short Circuit, Overheat, Cyberware Malfunction, Cripple Movement, Reboot Optics or Weapon Glitch, six kinds of one warned, interruptible upload. Register the matching implant through `Open77.cyberware.define` with the same provider, id, version and grade ids, in the `operating_system` slot. See [Hacking and counterplay](hacking.md).
+
+- runtime: server (network)
+- permissions: none checked in the handler
+- since: 2.31.13+op77.67
+- reasons it can return: action_owned, definition_owned, hacking_unavailable, invalid_action, invalid_definition, invalid_json, invalid_operation, invalid_options, invalid_player, invalid_request, invalid_target, json_too_large, operation_id_required, request_too_large, resource_stopping
+- returns: { ok = true }, or nil; reason on failure
+- guides: hacking#minimal-example
+
+```lua
+-- A training-grade Short Circuit quickhack
+assert(Open77.hacking.define({
+    id = "myserver.short_circuit", version = 1,
+    grades = {
+        { id = "training", range = 20, uploadMs = 2000, staminaCost = 20, cooldownMs = 5000,
+          damage = 25, statusMs = 750, recoveryMs = 4000, lockHacking = false, nonlethal = true },
+    },
+}))
+```
+
+_answering for build 2.31.13+op77.78 (no index published for 2.31.13+op77.84; serving 2.31.13+op77.78, the newest at or below it)_

@@ -1,0 +1,11 @@
+{
+  "applied_at": "2026-09-18T16:21:24-04:00",
+  "files": [
+    "bin/x64/plugins/cyber_engine_tweaks/mods/MANUAL TRANSMISSION V10/modules/clutch.lua (+Clutch.GetPedalAmount)",
+    "bin/x64/plugins/cyber_engine_tweaks/mods/MANUAL TRANSMISSION V10/init.lua (publish quest facts mt_v10_present=1 and mt_v10_clutch_pct 0-100 each frame; 0 on exit/shutdown)",
+    "bin/x64/plugins/cyber_engine_tweaks/mods/MT_Ecosystem/modules/telemetry.lua (readClutchInput trusts bridge when mt_v10_present==1)"
+  ],
+  "backups": "install-records/checkpoint-04/clutch-bridge-backup/ and *.pre-clutch-bridge.bak next to each file",
+  "workspace_copies": ["manual-transmission-init.mount-fallback.lua", "manual-transmission-clutch.bridge.lua", "ncm-telemetry-clutch-bridge.lua"],
+  "reason": "NCM telemetry HUD clutch meter never moved: NCM expected MT to publish mt_v10_clutch_pct but MT never did, so it fell back to a pad axis that ignores the keyboard clutch key."
+}

@@ -1,0 +1,23 @@
+﻿# server Open77.hacking.definePurge(definition: table)
+
+Registers this resource's active-purge definition and its grades.
+
+Requires `players.hacking.define`. Grades carry `staminaCost`, `cooldownMs`, `allowSelf`, `allowAlly`, `range`, `cancelUploads` and `removeStatuses`. The matching implant lives in the `purge` slot, profile `active_purge`.
+
+- runtime: server (network)
+- permissions: none checked in the handler
+- since: 2.31.13+op77.67
+- reasons it can return: action_owned, definition_owned, hacking_unavailable, invalid_action, invalid_definition, invalid_json, invalid_operation, invalid_options, invalid_player, invalid_request, invalid_target, json_too_large, operation_id_required, request_too_large, resource_stopping
+- returns: { ok = true }, or nil; reason on failure
+- guides: hacking#minimal-example
+
+```lua
+-- A purge that also clears an ally within 10 m
+assert(Open77.hacking.definePurge({
+    id = "myserver.purge", version = 1,
+    grades = { { id = "training", staminaCost = 15, cooldownMs = 8000, allowSelf = true, allowAlly = true,
+                 range = 10, cancelUploads = true, removeStatuses = true } },
+}))
+```
+
+_answering for build 2.31.13+op77.78 (no index published for 2.31.13+op77.84; serving 2.31.13+op77.78, the newest at or below it)_
