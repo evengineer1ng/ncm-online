@@ -89,7 +89,19 @@ One immediate finding: an OPEN//77 `player(id)` bag is visible to the player's w
 `ncmPractice`, `ncmVenue`, onboarding) need an audience classification before any external surface is added.
 No bag or transport was changed during this audit.
 
-## Captured, parked for deep dive after `IDEA-319`
+## Deep dive done; one migration drafted and awaiting a ruling
+
+`30_MACHINE_KNOWLEDGE_DEEP_DIVE.md` - the near-term audit `28` asks for. **Finding: the substrate is far
+closer to the spec than the spec assumes.** `vehicle_knowledge_evidence` is already asset-provenanced,
+idempotent and indexed by `(asset_id, observed_at)`; `encounter_count` already supplies the familiarity
+input the estimation envelopes need. **Exactly two irrecoverable facts are missing: observation
+coordinates and a configuration reference.** Migration 028 is drafted (four nullable columns) and NOT
+applied -- `IDEA-344`.
+
+Then `IDEA-251` (market discovery, half-built), then `IDEA-339` (capability audit), then the estimator
+as its own reviewed proposal.
+
+## Earlier: captured spec
 
 `28_MACHINE_KNOWLEDGE.md` - machine knowledge, discovery, documentation, empirical observation and
 estimation envelopes. **SPEC status: captured, not authorised.** `IDEA-320` to `IDEA-339`.
