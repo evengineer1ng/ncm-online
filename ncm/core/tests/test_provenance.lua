@@ -65,12 +65,11 @@ return {
 
         T.eq(P.AttributionBasis.is("recorded"), true)
         T.eq(P.AttributionBasis.is("guessed"), false, "the vocabulary is closed")
-        T.eq(P.MachineSource.is("unrecorded_legacy"), true)
 
         -- A recorded attribution claims we wrote it down at the time. Without an asset that is a lie.
         local ok, why = P.validateAttribution({ basis = "recorded" })
         T.eq(ok, false); T.eq(why, "recorded_without_asset")
-        T.eq(P.validateAttribution({ basis = "recorded", assetId = id, machineSource = "owned_asset" }), true)
+        T.eq(P.validateAttribution({ basis = "recorded", assetId = id }), true)
 
         -- A derived attribution must name the rule that produced it, so a later standard of evidence can
         -- supersede it without rewriting what this one concluded (L124 A4).
@@ -81,10 +80,10 @@ return {
         -- Unknown means unknown. Carrying an assetId alongside it is incoherent.
         ok, why = P.validateAttribution({ basis = "unknown", assetId = id })
         T.eq(ok, false); T.eq(why, "unknown_with_asset")
-        T.eq(P.validateAttribution({ basis = "unknown", machineSource = "unrecorded_legacy" }), true)
+        T.eq(P.validateAttribution({ basis = "unknown" }), true)
 
-        ok, why = P.validateAttribution({ basis = "recorded", assetId = id, machineSource = "borrowed" })
-        T.eq(ok, false); T.eq(why, "invalid_machine_source")
+        -- There is no machine-source vocabulary: a team car is a car (L126). Only WHICH and HOW-WELL-KNOWN.
+        T.eq(P.MachineSource, nil, "classifying machines by who uses them is the species distinction L123 forbids")
     end,
 
     registry_behaviour = function(T)

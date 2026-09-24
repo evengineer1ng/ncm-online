@@ -422,7 +422,8 @@ end
 
 -- ---------------------------------------------------------------------------------------------
 --- The machine this driver raced, and HOW WELL WE KNOW IT (L124 A4). Returns three values ready for the
---- insert: assetId (or "" for the NULLIF), machineSource, attributionBasis.
+--- insert: assetId (or "" for the NULLIF) and attributionBasis. There is no third value -- a team car is
+--- a car (L126), so WHICH machine and HOW WELL WE KNOW IT are the only facts.
 ---
 --- `recorded` is only ever claimed when the machine was observed under the driver at green. Everything else
 --- is `unknown`, deliberately: a result with no machine is a gap in the record, and a gap must never be
@@ -440,16 +441,14 @@ end
 
 local function attribution(rec, driverId)
     local assetId = machineFor(rec, driverId)
-    local source = assetId and "owned_asset" or "unknown"
     local basis = assetId and "recorded" or "unknown"
-    local ok, why = NcmCore.get("vocabulary.provenance").validateAttribution({
-        assetId = assetId, machineSource = source, basis = basis })
+    local ok, why = NcmCore.get("vocabulary.provenance").validateAttribution({ assetId = assetId, basis = basis })
     if not ok then
         -- Never write an attribution core refuses; record the gap and say why.
         log("attribution refused driver=%s: %s", tostring(driverId), tostring(why))
-        return "", "unknown", "unknown"
+        return "", "unknown"
     end
-    return assetId or "", source, basis
+    return assetId or "", basis
 end
 
 -- Completion: persist, settle (zero eddies), announce
@@ -469,8 +468,8 @@ local function complete(rec, results, reason, t)
             if state == "timed" then state = "finished" elseif state == "no_time" then state = "dns" end
             MySQL.insert.await(
                 "INSERT INTO session_result (session_id, ncm_driver_id, entry_id, position, state, total_ms, penalty_ms, gap_ms, gates_done, gates_total, jump_start, dnf_reason, " ..
-                "corrected_ms, incident_ms, incident_count, best_ms, asset_id, machine_source, attribution_basis) " ..
-                "VALUES (?, ?, NULLIF(?, ''), ?, ?, NULLIF(?, -1), ?, NULLIF(?, -1), ?, ?, ?, NULLIF(?, ''), NULLIF(?, -1), ?, ?, NULLIF(?, -1), NULLIF(?, ''), ?, ?)",
+                "corrected_ms, incident_ms, incident_count, best_ms, asset_id, attribution_basis) " ..
+                "VALUES (?, ?, NULLIF(?, ''), ?, ?, NULLIF(?, -1), ?, NULLIF(?, -1), ?, ?, ?, NULLIF(?, ''), NULLIF(?, -1), ?, ?, NULLIF(?, -1), NULLIF(?, ''), ?)",
                 { s.sessionId, r.driverId, r.entryId or "", r.position, state,
                   r.totalSec and math.floor(r.totalSec * 1000) or -1, math.floor((r.penaltySec or 0) * 1000),
                   r.gapSec and math.floor(r.gapSec * 1000) or -1, r.progress or 0, r.gatesTotal or 2, r.jumpStart and 1 or 0, r.dnfReason or "",
@@ -1255,7 +1254,7 @@ function NcmRace.practiceComplete(rec, results, reason, t)
         for _, r in ipairs(results) do
             if r.bestSec then
                 MySQL.insert.await(
-                    "INSERT INTO session_result (session_id, ncm_driver_id, entry_id, position, state, total_ms, penalty_ms, gates_done, gates_total, incident_ms, incident_count, best_ms, asset_id, machine_source, attribution_basis) VALUES (?, ?, NULL, ?, 'finished', ?, 0, ?, ?, ?, ?, ?, NULLIF(?, ''), ?, ?)",
+                    "INSERT INTO session_result (session_id, ncm_driver_id, entry_id, position, state, total_ms, penalty_ms, gates_done, gates_total, incident_ms, incident_count, best_ms, asset_id, attribution_basis) VALUES (?, ?, NULL, ?, 'finished', ?, 0, ?, ?, ?, ?, ?, NULLIF(?, ''), ?)",
                     { rec.s.sessionId, r.driverId, r.position, math.floor(r.bestSec * 1000), r.gatesTotal or 2, r.gatesTotal or 2,
                       math.floor((r.incidentSec or 0) * 1000), r.incidentCount or 0, math.floor(r.bestSec * 1000),
                       attribution(rec, r.driverId) })

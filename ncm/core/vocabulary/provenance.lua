@@ -73,18 +73,18 @@ Core.define("vocabulary.provenance", function(C)
     -- Machine attribution (IDEA-236, L124 A4)
     -- ---------------------------------------------------------------------------------------------
     --
-    -- What KIND of machine produced a result. `unrecorded_legacy` is not an apology -- it is a positive
-    -- statement that the system of the time did not record this, which is different from "no machine was
-    -- involved" and must stay distinguishable from it forever.
-    M.MachineSource = enum("machineSource", {
-        "owned_asset", "team_equipment", "unrecorded_legacy", "unknown",
-    })
+    -- There is deliberately NO "machine source" vocabulary. A team car is simply a car owned by a team, an
+    -- NCX car is simply a car, and exclusivity lives in market access rather than in the object (L124 A2,
+    -- L126). Classifying machines by who uses them is the species distinction L123 forbids, and an earlier
+    -- draft of this file carried it as `team_equipment` until migration 027 removed it.
+    --
+    -- WHICH machine is `asset_id`. HOW WELL WE KNOW IT is `AttributionBasis`. There is no third fact.
 
     -- How well we know it. The owner's ruling (A4): a derived attribution must remain permanently
     -- distinguishable from a recorded fact, and must carry the rule that produced it.
     M.AttributionBasis = enum("attributionBasis", { "recorded", "derived", "unknown" })
 
-    --- Validate an attribution: { assetId?, machineSource?, basis?, rule? }.
+    --- Validate an attribution: { assetId?, basis?, rule? }.
     --- Returns true, or false + reason. The invariants, in order of how badly each would mislead:
     ---   * `recorded` without an assetId is a lie -- it claims we wrote something down that we did not
     ---   * `derived` without a rule is unfalsifiable -- nobody can later judge or supersede the reasoning
@@ -94,7 +94,6 @@ Core.define("vocabulary.provenance", function(C)
         local id, basis = a.assetId, a.basis
         if id ~= nil and type(id) ~= "string" then return false, "asset_id_not_string" end
         if basis ~= nil and not M.AttributionBasis.is(basis) then return false, "invalid_basis" end
-        if a.machineSource ~= nil and not M.MachineSource.is(a.machineSource) then return false, "invalid_machine_source" end
         if basis == "recorded" and not id then return false, "recorded_without_asset" end
         if basis == "derived" and not (type(a.rule) == "string" and #a.rule > 0) then return false, "derived_without_rule" end
         if basis == "unknown" and id then return false, "unknown_with_asset" end

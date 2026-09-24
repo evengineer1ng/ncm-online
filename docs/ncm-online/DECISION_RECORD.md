@@ -997,3 +997,44 @@ into a live defect the moment it lands**, which is the worst possible time to di
 `enforceEnteredMachine`'s comment said a team entry *"names no machine and is untouched"*, framing a temporary
 gap as a permanent carve-out. Rewritten to say what is actually true: it names no machine **until M6**, and the
 rule needs no change when it does.
+
+## L127 — LOCKED — a machine is never classified by who uses it
+
+Owner, 2026-09-24, catching me up after drift:
+
+> *"Team cars are simply cars, owned by a team. Not a special category of car… a team car is simply a car
+> serialized like any other from a manufacturer, even NCX cars or any CAR. The design is team and more
+> competitive cars will be produced in external more exclusive markets, not base market. So people will have
+> genuine connections to markets that newer players won't."*
+
+### The rule
+
+**One species.** A team car, an NCX car, a street car and a show car are the same kind of object. What differs
+is **ownership, custody, configuration and history** — never the object's category. No schema, enum or
+vocabulary may classify a machine by who uses it.
+
+**Exclusivity lives in the channel, not the car.** Competitive machines are produced into external, restricted
+markets rather than the Base Market, so **market access becomes real progression**: an established player knows
+where to source what a newcomer cannot reach. That is *why* the serial space can stay uniform (L124 A2) — the
+scarcity was never supposed to be in the object.
+
+### What I broke, the day after L123 banned it
+
+Q2 offered three answers and I recommended (b), a `machine_source` enum carrying `team_equipment`. **The owner
+chose (c): "require every car to be an asset."** I then built (b) anyway, in migration 024 and in
+`ncm/core/vocabulary/provenance.lua`.
+
+So a superseded recommendation of mine became a schema column and a core enum, and the value it carried was
+precisely the species distinction L123 had forbidden **one day earlier**. Prose in a decision record did not
+prevent it.
+
+Migration 027 drops the column; the vocabulary and both write sites are corrected. What remains says only true
+things: **`asset_id` is WHICH machine, `attribution_basis` is HOW WELL WE KNOW IT, and there is no third fact.**
+"This was a team car" is `asset_id` pointing at a machine whose owner principal is an organization — which
+migration 025 already made expressible.
+
+### The guard
+
+`IDEA-315`: no enum under `ncm/core/vocabulary/` may contain a value naming a **use** rather than a **fact** —
+`team_equipment`, `loaner`, `grid_car`, `league_car`. Mechanically checkable, and the third time this session
+that a rule kept in prose failed where a gate assertion would have held (see also L125 §8, `IDEA-313`).

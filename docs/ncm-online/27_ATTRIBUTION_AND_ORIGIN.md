@@ -103,8 +103,7 @@ changes mid-session, log it: a car swap mid-race is either a bug or a story, and
 ```sql
 -- session_result
 asset_id          CHAR(36) NULL,                                   -- the machine fielded
-machine_source    ENUM('owned_asset','team_equipment',
-                       'unrecorded_legacy','unknown') NULL,        -- Q2(b)
+-- machine_source: REMOVED by migration 027. See the note below.
 attribution_basis ENUM('recorded','derived','unknown') NULL,       -- A4
 attribution_rule  VARCHAR(64) NULL,                                -- names the rule when basis='derived'
 configuration_ref CHAR(36) NULL                                    -- Q8: reserved, nothing writes it yet
@@ -125,9 +124,16 @@ is that "we will add it later" is exactly how 29 results became anonymous.
 
 ## The existing 29 rows
 
+> **CORRECTION, 2026-09-24 (L127).** An earlier draft of this document specified a `machine_source` enum
+> carrying `team_equipment`. That was wrong twice over: Q2 offered it as option (b) and **the owner chose (c),
+> "require every car to be an asset"**, and the value itself encodes the species distinction L123 forbids.
+> **A team car is simply a car owned by a team**; an NCX car is simply a car; exclusivity lives in market
+> access, not in the object (L124 A2, L126). Migration 027 drops the column. `asset_id` says WHICH machine and
+> `attribution_basis` says HOW WELL WE KNOW IT -- there is no third fact.
+
 | rows | proposal |
 |---|---|
-| 19 pre-purchase results + driver A's 2 | `machine_source='unrecorded_legacy'`, `attribution_basis='unknown'` |
+| 19 pre-purchase results + driver A's 2 | `attribution_basis='unknown'` |
 | the 8 post-purchase results | **`attribution_basis='derived'`, `attribution_rule='exclusive_ownership_v1'`** |
 
 **I am changing my earlier recommendation, and the reason matters.** On 2026-09-24 I recommended leaving all 29
