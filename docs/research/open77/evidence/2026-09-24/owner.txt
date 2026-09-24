@@ -1,0 +1,23 @@
+﻿# server Open77.vehicles.owner(id: vehicle id)
+
+Who is simulating a vehicle, in what capacity, and since when.
+
+Requires `world.vehicles`. FiveM's `NetworkGetEntityOwner` with more than a number, because the lease has more than one shape. `physicsOwner` and `authorityPlayerId` carry the same value (the vehicle read has always said the first, the NPC read says the second; a script reading both should not learn two words) and are `0` when the car is parked. `driver` is the seated controller -- the front-left occupant, or any occupant of an AV -- whether or not they own the lease, and is absent when nobody is. `steward` is true when the owner holds the lease without being the driver: the parked-car simulation the platform hands to the nearest occupant, or a script's own grant. `aiDriven` says an NPC drive task holds the lease. `epoch` is the authority epoch; `since` is when the owner last changed on the `GetGameTimer()` clock and `ageMs` how long ago that was; `reason` is why (`driverclaim`, `driverrelease`, `leaseexpired`, `playerdisconnected`, `validationfailed`, `serverrevoke`, or `none` for a platform steward grant and a car nobody has owned yet); `leaseMs` is how long the current lease still has, when there is one. There is no `Open77.vehicles.entity(id)`: the client read's `entity` FIELD and `Open77.vehicles.fromEntity` already cover `NetworkGetNetworkIdFromEntity`.
+
+- runtime: server (network)
+- permissions: world.vehicles
+- since: 2.31.13+op77.73
+- reasons it can return: none found in the handler; a refusal it forwards from a callee may still reach you as a second return value
+- returns: { physicsOwner, authorityPlayerId, driver?, steward, aiDriven, epoch, since, ageMs, reason, leaseMs? }, or nil; reason: invalid_vehicle_id, vehicle_not_found
+- guides: vehicles#who-owns-a-car
+
+```lua
+-- A speed camera only fines a car somebody is actually driving
+local owner = Open77.vehicles.owner(vehicleId)
+if owner and owner.driver and not owner.aiDriven then
+    local kph = Open77.vehicles.getSpeedKph(vehicleId)
+    if kph and kph > 80 then Open77.chat.send(owner.driver, ("Flashed at %d km/h"):format(kph)) end
+end
+```
+
+_answering for build 2.31.13+op77.78 (no index published for 2.31.13+op77.84; serving 2.31.13+op77.78, the newest at or below it)_

@@ -1,0 +1,24 @@
+﻿# client Open77.vehicles.get(id: integer)
+
+Reads one streamed server-owned vehicle.
+
+Client read-only API requiring `vehicles.read`. The snapshot contains durable state (`health`, flags, the derived `locked`, `undriveable`/`drivable` and `frozen` booleans -- the last two are server-authored bits no owner report can clear, see `wiki/vehicles.md` -- six door bits, four open-window bits, tyre/glass/light masks, detached panels and the 30-cell body grid), authority and occupants including durable seat-policy flags, an ephemeral generation-checked local entity handle, plus the replicated transform and the latest drivetrain and wheel telemetry. The transform is `position` (a plain `{ x, y, z }`, which is what an Open77 vector3 is), `orientation` as `{ x, y, z, w }`, and `heading`/`yaw` -- one value under both names, in degrees, extracted from the full quaternion so a car on a slope reports the heading it is actually facing, and matching the server vehicle read exactly. Both come from the latest replicated motion when one exists and from the canonical create otherwise, so a proximity query answers for a car whose REDengine projection has not attached yet. `speed` is metres per second, the unit every Open77 read uses, and `speedKph` is the same number converted once because performance ceilings and speed limits are authored in km/h. Open windows and broken glass are separate states. Creation, repair, authoritative seat assignment and arbitrary mutation are server-only; the complete server surface is documented in `wiki/vehicles.md`.
+
+- runtime: client (game)
+- permissions: vehicles.read
+- since: 2.31.0+op77.3
+- reasons it can return: none found in the handler; a refusal it forwards from a callee may still reach you as a second return value
+- returns: table { id, record, entity, engineEntity, revision, physicsOwner, authorityEpoch, flags, locked, health, position, orientation, heading, yaw, doors, windows, tires, bodyDamage, brokenGlass, brokenLights, detachedParts, damage, speed, speedKph, rpm, rpmMax, throttle, brake, steering, wheelRotation, suspensionLongitudinal, suspensionTransversal, burnout, gear, onGround, reversing, streamed, locallyOwned, occupants }, or nil
+- guides: state-bags#recipe-a-number-plate, vehicles#other-server-calls, vehicles#server-events, vehicles#client-api
+
+```lua
+-- A dashboard: speed and health of the car the player is driving
+SetTick(function()
+    local seat = Open77.vehicles.getPlayerSeat()
+    if not seat then return end
+    local car = Open77.vehicles.get(seat.vehicleId)
+    if car then dashboard.set(car.speedKph, car.health) end
+end)
+```
+
+_answering for build 2.31.13+op77.78 (no index published for 2.31.13+op77.84; serving 2.31.13+op77.78, the newest at or below it)_

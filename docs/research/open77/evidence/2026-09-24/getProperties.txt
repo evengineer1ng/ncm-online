@@ -1,0 +1,32 @@
+﻿# server Open77.vehicles.getProperties(id: vehicle id)
+
+Everything a garage has to store to put this exact car back.
+
+Requires `world.vehicles`. Answers one plain table -- strings, numbers, booleans and tables, so it survives `json.encode` and a database column unchanged -- or `nil, "vehicle_not_found"`. This is the Cyberpunk counterpart of the `GetVehicleProperties` helper every FiveM framework ships, and `setProperties` is its other half: **`setProperties(id, getProperties(id))` leaves the vehicle observably unchanged**, and the same table applied to a fresh vehicle of the same record reproduces it.
+
+The shape is `{ version = 1, record, appearance, paint = { applied, primary = {r,g,b}, secondary = {r,g,b}, lightsHue? }, health, engineOn, lights = "off"|"on"|"high", siren, locked, drivable, invulnerable, immortal, doors, windows, damage = { body = {30 cells}, glass, lights, tires, detachedParts, destroyed, exploded }, performance? }`.
+
+**Deliberately not where the car was standing.** Position, heading, velocity, occupants, routing bucket and revision are not properties of the car, and a table that carried them would tempt a caller into teleporting by accident; `setTransform` and `setBucket` still own those.
+
+**What Cyberpunk does not have is the real story here.** Vehicle visual customisation on build 2.31 is one struct, `GenericTemplatePersistentData` -- primary RGB, secondary RGB and a lights hue -- plus the entity appearance variant. There are no mod slots, no wheel types, no neon, no window tint and no numbered extras: not unimplemented, absent, with no RTTI type for any of them. `Open77.vehicles.unsupportedProperties` names every FiveM property that therefore has no counterpart, and `setProperties` refuses such a key by name rather than dropping it.
+
+- runtime: server (network)
+- permissions: world.vehicles
+- since: 2.31.13+op77.67
+- reasons it can return: none found in the handler; a refusal it forwards from a callee may still reach you as a second return value
+- returns: table, or nil; reason: vehicle_not_found, permission_denied:world.vehicles
+- guides: vehicles#vehicle-properties-and-what-cyberpunk-does-not-have
+
+```lua
+-- /park: store the caller's car so it can be brought back after a restart
+RegisterCommand("park", function(source)
+    local seat = Open77.vehicles.getPlayerSeat(source)
+    if not seat then return end
+    local props = Open77.vehicles.getProperties(seat.vehicleId)
+    Open77.kvp.set("garage:" .. Open77.players.identifier(source), json.encode(props))
+    Open77.vehicles.remove(seat.vehicleId)
+    Open77.chat.send(source, "Car stored.")
+end, false)
+```
+
+_answering for build 2.31.13+op77.78 (no index published for 2.31.13+op77.84; serving 2.31.13+op77.78, the newest at or below it)_

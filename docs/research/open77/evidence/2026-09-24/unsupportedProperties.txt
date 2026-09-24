@@ -1,0 +1,21 @@
+﻿# server Open77.vehicles.unsupportedProperties()
+
+The FiveM vehicle-property names with no Cyberpunk counterpart, and why.
+
+A table, not a function: each key is a FiveM `GetVehicleProperties` field this engine cannot express, and each value says what is missing. `setProperties` refuses every one of them by name. Read it to decide, before writing, what a ported script has to drop -- and read it instead of guessing, because several of the absences are surprising: there are no colour INDICES (Cyberpunk paint is RGB), no livery index (the appearance variant is a name, not a number), and no plate at all.
+
+The list covers `modKit`, `mods`, `modEngine`, `modBrakes`, `modTransmission`, `modSuspension`, `modArmour`, `modTurbo`, `wheels`, `wheelType`, `wheelColor`, `windowTint`, `neonEnabled`, `neonColor`, `xenonColor`, `livery`, `roofLivery`, `extras`, `color1`, `color2`, `pearlescentColor`, `interiorColor`, `dashboardColor`, `dirtLevel`, `tyreSmokeColor`, `plateText`, `plateIndex` and `fuelLevel`.
+
+- runtime: server (network)
+- permissions: none checked in the handler
+- since: 2.31.13+op77.67
+- reasons it can return: none found in the handler; a refusal it forwards from a callee may still reach you as a second return value
+- returns: table mapping property name to the reason it has no counterpart
+
+```lua
+for name, why in pairs(Open77.vehicles.unsupportedProperties) do
+  print(("%s: %s"):format(name, why))
+end
+```
+
+_answering for build 2.31.13+op77.78 (no index published for 2.31.13+op77.84; serving 2.31.13+op77.78, the newest at or below it)_

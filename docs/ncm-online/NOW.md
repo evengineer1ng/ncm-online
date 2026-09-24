@@ -11,7 +11,7 @@ tooling/API audit and the documentation-authority pass (L125). No runtime, schem
 deployment or gameplay behavior changed in this audit.
 
 > **Claim before writing:** decisions through **L128**; MASTER_TEST through **2.18** / **§AG**; next QA
-> letter **§AH**. BACKLOG next free **IDEA-359**; known issues through **KB-96**.
+> letter **§AH**. BACKLOG next free **IDEA-366**; known issues through **KB-96**.
 > *(Stale a THIRD time on 2026-09-24 — it read IDEA-295 while the ledger ran to IDEA-300. Three strikes is an
 > argument for the automated assertion proposed in `26_DOCUMENT_AUTHORITY.md` §8, not for trying harder.)*
 > *(This block was stale until 2026-09-24 — it still claimed L119 / IDEA-241 / KB-87 while 172 BACKLOG rows,
@@ -20,6 +20,33 @@ deployment or gameplay behavior changed in this audit.
 > `KB-87` is used **twice** (incident detection, and the odometer forensic) — an existing collision, not a typo.
 > L106 is the Market/access meaning (acquisition vs access); the probe-evidence corollary is **L109**.
 > Do not reuse IDs or rewrite another session's authored history.
+
+## `IDEA-339` is done: the capability audit, and what it settles
+
+`31_CAPABILITY_AUDIT.md` - the gate spec section 36 put in front of the observation vocabulary. **Nothing
+built; no runtime, schema or behaviour changed.** Three results:
+
+**More falls into our lap than the spec hoped.** Throttle, brake, **real steering input**, RPM, gear, wheel
+phase and longitudinal/transversal suspension forces, for **any streamed vehicle** -- not only the one you sit
+in. Nearly every performance characteristic section 36 names is reachable.
+
+**The surface is split and the halves do not overlap** (`IDEA-360`). Server has the velocity vectors and no
+drivetrain; client has the whole drivetrain and no velocity vectors. So every input-dependent characteristic
+is **client-observable only, therefore attested rather than authoritative**, and understeer<->oversteer needs
+one field from each side -- **the first characteristic neither side can measure alone.**
+
+**There are no components. At all** (`IDEA-359`). Not unimplemented -- absent, with no RTTI type. That retires
+the observational half of the parts design and **settles `configuration_ref`**: it can only ever reference an
+NCM-authored record, because there is no engine object to point at.
+
+**Do not write an observation before these are encoded:** a parked car reads **zero, not unknown**
+(`IDEA-361`), and `EPISTEMIC.observed` conflates server-measured with observer-attested (`IDEA-362`). Both are
+the wrong-number class of defect, and both become unrecoverable once rows exist.
+
+**Four cheap tests are owed** before anything numeric is frozen (`IDEA-365`). Two are free during a race.
+Test 1 -- paste the `telemetry fields:` line from a `.87` client -- has been owed since MASTER_TEST section
+103 and is the only thing that closes the nine-build gap between the published cards (`op77.78`) and the
+runtime.
 
 ## Next action: restart `ncm_league` on Development and open the Market
 

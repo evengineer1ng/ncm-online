@@ -1,0 +1,22 @@
+﻿# client Open77.vehicles.ratedTopSpeed(vehicleId: integer|string)
+
+Gearing rating of a vehicle's TweakDB record, in km/h.
+
+Requires `vehicles.read`. Returns the speed at which the record's top gear reaches its rated maximum engine RPM, reached through `vehEngineData`. Use it to rank a roster and to pick a ceiling no car has to be slowed much to meet. It is **not** the measured terminal velocity, which torque and aerodynamic drag carry higher. Returns `nil` when the record cannot be resolved.
+
+- runtime: client (game)
+- permissions: vehicles.read
+- since: 2.31.1+op77.9
+- reasons it can return: none found in the handler; a refusal it forwards from a callee may still reach you as a second return value
+- returns: number or nil
+
+```lua
+-- Pick a fair race cap: 10 km/h under the slowest car in the roster
+local cap = math.huge
+for _, record in ipairs(roster) do
+    cap = math.min(cap, Open77.vehicles.ratedTopSpeed(record) or cap)
+end
+Open77.vehicles.setPerformanceClass(roster[1], { topSpeedKph = cap - 10 })
+```
+
+_answering for build 2.31.13+op77.78 (no index published for 2.31.13+op77.84; serving 2.31.13+op77.78, the newest at or below it)_

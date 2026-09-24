@@ -1,0 +1,5 @@
+﻿17 vehicles match "maimai" (game 2.31)
+- {"record":"Vehicle.cs_savable_makigai_maimai","displayName":"Cs Savable Makigai Maimai","class":"other","classLabel":"Other","manufacturer":"Cs","seats":4,"tweakDbId":"0x2179412737"}
+- {"record":"Vehicle.cs_savable_makigai_maimai_broken","displayName":"Cs Savable Makigai Maimai Broken","class":"other","classLabel":"Other","manufacturer":"Cs","seats":4,"tweakDbId":"0x281f517b4a"}
+- {"record":"Vehicle.cs_savable_makigai_maimai_disabled_interactions","displayName":"Cs Savable Makigai Maimai Disabled Interactions","class":"other","classLabel":"Other","manufacturer":"Cs","seats":4,"tweakDbId":"0x37f53938c0"}
+â¦ 14 more: pass offset=3, or a narrower query
