@@ -70,6 +70,25 @@
     #instr .odo { font: 700 19px/1.1 var(--mono); letter-spacing: 0.03em; color: var(--text); margin-top: 3px; }
     #instr .odo small { font-size: 11px; color: var(--dim); letter-spacing: 0.14em; margin-right: 6px; }
 
+    /* Driver inputs (IDEA-366). Directly ABOVE the odometer and the same width, so the two read as one
+       cluster rather than two panels that happen to be near each other. Deliberately small and low-contrast:
+       it is glanceable confirmation of what the hands and feet are doing, never something to look AT while
+       driving. Three inputs only -- steering, throttle, brake. */
+    #inputs { position: absolute; left: 44px; bottom: 252px; padding: 8px 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; min-width: 152px; box-sizing: border-box; display: flex; align-items: flex-end; gap: 12px; }
+    #inputs .wheel { color: var(--dim); flex: 0 0 auto; }
+    /* 80ms is just over one 20 Hz sample, so motion is continuous without lagging behind the hands. */
+    #inputs .wheel g { transition: transform 80ms linear; transform-origin: 0 0; }
+    #inputs .wheel.na { opacity: 0.28; }
+    #inputs .peds { display: flex; gap: 8px; flex: 0 0 auto; }
+    #inputs .ped { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+    #inputs .bar { position: relative; width: 10px; height: 38px; background: rgba(255,255,255,0.09); border-radius: 3px; overflow: hidden; }
+    #inputs .bar i { position: absolute; left: 0; right: 0; bottom: 0; height: 0; display: block; transition: height 80ms linear; }
+    #inputs .bar.t i { background: var(--ok); }
+    #inputs .bar.b i { background: var(--red); }
+    #inputs .ped b { font: 700 9px/1 var(--mono); letter-spacing: 0.12em; color: var(--dim); }
+    #inputs .ped em { font: 700 10px/1 var(--mono); font-style: normal; color: var(--dim); }
+    #inputs .na .bar i { background: var(--line) !important; }
+
     /* Live race graph (P40). VERTICAL, and deliberately small.
        It used to be a 1240px bar across the bottom of the screen, which sat on top of the speedometer. It now
        stands on the left edge, clear of the vanilla driving HUD (bottom-centre speed, bottom-right minimap)
@@ -102,6 +121,13 @@
   </div>
   <div id="banner" class="hidden"></div>
   <div id="board" class="hidden"><div class="title"><span id="boardIcon"></span><span id="boardTitle"></span></div><table><tbody id="rows"></tbody></table></div>
+  <div id="inputs" class="hidden">
+    <div class="wheel" id="inWheel"><svg viewBox="-24 -24 48 48" width="40" height="40" aria-hidden="true"><g id="inWheelG"><circle r="20" fill="none" stroke="currentColor" stroke-width="3.2"/><line x1="-19.5" y1="-3" x2="19.5" y2="-3" stroke="currentColor" stroke-width="2.8"/><line x1="0" y1="-3" x2="0" y2="19.5" stroke="currentColor" stroke-width="2.8"/><circle r="3.2" fill="currentColor"/></g></svg></div>
+    <div class="peds">
+      <div class="ped" id="inThrPed"><div class="bar t"><i id="inThr"></i></div><b>THR</b><em id="inThrPct">--</em></div>
+      <div class="ped" id="inBrkPed"><div class="bar b"><i id="inBrk"></i></div><b>BRK</b><em id="inBrkPct">--</em></div>
+    </div>
+  </div>
   <div id="instr" class="hidden"><div class="who" id="instrWho"></div><div class="odo" id="instrOdo"></div></div>
   <div id="graph" class="hidden"><span class="flag" id="graphFlag"></span><div class="line"></div><div id="dots"></div><span class="lbl">START</span></div>
   <script src="glyphs.js"></script>
@@ -239,6 +265,39 @@
           banner.classList.add("hidden");
         }
       }
+
+      // Driver inputs arrive on their own channel at 20 Hz, deliberately NOT inside `race:state`: that
+      // payload is diffed and republished on race events, and folding a continuously changing value into it
+      // would defeat its own throttling. `off` (or an absent field) means "not read", and renders as a dash
+      // rather than as a resting pedal -- a confidently wrong instrument is worse than an absent one.
+      const inputs = document.getElementById("inputs");
+      const inWheel = document.getElementById("inWheel");
+      const inWheelG = document.getElementById("inWheelG");
+      const pedEls = {
+        throttle: { ped: document.getElementById("inThrPed"), fill: document.getElementById("inThr"), pct: document.getElementById("inThrPct") },
+        brake:    { ped: document.getElementById("inBrkPed"), fill: document.getElementById("inBrk"), pct: document.getElementById("inBrkPct") },
+      };
+      const setPedal = (el, v) => {
+        const known = typeof v === "number" && isFinite(v);
+        el.ped.classList.toggle("na", !known);
+        const h = known ? Math.max(0, Math.min(1, v)) * 100 : 0;
+        const css = h.toFixed(1) + "%";
+        if (el.fill.style.height !== css) el.fill.style.height = css;
+        text(el.pct, known ? Math.round(h) : "--");
+      };
+      Open77.on("race:inputs", (v) => {
+        if (!v || v.off) { inputs.classList.add("hidden"); return; }
+        inputs.classList.remove("hidden");
+        setPedal(pedEls.throttle, v.throttle);
+        setPedal(pedEls.brake, v.brake);
+        // Full lock is drawn at 120 degrees: enough that small corrections are visible without the spokes
+        // spinning past the point where the eye can read which way they went.
+        const st = typeof v.steering === "number" && isFinite(v.steering) ? v.steering : null;
+        inWheel.classList.toggle("na", st === null);
+        const deg = (st === null ? 0 : Math.max(-1, Math.min(1, st)) * 120).toFixed(1);
+        const tf = "rotate(" + deg + "deg)";
+        if (inWheelG.style.transform !== tf) inWheelG.style.transform = tf;
+      });
 
       Open77.on("race:state", apply);
       Open77.ready();

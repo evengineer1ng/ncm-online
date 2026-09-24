@@ -11,7 +11,10 @@ implementation warning asks for and nothing beyond it:
 > need… prioritize ensuring that any newly persisted empirical observations can retain world + serialised
 > machine + coordinates + timestamp rather than storing only a naked number."*
 
-**Nothing built.** One migration is drafted in §5 and not applied.
+**Nothing built when this was written.** The migration drafted in §5 was applied as **028** on
+2026-09-24, and the write site now carries the position. `31_CAPABILITY_AUDIT.md` §6 later settled what
+`configuration_ref` can point at: an NCM-authored record, because the engine has no component object at
+all. Migration **029** added the observation basis and the discovery position that this dive missed.
 
 ---
 
@@ -73,7 +76,7 @@ than a reason to wait.
 **It is not urgent in the way `IDEA-236` was** — 14 rows, no races depending on it. It is simply irrecoverable,
 and the columns cost nothing.
 
-## 5. The minimal additive change — drafted, not applied
+## 5. The minimal additive change — **applied** (migration 028, 2026-09-24)
 
 ```lua
 -- migration 028: observation provenance (IDEA-329)
@@ -88,6 +91,10 @@ Four nullable columns, no backfill, no behaviour change, and one write site
 (`collection.lua`) gains the player position it *already has in hand* — the discovery path reads the
 authoritative player snapshot for its anti-spoof bucket and distance checks, so the coordinates are already
 fetched and then discarded.
+
+**SETTLED SINCE, by `31_CAPABILITY_AUDIT.md` §6:** there is no engine object for `configuration_ref` to
+point at -- build 2.31 has no mod slots, no wheel types and no component RTTI -- so it can only ever reference
+an **NCM-authored** configuration record. Core now refuses every value by name until that record exists.
 
 **`configuration_ref` is reserved, exactly as migration 024 reserved it on `session_result`**, and for the same
 reason the owner gave in §24: *asset identity says which machine produced the observation; configuration history

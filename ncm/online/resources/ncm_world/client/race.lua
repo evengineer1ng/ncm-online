@@ -107,6 +107,10 @@ end
 -- from the synced server clock so they are not at the mercy of the 1 Hz state publication; the
 -- server's greenAt stays the authoritative timing reference.
 -- ---------------------------------------------------------------------------------------------
+-- Zero is a measurement; absence is not (IDEA-361). Shared definition, so the HUD and the database
+-- cannot disagree about what counts as having been read.
+local Reading = NcmCore.get("competition.machine_knowledge").reading
+
 local page, pageReady = nil, false
 local lastSent = nil
 local bannerUntil, bannerState = 0, nil
@@ -268,6 +272,87 @@ local function instrumentState()
     return { odo = Identity.formatOdometer(o.m), name = o.name,
              serial = o.ord and Identity.formatOrdinal(o.ord) or nil }
 end
+
+-- ---------------------------------------------------------------------------------------------
+-- Driver inputs: what my hands and feet are commanding right now (IDEA-366).
+-- ---------------------------------------------------------------------------------------------
+--
+-- `31_CAPABILITY_AUDIT.md` §3 established that these three fields exist **only on the client snapshot** --
+-- there is no `getThrottle` among the 138 server natives -- and §5 that `steering` exists at all only because
+-- Open77's adapter reads the native lateral input directly, REDengine having no RTTI for it. So this display
+-- is client-local by necessity, and anything it ever persists would be `client_attested`, never measured.
+--
+-- **It shows only what it read.** A field the running build does not expose renders as a dash, not as a
+-- centred wheel or an empty pedal, because a confidently wrong instrument is worse than an absent one -- the
+-- same rule as `IDEA-361` one layer up. The published cards answer for `op77.78` and this server runs `.87`,
+-- so the field names are resolved against the live snapshot once and reported rather than assumed.
+local inputNames = { throttle = { "throttle" }, brake = { "brake" }, steering = { "steering" } }
+local inputField, inputResolved = {}, false
+local lastInputs, lastInputAt = nil, 0
+
+local function resolveInputFields(v)
+    if inputResolved then return end
+    inputResolved = true
+    local found, missing = {}, {}
+    for key, candidates in pairs(inputNames) do
+        for _, name in ipairs(candidates) do
+            if type(v[name]) == "number" then inputField[key] = name; break end
+        end
+        if inputField[key] then found[#found + 1] = key .. "=" .. inputField[key]
+        else missing[#missing + 1] = key end
+    end
+    table.sort(found); table.sort(missing)
+    log("driver inputs resolved: %s%s", table.concat(found, " "),
+        #missing > 0 and ("  UNAVAILABLE: " .. table.concat(missing, " ")) or "")
+end
+
+--- Quantised so the HUD is driven by real movement rather than by float noise. A pedal to 2% and the wheel
+--- to 1% is finer than the eye resolves at racing speed and still costs at most a handful of sends a second.
+local function quantise(n, step)
+    if n == nil then return nil end
+    return math.floor(n / step + 0.5) * step
+end
+
+local function driverInputs()
+    if type(NcmClientOwnVehicle) ~= "function" then return nil end
+    local ok, v = pcall(NcmClientOwnVehicle)
+    if not ok or type(v) ~= "table" then return nil end
+    resolveInputFields(v)
+    local function read(key, lo, hi)
+        local name = inputField[key]
+        if not name then return nil end
+        local n = Reading(v[name])
+        if n == nil then return nil end
+        if n < lo then n = lo elseif n > hi then n = hi end
+        return n
+    end
+    local t, b = read("throttle", 0, 1), read("brake", 0, 1)
+    local st = read("steering", -1, 1)
+    -- Nothing readable at all is not a neutral car; it is no car. Hide rather than show a resting cluster.
+    if t == nil and b == nil and st == nil then return nil end
+    return { throttle = quantise(t, 0.02), brake = quantise(b, 0.02), steering = quantise(st, 0.01) }
+end
+
+local function pushInputs()
+    if not page or not pageReady then return end
+    local v = driverInputs()
+    local key = v and (tostring(v.throttle) .. "/" .. tostring(v.brake) .. "/" .. tostring(v.steering)) or "off"
+    local nowM = Open77.time.monotonic()
+    -- Resend an unchanged state every two seconds so a page that reloaded mid-drive recovers on its own.
+    if key == lastInputs and (nowM - lastInputAt) < 2 then return end
+    lastInputs, lastInputAt = key, nowM
+    page:send("race:inputs", v or { off = true })
+end
+
+CreateThread(function()
+    Wait(4000)
+    while true do
+        pcall(pushInputs)
+        -- 20 Hz while there is something to show, 2 Hz when out of a car. The platform's own observers run at
+        -- 30 Hz; 20 is smooth to the eye for pedal travel and costs a third less traffic.
+        Wait(lastInputs ~= "off" and 50 or 500)
+    end
+end)
 
 local function present()
     local instr = instrumentState()

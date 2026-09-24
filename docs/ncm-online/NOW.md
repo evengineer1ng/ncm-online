@@ -10,8 +10,8 @@ Last rewritten: **2026-09-24 — the NCM Single Player <-> Online convergence au
 tooling/API audit and the documentation-authority pass (L125). No runtime, schema, save, API, server configuration,
 deployment or gameplay behavior changed in this audit.
 
-> **Claim before writing:** decisions through **L128**; MASTER_TEST through **2.18** / **§AG**; next QA
-> letter **§AH**. BACKLOG next free **IDEA-366**; known issues through **KB-96**.
+> **Claim before writing:** decisions through **L128**; MASTER_TEST through **2.18** / **§AI**; next QA
+> letter **§AJ**. BACKLOG next free **IDEA-369**; known issues through **KB-96**.
 > *(Stale a THIRD time on 2026-09-24 — it read IDEA-295 while the ledger ran to IDEA-300. Three strikes is an
 > argument for the automated assertion proposed in `26_DOCUMENT_AUTHORITY.md` §8, not for trying harder.)*
 > *(This block was stale until 2026-09-24 — it still claimed L119 / IDEA-241 / KB-87 while 172 BACKLOG rows,
@@ -20,6 +20,35 @@ deployment or gameplay behavior changed in this audit.
 > `KB-87` is used **twice** (incident detection, and the odometer forensic) — an existing collision, not a typo.
 > L106 is the Market/access meaning (acquisition vs access); the probe-evidence corollary is **L109**.
 > Do not reuse IDs or rewrite another session's authored history.
+
+## Next action: restart Development, then drive. §AI is the checklist.
+
+**Built this pass and waiting on one restart** -- migration 029 applies on boot, and the HUD is new client
+code. Nothing here has a live PASS yet.
+
+**The driver-input HUD.** Throttle, brake and steering, directly above the odometer, 20 Hz while seated.
+Possible only because those three fields exist on the **client** snapshot and nowhere else. **It draws only
+what it read**: an absent field renders as a dash, never a resting pedal or a centred wheel.
+
+**Evidence provenance, before more evidence accumulates.** `observation_basis` now records whether an
+observation was `server_measured`, `client_attested` or `derived_mixed` -- the distinction the split surface
+forces and that `observed` was quietly swallowing. `vehicle_discovery` gained the position migration 028
+missed. Both nullable, neither backfilled: the three existing Development rows stay unknown, which is the
+honest answer.
+
+**Zero is a measurement; absence is not.** The sampler no longer writes `tonumber(v.speed) or 0`. An
+unreadable sample is dropped and counted (`/ncm.telemetry` reports `skipped`), and a parked car genuinely
+reading 0 still produces real evidence -- that half matters most and is the easy one to break.
+
+**`configuration_ref` is settled rather than deferred.** The engine has no component object, so it can only
+ever point at an NCM-authored record. Core now refuses every value by name until that record exists.
+
+Verified without a session: 029 applied **twice** against copies of the real table definitions, exit 0 both
+times, all 3 evidence and 3 discovery rows preserved, all four new columns NULL. Gate green, 271 core tests
+per interpreter.
+
+**Still owed:** `IDEA-251`'s Market PASS (same restart, §AI17-18), §AH21 incident attribution, and migration
+028's genuinely **fresh-world** case, which cannot be proven on a world that already has rows (`IDEA-319`).
 
 ## `IDEA-339` is done: the capability audit, and what it settles
 

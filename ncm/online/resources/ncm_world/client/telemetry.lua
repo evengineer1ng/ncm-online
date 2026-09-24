@@ -6,6 +6,10 @@
 -- names are logged: that is the E4/L57 record of what this build exposes. /ncm.telemetry on|off.
 local function log(fmt, ...) print(("[ncm_world/client/telemetry] " .. fmt):format(...)) end
 
+-- Zero survives, absence does not. `competition.machine_knowledge.reading` is the single definition of that
+-- rule and is shared with the server write path, so the client and the database cannot disagree about it.
+local Reading = NcmCore.get("competition.machine_knowledge").reading
+
 local enabled = true
 local batch = {}
 local loggedFields = false
@@ -20,6 +24,12 @@ local function serverNow()
     return (type(ss) == "table" and tonumber(ss.serverNow)) or 0
 end
 
+--- The snapshot of the car the local player is sitting in, or nil.
+---
+--- **This is the one place that reads it**, because two consumers now depend on the same answer: the race
+--- sampler below and the driver-input cluster in `race.lua`. Exported as a global (`NcmClientOwnVehicle`)
+--- rather than duplicated -- a second copy of the seat/snapshot dance is a second place for the field names
+--- to drift out of agreement with the runtime.
 local function myVehicle()
     local ok, seat = pcall(Open77.vehicles.getPlayerSeat)
     if not ok or type(seat) ~= "table" then
@@ -36,22 +46,62 @@ local function myVehicle()
         for k, val in pairs(v) do if type(val) ~= "table" then keys[#keys + 1] = k .. "=" .. tostring(val) end end
         table.sort(keys)
         log("telemetry fields: %s", table.concat(keys, " "))
+        -- **The runtime-verification record** (`31_CAPABILITY_AUDIT.md` §2, MASTER_TEST §103). The published
+        -- API cards answer for `op77.78`; this server runs `.87`. One line, once per session, says what the
+        -- build in front of us actually exposes -- and names the three driver-input fields explicitly, so a
+        -- missing one is legible at a glance instead of being inferred from a long sorted list.
+        local probe = {}
+        for _, name in ipairs({ "throttle", "brake", "steering", "rpm", "rpmMax", "gear",
+                                "suspensionLongitudinal", "suspensionTransversal", "speed", "onGround" }) do
+            probe[#probe + 1] = name .. "=" .. (v[name] ~= nil and type(v[name]) or "ABSENT")
+        end
+        log("input surface: %s", table.concat(probe, " "))
     end
     return v
 end
+NcmClientOwnVehicle = myVehicle
 
+--- One sample, or nothing at all.
+---
+--- **Zero is a measurement; absence is not** (`IDEA-361`, `31_CAPABILITY_AUDIT.md` §7). This function used
+--- to read `tonumber(v.speed) or 0`, `tonumber(v.gear) or 0` and `tonumber(v.health) or 1`, so a moment when
+--- the vehicle snapshot could not be read at all produced a sample claiming the car was stationary, in
+--- neutral and undamaged -- indistinguishable, forever, from a car that genuinely was. The server card is
+--- explicit that the motion half is *"zeroed when the vehicle has no owner"*, so this is not hypothetical.
+---
+--- A **parked car genuinely reading 0 km/h still produces a perfectly valid sample**, which is the half that
+--- matters most: the fix is not "reject zero", it is "reject what was never read".
+---
+--- The sample is all-or-nothing because the wire format is a dense positional array
+--- (`core telemetry.SAMPLE_FIELDS`); a hole in the middle of a Lua array constructor has an undefined length
+--- and would serialise unpredictably. `decodeBatch` compares timestamps rather than assuming a fixed
+--- cadence, so a dropped sample is a gap and not a corruption.
+local skipped = 0
 local function sample()
-    local ok, x, y, z = pcall(Open77.character.position)
-    if not ok or type(x) ~= "number" then return nil end
+    local okP, x, y, z = pcall(Open77.character.position)
+    if not okP then skipped = skipped + 1; return nil end
+    x, y, z = Reading(x), Reading(y), Reading(z)
+    if x == nil or y == nil or z == nil then skipped = skipped + 1; return nil end
+
     local v = myVehicle()
-    local speed = v and tonumber(v.speed) or 0
-    if v and not v.speed and v.speedKph then speed = v.speedKph / 3.6 end
-    local gear = v and tonumber(v.gear) or 0
-    local onGround = v and v.onGround
-    if onGround == nil then onGround = true end
-    local health = v and tonumber(v.health) or 1
+    if type(v) ~= "table" then skipped = skipped + 1; return nil end
+
+    -- `speed` is metres per second on both sides; `speedKph` is the same number converted once. Prefer the
+    -- native unit, fall back to the other, and give up rather than invent one.
+    local speed = Reading(v.speed)
+    if speed == nil then
+        local kph = Reading(v.speedKph)
+        speed = kph and (kph / 3.6) or nil
+    end
+    local gear, health = Reading(v.gear), Reading(v.health)
+    local onGround = v.onGround
+    if speed == nil or gear == nil or health == nil or type(onGround) ~= "boolean" then
+        skipped = skipped + 1
+        return nil
+    end
+    -- Health is documented 0..1; a build that reports a percentage is rescaled, not reinterpreted.
     if health > 1 then health = health / 100 end
-    return { serverNow(), x, y, z or 0, speed, gear, onGround and true or false, health }
+    return { serverNow(), x, y, z, speed, gear, onGround, health }
 end
 
 CreateThread(function()
@@ -80,5 +130,7 @@ end)
 RegisterCommand("ncm.telemetry", function(_, args)
     local a = args and args[1] and tostring(args[1]):lower() or nil
     if a == "on" then enabled = true elseif a == "off" then enabled = false end
-    log("telemetry %s · sent %d sample(s)", enabled and "on" or "off", sent)
+    -- `skipped` is surfaced deliberately: samples are now dropped rather than fabricated, so the count is
+    -- the only way to tell "nothing to report" from "could not read the car".
+    log("telemetry %s · sent %d sample(s) · skipped %d unreadable", enabled and "on" or "off", sent, skipped)
 end, false)

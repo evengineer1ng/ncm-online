@@ -97,6 +97,26 @@ local function sendPayload(pid)
     if ok and payload then TriggerClientEvent("ncm:collection.payload", pid, payload) end
 end
 
+-- **The authoritative position, or nothing** (IDEA-329, IDEA-361).
+--
+-- `fresh` is respected because a stale snapshot is a position from somewhere the driver no longer is, and a
+-- wrong coordinate is worse than none. Returns nil rather than a zero vector: `31_CAPABILITY_AUDIT.md` §7
+-- is that an unread value must never arrive as 0, since 0,0,0 is a real place in Night City.
+local function observedPosition(pid)
+    local okP, ps = pcall(Open77.players.get, tonumber(pid) or 0)
+    if okP and ps and ps.fresh and type(ps.position) == "table" then return ps.position end
+    return nil
+end
+
+-- **A nil in a MySQL params array truncates the sequence**, so an unknown coordinate would silently shorten
+-- the value list and fail the whole insert -- the trap that cost this file a live identity-reveal outage
+-- (SQL 1292). The sentinel cannot be 0 or -1: both are legitimate world coordinates.
+local NO_POS = -999999
+local function posArgs(obs)
+    if type(obs) ~= "table" then return NO_POS, NO_POS, NO_POS end
+    return (tonumber(obs.x) or NO_POS), (tonumber(obs.y) or NO_POS), (tonumber(obs.z) or NO_POS)
+end
+
 local function legacyRecordEncounter(pid, driver, entry, runtimeRecord, liveId, reg)
     local found = load(driver.ncmDriverId)
     -- unreadable history is not a first discovery: write the encounter, but stay silent rather than announce
@@ -121,11 +141,16 @@ local function legacyRecordEncounter(pid, driver, entry, runtimeRecord, liveId, 
         -- NULLIF(?, '') rather than a nil in the values array -- a nil mid-constructor truncates Lua's `#` and
         -- the statement arrives with fewer parameters than placeholders (the weather `invalid_parameters`
         -- defect, KB weather/saveMeta). Passing "" keeps the array dense and lets SQL produce the NULL.
+        -- IDEA-360: WHERE this model was first met. INSERT-only, exactly like `source_driver_id` above and
+        -- for the same reason -- driving past the same model months later must not rewrite where you first
+        -- saw it. A proximity dwell is detected by the server from its own snapshots, so the position is
+        -- server-measured.
+        local dx, dy, dz = posArgs(observedPosition(pid))
         MySQL.insert.await([[INSERT INTO vehicle_discovery
-            (ncm_driver_id, server_id, vehicle_key, first_discovered_at, last_encounter_at, encounter_count, discovery_method, first_runtime_record, source_driver_id, source_holding)
-            VALUES (?, ?, ?, ?, ?, 1, 'proximity_dwell', ?, NULLIF(?, ''), NULLIF(?, ''))
+            (ncm_driver_id, server_id, vehicle_key, first_discovered_at, last_encounter_at, encounter_count, discovery_method, first_runtime_record, source_driver_id, source_holding, first_obs_x, first_obs_y, first_obs_z)
+            VALUES (?, ?, ?, ?, ?, 1, 'proximity_dwell', ?, NULLIF(?, ''), NULLIF(?, ''), NULLIF(?, -999999), NULLIF(?, -999999), NULLIF(?, -999999))
             ON DUPLICATE KEY UPDATE last_encounter_at = VALUES(last_encounter_at), encounter_count = encounter_count + 1]],
-            { driver.ncmDriverId, serverId(), entry.vehicleKey, t, t, runtimeRecord, srcId, srcHolding })
+            { driver.ncmDriverId, serverId(), entry.vehicleKey, t, t, runtimeRecord, srcId, srcHolding, dx, dy, dz })
     end)
     if not ok then log("encounter write failed driver=%s key=%s: %s", driver.ncmDriverId:sub(1, 8), entry.vehicleKey, tostring(err)); return end
     if first then
@@ -166,10 +191,17 @@ function NcmCollection.revealIdentity(pid, vehicleKey, opts)
     local first = found ~= nil and found[entry.vehicleKey] == nil
     local t, source = tonumber(opts.observedAt) or now(), tostring(opts.source or "")
     local physical = source == "world_encounter"
+    -- **How this reached us, which is not the same question as how true it is** (IDEA-362). Every reveal on
+    -- this path is decided server-side -- a proximity dwell the server detected from its own snapshots, or a
+    -- Market card the server served -- so the basis is `server_measured`. `epistemic` stays orthogonal and
+    -- keeps answering the other question: a Market card is `published` knowledge that the server measured you
+    -- receiving. A caller reading a client snapshot must pass `client_attested` instead; core refuses
+    -- anything outside `BASIS`.
     local evidence, evidenceWhy = Knowledge.evidence({
         driverId = driver.ncmDriverId, vehicleKey = entry.vehicleKey, assetId = opts.assetId,
         evidenceKey = "identity:" .. entry.vehicleKey, kind = "identity_reveal", source = source,
         epistemic = opts.epistemic or (physical and "observed" or "published"), observedAt = t,
+        basis = opts.basis or "server_measured",
     })
     if not evidence then return nil, evidenceWhy end
 
@@ -193,37 +225,35 @@ function NcmCollection.revealIdentity(pid, vehicleKey, opts)
     -- same source the anti-spoof bucket/distance checks use. `fresh` is respected because a stale snapshot is
     -- a position from somewhere the driver no longer is, and a wrong coordinate is worse than none.
     local obs = opts.pos
-    if type(obs) ~= "table" then
-        local okP, ps = pcall(Open77.players.get, tonumber(pid) or 0)
-        if okP and ps and ps.fresh and ps.position then obs = ps.position end
-    end
+    if type(obs) ~= "table" then obs = observedPosition(pid) end
     -- **A nil in a MySQL params array truncates the sequence**, so three unknown coordinates would silently
     -- shorten the value list and fail the whole insert -- the same trap that cost migration 021 a `NULLIF(?, '')`
     -- sentinel and cost this very function a live identity-reveal outage (SQL 1292, above). A sentinel is
     -- required. It cannot be 0 or -1: both are legitimate world coordinates. NO_POS is far outside Night City.
-    local NO_POS = -999999
-    local ox = (type(obs) == "table" and tonumber(obs.x)) or NO_POS
-    local oy = (type(obs) == "table" and tonumber(obs.y)) or NO_POS
-    local oz = (type(obs) == "table" and tonumber(obs.z)) or NO_POS
+    local ox, oy, oz = posArgs(obs)
 
     local ok, err = pcall(function()
         local committed = MySQL.transaction.await({
             { query = [[INSERT IGNORE INTO vehicle_knowledge_evidence
                 (evidence_id, evidence_key, ncm_driver_id, server_id, vehicle_key, asset_id,
-                 knowledge_kind, source_kind, epistemic_kind, observed_at, obs_x, obs_y, obs_z)
-                VALUES (?, ?, ?, ?, ?, NULLIF(?, ''), ?, ?, ?, ?, NULLIF(?, -999999), NULLIF(?, -999999), NULLIF(?, -999999))]],
+                 knowledge_kind, source_kind, epistemic_kind, observation_basis, observed_at, obs_x, obs_y, obs_z)
+                VALUES (?, ?, ?, ?, ?, NULLIF(?, ''), ?, ?, ?, NULLIF(?, ''), ?, NULLIF(?, -999999), NULLIF(?, -999999), NULLIF(?, -999999))]],
               values = { ids.uuid4(hostRng), evidence.evidenceKey, evidence.driverId, serverId(), evidence.vehicleKey,
-                  assetId, evidence.kind, evidence.source, evidence.epistemic or "", evidence.observedAt,
-                  ox, oy, oz } },
+                  assetId, evidence.kind, evidence.source, evidence.epistemic or "", evidence.basis or "",
+                  evidence.observedAt, ox, oy, oz } },
+            -- The three coordinates are absent from the UPDATE clause on purpose: they record where this
+            -- model was FIRST met, and a later encounter must not move that (IDEA-360).
             { query = [[INSERT INTO vehicle_discovery
                 (ncm_driver_id, server_id, vehicle_key, first_discovered_at, last_encounter_at, encounter_count,
-                 discovery_method, first_runtime_record, source_driver_id, source_holding, source_asset_id)
-                VALUES (?, ?, ?, ?, NULLIF(?, 0), ?, ?, NULLIF(?, ''), NULLIF(?, ''), NULLIF(?, ''), NULLIF(?, ''))
+                 discovery_method, first_runtime_record, source_driver_id, source_holding, source_asset_id,
+                 first_obs_x, first_obs_y, first_obs_z)
+                VALUES (?, ?, ?, ?, NULLIF(?, 0), ?, ?, NULLIF(?, ''), NULLIF(?, ''), NULLIF(?, ''), NULLIF(?, ''),
+                        NULLIF(?, -999999), NULLIF(?, -999999), NULLIF(?, -999999))
                 ON DUPLICATE KEY UPDATE
                   last_encounter_at = IF(VALUES(last_encounter_at) IS NULL, last_encounter_at, VALUES(last_encounter_at)),
                   encounter_count = encounter_count + VALUES(encounter_count)]],
               values = { driver.ncmDriverId, serverId(), entry.vehicleKey, t, lastEncounter, encounterCount,
-                  source, opts.runtimeRecord or "", srcId, srcHolding, assetId } },
+                  source, opts.runtimeRecord or "", srcId, srcHolding, assetId, ox, oy, oz } },
         })
         if not committed then error("transaction_refused") end
     end)

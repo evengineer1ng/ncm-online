@@ -812,3 +812,46 @@ Rows marked **[me]** I verify in the database afterwards — you do not need to 
 | **WATCH FOR ANYTHING** |||
 | §AH26 | Any `[ERR]` line in the server log during the session. | There should be none. **One known and expected:** a single `SQL 1146` at boot ONLY if the schema was behind, which it is not any more (KB-92). |
 | §AH27 | A wrong-machine refusal you did not deliberately cause. | Should never happen. **Tell me immediately if it does** — that is the rule misfiring and I will make it log-only. |
+
+---
+
+## §AI — driver-input HUD, evidence trust and the zero/unknown invariant (2026-09-24, NCM Development)
+
+**Restart first.** Migration **029** applies on boot (`observation_basis`, plus discovery coordinates), and
+the HUD is new client code. Expect `pending=[]` and schema **29** afterwards. Migration **028** applied on the
+previous deploy and is already at rest.
+
+Verified before you drive (no session needed): 029 applied **twice** against copies of the real table
+definitions -- exit 0 both times, all 3 evidence rows and all 3 discovery rows preserved, all four new columns
+`NULL` on every existing row. Gate green, 271 core tests per interpreter.
+
+| # | Do | Expect |
+|---|---|---|
+| **THE DRIVER-INPUT HUD (new, the point of this pass)** |||
+| §AI1 | Get into any car. Look bottom-left, **directly above the odometer**. | A small panel: a steering wheel on the left, two vertical bars (`THR` green, `BRK` red) with a percentage under each. |
+| §AI2 | **Neutral.** Hands off, feet off. | Wheel upright. Both bars empty, both reading `0`. |
+| §AI3 | **Full throttle.** | `THR` fills to `100` and drains back smoothly when released. |
+| §AI4 | **Full brake.** | `BRK` fills to `100` and drains back. |
+| §AI5 | **Steer full left, then full right.** | The wheel rotates the same way you are steering, up to about a third of a turn at full lock. **If it rotates the wrong way, say so** -- the sign convention is the one thing I cannot check without you. |
+| §AI6 | **Both at once**: throttle and brake together, then steering while braking. | Both bars move independently; the wheel is unaffected by the pedals. |
+| §AI7 | **Get out of the car.** | The panel disappears. The odometer below it is unaffected. |
+| §AI8 | Drive a full race with it on screen. | No stutter, no frame cost you can feel. It updates at 20 Hz while seated and 2 Hz when not. |
+| §AI9 | **If a bar or the wheel shows a dash `--` instead of a number**, that field is genuinely absent on this build. | **Not a bug to fix in the HUD -- report it.** The panel deliberately refuses to draw a resting pedal for a value it could not read. |
+| §AI10 | **[me]** Client log, once per session: `input surface: throttle=... brake=... steering=... rpm=... gear=...`. | **Paste that line.** It is the runtime-verification record -- the published cards answer for `op77.78`, this server runs `.87`, and this line is the only proof of what the build actually exposes. Closes §103, owed since it was written. |
+| **EVIDENCE PROVENANCE (silent -- nothing visible changes)** |||
+| §AI11 | Discover a machine: drive near an unfamiliar car, or open a Market card you have not looked at. | Normal discovery toast. |
+| §AI12 | **[me]** `SELECT obs_x, obs_y, observation_basis FROM vehicle_knowledge_evidence ORDER BY observed_at DESC LIMIT 3;` | New rows carry coordinates **and** `observation_basis = 'server_measured'`. **This also closes the live PASS owed for migration 028** -- Development has 3 evidence rows and none has a position yet. |
+| §AI13 | **[me]** `SELECT first_obs_x, first_obs_y FROM vehicle_discovery ORDER BY first_discovered_at DESC LIMIT 3;` | The new row has a position; the three older ones stay `NULL` forever. **No backfill is correct behaviour, not a gap.** |
+| §AI14 | **[me]** Drive past that same model again days later. | `encounter_count` rises; `first_obs_*` does **not** move. INSERT-only, same rule as `source_driver_id`. |
+| **THE ZERO/UNKNOWN INVARIANT** |||
+| §AI15 | Sit **stationary** in a car during a race and let telemetry sample you. | Samples are still produced. **A parked car genuinely reading 0 is real evidence and must stay real** -- this is the half of the fix that is easy to break. |
+| §AI16 | `/ncm.telemetry` mid-race. | Now reports `sent N · skipped M unreadable`. **`skipped` should be low.** A large or growing count means the vehicle snapshot is frequently unreadable on this build -- tell me, it changes what the HUD can promise. |
+| **MARKET DISCOVERY (owed from the previous pass, same restart)** |||
+| §AI17 | Open the Market. | Same three offerings, same balance. Nothing should look different. |
+| §AI18 | **[me]** `SELECT market_id, source_kind, access_state FROM player_market_knowledge;` | One row per driver: `base_market` / `universal` / `open`. The table has been empty since migration 017. |
+| **WATCH FOR ANYTHING** |||
+| §AI19 | Any `[ERR]` during boot or the session. | There should be none. |
+| §AI20 | Odometer, race HUD, markers, Machine Index, toasts. | All unchanged. The input panel is additive and sits above the odometer without moving it. |
+
+**OWED regardless of this session:** migration 028's *fresh-world* behaviour cannot be proven on a world that
+already has rows. That case stays owed (`IDEA-319`).

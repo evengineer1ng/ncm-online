@@ -9,8 +9,9 @@
 > OBSERVABLE · DERIVABLE · DOCUMENTABLE/AUTHORABLE · SCANNER/ENGINEERING CANDIDATE · UNSUPPORTED. **The
 > audit's job is to discover what falls into our lap.**"*
 
-**Nothing built. No runtime, schema or behaviour changed.** This is read-only research against the published
-API cards and against NCM's own working code.
+**Nothing built when this was written.** It was read-only research against the published API cards and
+against NCM's own working code. **§11 records what was built from it the same day**, and marks which findings
+are now enforced in code rather than merely stated here.
 
 ---
 
@@ -227,3 +228,40 @@ that made migrations 024 and 028 worth doing early.
    left it** — its own reviewed proposal.
 
 **Components are not on this list, and that is the audit's answer rather than a deferral.**
+
+---
+
+## 11. What was implemented from this audit (2026-09-24, same day)
+
+The audit's own §10 order was followed, except that test 1 moved *into* the implementation rather than
+blocking it — the runtime-verification line is now printed by the code that depends on it.
+
+| Finding | Now enforced in code |
+|---|---|
+| §3 — the split surface (`IDEA-360`) | `machine_knowledge.BASIS = { server_measured, client_attested, derived_mixed }`, validated on write; `observation_basis` on `vehicle_knowledge_evidence` (migration 029). Nil stays nil: every earlier row keeps an unknown basis. |
+| §7 — a parked car reads zero, not unknown (`IDEA-361`) | `machine_knowledge.reading()` — **zero survives, absence does not**. The client sampler no longer writes `tonumber(v.speed) or 0`; an unreadable sample is dropped and counted rather than fabricated. |
+| §6 — there are no components (`IDEA-359`) | `machine_knowledge.configurationRef()` refuses **every** value with `configuration_substrate_absent`. The column stays reserved and cannot be filled with a guess. |
+| §4 — discovery position | `vehicle_discovery.first_obs_x/y/z` (migration 029), INSERT-only, so a later encounter cannot move where you first met a model. |
+| §5 — `steering` exists and is real | **Built**: the driver-input HUD, §11.1. |
+| §2 — the nine-build gap | The sampler logs `input surface: …` once per session, naming each input field or `ABSENT`. The gap now closes by driving rather than by another audit. |
+
+### 11.1 The driver-input HUD (`IDEA-366`)
+
+Throttle, brake and steering, directly above the odometer in the race HUD page, 20 Hz while seated and 2 Hz
+when not. Client-local by necessity — §3 is that these three fields exist **only** on the client snapshot.
+
+**It draws only what it read.** A field this build does not expose renders as a dash, not as a resting pedal
+or a centred wheel, which is §7's rule applied one layer up in the UI: a confidently wrong instrument is worse
+than an absent one. Field names are resolved against the live snapshot once per session and logged, so a
+`.87` runtime that differs from the `op77.78` cards is visible rather than silently wrong.
+
+**RPM and gear are deliberately not shown**, though the same snapshot carries them and the probe already
+reports them. The reader is shared and adding a fourth reading is a small change; expanding the panel because
+fields exist is not a reason to expand it.
+
+### 11.2 Still exactly as this audit left them
+
+No estimator, no envelopes, no understeer↔oversteer calculation, no scanner, no component assets, no
+observation vocabulary beyond provenance, no telemetry persistence or replay. §9's six safe characteristics
+are **not** defined yet — the provenance they would need to be honest now exists, which was the prerequisite.
+
