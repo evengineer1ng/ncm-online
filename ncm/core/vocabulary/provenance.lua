@@ -49,6 +49,27 @@ Core.define("vocabulary.provenance", function(C)
     })
 
     -- ---------------------------------------------------------------------------------------------
+    -- Ownership principals (IDEA-297, IDEA-168, IDEA-162; L92/L93)
+    -- ---------------------------------------------------------------------------------------------
+    --
+    -- Who can hold title, money or custody. A team machine is an ORDINARY machine (L123, L124 A2) -- what
+    -- differs is the principal on the row, never the species of the object. Deliberately small: every new
+    -- kind added here is a new thing that can own property across the whole economy.
+    M.PrincipalKind = enum("principalKind", { "driver", "organization" })
+
+    --- Validate an owner principal: { kind, id }. Nil means UNOWNED, which is legitimate and load-bearing --
+    --- unsold market stock has no owner, and inventing one for a car on a shelf would be a lie.
+    --- Returns true, or false + reason.
+    function M.validatePrincipal(p)
+        if p == nil then return true end                       -- unowned
+        if type(p) ~= "table" then return false, "principal_not_table" end
+        if p.kind == nil and p.id == nil then return true end  -- unowned, spelled out
+        if not M.PrincipalKind.is(p.kind) then return false, "invalid_principal_kind" end
+        if type(p.id) ~= "string" or #p.id == 0 then return false, "principal_without_id" end
+        return true
+    end
+
+    -- ---------------------------------------------------------------------------------------------
     -- Machine attribution (IDEA-236, L124 A4)
     -- ---------------------------------------------------------------------------------------------
     --

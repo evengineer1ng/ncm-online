@@ -39,6 +39,26 @@ return {
         _, why = P.validateContext({ origin = "sp", sessionKind = "race", sanctioned = true, category = "Bad Cat" }); T.eq(why, "invalid_category")
     end,
 
+    owner_principal = function(T)
+        local P = T.Core.get("vocabulary.provenance")
+        T.eq(P.PrincipalKind.is("driver"), true)
+        T.eq(P.PrincipalKind.is("organization"), true)
+        T.eq(P.PrincipalKind.is("team"), false, "the vocabulary is closed; 'organization' is the word")
+
+        -- Unowned is legitimate: unsold market stock has no owner, and that must stay expressible.
+        T.eq(P.validatePrincipal(nil), true, "nil means unowned")
+        T.eq(P.validatePrincipal({}), true, "empty means unowned")
+
+        T.eq(P.validatePrincipal({ kind = "driver", id = "72519ab3-010d-4a3e-b5d9-ed5e653d2be6" }), true)
+        T.eq(P.validatePrincipal({ kind = "organization", id = "ncx_rayfield" }), true,
+             "a team holds title the same way a driver does -- one model, not two")
+
+        local ok, why = P.validatePrincipal({ kind = "driver" })
+        T.eq(ok, false); T.eq(why, "principal_without_id")
+        ok, why = P.validatePrincipal({ kind = "syndicate", id = "x" })
+        T.eq(ok, false); T.eq(why, "invalid_principal_kind")
+    end,
+
     machine_attribution = function(T)
         local P = T.Core.get("vocabulary.provenance")
         local id = "10000000-0000-4000-8000-000000000001"
