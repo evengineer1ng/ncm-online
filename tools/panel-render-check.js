@@ -404,12 +404,12 @@ check("an accepted submission names the report", /Report received/.test(ht) && /
 // Help listed all three. One definition now feeds every panel; this is the guard that it stays that way.
 console.log("  -- shell nav --");
 const navLabels = (id) => (document.getElementById(id).children || []).map(b => b._text);
-for (const [panel, navId] of [["guide", "guideNav"], ["market", "marketNav"], ["collection", "collectionNav"], ["help", "helpNav"]]) {
+for (const [panel, navId] of [["guide", "guideNav"], ["market", "marketNav"], ["collection", "collectionNav"], ["wheel", "wheelNav"], ["help", "helpNav"]]) {
   emitted.length = 0;
   fire("panel:show", { panel: panel });
   if (panel === "help") fire("panel:help", HELP_MIN);
   const labels = navLabels(navId);
-  check(panel + " panel offers every shell surface", labels.join("|") === "RACE GUIDE|MARKET|MACHINE INDEX|HELP",
+  check(panel + " panel offers every shell surface", labels.join("|") === "RACE GUIDE|MARKET|MACHINE INDEX|WHEEL|HELP",
     panel + " nav = [" + labels.join(", ") + "]");
   const active = (document.getElementById(navId).children || []).filter(b => b.classList.contains("active"));
   check(panel + " panel marks itself as the current tab", active.length === 1 && active[0].disabled === true,

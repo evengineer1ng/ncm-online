@@ -193,7 +193,23 @@
     .collection-layout { display:grid; grid-template-columns:minmax(0,1fr) 390px; gap:18px; flex:1; min-height:0; }
     #collection { display:flex; flex-direction:column; }
     #guide, #market, #collection, #help { box-sizing:border-box; }
-    .guide-head, .guide-tabs, .collection-head, .market-head { flex-shrink:0; }
+    .guide-head, .guide-tabs, .collection-head, .market-head, .wheel-head { flex-shrink:0; }
+    .wheel-head h2 { margin: 0 0 4px; font: 700 22px/1 var(--mono); letter-spacing: .14em; }
+    .wheel-head .sub { font: 700 13px/1.3 var(--mono); letter-spacing: .1em; color: var(--dim); margin-bottom: 16px; }
+    .wheel-row { display: flex; align-items: baseline; gap: 14px; padding: 9px 0; border-bottom: 1px solid var(--line); }
+    .wheel-row .k { min-width: 190px; font: 700 12px/1.2 var(--mono); letter-spacing: .12em; color: var(--dim); }
+    .wheel-row .v { font: 700 15px/1.2 var(--mono); color: var(--text); }
+    .wheel-row .v.warn { color: var(--warn); }
+    .wheel-row .v.ok { color: var(--ok); }
+    /* The ladder is drawn as discrete rungs and NEVER as a slider. A continuous control would quietly undo
+       the wrist protection at the last step -- the rungs ARE the safety property (IDEA-395). */
+    .wheel-rungs { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
+    .wheel-rungs button { min-width: 52px; padding: 8px 6px; font: 700 13px/1 var(--mono); }
+    .wheel-rungs button.on { color: var(--accent); border-color: var(--accent); box-shadow: inset 0 -3px var(--accent); }
+    .wheel-actions { display: flex; gap: 10px; margin-top: 18px; }
+    .wheel-actions button { min-width: 150px; padding: 11px 16px; font: 700 14px/1 var(--mono); letter-spacing: .1em; }
+    .wheel-note { margin-top: 16px; font: 600 13px/1.6 var(--mono); color: var(--dim); max-width: 760px; }
+    .wheel-note b { color: var(--warn); }
     .schedule, .event-detail, .collection-wall, .vehicle-dossier, .help-scroll { min-height:0; }
     .asset-id { overflow-wrap:anywhere; font:13px/1.5 var(--mono); }
     .ncm-bottom { display:flex; justify-content:center; gap:12px; margin-top:10px; flex:none; }
@@ -268,6 +284,16 @@
       <div class="collection-layout"><div class="collection-wall" id="collectionWall"></div><aside class="vehicle-dossier" id="collectionDetail"></aside></div>
       <div class="ncm-bottom" id="collectionNav"></div>
     </div>
+    <!-- WHEEL (IDEA-399). The only tab whose data is LOCAL: it comes from the companion process on this
+         player's machine, never from the server. Its most important state is the one a new player sees
+         first -- no companion running -- so that case is a first-class layout, not an error message. -->
+    <div id="wheel" class="card hidden">
+      <div class="close">ESC · close</div>
+      <div class="wheel-head"><div class="eyebrow">Night City Motorsports · Driver Station</div><h2>FORCE FEEDBACK</h2><div class="sub" id="wheelStatus"></div></div>
+      <div id="wheelBody"></div>
+      <div class="ncm-bottom" id="wheelNav"></div>
+    </div>
+
     <div id="market" class="card hidden">
       <div class="close">ESC · close</div>
       <div class="market-head"><div><div class="eyebrow">Night City Motorsports · Commercial Network</div><h1>Base Market</h1><div class="sub">Real stock. Every machine is an individual.</div></div><div class="market-balance" id="marketBalance"></div></div>
@@ -304,6 +330,10 @@
       const collectionDetail = document.getElementById("collectionDetail");
       const collectionCount = document.getElementById("collectionCount");
       const collectionTitle = document.getElementById("collectionTitle");
+      const wheelCard = document.getElementById("wheel");
+      const wheelNav = document.getElementById("wheelNav");
+      const wheelStatus = document.getElementById("wheelStatus");
+      const wheelBody = document.getElementById("wheelBody");
       const marketCard = document.getElementById("market");
       const helpCard = document.getElementById("help");
       const helpScroll = document.getElementById("helpScroll");
@@ -313,7 +343,7 @@
       const marketNav = document.getElementById("marketNav");
       const marketGrid = document.getElementById("marketGrid");
       const marketBalance = document.getElementById("marketBalance");
-      let mode = null;          // "questionnaire" | "inbox" | "guide" | "market" | "collection" | null
+      let mode = null;          // "questionnaire" | "inbox" | "guide" | "market" | "collection" | "wheel" | null
       let guideTick = null;
       let questions = [], version = 1, index = 0, answers = [];
       let pointerSeen = false;
@@ -326,7 +356,7 @@
       // The NCM shell nav. ONE definition, rendered into whichever panel is open, so a surface can never be
       // present in one panel's tab strip and missing from another's. Add a surface here and it appears
       // everywhere at once; that is the whole point.
-      const SHELL_TABS = [["guide", "RACE GUIDE"], ["market", "MARKET"], ["collection", "MACHINE INDEX"], ["help", "HELP"]];
+      const SHELL_TABS = [["guide", "RACE GUIDE"], ["market", "MARKET"], ["collection", "MACHINE INDEX"], ["wheel", "WHEEL"], ["help", "HELP"]];
       function renderNav(container, current) {
         if (!container) return;
         container.innerHTML = "";
@@ -349,6 +379,7 @@
         guideCard.classList.toggle("hidden", which !== "guide");
         collectionCard.classList.toggle("hidden", which !== "collection");
         marketCard.classList.toggle("hidden", which !== "market");
+        wheelCard.classList.toggle("hidden", which !== "wheel");
         helpCard.classList.toggle("hidden", which !== "help");
         if (SHELL_TABS.some(tab => tab[0] === which)) renderNav(document.getElementById(which + "Nav"), which);
         if (which !== "guide" && guideTick) { clearInterval(guideTick); guideTick = null; }
@@ -1187,12 +1218,99 @@
           guard("collection", () => { show("collection"); renderCollection(d.collection || collectionData || {}); });
         } else if (d.panel === "help") {
           guard("help", () => { show("help"); renderHelp(null); });
+        } else if (d.panel === "wheel") {
+          guard("wheel", () => { show("wheel"); renderWheel(d.wheel || wheelData || {}); });
         } else if (d.panel === "market") {
           guard("market", () => { show("market"); renderMarket(d.market || marketData || {}); });
         } else {
           show(null);
         }
       });
+      // -----------------------------------------------------------------------------------------------
+      // WHEEL (IDEA-399)
+      // -----------------------------------------------------------------------------------------------
+      //
+      // The safety rules are drawn, not merely obeyed: the ladder is a row of DISCRETE rungs, the ceiling is
+      // stated in words, and an unrecognised device says so rather than showing a reassuring default. A
+      // continuous slider here would undo `IDEA-395` at the last step, which is exactly where it would not
+      // be noticed.
+      let wheelData = null;
+      const wheelCmd = (kind, payload) => Open77.emit("panel:wheel.command", { kind: kind, payload: payload || {} });
+
+      const wheelRow = (key, value, cls) => {
+        const row = document.createElement("div"); row.className = "wheel-row";
+        const k = document.createElement("div"); k.className = "k"; k.textContent = key;
+        const v = document.createElement("div"); v.className = "v" + (cls ? " " + cls : ""); v.textContent = value;
+        row.append(k, v); return row;
+      };
+
+      function renderWheel(d) {
+        if (d) wheelData = d;
+        const s = wheelData || {};
+        wheelBody.innerHTML = "";
+
+        if (!s.connected) {
+          // The first state a new player sees, so it is a layout rather than an error.
+          text(wheelStatus, s.enabled ? "COMPANION NOT DETECTED" : "OFF");
+          const note = document.createElement("div"); note.className = "wheel-note";
+          note.innerHTML = s.enabled
+            ? "Nothing is listening on <b>" + (s.url || "the companion address") + "</b>.<br>"
+              + "Force feedback needs a small companion program running on this PC — the game cannot reach a "
+              + "wheel on its own. Start it, and this page fills in by itself."
+            : "Force feedback is off.<br>Turn it on to look for a wheel companion on this PC.";
+          wheelBody.append(note);
+          const acts = document.createElement("div"); acts.className = "wheel-actions";
+          const toggle = document.createElement("button");
+          toggle.textContent = s.enabled ? "TURN OFF" : "TURN ON";
+          toggle.addEventListener("click", () => wheelCmd("enable", { on: !s.enabled }));
+          acts.append(toggle); wheelBody.append(acts);
+          return;
+        }
+
+        const dev = s.device || {};
+        const known = dev.class && dev.class !== "unknown";
+        text(wheelStatus, "COMPANION CONNECTED");
+        wheelBody.append(wheelRow("DEVICE", dev.name || "unidentified", known ? "ok" : "warn"));
+        wheelBody.append(wheelRow("CLASS", (dev.class || "unknown").replace("_", " ").toUpperCase(), known ? "" : "warn"));
+        wheelBody.append(wheelRow("FORCE OUTPUT", dev.armed ? "ARMED" : "DISARMED — telemetry only", dev.armed ? "warn" : ""));
+        wheelBody.append(wheelRow("FRAMES SENT", String(s.sent || 0)));
+
+        const rungs = Array.isArray(dev.rungs) ? dev.rungs : [];
+        if (rungs.length) {
+          const row = document.createElement("div"); row.className = "wheel-row";
+          const k = document.createElement("div"); k.className = "k"; k.textContent = "STRENGTH";
+          const wrap = document.createElement("div"); wrap.className = "wheel-rungs";
+          rungs.forEach((value, i) => {
+            const b = document.createElement("button");
+            b.textContent = value.toFixed(2);
+            if ((dev.rung || 1) === i + 1) b.classList.add("on");
+            b.addEventListener("click", () => wheelCmd("settings", { rung: i + 1 }));
+            wrap.append(b);
+          });
+          row.append(k, wrap); wheelBody.append(row);
+        }
+
+        const acts = document.createElement("div"); acts.className = "wheel-actions";
+        const test = document.createElement("button");
+        test.textContent = "TEST PULSE";
+        test.addEventListener("click", () => wheelCmd("test", {}));
+        const off = document.createElement("button");
+        off.textContent = "TURN OFF";
+        off.addEventListener("click", () => wheelCmd("enable", { on: false }));
+        acts.append(test, off); wheelBody.append(acts);
+
+        const note = document.createElement("div"); note.className = "wheel-note";
+        note.innerHTML = known
+          ? "Start at the lowest strength and step up only while each step still adds something. "
+            + "<b>Stop as soon as one does not.</b> This class is capped well below the device's maximum."
+          : "This wheel was <b>not recognised</b>, so it is treated as the most powerful thing it could be "
+            + "and capped hard. That is deliberate: the same number is a nudge on one wheel and a wrench on "
+            + "another.";
+        wheelBody.append(note);
+      }
+
+      Open77.on("panel:wheel", (d) => { wheelData = d; if (mode === "wheel") guard("wheel", () => renderWheel(d)); });
+
       Open77.on("panel:inbox", (d) => { lastInboxData = d; if (mode === "inbox") guard("inbox", () => renderInbox(d)); });
       Open77.on("panel:hide", () => { show(null); });
 

@@ -68,7 +68,10 @@ for _, res in ipairs(readDir(RES)) do
                     for line in fh:lines() do
                         n = n + 1
                         -- definitions: any top-level assignment, or a function/field on a global
+                        -- `function NcmFoo()` is as much a definition as `NcmFoo = function()`; missing it
+                        -- reported a defined global as a cross-VM reference (a false positive, 2026-09-24).
                         local d = line:match("^%s*(Ncm%a+)%s*=") or line:match("^%s*function%s+(Ncm%a+)[.:]")
+                                  or line:match("^%s*function%s+(Ncm%a+)%s*%(")
                                   or line:match("^%s*(Ncm%a+)%.%w+%s*=")
                         if d then scopes[key].defines[d] = true end
                         -- references, ignoring comments and acknowledged exceptions

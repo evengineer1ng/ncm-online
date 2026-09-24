@@ -76,3 +76,7 @@ Thumbs.db
 desktop.ini
 .vs/
 .idea/
+
+# Built companion executable (tools/build-ffb-companion.ps1). 15+ MB, reproducible from source,
+# and per-machine -- it is an artefact, not a source file.
+/dist/

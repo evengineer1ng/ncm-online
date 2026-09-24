@@ -211,6 +211,20 @@ local function showMarket()
     sendBig("panel:market", lastMarket or { items = {}, markets = {}, loading = true }, "items")
 end
 
+--- The WHEEL tab (`IDEA-399`).
+---
+--- **Unlike every other tab, its data does not come from the server.** It comes from the companion process on
+--- this player's own machine, up the FFB bridge and through `NcmClientFfbState()`. So there is no
+--- `TriggerServerEvent` here and nothing to wait for -- the state is local and always immediately available,
+--- including the state "no companion is running", which is the one a new player will see first.
+local function showWheel()
+    if not page or not pageReady then return end
+    setOpen("wheel")
+    page:send("panel:show", { panel = "wheel" })
+    local state = (type(NcmClientFfbState) == "function") and NcmClientFfbState() or nil
+    page:send("panel:wheel", state or { enabled = false, connected = false })
+end
+
 local function hide()
     if page and pageReady then page:send("panel:hide", {}) end
     setOpen(nil)
@@ -253,6 +267,7 @@ AddEventHandler("onClientResourceStart", function(name)
         if type(d) ~= "table" then return end
         if d.panel == "guide" then showGuide() elseif d.panel == "market" then showMarket()
         elseif d.panel == "collection" then showCollection()
+        elseif d.panel == "wheel" then showWheel()
         elseif d.panel == "help" then showHelp() end
     end)
     -- The page owns the report id and reuses it on retry, so a resend is the same report (idempotent by key).
@@ -260,6 +275,18 @@ AddEventHandler("onClientResourceStart", function(name)
         if type(d) ~= "table" then return end
         TriggerServerEvent("ncm:report.submit", tostring(d.reportId or ""), tostring(d.text or ""),
             { panel = tostring(d.panel or "help"), ms = tonumber(d.ms) })
+    end)
+
+    -- Every wheel action is a local command to the companion; none of it reaches the server, because none
+    -- of it is anyone else's business (`IDEA-388`).
+    page:on("panel:wheel.command", function(d)
+        if type(d) ~= "table" or type(NcmClientFfbCommand) ~= "function" then return end
+        pcall(NcmClientFfbCommand, tostring(d.kind or ""), d.payload)
+        -- Redraw from the authoritative state rather than from what the page assumed it just did.
+        if page and pageReady and open == "wheel" then
+            local state = (type(NcmClientFfbState) == "function") and NcmClientFfbState() or nil
+            page:send("panel:wheel", state or { enabled = false, connected = false })
+        end
     end)
 
     page:on("panel:market.purchase", function(d)

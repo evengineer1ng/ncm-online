@@ -99,6 +99,73 @@ def slew(previous: float, target, dt: float, max_per_second: float = MAX_SLEW_PE
     return want
 
 
+# --------------------------------------------------------------------------------------------------
+# Device discovery. Reporting only -- nothing here opens a haptic effect.
+# --------------------------------------------------------------------------------------------------
+#
+# The companion is the only thing in the system that can see the hardware, so it is the only thing that may
+# describe it. **Classification decides the ceiling**, so getting it wrong in the permissive direction is the
+# one mistake that matters: anything not confidently recognised stays `unknown`, which carries the lowest cap.
+#
+# Name matching is crude on purpose. A curated list of substrings we can defend beats a clever heuristic that
+# might promote an unknown direct-drive base into the `belt` ceiling.
+BELT_OR_GEAR = {
+    "g29": "gear", "g920": "gear", "g923": "gear", "g27": "gear", "g25": "gear", "driving force": "gear",
+    "t300": "belt", "t150": "belt", "tmx": "belt", "t500": "belt", "thrustmaster": "belt",
+    "csl elite": "belt", "clubsport": "belt",
+}
+DIRECT_DRIVE = ("moza", "simucube", "simagic", "fanatec dd", "podium", "csl dd", "vrs ", "asetek", "cammus")
+
+
+def classify(name: str) -> str:
+    """A device class, or `unknown`. **Never guesses upward.**"""
+    n = (name or "").lower()
+    for token in DIRECT_DRIVE:
+        if token in n:
+            return "direct_drive"
+    for token, cls in BELT_OR_GEAR.items():
+        if token in n:
+            return cls
+    return "unknown"
+
+
+def discover():
+    """The first haptic-capable device SDL can see, described but NOT opened for output.
+
+    Returns (name, class, capabilities dict) or (None, "unknown", {}). An import failure is reported rather
+    than crashing the bridge: telemetry is still worth watching on a machine with no wheel attached.
+    """
+    try:
+        import sdl2
+    except Exception as exc:                                    # noqa: BLE001 - diagnostic path
+        print("[ffb] SDL unavailable (%s); running without hardware discovery" % exc, flush=True)
+        return None, "unknown", {}
+    try:
+        sdl2.SDL_InitSubSystem(sdl2.SDL_INIT_JOYSTICK | sdl2.SDL_INIT_HAPTIC)
+        count = sdl2.SDL_NumHaptics()
+        if count < 1:
+            print("[ffb] SDL sees no haptic device. On Logitech wheels G HUB must be installed and running.",
+                  flush=True)
+            return None, "unknown", {}
+        raw = sdl2.SDL_HapticName(0)
+        name = raw.decode(errors="replace") if isinstance(raw, bytes) else str(raw)
+        dev = sdl2.SDL_HapticOpen(0)
+        caps = {}
+        if dev:
+            bits = sdl2.SDL_HapticQuery(dev)
+            for label, flag in (("constant", sdl2.SDL_HAPTIC_CONSTANT), ("sine", sdl2.SDL_HAPTIC_SINE),
+                                ("leftright", sdl2.SDL_HAPTIC_LEFTRIGHT), ("damper", sdl2.SDL_HAPTIC_DAMPER),
+                                ("spring", sdl2.SDL_HAPTIC_SPRING)):
+                caps[label] = bool(bits & flag)
+            # Closed again immediately. Discovery must not leave a device held open by a process that is not
+            # going to drive it.
+            sdl2.SDL_HapticClose(dev)
+        return name, classify(name), caps
+    except Exception as exc:                                    # noqa: BLE001 - diagnostic path
+        print("[ffb] device discovery failed: %s" % exc, flush=True)
+        return None, "unknown", {}
+
+
 BRIDGE_HTML = """<!doctype html>
 <html><head><meta charset="utf-8"><title>NCM FFB bridge</title></head>
 <body style="margin:0;background:transparent">
@@ -115,6 +182,14 @@ BRIDGE_HTML = """<!doctype html>
       ws = new WebSocket("ws://" + location.host + "/telemetry");
     } catch (e) { tell("ncm:ffb.closed", "construct failed: " + e); return; }
     ws.onopen = function () { ready = true; tell("ncm:ffb.ready", location.origin); };
+    // Upward: whatever the companion says about the hardware. Passed through untouched -- this page owns no
+    // policy and must not be the place a device class quietly changes.
+    ws.onmessage = function (ev) {
+      try {
+        var msg = JSON.parse(ev.data);
+        if (msg && msg.device && window.Open77 && Open77.emit) Open77.emit("ncm:ffb.device", msg.device);
+      } catch (e) {}
+    };
     ws.onclose = function () { ready = false; tell("ncm:ffb.closed", "socket closed"); setTimeout(connect, 2000); };
     ws.onerror = function () { ready = false; };
   };
@@ -127,6 +202,10 @@ BRIDGE_HTML = """<!doctype html>
     // `idle` is sent deliberately instead of going quiet: silence and "no force" are different instructions,
     // and a companion holding the last frame would keep pushing at a wheel whose car it can no longer see.
     Open77.on("ncm:ffb.idle", function (p) { relay({ v: (p && p.v) || 1, idle: true }); });
+    // Downward: panel settings and the test pulse take the SAME socket the telemetry came up. One transport,
+    // so the two sides cannot disagree about which is authoritative.
+    Open77.on("ncm:ffb.settings", function (p) { relay({ cmd: "settings", settings: p || {} }); });
+    Open77.on("ncm:ffb.test", function (p) { relay({ cmd: "test", test: p || {} }); });
   }
   connect();
 })();
@@ -165,13 +244,45 @@ class Mixer:
     channel contributes nothing and leaves the previous level to decay through the slew limiter, rather than
     asserting that the car is idling, straight and gripping."""
 
-    def __init__(self, device_class: str, rung: float):
+    def __init__(self, device_class: str, rung: float, armed: bool = False):
         self.device_class = device_class
         self.rung = rung
         self.level = 0.0
         self.last = time.monotonic()
         self.frames = 0
         self.idles = 0
+        self.device_name = None
+        self.caps = {}
+        # **Force output is opt-in and off.** Everything else in this file runs identically either way, so the
+        # difference between watching telemetry and moving a wheel is one flag rather than a code path nobody
+        # exercised until the day it mattered.
+        self.armed = armed
+
+    def set_rung(self, index) -> float:
+        """Move to a rung BY INDEX on this class's ladder. There is deliberately no way to set an arbitrary
+        magnitude: the ladder is the safety property, and a free value would be a slider with extra steps."""
+        rungs = ladder(self.device_class)
+        if not rungs:
+            return self.rung
+        try:
+            i = int(index)
+        except (TypeError, ValueError):
+            return self.rung
+        i = max(1, min(i, len(rungs)))
+        self.rung = rungs[i - 1]
+        return self.rung
+
+    def describe(self) -> dict:
+        rungs = ladder(self.device_class)
+        try:
+            idx = rungs.index(self.rung) + 1
+        except ValueError:
+            idx = 1
+        return {
+            "name": self.device_name or "no haptic device",
+            "class": self.device_class,
+            "rung": idx, "rungs": rungs, "armed": self.armed, "haptics": self.caps,
+        }
 
     def feed(self, f: dict) -> float:
         now = time.monotonic()
@@ -237,6 +348,26 @@ def serve(conn: socket.socket, addr, mixer: Mixer, port: int) -> None:
     print("[ffb] telemetry socket open from %s (origin %s)"
           % (headers.get("user-agent", "?")[:40], headers.get("origin", "?")), flush=True)
 
+    def say(payload: dict) -> None:
+        data = json.dumps(payload).encode()
+        header = bytearray([0x81])
+        if len(data) < 126:
+            header.append(len(data))
+        elif len(data) < (1 << 16):
+            header.append(126)
+            header += struct.pack(">H", len(data))
+        else:
+            header.append(127)
+            header += struct.pack(">Q", len(data))
+        try:
+            conn.sendall(bytes(header) + data)
+        except OSError:
+            pass
+
+    # The panel cannot draw a wheel it has not been told about, and it must not invent one. Announced on
+    # connect and again whenever a setting changes, so the tab is correct without polling.
+    say({"device": mixer.describe()})
+
     last_print = 0.0
     while True:
         frame = _read_frame(conn)
@@ -253,6 +384,19 @@ def serve(conn: socket.socket, addr, mixer: Mixer, port: int) -> None:
         try:
             f = json.loads(payload.decode(errors="replace"))
         except Exception:
+            continue
+        cmd = f.get("cmd")
+        if cmd == "settings":
+            rung = mixer.set_rung((f.get("settings") or {}).get("rung"))
+            print("[ffb] rung -> %.2f (%s)" % (rung, mixer.device_class), flush=True)
+            say({"device": mixer.describe()})
+            continue
+        if cmd == "test":
+            # A test pulse is a RAMP, never a step: the slew limiter exists precisely so nothing arrives as a
+            # hammer blow, and a "test" that bypassed it would be testing something we never ship.
+            print("[ffb] TEST pulse at rung %.2f, ceiling %.2f%s" %
+                  (mixer.rung, CEILING.get(mixer.device_class, CEILING["unknown"]),
+                   "" if mixer.armed else "  (NOT ARMED -- no force applied)"), flush=True)
             continue
         if f.get("v") != FRAME_VERSION:
             # A companion that does not recognise the version refuses the stream rather than guessing at it.
@@ -275,9 +419,18 @@ def serve(conn: socket.socket, addr, mixer: Mixer, port: int) -> None:
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--port", type=int, default=38480)
-    ap.add_argument("--class", dest="device_class", default="unknown", choices=sorted(CEILING))
+    ap.add_argument("--class", dest="device_class", default=None, choices=sorted(CEILING),
+                    help="override the detected class. Only ever use this to go LOWER than detection.")
     ap.add_argument("--rung", type=int, default=1, help="1-based rung on this class's ladder (default: lowest)")
+    ap.add_argument("--arm", action="store_true",
+                    help="permit force output. OFF by default: everything works identically without it.")
     args = ap.parse_args()
+
+    name, detected, caps = discover()
+    device_class = args.device_class or detected
+    if args.device_class and args.device_class != detected:
+        print("[ffb] class OVERRIDDEN: detected %r, using %r" % (detected, args.device_class), flush=True)
+    args.device_class = device_class
 
     rungs = ladder(args.device_class)
     if not rungs:
@@ -295,7 +448,10 @@ def main() -> int:
         print("[ffb] NOTE: this class is untested by the authors. The ceiling is deliberately low and is a"
               " starting point for testing, not a tuned value.", flush=True)
 
-    mixer = Mixer(args.device_class, rung)
+    mixer = Mixer(args.device_class, rung, armed=args.arm)
+    mixer.device_name, mixer.caps = name, caps
+    print("[ffb] device       : %s" % (name or "none detected"), flush=True)
+    print("[ffb] force output : %s" % ("ARMED" if args.arm else "disarmed (telemetry only)"), flush=True)
     srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     srv.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     srv.bind(("127.0.0.1", args.port))

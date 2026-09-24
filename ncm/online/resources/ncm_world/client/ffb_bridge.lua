@@ -29,12 +29,42 @@ local enabled, url = false, DEFAULT_URL
 local surface, surfaceReady = nil, false
 local sent, skipped = 0, 0
 
+-- What the companion told us about the hardware, or nil if it has not said. **Never invented**: an absent
+-- device is reported as absent, because "no wheel detected" and "a wheel we could not identify" are different
+-- things to show a player, and only one of them is their problem to fix.
+local device = nil
+
+--- Read by the NCM panel (`client/panel.lua`) to draw the WHEEL tab. A plain snapshot, so the panel never
+--- reaches into this file's state or has to know a companion exists.
+NcmClientFfbState = function()
+    return {
+        enabled = enabled, url = url,
+        surface = surface ~= nil, connected = surfaceReady,
+        device = device, sent = sent, idle = skipped,
+    }
+end
+
+--- The panel's only way in. Settings and the test pulse go DOWN the same bridge the telemetry comes up, so
+--- there is no second transport and no second place for the two sides to disagree about state.
+NcmClientFfbCommand = function(kind, payload)
+    if kind == "enable" then
+        enabled = payload and true or false
+        return true
+    end
+    if not (surface and surfaceReady) then return false, "not_connected" end
+    if kind == "settings" or kind == "test" then
+        surface:send("ncm:ffb." .. kind, type(payload) == "table" and payload or {})
+        return true
+    end
+    return false, "unknown_command"
+end
+
 local function tearDown(why)
     if surface then
         pcall(function() surface:destroy() end)
         log("bridge closed (%s) after %d frame(s), %d skipped", tostring(why), sent, skipped)
     end
-    surface, surfaceReady = nil, false
+    surface, surfaceReady, device = nil, false, nil
 end
 
 local function bringUp()
@@ -56,7 +86,23 @@ local function bringUp()
     end)
     page:on("ncm:ffb.closed", function(info)
         surfaceReady = false
+        device = nil
         log("companion dropped: %s", type(info) == "table" and tostring(info.detail or "?") or "?")
+    end)
+    -- The companion is the only thing that can see the hardware, so it is the only thing that may describe
+    -- it. `class` decides the ceiling (`driver.feedback`), and a class we do not recognise is NOT silently
+    -- upgraded here -- `clamp` treats it as the most dangerous thing it could be.
+    page:on("ncm:ffb.device", function(d)
+        if type(d) ~= "table" then return end
+        device = {
+            name = tostring(d.name or "unknown device"),
+            class = Feedback.CLASSES[d.class] and d.class or "unknown",
+            rung = tonumber(d.rung), rungs = type(d.rungs) == "table" and d.rungs or nil,
+            armed = d.armed and true or false,
+            haptics = type(d.haptics) == "table" and d.haptics or nil,
+        }
+        log("device: %s | class=%s | rung=%s | armed=%s",
+            device.name, device.class, tostring(device.rung), tostring(device.armed))
     end)
     log("bridge surface created for %s; waiting for the companion", url)
 end
