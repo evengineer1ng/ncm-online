@@ -333,29 +333,77 @@
             verdict: verdict, detail: String(detail), elapsedMs: Math.round(now - t0),
           }, env));
         };
-        let ws;
-        try {
-          ws = new WebSocket(url);
-        } catch (e) {
-          // A synchronous throw is the signature of a policy refusal rather than a failed connection.
-          report("BLOCKED-SYNC", e && e.message ? e.message : e);
-          return;
+        // ROUND 2. The first probe answered the headline question -- `ws://` from this `https://` bundled page
+        // failed in 0ms without the listener ever seeing a TCP connection, which is a policy refusal and not a
+        // refused connect. What it did NOT answer is WHICH policy, and that decides what we build instead.
+        //
+        // So: try several schemes against a port where NOTHING is listening, and read the TIMING.
+        //   * a scheme the browser refuses fails in ~0ms, before any socket is opened;
+        //   * a scheme the browser permits reaches the network and fails on ECONNREFUSED, measurably later.
+        // That single distinction separates "mixed content blocks ws://" from "loopback is unreachable at all",
+        // and it needs no certificate and no change to the machine.
+        const DEAD = (url.split(":")[2] || "38480").replace(/[^0-9]/g, "") === "38480" ? "38481" : "38481";
+        const trials = [
+          { name: "ws-live",     run: (done) => wsTrial(url, done) },
+          { name: "ws-dead",     run: (done) => wsTrial("ws://127.0.0.1:" + DEAD, done) },
+          { name: "wss-dead",    run: (done) => wsTrial("wss://127.0.0.1:" + DEAD, done) },
+          { name: "fetch-http",  run: (done) => fetchTrial("http://127.0.0.1:" + DEAD + "/", done) },
+          { name: "fetch-https", run: (done) => fetchTrial("https://127.0.0.1:" + DEAD + "/", done) },
+        ];
+
+        function wsTrial(u, done) {
+          const s0 = now();
+          let sock;
+          try { sock = new WebSocket(u); }
+          catch (e) { done("THREW", e && e.message ? e.message : String(e), now() - s0); return; }
+          let settled = false;
+          const finish = (v, d) => { if (!settled) { settled = true; try { sock.close(); } catch (e) {} done(v, d, now() - s0); } };
+          const t = setTimeout(() => finish("TIMEOUT", "no result in 5s"), 5000);
+          sock.onopen = () => { clearTimeout(t); finish("OPEN", "connected"); };
+          sock.onerror = () => { clearTimeout(t); finish("ERROR", "failed"); };
         }
-        const timer = setTimeout(() => { try { ws.close(); } catch (e) {} report("TIMEOUT", "no open in 4s"); }, 4000);
-        ws.onopen = () => {
-          clearTimeout(timer);
-          // Send one realistic frame, so this proves the payload path and not merely the handshake.
+
+        function fetchTrial(u, done) {
+          const s0 = now();
+          let settled = false;
+          const finish = (v, d) => { if (!settled) { settled = true; done(v, d, now() - s0); } };
           try {
-            ws.send(JSON.stringify({
-              probe: "ncm", origin: env.origin, secureContext: env.secureContext,
-              sample: { throttle: 0.5, brake: 0, steering: -0.25, rpm: 3200, rpmMax: 5300, gear: 3 },
-            }));
-          } catch (e) {}
-          report("OPEN", "handshake completed and one frame sent");
-          setTimeout(() => { try { ws.close(1000, "probe done"); } catch (e) {} }, 500);
-        };
-        ws.onerror = () => { clearTimeout(timer); report("ERROR", "connection failed (refused or blocked -- check the listener's own log)"); };
-        ws.onclose = (ev) => { clearTimeout(timer); };
+            fetch(u, { mode: "cors", cache: "no-store" })
+              .then((r) => finish("OK", "status " + r.status))
+              .catch((e) => finish("ERROR", (e && e.message) ? e.message : String(e)));
+            setTimeout(() => finish("TIMEOUT", "no result in 5s"), 5000);
+          } catch (e) { finish("THREW", e && e.message ? e.message : String(e)); }
+        }
+
+        function now() { return (performance && performance.now) ? performance.now() : Date.now(); }
+
+        // The live socket still gets its real attempt first, and still sends a frame if it opens.
+        let ws;
+        try { ws = new WebSocket(url); } catch (e) { /* recorded by the ws-live trial below */ }
+        if (ws) {
+          ws.onopen = () => {
+            try {
+              ws.send(JSON.stringify({ probe: "ncm", origin: env.origin,
+                sample: { throttle: 0.5, brake: 0, steering: -0.25, rpm: 3200, rpmMax: 5300, gear: 3 } }));
+            } catch (e) {}
+            setTimeout(() => { try { ws.close(1000, "probe done"); } catch (e) {} }, 400);
+          };
+          ws.onerror = () => {};
+        }
+
+        const results = [];
+        let i = 0;
+        (function next() {
+          if (i >= trials.length) {
+            report("MATRIX", results.join("  |  "));
+            return;
+          }
+          const trial = trials[i++];
+          trial.run((verdict, detail, ms) => {
+            results.push(trial.name + "=" + verdict + "/" + Math.round(ms) + "ms(" + detail + ")");
+            next();
+          });
+        })();
       });
 
       Open77.on("race:state", apply);

@@ -37,6 +37,40 @@ import time
 GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 
 
+# The page served to a remote WebUI entry. Deliberately tiny: its only job is to prove the three facts the
+# bundled page failed on -- that a page with a real http origin (a) loads inside the game, (b) still receives
+# the Lua bridge, and (c) can open a same-origin WebSocket.
+BRIDGE_HTML = """<!doctype html>
+<html><head><meta charset="utf-8"><title>NCM bridge probe</title></head>
+<body style="margin:0;background:transparent">
+<script>
+(function () {
+  var report = function (stage, detail) {
+    try {
+      if (window.Open77 && Open77.emit) {
+        Open77.emit("ncm:bridge.result", {
+          stage: stage, detail: String(detail),
+          origin: location.origin, secureContext: !!window.isSecureContext,
+          hasBridge: !!(window.Open77 && Open77.emit)
+        });
+      }
+    } catch (e) {}
+  };
+  report("loaded", "bridge present=" + !!(window.Open77 && Open77.emit));
+  try {
+    var ws = new WebSocket("ws://" + location.host + "/telemetry");
+    ws.onopen = function () {
+      report("ws-open", "same-origin websocket connected");
+      try { ws.send(JSON.stringify({ probe: "ncm-bridge", origin: location.origin })); } catch (e) {}
+    };
+    ws.onerror = function () { report("ws-error", "same-origin websocket failed"); };
+  } catch (e) { report("ws-threw", e && e.message ? e.message : e); }
+})();
+</script>
+</body></html>
+"""
+
+
 def _accept_key(key: str) -> str:
     return base64.b64encode(hashlib.sha1((key + GUID).encode()).digest()).decode()
 
@@ -102,8 +136,37 @@ def serve(conn: socket.socket, addr) -> None:
 
     key = headers.get("sec-websocket-key")
     if not key:
-        conn.sendall(b"HTTP/1.1 400 Bad Request\r\n\r\n")
-        print("[probe] NOT a websocket handshake", flush=True)
+        # -----------------------------------------------------------------------------------------
+        # Plain HTTP: serve the bridge page itself.
+        # -----------------------------------------------------------------------------------------
+        #
+        # Round 2 showed a BUNDLED page cannot reach the network at all -- ws, wss, http and https, every
+        # one refused in ~0ms, the whole matrix finishing in 1ms, so nothing ever touched a socket. The
+        # `Open77.webui.create` card points at the way out:
+        #
+        #   > "An HTTP(S) `entry` does not require `web_files` ... External scripts, media, requests and
+        #   >  embeds follow browser CORS and TLS rules. Only the configured top-level entry origin
+        #   >  receives the Lua bridge."
+        #
+        # A page whose entry is `http://127.0.0.1:<port>/bridge.html` has a REAL http origin, so a
+        # WebSocket back to that same origin is **same-origin** -- no CORS, no mixed content, nothing to
+        # negotiate. And the card says the top-level entry origin still receives the Lua bridge.
+        path = lines[0].split(" ")[1] if " " in lines[0] else "/"
+        print("[probe] HTTP GET %s  Origin=%s" % (path, headers.get("origin", "(none)")), flush=True)
+        body = BRIDGE_HTML.encode()
+        # Built from chr() rather than escapes: this file is edited by tooling that has already mangled a
+        # backslash sequence once, and a header terminator that is silently wrong produces a page that
+        # never loads for reasons nothing reports.
+        crlf = chr(13) + chr(10)
+        head = crlf.join([
+            "HTTP/1.1 200 OK",
+            "Content-Type: text/html; charset=utf-8",
+            "Content-Length: " + str(len(body)),
+            "Cache-Control: no-store",
+            "Connection: close",
+        ]) + crlf + crlf
+        conn.sendall(head.encode() + body)
+        print("[probe] served bridge.html (%d bytes) -- REMOTE ENTRY LOADED" % len(body), flush=True)
         return
 
     conn.sendall(

@@ -376,6 +376,52 @@ end)
 -- client instead of guessed.
 --
 -- Run `python tools/ws-probe-server.py` first, then `/ncm.wsprobe` in game.
+-- `/ncm.bridgeprobe` -- the candidate solution, after the bundled page failed (IDEA-387).
+--
+-- Round 2 was conclusive and negative: from the bundled page, `ws`, `wss`, `http` and `https` were ALL
+-- refused in ~0ms, the whole five-trial matrix finishing in 1ms. Nothing touched a socket. That is not mixed
+-- content -- a mixed-content block would have spared the secure schemes -- it is a bundled origin with no
+-- outbound network at all. Its origin is `https://r-NN-g-1.cym-ui`, a private scheme.
+--
+-- `Open77.webui.create` names the way out:
+--
+--   > "An HTTP(S) `entry` does not require `web_files` ... External scripts, media, requests and embeds
+--   >  follow browser CORS and TLS rules. **Only the configured top-level entry origin receives the Lua
+--   >  bridge.**"
+--
+-- So: serve the page FROM the companion. Its origin is then a real `http://127.0.0.1:<port>`, a WebSocket
+-- back to it is **same-origin** -- no CORS, no mixed content, nothing to negotiate -- and that sentence says
+-- the Lua bridge still reaches it.
+--
+-- **This is a separate, hidden surface and not the race HUD.** If the companion is not running the surface
+-- simply fails to load, and the HUD is untouched. The HUD must never depend on an external process.
+local bridgePage = nil
+
+RegisterCommand("ncm.bridgeprobe", function(_, args)
+    local url = (args and args[1]) and tostring(args[1]) or "http://127.0.0.1:38480/bridge.html"
+    if bridgePage then
+        pcall(function() bridgePage:destroy() end)
+        bridgePage = nil
+    end
+    log("bridgeprobe: creating a WebUI surface with a REMOTE entry: %s", url)
+    local p, reason = WebUI.create({
+        entry = url, layer = "hud", width = 16, height = 16,
+        zIndex = 1, transparent = true, visible = false,
+    })
+    if not p then
+        log("bridgeprobe: WebUI.create REFUSED the remote entry: %s", tostring(reason))
+        return
+    end
+    bridgePage = p
+    p:on("ncm:bridge.result", function(r)
+        if type(r) ~= "table" then log("bridgeprobe: malformed result"); return end
+        log("bridgeprobe: %s | origin=%s secureContext=%s hasBridge=%s | %s",
+            tostring(r.stage), tostring(r.origin), tostring(r.secureContext),
+            tostring(r.hasBridge), tostring(r.detail))
+    end)
+    log("bridgeprobe: surface created; waiting for the page to report")
+end, false)
+
 RegisterCommand("ncm.wsprobe", function(_, args)
     local url = (args and args[1]) and tostring(args[1]) or "ws://127.0.0.1:38480"
     if not page or not pageReady then
