@@ -239,6 +239,146 @@ def _read_frame(conn: socket.socket):
     return opcode, bytes(b ^ mask[i % 4] for i, b in enumerate(payload))
 
 
+class Output:
+    """The only thing in this program that can move a wheel.
+
+    **Every safety rule is enforced on the way in, not by the caller.** `write()` takes a level that has
+    already been clamped and slewed by `Mixer`, and clamps it again here -- because this is the last place a
+    mistake is still cheap, and the cost of a redundant `min()` is nothing against the cost of being wrong.
+
+    Design choices that are safety choices:
+
+      * **A periodic SINE, not a CONSTANT force.** A constant effect is a sustained torque in one direction --
+        it fights the driver and it is what wrenches a wrist. A sine oscillates around centre: it is felt as
+        texture, and its worst case is a buzz rather than a pull.
+      * **The effect is created once and UPDATED**, never re-played per frame. Re-triggering at 30 Hz makes an
+        audible click and, worse, restarts the envelope each time.
+      * **Stop is idempotent and runs on every exit path** -- idle frame, socket close, process exit,
+        exception. A wheel left buzzing after the game closed is the single worst outcome here, and it is the
+        one a crash would otherwise produce.
+    """
+
+    def __init__(self, device_class: str):
+        self.device_class = device_class
+        self.sdl = None
+        self.haptic = None
+        self.name = None
+        self.caps = {}
+        self.dev = None
+        self.effect_id = None
+        self.effect = None
+        self.last_sent = -1.0
+        self.mode = "none"
+
+    def open(self) -> str:
+        """Open the device and leave a silent effect running. Returns "" on success, else why not.
+
+        Three details copied from `anyffb`, which works on this exact hardware and was worth reading before
+        guessing:
+
+          * **`SDL_Init(SDL_INIT_HAPTIC)`**, not `SDL_InitSubSystem` on an uninitialised SDL. The latter
+            returned *"Haptic error Resetting device"* here.
+          * **`SDL_HapticDirection` constructed properly**, not a field assignment into `.dir[0]`.
+          * **`length = 0xFFFFFFFF`** and an explicit `SDL_HapticSetGain(100)`.
+
+        **`CONSTANT` is deliberately NOT used as a fallback**, though anyffb offers it. A constant effect is a
+        sustained torque in one direction -- it fights the driver rather than texturing the wheel, and it is
+        the shape that hurts. LEFTRIGHT and SINE cover every wheel we expect; a device offering neither gets
+        no force rather than the dangerous one.
+        """
+        try:
+            import sdl2
+            import sdl2.haptic as haptic
+            from ctypes import c_long
+        except Exception as exc:                                # noqa: BLE001 - diagnostic path
+            return "SDL unavailable: %s" % exc
+        self.sdl, self.haptic = sdl2, haptic
+        try:
+            if sdl2.SDL_Init(sdl2.SDL_INIT_HAPTIC) != 0:
+                return "SDL_Init(HAPTIC) failed: %s" % sdl2.SDL_GetError()
+            if haptic.SDL_NumHaptics() < 1:
+                return "no haptic device"
+            raw = haptic.SDL_HapticName(0)
+            self.name = raw.decode(errors="replace") if isinstance(raw, bytes) else str(raw)
+            self.dev = haptic.SDL_HapticOpen(0)
+            if not self.dev:
+                return "SDL_HapticOpen failed: %s" % sdl2.SDL_GetError()
+            caps = haptic.SDL_HapticQuery(self.dev)
+            self.caps = {
+                "constant": bool(caps & haptic.SDL_HAPTIC_CONSTANT),
+                "sine": bool(caps & haptic.SDL_HAPTIC_SINE),
+                "leftright": bool(caps & haptic.SDL_HAPTIC_LEFTRIGHT),
+                "damper": bool(caps & haptic.SDL_HAPTIC_DAMPER),
+            }
+            haptic.SDL_HapticSetGain(self.dev, 100)
+
+            eff = haptic.SDL_HapticEffect()
+            if caps & haptic.SDL_HAPTIC_LEFTRIGHT:
+                self.mode = "leftright"
+                eff.type = haptic.SDL_HAPTIC_LEFTRIGHT
+                eff.leftright.length = 0xFFFFFFFF
+                eff.leftright.large_magnitude = 0
+                eff.leftright.small_magnitude = 0
+            elif caps & haptic.SDL_HAPTIC_SINE:
+                self.mode = "sine"
+                eff.type = haptic.SDL_HAPTIC_SINE
+                eff.periodic.direction = haptic.SDL_HapticDirection(
+                    haptic.SDL_HAPTIC_CARTESIAN, (c_long * 3)(0, 0, 0))
+                eff.periodic.length = 0xFFFFFFFF
+                eff.periodic.period = 40                        # 25 Hz: texture, not a shove
+                eff.periodic.magnitude = 0
+                eff.periodic.offset = 0
+                eff.periodic.phase = 0
+            else:
+                return "device offers neither LEFTRIGHT nor SINE (CONSTANT is refused on purpose)"
+
+            self.effect = eff
+            self.effect_id = haptic.SDL_HapticNewEffect(self.dev, eff)
+            if self.effect_id < 0:
+                return "SDL_HapticNewEffect failed: %s" % sdl2.SDL_GetError()
+            haptic.SDL_HapticRunEffect(self.dev, self.effect_id, 1)
+            return ""
+        except Exception as exc:                                # noqa: BLE001 - diagnostic path
+            return "haptic open failed: %s" % exc
+
+    def write(self, level: float) -> None:
+        if self.mode == "none" or self.sdl is None:
+            return
+        level = clamp(self.device_class, level)                 # last line of defence, deliberately redundant
+        if abs(level - self.last_sent) < 0.005:
+            return
+        self.last_sent = level
+        try:
+            mag = int(level * 32767)
+            if self.mode == "leftright":
+                self.effect.leftright.large_magnitude = mag
+                self.effect.leftright.small_magnitude = mag
+            else:
+                self.effect.periodic.magnitude = mag
+            self.haptic.SDL_HapticUpdateEffect(self.dev, self.effect_id, self.effect)
+        except Exception:                                       # noqa: BLE001 - never let output kill the loop
+            self.stop()
+
+    def stop(self) -> None:
+        """Silence, by every means available, and safe to call twice."""
+        self.last_sent = -1.0
+        if self.sdl is None or self.dev is None:
+            return
+        try:
+            self.haptic.SDL_HapticStopAll(self.dev)
+        except Exception:                                       # noqa: BLE001
+            pass
+
+    def close(self) -> None:
+        self.stop()
+        try:
+            if self.haptic and self.dev:
+                self.haptic.SDL_HapticClose(self.dev)
+        except Exception:                                       # noqa: BLE001
+            pass
+        self.dev, self.mode = None, "none"
+
+
 class Mixer:
     """Telemetry in, a would-be magnitude out. Every channel is optional and ABSENCE IS NOT ZERO: a missing
     channel contributes nothing and leaves the previous level to decay through the slew limiter, rather than
@@ -253,6 +393,7 @@ class Mixer:
         self.idles = 0
         self.device_name = None
         self.caps = {}
+        self.out = None                 # set by main() only when --arm was given
         # **Force output is opt-in and off.** Everything else in this file runs identically either way, so the
         # difference between watching telemetry and moving a wheel is one flag rather than a code path nobody
         # exercised until the day it mattered.
@@ -291,6 +432,7 @@ class Mixer:
         if f.get("idle"):
             self.idles += 1
             self.level = slew(self.level, 0.0, dt)
+            self._emit()
             return self.level
 
         self.frames += 1
@@ -303,13 +445,45 @@ class Mixer:
                 contributions.append(weight * min(1.0, abs(v)))
         if not contributions:
             self.level = slew(self.level, 0.0, dt)
+            self._emit()
             return self.level
 
         # The rung IS the scale. Channel weights sum to roughly 0..1.8, so the lowest rung (0.05) puts a
         # fully-loaded car at about a twentieth of the device maximum -- which is where tuning starts.
         target = clamp(self.device_class, sum(contributions) * self.rung)
         self.level = slew(self.level, target, dt)
+        self._emit()
         return self.level
+
+    def _emit(self) -> None:
+        """The single point where a level becomes force. Nothing else in this class touches the device, so
+        'is force being applied?' has exactly one answer to check."""
+        if self.out is not None:
+            self.out.write(self.level)
+
+    def silence(self) -> None:
+        self.level = 0.0
+        if self.out is not None:
+            self.out.stop()
+
+    def pulse(self) -> None:
+        """A test pulse is a RAMP UP AND BACK DOWN, never a step.
+
+        The slew limiter exists precisely so nothing arrives as a hammer blow, and a 'test' that bypassed it
+        would be testing something we never ship. So this walks the same limiter the telemetry path uses, at
+        the current rung, and returns to silence."""
+        if self.out is None:
+            return
+        step = 1.0 / 60.0
+        level = 0.0
+        for target in (self.rung, 0.0):
+            for _ in range(60):
+                level = slew(level, target, step)
+                self.out.write(level)
+                time.sleep(step)
+                if abs(level - target) < 0.002:
+                    break
+        self.out.stop()
 
 
 def serve(conn: socket.socket, addr, mixer: Mixer, port: int) -> None:
@@ -397,6 +571,8 @@ def serve(conn: socket.socket, addr, mixer: Mixer, port: int) -> None:
             print("[ffb] TEST pulse at rung %.2f, ceiling %.2f%s" %
                   (mixer.rung, CEILING.get(mixer.device_class, CEILING["unknown"]),
                    "" if mixer.armed else "  (NOT ARMED -- no force applied)"), flush=True)
+            if mixer.armed:
+                threading.Thread(target=mixer.pulse, daemon=True).start()
             continue
         if f.get("v") != FRAME_VERSION:
             # A companion that does not recognise the version refuses the stream rather than guessing at it.
@@ -413,7 +589,11 @@ def serve(conn: socket.socket, addr, mixer: Mixer, port: int) -> None:
                      f.get("slipTotal"), level, CEILING.get(mixer.device_class, CEILING["unknown"])),
                   flush=True)
 
-    print("[ffb] socket closed after %d frame(s), %d idle" % (mixer.frames, mixer.idles), flush=True)
+    # **The game went away. Stop.** A wheel still buzzing after the client closed is the worst outcome
+    # this program can produce, and a dropped socket is the likeliest way to reach it.
+    mixer.silence()
+    print("[ffb] socket closed after %d frame(s), %d idle -- output silenced" % (mixer.frames, mixer.idles),
+          flush=True)
 
 
 def main() -> int:
@@ -450,6 +630,33 @@ def main() -> int:
 
     mixer = Mixer(args.device_class, rung, armed=args.arm)
     mixer.device_name, mixer.caps = name, caps
+    if args.arm:
+        out = Output(args.device_class)
+        why = out.open()
+        if why:
+            print("[ffb] ARM FAILED: %s" % why, flush=True)
+            if "Resetting device" in why or "HapticOpen" in why:
+                # Observed 2026-09-24: SDL can NAME the G29 but cannot open its haptics while Cyberpunk is
+                # already running. DirectInput force feedback is an exclusive acquisition and the first
+                # process to take it keeps it, so the order of startup decides who gets the wheel.
+                print("[ffb] SDL can see the device but cannot acquire it. Force feedback is an EXCLUSIVE",
+                      flush=True)
+                print("[ffb] acquisition -- whichever process takes it first keeps it. Start this companion",
+                      flush=True)
+                print("[ffb] BEFORE the game (build-ffb-companion.ps1 -InstallStartup does that for you).",
+                      flush=True)
+                print("[ffb] Also check that Logitech G HUB is running, which Logitech wheels need for SDL",
+                      flush=True)
+                print("[ffb] haptics to be exposed at all.", flush=True)
+            print("[ffb] continuing with telemetry only.", flush=True)
+            mixer.armed = False
+        else:
+            mixer.out = out
+            # Output has just opened the device, so it knows the name and capabilities first-hand. Use those
+            # rather than the earlier open/close probe -- one open, one source of truth.
+            if out.name:
+                mixer.device_name, mixer.caps = out.name, out.caps
+            print("[ffb] armed via %s effect" % out.mode, flush=True)
     print("[ffb] device       : %s" % (name or "none detected"), flush=True)
     print("[ffb] force output : %s" % ("ARMED" if args.arm else "disarmed (telemetry only)"), flush=True)
     srv = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -465,6 +672,11 @@ def main() -> int:
     except KeyboardInterrupt:
         pass
     finally:
+        # Unconditional. Ctrl-C, an unhandled exception, a closed window -- every one of them ends with the
+        # wheel quiet, because the alternative is a device left oscillating by a process that no longer runs.
+        mixer.silence()
+        if mixer.out is not None:
+            mixer.out.close()
         srv.close()
     return 0
 
