@@ -665,6 +665,7 @@ class Output:
         self.sine = self.sine_id = None
         self.const = self.const_id = None
         self.conditions = {}
+        self.axes = 1
         self.last_texture = -1.0
         self.last_torque = None
         self._registered = False
@@ -728,6 +729,10 @@ class Output:
                 "friction": bool(bits & haptic.SDL_HAPTIC_FRICTION),
             }
             haptic.SDL_HapticSetGain(self.dev, 100)
+            self.axes = max(1, haptic.SDL_HapticNumAxes(self.dev))
+            print("[ffb] device axes: %d | effects: %d stored, %d playing"
+                  % (self.axes, haptic.SDL_HapticNumEffects(self.dev),
+                     haptic.SDL_HapticNumEffectsPlaying(self.dev)), flush=True)
 
             modes = []
             if self.caps["sine"]:
@@ -784,8 +789,13 @@ class Output:
         return e
 
     def _condition_effect(self, c_long, kind, strength):
-        """A SPRING or DAMPER at `strength` 0..1. Both axes are set because a wheel reports one axis and
-        some drivers read the second regardless; leaving it zero has been observed to silence the effect."""
+        """A SPRING or DAMPER at `strength` 0..1.
+
+        **Configured for the axes the device actually has, which on a wheel is ONE.** The first version wrote
+        parameters for three axes on the assumption that a spare axis is harmless. It is not: force feedback
+        worked before spring and damper were added and was completely silent afterwards, because writing
+        condition parameters for axes that do not exist takes the whole device down. `SDL_HapticNumAxes`
+        reports 1 for this G29, and asking is free."""
         h = self.haptic
         e = h.SDL_HapticEffect()
         e.type = kind
@@ -793,12 +803,11 @@ class Output:
         e.condition.direction = h.SDL_HapticDirection(h.SDL_HAPTIC_CARTESIAN, (c_long * 3)(1, 0, 0))
         e.condition.length = 0xFFFFFFFF
         sat = int(max(0.0, min(1.0, strength)) * 32767)
-        coeff = int(max(0.0, min(1.0, strength)) * 32767)
-        for axis in (0, 1, 2):
+        for axis in range(self.axes):
             e.condition.right_sat[axis] = sat
             e.condition.left_sat[axis] = sat
-            e.condition.right_coeff[axis] = coeff
-            e.condition.left_coeff[axis] = coeff
+            e.condition.right_coeff[axis] = sat
+            e.condition.left_coeff[axis] = sat
             e.condition.deadband[axis] = 0
             e.condition.center[axis] = 0
         return e
@@ -811,7 +820,7 @@ class Output:
             return False
         eff, eid = entry
         sat = int(max(0.0, min(1.0, strength)) * 32767)
-        for axis in (0, 1, 2):
+        for axis in range(self.axes):
             eff.condition.right_sat[axis] = sat
             eff.condition.left_sat[axis] = sat
             eff.condition.right_coeff[axis] = sat

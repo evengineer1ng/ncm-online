@@ -149,27 +149,46 @@ end
 --- their steering mid-corner.
 local loggedState = false
 
+--- **Are we actually in a car?**
+---
+--- Answered the hard way, because the two easy answers are both wrong on this build:
+---
+---   * `Open77.character.state()` has **no `inVehicle` field at all**. Logged from the running client, it
+---     returns age, air, alive, animation, attached, crouched, engineId, fall, groundSpeed, grounded,
+---     hasDouble, health, id, inWorkspot, isPlayer, landing, owned, sliding, source, speed, vaulting, yaw.
+---     The check for it therefore always fell through.
+---   * `getPlayerSeat()` is **sticky** -- it keeps naming a seat after the driver has walked away.
+---
+--- So the seat is treated as a claim and then verified: ask the vehicle it names who is actually aboard. A
+--- stale seat pointing at a car whose occupants no longer include us is exactly the on-foot case, and it is
+--- the one the sticky read cannot see.
 local function seated()
-    local ok, st = pcall(Open77.character.state)
-    -- The rig was still live on foot even after this check went in, so record what the platform ACTUALLY
-    -- returns rather than continuing to assume a field name. Once per session, like the telemetry probe.
-    if ok and type(st) == "table" and not loggedState then
-        loggedState = true
-        local parts = {}
-        for k, v in pairs(st) do
-            if type(v) ~= "table" and type(v) ~= "function" then
-                parts[#parts + 1] = tostring(k) .. "=" .. tostring(v)
-            end
-        end
-        table.sort(parts)
-        log("character.state: {%s}", table.concat(parts, " "))
-    elseif not ok and not loggedState then
-        loggedState = true
-        log("character.state: UNAVAILABLE (%s)", tostring(st))
+    local okSeat, seat = pcall(Open77.vehicles.getPlayerSeat)
+    if not okSeat or type(seat) ~= "table" then return false end
+    local vid = seat.vehicleId or seat.vehicle or seat.id
+    if not vid then return false end
+
+    local okV, v = pcall(Open77.vehicles.get, vid)
+    if not okV or type(v) ~= "table" then
+        -- The car is not streamed to us. We cannot be sitting in it.
+        return false
     end
-    if ok and type(st) == "table" and type(st.inVehicle) == "boolean" then return st.inVehicle end
-    local ok2, seat = pcall(Open77.vehicles.getPlayerSeat)
-    if ok2 and type(seat) == "table" then return true end
+    local okId, me = pcall(Open77.players.localId)
+    if not okId or me == nil or type(v.occupants) ~= "table" then
+        -- Cannot verify. **Absent is not a negative** -- believe the seat rather than cutting steering
+        -- mid-corner on a missing field, which is the mistake `vehicle_access.lua` records.
+        if not loggedState then
+            loggedState = true
+            log("seat check: cannot verify occupants (localId=%s occupants=%s); trusting the seat read",
+                tostring(okId and me or "?"), type(v.occupants))
+        end
+        return true
+    end
+    for _, occ in pairs(v.occupants) do
+        local who = occ
+        if type(occ) == "table" then who = occ.playerId or occ.player or occ.id end
+        if who ~= nil and tostring(who) == tostring(me) then return true end
+    end
     return false
 end
 
