@@ -566,3 +566,80 @@ Workmanship moves a threshold; it never cancels exposure, and the two are never 
 
 This is also what makes an engineer's reputation mechanically real rather than decorative: two engineers
 service the same gearbox, and the difference shows up in how long it stays fixed.
+
+## L121 — LOCKED — version control, and the workshop is standing
+
+Owner direction, 2026-09-24: *"we need to turn the windows server back on, port our lightsail work there... maybe
+first order of business is actually a private github repo with our code, and in fact this would help us port to
+server 2 in general... any lightsail updates in the future will have been instrumented on windows first."*
+
+### 1. The repository is the transport, not just the backup
+
+The repo was made first because it solves both problems at once. Until 2026-09-24 the only defence against
+losing this work was a hash inventory (M0.1 criterion 8) and the idempotence of the deploy scripts. There was no
+history, no branch, and no copy off this machine of the entire NCM Online implementation, the published
+single-player payload, and ~470 KB of design record.
+
+`github.com/evengineer1ng/ncm-online`, private (verified: unauthenticated API returns 404). 644 files, ~11 MB.
+
+**What is tracked is what we wrote.** The workspace is not one package -- it is authored source, downloaded
+runtimes, release snapshots and recovered game assets sharing a folder. ~1.9 GB is excluded, and `.gitignore`
+states which of three reasons applies to each path: re-downloadable binary, content we may not redistribute, or
+machine-local state. The RB15 livery artwork is excluded on the second and first grounds together and therefore
+**still has no backup** (`IDEA-293`) -- recorded rather than quietly dropped.
+
+**No secret has ever been in the tracked set.** Credentials are DPAPI-encrypted outside the workspace and
+`server.jsonc` is ignored; verified by scan before the first commit. That discipline, established long before
+there was a repo, is the only reason this could be a same-day decision.
+
+### 2. NCM Development is running; NCM Online is untouched
+
+L112 described this split and said "not now", gated on the ordinary-player spine. That gate still stands, and
+**nothing about the live world changed**: `serverId` is still `ncm-dev`, it is not renamed, and
+`deploy-staging.ps1` still defaults to `-Target online`. Those are cutover steps 3-6 and they remain the
+owner's call.
+
+What was done is steps 1-2 only, because standing up the workshop never required touching the world:
+
+| | before | now |
+|---|---|---|
+| OPEN//77 | `.82` | `.87` — 704 files verified against the package manifest |
+| load list | 35 entries, `.82`-era | mirrored from production's **actual** 39 |
+| database | MariaDB **13.0**, at migration 005 | MariaDB **10.11.14**, at 023 |
+| identity | would have defaulted to `ncm-dev` | `serverId = ncm-devbox`, `environment = development` |
+
+### 3. Version parity is not pedantry, and the direction of error is the whole argument
+
+`16_ENVIRONMENTS.md` claimed "MariaDB: same engine both sides." That was **false** by 2026-09-24: the box had
+13.0 (winget's only build; it has no 10.11 at all), production runs 10.11.14.
+
+A newer engine **accepts** syntax an older one rejects. So the failure mode is not symmetric: the dev box would
+go green and production would still break. **False greens flow downhill into the canonical world; false reds do
+not.** An environment whose job is to catch problems before production cannot be the more permissive of the two.
+Pinned to 10.11.14 from the official archive, checksum-verified, via `tools/db-pin-1011.ps1`.
+
+The existing migration discipline paid for itself here: every one of 23 migrations declares `CHARSET`/`COLLATE`
+explicitly, so the 13.0 dump restored into 10.11 without a single collation rewrite. The default collation
+changed in MariaDB 11.5, and that would otherwise have been a silent, tedious divergence.
+
+### 4. The box earned its keep before it finished booting
+
+Three defects in the first hour, all of which production hides:
+
+- **KB-51 reproduced, and stopped.** `.87` makes `freeroam` depend on `open77_cyberware_lab`; the local load
+  list did not have it. That aborts the *entire* automatic start set while the server still listens and
+  registers with the master -- healthy-looking, NCM absent. It cost an hour of production downtime once. The
+  guard caught it on the candidate tree **before the swap and before any start**. `check-load-list.py` now takes
+  the server root as a parameter, because a guard that only runs in production runs too late.
+- **KB-93**, a duplicated schema entry in the manifest, harmless only because the loader de-duplicated the path.
+- **KB-92**, a `SQL 1146` that only fires when the schema is behind the code -- i.e. on every fresh install,
+  and never in production.
+
+**This is the argument for the whole exercise, made by the exercise.** All three are invisible on a
+long-running, already-migrated server.
+
+### 5. Standing rule
+
+**Lightsail changes are instrumented on Windows first.** Not ceremony: the point is that a change is *tested
+somewhere* before it reaches a world with durable player property in it. The promotion procedure is the one
+already written in `16_ENVIRONMENTS.md`; it now has a real environment behind it.

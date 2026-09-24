@@ -26,8 +26,13 @@ open77-server-*.tar.gz
 # --- Release snapshots and reference material (B, L) --------------------------
 # staging/ holds extracted published releases; references/ holds third-party
 # source read for research. Neither is an editing target (AGENTS.md).
-staging/
-references/
+#
+# ANCHORED with a leading slash on purpose. Unanchored, `staging/` matches a
+# directory of that name at ANY depth -- which silently swallowed tools/staging/,
+# our own authored ops scripts (bootstrap, the KB-51 load-list guard, the config
+# flag scripts) that OPS_STAGING.md tells you to run. Those are source.
+/staging/
+/references/
 
 # --- Recovered / third-party game assets (L, B) -------------------------------
 # The liveries project is 353 MB of textures, including a 112 MB zip that

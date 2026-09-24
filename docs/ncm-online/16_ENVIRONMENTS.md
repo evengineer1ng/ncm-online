@@ -1,7 +1,9 @@
 # NCM environments — the world and the workshop
 
-**Status:** architecture agreed and recorded (L112). Groundwork landed 2026-09-23. **The split is not active:
-there is still exactly one server.** Nothing has been renamed, opened, or migrated.
+**Status:** architecture agreed (L112). **NCM Development is standing as of 2026-09-24 (L121).**
+NCM Online is **unchanged**: still `serverId = ncm-dev`, unrenamed, and `deploy-staging.ps1` still defaults to
+`-Target online`. Cutover steps 1-2 are done; **steps 3-6 remain the operator's call** and are still gated on
+the ordinary-player spine below. Standing up the workshop never required touching the world.
 
 > **NCM Online is the world. NCM Development is the workshop.**
 
@@ -29,6 +31,9 @@ canonical world, not a lost test.
 | Forward-only migrations | **exists** — `NcmSchema` + `server/migrations.lua`, one transaction per version, replay-safe |
 | Environment-specific settings | **exists** — `Open77.tunables.declare`, `apply = "live"`, edited in Warden. No second config file is needed |
 | Deployment targeting | **added 2026-09-23** — `deploy-staging.ps1 -Target online|dev`, with a banner naming the world |
+| Version control | **added 2026-09-24** — private repo `github.com/evengineer1ng/ncm-online`; the promotion unit is now a named revision rather than "whatever is on the disk" (L121) |
+| Platform upgrades on Windows | **added 2026-09-24** — `tools/o77-upgrade.ps1`, the counterpart of `upgrade-open77.sh`: verifies the package against its own manifest, preserves operator state, runs the KB-51 load-list guard **before** the swap, keeps a rollback tree |
+| Database version pinning | **added 2026-09-24** — `tools/db-pin-1011.ps1` pins the dev engine to production's exact version |
 
 The two-environment model is roughly 80% built already. What was missing was identity, not machinery.
 
@@ -121,7 +126,9 @@ the other.
 | Path separators | Lua `require`/`dofile` paths in the repo use `/`; the manifest uses `/`. `ncm-build.ps1` normalises. Low risk. |
 | **Filesystem case sensitivity** | **The real one.** Windows is case-insensitive, Linux is not. A resource file referenced as `Server/Main.lua` would work on the dev box and fail on Lightsail. The `luac -p` gate walks actual files, so a *missing* file is caught, but a *case-mismatched reference* is only caught on Linux. |
 | Line endings | Already bitten us: a CR-insensitive diff was needed to compare local and deployed files. Cosmetic, but it makes verification harder. |
-| MariaDB | Same engine both sides. `ADD COLUMN IF NOT EXISTS` is a MariaDB extension and was verified against the live 10.11 before use. |
+| **MariaDB version** | **This row used to read "same engine both sides". It was false.** On 2026-09-24 the box had **13.0** (winget has no 10.11 build at all) against production's **10.11.14**. The danger is directional: a newer engine ACCEPTS syntax an older one rejects, so the dev box goes green and production still breaks -- false greens flow downhill into the canonical world. Now pinned to 10.11.14 from the official archive, checksum-verified (`tools/db-pin-1011.ps1`). `ADD COLUMN IF NOT EXISTS` remains verified against the live 10.11. **Re-check this row whenever either side is upgraded.** |
+| Schema charset | Every one of the 23 migrations declares `CHARSET`/`COLLATE` explicitly, so a 13.0 dump restored into 10.11 with no collation rewrite. MariaDB changed its default collation in 11.5; without that discipline the version gap would have been a silent divergence. |
+| **Resource load list** | **The one that has actually bitten (KB-51).** `resources.load` is an explicit allow-list, not a directory scan, so a platform upgrade that adds a resource and makes a loaded one depend on it aborts the WHOLE automatic start set -- while the server still listens and registers, looking healthy with NCM absent. Reproduced on the Windows box during the `.87` upgrade and stopped before the swap. `tools/staging/check-load-list.py` now takes a server root argument and runs on both sides; `tools/o77-upgrade.ps1` runs it against the candidate tree before swapping. |
 | Native/platform | The OPEN//77 server is the same product on both; `o77-server.ps1` already runs it on Windows. |
 
 **Cross-VM references (not a parity risk, but the same family):** `ncm_world` and `ncm_league` are separate

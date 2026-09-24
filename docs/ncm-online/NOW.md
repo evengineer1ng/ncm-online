@@ -3,11 +3,54 @@
 **Rewritten at the end of every working session.** Read this first, then BACKLOG.md, KNOWN_BUGS.md,
 DECISION_RECORD.md and the referenced QA rows.
 
-Last rewritten: **2026-09-23 — KB-87 incident detection pass built locally, not deployed.** Earlier the same
-day: vehicle identity/provenance/odometer, dynamic supply, Base Market supply, and race navigation shipped.
+Last rewritten: **2026-09-24 — version control, and NCM Development is standing (L121).** Earlier: the
+engineering/wear proposals accepted with one reconciliation (L120); before that KB-87 incident detection, built
+locally and still not deployed.
 
-> **Claim before writing:** decisions through **L119**; MASTER_TEST through **2.18** / **§AG**; next QA
-> letter **§AH**. BACKLOG next free **IDEA-241**; known issues through **KB-87**.
+> **Claim before writing:** decisions through **L121**; MASTER_TEST through **2.18** / **§AG**; next QA
+> letter **§AH**. BACKLOG next free **IDEA-295**; known issues through **KB-93**.
+> *(This block was stale until 2026-09-24 — it still claimed L119 / IDEA-241 / KB-87 while 172 BACKLOG rows,
+> L120 and KB-91 already existed. It is the only guard against reusing an ID, so correct it every session.)*
+> Historical §Z collision remains: qualify it by section (2.14 Machine Index vs 2.16 Help).
+> `KB-87` is used **twice** (incident detection, and the odometer forensic) — an existing collision, not a typo.
+> L106 is the Market/access meaning (acquisition vs access); the probe-evidence corollary is **L109**.
+> Do not reuse IDs or rewrite another session's authored history.
+
+## The work now has a repository, and a workshop to happen in
+
+**`github.com/evengineer1ng/ncm-online` — private, 644 files, ~11 MB.** Everything we wrote; ~1.9 GB of
+runtimes, snapshots and third-party assets excluded with a stated reason per rule. Verified private. No secret
+was ever in the tracked set (DPAPI, outside the workspace) — which is the only reason this was a same-day job.
+**One gap, recorded not hidden: the RB15 livery artwork (353 MB) is still backed up nowhere (`IDEA-293`).**
+
+**NCM Development is running on the Windows box.** `.87` (704 files verified), production's exact 39-entry load
+list, `serverId = ncm-devbox`, `environment = development`, database migrated 005 → 023 cleanly.
+
+**NCM Online was not touched.** Still `ncm-dev`, unrenamed, `deploy-staging.ps1` still defaults to
+`-Target online`. Those are L112 cutover steps 3-6 and remain the owner's call.
+
+### The box found three things before it finished booting
+
+All three are **invisible in production**, which is always already migrated and long-running:
+
+- **KB-51 reproduced and stopped.** `.87` makes `freeroam` depend on `open77_cyberware_lab`, which the local
+  load list lacked — the fault that aborted the whole start set and took NCM offline for an hour. The guard
+  caught it on the candidate tree *before* the swap. `check-load-list.py` now runs on both sides.
+- **KB-93** — `022_supply_dynamics.lua` was listed twice in the manifest. Fixed.
+- **KB-92** — a `SQL 1146` that only fires when the schema is behind the code, i.e. on every fresh install.
+
+**Standing rule (L121): Lightsail changes are instrumented on Windows first.**
+
+### Next, in order
+
+1. **`IDEA-292` needs one word from the owner** — the dev database still holds 57 `event` rows keyed `ncm-dev`,
+   the live world's identity. Relabel or delete? Not touched without instruction.
+2. **The owed live QA is now the blocker it was always going to be.** §AD1–AD7, §AE8–AE13, §AF4–AF6, §AG5–AG8
+   are all NOT RUN, and `IDEA-287` already promoted §AG5/§AG6 to a **prerequisite** for wear carrying any
+   economic weight. The dev box can now run the console-driven and destructive half of these without touching
+   the world — which is exactly what it is for.
+3. **KB-86 live re-check** on Online: Guide loads, correct date, PAST RESULTS shows the two finished runs.
+4. Then the parts work (`18`/`19`/`20`, proposals `21`/`22`, L120), which is why the workshop was wanted.
 > Historical §Z collision remains: qualify it by section (2.14 Machine Index vs 2.16 Help).
 > L106 is the Market/access meaning (acquisition vs access); the probe-evidence corollary is **L109**.
 > Do not reuse IDs or rewrite another session's authored history.
