@@ -159,7 +159,7 @@ RED4EXT_C_EXPORT uint32_t RED4EXT_CALL Supports()
 // address that used to mean something. The alternative -- a hardcoded offset on an unexpected build -- is
 // how a mod corrupts memory instead of failing.
 
-RED4EXT_C_EXPORT bool RED4EXT_CALL Main(RED4ext::PluginHandle handle, RED4ext::v1::EMainReason reason,
+RED4EXT_C_EXPORT bool RED4EXT_CALL Main(RED4ext::v1::PluginHandle handle, RED4ext::v1::EMainReason reason,
                                         const RED4ext::v1::Sdk* sdk)
 {
     switch (reason) {

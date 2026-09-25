@@ -73,8 +73,10 @@ if (-not (Test-Path (Join-Path $carrier "third_party\RED4ext.SDK\CMakeLists.txt"
 }
 
 if (-not $SkipBuild) {
-    if (-not $env:VCPKG_ROOT) {
-        throw "VCPKG_ROOT is not set. The build needs vcpkg for SDL2 and nlohmann-json."
+    if (-not (Test-Path (Join-Path $carrier "third_party\SDL2\include\SDL.h"))) {
+        Write-Host "== fetching dependencies" -ForegroundColor Cyan
+        & (Join-Path $carrier "fetch-deps.ps1")
+        if ($LASTEXITCODE -ne 0 -and $LASTEXITCODE -ne $null) { throw "dependency fetch failed" }
     }
     Write-Host "== configuring" -ForegroundColor Cyan
     & cmake --preset release -S $carrier
@@ -113,10 +115,10 @@ $licences = Join-Path $pluginDir "THIRD_PARTY_LICENSES.md"
 | Component | Licence | Redistributable |
 |---|---|---|
 | RED4ext.SDK (WopsS) | MIT | Yes |
-| SDL2 | zlib | Yes |
-| nlohmann/json | MIT | Yes (header-only, compiled in) |
+| SDL2 2.32.10 | zlib | Yes |
+| nlohmann/json 3.11.3 | MIT | Yes (header-only, compiled in) |
 
-Full texts: ncm/carrier/third_party/RED4ext.SDK/LICENSE.md and the vcpkg port directories.
+Full texts: ncm/carrier/third_party/RED4ext.SDK/LICENSE.md and third_party/SDL2/COPYING.txt.
 "@ | Set-Content -Encoding utf8 $licences
 
 $zip = Join-Path $dist "ncm-carrier-$version.zip"

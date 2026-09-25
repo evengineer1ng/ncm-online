@@ -177,6 +177,18 @@ def enable_block(text):
     return text
 
 
+def set_note(text, note):
+    """The note is what a player READS in the consent dialog. Leaving a stale one there is not cosmetic:
+    it describes content that is not being offered, next to a request to accept executable code."""
+    escaped = note.replace("\\", "\\\\").replace('"', '\\"')
+    updated, n = re.subn(r'("requiredMods"\s*:\s*\{[^}]*?"note"\s*:\s*)"[^"]*"',
+                         lambda m: m.group(1) + '"' + escaped + '"', text, count=1)
+    if n == 0:
+        print("WARNING: no requiredMods note field to update")
+        return text
+    return updated
+
+
 def backup_and_write(conf, text):
     stamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     shutil.copy2(conf, "%s.bak-%s" % (conf, stamp))
@@ -196,6 +208,8 @@ def main():
     parser.add_argument("--version", help="defaults to the version in the zip's file name")
     parser.add_argument("--enable", action="store_true",
                         help="also set requiredMods enabled=true and unsecured=true")
+    parser.add_argument("--note", metavar="TEXT",
+                        help="the requiredMods note -- players read this at the consent gate")
     parser.add_argument("--drop", action="append", default=[], metavar="ID",
                         help="also remove this package id from the declaration; repeatable")
     parser.add_argument("--remove", action="store_true")
@@ -264,6 +278,10 @@ def main():
         if pruned:
             print("  pruned older carrier blob(s): %s" % ", ".join(pruned))
 
+        # **No `capability` here.** It belongs in the store metadata and ONLY there:
+        # `RequiredModConfiguration` has no such member and the server refuses to start with it present --
+        # "The JSON property 'capability' could not be mapped to any .NET member". Learned the hard way on
+        # 2026-09-25; `configure-required-mods-https.py` already filtered it out and this script did not.
         entry = {
             "id": PACKAGE_ID,
             "source": "hosted",
@@ -271,7 +289,6 @@ def main():
             "version": version,
             "sha256": info["sha256"],
             "sizeBytes": info["sizeBytes"],
-            "capability": CAPABILITY,
         }
         new_objs = kept + [json.dumps(entry, indent=2)]
 
@@ -281,6 +298,8 @@ def main():
 
     if args.enable and not args.remove:
         updated = enable_block(updated)
+    if args.note:
+        updated = set_note(updated, args.note)
 
     stamp = backup_and_write(conf, updated)
     print("\nbackup: server.jsonc.bak-%s" % stamp)

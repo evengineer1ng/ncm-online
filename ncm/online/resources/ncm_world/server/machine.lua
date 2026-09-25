@@ -22,6 +22,10 @@ local Weather = NcmCore.get("world.weather")
 
 local function log(fmt, ...) print(("[ncm_world/machine] " .. fmt):format(...)) end
 
+-- The server Lua sandbox has no `os` -- `os.time()` is a nil index, which is how the first live run of this
+-- file died. Every other NCM server module already goes through the platform clock; this one now does too.
+local function now() return math.floor(Open77.time.unix()) end
+
 NcmMachine = NcmMachine or {}
 
 -- The live world state the projection composes from. Weather is the only one that moves today; the others
@@ -64,7 +68,7 @@ function NcmMachine.recompute(why)
             record = record,
             weather = { wetness = state.wetness },
             ruleset = { ceiling = type(ceiling) == "table" and ceiling or nil },
-        }, { at = os.time() })
+        }, { at = now() })
 
         if not envelope then
             -- Named, never silent. A refusal here means the fleet or the ruleset is malformed, and a car
@@ -84,7 +88,7 @@ function NcmMachine.recompute(why)
     -- forever. The same lesson `client/main.lua` learned about ceilings that stop being published.
     for record in pairs(published) do
         if out[record] == nil then
-            out[record] = Projection.clear(record, { at = os.time() })
+            out[record] = Projection.clear(record, { at = now() })
             published[record] = nil
             cleared = cleared + 1
         end

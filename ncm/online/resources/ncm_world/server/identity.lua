@@ -60,6 +60,51 @@ local function schemaReady()
     return false
 end
 
+-- Ownership identifiers, added by OPEN//77 op77.102 to prove a player owns a genuine Cyberpunk licence.
+--
+-- **The binding key is deliberately NOT changed.** `ncm_driver_binding.user_id` has been
+-- `GetPlayerIdentifier()` since M2.1, and every driver, profile, SR row and machine in the database hangs
+-- off it. If `license` turns out to be a different string, switching to it would orphan every existing
+-- driver in one deploy -- silently, because a missing binding just mints a new one and the player finds an
+-- empty garage.
+--
+-- So this observes and reports rather than migrating. It logs, once per player, whether the new `license`
+-- identifier matches the key NCM already uses. That answers the question from ordinary play, with no
+-- probe session and nothing asked of anyone. **Migrate only on the evidence** -- and if they do differ, the
+-- migration is a backfill of a second column, never an in-place key change.
+local reportedIdentifiers = {}
+
+local function observeIdentifiers(id, userId)
+    if reportedIdentifiers[userId] then return end
+    reportedIdentifiers[userId] = true
+
+    local ok, ids = pcall(function()
+        if Open77 and Open77.players and Open77.players.identifiers then
+            return Open77.players.identifiers(id)
+        end
+        return nil
+    end)
+    if not ok or type(ids) ~= "table" then
+        -- Absent is not a negative: an older server simply does not have this yet (`IDEA-361`).
+        log("identifiers: API not available on this build; binding key unchanged")
+        return
+    end
+
+    local license = ids.license
+    -- Steam and GOG are recorded as PRESENT or ABSENT only. They are account identifiers for a third-party
+    -- store and NCM has no use for their values, so it does not write them down.
+    log("identifiers: license=%s steam=%s gog=%s | matches binding key: %s",
+        tostring(license) ~= "nil" and "present" or "absent",
+        ids.steam and "present" or "absent",
+        ids.gog and "present" or "absent",
+        tostring(license == userId))
+
+    if license ~= nil and license ~= userId then
+        log("IDENTITY DIVERGENCE: license differs from the binding key. Do NOT switch the key without a " ..
+            "backfill migration -- every existing driver would orphan. See BACKLOG IDEA-479.")
+    end
+end
+
 --- Load or create the driver for a connected player. Runs inside a thread. Returns profile or nil, reason.
 function NcmIdentity.resolve(playerId)
     local id = tonumber(playerId) or 0
@@ -67,6 +112,7 @@ function NcmIdentity.resolve(playerId)
     local name = GetPlayerName(id)
     if type(userId) ~= "string" or userId == "" then return nil, "no_user_id" end
     if type(name) ~= "string" or name == "" then name = "driver-" .. tostring(id) end
+    pcall(observeIdentifiers, id, userId)
     local sid = serverId()
 
     if not MySQL.isReady() then return nil, "database_not_ready" end
