@@ -9,40 +9,34 @@ Last rewritten: **2026-09-25 - the carrier is built, hosted and live on Developm
 > BACKLOG next free **IDEA-479**; known issues through **KB-121** plus the pre-existing duplicates **KB-87**
 > and **L119**. Read the last row of each ledger, not this line (`KB-114`).
 
-## Next action: join Development.
+## Next action: an owner decision on how Development is joined.
 
-**Everything is in place.** The carrier is imported, declared and served; both causes of the two dead joins
-are fixed.
+**The input bug is fixed and it was never the carrier** (`KB-127`). A wedged `NCM-Wheel-Support.exe` had been
+running 16.3 hours with its bridge dead, still holding a ViGEm virtual Xbox 360 pad and feeding the game
+stale centred axes -- which is what a bipolar axis at rest becomes when mapped to 0..1, i.e. throttle, brake
+and steering all pinned near 50% while the car fights itself. Stopped; virtual pad count dropped 2 to 1 on
+the spot. Autostart renamed `NCM Wheel Support.lnk.disabled` -- rename back to restore.
 
-Development: manifest digest `1e4f80c0...`, `enabled: true`, one package **`ncm-carrier-0-1-0` v1.0.0**,
-868,069 bytes, blob `7febfa6e...`, advertised over loopback. No script errors.
+**The carrier still has not been delivered, and the earlier URL diagnosis was wrong** (`KB-126`, `IDEA-485`).
+Development is `Visibility=Unlisted` and is joined by raw address, and a direct-IP join **never requests
+`/mods/v1/manifest`** -- the server log shows no such request during the join at all. Fixing `publicBaseUrl`
+was correct on its own merits and changed nothing. Three ways forward, and the first is the owner's call
+because it publishes a development box:
 
-Expect on the join: a consent prompt naming **NCM Carrier** as executable content, `modstack: ... N added`
-in `%LOCALAPPDATA%/Open77/launcher.log`, `ncm_carrier` in `<game>/red4ext/logs/`, and a
-`red4ext/plugins/ncm_carrier/ncm_carrier.log` naming its version, whether the bridge is listening and what
-device it found. **A declined hook is still a PASS** -- effects and force feedback do not depend on it.
+1. Set the world **Listed** so it resolves through the master with its mods digest.
+2. Find whether the launcher takes a world id or invite for an unlisted world.
+3. Test delivery on **Production**, where listing already works and §AP already proved the path.
 
-That is **AT1**. If the game does not launch: `publish-carrier.py tools/open77/server --remove`, restart,
-rejoin -- and read `ncm_carrier.log`.
+**Do not spend more joins guessing.** The one distinguishing line is `OP77_WORLD_MODS_DIGEST` on the
+launcher command line: `-` means nothing was offered.
 
-**Why the first two joins delivered nothing** -- neither cause was the plugin, and nothing NCM wrote ran:
+**Ownership identifiers: answered** (`IDEA-484`). `license` is **not** the same string as NCM's binding key --
+the divergence warning fired on the first ordinary join, exactly as designed. Had NCM switched keys on the
+strength of the announcement, every existing driver would have orphaned into an empty garage. Steam and GOG
+were both absent, so ownership evidence is licence-only for this account.
 
-- **`KB-125`**: the server advertised its blob URL as `http://10.0.0.70:11779/`, private-LAN plain HTTP,
-  which launchers `.89`/`.100` null out before download, cache or hash. That is **`KB-112`**, which named
-  Development as the remaining offender and was never acted on. Result: `OP77_WORLD_MODS_DIGEST=-`,
-  `0 added`, no consent prompt, **no error anywhere**. Now loopback; `set-download-url.py` refuses a
-  non-loopback HTTP value rather than letting it be set again.
-- **`KB-124`**: a hand-written store entry vanished on restart. **Cause never established** -- the claim
-  that only Warden may fill the store was wrong, since Production's loaders went in without it. The likely
-  companion fault is `IDEA-483`: Warden derives its own id (`ncm-carrier-0-1-0`, not `ncm-carrier`), so a
-  declaration that restates an assumed id can never resolve. `publish-carrier.py` now reads the store and
-  declares exactly what it finds.
-
-**What the dead joins showed about inputs** (`IDEA-482`): the launcher **removed 44 files and added none**
--- ArchiveXL's and TweakXL's DLLs -- and RED4ext loaded exactly **one** plugin, Open77. The player was in the
-world with their RED4ext stack absent; that is what changed the feel. A join that delivers nothing is
-indistinguishable from one that delivers everything, and the cheapest fix is to compare what the launcher
-projected against what the server declared and show it in the panel.
+**Double spawn** (`IDEA-486`): `open77_appearance` restored the same player three times on one join. Platform
+code, observed not diagnosed, recorded so the next person starts from the log.
 
 ## Ownership identifiers -- observing, not migrating
 
