@@ -103,7 +103,7 @@ unbuilt) while the brick methodology itself is HISTORICAL (a closed experiment).
 - [28_MACHINE_KNOWLEDGE.md](28_MACHINE_KNOWLEDGE.md) - machine knowledge, discovery, documentation, observation and estimation envelopes
 - [bricks/assignments/B-089-race-tags.v1.md](bricks/assignments/B-089-race-tags.v1.md) - Race Tags - owner wants it integrated eventually; NOT yet integrated (IDEA-301)
 
-## Proposal - no authority until ruled (7)
+## Proposal - no authority until ruled (14)
 
 - [21_ENGINEERING_PROPOSAL.md](21_ENGINEERING_PROPOSAL.md) - engineering architecture - ACCEPTED; decisions live in L120
 - [22_WEAR_PROPOSAL.md](22_WEAR_PROPOSAL.md) - wear architecture - ACCEPTED; decisions live in L120
@@ -113,6 +113,12 @@ unbuilt) while the brick methodology itself is HISTORICAL (a closed experiment).
 - [29_STATE_BAG_AUDIENCE_AUDIT.md](29_STATE_BAG_AUDIENCE_AUDIT.md) - replication audience of NCM player state-bag mirrors - audited, corrections not applied
 - [30_MACHINE_KNOWLEDGE_DEEP_DIVE.md](30_MACHINE_KNOWLEDGE_DEEP_DIVE.md) - what the knowledge substrate already records, and the minimal additive change it needs
 - [31_CAPABILITY_AUDIT.md](31_CAPABILITY_AUDIT.md) - what the platform exposes or lets NCM derive about a machine, classified (`IDEA-339`)
+- [32_PARTS_ENGINEERING_REENTRY_AUDIT.md](32_PARTS_ENGINEERING_REENTRY_AUDIT.md) - existing-system audit plus lineage, reconstruction-knowledge and fabrication-ceremony feasibility; owner rulings now live in L134 / Report 33
+- [33_PARTS_ENGINEERING_FINAL_RECONCILIATION.md](33_PARTS_ENGINEERING_FINAL_RECONCILIATION.md) - owner-ruling reconciliation, focused Gate 5 audit and Chrome/setPerformance Gate 6 proof plan
+- [34_GATE6_INPUT_AUTHORITY_REQUIRED_MOD_AUDIT.md](34_GATE6_INPUT_AUTHORITY_REQUIRED_MOD_AUDIT.md) - companion input authority, OPEN//77 control limits, required-world-mod delivery and additional Gate 6 carrier proofs
+- [35_REQUIREDMODS_FORENSIC_AUDIT.md](35_REQUIREDMODS_FORENSIC_AUDIT.md) - real RB15/livery package audit, exact public-HTTP `Unverifiable` cause, HTTPS correction and acceptance contract
+- [36_DRIVEABILITY_MOD_CARRIER_ASSESSMENT.md](36_DRIVEABILITY_MOD_CARRIER_ASSESSMENT.md) - whether a hosted mod can widen vehicle control past the three exposed performance fields and carry FFB natively; three engine surfaces, spawn-caching, multiplayer integrity, licensing (`IDEA-453`) - **revision 2** adds the research pass that answered §AR without an experiment
+- [37_REPOSITORY_RECONCILIATION_SCHEDULE.md](37_REPOSITORY_RECONCILIATION_SCHEDULE.md) - **the single ordered execution schedule** for both repositories and both servers, including where the RB15 withdrawal safely lands - WRITTEN, NOT EXECUTED (`IDEA-459`)
 
 ## Ledgers - living records (6)
 
