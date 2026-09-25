@@ -427,6 +427,25 @@ proof window adds a variable to a session that already has enough. Commit and pu
 
 ## 9. The ordered schedule
 
+> **EXECUTION RECEIPT - 2026-09-25. Steps 0-5 are DONE.** Gate green before committing. Inventory verified
+> before and after: an aggregate SHA-256 over all 173 `.lua`/`.html` files under `ncm/online/resources` is
+> `a3007a11…` on both the committed tree and `/opt/ncm/resources/ncm`, so **production is now reproducible
+> from a commit and that commit is on the remote.** Working tree clean; no server was changed.
+>
+> `cyberpunk2077`: `8dc321b` spawn fix (alone, pushed first) → `8d9da32` FFB panel and ladder →
+> `b80fd82` HTTPS deployment inputs → `7e2c1c6` load-list guard → `aa47fd1` reports 32-37 with INDEX →
+> `a6f43b9` ledgers. `ncm-wheel`: `59eb5aa` effect lifecycle test and its CI step (alone, first) →
+> `52dd7de` the KB-103/104/106 fixes. **No release cut.**
+>
+> Two deviations, stated rather than buried. **(1)** §3.5's recommended per-workstream hunk staging of the
+> ledgers was not used: `git add -p` is interactive and unavailable in this environment, and the six ledgers
+> interleave rows from several workstreams and sessions. One `docs:` ledger commit, as §3.5's acceptable
+> option. **(2)** The reports were committed **with** INDEX rather than separately, because the docs-authority
+> gate requires every document to be listed and every link to resolve; splitting them would have left
+> intermediate commits red.
+>
+> **Step 7 was collapsed by L142** — see below and `IDEA-460`. Steps 6, 8a and 8b remain the owner's.
+
 | # | Step | Blocks on | Touches a server? |
 |---|---|---|---|
 | 0 | Three-way inventory (§2.2), both repositories. Record it in §2 of this document. | — | read-only ssh + masked config read |
@@ -436,7 +455,7 @@ proof window adds a variable to a session that already has enough. Commit and pu
 | 4 | Documentation and ledger commits, per §3.5. Push. | 3 | no |
 | 5 | `ncm-wheel`: commit `test_resume.py` + `release.yml`, then the fixes. Push. No release. (§8.1) | — (independent) | no |
 | 6 | **OWNER GATE G1 — finish §AP4** (reconnect without redownload, then Solo, then byte-exact restoration of the ten named manual files), with **§AQ2/§AQ4** taken on the same session and G3 opportunistically. **Or** explicitly write off that evidence. | 2 | owner's client only |
-| 7 | Development correction: instrument, fix URL, decide the package set — **without reintroducing RB15**. (§7) | 4, 5 | Development only |
+| 7 | Development correction — **collapsed by `L142`.** Its only two declared packages are RB15 and the liveries, both withdrawn, so there is nothing left to declare and the KB-112 URL fix is moot until NCM has content of its own. Now one action: run the repaired `check-load-list.py`, then park `requiredMods` with the existing `tools/staging/set-mods-off.py`. **Awaiting the owner's go.** | 4, 5 — **unblocked** | Development only |
 | 8a | **RB15 withdrawal (§AS, L142):** capture the pre-state, remove both packages from Online's declaration through a targeted script, restart, confirm the new digest and master row, stop serving the blobs, verify local preservation. | **6** | **Online** |
 | 8b | Re-run the §2.2 inventory. Then, and only then, the first post-Case-A Online *code* deploy — if there is a reason for one. Combine with 8a if both are due, since the deploy is whole-tree anyway (`KB-116`). | 6, 7, 8a | **Online** |
 | 9 | Re-run the inventory immediately after any deploy; confirm Online matches the tree byte for byte. | 8b | read-only ssh |

@@ -3,7 +3,7 @@
 > **STATUS: LEDGER** - living session memory, rewritten at the end of every working session.
 > Authority map: [INDEX.md](INDEX.md) - classified 2026-09-24 (L125).
 
-Last rewritten: **2026-09-25 - RequiredMods delivery proven to session entry; RB15 withdrawn by ruling; §AR answered by research, not experiment.**
+Last rewritten: **2026-09-25 - reconciliation steps 0-5 executed and pushed; KB-115 closed; owner's §AP4 is the only thing in the way.**
 
 > **Claim before writing:** decisions through **L143**; MASTER_TEST through **2.19 / §AS**; next QA letter
 > **§AT**. BACKLOG next free **IDEA-469**; known issues through **KB-119** plus the pre-existing duplicates
@@ -12,29 +12,30 @@ Last rewritten: **2026-09-25 - RequiredMods delivery proven to session entry; RB
 > *`KB-114` records why this line went stale before: the documentation gate asserts ID discipline for
 > BACKLOG only. Read the last row of each ledger, not this line.*
 
-## Next action: commit the spawn fix, then finish §AP4
+## Next action: owner finishes §AP4 (or writes it off)
 
-Two things, in this order. The first needs nobody but the repository; the second is the owner's.
+**The repository work is done.** Steps 0-5 of
+[37_REPOSITORY_RECONCILIATION_SCHEDULE.md](37_REPOSITORY_RECONCILIATION_SCHEDULE.md) executed 2026-09-25:
+six commits in `cyberpunk2077`, two in `ncm-wheel`, both pushed, working tree clean, no release cut, no server
+changed. `KB-115` is **closed** - an aggregate SHA-256 over all 173 resource files is `a3007a11…` on both the
+committed tree and `/opt/ncm/resources/ncm`, so **production is reproducible from a commit and that commit is
+on the remote.** The spawn fix went first and alone as `8dc321b`.
 
-**1. Commit and push the location/spawn fix, alone, first.** `KB-115` is unchanged and is still the largest
-exposure in the project: **Online is byte-identical to the uncommitted working tree and matches no commit**,
-while `HEAD`'s `location.lua` is the KB-113-broken version. Development *is* that tree through a junction, so
-an ordinary `git checkout --`, `stash`, `reset` or fresh clone would change Development live and stage a silent
-production regression. One commit, pushed, removes the whole class of failure. It is step 2 of
-[37_REPOSITORY_RECONCILIATION_SCHEDULE.md](37_REPOSITORY_RECONCILIATION_SCHEDULE.md), which is **written and
-awaiting approval to execute**.
+What is left is the owner's, and it is time-sensitive:
 
-The fix is now known to work: at 15:38 UTC, two minutes after deploy, the log shows
-`location: not saving ... ncm-ready=NO in-world=NO platform-stage=none` and
-`location: NOT restoring driver=72519ab3 (below_world) -- default spawn`, with `ready:` at a real position.
-That code exists in no commit.
+**§AP4 — reconnect without redownload, then switch to Solo, then prove byte-exact restoration of the ten named
+manual RB15/livery files.** That evidence exists only while the current packages and projection are in place,
+which is why the RB15 withdrawal is ruled but parked. Either capture it, or say explicitly that it is written
+off — both are fine, but the choice has to be made before anything touches Online.
 
-**2. Finish §AP4, or write the evidence off.** The owner's join discharged most of G1 (below). What is left is
-reconnect-without-redownload, then Solo, then byte-exact restoration of the ten named manual RB15/livery files.
-**That evidence only exists while the current packages and projection are in place** — which is why the RB15
-withdrawal, though ruled, cannot execute yet. Take **§AQ2** (*"did I spawn in once?"*) and **§AQ4** (log out
-somewhere distinctive, log back in — L110 has still never been observed working) on the same session, and open
-WHEEL/PEDALS with the companion stopped for **§AQ3/G3** while you are there.
+Take **§AQ2** (*"did I spawn in once?"*) and **§AQ4** (log out somewhere distinctive, log back in — L110 has
+still never been observed working) on the same session, and open WHEEL/PEDALS **with the companion stopped**
+for §AQ3/G3 while you are there. Four gates, one join.
+
+**One decision waiting, not urgent:** `L142` collapsed the Development correction. Development's only two
+declared packages are RB15 and the liveries, so there is nothing left to declare and the KB-112 URL fix is
+moot until NCM has content of its own. The coherent action is to run the repaired `check-load-list.py` and
+then park `requiredMods` with the existing `set-mods-off.py`. **Not done — awaiting a go** (`IDEA-460`).
 
 Do not implement Parts/Engineering, component rows, migration, physical effects or a control extension.
 
@@ -121,16 +122,19 @@ Applying that order answered it the same day:
 
 ## Repository and server state
 
-- Both repositories **fully uncommitted**, both level with their remotes. `cyberpunk2077` @ `main`: four
-  workstreams plus documentation. `ncm-wheel` @ `main`: `ncm-wheel.py`, `release.yml`, `test_resume.py`
-  untracked.
+- **Both repositories are committed, pushed and clean.** `cyberpunk2077` @ `main` = `a6f43b9`:
+  `8dc321b` spawn fix (alone, first), `8d9da32` FFB panel/ladder, `b80fd82` HTTPS deployment inputs,
+  `7e2c1c6` load-list guard, `aa47fd1` reports 32-37 with INDEX, `a6f43b9` ledgers.
+  `ncm-wheel` @ `main` = `52dd7de`: `59eb5aa` the effect lifecycle test and its CI step, then the
+  KB-103/104/106 fixes. **No release cut** — not while an owner proof window is open.
 - **`ncm-wheel` is canonical and drives hardware; `tools/ncm-wheel.py` is a reference harness** that says of
   itself *"This drives no hardware."* and lacks the `KB-103`/`KB-104`/`KB-106` fixes. **Do not sync them**
   (`KB-117`). Their shared contract is `ncm/core/driver/feedback.lua`, and the Lua is authoritative. **No new
   companion release** merely because a native replacement is being investigated.
 - **No deploy can be scoped to one workstream** (`KB-116`): whole-tree `rm -rf`/`mv`.
-- **Development is behind Online on three axes** (`IDEA-460`): `http://10.0.0.70:11779/` (KB-112-broken), two
-  packages with **neither loader**, `unsecured=false`. Its correction must not reintroduce RB15.
+- **Development's correction collapsed** (`IDEA-460`): it declares only RB15 and the liveries, both withdrawn
+  by `L142`, so the KB-112-broken `http://10.0.0.70:11779/` no longer matters until NCM has content of its own.
+  Park `requiredMods` there rather than fixing a URL for packages that are leaving.
 - Caddy 2.11.4 owns public `11779` at `https://52-60-225-137.sslip.io:11779/`; OPEN//77's resource origin is
   loopback-only at `127.0.0.1:11782`; Warden loopback-only at `127.0.0.1:11780`. Certificate expires
   2026-12-24, renews automatically. `IDEA-452` tracks replacing the interim `sslip.io` name.
@@ -173,5 +177,10 @@ Applying that order answered it the same day:
 - **KB-118** the RequiredMods pipeline has no redistribution-permission gate; **KB-119** two documents state a
   platform limit in engine-limit language. **KB-113** updated to server-side LIVE PASS.
 - Reports **36** and **37** are both at **revision 2**; 37 remains the **single** execution schedule.
-- **Nothing was implemented, committed, pushed, deployed, restarted or configured this session.** Server access
-  was read-only: `sha256sum` of four resource files, a masked configuration read, and log greps.
+- **Committed and pushed this session; nothing deployed, restarted or configured.** Eight commits across two
+  repositories, both remotes updated, both trees clean. Server access was read-only throughout: aggregate
+  `sha256sum` over the deployed resource tree (twice, before and after), a masked configuration read, and log
+  greps. **Online was not touched.**
+- Two deviations from Report 37 §3.5, stated rather than buried: the ledgers went in one `docs:` commit because
+  `git add -p` is interactive and unavailable here, and the reports were committed **with** INDEX because the
+  docs gate requires every document to be listed and every link to resolve.
