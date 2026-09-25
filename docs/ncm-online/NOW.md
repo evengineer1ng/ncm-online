@@ -3,65 +3,55 @@
 > **STATUS: LEDGER** — living session memory, rewritten at the end of every working session.
 > Authority map: [INDEX.md](INDEX.md) — classified 2026-09-24 (L125).
 
-Last rewritten: **2026-09-24 — Driver Card distance hotfix promoted through Development to Online.**
-Commit `80ad0aa` is on `origin/main` and the same resource revision is running in the persistent world.
+Last rewritten: **2026-09-24 — Market nullable-binding hotfix promoted through Development to Online.**
+Commit `0406562` is on `origin/main`, and its resource file is running in the persistent world.
 
-> **Claim before writing:** decisions through **L130**; MASTER_TEST through **2.18 / §AK**; next QA letter
-> **§AL**. BACKLOG next free **IDEA-414**; known issues through **KB-98** plus the existing duplicate KB-87.
+> **Claim before writing:** decisions through **L130**; MASTER_TEST through **2.18 / §AL**; next QA letter
+> **§AM**. BACKLOG next free **IDEA-415**; known issues through **KB-99** plus the existing duplicate KB-87.
 > Historical §Z collision remains: qualify by section (2.14 Machine Index vs 2.16 Help).
 
-## Next action: visually re-test §AK6 with a WebUI-capable observing client
+## Next action: visually confirm the recovered Market
 
-Reconnect after the Online restart, face another streamed player, and walk from roughly 5 m toward the ordinary
-35 m plate limit. The card should remain full size nearby, shrink smoothly with distance, stay anchored above
-the player, and never grow relative to the body. This must be observed from a client whose WebUI host imported
-surfaces; the second local process used tonight cannot prove it because KB-4 fired before the card page ran.
+The first post-fix request already passed the server path: `base_market / universal / NULL / open` was written,
+the panel reported healthy in 13 ms and no old failure recurred. Confirm that the page visibly showed all three
+authored offerings and the current balance, then open it once more. Re-query the row to prove the second open did
+not duplicate it or rewrite `first_known_at`; record those last observations in MASTER_TEST §AL.
 
-## Driver Card hotfix
+## Market recovery
 
-The first two-client observation found one genuine NCM defect: the rich card stayed 288×84 screen pixels at
-every world distance, so it looked progressively larger relative to the remote body. The correction uses the
-platform's existing per-frame distance: full size through 5 m, a monotonic taper, and a readable 0.58 floor at
-the ordinary 35 m plate limit. It changes no stream range, visibility, bucket audience or through-wall policy.
+The first live Market open after IDEA-251 failed in `NcmMarketKnowledge.ensureUniversal`, before any payload
+reached WebUI. A universal market legitimately has no `source_ref`, but the adapter put Lua `nil` at position 6
+of a seven-value SQL array. OPEN//77 rejected the shortened/holed parameter sequence as `invalid_parameters`.
+Inventory, balance and the Market renderer were not the cause.
 
-Focused checks now include five distance-scale assertions and pass **26/26**. The complete repository gate is
-green under Lua 5.4 and LuaJIT: **285 core tests per interpreter**, 41 cross-scope checks, 17 QA checks,
-35 vehicle-access checks, **165 resource Lua files**, five WebUI scripts, **96 panel assertions**, 26 Driver
-Card assertions and documentation authority.
+The fix uses the repository's established nullable-value contract: send a dense empty-string sentinel and let
+`NULLIF(?, '')` restore database `NULL`. `tools/test-market-knowledge.lua` executes the real host adapter and
+asserts seven non-nil positional parameters, the sentinel position and SQL conversion under Lua 5.4 and LuaJIT.
+The full gate is green: **285 core tests per interpreter**, 41 cross-scope checks, the new 6-assertion Market
+adapter check, 17 QA checks, 35 vehicle-access checks, **165 resource Lua files**, five WebUI scripts, 96 panel
+assertions, 26 Driver Card assertions and documentation authority.
 
-Development restarted at **21:18 EDT** with resource digest `9336284e…`, schema 30 / `pending=[]`, HTTP health
-200, zero stderr bytes and no boot-error matches. This is deployment evidence, not the still-owed visual PASS.
+Development restarted at **21:29 EDT** with schema 30 / `pending=[]`, Market ready, HTTP 200 and empty stderr.
+Commit `0406562` was pushed before production promotion. Fresh Online rollback artifacts were taken at
+`20260925-013053`: a 230 KB database dump containing 63 tables and a 494 KB resource-tree archive. The named
+`deploy-staging.ps1 -Target online` pipeline restarted Online at **01:32 UTC**. Service is active, health is 200,
+schema remains 30, and the deployed fix hash `0453300b…` exactly matches local. There are no post-restart error
+matches. Canonical counts remain 13 drivers, 13 bindings, 19 assets, 29 results, 23 ledger rows, 14 evidence and
+14 discoveries; the sole server identity remains `ncm-dev`. At 01:34 UTC the first live Market request created
+the intended knowledge row with a real SQL `NULL`, logged a healthy 13 ms panel open and produced no error. The
+visual content confirmation and repeated-open idempotency check are the only §AL items still owed.
 
-Commit `80ad0aa` was pushed before production promotion. Fresh Online rollback artifacts were taken at
-`20260925-012200`: a 230 KB database dump containing 63 tables and a 493 KB resource-tree archive. The named
-`deploy-staging.ps1 -Target online` pipeline then published digest `e17702fa…` at 01:23 UTC. Service is active,
-health is 200, schema remains 30 with `pending=[]`, and the post-restart error count is zero.
+## Driver Card and rig work remain intact
 
-## The owner's banner was not missing state
+The Driver Card distance correction remains deployed. MASTER_TEST §AK6 still needs a WebUI-capable observing
+client to verify proportional scaling; the second local process cannot provide that proof while KB-4 leaves its
+WebUI host disconnected. The owner's `ncm_default` banner state was already present and published.
 
-Read-only Online evidence shows `baremetaleven` already has `ncm_default`, and the server published that public
-projection successfully. The first local game process activated the custom Driver Card. The second local game
-process did not: its OPEN//77 WebHost disconnected with `pipe_read_failed:109`, imported zero WebUI surfaces,
-and never emitted the custom-card ready/handoff line. It therefore cannot draw the banner, chat or notifications.
-That is the existing platform/hardware limitation KB-4, not a presentation-row defect; no identity data was
-altered and no native text fallback is being called a rich-card fix.
-
-## Current Online baseline to preserve
-
-The first owner-authorised promotion earlier tonight advanced migrations 024–030. The hotfix promotion changed
-no schema or canonical data: Online still has only `server_id = ncm-dev` and exactly 13 drivers, 13 bindings,
-19 assets, 29 results, 23 ledger rows, 14 evidence rows and 14 discoveries. `baremetaleven -> ncm_default`
-also remains intact. Both the original `20260924-235549` rollback pair and the fresh hotfix pair remain on-box.
-
-## Other current work to preserve
-
-The rig/FFB line through repository commit `3737a69` remains intact: generic wheel input, axis-level device
-detection, panel arming, safe bounded feedback and cleanup. Its live calibration work and owed checks remain in
-BACKLOG IDEA-395–412. This Driver Card pass does not modify that code or reinterpret those findings.
+The rig/FFB line through commit `3737a69` remains intact: generic wheel input, axis-level device detection,
+panel arming, bounded feedback and cleanup. Its live calibration and owed checks remain in BACKLOG IDEA-395–412.
 
 ## Live QA still owed
 
-MASTER_TEST §AK remains the Driver Card authority. §AK6 has an honest pre-hotfix Online FAIL beside KB-98 and
-needs a Development/Online visual re-test after promotion. The remainder of §AK is not silently passed. A
-WebUI-capable observing client (normally a separate machine, because of KB-4) is required to prove the owner's
-card, exactly-one-renderer handoff, scale/track/cleanup, join/leave, reload, native restoration and Unicode.
+- **§AL1–§AL2:** visual confirmation of three offerings and one repeated-open idempotency check. §AL3 passed.
+- **§AK:** two-client Driver Card renderer handoff, presentation lifecycle and corrected distance scaling.
+- **Rig/FFB:** the outstanding physical/in-game checks already named in BACKLOG and MASTER_TEST.

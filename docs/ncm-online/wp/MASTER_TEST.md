@@ -921,3 +921,26 @@ explicit Development-only alternate; the command changes no accomplishment or pe
 Invalid/missing asset fallback, public-schema privacy, three-badge bound, unavailable Fingerprint, text escaping,
 stream cleanup logic and native restoration ordering are already deterministic offline assertions. Do not mutate
 a live state bag merely to re-prove malformed input handling.
+
+---
+
+## §AL — Market nullable-binding recovery (2026-09-24, Development + Online) — **LIVE PANEL PASS OWED**
+
+The first Market open after the IDEA-251 promotion failed before any payload reached WebUI. Online evidence was
+`open77/runtime.lua:330: invalid_parameters`; the Market service and its three offerings were otherwise healthy.
+`KB-99` records the exact cause and correction. Commit `0406562` is pushed and deployed through Development and
+the named Online pipeline. The full gate is green under Lua 5.4 and LuaJIT, including a new executable adapter
+regression that proves the real universal-market write sends seven dense SQL parameters and restores absent
+`source_ref` to SQL `NULL`.
+
+Deployment evidence: Development restarted cleanly at 21:29 EDT with schema 30 / `pending=[]`, Market ready,
+HTTP 200 and empty stderr. Fresh Online backups are `ncm-db-20260925-013053.sql.gz` and
+`ncm-resources-20260925-013053.tar.gz`. Online restarted at 01:32 UTC; service active, HTTP 200, schema 30, no
+post-restart error matches, deployed source hash `0453300b…` equals local, and counts remain 13 drivers / 13
+bindings / 19 assets / 29 results / 23 ledger / 14 evidence / 14 discovery. Deployment is not the panel PASS.
+
+| # | Smallest live proof | PASS condition | State |
+|---|---|---|---|
+| §AL1 | Reconnect to Online after the restart and open Market once. | Market renders its three authored offerings and current balance; server emits no `payload failed` or `invalid_parameters`. | **PARTIAL PASS 01:34 UTC — request completed with no failure; player must confirm the three offerings were visible** |
+| §AL2 | After §AL1, query the owner's new `player_market_knowledge` row. | `base_market / universal / NULL / open`; repeated opens create no duplicate and do not rewrite first sight. | **PARTIAL PASS — exact row exists with SQL NULL; repeated-open observation owed** |
+| §AL3 | Inspect the post-open Online log. | `panel OK ... panel=market` reaches its drawn report and no new `[ERR]` appears. | **PASS 01:34 UTC — 13 ms, 0 faults; no payload failure, invalid parameters or ERR** |
