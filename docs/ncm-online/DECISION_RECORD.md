@@ -1156,3 +1156,56 @@ Fingerprint V1 remains separately gated. No values ship until evidence inputs, e
 independent measures, minimum sample, window, cadence, anti-farming implications and definition version are
 deliberately ruled. The public contract reserves the version and unavailable state now; it does not invent
 formulas.
+
+## L131 — LOCKED — NCM owns the player-facing surface; the platform gamemode's sandbox is closed
+
+Owner ruling, 2026-09-25: *"kill it with fire. /freeroam i mean. and of course its vehicles. in fact the /race
+as well and /pvp. we can keep anim. we are handcrafting this all... we want our funnel to our experience."*
+
+The ruling was prompted by evidence, not by preference. On 2026-09-25 at 03:22 a player took a rifle with 500
+reserve rounds, a katana and an Archer Bandit out of the `freeroam` menu, five seconds before getting into the
+car and crashing it — having opened NCM's Market four times, with 10,000 unspent eddies, and bought nothing.
+
+### What is ruled
+
+- **A player may not be given a vehicle.** This is **L102** restated against a resource rather than against a
+  command: *"a player being able to spawn cars, even loaners, sinks economy."* It binds every resource loaded
+  beside NCM, not only NCM's own code. Closing NCM's spawn path while a platform gamemode keeps its own open
+  is not compliance with L102, it is the appearance of it.
+- **`/race` and `/pvp` leave.** Not because they are bad, but because they answer the question NCM exists to
+  answer, in a different voice, from a menu. Racing on this server is NCM's. PvP, when it happens, will be the
+  emergent server-side system NCM already has the pieces for — not necessarily guns, and not decided yet.
+- **`/anim` stays.** It is expression, it competes with nothing, and it is not freeroam's anyway:
+  `open77_animations` registers the command and only the no-argument menu needs a gamemode to draw the page.
+- **The persistent command-hint panel becomes NCM's** (`IDEA-417`). A standing list of what you can type is
+  better than a help toast, and it should say NCM's vocabulary rather than a sandbox's.
+
+### First-pass implementation scope — superseded by L132
+
+The first implementation trimmed rather than evicted `freeroam`, because it owns the join spawn and the only
+respawn-after-death path the server had. That was an implementation-risk judgment, not an owner ruling, and it
+left `/freeroam` plus the forced join kill alive. L132 records the owner's correction and governs the current
+load set.
+
+### A standing consequence
+
+The freeroam tree is vendor-owned, so an OPEN//77 upgrade restores everything this ruling removes. The
+enforcement therefore lives in `tools/staging/close-freeroam-sandbox.py` and must be re-run after every
+upgrade, beside `check-load-list.py`. A ruling kept only in prose has already failed four times in this
+project (`IDEA-380`); this one is kept in a script that reports its own state.
+
+## L132 — LOCKED — The platform freeroam resources are evicted now; missing lifecycle conveniences do not veto the boundary
+
+Owner clarification, 2026-09-25: *"finish the job of killing the things with fire ... was the whole reason for
+a reboot that got Kazami."* The intended result of L131 was removal, not merely disabling some subcommands.
+
+- `freeroam` and `open77_freeroam` do not belong in `resources.load`, and the server is not advertised with a
+  `freeroam` tag. Their vehicle/weapon menu, `/freeroam`, `/race`, `/footrace`, `/pvp`, `/dm`, join kill and
+  separate persistence/wallet surface leave together.
+- `open77_animations` remains loaded. The independent `/anim <profile>`, `list`, `info` and `stop` paths stay;
+  the freeroam-owned no-argument picker is allowed to leave until NCM deliberately owns one.
+- The known lack of an NCM respawn-after-death path is a real lifecycle gap, but it is not authority for an
+  unrelated gamemode to remain loaded. Until repaired, reconnecting is the honest workaround.
+- The removal remains a re-appliable vendor-tree operation and must be asserted after each OPEN//77 upgrade.
+  The script keeps the earlier command/PvP edits as defence in depth against an accidental manual start, but
+  absence from the load list is the authority boundary.

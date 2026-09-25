@@ -3,55 +3,55 @@
 > **STATUS: LEDGER** — living session memory, rewritten at the end of every working session.
 > Authority map: [INDEX.md](INDEX.md) — classified 2026-09-24 (L125).
 
-Last rewritten: **2026-09-24 — Market nullable-binding hotfix promoted through Development to Online.**
-Commit `0406562` is on `origin/main`, and its resource file is running in the persistent world.
+Last rewritten: **2026-09-25 — full platform-freeroam eviction verified in Development; Online activation pending.**
 
-> **Claim before writing:** decisions through **L130**; MASTER_TEST through **2.18 / §AL**; next QA letter
-> **§AM**. BACKLOG next free **IDEA-415**; known issues through **KB-99** plus the existing duplicate KB-87.
+> **Claim before writing:** decisions through **L132**; MASTER_TEST through **2.18 / §AM**; next QA letter
+> **§AN**. BACKLOG next free **IDEA-420**; known issues through **KB-102** plus the existing duplicate KB-87.
 > Historical §Z collision remains: qualify by section (2.14 Machine Index vs 2.16 Help).
 
-## Next action: visually confirm the recovered Market
+## Next action: promote the verified eviction without repeating the Kazami restart race
 
-The first post-fix request already passed the server path: `base_market / universal / NULL / open` was written,
-the panel reported healthy in 13 ms and no old failure recurred. Confirm that the page visibly showed all three
-authored offerings and the current balance, then open it once more. Re-query the row to prove the second open did
-not duplicate it or rewrite `first_known_at`; record those last observations in MASTER_TEST §AL.
+Development now excludes both `freeroam` and `open77_freeroam` from `resources.load` and no longer carries the
+`freeroam` discovery tag. The independent `open77_animations` resource remains. A clean Development restart at
+00:55 EDT proved: dependency audit green (36 explicit resources), neither freeroam resource discovered or
+started, animations and both NCM resources started, schema 30 / `pending=[]`, health 200, empty stderr and zero
+boot errors. The repository gate is green after the idempotency repair to the vendor-tree script.
 
-## Market recovery
+The same change still needs to be staged and activated on Online. Before any restart: push the commit, take a
+fresh database/resource/config rollback set, verify the effective config, and query current players. Re-check
+immediately before restart. That narrows but does not close KB-102: the prior restart entered `Stopping` at
+04:39:23 UTC, accepted Kazami at 04:39:29, and kept the listener alive until systemd killed it at 04:40:53.
+There is no proven admission-drain mechanism yet; do not describe an empty preflight as a lock.
 
-The first live Market open after IDEA-251 failed in `NcmMarketKnowledge.ensureUniversal`, before any payload
-reached WebUI. A universal market legitimately has no `source_ref`, but the adapter put Lua `nil` at position 6
-of a seven-value SQL array. OPEN//77 rejected the shortened/holed parameter sequence as `invalid_parameters`.
-Inventory, balance and the Market renderer were not the cause.
+## What changed (L132 / IDEA-416)
 
-The fix uses the repository's established nullable-value contract: send a dense empty-string sentinel and let
-`NULLIF(?, '')` restore database `NULL`. `tools/test-market-knowledge.lua` executes the real host adapter and
-asserts seven non-nil positional parameters, the sentinel position and SQL conversion under Lua 5.4 and LuaJIT.
-The full gate is green: **285 core tests per interpreter**, 41 cross-scope checks, the new 6-assertion Market
-adapter check, 17 QA checks, 35 vehicle-access checks, **165 resource Lua files**, five WebUI scripts, 96 panel
-assertions, 26 Driver Card assertions and documentation authority.
+`tools/staging/close-freeroam-sandbox.py` now enforces the whole boundary:
 
-Development restarted at **21:29 EDT** with schema 30 / `pending=[]`, Market ready, HTTP 200 and empty stderr.
-Commit `0406562` was pushed before production promotion. Fresh Online rollback artifacts were taken at
-`20260925-013053`: a 230 KB database dump containing 63 tables and a 494 KB resource-tree archive. The named
-`deploy-staging.ps1 -Target online` pipeline restarted Online at **01:32 UTC**. Service is active, health is 200,
-schema remains 30, and the deployed fix hash `0453300b…` exactly matches local. There are no post-restart error
-matches. Canonical counts remain 13 drivers, 13 bindings, 19 assets, 29 results, 23 ledger rows, 14 evidence and
-14 discoveries; the sole server identity remains `ncm-dev`. At 01:34 UTC the first live Market request created
-the intended knowledge row with a real SQL `NULL`, logged a healthy 13 ms panel open and produced no error. The
-visual content confirmation and repeated-open idempotency check are the only §AL items still owed.
+- remove `freeroam` and `open77_freeroam` from the load list;
+- remove the `freeroam` server tag;
+- keep `open77_animations` loaded;
+- retain the earlier restricted-command, PvP-off and race/PvP manifest edits as defence in depth;
+- print and validate the resulting load state; and
+- remain reversible and idempotent across upgrades.
 
-## Driver Card and rig work remain intact
+This removes the platform vehicle/weapon menu, `/freeroam`, `/car`, platform `/race`/`/footrace`, `/pvp`/`/dm`,
+the separate freeroam persistence/wallet resource and the forced kill-respawn on every join. `/anim <profile>`,
+`list`, `info` and `stop` remain. The no-argument animation picker leaves with freeroam.
 
-The Driver Card distance correction remains deployed. MASTER_TEST §AK6 still needs a WebUI-capable observing
-client to verify proportional scaling; the second local process cannot provide that proof while KB-4 leaves its
-WebUI host disconnected. The owner's `ncm_default` banner state was already present and published.
+## Honest lifecycle gap
 
-The rig/FFB line through commit `3737a69` remains intact: generic wheel input, axis-level device detection,
-panel arming, bounded feedback and cleanup. Its live calibration and owed checks remain in BACKLOG IDEA-395–412.
+NCM does not yet own respawn-after-death. `open77_death` observes life state but does not respawn, and no NCM
+handler replaces freeroam's `/revive`/auto-respawn. Until that is built and tested, reconnecting is the honest
+workaround after death. This gap no longer vetoes the authority boundary.
+
+KB-101 also remains: NCM can save a not-yet-incarnated player's origin placeholder and later restore it. That
+is independent of freeroam and still needs the readiness/origin guards already recorded.
 
 ## Live QA still owed
 
-- **§AL1–§AL2:** visual confirmation of three offerings and one repeated-open idempotency check. §AL3 passed.
+- **§AM3–§AM7:** activate Online, verify boot, then use a real client to prove no join death, no sandbox
+  commands, animations still work, and record current death behavior.
+- **§AL1–§AL2:** visually confirm the three Market offerings and repeated-open idempotency. §AL3 passed.
 - **§AK:** two-client Driver Card renderer handoff, presentation lifecycle and corrected distance scaling.
-- **Rig/FFB:** the outstanding physical/in-game checks already named in BACKLOG and MASTER_TEST.
+- **Rig/FFB:** the outstanding physical/in-game checks named in BACKLOG IDEA-395–412.
+- Still owed from earlier: IDEA-251 full Market live PASS, §AH21 incident attribution, migration 028 fresh-world.

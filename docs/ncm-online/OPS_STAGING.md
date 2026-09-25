@@ -44,6 +44,32 @@ targeted python scripts in `tools/staging/`, which print only the section they t
 
 Do not restart with clients connected unless you accept the kick (KB-5).
 
+### After every OPEN//77 upgrade, run BOTH guards
+
+The platform's resource tree is vendor-owned and an upgrade rewrites it, so two things have to be re-asserted
+before the restart -- neither is optional and neither announces itself when it is missing:
+
+```
+scp -i C:\Users\eveng\.ssh\lightsail-ncm.pem tools\staging\check-load-list.py         ubuntu@52.60.225.137:/tmp/
+scp -i C:\Users\eveng\.ssh\lightsail-ncm.pem tools\staging\close-freeroam-sandbox.py  ubuntu@52.60.225.137:/tmp/
+ssh -i C:\Users\eveng\.ssh\lightsail-ncm.pem ubuntu@52.60.225.137 'sudo python3 /tmp/check-load-list.py && sudo python3 /tmp/close-freeroam-sandbox.py'
+```
+
+`check-load-list.py` catches a new dependency missing from `resources.load`, which aborts the whole automatic
+start set and leaves a healthy-looking server with no NCM (KB-51). `close-freeroam-sandbox.py` evicts
+`freeroam` and `open77_freeroam` from the load set, removes the discovery tag, retains `open77_animations`, and
+keeps the earlier script/config edits as defence in depth (L131/L132). An upgrade restores the vendor tree and
+may restore the config template, so read the script's state report: both freeroam resources must say `no`,
+animations must say `yes`, and the dependency guard must still pass.
+
+The eviction deliberately removes the forced join death. It also removes freeroam's respawn-after-death and
+the no-argument animation picker. Until NCM owns those paths, reconnect is the respawn workaround and
+`/anim <profile>`, `/anim list`, `/anim info` and `/anim stop` are the supported animation surface.
+
+**A player can join after an empty-server check while systemd is already stopping the old process (KB-102).**
+Re-check immediately before every restart, but do not call that a drain lock. A supported maintenance/admission
+gate remains `IDEA-419`; do not improvise a permanent firewall rule as routine procedure.
+
 ## Connecting a test client
 
 A directly-launched game does **not** auto-connect. E0 (2026-09-19) established that `OP77_CONNECT` and
