@@ -6,7 +6,7 @@
 Last rewritten: **2026-09-25 - reconciliation steps 0-5 executed and pushed; KB-115 closed; owner's §AP4 is the only thing in the way.**
 
 > **Claim before writing:** decisions through **L143**; MASTER_TEST through **2.19 / §AS**; next QA letter
-> **§AT**. BACKLOG next free **IDEA-469**; known issues through **KB-119** plus the pre-existing duplicates
+> **§AT**. BACKLOG next free **IDEA-469**; known issues through **KB-120** plus the pre-existing duplicates
 > **KB-87** and **L119** (both in `HEAD`, neither renumbered).
 > Historical §Z collision remains: qualify by section (2.14 Machine Index vs 2.16 Help).
 > *`KB-114` records why this line went stale before: the documentation gate asserts ID discipline for
@@ -32,10 +32,13 @@ Take **§AQ2** (*"did I spawn in once?"*) and **§AQ4** (log out somewhere disti
 still never been observed working) on the same session, and open WHEEL/PEDALS **with the companion stopped**
 for §AQ3/G3 while you are there. Four gates, one join.
 
-**One decision waiting, not urgent:** `L142` collapsed the Development correction. Development's only two
-declared packages are RB15 and the liveries, so there is nothing left to declare and the KB-112 URL fix is
-moot until NCM has content of its own. The coherent action is to run the repaired `check-load-list.py` and
-then park `requiredMods` with the existing `set-mods-off.py`. **Not done — awaiting a go** (`IDEA-460`).
+**Development is parked** (`IDEA-460`, done 2026-09-25). `L142` collapsed the correction: its only two declared
+packages were RB15 and the liveries, so nothing was left to declare and the KB-112 URL fix became moot.
+Instrumented first — `check-load-list.py` reported *40 resources, every dependency satisfied* with all four NCM
+resources present — then parked with `set-mods-off.py`: `enabled=false`, `unsecured=false`, both packages still
+declared, timestamped backup beside the file. **One small thing owed: restart the dev server** so the parked
+flags take effect (`tools/o77-server.ps1`; `Open77.Server.exe` is currently running with the old config).
+Doing this required parameterising a script hardcoded to Production — `KB-120`.
 
 Do not implement Parts/Engineering, component rows, migration, physical effects or a control extension.
 
@@ -132,9 +135,9 @@ Applying that order answered it the same day:
   (`KB-117`). Their shared contract is `ncm/core/driver/feedback.lua`, and the Lua is authoritative. **No new
   companion release** merely because a native replacement is being investigated.
 - **No deploy can be scoped to one workstream** (`KB-116`): whole-tree `rm -rf`/`mv`.
-- **Development's correction collapsed** (`IDEA-460`): it declares only RB15 and the liveries, both withdrawn
-  by `L142`, so the KB-112-broken `http://10.0.0.70:11779/` no longer matters until NCM has content of its own.
-  Park `requiredMods` there rather than fixing a URL for packages that are leaving.
+- **Development is parked** (`IDEA-460`, done): `requiredMods.enabled=false`, `unsecured=false`, both packages
+  still declared, backup taken. The KB-112-broken `http://10.0.0.70:11779/` is now moot until NCM has content
+  of its own to deliver. **Restart owed** for the flags to take effect.
 - Caddy 2.11.4 owns public `11779` at `https://52-60-225-137.sslip.io:11779/`; OPEN//77's resource origin is
   loopback-only at `127.0.0.1:11782`; Warden loopback-only at `127.0.0.1:11780`. Certificate expires
   2026-12-24, renews automatically. `IDEA-452` tracks replacing the interim `sslip.io` name.
