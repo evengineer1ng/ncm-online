@@ -20,7 +20,7 @@ This mirrors `ncm/core/driver/feedback.lua`, which is the authority and is cover
 in step; if they ever disagree, the Lua is right.
 
 **SDL haptic magnitude is normalised, and normalised is not equal.** A 0.5 constant force is about a
-newton-metre on a belt-drive G29 and about ten on a 20 Nm direct-drive base. The same number is a nudge on one
+newton-metre on a gear-drive G29 and about ten on a 20 Nm direct-drive base. The same number is a nudge on one
 device and a wrist injury on another. So:
 
   * ceilings are per device CLASS, and the classes nobody here can test are held far below the ones we can;

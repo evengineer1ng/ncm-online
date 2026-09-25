@@ -25,7 +25,7 @@ Core.define("driver.feedback", function(C)
     -- ---------------------------------------------------------------------------------------------
     --
     -- **SDL haptic magnitude is normalised, and normalised is not the same as equal.** A `0.5` constant force
-    -- is roughly a newton-metre on a belt-drive G29 and roughly ten on a 20 Nm direct-drive base. **The same
+    -- is roughly a newton-metre on a gear-drive G29 and roughly ten on a 20 Nm direct-drive base. **The same
     -- number is a nudge on one device and a wrist injury on another.** A profile that feels right on the only
     -- wheel we own would, shipped unchanged, be genuinely dangerous on hardware we have never touched.
     --

@@ -436,6 +436,63 @@ emitted.length=0; ownedButtons.forEach(b=>b.click());
 check("CALL carries each exact assetId",emitted.filter(e=>e.name==="panel:vehicle.call").map(e=>e.data.assetId).join("|")===assetIds.slice(0,2).join("|"));
 fire("panel:collection",{slots:[{slot:1,discovered:true,owned:false,displayName:"Galena"}]});
 check("discovery alone offers no CALL",!dump(document.getElementById("collectionDetail")).join("|").includes("CALL VEHICLE"));
+// ---- WHEEL/PEDALS. **Added after a real defect shipped past this gate on 2026-09-25**: a block reading
+// `dev.seen` was inserted into the `!s.connected` branch, ABOVE where `const dev` is declared, so every
+// player who opened the tab without the companion running hit a temporal-dead-zone ReferenceError. There
+// were 96 assertions and not one of them drew this panel with a payload. `guard()` swallows the throw and
+// emits no `panel:drawn`, which is the KB-61 path -- the panel just closes.
+console.log("  -- wheel/pedals --");
+fire("panel:show",{panel:"wheel"});
+
+const wheelDrawn=()=>{emitted.length=0;return emitted;};
+function drawWheel(label,payload){
+  emitted.length=0;
+  fire("panel:wheel",payload);
+  check(label,emitted.some(e=>e.name==="panel:drawn"),
+    "render threw; no panel:drawn (see guard() in panel.html)");
+}
+
+// The state a brand-new tester sees first, and the one the bug lived in.
+drawWheel("wheel panel draws with NO companion",{enabled:true,connected:false,url:"127.0.0.1:47811"});
+drawWheel("wheel panel draws when force feedback is off",{enabled:false,connected:false});
+// An older companion that knows nothing of the newer fields.
+drawWheel("wheel panel draws for a companion with no device at all",{enabled:true,connected:true,sent:0});
+drawWheel("wheel panel draws for a companion sending only the old fields",
+  {enabled:true,connected:true,sent:12,device:{name:"Wheel",class:"belt",rung:3,
+    rungs:[0.02,0.04,0.06,0.08,0.10,0.12,0.14,0.16,0.18,0.20],armed:false}});
+
+const FULL={enabled:true,connected:true,sent:900,device:{
+  name:"Thrustmaster T128",class:"belt",rung:4,
+  rungs:[0.02,0.04,0.06,0.08,0.10,0.12,0.14,0.16,0.18,0.20],
+  armed:true,haptics:{},caps:{spring:true,damper:true},
+  tune:{spring:0.55,damper:0.35,texture:0.60,engine:0.45,road:1.00},
+  engineHz:27.0,engineBand:[12,47],
+  seen:{suspLong:{max:0.0031,frames:900,live:880},slipTotal:{max:0.42,frames:900,live:310}},
+  rig:{steerDegrees:45,devices:[]}}};
+drawWheel("wheel panel draws a fully populated companion",FULL);
+
+const wheelText=dump(document.getElementById("wheelBody")).join("|");
+check("STRENGTH is shown as a rung out of the ladder length",/rung 4 \/ 10/.test(wheelText),wheelText.slice(0,400));
+check("the rung's actual magnitude is shown beside it",/0\.08/.test(wheelText),wheelText.slice(0,400));
+check("a channel too weak to feel is marked as such",/too small to feel/.test(wheelText),wheelText.slice(0,400));
+check("a channel with real signal is not marked weak",/0\.4200/.test(wheelText),wheelText.slice(0,400));
+
+// The STRENGTH slider must still refuse to leave the ladder: the ceiling is the wrist protection.
+// Find the STRENGTH row by its own label rather than by position, then its slider. Selecting every range
+// input instead would also collect steering range and the five feel knobs, whose maxima are unrelated.
+const strengthRow=(document.getElementById("wheelBody").children||[])
+  .find(r=>(r.children||[]).some(c=>c._text==="STRENGTH"));
+const strengthSlider=strengthRow
+  ? (strengthRow.children||[]).flatMap(w=>w.children||[]).find(e=>e.type==="range")
+  : null;
+check("STRENGTH is a slider",!!strengthSlider,"no range input in the STRENGTH row");
+check("STRENGTH cannot be dragged past the ceiling rung",
+  !!strengthSlider&&Number(strengthSlider.max)===10&&Number(strengthSlider.min)===1,
+  strengthSlider?("min="+strengthSlider.min+" max="+strengthSlider.max):"absent");
+check("STRENGTH moves one rung at a time",
+  !!strengthSlider&&Number(strengthSlider.step)===1,
+  strengthSlider?("step="+strengthSlider.step):"absent");
+
 fire("panel:show",{panel:"help"});
 check("Help explains purchase and specific-asset access",/I bought a car/.test(helpText()) && /specific owned asset/.test(helpText()));
 

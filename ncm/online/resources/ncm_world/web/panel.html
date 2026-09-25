@@ -201,8 +201,12 @@
     .wheel-row .v { font: 700 15px/1.2 var(--mono); color: var(--text); }
     .wheel-row .v.warn { color: var(--warn); }
     .wheel-row .v.ok { color: var(--ok); }
-    /* The ladder is drawn as discrete rungs and NEVER as a slider. A continuous control would quietly undo
-       the wrist protection at the last step -- the rungs ARE the safety property (IDEA-395). */
+    /* STRENGTH is a slider whose STEP is one rung (L133). The earlier rule here -- "never a slider, the
+       rungs ARE the safety property" -- named the wrong thing: the CEILING is the protection, `clamp()`
+       enforces it in the companion, and a slider bounded by the same maximum cannot exceed it. The ladder
+       was a measuring instrument, it did its job in IDEA-411, and the rung survives as the shared unit
+       testers quote to each other. `.wheel-rungs` is kept: nothing should break if an older payload
+       arrives. */
     .wheel-rungs { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
     .wheel-rungs button { min-width: 52px; padding: 8px 6px; font: 700 13px/1 var(--mono); }
     .wheel-rungs button.on { color: var(--accent); border-color: var(--accent); box-shadow: inset 0 -3px var(--accent); }
@@ -1236,12 +1240,35 @@
       // WHEEL (IDEA-399)
       // -----------------------------------------------------------------------------------------------
       //
-      // The safety rules are drawn, not merely obeyed: the ladder is a row of DISCRETE rungs, the ceiling is
+      // The safety rules are drawn, not merely obeyed: STRENGTH steps one rung at a time, the ceiling is
       // stated in words, and an unrecognised device says so rather than showing a reassuring default. A
       // continuous slider here would undo `IDEA-395` at the last step, which is exactly where it would not
       // be noticed.
       let wheelData = null;
       const wheelCmd = (kind, payload) => Open77.emit("panel:wheel.command", { kind: kind, payload: payload || {} });
+
+      // **A periodic refresh must not fight the hand on the slider.** renderWheel rebuilds every control
+      // from scratch, so a status frame that was already in flight when a value was committed carries the
+      // old number and visibly undoes the change.
+      let wheelDragging = false;      // a control is being manipulated right now
+      let wheelDirty = false;         // a refresh arrived while it was, and is owed
+      const tunePending = {};         // key -> { value, at }: committed locally, not yet echoed back
+      const TUNE_HOLD_MS = 5000;      // after this the companion's value wins, even if it disagrees
+
+      /** The value to SHOW for a knob: what was just chosen, until the companion confirms it.
+       *  Used for the 0..1 feel values and for the integer STRENGTH rung alike -- the 0.001 tolerance below
+       *  settles an exact integer match just as well as a float one. */
+      function tuneValue(key, serverValue) {
+        const p = tunePending[key];
+        if (!p) return serverValue;
+        if (Date.now() - p.at > TUNE_HOLD_MS) { delete tunePending[key]; return serverValue; }
+        // Echoed back: the round trip is complete and the companion is authoritative again.
+        if (typeof serverValue === "number" && Math.abs(serverValue - p.value) < 0.001) {
+          delete tunePending[key];
+          return serverValue;
+        }
+        return p.value;
+      }
 
       const wheelRow = (key, value, cls) => {
         const row = document.createElement("div"); row.className = "wheel-row";
@@ -1252,6 +1279,10 @@
 
       function renderWheel(d) {
         if (d) wheelData = d;
+        // Defer rather than drop: the newest data is already stored, and it is drawn the moment the
+        // interaction ends. Dropping it would leave the panel stale instead of merely late.
+        if (wheelDragging) { wheelDirty = true; return; }
+        wheelDirty = false;
         const s = wheelData || {};
         wheelBody.innerHTML = "";
 
@@ -1265,7 +1296,7 @@
               + "wheel on its own. Start it, and this page fills in by itself."
             : "Force feedback is off.<br>Turn it on to look for a wheel companion on this PC.";
           wheelBody.append(note);
-          const acts = document.createElement("div"); acts.className = "wheel-actions";
+        const acts = document.createElement("div"); acts.className = "wheel-actions";
           const toggle = document.createElement("button");
           toggle.textContent = s.enabled ? "TURN OFF" : "TURN ON";
           toggle.addEventListener("click", () => wheelCmd("enable", { on: !s.enabled }));
@@ -1281,18 +1312,46 @@
         wheelBody.append(wheelRow("FORCE OUTPUT", dev.armed ? "ARMED" : "DISARMED — telemetry only", dev.armed ? "warn" : ""));
         wheelBody.append(wheelRow("FRAMES SENT", String(s.sent || 0)));
 
+        // **A slider whose step is one rung.** The ceiling is the wrist protection -- `clamp()` is the
+        // only way a magnitude leaves the companion and nothing here can exceed it -- so a bounded slider is
+        // exactly as safe as a row of buttons. The rung survives as the UNIT rather than as the widget,
+        // because several testers on different wheels now compare notes and "rung 4" travels between a T128,
+        // a G29 and a G923 in a way "about 60%" does not.
         const rungs = Array.isArray(dev.rungs) ? dev.rungs : [];
         if (rungs.length) {
           const row = document.createElement("div"); row.className = "wheel-row";
           const k = document.createElement("div"); k.className = "k"; k.textContent = "STRENGTH";
-          const wrap = document.createElement("div"); wrap.className = "wheel-rungs";
-          rungs.forEach((value, i) => {
-            const b = document.createElement("button");
-            b.textContent = value.toFixed(2);
-            if ((dev.rung || 1) === i + 1) b.classList.add("on");
-            b.addEventListener("click", () => wheelCmd("settings", { rung: i + 1 }));
-            wrap.append(b);
+          const wrap = document.createElement("div"); wrap.className = "wheel-range";
+          const slider = document.createElement("input");
+          slider.type = "range";
+          slider.min = "1"; slider.max = String(rungs.length); slider.step = "1";
+          const current = Math.max(1, Math.min(rungs.length, tuneValue("rung", dev.rung || 1)));
+          slider.value = String(current);
+          slider.title = "Force output. The top of this slider is this wheel class's safe ceiling.";
+          const deg = document.createElement("span"); deg.className = "deg";
+          // Both numbers, always: the rung is what you quote to another tester, the magnitude is what the
+          // device is actually asked for, and neither alone is enough to compare two rigs.
+          const show = (i) => {
+            const v = rungs[Number(i) - 1];
+            deg.textContent = "rung " + i + " / " + rungs.length
+                            + "   (" + (v != null ? v.toFixed(2) : "?") + ")";
+          };
+          show(slider.value);
+          slider.addEventListener("input", () => show(slider.value));
+          const grab = () => { wheelDragging = true; };
+          slider.addEventListener("pointerdown", grab);
+          slider.addEventListener("keydown", grab);
+          slider.addEventListener("focus", grab);
+          slider.addEventListener("change", () => {
+            const v = Number(slider.value);
+            tunePending["rung"] = { value: v, at: Date.now() };
+            wheelCmd("settings", { rung: v });
           });
+          const release = () => { wheelDragging = false; if (wheelDirty) renderWheel(); };
+          slider.addEventListener("pointerup", release);
+          slider.addEventListener("pointercancel", release);
+          slider.addEventListener("blur", release);
+          wrap.append(slider, deg);
           row.append(k, wrap); wheelBody.append(row);
         }
 
@@ -1314,14 +1373,27 @@
           const wrap = document.createElement("div"); wrap.className = "wheel-range";
           const slider = document.createElement("input");
           slider.type = "range"; slider.min = "15"; slider.max = "180"; slider.step = "5";
-          slider.value = String(Math.round(rig.steerDegrees || 45));
+          slider.value = String(Math.round(tuneValue("steerDegrees", rig.steerDegrees || 45)));
           const deg = document.createElement("span"); deg.className = "deg";
           const show = (v) => { deg.textContent = v + "\u00B0 / side"; };
           show(slider.value);
           slider.addEventListener("input", () => show(slider.value));
           // Commit on release, not on every pixel of drag: each change re-scales live steering, and doing
           // that sixty times during one drag would make the car twitch while the slider moved.
-          slider.addEventListener("change", () => wheelCmd("settings", { steerDegrees: Number(slider.value) }));
+          // The same round-trip race as the feel sliders (KB-105) applies here, so the same two guards do.
+          const grabDeg = () => { wheelDragging = true; };
+          slider.addEventListener("pointerdown", grabDeg);
+          slider.addEventListener("keydown", grabDeg);
+          slider.addEventListener("focus", grabDeg);
+          slider.addEventListener("change", () => {
+            const v = Number(slider.value);
+            tunePending["steerDegrees"] = { value: v, at: Date.now() };
+            wheelCmd("settings", { steerDegrees: v });
+          });
+          const releaseDeg = () => { wheelDragging = false; if (wheelDirty) renderWheel(); };
+          slider.addEventListener("pointerup", releaseDeg);
+          slider.addEventListener("pointercancel", releaseDeg);
+          slider.addEventListener("blur", releaseDeg);
           wrap.append(slider, deg);
           row.append(k, wrap); wheelBody.append(row);
         }
@@ -1350,21 +1422,68 @@
             } else {
               const slider = document.createElement("input");
               slider.type = "range"; slider.min = "0"; slider.max = "100"; slider.step = "5";
-              slider.value = String(Math.round((tune[key] != null ? tune[key] : 0) * 100));
+              const shown = tuneValue(key, tune[key] != null ? tune[key] : 0);
+              slider.value = String(Math.round(shown * 100));
               slider.title = hint;
               const pct = document.createElement("span"); pct.className = "deg";
               const show = (v) => { pct.textContent = v + "%"; };
               show(slider.value);
               slider.addEventListener("input", () => show(slider.value));
+              // While a finger is down, refreshes are held. Both pointer and keyboard reach a slider, and
+              // `change` ends the interaction either way.
+              const grab = () => { wheelDragging = true; };
+              slider.addEventListener("pointerdown", grab);
+              slider.addEventListener("keydown", grab);
+              slider.addEventListener("focus", grab);
               // Commit on release. A spring re-created sixty times during one drag would buzz.
               slider.addEventListener("change", () => {
-                const payload = {}; payload[key] = Number(slider.value) / 100;
+                const value = Number(slider.value) / 100;
+                // Recorded BEFORE the command goes out: the reply can beat the next render either way, and
+                // a value that is on screen must not depend on which won.
+                tunePending[key] = { value: value, at: Date.now() };
+                const payload = {}; payload[key] = value;
                 wheelCmd("settings", payload);
               });
+              const release = () => {
+                wheelDragging = false;
+                if (wheelDirty) renderWheel();
+              };
+              slider.addEventListener("pointerup", release);
+              slider.addEventListener("pointercancel", release);
+              slider.addEventListener("blur", release);
               wrap.append(slider, pct);
             }
             row.append(k, wrap); wheelBody.append(row);
           }
+        }
+
+        // **What the channels have actually been observed to do.** ROAD reading ~0 at 100% is the reason
+        // this exists: a channel that is always present and always tiny is not a weak channel, it is one
+        // whose units we have misread -- and that is indistinguishable from "the game never sends it"
+        // unless the number is written down. Peak is the magnitude to normalise against.
+        const seen = dev.seen || {};
+        const channels = [["suspLong", "ROAD (long)"], ["suspLat", "ROAD (lat)"],
+                        ["slipTotal", "SLIP (total)"], ["slipLong", "SLIP (long)"], ["slipLat", "SLIP (lat)"]];
+        const observed = channels.filter(([key]) => seen[key]);
+        if (observed.length) {
+        const head = document.createElement("div"); head.className = "wheel-row";
+        const hk = document.createElement("div"); hk.className = "k"; hk.textContent = "MEASURED";
+        const hv = document.createElement("div"); hv.className = "v";
+        hv.style.font = "600 11px/1.4 var(--mono)"; hv.style.color = "var(--dim)";
+        hv.textContent = "peak seen · frames with signal";
+        head.append(hk, hv); wheelBody.append(head);
+        for (const [key, label] of observed) {
+          const row = seen[key] || {};
+          const peak = typeof row.max === "number" ? row.max : 0;
+          const live = row.live || 0, frames = row.frames || 0;
+          const pctLive = frames ? Math.round((live / frames) * 100) : 0;
+          // A peak this small cannot move a wheel once it is multiplied by the rung, so say so plainly
+          // rather than leaving the reader to do the arithmetic.
+          const weak = peak > 0 && peak < 0.05;
+          wheelBody.append(wheelRow(label,
+            peak.toFixed(4) + "  ·  " + pctLive + "% of " + frames + (weak ? "   (too small to feel)" : ""),
+            weak ? "warn" : (peak > 0 ? "ok" : "")));
+        }
         }
 
         const acts = document.createElement("div"); acts.className = "wheel-actions";
