@@ -1557,3 +1557,33 @@ whether the live `WheeledPhysics` handling fields can be *written* per-instance 
 states why no existing implementation answers it: nothing writes them, and the one open-source wheel-reinit
 attempt is commented out in its own source. That is a code-reading and eventually an isolated native-prototype
 question. **It is not an owner single-player session, and it must not be re-proposed as one.**
+
+## L144 - LOCKED OWNER RULING - the owner does not leave NCM Online; no test may require Solo
+
+Owner correction, 2026-09-25: *"i told you im not going to solo."*
+
+**The correction was warranted.** L143 recorded that the owner is committed to NCM Online and will not flip mod
+environments or profiles, and two messages later the next-action list still opened with *"reconnect, switch to
+Solo"*. L143 was written as if it were about one experiment. It is not. It is a standing constraint on
+**every** test design, and §AP4/§AP6 were drafted before it existed.
+
+**Ruled:**
+
+- **No MASTER_TEST row may require the owner to enter Solo, single-player, another profile, or another mod
+  configuration.** A row that needs it is not "owed" - it is **unrunnable as written** and must be re-scoped or
+  marked blocked by owner choice, like §AR.
+- **Re-scope before asking.** The great majority of what §AP wanted was already sitting in launcher, RED4ext
+  and ArchiveXL logs and in the game directory's own file metadata. That was true the whole time and nobody
+  looked (`KB-121`). The standing order from L143 - research before asking - applies to **the owner's own
+  machine** as much as to third-party mods.
+- **What genuinely needs a human is now small and is all inside Online:** does the RB15 exist and drive, and
+  are the NCM liveries visibly right. Both are in-world observations on the world the owner is already in.
+
+**What is left of Solo.** Only one honest question needs it: *does a world-mod file leak into the Solo
+profile?* That is an OPEN//77 correctness question, not an NCM one. It is recorded, unrun, and **not to be
+scheduled** - the same disposition as §AR. If it ever matters, it matters to the platform.
+
+**This does not weaken the evidence bar.** Case A still cannot prove the hosted packages supplied the content,
+because the launcher explicitly kept the manual copies that were already on disk. That limitation is now
+documented from the launcher's own words rather than assumed, and Case B remains the only thing that settles
+it - by isolating files, which is a filesystem operation and needs no profile change.

@@ -3,42 +3,42 @@
 > **STATUS: LEDGER** - living session memory, rewritten at the end of every working session.
 > Authority map: [INDEX.md](INDEX.md) - classified 2026-09-24 (L125).
 
-Last rewritten: **2026-09-25 - reconciliation steps 0-5 executed and pushed; KB-115 closed; owner's §AP4 is the only thing in the way.**
+Last rewritten: **2026-09-25 - AP1-AP4 pass after reading the client's own logs; no test may require Solo (L144); Case B must be decided before RB15 leaves.**
 
-> **Claim before writing:** decisions through **L143**; MASTER_TEST through **2.19 / §AS**; next QA letter
-> **§AT**. BACKLOG next free **IDEA-469**; known issues through **KB-120** plus the pre-existing duplicates
+> **Claim before writing:** decisions through **L144**; MASTER_TEST through **2.19 / §AS**; next QA letter
+> **§AT**. BACKLOG next free **IDEA-469**; known issues through **KB-121** plus the pre-existing duplicates
 > **KB-87** and **L119** (both in `HEAD`, neither renumbered).
 > Historical §Z collision remains: qualify by section (2.14 Machine Index vs 2.16 Help).
 > *`KB-114` records why this line went stale before: the documentation gate asserts ID discipline for
 > BACKLOG only. Read the last row of each ledger, not this line.*
 
-## Next action: owner finishes §AP4 (or writes it off)
+## Next action: two looks in Online, then decide Case B before RB15 leaves
 
-**The repository work is done.** Steps 0-5 of
-[37_REPOSITORY_RECONCILIATION_SCHEDULE.md](37_REPOSITORY_RECONCILIATION_SCHEDULE.md) executed 2026-09-25:
-six commits in `cyberpunk2077`, two in `ncm-wheel`, both pushed, working tree clean, no release cut, no server
-changed. `KB-115` is **closed** - an aggregate SHA-256 over all 173 resource files is `a3007a11…` on both the
-committed tree and `/opt/ncm/resources/ncm`, so **production is reproducible from a commit and that commit is
-on the remote.** The spawn fix went first and alone as `8dc321b`.
+**§AP4 as written is gone.** It asked the owner to switch to Solo, two messages after `L143` recorded that they
+do not leave NCM Online. `L144` now rules that **no MASTER_TEST row may require Solo, single-player or another
+profile**, and §AP was re-scoped rather than re-asked.
 
-What is left is the owner's, and it is time-sensitive:
+Re-scoping found that **most of §AP was already on disk** (`KB-121`) — in `launcher.log`, `red4ext/logs/` and
+ArchiveXL's own log — at higher precision than a human could report. Reading it closed §AP2's journal half,
+most of §AP3, and all of the runnable part of §AP4 in one pass. **§AP1-§AP4 now PASS.**
 
-**§AP4 — reconnect without redownload, then switch to Solo, then prove byte-exact restoration of the ten named
-manual RB15/livery files.** That evidence exists only while the current packages and projection are in place,
-which is why the RB15 withdrawal is ruled but parked. Either capture it, or say explicitly that it is written
-off — both are fine, but the choice has to be made before anything touches Online.
+**What is genuinely left, and it is short:**
 
-Take **§AQ2** (*"did I spawn in once?"*) and **§AQ4** (log out somewhere distinctive, log back in — L110 has
-still never been observed working) on the same session, and open WHEEL/PEDALS **with the companion stopped**
-for §AQ3/G3 while you are there. Four gates, one join.
+1. **Two looks, in Online, no Solo:** does the **RB15 exist and drive**, and do the **NCM liveries look right**.
+   These are the only §AP items with no artifact behind them. Take `§AQ2` ("did I spawn in once?") and `§AQ4`
+   (log out somewhere distinctive, log back in — `L110` has still never been seen working) on the same session,
+   and open WHEEL/PEDALS with the companion stopped for `§AQ3`/G3.
+2. **A decision, and it has a deadline of your own making.** Case A proved the content loads. It **cannot**
+   prove the hosted packages supplied it, because the launcher said outright *"kept the copy of
+   `archive/pc/mod/ncm_rb15_liveries.archive` that was already there"*. Only **Case B (§AP5)** settles that —
+   and `L142` withdraws both packages, after which there is nothing left to run it against. So: **run Case B
+   before §AS, or record deliberately that NCM chose withdrawal over the proof** and that hosted delivery of
+   NCM's *own* content stays unproven until the first package NCM actually ships. Case B needs no Solo — it is
+   a file-isolation operation. **Do not let this lapse silently.**
 
-**Development is parked** (`IDEA-460`, done 2026-09-25). `L142` collapsed the correction: its only two declared
-packages were RB15 and the liveries, so nothing was left to declare and the KB-112 URL fix became moot.
-Instrumented first — `check-load-list.py` reported *40 resources, every dependency satisfied* with all four NCM
-resources present — then parked with `set-mods-off.py`: `enabled=false`, `unsecured=false`, both packages still
-declared, timestamped backup beside the file. **One small thing owed: restart the dev server** so the parked
-flags take effect (`tools/o77-server.ps1`; `Open77.Server.exe` is currently running with the old config).
-Doing this required parameterising a script hardcoded to Production — `KB-120`.
+**Then, on your word:** §AS — the RB15 withdrawal. §AP6 is largely the same removal, so run them together.
+
+**Small and owed:** restart the dev server so the parked `requiredMods` flags take effect.
 
 Do not implement Parts/Engineering, component rows, migration, physical effects or a control extension.
 
@@ -50,12 +50,29 @@ entry**. Server log corroborates: `connected` 15:38:26, `ready` 15:38:43. **No `
 closed as a delivery blocker. The four `Not reviewed` verdicts match Report 35's `safety=unknown` finding
 exactly.
 
-**NOT PROVEN — do not inflate:** that ArchiveXL or TweakXL initialised (no loader log captured); that the RB15
-record exists or drives; that any livery is available; that projection handled the pre-existing manual files
-correctly; that reconnect reuses cache; that Solo restores every manual byte.
+**ALSO PROVEN, from on-disk artifacts read 2026-09-25** (`KB-121` — this was available all along):
 
-**Row states:** §AP1 **PASS** · §AP2 **PASS on the consent half**, journal half unevidenced · §AP3 **PARTIAL**
-· §AP4-§AP7 **owed**. *A session-entry PASS is not an in-game content PASS.*
+- **Executable-root delivery.** `unsecured world: accepting unreviewed executable content in 'tweakxl'
+  ('red4ext/plugins/TweakXL/TweakXL.dll')`, same for ArchiveXL.
+- **The overlap was named and handled, not silently overwritten.** `modstack: replacing an unmanaged copy of
+  archive/pc/mod/ncm_rb15_liveries.archive` → `kept the copy that was already there (705a3c2207b0)`.
+  Receipt: `projected 387 file(s) — 2 added, 1 repaired, 0 removed`.
+- **The declared loaders initialised.** RED4ext log: `ArchiveXL (version: 1.27.1…) has been loaded`,
+  `TweakXL (version: 1.11.4…) has been loaded`, `3 plugin(s) loaded`, clean unload at disconnect.
+- **Both archives loaded.** ArchiveXL log: `Loading "fable5.archive.xl"`, `Loading "ncm_rb15_liveries.archive.xl"`,
+  RB15 localization merged. No errors.
+- **Reconnect reuses cache.** Three later Connects each logged `projected 0 file(s), removed 0, kept 387 in place`.
+- **The manual files were not touched.** All ten destinations present; mtimes 2026-08-14 / 08-30 / 09-19 / 09-20,
+  all weeks before the join.
+
+**STILL NOT PROVEN:** that the RB15 record exists and drives; that the liveries look right; and — the important
+one — **that the hosted packages supplied any of it**, since the launcher kept the manual copies. The on-disk
+livery archive is **8,003,584 bytes** against the declared package's **7,829,853**: a different artifact
+(`IDEA-451`).
+
+**Row states:** §AP1-§AP4 **PASS** · §AP4b **blocked by owner choice** (`L144`) · §AP5 Case B **the only
+remaining proof of hosted delivery** · §AP6 folds into §AS · §AP7 log review largely done.
+*Timestamps: launcher and game logs are local (UTC-4), the NCM server log is UTC; the join is 11:38 = 15:38.*
 
 **Future sessions: do not resurrect the "RequiredMods doesn't work" narrative.** It was false, Report 35 found
 the cause, the fix is deployed, and a human has walked the whole funnel.
@@ -87,7 +104,9 @@ is superseded — this is a decision, not an open question.*
 - **Preserve, do not delete.** Blobs, declarations, hashes, provenance manifest and authoring sources stay.
 - **No substitute open-wheel mod.** Ruled explicitly.
 - **NOT EXECUTED.** Removal needs a Production `server.jsonc` write, a restart, a digest mutation and a serving
-  change — all gated, because §AP4/Case B evidence only survives while the current packages are in place.
+  change. **§AP4 no longer gates it** — that evidence is captured. **Case B (§AP5) is now the only thing the
+  withdrawal would destroy**, and it is the sole proof that hosted delivery of NCM's own content works. Decide
+  it deliberately, in either direction, before §AS runs.
 
 > **The exact next authorised operation the owner must approve:** *finish §AP4 or write off that evidence;
 > then run a targeted `tools/staging/` script removing the two RB15 packages from Online's
