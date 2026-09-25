@@ -107,6 +107,36 @@ def edit(path, pairs, revert):
     return done
 
 
+def set_array_values(path, key, values, present):
+    """Add/remove exact string entries in one JSONC array without depending on their order."""
+    with open(path, "r", encoding="utf-8") as fh:
+        text = fh.read()
+    pattern = re.compile(
+        r'(?P<head>^[ \t]*"%s"\s*:\s*\[)(?P<body>.*?)(?P<tail>^[ \t]*\])'
+        % re.escape(key), re.M | re.S)
+    match = pattern.search(text)
+    if not match:
+        raise ValueError("cannot find JSONC array: %s" % key)
+    current = re.findall(r'"([a-zA-Z0-9_]+)"', match.group("body"))
+    before = list(current)
+    if present:
+        for value in values:
+            if value not in current:
+                current.append(value)
+    else:
+        current = [value for value in current if value not in values]
+    if current == before:
+        return []
+    indent_match = re.search(r'^([ \t]*)"', match.group("body"), re.M)
+    indent = indent_match.group(1) if indent_match else "      "
+    body = "\n" + ",\n".join('%s"%s"' % (indent, value) for value in current) + "\n"
+    text = text[:match.start()] + match.group("head") + body + match.group("tail") + text[match.end():]
+    with open(path, "w", encoding="utf-8", newline="") as fh:
+        fh.write(text)
+    action = "added" if present else "removed"
+    return ["%s %s from %s[]" % (action, ", ".join(values), key)]
+
+
 def main():
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
     revert = "--revert" in sys.argv
@@ -139,10 +169,13 @@ def main():
     ], revert)
 
     changed += edit(manifest, [(line, "%s %s" % (MARK, line)) for line in DISABLE], revert)
-    changed += edit(server_conf, [
-        ('      "freeroam",\n      "english",', '      "english",'),
-        ('      "open77_zones",\n      "freeroam",\n      "open77_freeroam"', '      "open77_zones"'),
-    ], revert)
+    try:
+        changed += set_array_values(server_conf, "tags", ["freeroam"], present=revert)
+        changed += set_array_values(
+            server_conf, "load", ["freeroam", "open77_freeroam"], present=revert)
+    except ValueError as exc:
+        print("cannot inspect: %s" % exc)
+        return 2
 
     verb = "re-enabled" if revert else "disabled"
     if not changed:
@@ -159,6 +192,8 @@ def main():
         m = fh.read()
     with open(server_conf, encoding="utf-8") as fh:
         s = fh.read()
+    tag_match = re.search(r'"tags"\s*:\s*\[(.*?)\]', s, re.S)
+    tags = set(re.findall(r'"([a-zA-Z0-9_]+)"', tag_match.group(1))) if tag_match else set()
     load_match = re.search(r'"resources"\s*:\s*\{.*?"load"\s*:\s*\[(.*?)\]', s, re.S)
     loaded = set(re.findall(r'"([a-zA-Z0-9_]+)"', load_match.group(1))) if load_match else set()
     print("")
@@ -169,9 +204,11 @@ def main():
     print("freeroam loaded        = %s" % ("yes" if "freeroam" in loaded else "no"))
     print("open77_freeroam loaded = %s" % ("yes" if "open77_freeroam" in loaded else "no"))
     print("open77_animations kept = %s" % ("yes" if "open77_animations" in loaded else "NO"))
+    print("freeroam server tag     = %s" % ("yes" if "freeroam" in tags else "no"))
 
     expected = revert == ("freeroam" in loaded and "open77_freeroam" in loaded)
-    if not expected or "open77_animations" not in loaded:
+    expected_tag = revert == ("freeroam" in tags)
+    if not expected or not expected_tag or "open77_animations" not in loaded:
         print("ERROR: resources.load did not reach the requested state")
         return 2
     return 0
