@@ -3,6 +3,9 @@
 
   var MAX_BADGES = 3;
   var DEFAULT_BANNER = "ncm_default";
+  var FULL_SIZE_DISTANCE_M = 5;
+  var MIN_SIZE_DISTANCE_M = 35;
+  var MIN_CARD_SCALE = 0.58;
   var root = document.getElementById("nameplates");
   var cards = new Map();
   var latestPlayers = new Map();
@@ -14,6 +17,18 @@
     var name = typeof value === "string" ? value.trim() : "";
     if (!name) return "Unknown driver";
     return Array.from(name).slice(0, 64).join("");
+  }
+
+  // The projection is screen-space, so a fixed-pixel card looks larger relative
+  // to its driver as the body recedes. Keep the close-range card readable, then
+  // taper it to a bounded size at the platform's normal 35 m plate limit.
+  function cardScale(value) {
+    var distance = Number(value);
+    if (!Number.isFinite(distance) || distance <= FULL_SIZE_DISTANCE_M) return 1;
+    if (distance >= MIN_SIZE_DISTANCE_M) return MIN_CARD_SCALE;
+    var progress = (distance - FULL_SIZE_DISTANCE_M) /
+      (MIN_SIZE_DISTANCE_M - FULL_SIZE_DISTANCE_M);
+    return Math.round((1 - progress * (1 - MIN_CARD_SCALE)) * 1000) / 1000;
   }
 
   function normalizeAssets(value) {
@@ -149,6 +164,7 @@
     var distance = Math.max(0, Number(player.distance) || 0);
     card.style.left = (x * 100) + "%";
     card.style.top = (y * 100) + "%";
+    card.style.setProperty("--card-scale", String(cardScale(distance)));
     card.style.setProperty("--card-opacity", String(Math.max(0.42, 1 - distance / 80)));
     var presentationSignature = assetGeneration + "|" + presentation.bannerId + "|" + presentation.displayedBadgeIds.join(",");
     if (card.dataset.presentationSignature !== presentationSignature) {
@@ -230,6 +246,7 @@
 
   window.NcmDriverCards = {
     safeName: safeName,
+    cardScale: cardScale,
     normalizePresentation: normalizePresentation,
     staleIds: staleIds,
     onStreamEvent: onStreamEvent,

@@ -878,12 +878,19 @@ Constraint recorded as `IDEA-393`: **the race HUD stays bundled**; only the brid
 
 ## §AK — Driver Card/nameplate first live pass (2026-09-24, NCM Development) — **OWED**
 
-Offline gate: 278 core tests per interpreter, 162 resource Lua files, five WebUI scripts, 94 existing panel
-assertions and 21 Driver Card assertions pass. **Deployment PASS, 16:44 EDT:** Development published the new
+Current offline gate: 285 core tests per interpreter, 165 resource Lua files, five WebUI scripts, 96 existing
+panel assertions and 26 Driver Card assertions pass. **Deployment PASS, 16:44 EDT:** Development published the new
 resource generation; schema entries 30 includes `030:driver_presentation`, `pending=[]`; both NCM resources,
 scheduler and race control started; HTTP health 200; stderr empty; zero boot error matches. This is not a
 nameplate PASS. The section still requires **two live clients**. Join both in the same bucket and note their
 player IDs. Client A observes Client B unless a row says otherwise.
+
+**First live observation, NCM Online 2026-09-24:** the WebUI-capable first process drew the remote Driver Card,
+but its fixed screen-pixel size visibly grew relative to the receding body (**§AK6 FAIL / KB-98**). The server
+correctly held and published `baremetaleven -> ncm_default`. The second local process could not draw that card:
+its OPEN//77 WebHost disconnected with `pipe_read_failed:109`, imported zero WebUI surfaces and never emitted
+the custom-card ready/handoff line (existing KB-4). That is not a missing presentation row and is not recorded
+as a Driver Card PASS. The scale correction is deployed to Development; visual re-test remains owed.
 
 Use the server console command `ncm.card.preview <B-id> <0|1|2|3> [default|selected]`. `selected` is the
 explicit Development-only alternate; the command changes no accomplishment or persisted entitlement.
@@ -895,7 +902,7 @@ explicit Development-only alternate; the command changes no accomplishment or pe
 | §AK3 | Run preview with `0 default`, then `0 selected`. | Baseline and selected banner treatments are visibly distinct, crop cleanly, and both remain readable. | **OWED — two clients** |
 | §AK4 | Run preview with `0`, `1`, `2`, then `3 selected`. | All four badge layouts look intentional; never more than three slots render. | **OWED — two clients** |
 | §AK5 | Inspect the right-hand instrument region in every variant. | It remains fixed/high-contrast and says **Fingerprint / Unavailable / Insufficient data**; no zero polygon. | **OWED — two clients** |
-| §AK6 | Walk/drive B across A's view and toward the ordinary nameplate range limit. | Card tracks B without obvious extra Lua lag; existing fade/distance/visibility policy is not widened. | **OWED — two clients** |
+| §AK6 | Walk/drive B across A's view and toward the ordinary nameplate range limit. | Card tracks B without obvious extra Lua lag; card scale remains proportionate; existing fade/distance/visibility policy is not widened. | **FAIL 2026-09-24 Online — fixed-pixel card grew relative to body (KB-98); Development correction awaits live re-test** |
 | §AK7 | Turn A's camera until B is behind it, then return; move B out of stream range and back. | Card disappears when not projected/streamed, returns once, and leaves no stranded DOM card. | **OWED — two clients** |
 | §AK8 | Have B leave and rejoin; if practical, force one normal body recreation. | Old card disappears; the new streamed body gets exactly one current card, including late presentation state. | **OWED — two clients** |
 | §AK9 | If practical, move B to another routing bucket and back. | A loses the card with the bucket-public bag mirror and regains one after return. | **OWED — two clients / bucket command** |

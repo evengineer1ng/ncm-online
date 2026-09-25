@@ -82,6 +82,15 @@ check(api.safeName(hostile) === hostile, "non-ASCII name content is preserved as
 check(api.safeName("x".repeat(100)).length === 64, "long name is bounded without changing source identity");
 check(api.safeName("   ") === "Unknown driver", "missing name has an honest fallback");
 
+check(api.cardScale(0) === 1 && api.cardScale(5) === 1,
+  "Driver Card stays full-size at conversational distance");
+check(api.cardScale(15) < api.cardScale(5) && api.cardScale(25) < api.cardScale(15),
+  "Driver Card scale decreases monotonically as its driver recedes");
+check(api.cardScale(35) === 0.58 && api.cardScale(200) === 0.58,
+  "Driver Card distance scaling has a readable lower bound");
+check(api.cardScale("not-a-distance") === 1,
+  "missing distance cannot collapse the Driver Card");
+
 check(api.staleIds(["7", "8", "9"], [{ id: 8 }, { id: "9" }]).join(",") === "7",
   "stream-out/leave reconciliation identifies stale DOM entry");
 check(api.staleIds(["7"], []).join(",") === "7", "empty stream removes every proximity card");
@@ -99,6 +108,9 @@ check(!style.includes("backdrop-filter") && !/filter\s*:\s*blur\(/.test(style),
   "card uses no blur effect");
 check(source.includes("card.dataset.presentationSignature !== presentationSignature"),
   "per-frame projection does not rebuild slow banner and badge DOM");
+check(source.includes('card.style.setProperty("--card-scale"') &&
+  style.includes("scale(var(--card-scale, 1))"),
+  "per-frame distance drives bounded card scale without rebuilding DOM");
 
 const clientLua = fs.readFileSync(path.resolve(webRoot, "../client/nameplates.lua"), "utf8");
 const streamAt = clientLua.indexOf("Open77.nameplates.stream(page)");

@@ -30,11 +30,11 @@ body,
   height: 84px;
   display: grid;
   grid-template-columns: minmax(0, 1fr) 82px;
-  transform: translate(-50%, -100%);
+  transform: translate(-50%, -100%) scale(var(--card-scale, 1));
   transform-origin: 50% 100%;
   filter: drop-shadow(0 3px 4px rgba(0, 0, 0, 0.82));
   opacity: var(--card-opacity, 1);
-  transition: opacity 90ms linear;
+  transition: opacity 90ms linear, transform 90ms linear;
 }
 
 .ncm-card__banner {
@@ -264,10 +264,4 @@ body,
   line-height: 7px;
   text-align: center;
   text-transform: uppercase;
-}
-
-@media (max-width: 1280px) {
-  .ncm-card {
-    transform: translate(-50%, -100%) scale(0.9);
-  }
 }
