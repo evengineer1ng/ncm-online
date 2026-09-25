@@ -1,19 +1,26 @@
 # Build the NCM Carrier plugin and assemble the hosted package.
 #
-# Produces THREE things and stops:
-#   dist/ncm_carrier/red4ext/plugins/ncm_carrier/ncm_carrier.dll   the tree as it lands in the game
-#   dist/ncm-carrier-<version>.zip                                 the blob the launcher downloads
-#   a declaration snippet, printed, for tools/staging/declare-carrier.py
+# Builds, packages and -- with -PublishDev -- hosts it on the local Development server and restarts it.
+# Then you launch the game and join. There is no manual copy step: the launcher installs the package, which
+# is the path that actually ships, and it is the path worth testing.
 #
-# It declares nothing and deploys nothing. **Test the DLL by hand before it becomes a join requirement**
-# (MASTER_TEST section AT1): copy the tree into the game, launch, and read red4ext/logs/. A plugin that stops
-# the game launching must be found by us, once, and not by every player at the same time.
+# RECOVERY IF THE GAME WILL NOT LAUNCH. One command, server-side, nothing to hunt for on disk:
 #
-#   .\tools\build-carrier.ps1                 build and package
-#   .\tools\build-carrier.ps1 -SkipBuild      repackage what is already in build/
+#   python tools/staging/publish-carrier.py tools/open77/server --remove
+#   .\tools\build-carrier.ps1 -RestartDevOnly
+#
+# The launcher then removes what it projected on the next join. That is why hosting beats copying by hand:
+# the uninstall is somebody else's job and it is already written.
+#
+#   .\tools\build-carrier.ps1                     build and package only
+#   .\tools\build-carrier.ps1 -PublishDev         build, package, host on Development, restart it
+#   .\tools\build-carrier.ps1 -SkipBuild -PublishDev   repackage and host what is already built
+#   .\tools\build-carrier.ps1 -RestartDevOnly     just bounce the Development server
 [CmdletBinding()]
 param(
     [switch]$SkipBuild,
+    [switch]$PublishDev,
+    [switch]$RestartDevOnly,
     [string]$Configuration = "Release"
 )
 
@@ -21,6 +28,45 @@ $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
 $carrier = Join-Path $root "ncm\carrier"
 $dist = Join-Path $root "dist"
+
+$devRoot = Join-Path $root "tools\open77\server"
+
+function Restart-DevServer {
+    # Stop whatever is serving, then start it detached the way o77-server.ps1 does, so the licence key
+    # still comes from the DPAPI secret store and never from a file or an argument.
+    $running = Get-Process -Name "Open77.Server" -ErrorAction SilentlyContinue
+    foreach ($proc in $running) {
+        Write-Host "stopping Open77.Server (pid $($proc.Id))" -ForegroundColor DarkGray
+        try { Stop-Process -Id $proc.Id -Force -ErrorAction Stop } catch {}
+    }
+    if ($running) { Start-Sleep -Seconds 2 }
+
+    $script = Join-Path $root "tools\o77-server.ps1"
+    Start-Process -FilePath "powershell" `
+        -ArgumentList @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $script) `
+        -WorkingDirectory $root -WindowStyle Minimized | Out-Null
+    Write-Host "Development server starting..." -ForegroundColor Cyan
+
+    # Wait for the manifest rather than for a fixed sleep: the digest is the thing we actually care about.
+    for ($i = 0; $i -lt 30; $i++) {
+        Start-Sleep -Seconds 2
+        try {
+            $manifest = Invoke-RestMethod -Uri "http://127.0.0.1:11779/mods/v1/manifest" -TimeoutSec 3
+            return $manifest
+        } catch { }
+    }
+    Write-Warning "server did not answer /mods/v1/manifest within 60s -- check its console window"
+    return $null
+}
+
+if ($RestartDevOnly) {
+    $m = Restart-DevServer
+    if ($m) {
+        Write-Host "manifest digest: $($m.digest)" -ForegroundColor Green
+        Write-Host "enabled: $($m.enabled)  packages: $($m.mods.Count)"
+    }
+    return
+}
 
 if (-not (Test-Path (Join-Path $carrier "third_party\RED4ext.SDK\CMakeLists.txt"))) {
     throw "RED4ext.SDK is not checked out. Run: git submodule update --init --recursive"
@@ -86,22 +132,38 @@ Write-Host "  $zip"
 Write-Host "  sha256 $hash"
 Write-Host "  $size bytes"
 Write-Host ""
-Write-Host "== declaration (for tools/staging/declare-carrier.py)" -ForegroundColor Green
-@"
-{
-  "id": "ncm-carrier",
-  "source": "hosted",
-  "displayName": "NCM Carrier",
-  "version": "$version",
-  "sha256": "$hash",
-  "sizeBytes": $size,
-  "capability": "executable"
+if (-not $PublishDev) {
+    Write-Host "Not published. Run again with -PublishDev to host it on Development." -ForegroundColor Yellow
+    return
 }
-"@ | Write-Host
 
-Write-Host "NEXT, IN THIS ORDER:" -ForegroundColor Yellow
-Write-Host "  1. Copy dist\ncm_carrier\red4ext\ into the game by hand and launch it."
-Write-Host "     Read <game>\red4ext\logs\ and red4ext\plugins\ncm_carrier\ncm_carrier.log."
-Write-Host "     THE GAME MUST LAUNCH. Do not skip this."
-Write-Host "  2. Only then host the blob and declare it on DEVELOPMENT."
-Write-Host "  3. Production is a separate decision on a separate day."
+Write-Host "== publishing to Development" -ForegroundColor Cyan
+# RB15 and its liveries are still declared on Development, parked. Enabling requiredMods would make them
+# required to join again, and `L142` ceased their redistribution -- so they go as the carrier arrives.
+& python (Join-Path $root "tools\staging\publish-carrier.py") $devRoot `
+    --zip $zip --version $version --enable `
+    --drop "rb15-f1-inert-v10" --drop "ncm-rb15-liveries"
+if ($LASTEXITCODE -ne 0) { throw "publish failed -- server.jsonc was not changed" }
+
+$manifest = Restart-DevServer
+if ($manifest) {
+    Write-Host ""
+    Write-Host "== Development is serving" -ForegroundColor Green
+    Write-Host "  digest   $($manifest.digest)"
+    Write-Host "  enabled  $($manifest.enabled)"
+    foreach ($mod in $manifest.mods) { Write-Host "  package  $($mod.id) $($mod.version)" }
+    if ($manifest.digest -notmatch $hash.Substring(0, 8) -and $manifest.mods.Count -eq 0) {
+        Write-Warning "no packages in the manifest -- requiredMods may still be parked"
+    }
+}
+
+Write-Host ""
+Write-Host "NEXT: launch the game and join Development." -ForegroundColor Yellow
+Write-Host "  The launcher will name NCM Carrier as executable content and ask you to accept it."
+Write-Host "  Then MASTER_TEST section AT: AT1 the game launches, AT2 the bridge connects, AT4 weather"
+Write-Host "  reaches a freshly spawned car, AT6 one drive closes KB-106."
+Write-Host ""
+Write-Host "IF THE GAME WILL NOT LAUNCH:" -ForegroundColor Yellow
+Write-Host "  python tools/staging/publish-carrier.py tools/open77/server --remove"
+Write-Host "  .\tools\build-carrier.ps1 -RestartDevOnly"
+Write-Host "  Rejoin; the launcher removes what it projected. Read ncm_carrier.log for why."

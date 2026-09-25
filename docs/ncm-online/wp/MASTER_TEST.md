@@ -1208,27 +1208,42 @@ substitute open-wheel mod - the owner ruled explicitly against substituting one 
 `L146` / `IDEA-472`. The carrier is one RED4ext plugin carrying drive-model effects, final-command authority
 and force feedback. It is built and offline-green; nothing below has been run.
 
-**AT1 IS NOT OPTIONAL AND IT COMES FIRST.** A RED4ext plugin that fails badly does not degrade gracefully -
-RED4ext puts up a MessageBox and terminates, so the game does not launch at all, and the player's only clue
-is that Cyberpunk broke after installing NCM's mod. That failure reaches every player at the same moment.
-It is found by us, once, by hand, before the package is a join requirement (`IDEA-478`).
+**The carrier is hosted on Development and installed by the launcher. There is no manual copy step.**
+An earlier draft of this section asked for one "for safety"; that was backwards and it was extra QA invented
+on top of the real thing (owner, 2026-09-25). The launcher path is the path that ships, so it is the path
+worth testing -- and it is also the more recoverable one, because the uninstall is already written:
 
-**Everything here runs in NCM Online or on the desktop. Nothing requires Solo** (`L144`).
+```
+python tools/staging/publish-carrier.py tools/open77/server --remove
+.\tools\build-carrier.ps1 -RestartDevOnly
+```
+
+Rejoin and the launcher removes what it projected. A hand-copied DLL has to be hunted down instead.
+
+The load risk itself is unchanged and is handled in code, not by procedure: every startup stage is
+independently wrapped, offsets are RTTI-resolved with a credibility bound that refuses rather than writes,
+and the plugin declares `RUNTIME_VERSION_INDEPENDENT` so a game patch does not refuse the load outright.
+`ncm_carrier.log`, written beside the DLL, is the only diagnostic that survives a failed load -- read it
+first, always.
+
+**Everything here runs in NCM Online. Nothing requires Solo** (`L144`).
 
 | # | Operation | Expected | Result |
 |---|---|---|---|
-| §AT1 | **Copy `dist/ncm_carrier/red4ext/` into the game by hand. Do not declare anything. Launch Cyberpunk.** Read `<game>/red4ext/logs/` and `red4ext/plugins/ncm_carrier/ncm_carrier.log`. | **The game launches.** `ncm_carrier` appears in the RED4ext log as loaded. The carrier log names its version, whether the bridge is listening, whether the hook installed, and what device it found. A declined hook is a PASS - effects and force feedback do not depend on it. | **NOT RUN** |
-| §AT2 | Join Development with the carrier present. | `carrier_bridge` connects: the client log shows `carrier <version> | hook=... ` and the bridge reports a listener. The bridge is on by default now, so no `/ncm.ffb on` is needed. | **NOT RUN** |
+| §AT0 | `.\tools\build-carrier.ps1 -PublishDev`. | The DLL builds; the package is stored as a blob on Development, declared, and requiredMods is un-parked with **RB15 and the liveries dropped** (`L142`). The server restarts and the manifest reports a new digest with `ncm-carrier` in it. | **NOT RUN** |
+| §AT1 | Launch Cyberpunk and join Development through the launcher. | The consent gate names **NCM Carrier** as executable content into `red4ext/plugins/`; the launcher projects it; **the game launches and the join completes.** `ncm_carrier` appears in `<game>/red4ext/logs/` as loaded, and `red4ext/plugins/ncm_carrier/ncm_carrier.log` names its version, whether the bridge is listening, whether the hook installed, and what device it found. **A declined hook is a PASS** - effects and force feedback do not depend on it. | **NOT RUN** |
+| §AT2 | Still in the world, check the client log. | `carrier_bridge` connects: `carrier <version> | hook=...`. The bridge is on by default now, so no `/ncm.ffb on` is needed. | **NOT RUN** |
 | §AT3 | Open the NCM panel, WHEEL/PEDALS tab. | The wheel is named, classified, and its rung shown against the ladder for that class. An unrecognised wheel reads `unknown` and gets the lowest ceiling - **it is not silently upgraded**. | **NOT RUN** |
 | §AT4 | `ncm.machine weather rain` on the server. Then **spawn a fresh car** and drive it. | The server publishes projections; the client pushes them; the carrier log reports `projection v1 on <record>: N applied`. The car has less lateral grip and longer braking. **Spawn-cached: a car already in the world does not change** - that is correct behaviour, not a failure. | **NOT RUN** |
 | §AT5 | `ncm.machine weather sunny`, then spawn again. Then disconnect. | Grip returns on the next spawn. On disconnect the carrier restores every captured original and says how many. **Verify by relaunching single-player later: the player's own game must be exactly as it was.** This is the row that protects someone's install from us. | **NOT RUN** |
 | §AT6 | One drive with force feedback armed. Then quit and read the carrier log. | Force is felt: weight building with speed, texture as the tyres let go, engine hum rising with revs. On shutdown the log prints `measured <channel>: peak ... over N frames` for every channel. **This closes `KB-106`** - if `suspLong`/`suspLat` peak far below 0.05 the road channel has been inaudible and `kRoadScale` is wrong. | **NOT RUN** |
-| §AT7 | Host the blob, `declare-carrier.py <dev-root> --version ... --sha256 ... --size ...`, restart Development, join through the launcher. | The manifest digest changes; the consent gate names **NCM Carrier** as executable content; the launcher projects it into `red4ext/plugins/ncm_carrier/`; the game launches and §AT2-§AT6 still hold. **This is NCM's first own package through its own pipeline.** | **NOT RUN** |
+| §AT7 | Disconnect, rebuild with any change, `-PublishDev` again, rejoin. | The digest changes, the launcher fetches the new blob rather than reusing the cached one, and the old carrier blob is pruned from the store. **This is the loop the whole thing exists to make cheap** - a code change reaches the game in one command and one join. | **NOT RUN** |
 
 ### What passing §AT does and does not establish
 
-It establishes that NCM can ship native code of its own through its own delivery pipeline, that the record
-carrier works end to end, and that force feedback survived moving inside the game.
+It establishes that NCM can ship native code of its own through its own delivery pipeline -- **AT0 and AT1
+together are NCM's first own package, delivered by NCM's own launcher path** -- that the record carrier works
+end to end, and that force feedback survived moving inside the game.
 
 It does **not** establish per-player differentiation - two drivers of the same model still share one record,
 which is Report 36's hardest constraint and the one that sits across the premise of a parts economy. It does

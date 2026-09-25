@@ -9,25 +9,32 @@ Last rewritten: **2026-09-25 - the NCM Carrier built: one native mod for parts, 
 > BACKLOG next free **IDEA-479**; known issues through **KB-121** plus the pre-existing duplicates **KB-87**
 > and **L119**. Read the last row of each ledger, not this line (`KB-114`).
 
-## Next action: build the DLL, then launch the game once, by hand.
+## Next action: build it and host it on Development.
 
 ```
 git submodule update --init --recursive
 $env:VCPKG_ROOT = "<your vcpkg>"
-.\tools\build-carrier.ps1
+.\tools\build-carrier.ps1 -PublishDev
 ```
 
-Then **§AT1, which is not optional**: copy `dist\ncm_carrier\red4ext\` into the game, launch, and read
-`red4ext\logs\` and `red4ext\plugins\ncm_carrier\ncm_carrier.log`. **The game must launch.** A RED4ext plugin
-that fails badly does not degrade - RED4ext shows a MessageBox and terminates - and that failure would reach
-every player at the same moment. We find it once, ourselves (`IDEA-478`).
+That builds the DLL, stores the blob on Development, declares it, drops RB15 and the liveries from the
+declaration (`L142`), un-parks requiredMods and restarts the server. Then launch the game and join: the
+launcher names **NCM Carrier** as executable content, you accept it, and it installs. That is MASTER_TEST
+**AT0 and AT1**, and together they are NCM's first own package through NCM's own pipeline.
 
-Only after that: host the blob, `declare-carrier.py` against **Development**, restart, join. Production is a
-separate decision on a separate day.
+**If the game will not launch**, the fix is server-side and there is nothing to hunt for on disk:
 
-Expect to debug the flat write first (`IDEA-477`) and the OPEN//77 coexistence question second - OPEN//77 is
-itself a RED4ext plugin with its own vehicle adapter and nobody has ever asked whether a second one sharing
-the drive path is fine.
+```
+python tools/staging/publish-carrier.py tools/open77/server --remove
+.\tools\build-carrier.ps1 -RestartDevOnly
+```
+
+Read `red4ext/plugins/ncm_carrier/ncm_carrier.log` for why -- it is the only diagnostic that survives a
+failed load.
+
+Expect to debug the flat write first (`IDEA-477`) and OPEN//77 coexistence second: OPEN//77 is itself a
+RED4ext plugin with its own vehicle adapter, and nobody has asked whether a second one sharing the drive
+path is fine.
 
 ## What was built this session
 
@@ -76,7 +83,7 @@ Offline gate green. Nothing is compiled, packaged, declared or deployed.
 
 ## Outstanding live QA
 
-- **§AT:** the carrier, AT1-AT7. Nothing run. AT1 gates everything else.
+- **§AT:** the carrier, AT0-AT7. Nothing run. AT0 publishes, AT1 is the join.
 - **§AQ:** AQ1/AQ3 **LIVE PASS**; AQ2 and AQ4 cheap and owed.
 - **`KB-106`'s `ROAD_SCALE`** is now folded into **§AT6** - the carrier prints the measured peaks on shutdown,
   so one drive closes it.
@@ -96,5 +103,6 @@ and blocked by nothing.
   discharged, **KB-117 closed by retirement**.
 - **IDEA-472** the carrier; **473** NCM had already written these flats itself and nobody checked; **474** four
   families cannot be felt; **475** one fact, one carrier; **476** rain as grip; **477** how a flat is actually
-  written; **478** launch it by hand first.
+  written; **478** superseded -- the manual pre-flight was extra QA on top of the path that actually ships,
+  and the hosted path is the more recoverable one.
 - Online untouched. No deploy, no restart, no config change.
