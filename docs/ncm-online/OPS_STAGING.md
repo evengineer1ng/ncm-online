@@ -4,10 +4,15 @@
 > Authority map: [INDEX.md](INDEX.md) - classified 2026-09-24 (L125)
 
 Day-to-day recipe for the staging server. Facts: Ubuntu 24.04, 2 vCPU / 4 GB, static IP `52.60.225.137`,
-OPEN//77 `2.31.13+op77.84 linux-x64`, server id `6b154fdc-d515-4903-97dd-df37cb966151`, name "NCM Staging",
+OPEN//77 `2.31.13+op77.87 linux-x64`, server id `6b154fdc-d515-4903-97dd-df37cb966151`, name "NCM Online",
 unlisted. Layout `/opt/ncm/{server,resources/ncm,mods,logs}`; systemd unit `ncm-server` (`Restart=always`, so any
 exit — including a Warden restart — comes straight back in 5 s). MariaDB 10.11 on the box, db `ncm`, user
 `ncm@127.0.0.1`; the password lives only in `/opt/ncm/server.env` (mode 600) and is never printed.
+
+Required-mod resources are public through Caddy 2.11.4 at
+`https://52-60-225-137.sslip.io:11779/` (interim proof hostname). Caddy terminates TLS on public 11779 and proxies
+to OPEN//77 at `127.0.0.1:11782`; its ACME HTTP-01 listener uses public TCP 80. Warden remains private at
+`127.0.0.1:11780` and Caddy's admin socket remains private at `127.0.0.1:2019`.
 
 Secrets rule: never `cat server.jsonc` (it holds the licence). Read it through `tools/o77-config-show.ps1` or the
 targeted python scripts in `tools/staging/`, which print only the section they touch.
@@ -30,8 +35,9 @@ targeted python scripts in `tools/staging/`, which print only the section they t
   VS Code extension can** — it opened SSH on port 22 directly and ran `deploy-staging.ps1` end to end on
   2026-09-22 (deploy 9). So: an agent should test reachability (`Test-NetConnection 52.60.225.137 -Port 22`) rather
   than assume either way, and this launcher is the hand-off point only when that test fails.
-- Firewall is two layers: **ufw on the box** (22/tcp, 11778/udp, 11779/tcp) *and* the **Lightsail instance firewall**
-  (Networking tab). Both must pass 11778/udp + 11779/tcp (KB-9). Lightsail's default only passes 22 and 80.
+- Firewall is two layers: **ufw on the box** (22/tcp, 80/tcp for ACME, 11778/udp, 11779/tcp) *and* the
+  **Lightsail instance firewall** (Networking tab). Both must pass 11778/udp + 11779/tcp; TCP 80 must remain
+  reachable for certificate issuance/renewal (KB-9). Lightsail's default passes 22 and 80.
 
 ## Everyday commands (any terminal; `ssh` ships with Windows)
 | Want | Command |
@@ -143,18 +149,42 @@ Post-upgrade health, in one line each: `migrations: N applied` → `ownership le
 `ncm_world started v…` → `class ceilings published` → `scheduler started: 5 series`. If the series line is
 missing, NCM did not start.
 
-## Required mods (state as of 2026-09-20)
+## Required mods (state as of 2026-09-25 15:00 UTC)
 Imported in Warden and on disk: `rb15-f1-inert-v10` 10.0.0, `ncm-rb15-liveries` 1.0.0 (both INERT),
-`archivexl` 1.27.1, `tweakxl` 1.11.4 (executable). **Parked**: `requiredMods.enabled=false, unsecured=false`
-because the launcher refuses every hosted hash (`Unverifiable`, KB-8). Testers install by hand (P34).
+`archivexl` 1.27.1, `tweakxl` 1.11.4 (executable). **Enabled on the whitelisted Online world**:
+`requiredMods.enabled=true, unsecured=true`, digest
+`06ab5485585f57f29cb5a1ad30b3e99bcdbd99985216765f76e7d01a268c90a7`. The owner authorised this production
+proof and owns the remaining launcher/game checks (L137 / MASTER_TEST §AP).
+
+Caddy owns public TCP 11779 with a trusted certificate for `52-60-225-137.sslip.io`; OPEN//77 listens only on
+`127.0.0.1:11782`. The master row relays four HTTPS blob URLs and the correct executable/inert classifications.
+External full downloads of all four blobs matched declared size/SHA-256 and ETag; RB15 Range returned 206.
+Warden stayed on loopback. `sslip.io` is an interim proof hostname, not permanent owned infrastructure
+(`IDEA-452`). Certificate observed: Let's Encrypt, TLS 1.3, expires 2026-12-24; Caddy renews automatically.
 
 Flag scripts (upload with `scp -i <key> tools\staging\<name>.py ubuntu@52.60.225.137:/tmp/`, run with
 `ssh -i <key> ubuntu@52.60.225.137 "python3 /tmp/<name>.py && sudo systemctl restart ncm-server"`):
 - `set-unsecured.py` — `enabled=true, unsecured=true`, drops indexed loader entries. **Run it after any Warden
   import**: an import rewrites the `requiredMods` block and silently drops `unsecured`.
-- `set-mods-off.py` — `enabled=false, unsecured=false` (current parked state).
+- `set-mods-off.py` — `enabled=false, unsecured=false` (emergency/manual park; not the current state).
 Warden's Mods page has no unsecured toggle and no review button; the review API works from the browser console:
 `fetch('/api/mods/<id>/request-review', {method:'POST'})` on the Warden tab.
+
+**2026-09-25 forensic correction and production transport deployment:** KB-112 / Report 35 recovered the exact
+failure. Launchers `.89` and current `.100` discard every non-loopback HTTP hosted-mod URL, then call the missing
+URL `Unverifiable`; unsecured consent and review were not the blocker. L137 authorised the whitelisted Online
+proof. The HTTPS endpoint and MASTER_TEST §AP1 are live-green. Do not retry indexed loader IDs unless the signed
+index actually contains them. Do not call the delivery path accepted until the owner completes §AP2-§AP7.
+
+Deployment artifacts and rollback:
+
+- checked-in Caddy config: `tools/staging/Caddyfile.required-mods`;
+- checked-in idempotent dry-run/apply guard: `tools/staging/configure-required-mods-https.py`;
+- server config backup: `/opt/ncm/backups/required-mods-https-20260925T145252Z/server.jsonc`;
+- prior Caddyfile backup: `/opt/ncm/backups/required-mods-https-prestage-20260925T145252Z/Caddyfile`;
+- health: `systemctl is-active caddy ncm-server`, then independently GET the public manifest and one Range;
+- park with `set-mods-off.py` if launcher acceptance finds a package/projection fault. Restoring the old
+  public-HTTP endpoint does not make hosted delivery usable and is not an acceptable steady-state rollback.
 
 ## Rebuild from nothing
 1. Lightsail: Ubuntu 24.04, 2 vCPU/4 GB, static IP, firewall rules above, SSH key downloaded.

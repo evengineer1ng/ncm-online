@@ -975,3 +975,193 @@ knowledge evidence/discovery rows, all under the sole `ncm-dev` world identity.
 | §AM5 | Try `/freeroam`, `/car`, `/race`, `/footrace`, `/pvp` and `/dm`. | None of the platform sandbox surfaces exists or mutates world state. | **OWED — live client** |
 | §AM6 | Try `/anim list`, one named animation and `/anim stop`. | Standalone animation command still works; no-argument picker absence is accepted. | **OWED — live client** |
 | §AM7 | Die once. | Record the actual current behavior honestly. Reconnect is the expected workaround until NCM owns respawn. | **OWED — live client** |
+
+---
+
+## §AN — Gate 6 physical performance and composition proof (NCM Development) — **NOT RUN**
+
+`IDEA-435` / `IDEA-436`; exact architecture and safety boundary in
+`33_PARTS_ENGINEERING_FINAL_RECONCILIATION.md` §7. This section does not authorize a harness, deployment or
+Parts implementation. Use one explicit ordinary canonical Development vehicle on a safe straight. The harness
+must refuse outside Development and from a player command, capture the exact pre-test profile, enforce a short
+TTL, restore on every exit and never call `clearAllPerformance`.
+
+| # | Smallest live proof | PASS condition | State |
+|---|---|---|---|
+| §AN1 | Baseline the named Hella/MaiMai at full throttle on the same straight; capture `getPerformance`, target ID/record and telemetry. | Vehicle comfortably exceeds the proposed 80 km/h test cap; pre-test profile is recorded. | **NOT RUN — no harness built** |
+| §AN2 | Compose one Development limiter input to `{topSpeedKph=80, accelerationScale=0.50, taperKph=12}`, apply it once through server `setPerformance`, then read it back. | Input, final profile and exact matching read-back are logged; no independent writer is invoked. | **NOT RUN** |
+| §AN3 | Repeat the baseline drive under §AN2. | Clearly slower pickup and a stable plateau near 80 km/h, with telemetry evidence and no hunting/rubber-banding. | **NOT RUN** |
+| §AN4 | Restore the exact captured baseline, then reload/stop the harness. | Read-back returns to baseline; vehicle again exceeds 80 with baseline-like pickup; no profile remains after teardown. | **NOT RUN** |
+| §AN5 | Run A only: homologation `{120, 0.80, 15}`. Restore. Run B only: temporary limiter `{90, 0.90, 10}`. Restore. | Read-back and physical behavior match each distinct individual profile. | **NOT RUN** |
+| §AN6 | Run A+B through the one composer, using the test-only expected result `{90, 0.72, 10}`. | Final profile differs from A and B; car plateaus near 90 and accelerates more slowly than B-only. Last-writer output is a FAIL. | **NOT RUN** |
+| §AN7 | Remove B while A remains, then remove A while B remains; finally remove both. | Recomputes A, then B, then exact baseline. Removing one input never clears the other. | **NOT RUN** |
+| §AN8 | Inspect server/client logs and the target after abort, disconnect and resource stop. | Every path produces one restoration receipt; no `[ERR]`, stranded cap, DB/schema write or effect on another vehicle. | **NOT RUN** |
+
+Passing §AN1–§AN4 proves the carrier. Passing §AN5–§AN8 proves composition for the three governor dimensions only.
+Neither result proves grip, brakes, suspension, steering, tires or above-native power.
+
+---
+
+## §AO - Gate 6 Development-only input-mediated brake proof - **NOT RUN**
+
+`IDEA-442`; exact semantic/safety boundary in
+`34_GATE6_INPUT_AUTHORITY_REQUIRED_MOD_AUDIT.md` sections 8-10. This is a local companion experiment, not a
+native brake-force test, not Parts, and not sanctioned enforcement. It needs no NCM server change or schema.
+Do not begin until the temporary harness records distinct raw/merged/transformed values and neutralises the
+virtual pad on tick failure (`KB-110`, `KB-111`).
+
+Use one ordinary known vehicle, one flat safe straight, repeatable 80 km/h entry and unchanged
+weather/damage/setup. Run A/B/A three times each: cap 1.00, cap 0.55, restored cap 1.00.
+
+| # | Smallest live proof | PASS condition | State |
+|---|---|---|---|
+| §AO1 | Start the test-only companion with cap 1.00; press/release every axis; deliberately stop it once. | Monotonic log carries physical normalised, merged, cap, transformed, virtual-update success and age. Stop/reset leaves every virtual axis neutral. | **NOT RUN - no harness built** |
+| §AO2 | Baseline three full-pedal stops from 80 km/h. | Raw and virtual brake reach about 1.00; game snapshot/HUD follows; entry speed, stop time and distance are repeatable enough to distinguish the next condition. | **NOT RUN** |
+| §AO3 | Repeat three stops with cap 0.55. | Raw pedal still reaches about 1.00; transformed virtual and game brake remain bounded near 0.55; stopping time/distance materially increase. | **NOT RUN** |
+| §AO4 | Restore cap 1.00 and repeat. | Virtual/game brake and physical result return to the baseline envelope. No setting or transformed output survives restart. | **NOT RUN** |
+| §AO5 | During a stationary safe check, inject/induce one harness tick failure or disconnect. | Watchdog logs once, neutralises the pad and aborts. No stale throttle/brake/steer remains. | **NOT RUN** |
+| §AO6 | Inspect client/companion logs and the vehicle afterward. | No server/schema/Parts write, no Production change, no claim of native brake-force modification. | **NOT RUN** |
+
+Passing AO proves only that command mediation routed through the companion can create a convincing physical
+braking consequence. It does not prove controller/keyboard coverage or competitive integrity. A static
+low-speed steering clamp may be tested afterward as a separate bounded observation; dynamic steering feedback
+is outside AO.
+
+---
+
+## §AP - real RB15 + NCM liveries RequiredMods acceptance - **IN PROGRESS; AP1 PASS, AP2 PASS, AP3 PARTIAL**
+
+`IDEA-448` / `IDEA-450`; exact forensic result and package hashes in
+`35_REQUIREDMODS_FORENSIC_AUDIT.md`. KB-112 proves why the old run failed: NCM advertised public HTTP and the
+launcher discarded the URLs before download. This proof is independent of AN/AO and must not delay them. Do not
+create a dummy package and do not rebuild the real packages to manufacture a pass. The owner explicitly
+authorised the currently whitelisted Online world for the public-HTTPS proof on 2026-09-25 and retained the
+launcher/game checks personally; L137 supersedes the earlier Development-only operational limit.
+
+Prerequisites: either loopback HTTP for a same-PC Development proof or a valid HTTPS resource origin for any
+remote client; current compatible launcher/server builds; real ArchiveXL and TweakXL dependency packages through
+an authorised current path; save and named-file backups; a confirmed empty test world. The evidence must label
+which transport was exercised. Production deployment/restart is outside this contract unless separately authorised.
+
+| # | Smallest live proof | PASS condition | State |
+|---|---|---|---|
+| §AP1 | Before Connect, capture the master row and server boot state for the real two NCM packages plus ArchiveXL/TweakXL: IDs, versions, hashes, byte sizes, classification, usable URLs, four-package digest and `unsecured=true`. Independently GET and hash every advertised blob from the client machine. | Every URL survives launcher sanitation, every exact byte/size matches, dependencies use a real hosted/resource identity rather than absent index IDs, and no secret/Warden endpoint is exposed. Loopback HTTP passes only as a labeled same-PC proof; a remote proof requires HTTPS. | **LIVE PASS 2026-09-25 14:56-15:00 UTC — Online boot: 4 declared, digest `06ab5485585f57f29cb5a1ad30b3e99bcdbd99985216765f76e7d01a268c90a7`, enabled/unsecured true. Master row: four `https://52-60-225-137.sslip.io:11779/...` URLs, correct executable/inert classes, zero players. Let’s Encrypt TLS 1.3 certificate trusted. External full downloads matched all four declared sizes and SHA-256 values; every ETag matched its hash; RB15 Range returned 206 with bytes 0-1023/38537004. Caddy public 11779 -> OPEN//77 loopback 11782; Warden remained loopback 11780.** |
+| §AP2 | Case A: with the current manually installed RB15/livery files present and backed up, click Connect, read the warning and explicitly consent. Capture launcher resolution/fetch/cache/inspection/collision/projection receipts. | No `Unverifiable`; all four packages resolve. Any manual-file overlap is named and handled by the world-profile journal rather than silently overwritten. | **LIVE PASS 2026-09-25 (owner) on the consent half; journal half NOT EVIDENCED.** The owner received the unsecured-world warning, then the RequiredMods review/consent UI naming all four packages - TweakXL, ArchiveXL, NCM RB15 Team Liveries, RB15 F1 car only/no ERS - each presented as **Not reviewed**, and chose **Download and Join**. **No `Unverifiable` appeared. `KB-112` is closed as a delivery blocker.** Four `Not reviewed` verdicts match Report 35's `safety=unknown` attestation finding exactly. Collision/quarantine handling of the pre-existing manual files was not captured and is still owed. |
+| §AP3 | Let the launcher boot/connect. Capture `OP77_WORLD_MODS_DIGEST`/launcher context, RED4ext, ArchiveXL and TweakXL logs; then request/spawn the real RB15 and inspect every NCM team livery in game. | Expected digest is active; loaders initialise; RB15 record exists and drives; expected livery records/appearances are actually available. A file-on-disk check alone is not a PASS. | **PARTIAL 2026-09-25 (owner).** The launcher progressed through **Preparing server mods** and **Preparing your session** and the owner **entered NCM Online** - server log confirms `connected: player=1 name=easporks` at 15:38:26 UTC and `ready:` at 15:38:43. That proves fetch, hash, projection, boot and session entry. It does **not** prove loader initialisation, the RB15 record, or any livery: no RED4ext/ArchiveXL/TweakXL log was captured, no vehicle was spawned, no livery inspected. **Do not record this as an in-game content PASS.** |
+| §AP4 | Disconnect/reconnect Case A, then switch to Solo/remove the world layer. Hash the ten named RB15/livery destinations against the backup and inspect the projection journal. | Reconnect reuses cache without corruption; Solo/removal restores or preserves every pre-existing manual byte exactly; no world file leaks into Solo. | **NOT RUN** |
+| §AP5 | Case B: safely isolate only the named manual RB15/livery files after backup, leaving unrelated personal content untouched. Reconnect through the same consent path and repeat §AP2-§AP3. | OPEN//77 alone supplies the complete required set; the same RB15 and liveries load in game. Verdict does not depend on a pre-existing manual copy. | **NOT RUN** |
+| §AP6 | Park/remove the RequiredMods set on the test world, reconnect/switch profiles, and restore the isolated manual files. | World projection is removed cleanly, manual installation is byte-exact, store cleanup is not confused with projection cleanup, and no unrelated package/save is changed. | **NOT RUN** |
+| §AP7 | Review all launcher/server/resource/loader logs for both cases. | No `[ERR]`, hash/root/traversal/collision ambiguity, partial fetch, stale pending journal or unexplained foreign-file change. Evidence covers every stage from consent through in-game content and restoration. | **NOT RUN** |
+
+Passing AP proves the existing inert vehicle/livery path and their real executable loader dependencies on the
+exercised unsecured world. It does **not** prove a future NCM control extension, secured exact-hash review,
+runtime heartbeat/readiness or anti-cheat. Those are later, separate proofs; the real-package proof comes first.
+
+---
+
+## §AQ - the KB-113 spawn/location fix, live - **NOT RUN**
+
+`KB-113`; fix deployed to Online 2026-09-25 15:36 UTC and present in the working tree, uncommitted (`KB-115`).
+This is the live PASS the fix is owed (L69). **It costs no separate session:** §AP2 requires the owner to click
+Connect and join, which is the same join this section observes. Capture both on one Connect.
+
+The five parts of the fix, each with the symptom it removes: `saveLocation` now gates on the `KB-60` readiness
+rule rather than on position validity; `Location.valid` gained a vertical band (`minZ = -100`, `maxZ = 1200`)
+returning `below_world`/`above_world`, which refuses the already-poisoned row on the way out and is therefore
+self-healing without DB surgery; `shouldRestore` refuses `same_session`; `Location.alreadyThere` skips a
+teleport within 3 m; and save refusals log once per reason per session, because *saves were entirely silent*,
+which is how a write of the world origin hid for two days behind a correctly-worded restore line.
+
+| # | Smallest live proof | PASS condition | State |
+|---|---|---|---|
+| §AQ1 | Join Online as a driver with a poisoned stored position (Lord Inateur `a5ea6289`, `72519ab3` or `fe4a7a7e` all qualify — the deepest recorded fall was z = -906.4). | The driver arrives where the platform placed them. No origin teleport, no fall. The poisoned row is refused on read with `below_world`/`above_world` named in the log. | **LIVE PASS 2026-09-25 15:38 UTC, server-side.** Driver `72519ab3` joined 2 minutes after the fix deployed and the log reads `location: NOT restoring driver=72519ab3 (below_world) -- default spawn` at 15:38:45. `ready:` placed them at `x=2566.9 y=112.6 z=78.6` — a real position. **The self-healing half is proven:** the poisoned `0.0,3.6,-906.4` row written at 15:29 was refused on read without DB surgery. |
+| §AQ2 | Watch the same join for a second arrival. | **No double spawn.** No `fade = true` teleport follows the platform's placement — `alreadyThere` suppresses it within 3 m. This is the owner's *"why do i spawn in twice every time?"*. | **STRONG INDIRECT PASS; visual confirmation still owed.** No restore of any kind fired on the 15:38 join, so no teleport followed the platform's placement and there was nothing that could produce a second arrival. `alreadyThere` was not itself exercised, because the restore was refused earlier in the chain. One owner join reporting "spawned in once" closes this. |
+| §AQ3 | Read the `location:` lines for the join window. | A save refusal is **logged with its reason** rather than passing silently. At least one refusal reason appears for a player who has not yet reached a playable world. | **LIVE PASS 2026-09-25 15:38 UTC.** `location: not saving for driver=72519ab3 -- ncm-ready=NO in-world=NO platform-stage=none (not a position anyone is standing at)` at 15:38:36. All three readiness facts are named in one line. **The silence that hid the origin write for two days is gone.** |
+| §AQ4 | Drive somewhere distinctive, disconnect deliberately, reconnect. | **L110 works for the first time:** the driver returns to where they logged out, not to the origin and not to the bootstrap spawn. The disconnect save is exempted for anyone who was playable this session; the `same_session` refusal does not eat it. | **NOT RUN** |
+| §AQ5 | Confirm the join spawn is NCM's and not a gamemode's. | No `freeroam:join_spawn` marker weapon, no death on join (`KB-100`), and no restore to `-1430.3, 1257.7, 23.6`. | **NOT RUN** |
+
+A PASS here closes `KB-113` and is the first live evidence that `L110` — *where you log out is where you log
+in* — has ever actually worked. It does not close `KB-101`, which is the same family and remains recorded.
+
+### The owner's fall-through, resolved against the log (2026-09-25)
+
+The owner reported falling through the world around the RequiredMods join and correctly said the behaviour
+predates it. The server log dates it exactly. `easporks` / driver `72519ab3` joined **four** times:
+
+| Join | `ready:` position | What NCM's location system did | Fix deployed? |
+|---|---|---|---|
+| 15:01:35 | x=2566.9 | `restored ... to 0.0,3.6,0.5` (the origin) | no |
+| 15:04:14 | x=2566.9 | `restored ... to 0.0,3.6,0.5` (the origin) | no |
+| 15:29:03 | x=2566.9 | `restored ... to 0.0,3.6,-906.4` (**into the fall**) | no |
+| **15:38:26** | **x=2566.9 y=112.6 z=78.6** | **save refused with a reason; restore refused `below_world`; no teleport at all** | **yes, 15:36:15** |
+
+**The fall-through is KB-113, it happened on the pre-fix joins, and it did not recur on the post-fix join.**
+It is not attributable to RequiredMods, and the two should not be conflated. §AQ4 (log out somewhere
+distinctive, reconnect, arrive there) is the remaining substantive row and is still owed — the 15:38 session
+lasted two minutes and ended in `connection_closed`, so L110 has still never been observed working.
+
+---
+
+## §AR - are drive-model handling values live, spawn-cached, or restart-bound? - **NOT RUN; SUPERSEDED AS METHOD; DEFERRED BY OWNER (L143)**
+
+`IDEA-455`; rationale and the conflicting evidence in
+[36_DRIVEABILITY_MOD_CARRIER_ASSESSMENT.md](../36_DRIVEABILITY_MOD_CARRIER_ASSESSMENT.md) §4.
+
+> **DO NOT SCHEDULE THIS. DO NOT ASK THE OWNER TO RUN IT.** On 2026-09-25 the owner ruled (**L143**) that they
+> will not change mod environments or return to single-player to answer a question existing mods may already
+> have answered, and set a standing order: **existing-implementation research → forensic source inspection →
+> identify the residual unknown → only then propose an experiment.** Applying that order answered this section
+> without running it. Report 36 §4 now classifies the drive model as **SPAWN-CACHED**, corroborated by Vehicle
+> Physics Config's stated engine limitation and resummon-based UX, by the discovery that Direct Wheel's
+> contradicting CET module is **not shipped by its own installer**, and by the live `WheeledPhysics` struct
+> being a per-instance copy of the record. The rows below are **retained unrun** so a future session with a
+> reason to confirm it directly finds the design already written. Report 36 §11 holds the residual unknown,
+> which is about **writing** the live instance and is not this experiment.
+
+**This is an offline single-player experiment.** No server, no OPEN//77, no NCM code, no Production, no Parts,
+no schema, no deployment. Back up saves first (AGENTS.md). It exists because Direct Wheel's CET module writes
+`vehDriveModelData` flats every frame while driving and its README calls the same values *"(Requires game
+restart to apply)"* — both cannot govern the same field on the same build, and the answer decides whether
+Parts, Chrome and wear can ever be **felt** in-session or only from the next spawn.
+
+Method: resolve `<vehicle record>.vehDriveModelData`, capture the stock flats, drive a repeatable straight and a
+repeatable constant-radius turn, then observe the same car in three states. Halve `maxWheelTurnDeg` — a change
+too large to mistake for run variance. Restore the captured values at the end and verify by read-back.
+
+| # | Smallest proof | What each outcome means | State |
+|---|---|---|---|
+| §AR1 | Write the changed flat **while seated and moving**. Repeat the constant-radius turn without leaving the car. | Turn-in changes ⇒ **LIVE**: handling is a real-time carrier and Report 33 §6.8's recompute-event list transfers wholesale. No change ⇒ continue to §AR2. | **NOT RUN** |
+| §AR2 | Dismount and re-mount the same vehicle. Repeat the turn. | Changes now ⇒ read at mount. Still nothing ⇒ continue to §AR3. | **NOT RUN** |
+| §AR3 | Despawn and respawn the vehicle. Repeat the turn. | Changes now ⇒ **SPAWN-CACHED**: handling is a *configuration* carrier. Parts and setup still work; **wear and Chrome do not**, and must stay on `setPerformance` or stay simulated. Still nothing ⇒ **RESTART-BOUND** and effectively useless as an NCM carrier. | **NOT RUN** |
+| §AR4 | Restore every captured flat. Read each one back. Repeat the turn. | Read-back equals the captured value and the car returns to baseline behaviour within ordinary run variance. A probe that cannot restore is a probe that must not be repeated. | **NOT RUN** |
+| §AR5 | While the change is active, observe a **second** vehicle of the same model — AI traffic is sufficient. | The second car is affected too. This is the per-record blast radius (`IDEA-454`) made visible rather than argued, and it is the single fact most likely to be forgotten later. | **NOT RUN** |
+
+Passing §AR proves a **single-player engine behaviour**. It proves nothing about OPEN//77, nothing about
+delivery, nothing about multiplayer integrity, and it authorises no carrier. Its entire value is that three
+different design futures collapse to one before any of them is designed.
+
+---
+
+## §AS - RB15 withdrawal from public redistribution - **NOT RUN**
+
+`IDEA-465`; owner ruling **L142**. NCM has not established sufficient redistribution permission for the exact
+RB15 package it was hosting and will cease public redistribution pending permission or provenance resolution.
+The NCM liveries are NCM-owned but are RB15 content and park with it (Report 36 §7.1).
+
+**This section proves a removal, not a feature.** It is gated: the operations below write Production
+configuration and are blocked by Report 37 §6 until the owner releases that gate. **Preserve, do not delete** -
+blobs, declarations, hashes, the provenance manifest and all local authoring sources stay.
+
+| # | Smallest live proof | PASS condition | State |
+|---|---|---|---|
+| §AS1 | Before any change, capture the current four-package declaration, digest, master row and the served blob listing. | A complete pre-withdrawal record exists, so the exact state being left can be reconstructed or restored. | **NOT RUN** |
+| §AS2 | Remove `rb15-f1-inert-v10` and `ncm-rb15-liveries` from the Online `requiredMods.packages` declaration through a targeted `tools/staging/` script. Restart. | The server boots with the reduced set; the new digest differs from `06ab5485…`; the master row advertises only the remaining packages. | **NOT RUN** |
+| §AS3 | Confirm the two withdrawn blobs are no longer publicly fetchable over HTTPS, and that the retained packages still are. | Withdrawn blob URLs no longer serve bytes; retained package URLs keep exact size/hash/ETag/Range behaviour. No Warden route or secret exposed. | **NOT RUN** |
+| §AS4 | Decide and record what remains declared at all. With RB15 and the liveries gone, ArchiveXL and TweakXL have no NCM content to load. | Either the required set is parked entirely, or the retained loaders have a stated purpose. **An empty-purpose required set still costs every joiner the unsecured badge and the consent gate for nothing** (`IDEA-461`). | **NOT RUN** |
+| §AS5 | Connect once after the change. | Consent names only what is actually declared; no `Unverifiable`; session entry still works; no stale digest mismatch forces a relaunch loop. | **NOT RUN** |
+| §AS6 | Confirm Development's intended package set and documentation no longer treat RB15 as an active NCM dependency. | `IDEA-460`'s Development correction does not reintroduce it; OPS_STAGING, NOW.md and the package tables agree. | **NOT RUN** |
+| §AS7 | Verify local preservation. | Every blob, declaration, hash record and authoring source is still on disk and still hash-identical. Withdrawal removed a public offer, not NCM's work. | **NOT RUN** |
+
+Passing AS proves NCM stopped publicly redistributing content it had not established the right to serve. It
+proves nothing about permission, which is a separate conversation with the author, and it does not authorise a
+substitute open-wheel mod - the owner ruled explicitly against substituting one now.

@@ -7,7 +7,7 @@ Maintained during the orientation/interview phase. Every entry cites its basis. 
 
 Legend: **LOCKED** — owner-approved or forced by verified platform facts · **PROVISIONAL** — recommended, not yet approved · **OPEN** — needs the owner · **EXPERIMENT** — needs a measured result.
 
-Last updated: 2026-09-24 — L130 records the Driver Card and Fingerprint owner rulings. Previous entries remain authoritative.
+Last updated: 2026-09-25 - L135 separates mechanical truth from host expression and keeps additional carriers experimental. Previous entries remain authoritative.
 
 ## Guiding principle (owner, 2026-09-19)
 
@@ -1209,3 +1209,351 @@ a reboot that got Kazami."* The intended result of L131 was removal, not merely 
 - The removal remains a re-appliable vendor-tree operation and must be asserted after each OPEN//77 upgrade.
   The script keeps the earlier command/PvP edits as defence in depth against an accidental manual start, but
   absence from the load list is the authority boundary.
+
+## L133 — LOCKED — the CEILING is the wrist protection; the rung is a unit, not a widget
+
+Owner question, 2026-09-25: *"do you think force levels should be a slider like the rest? same min and max
+but a slider?"* Yes, and the rule it replaces named the wrong thing.
+
+`panel.html` carried this, in the stylesheet, as a standing prohibition:
+
+> *The ladder is drawn as discrete rungs and NEVER as a slider. A continuous control would quietly undo the
+> wrist protection at the last step — the rungs ARE the safety property (IDEA-395).*
+
+**That is false, and it was false when written.** The protection is `CEILING` and the `clamp()` that enforces
+it: a magnitude cannot leave the companion above its device class's cap, whatever control asked for it. A
+slider bounded by the same maximum is exactly as safe as a row of buttons bounded by it. Discreteness was
+never protecting anything — it protected against a danger that `clamp()` already made impossible.
+
+What the ladder actually was is a **measuring instrument**. Walk it from the bottom and report the rung where
+it becomes too strong. That is precisely how `IDEA-411` corrected four ceilings that had been reasoned about
+at a desk and were all wrong, by ~60%. **The instrument did its job and the measurement is done.**
+
+### What is ruled
+
+- **STRENGTH is a slider whose step is one rung.** Same minimum, same maximum, same permitted values.
+- **The rung survives as the shared unit**, displayed alongside the magnitude (`rung 4 / 10 (0.08)`). This is
+  the part worth keeping: several testers on different hardware now compare notes — a T128, a G29, a G923 —
+  and *"rung 4 was right"* travels between them in a way *"about 60%"* does not. A unit that survives being
+  quoted in somebody else's message is worth more than a widget.
+- **A safety claim in a comment is not a safety mechanism.** This rule sat unchallenged because it was
+  written in the imperative and sounded careful. The test for whether something protects a wrist is whether
+  removing it lets a larger number reach the device — and removing this one does not. Asserted now:
+  `panel-render-check.js` fails if the STRENGTH control's maximum is not the ceiling rung.
+
+### Related, from the same session
+
+The panel render gate had 96 assertions and **drew the WHEEL/PEDALS panel with no payload at all**, which is
+how a genuine ReferenceError in its not-connected branch passed review and the gate on 2026-09-25. Coverage
+added; it now fails 13 assertions against that defect. A gate that does not exercise a surface is not
+evidence about that surface, and the count of assertions says nothing about which surfaces they touch.
+
+## L134 — LOCKED — Parts / Engineering knowledge, fabrication and design-promotion rulings
+
+Owner rulings, 2026-09-25, following review of `32_PARTS_ENGINEERING_REENTRY_AUDIT.md`. **These are design
+authority. Nothing in this ruling implements Parts/Engineering, changes schema/data, or proves a physical
+vehicle effect.** The reconciliation and two remaining technical gates are in
+`33_PARTS_ENGINEERING_FINAL_RECONCILIATION.md`.
+
+### Knowledge and execution
+
+- Complete process knowledge may be represented by an opaque, high-entropy, human-shareable reference. Public
+  Discord/wiki cataloguing is legitimate technological diffusion, not an exploit.
+- Long-term progression must not depend on permanent secrecy. **Knowing how is not being capable of doing.**
+  Competency, family specialisation, Diagnostics, facilities, capacity, money, time, access, specimens,
+  installation and manufacturing repeatability remain separate requirements.
+- First implementation shares **complete facts only**. Partial understanding remains accumulated evidence /
+  design-specific knowledge state, not token substrings and not independently tradeable fragments.
+- A knowledge reference is never a PRNG seed, predictable-stat hash, exposed generator input, proximity code,
+  partial hexadecimal puzzle or correctness oracle. The server-private resolver owns truth and historical
+  resolved outcomes remain stored across resolver versions.
+- Effect-labelled information may be shown only when Diagnostics/evidence epistemically justify it. Mystery is
+  uncertainty about truth, not permanent cosmetic obscurity.
+
+### Fabrication, costs and physical failure
+
+- First fabrication economics are **money + elapsed time + bounded capacity**, plus legitimate source hardware,
+  destructive-analysis specimens, knowledge/capability requirements and access. Costs commit before outcome;
+  cancellation is not a free reroll. No general material inventory or arbitrary daily attempt cap.
+- Fabrication distinguishes **functional poor/detrimental**, **functional neutral/unremarkable**, and
+  **nonfunctional/junk** output. Nonfunctional means it cannot perform the intended component role; it is not a
+  merely weak installable part.
+- A failed project normally leaves a persistent physical asset with identity, source design, fabrication
+  operation, maker, cost/time and diagnostic/provenance value. It is not installable solely because it has an
+  asset row and it does not disappear behind `CRAFT FAILED`.
+- Failure is governed by competency/capability, not added as punishment for copied knowledge. Mastery of a
+  fully known mature process should approach reliable repeatability, without an arbitrary permanent casino tax.
+- No scrap/material economy is implied. Storage, honest transfer, inspection, destructive analysis and a
+  provenance-preserving terminal disposal are sufficient first lifecycle options.
+
+### Prototype and design identity
+
+- A one-off experimental result remains a physical asset/prototype, however extraordinary. It does not
+  automatically become a component design.
+- **Discovery is not understanding. Understanding is not automatically repeatable manufacturing.** A new
+  immutable design is born only through an explicit Design/Manufacturing promotion operation after sufficient
+  knowledge, competency, tooling/capability and evidence.
+- Promotion creates design identity and ancestry; it never rewrites the prototype's realised outcome, maker,
+  serial or operation. Functional reproduction never grants the historical source manufacturer's provenance.
+- First implementation uses the explicit lineage -> immutable design revision -> run/project -> physical asset
+  distinction, with revision labels remaining presentation rather than power.
+
+### Costs, migration and unresolved gates
+
+- Existing machines eventually receive canonical factory components without changing machine identity,
+  ownership, paint, ordinals, odometer, result/transfer history or known provenance. Original-component exposure
+  derives from existing odometer where appropriate; unknown installers/batches/timestamps remain unknown.
+  Development and Online remain separate data universes. No migration is authorised yet.
+- **Gate 5 remains open:** `25_MACHINE_ARCHITECTURE_PROFILE.md` is not accepted by this ruling. Report 33
+  recommends accepting it with amendments.
+- **Gate 6 remains an experiment:** a sole NCM performance composer is desired and high-confidence, but neither
+  physical effect nor composition has a live PASS. Parts may not depend on it until the two Development proofs
+  in Report 33 pass. The known carrier remains limited to top-speed ceiling, acceleration reduction and taper;
+  no grip/brake/suspension/steering authority is implied.
+
+## L135 - LOCKED INVARIANT / EXPERIMENTAL CARRIERS - mechanical truth is not today's host expression
+
+Owner Gate 6 input-authority and required-world-mod addenda, 2026-09-25; capability result in
+`34_GATE6_INPUT_AUTHORITY_REQUIRED_MOD_AUDIT.md`.
+
+**Locked invariant:** NCM machine/component/condition truth must not be defined by today's writable host fields.
+One versioned calculation may eventually project that truth through several separately proven carriers:
+performance, input authority, a deeper client vehicle extension, or NCM simulation only. Each carrier has one
+owner and explicit composition/removal semantics. The same mechanical fact may not be silently expressed twice.
+Changing from a crude projection to a future better native carrier changes the projection adapter/version, not
+component identity, realised characteristics, wear, history or provenance.
+
+**Still experiments, not accepted Parts design:**
+
+- the current `setPerformance` carrier and composition proofs remain owed in MASTER_TEST section AN;
+- a companion-side brake/steering/throttle transform is Development-only until measured, device-independent and
+  enforceable; section AO records the first brake proof;
+- a common game-side final-command extension is plausible, but no exact hook/bridge/technology is selected;
+- automatic world-mod delivery and runtime readiness must pass section AP before NCM depends on it; L136/KB-112
+  supersede the old KB-8 causal diagnosis, while R5/§AP and L76 remain active;
+- a launcher digest or client handshake is compatibility evidence, not anti-cheat, without platform-owned
+  runtime attestation.
+
+Current official documentation now explicitly permits exact-hash verified executable world packages (`.reds`,
+CET Lua and native/RED4ext content) on a secured server, and unreviewed executable packages with conspicuous
+consent on an unsecured server. This **qualifies the platform rationale** in L50/L71 that executable content
+cannot be a world requirement. It does not silently reverse the owner's curated-fleet or no-third-party-
+dependency choices, and it does not prove NCM's currently parked path works. L76 remains the operational gate.
+
+## L136 - PROVISIONAL EVIDENCE GATE - public hosted RequiredMods need HTTPS and the real packages must pass first
+
+Owner RequiredMods forensic-audit instruction, 2026-09-25; evidence and exact acceptance contract in
+`35_REQUIREDMODS_FORENSIC_AUDIT.md`.
+
+The historic `Unverifiable` result is no longer treated as a review/attestation verdict or a general platform
+wall. Launcher `.89` and current `.100` both discard every non-loopback HTTP hosted-mod URL before resolution;
+NCM advertised public HTTP, so the resolver received no URL and returned `Unverifiable` after consent but before
+download. The two real NCM packages themselves pass declaration, exact-byte, archive-root and content-class
+audit. Existing manual files could not cause that pre-download refusal.
+
+Operational gate: keep Online RequiredMods parked. The first same-PC Development recovery may use
+`http://127.0.0.1:11779/`, which the launcher explicitly accepts; every remote/public client path requires a valid
+HTTPS resource origin. Use aligned supported builds, the existing RB15 and NCM livery hashes, and actual
+ArchiveXL/TweakXL dependencies. MASTER_TEST §AP must prove both the current manual-installed client and a safely
+isolated relevant-mod client, including in-game content and exact Solo/removal restoration. No dummy package
+substitutes for this proof.
+
+Until §AP passes, RequiredMods remains **unknown with an exact remaining question**, not an accepted dependency
+for the proposed input/control layer. After a pass it may be accepted as an unsecured Development delivery path
+only for the roots/classes exercised. Secured executable delivery and runtime readiness remain separate review
+and handshake questions. This provisional gate authorises no Production endpoint, deployment or restart.
+
+## L137 - PROVISIONAL OPERATIONAL DECISION - prove RequiredMods through the whitelisted Online world over HTTPS
+
+Owner instruction, 2026-09-25, superseding only L136's Development-first and no-Production operational limits.
+The owner explicitly selected the currently whitelisted production world for the real-package proof because
+loopback HTTP would conceal the transport defect being tested, authorised the endpoint/configuration change and
+restart, and retained the launcher/game checks personally.
+
+NCM Online now terminates public TLS with Caddy on
+`https://52-60-225-137.sslip.io:11779/`; OPEN//77's resource origin is loopback-only on
+`http://127.0.0.1:11782`, and Warden remains loopback-only on `127.0.0.1:11780`. RequiredMods is enabled and
+unsecured with the exact retained ArchiveXL 1.27.1, TweakXL 1.11.4, RB15 10.0.0 and NCM liveries 1.0.0 blobs.
+The public master row, trusted certificate, external full-byte hashes, ETags and Range response passed as
+MASTER_TEST §AP1. This is an interim proof origin: replace the `sslip.io` name with owner-controlled DNS before
+treating it as permanent production infrastructure.
+
+This decision proves transport/configuration only. It does not turn §AP2-§AP7 green: launcher consent,
+projection, loader boot, the real in-game vehicle/liveries, reconnect, Solo isolation and byte-exact restoration
+still require the owner's live checks. It does not accept RequiredMods as a future NCM control-extension path,
+approve Parts/Engineering, or change Gate 6 AN/AO.
+
+## L138 - OPEN - three owner decisions the driveability-mod avenue needs
+
+Assessment in `36_DRIVEABILITY_MOD_CARRIER_ASSESSMENT.md`, 2026-09-25, answering the owner's question of
+whether a hosted mod can give finer control over driveability than the three exposed fields and carry FFB
+natively. **The assessment authorises nothing.** It found that the answer is yes to both and larger than
+expected — and that every capability behind that yes is demonstrated in single-player Cyberpunk 2.31 by a
+third party (`natpoh/cp2077-wheel-mod-moza`, MIT) and has never run under OPEN//77.
+
+Three decisions are genuinely the owner's, and the first gates the other two:
+
+1. **Does NCM become a mod-required world?** Not whether it can — it can. Whether the red `UNSECURED` badge in
+   the server browser, the unsecured warning, a named-package consent gate that *"a double-click cannot skip"*
+   and a 48.4 MB first download are a price worth paying for a funnel that already loses people at the connect
+   wall. `KB-60` is what that wall costs today.
+2. **Does NCM take ownership of native code?** A RED4ext plugin reaches the final vehicle command point, which
+   would make the companion's virtual-pad layer redundant and dissolve `KB-110`, `KB-111` and Report 34 §7's
+   whole bypass table. It also means **the world cannot be entered at all** when the RED4ext address database
+   lags a CDPR patch, plus ABI, crash and review cost. A CET/REDscript layer is lighter and reaches the
+   handling flats, but has not been shown to reach the command point.
+3. **Does the companion remain the FFB device layer?** The answer decides whether the canonical `ncm-wheel`
+   repository is a long-lived product or a bridge.
+
+**Not a decision, but a scheduling fact:** all three are worth less until the spawn-cached-versus-live question
+is answered, and that costs one offline single-player drive (`IDEA-455`, MASTER_TEST §AR).
+
+## L139 - PROVISIONAL - no handling carrier is designed or built before §AR and §AP Case A
+
+Consequence of L138 and of the L135 invariant, which already separates mechanical truth from host expression
+and therefore needs no amendment.
+
+- **No carrier beyond `{topSpeedKph, accelerationScale, taperKph}` may be designed, prototyped or implemented**
+  until MASTER_TEST **§AR** says whether drive-model handling values are live, spawn-cached or restart-bound,
+  and until **§AP2-§AP7** proves NCM can deliver a package at all. Either answer changes the design; guessing
+  produces work that is thrown away.
+- **Naming discipline is unchanged and unconditional.** Report 34 §8 governs: input mediation is
+  `brake_command_authority`, never `native_brake_force`, and presenting throttle withdrawal as grip remains
+  semantically dishonest whatever carrier arrives later.
+- **The parts economy's integrity does not depend on any of this.** Existence, provenance, ownership,
+  transfer, wear and failure are server-authoritative today and stay that way. Only *feel* is client-applied,
+  and the server has no read-back for it and can construct none (`IDEA-458`).
+- **One thing may proceed now:** the §AR probe itself, offline, single-player, no server, no OPEN//77, no NCM
+  code, saves backed up. AGENTS.md's isolated-prototype allowance covers exactly this.
+- **One thing must not be deferred behind it:** `KB-106`'s `ROAD_SCALE` measurement. A native source would make
+  the units knowable, but that is a project and the measurement is one drive with instrumentation that already
+  ships. A better desk is still a desk (`IDEA-411`).
+
+## L140 - PROVISIONAL OPERATIONAL DECISION - commit before deploying; the spawn fix is committed first and alone
+
+Schedule in `37_REPOSITORY_RECONCILIATION_SCHEDULE.md`, 2026-09-25. **Written, not executed.** No commit,
+push, deploy, restart or configuration change has been made.
+
+A read-only hash comparison found that **NCM Online is byte-identical to the uncommitted working tree and
+differs from every commit**: `panel.html` `36ddb90f…`, `location.lua` `299c868b…`, `ncm_world/server/main.lua`
+`b95e45fd…` all match Online and none match `HEAD`. Three facts follow, recorded as `KB-115`, `KB-116` and
+`KB-117`, and they set the order:
+
+- The exact bytes running in production exist **on one disk, in no commit, unpushed**.
+- The untested FFB panel work is **already on Online**, not merely on Development, because
+  `deploy-staging.ps1` does a whole-tree `rm -rf` / `mv` replace and the 15:36 UTC spawn-fix deploy carried it.
+- `HEAD`'s `location.lua` is the `KB-113`-broken version, so an ordinary `git checkout --`, `stash`, `reset` or
+  fresh clone would change **NCM Development instantly and live** — the resources junction has no copy step —
+  and stage a silent production regression for the next deploy.
+
+**Ruled provisionally, pending the owner's approval to execute:**
+
+- **Commit the location/spawn fix first, alone, and push it.** After that commit exists, no ordinary git
+  operation can reintroduce the regression. That is the entire mitigation and it costs one commit.
+- **Commit before deploying, always.** Promotion moves a known revision (16_ENVIRONMENTS); today it would move
+  a state that exists nowhere else.
+- **No Online deploy, restart or configuration change until the owner's §AP2-§AP4 Case A is finished**, pass or
+  fail. `KB-102` measured a 90-second window in which a stopping server still admits players.
+- **§AQ is captured on the same Connect as §AP2.** The launcher proof and the `KB-113` live join observation
+  need the same single join.
+- **Windows dev is instrumented before any Lightsail change**, and the Development correction needs its package
+  set decided as well as its URL (`IDEA-460`).
+- **The two companions are not synced.** `ncm-wheel` is canonical and drives hardware; `tools/ncm-wheel.py`
+  says of itself *"This drives no hardware."* Their shared contract is `ncm/core/driver/feedback.lua`, and the
+  Lua is authoritative.
+
+## L141 - LOCKED EVIDENCE - RequiredMods delivery works; the "mods cannot be installed" narrative is closed
+
+Owner-run live Online sequence, 2026-09-25. The owner connected to NCM Online, received the OPEN//77
+unsecured-world warning, received the RequiredMods review/consent UI naming all four declared packages -
+TweakXL, ArchiveXL, NCM RB15 Team Liveries and RB15 F1 car only/no ERS, **each presented as "Not reviewed"** -
+chose **Download and Join**, watched the launcher progress through *Preparing server mods* and *Preparing your
+session*, and **entered NCM Online**. The server log corroborates: `connected: player=1 name=easporks` at
+15:38:26 UTC, `ready:` at 15:38:43.
+
+**What this proves, exactly:**
+
+> public HTTPS -> unsecured warning -> named-package consent -> Download and Join -> preparation ->
+> successful NCM session entry.
+
+**No `Unverifiable` appeared.** `KB-112` is closed as a delivery blocker: the launcher's non-loopback HTTP URL
+sanitation was the whole of the old wall, and HTTPS clears it. The four `Not reviewed` verdicts match Report
+35's `safety=unknown` attestation finding exactly, so unverified inert and unverified executable packages are
+both accepted after consent on an unsecured world, as documented.
+
+**What this does NOT prove, and must not be inflated into:**
+
+- that ArchiveXL or TweakXL initialised - no loader log was captured;
+- that the RB15 record exists in game or drives;
+- that any NCM livery is available;
+- that projected files coexisted correctly with the pre-existing manual installation;
+- that reconnect reuses cache, or that switching to Solo restores every manual byte exactly.
+
+§AP2 is a PASS on its consent half with the collision/journal half unevidenced; §AP3 is **PARTIAL**; §AP4 and
+Case B (§AP5-§AP7) remain owed. **A session-entry PASS is not an in-game content PASS.**
+
+**Standing instruction to future sessions:** do not resurrect the "RequiredMods doesn't work" narrative. It was
+false, its cause was found (Report 35), the correction was deployed, and a human has now walked the whole
+funnel. Equally, do not cite this decision as proof that NCM's mod content loads.
+
+## L142 - LOCKED OWNER RULING - NCM ceases public redistribution of RB15
+
+Owner ruling, 2026-09-25, after revisiting the permissions.
+
+> **NCM has not established sufficient redistribution permission for the exact RB15 package it was hosting,
+> and will not continue publicly rehosting it unless and until that package is established as redistributable
+> or the author grants permission.**
+
+Earlier licensing research found the provenance is mixed: the underlying model and model-derived portions
+appear to carry **CC BY 4.0** provenance, while the Cyberpunk mod author's own implementation, configuration
+and the complete or modified package carry **separate redistribution restrictions requiring permission**. A
+package can be partly permissively licensed and still not be NCM's to serve. Permission will be sought and the
+question revisited. The earlier framing "terms not established" is superseded - the operative state is a
+decision, not an open question.
+
+**RB15 is currently NCM's only open-wheel vehicle candidate. That does not override the permissions issue, and
+no substitute open-wheel mod is to be adopted now.**
+
+Consequences:
+
+- **The NCM liveries park with it.** NCM owns those bytes outright, but they are ArchiveXL/TweakXL content
+  extending the RB15 vehicle record; projected without it they extend nothing, and they would cost every joiner
+  7.8 MB for no effect.
+- **Preserve, do not delete.** Blobs, declarations, hashes, the provenance manifest and all local authoring
+  sources stay. This withdraws a public offer; it does not discard NCM's work.
+- **It does not execute now.** Removal is a Production `server.jsonc` write, a restart, a digest mutation and a
+  serving change - every one of them gated by Report 37 §6, because §AP4 and Case B evidence only exists while
+  the current packages and projection are in place. Report 37 §6.2 names the exact operation the owner must
+  authorise; MASTER_TEST **§AS** holds the proof rows. **The ruling is recorded and parked, not disobeyed.**
+- **Two facts for the owner's decision:** RB15 is 38.5 MB of the 48.4 MB first-join download, so withdrawal
+  improves the funnel by roughly 80%; and with it and the liveries gone, ArchiveXL and TweakXL have no NCM
+  content left to load, so parking `requiredMods` entirely may be the honest end state (§AS4).
+
+## L143 - LOCKED OWNER RULING - research before experiment; the single-player probe is deferred
+
+Owner ruling, 2026-09-25, on Report 36's proposed §AR offline single-player CET probe.
+
+> *"I have not returned to single-player. I am committed to NCM Online right now, and I do not want to flip my
+> mod environment around, change installations/profiles, or create another local configuration merely to answer
+> something that may already have been answered by existing Cyberpunk mods."*
+
+**This is a workflow constraint, not a technical objection to experimentation.** The standing order it sets:
+
+> **existing implementation research -> forensic source/repository inspection -> identify the remaining
+> unknown -> only then propose an isolated experiment, and only if the unknown genuinely cannot be answered
+> otherwise.**
+
+Report 37's revision-1 note that §AR *"can happen at any point"* described a dependency, not a permission, and
+has been corrected. **§AR is not scheduled. Do not ask the owner to run it.**
+
+**Applying the order answered the question the same day, without an owner session.** Report 36 §4 now
+classifies the drive model as **SPAWN-CACHED**, on three independent lines of evidence: Vehicle Physics Config
+states it as an engine limitation and builds its whole resummon-based UX around it; Direct Wheel's apparently
+contradicting CET module turns out to be **absent from its own `deploy.ps1` and FOMOD installer**, an unshipped
+experiment; and the live `WheeledPhysics` instance is a named per-instance copy of the drive-model record.
+
+**Where any future experiment proposal must now start.** Report 36 §11 records the single residual unknown -
+whether the live `WheeledPhysics` handling fields can be *written* per-instance and have the write hold - and
+states why no existing implementation answers it: nothing writes them, and the one open-source wheel-reinit
+attempt is commented out in its own source. That is a code-reading and eventually an isolated native-prototype
+question. **It is not an owner single-player session, and it must not be re-proposed as one.**

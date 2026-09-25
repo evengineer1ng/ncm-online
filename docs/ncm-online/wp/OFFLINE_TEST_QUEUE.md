@@ -1418,14 +1418,16 @@ watchdog stays earning its keep.
 
 **Notes:** 
 
-### R5 · Required mods on .87 — KB-8, owner: "important we need to try soon"
+### R5 · Real RB15/livery RequiredMods over HTTPS — KB-112 / MASTER_TEST §AP
 
-**Do:** `set-unsecured.py` + restart, try Play from the launcher, then **park it again with `set-mods-off.py`**.
+**Do:** Superseded by the fuller §AP contract. On a current aligned **Development** server, advertise a valid
+HTTPS resource base and the exact existing RB15/livery hashes plus real ArchiveXL/TweakXL dependencies. Run
+Case A with the named manual files present, then Case B with only those files safely isolated after backup.
+Capture consent, fetch/hash, projection, boot/load, actual content and restoration. Park the set afterward.
 
-**Pass:** Either verdict is a result. Refused in ~300 ms (`Unverifiable` / `NotInIndex`) = unchanged, KB-8 stands.
-Connects = the upstream review landed, and **L76 re-opens by its own terms**, KB-40's hand-install workaround
-leaves TW1's critical path, and P34 changes. **Do not leave required mods enabled** — a real player is refused
-entry until it is parked back.
+**Pass:** Only the full §AP live receipt passes. Another `Unverifiable` must include the advertised sanitized
+URL and exact resolver input; review landing is not the criterion. **Do not enable/restart Production without
+separate owner authorisation and do not leave a test world enabled after a failed run.**
 
 **Result:** `NOT RUN`
 

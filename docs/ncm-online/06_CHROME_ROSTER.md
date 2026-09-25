@@ -49,6 +49,15 @@ Worse: `clearPerformance` "hands a vehicle back its record's rated performance" 
 the contributing layers (class, conditions, hacks, boosts) and writes the composed result. Nothing else may call
 it. This should exist *before* the first Chrome prototype, and it is useful on its own for E9 and wet racing.
 
+> **RECONCILIATION, 2026-09-25 (L134 / Report 33 §6–7):** the ownership conclusion survives, but the original
+> reset rationale predates the current documented platform layers. Current precedence is per-instance, then
+> record-class, then default; clearing an instance profile can therefore fall back to a record cap. NCM currently
+> publishes class data and calls client-local record-wide `setPerformanceClass`; it does **not** yet have the
+> general composer described here, and no live PASS proves a physical change. The current server API also offers
+> per-instance `setPerformance` plus read-back, which is the preferred Development proof candidate. This remains
+> limited to top-speed ceiling, acceleration reduction and taper; it does not imply grip/brake/suspension or
+> above-native power authority.
+
 ### 2. Racing hacks must be `cosmetic` / `nonlethal`
 
 Every hack carries a `damage` field (0–300, "the direct electrical hit of every kind") and the six kinds hit the

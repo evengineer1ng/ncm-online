@@ -156,6 +156,14 @@ high-resolution roll, *not* a literal D100 presentation. Competency shifts the *
 **Not pass/fail.** Poor fabrication still produces a poor but legitimate physical component, with identity,
 provenance and history. Beginners should be able to make terrible parts, and making them is still practice.
 
+> **OWNER CLARIFICATION, 2026-09-25 (L134):** preserve this anti-disappearing-failure principle, but it is no
+> longer an absolute claim that every output performs its intended component function. Fabrication may produce a
+> persistent **nonfunctional-as-built** physical asset with full identity/provenance. It is not installable, is
+> not merely a nerfed functional part, and may still be inspected, analysed, transferred with honest disclosure
+> or disposed through a provenance-preserving lifecycle. Complete knowledge does not replace execution
+> competency/capability, while mastery of a fully known mature process should approach repeatability rather than
+> retain an arbitrary casino failure tax. Representation is reconciled in Report 33 §9.
+
 > **OUTCOME MAY BE STOCHASTIC. LEARNING MUST NOT BE PURELY STOCHASTIC.**
 
 A bad roll does not mean nothing was learned. One miraculous roll does not make a beginner a master.
