@@ -39,6 +39,8 @@ return {
     "competition/discoveries.lua",
     "competition/machine_knowledge.lua",
     "engineering/competency.lua",
+    "machine/flats.lua",
+    "machine/projection.lua",
     "economy/markets.lua",
     "economy/production.lua",
     "economy/supply_profiles.lua",

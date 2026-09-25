@@ -1,0 +1,9 @@
+{
+  "name": "ncm-carrier",
+  "version-string": "0.1.0",
+  "description": "NCM Online carrier: drive-model effects, final-command authority and force feedback.",
+  "dependencies": [
+    "sdl2",
+    "nlohmann-json"
+  ]
+}
