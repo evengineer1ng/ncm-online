@@ -35,7 +35,10 @@ def load_list():
     m = re.search(r'"load"\s*:\s*\[(.*?)\]', text, re.S)
     if not m:
         return None
-    return set(re.findall(r'"([A-Za-z0-9_]+)"', m.group(1)))
+    # **Match any quoted entry, not just [A-Za-z0-9_]+.** Load entries may be globs -- `ncm/*` is how every
+    # NCM resource is loaded -- and the narrower class silently dropped exactly that one. A guard whose whole
+    # purpose is "did NCM fail to load" could not see NCM's own line (2026-09-25).
+    return set(re.findall(r'"([^"]+)"', m.group(1)))
 
 
 def manifests():
@@ -78,6 +81,19 @@ def main():
     known = set(found)
     problems = []
 
+    # A glob entry such as `ncm/*` names a DIRECTORY of resources rather than one resource. Expand it to
+    # whatever manifests live under that directory, and say so when it expands to nothing -- an empty glob is
+    # the silent way a whole subsystem goes missing.
+    expanded, globs = set(), [n for n in loaded if "*" in n or "/" in n]
+    for g in globs:
+        base = g.split("*")[0].rstrip("/")
+        prefix = os.path.join(ROOT, base.replace("/", os.sep))
+        hits = {nm for nm, (p, _) in found.items() if p.startswith(prefix + os.sep)}
+        if not hits:
+            problems.append(("glob matches nothing on disk", g, "", base))
+        expanded |= hits
+    loaded = (loaded - set(globs)) | expanded
+
     for name in sorted(loaded):
         path, deps = found.get(name, (None, set()))
         if path is None:
@@ -88,8 +104,15 @@ def main():
                 where = "present on disk" if dep in known else "NOT ON DISK"
                 problems.append(("dependency not in load list", name, dep, where))
 
+    # The KB-51 question, asked directly instead of inferred. A server with every dependency satisfied and
+    # no NCM is exactly the failure this file exists to prevent, and it looks perfectly healthy.
+    ncm = sorted(n for n in loaded if n.startswith("ncm_"))
+    if not ncm:
+        problems.append(("NCM IS NOT IN THE LOAD LIST", "ncm/*", "", "the server will run without NCM"))
+
     if not problems:
         print("load list OK: %d resources, every dependency satisfied" % len(loaded))
+        print("NCM resources loaded: %s" % ", ".join(ncm))
         return 0
 
     print("PROBLEMS FOUND (%d) -- the server will abort its automatic start set:" % len(problems))
