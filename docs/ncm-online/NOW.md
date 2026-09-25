@@ -9,27 +9,34 @@ Last rewritten: **2026-09-25 - the carrier is built, hosted and live on Developm
 > BACKLOG next free **IDEA-479**; known issues through **KB-121** plus the pre-existing duplicates **KB-87**
 > and **L119**. Read the last row of each ledger, not this line (`KB-114`).
 
-## Next action: launch the game and join Development.
+## Next action: import the carrier in Warden, then declare it.
 
-**The carrier is built, hosted and live on Development.** AT0 passed. The launcher will name **NCM Carrier**
-as executable content, you accept it, and it installs. That is **AT1** -- and AT1 through AT7 are all that
-sit between here and a car that feels the weather.
+Two joins delivered **nothing**, and nothing NCM wrote ran. Both causes are found and fixed; what is left is
+one import you have to click.
 
-Development: **op77.102**, manifest digest `78c37893...`, `enabled: true`, one declared package
-(`ncm-carrier 0.1.0`, 868,069 bytes), note corrected. No script errors; `machine.lua` is publishing 11
-record(s).
+1. Open **http://127.0.0.1:11780** and import `C:\Users\eveng\Documents\cyberpunk2077\dist\ncm-carrier-0.1.0.zip`.
+   Expected sha256 `7febfa6e794ca0748d6f03c325de8053d20beba403840e0883aa97fdea619286`.
+2. `python tools/staging/publish-carrier.py tools/open77/server --zip dist/ncm-carrier-0.1.0.zip --enable`
+   It verifies the blob is in the store and refuses with instructions if it is not.
+3. Restart Development, then join. Expect a consent prompt naming **NCM Carrier**, and
+   `modstack: ... N added` in the launcher log.
 
-**If the game will not launch:**
+**Why the first two joins delivered nothing** -- neither cause was the plugin:
 
-```
-python tools/staging/publish-carrier.py tools/open77/server --remove
-.\tools\build-carrier.ps1 -RestartDevOnly
-```
+- **`KB-125`**: the server advertised its blob URL as `http://10.0.0.70:11779/`, private-LAN plain HTTP,
+  which launchers `.89`/`.100` null out before download, cache or hash. That is **`KB-112`**, which named
+  Development as the remaining offender and was never acted on. Result: `OP77_WORLD_MODS_DIGEST=-`,
+  `0 added`, no consent prompt, **no error anywhere**. Fixed to loopback, and `set-download-url.py` now
+  refuses a non-loopback HTTP value rather than letting it be set again.
+- **`KB-124`**: the mod store is Warden's catalogue, not a drop folder. The hand-written entry served for
+  one session and was pruned on the next restart, taking the declaration with it. `publish-carrier.py` is
+  now declare-only.
 
-Read `red4ext/plugins/ncm_carrier/ncm_carrier.log` for why -- it is the only diagnostic that survives a
-failed load. Expect the flat write (`IDEA-477`) and OPEN//77 coexistence to be the first two suspects:
-OPEN//77 is itself a RED4ext plugin with its own vehicle adapter, and nobody has asked whether a second one
-sharing the drive path is fine.
+**What the session actually showed about inputs** (`IDEA-482`): the launcher **removed 44 files and added
+none** -- ArchiveXL's and TweakXL's DLLs -- and RED4ext loaded exactly **one** plugin, Open77. The player was
+in the world with their RED4ext stack absent; that is what changed the feel. A join that delivers nothing is
+indistinguishable from one that delivers everything, and the cheapest fix is to compare what the launcher
+projected against what the server declared and show it in the panel.
 
 ## Ownership identifiers -- observing, not migrating
 
@@ -94,7 +101,8 @@ the server Lua sandbox, so the projection publisher was dead and silent). `IDEA-
 
 ## Outstanding live QA
 
-- **§AT:** the carrier. **AT0 PASS** -- built, hosted, serving. AT1-AT7 owed; AT1 is one join.
+- **§AT:** the carrier. **AT0 PASS**; **AT1 FAIL** -- the package was never offered (`KB-125`). Both
+  causes fixed; needs a Warden import and one more join. AT2-AT7 owed.
 - **§AQ:** AQ1/AQ3 **LIVE PASS**; AQ2 and AQ4 cheap and owed.
 - **`KB-106`'s `ROAD_SCALE`** is now folded into **§AT6** - the carrier prints the measured peaks on shutdown,
   so one drive closes it.

@@ -5,10 +5,17 @@
     python3 publish-carrier.py <server-root>                                   # show what is declared
     python3 publish-carrier.py <server-root> --remove                          # withdraw it
 
-**ONE SCRIPT, NOT THREE.** Importing a blob, declaring a package and un-parking the block are one operation
-in practice -- a blob with no declaration is invisible and a declaration with no blob fails every join. Three
-scripts is how `set-unsecured.py` ended up aborting on a parked block while `set-mods-on.py` existed to undo
-exactly that. Keep them together.
+**WARDEN OWNS THE STORE. THIS SCRIPT ONLY DECLARES.**
+
+An earlier version wrote the blob and its metadata into `.open77/mods/` by hand. It worked until the server
+restarted, and then the server **pruned both the store files and the declaration** -- silently, leaving an
+empty package list and an empty-set digest, while the Warden-imported RB15 entries beside them survived
+untouched (observed 2026-09-25). The store is the server's catalogue, not a drop folder.
+
+So the order is: **import the zip in Warden (http://127.0.0.1:11780), then run this to declare it.** This
+script now verifies the blob is present before it writes anything, and refuses with instructions if it is
+not. `--import-blob` restores the old behaviour for an operator who knows why they want it; it is not the
+default and it is not recommended.
 
 The server root is a PARAMETER (`KB-120`). Development is `tools/open77/server`; the Lightsail default is
 kept only so Production is not a special case. **Pass the root explicitly and read what you passed** -- this
@@ -208,6 +215,9 @@ def main():
     parser.add_argument("--version", help="defaults to the version in the zip's file name")
     parser.add_argument("--enable", action="store_true",
                         help="also set requiredMods enabled=true and unsecured=true")
+    parser.add_argument("--import-blob", action="store_true",
+                        help="write the blob into the store by hand instead of importing via Warden "
+                             "(the server has been observed to prune these; prefer Warden)")
     parser.add_argument("--note", metavar="TEXT",
                         help="the requiredMods note -- players read this at the consent gate")
     parser.add_argument("--drop", action="append", default=[], metavar="ID",
@@ -273,10 +283,32 @@ def main():
         if not any(r.startswith("red4ext/plugins") for r in info["roots"]):
             print("  WARNING: nothing under red4ext/plugins -- the carrier will not load")
 
-        store_blob(root, args.zip, version, info)
-        pruned = prune_old_blobs(root, info["sha256"])
-        if pruned:
-            print("  pruned older carrier blob(s): %s" % ", ".join(pruned))
+        store = os.path.join(root, ".open77", "mods")
+        blob = os.path.join(store, "%s.blob" % info["sha256"])
+        present = os.path.exists(blob)
+
+        if args.import_blob:
+            store_blob(root, args.zip, version, info)
+            pruned = prune_old_blobs(root, info["sha256"])
+            if pruned:
+                print("  pruned older carrier blob(s): %s" % ", ".join(pruned))
+            print("  NOTE: hand-written store entries have been pruned by the server on restart.")
+            print("        Prefer importing through Warden.")
+        elif not present:
+            print("")
+            print("NOT IN THE STORE. Nothing was changed.")
+            print("")
+            print("Import it in Warden first -- the store is the server's catalogue, not a drop folder, and")
+            print("a hand-written entry gets pruned on the next restart:")
+            print("")
+            print("  1. open  http://127.0.0.1:11780")
+            print("  2. import  %s" % os.path.abspath(args.zip))
+            print("  3. run this command again to declare it")
+            print("")
+            print("Expected sha256 once imported: %s" % info["sha256"])
+            return 1
+        else:
+            print("  blob present in the store -- declaring it")
 
         # **No `capability` here.** It belongs in the store metadata and ONLY there:
         # `RequiredModConfiguration` has no such member and the server refuses to start with it present --
