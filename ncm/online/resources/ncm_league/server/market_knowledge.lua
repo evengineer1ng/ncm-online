@@ -38,9 +38,12 @@ function NcmMarketKnowledge.learn(driverId, marketId, sourceKind, sourceRef, acc
     end
     MySQL.insert.await([[INSERT IGNORE INTO player_market_knowledge
         (ncm_driver_id, server_id, market_id, first_known_at, source_kind, source_ref, access_state)
-        VALUES (?, ?, ?, ?, ?, ?, ?)]],
+        VALUES (?, ?, ?, ?, ?, NULLIF(?, ''), ?)]],
+        -- `sourceRef` is legitimately absent for a universal market. Keep the positional array dense and let
+        -- SQL restore NULL: a nil at index 6 makes OPEN//77 receive fewer values than placeholders and reject
+        -- the call with `invalid_parameters`, preventing the entire Market payload from being sent.
         { fact.driverId, fact.serverId, fact.marketId, fact.firstKnownAt,
-          fact.sourceKind, fact.sourceRef, fact.accessState })
+          fact.sourceKind, fact.sourceRef or "", fact.accessState })
     return true
 end
 
