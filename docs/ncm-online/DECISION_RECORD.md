@@ -1587,3 +1587,42 @@ scheduled** - the same disposition as §AR. If it ever matters, it matters to th
 because the launcher explicitly kept the manual copies that were already on disk. That limitation is now
 documented from the launcher's own words rather than assumed, and Case B remains the only thing that settles
 it - by isolating files, which is a filesystem operation and needs no profile change.
+
+## L145 - EXECUTED - RB15 and the liveries are gone from Production; Case B is closed as moot
+
+Owner, 2026-09-25: *"we are removing it end of discussion. in fact, i just deleted them in warden on
+production. poof. both rb15 and liveries."*
+
+**Verified live, read-only.** The public manifest at `https://52-60-225-137.sslip.io:11779/mods/v1/manifest`
+now declares **two** packages - ArchiveXL 1.27.1 and TweakXL 1.11.4 - with digest
+`67ad384b2d8bcc70c2eeedd113e2abc654ce04d23b3fb8098ae81ae2937d499d`, replacing `06ab5485…`. No RB15, no
+liveries. Development was parked the same day (`enabled=false`, empty-set digest) and restarted.
+
+`L142` is therefore **executed**, not pending. MASTER_TEST §AS is satisfied by the owner's own Warden action.
+
+### Case B is closed as moot, and the framing that kept it open was wrong
+
+Owner: *"hosted delivery of ncms content is not unproven. we proved we can host. we didnt write the packages
+we want to host yet. thats not the same thing."*
+
+**Correct, and the earlier wording confused two different things.** What `L141` and the client-log evidence
+prove is the **pipeline**: HTTPS transport, consent, executable-root acceptance, projection, loader
+initialisation and archive loading all work, end to end, for real packages. Case B would only have shown
+whether one specific file that already existed locally came from the host rather than from disk. That is a
+custody detail about a package NCM is deleting - not a capability gap.
+
+**NCM has no unproven delivery capability. NCM has unwritten packages.** Those are a build task, and the
+pipeline is warm and waiting for the first one.
+
+Consequences, so nobody re-opens this:
+
+- **§AP is complete for its purpose.** §AP5/§AP6 are retired as moot; §AP3's two remaining in-world looks -
+  does the RB15 drive, do the liveries render - are retired with their subject. **Do not ask anyone to drive
+  an RB15.**
+- **The two loaders stay staged deliberately.** They currently deliver no NCM content, which is the
+  `§AS4`/`IDEA-461` cost - an unsecured badge and a consent gate for two DLLs that load nothing. Keeping them
+  means the pipeline is already correct the day NCM's first real package exists. Revisit only if the join
+  funnel is being measured. The `requiredMods.note` still reads *"NCM RB15, liveries, and exact hosted loader
+  dependencies"* and is now stale; correct it on the next config touch, not with a restart of its own.
+- **The next package proves itself.** Whatever NCM ships first carries its own §AP-style receipt, and by then
+  the whole pipeline is a known quantity rather than a question.

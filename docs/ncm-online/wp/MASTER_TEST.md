@@ -1029,7 +1029,7 @@ is outside AO.
 
 ---
 
-## §AP - real RB15 + NCM liveries RequiredMods acceptance - **AP1-AP4 PASS (re-scoped); two in-world observations and Case B remain**
+## §AP - real RB15 + NCM liveries RequiredMods acceptance - **COMPLETE FOR ITS PURPOSE. AP1-AP4 PASS; AP5-AP6 retired as moot (L145)**
 
 `IDEA-448` / `IDEA-450`; exact forensic result and package hashes in
 `35_REQUIREDMODS_FORENSIC_AUDIT.md`. KB-112 proves why the old run failed: NCM advertised public HTTP and the
@@ -1062,11 +1062,13 @@ then a clean `…has been unloaded` trio at 11:40:14 matching the 11:40:31 disco
 `Loading "ncm_rb15_liveries.archive.xl"...`, `[Localization] Merging entries from "fable5\rb15\localization\en-us.json"...`.
 **Both archives loaded, no errors.** What is left of this row is two in-world observations with no artifact behind them:
 **does the RB15 exist and drive, and do the NCM liveries look right.** Both are Online observations; neither needs Solo (`L144`).
-**Standing caveat: this does not prove the hosted packages supplied the content** — see §AP4 and Case B. |
+**RETIRED 2026-09-25 (`L145`).** The two remaining in-world looks — does the RB15 drive, do the liveries render —
+died with their subject: the owner deleted both packages from Warden on Production. **Do not ask anyone to drive an RB15.**
+The pipeline half of this row stands as PASS. |
 | §AP4 | **RE-SCOPED 2026-09-25 (`L144`, `KB-121`).** Disconnect/reconnect Case A and verify the ten named RB15/livery destinations on disk. The Solo half is separated out as §AP4b. | Reconnect reuses cache without corruption; every pre-existing manual byte is preserved. | **PASS.** *Reconnect:* three further Connects at 11:03:39, 11:28:26 and 11:37:51 each logged `modstack: projected 0 file(s), removed 0, kept 387 in place` — **nothing refetched, nothing rewritten, three times over.** *Manual files:* all ten destinations present and readable; `fable5.archive` 38,821,888 B, `ncm_rb15_liveries.archive` 8,003,584 B, the five RB15 tweaks and the livery tweak all intact. **Their mtimes are 2026-08-14, 08-30, 09-19 and 09-20 — all weeks before the 09-25 join — so the projection did not rewrite them.** |
 | §AP4b | Does a world-mod file leak into the Solo profile? | No world file appears in Solo; the Solo profile is unaffected. | **NOT RUN; BLOCKED BY OWNER CHOICE (`L144`) — do not schedule.** The owner does not leave NCM Online. This is an OPEN//77 profile-isolation question rather than an NCM one; the launcher's `World reconcile keeps 343 file(s) from the other layer in place` line shows it maintains layers deliberately. Recorded, not owed. |
-| §AP5 | Case B: safely isolate only the named manual RB15/livery files after backup, leaving unrelated personal content untouched. Reconnect through the same consent path and repeat §AP2-§AP3. | OPEN//77 alone supplies the complete required set; the same RB15 and liveries load in game. Verdict does not depend on a pre-existing manual copy. | **NOT RUN — and now known to be the ONLY row that can settle the central question.** Case A proved the content loads; it cannot prove **who supplied it**, because the launcher said outright that it *kept the copy that was already there*. Sharper still: the on-disk livery archive is **8,003,584 bytes** while the declared package is **7,829,853** — a *different artifact*, which is `IDEA-451`'s provenance drift showing up in production. **Needs no Solo** — isolating files is a filesystem operation (`L144`). But see the note below: `L142` may retire this row instead. |
-| §AP6 | Park/remove the RequiredMods set on the test world, reconnect, and restore the isolated manual files. | World projection is removed cleanly, manual installation is byte-exact, store cleanup is not confused with projection cleanup, and no unrelated package/save is changed. | **NOT RUN.** *"switch profiles" struck under `L144`.* **This row is largely satisfied by §AS**, which removes the packages for the `L142` withdrawal — the same removal, done for a different reason. Run them together rather than twice. |
+| §AP5 | Case B: isolate the manual RB15/livery files and reconnect, to show OPEN//77 alone supplies the set. | — | **RETIRED AS MOOT (`L145`).** The packages are deleted from Production. More importantly the row was mis-framed: the **pipeline** is proven — transport, consent, executable roots, projection, loader init, archive load — and Case B would only have shown whether one already-present file came from the host or from disk. That is custody trivia about a package being deleted, not a capability gap. **NCM has no unproven delivery capability; NCM has unwritten packages.** The first real NCM package carries its own receipt. |
+| §AP6 | Park/remove the RequiredMods set, reconnect, restore. | Projection removed cleanly; no unrelated package or save changed. | **SATISFIED BY §AS (`L145`).** The owner removed both packages in Warden; the public manifest now declares two loaders at digest `67ad384b…`, and Development is parked at the empty-set digest. |
 | §AP7 | Review all launcher/server/resource/loader logs for both cases. | No `[ERR]`, hash/root/traversal/collision ambiguity, partial fetch, stale pending journal or unexplained foreign-file change. Evidence covers every stage from consent through in-game content and restoration. | **NOT RUN** |
 
 Passing AP proves the existing inert vehicle/livery path and their real executable loader dependencies on the
@@ -1082,14 +1084,9 @@ the runnable part of §AP4 in one pass, and removed a request that the owner ent
 already ruled out. **Timestamps: the launcher and game logs are local (UTC-4); the NCM server log is UTC. The
 join is 11:38 local = 15:38 UTC.**
 
-**What is genuinely left, and it is short:**
-
-1. **Two in-world looks, on Online, no Solo:** does the RB15 exist and drive; do the NCM liveries look right.
-2. **Case B (§AP5)** — the only row that can prove the *hosted packages* supplied the content rather than the
-   manual copies the launcher kept. **But `L142` withdraws both packages**, and once they are gone there is
-   nothing left to prove Case B about. **Decide deliberately:** either run Case B before §AS, or record that
-   NCM chose withdrawal over the proof and that hosted delivery of *NCM's own* content remains unproven —
-   which would then be owed by the first package NCM actually ships. **Do not let it lapse silently.**
+**Nothing is left. Closed 2026-09-25 (`L145`).** Both remaining items died with their subject when the owner
+deleted RB15 and the liveries from Warden. The pipeline is proven; what NCM lacks is packages of its own,
+which is a build task and not a proof debt.
 
 ---
 
@@ -1176,15 +1173,21 @@ different design futures collapse to one before any of them is designed.
 
 ---
 
-## §AS - RB15 withdrawal from public redistribution - **NOT RUN**
+## §AS - RB15 withdrawal from public redistribution - **DONE 2026-09-25 by the owner in Warden (L145)**
 
 `IDEA-465`; owner ruling **L142**. NCM has not established sufficient redistribution permission for the exact
 RB15 package it was hosting and will cease public redistribution pending permission or provenance resolution.
 The NCM liveries are NCM-owned but are RB15 content and park with it (Report 36 §7.1).
 
-**This section proves a removal, not a feature.** It is gated: the operations below write Production
-configuration and are blocked by Report 37 §6 until the owner releases that gate. **Preserve, do not delete** -
-blobs, declarations, hashes, the provenance manifest and all local authoring sources stay.
+**DONE.** The owner deleted both packages directly in Warden on Production rather than through a script. The
+public manifest now declares ArchiveXL 1.27.1 and TweakXL 1.11.4 only, at digest
+`67ad384b2d8bcc70c2eeedd113e2abc654ce04d23b3fb8098ae81ae2937d499d` (was `06ab5485…`). Development was parked
+the same day and restarted: `enabled=false`, `mods:[]`, empty-set digest. Local blobs, declarations, hashes
+and authoring sources are untouched on disk - the withdrawal removed a public offer, not NCM's work.
+
+The rows below are kept as the record of what the removal had to satisfy. §AS4's question is answered by
+choice: the two loaders **stay staged**, delivering no NCM content today, so the pipeline is already correct
+the day NCM's first real package exists.
 
 | # | Smallest live proof | PASS condition | State |
 |---|---|---|---|
