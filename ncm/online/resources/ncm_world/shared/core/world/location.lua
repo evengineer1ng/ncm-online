@@ -25,6 +25,14 @@ Core.define("world.location", function(C)
         maxAgeSec = 7 * 86400,   -- a three-day-old position is not where the player thinks they are; a week is the outer bound
         maxCoord  = 100000,      -- Night City is nowhere near this; anything beyond is corruption, not a place
         minMoveM  = 3.0,         -- do not rewrite storage for a player standing still
+        -- KB-113: a vertical band, because the horizontal bound alone accepts a fall. The authored world
+        -- floor is about -5 m and the highest authored node is 230 m, so these are far outside anything a
+        -- player can stand on while staying inside the same order of magnitude as the world. A position
+        -- below the floor was never stood at -- it is a fall caught in progress, and replaying it drops the
+        -- player back into the same fall.
+        minZ      = -100,
+        maxZ      = 1200,
+        arrivedM  = 3.0,         -- already within this of the pose: moving them is a second arrival for nothing
     }
 
     local function finite(n)
@@ -40,6 +48,9 @@ Core.define("world.location", function(C)
         if math.abs(p.x) > maxCoord or math.abs(p.y) > maxCoord or math.abs(p.z) > maxCoord then
             return false, "out_of_bounds"
         end
+        -- Checked after the coarse bound so corruption still reads as corruption rather than as a fall.
+        if p.z < (tonumber(cfg.minZ) or DEFAULTS.minZ) then return false, "below_world" end
+        if p.z > (tonumber(cfg.maxZ) or DEFAULTS.maxZ) then return false, "above_world" end
         return true
     end
 
@@ -59,6 +70,11 @@ Core.define("world.location", function(C)
         if not at then return false, "undated" end
         if type(now) ~= "number" then return false, "no_clock" end
         if at > now + 300 then return false, "from_the_future" end   -- a clock stepped; do not trust it
+        -- KB-113: a position stored AFTER this session began is not where the player logged out -- it is
+        -- something this very join wrote, which is how a placeholder puppet at the world origin came back as
+        -- a destination. `connectedAt` is optional so a host that cannot say still gets every other guard.
+        local connectedAt = tonumber(cfg.connectedAt)
+        if connectedAt and at >= connectedAt then return false, "same_session" end
         if now - at > maxAge then return false, "stale" end
         -- A seat is not a place. The vehicle that seat belonged to is very likely gone, and arriving inside a
         -- vehicle that no longer exists is the classic wedge.
@@ -78,6 +94,17 @@ Core.define("world.location", function(C)
             bucket = tonumber(saved.bucket) or 0,
             trusted = ok and true or false,
         }
+    end
+
+    --- Are they already standing where we were about to put them? L110 owes the player their position back,
+    --- not a second arrival: a fade-to-black that lands them where they already were reads as spawning in
+    --- twice, and every join pays for it because the default spawn and the stored position usually agree.
+    function M.alreadyThere(current, pose, opts)
+        local cfg = type(opts) == "table" and opts or {}
+        local near = tonumber(cfg.arrivedM) or DEFAULTS.arrivedM
+        if type(pose) ~= "table" or not M.valid(current, cfg) then return false end
+        local dx, dy, dz = current.x - pose.x, current.y - pose.y, current.z - pose.z
+        return (dx * dx + dy * dy + dz * dz) <= (near * near)
     end
 
     --- Is this new position worth writing? Saving every tick is noise; saving nothing loses the session.

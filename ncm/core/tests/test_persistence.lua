@@ -60,6 +60,49 @@ return {
         T.eq(L.worthSaving({ x = 0/0, y = 0, z = 0 }, at), true, "...but recover from it")
     end,
 
+    -- KB-113. The exact live failure: a placeholder puppet at the world origin was stored during the join
+    -- window and replayed as a destination 3 s later. Ten times, three drivers, two days.
+    a_position_this_join_wrote_is_not_where_you_logged_out = function(T)
+        local L = T.Core.get("world.location")
+        local joined = 1000
+        local mine = { x = 0, y = 3.6, z = 0, savedAt = 1009 }   -- written 9 s after connecting
+        local ok, why = L.shouldRestore(mine, 1012, { connectedAt = joined })
+        T.eq(ok, false, "this join wrote it; it cannot also be where the driver left")
+        T.eq(why, "same_session")
+        T.eq(L.shouldRestore(mine, 1012), true, "a host that cannot say keeps every other guard, and no more")
+        local earlier = { x = 0, y = 3.6, z = 0, savedAt = 999 }
+        T.eq(L.shouldRestore(earlier, 1012, { connectedAt = joined }), true, "one second before the join is last session")
+    end,
+
+    -- KB-113, second half: the row that survived the first guard held z = -906.4 -- a fall, caught by the
+    -- 20 s sweep and then replayed, which drops the player straight back into it.
+    a_fall_is_not_a_place_and_is_never_stored_or_replayed = function(T)
+        local L = T.Core.get("world.location")
+        local falling = { x = 0, y = 3.6, z = -906.4 }
+        local ok, why = L.valid(falling)
+        T.eq(ok, false, "nobody has ever stood 906 m below Night City")
+        T.eq(why, "below_world")
+        T.eq(L.worthSaving(nil, falling), false, "so it never reaches storage in the first place")
+        local _, restore = L.shouldRestore({ x = 0, y = 3.6, z = -906.4, savedAt = 900 }, 1000)
+        T.eq(restore, "below_world", "and a row already holding one is refused on the way out")
+        T.eq(L.valid({ x = 100, y = -200, z = -5 }), true, "the authored world floor is still a place")
+        T.eq(L.valid({ x = 100, y = -200, z = 230 }), true, "and so is the highest authored node")
+        local _, above = L.valid({ x = 1, y = 1, z = 4000 })
+        T.eq(above, "above_world")
+    end,
+
+    -- The owner's report was "why do i spawn in twice every time?" -- the platform places you, then L110
+    -- fades you to black and puts you 0.5 m away.
+    being_put_back_where_you_already_are_is_not_a_restore = function(T)
+        local L = T.Core.get("world.location")
+        local pose = L.arrivalPose({ x = 2566.9, y = 112.6, z = 78.6, savedAt = 1000 })
+        T.eq(L.alreadyThere({ x = 2566.9, y = 112.6, z = 78.6 }, pose), true, "the default spawn and the stored position agree")
+        T.eq(L.alreadyThere({ x = 2566.9, y = 112.6, z = 78.6 }, pose, { arrivedM = 0.1 }), false, "a host may insist on precision")
+        T.eq(L.alreadyThere({ x = 2600.0, y = 112.6, z = 78.6 }, pose), false, "30 m away is a real restore")
+        T.eq(L.alreadyThere(nil, pose), false)
+        T.eq(L.alreadyThere({ x = 0/0, y = 1, z = 1 }, pose), false, "an unreadable position is not an arrival")
+    end,
+
     staleness_is_configurable_because_a_week_is_a_guess = function(T)
         local L = T.Core.get("world.location")
         local p = { x = 1, y = 1, z = 1, savedAt = 0 }

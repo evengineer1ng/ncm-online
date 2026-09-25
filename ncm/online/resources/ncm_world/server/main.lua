@@ -12,6 +12,11 @@ local Location = Core.get("world.location")
 local limbo = Readiness.new()
 local SWEEP_S = 5
 
+-- KB-113 session bookkeeping. Both are keyed by player id, both are cleared on disconnect, and both exist
+-- so the location code can tell "where this driver logged out" from "what this join has written so far".
+local connectedAtUnix = {}   -- playerId -> unix seconds this session began
+local playedThisSession = {} -- playerId -> true once they were observed playable at least once
+
 --- Monotonic seconds. `GetGameTimer` is the platform's own clock and cannot walk backwards over an NTP step,
 --- which `os.time` can -- and a clock that jumps is a watchdog that either nags or goes quiet.
 --- The world's identity, published by ncm_league (separate resource, separate Lua VM -- `NcmCalendar` is nil
@@ -96,6 +101,9 @@ AddEventHandler("onPlayerConnected", function(playerId)
     local id = tonumber(playerId) or 0
     log("connected: player=%d user=%s name=%s", id, tostring(GetPlayerIdentifier(id)), tostring(GetPlayerName(id)))
     limbo:connected(id, nowS(), GetPlayerName(id))   -- KB-60: the limbo clock starts here, not at readiness
+    local okNow, nowUnix = pcall(Open77.time.unix)
+    connectedAtUnix[id] = okNow and math.floor(nowUnix) or nil   -- KB-113: what "this session" means, in save clock
+    playedThisSession[id] = nil
     local session = Open77.ready.hold(id, "NCM driver identity")
     CreateThread(function()
         local prof, reason = NcmIdentity.resolve(id)
@@ -324,13 +332,56 @@ end
 -- remaining guards are staleness, sanity, refusing a saved seat, and KB-58 separation on arrival.
 local LOCATION_SAVE_S = 20
 local lastSaved = {}       -- driverId -> the position last written, so a stationary player is not re-written
+local saveRefused = {}     -- playerId -> the last refusal logged, so the join window is one line and not a stream
+
+--- Is this player standing anywhere yet? (KB-113)
+---
+--- The bug this exists to stop: during the join window the client reports a placeholder puppet at the world
+--- origin, the sweep stored it as a location, and the restore three seconds later teleported the player into
+--- it. `fresh` cannot separate those -- the placeholder snapshots are genuinely fresh, and the readiness sweep
+--- logged `in-world=yes` for a player it was simultaneously reporting as CANNOT PLAY. The rule that CAN tell
+--- them apart is the one KB-60 already established, so this asks that question instead.
+---
+--- The disconnect save is the exception, and deliberately so: it is the most valuable position we ever take,
+--- and by the time the handler runs the puppet may already be gone, which would read as "not playable" for a
+--- driver who spent an hour racing. Having been playable once this session is enough for that one caller.
+local function standingSomewhere(pid, reason)
+    local st = limbo:state(pid, nowS(), inTheWorld(pid))
+    if st.playable then
+        playedThisSession[pid] = true
+        return true
+    end
+    if reason == "disconnect" and playedThisSession[pid] then return true end
+    return false, st.known and Readiness.why(st) or "not tracked"
+end
 
 local function saveLocation(pid, driverId, reason)
     if not (driverId and MySQL and MySQL.isReady()) then return end
+    local standing, why = standingSomewhere(pid, reason)
+    if not standing then
+        -- One line per reason per player: the join window is ~12-120 s of sweeps and this must not become a
+        -- stream. Saves were silent before KB-113, which is exactly why a write of the world origin hid.
+        if saveRefused[pid] ~= why then
+            saveRefused[pid] = why
+            log("location: not saving for driver=%s -- %s (not a position anyone is standing at)",
+                tostring(driverId):sub(1, 8), tostring(why))
+        end
+        return
+    end
+    saveRefused[pid] = nil
     local ok, p = pcall(Open77.players.get, pid)
     if not ok or type(p) ~= "table" or not p.position then return end
     local here = { x = p.position.x, y = p.position.y, z = p.position.z }
-    if not Location.valid(here) then return end
+    local sane, badly = Location.valid(here)
+    if not sane then
+        -- A fall reaches here as a legitimate-looking reading (KB-113: z = -906 was stored and replayed).
+        if saveRefused[pid] ~= badly then
+            saveRefused[pid] = badly
+            log("location: not saving %.1f,%.1f,%.1f for driver=%s -- %s",
+                here.x, here.y, here.z, tostring(driverId):sub(1, 8), tostring(badly))
+        end
+        return
+    end
     if not Location.worthSaving(lastSaved[driverId], here) and reason ~= "disconnect" then return end
     lastSaved[driverId] = here
     local seated = false
@@ -364,12 +415,23 @@ local function restoreLocation(pid, driverId)
     end
     local saved = { x = row.x, y = row.y, z = row.z, heading = row.heading, bucket = row.bucket,
                     inVehicle = tonumber(row.in_vehicle) == 1, savedAt = tonumber(row.saved_at) }
-    local should, why = Location.shouldRestore(saved, math.floor(Open77.time.unix()))
+    local should, why = Location.shouldRestore(saved, math.floor(Open77.time.unix()),
+        { connectedAt = connectedAtUnix[pid] })
     if not should then
         log("location: NOT restoring driver=%s (%s) -- default spawn", tostring(driverId):sub(1, 8), tostring(why))
         return
     end
     local pose = Location.arrivalPose(saved)
+    -- L110 owes them their position back, not a second arrival. The platform has already placed them, and
+    -- when it placed them where they left, a faded teleport to the same spot is the "I spawn in twice" the
+    -- owner reported -- paid on every single join, because the two positions usually agree.
+    local okHere, here = pcall(Open77.players.get, pid)
+    local current = okHere and type(here) == "table" and here.fresh and here.position or nil
+    if current and Location.alreadyThere(current, pose) then
+        log("location: driver=%s is already at %.1f,%.1f,%.1f -- no second arrival",
+            tostring(driverId):sub(1, 8), pose.x, pose.y, pose.z)
+        return
+    end
     local okTp, reason = pcall(Open77.players.teleport, pid,
         { x = pose.x, y = pose.y, z = pose.z }, { fade = true, dismount = true })
     if not okTp or reason == false then
@@ -579,6 +641,8 @@ AddEventHandler("onPlayerDisconnected", function(playerId, reason)
         pcall(saveLocation, tonumber(playerId) or 0, leaving.ncmDriverId, "disconnect")
         lastSaved[leaving.ncmDriverId] = nil
     end
+    local gone = tonumber(playerId) or 0
+    connectedAtUnix[gone], playedThisSession[gone], saveRefused[gone] = nil, nil, nil
     local departure = limbo:forget(playerId, nowS())
     if departure then
         log("readiness: player=%s name=%s left after %ds without ever being able to play (%s) -- warned %d time(s) (KB-60)",
