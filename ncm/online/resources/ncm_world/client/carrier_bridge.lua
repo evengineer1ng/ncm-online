@@ -1,4 +1,11 @@
--- ncm_world / client / ffb_bridge — telemetry out to a local force-feedback companion (IDEA-386).
+-- ncm_world / client / carrier_bridge -- the single channel between NCM and whatever is listening on
+-- loopback: the NCM Carrier plugin, or the older force-feedback companion.
+--
+-- It began as the FFB bridge (`IDEA-386`) and carries two things now: telemetry UP, so a wheel can be made
+-- to feel what the car is doing, and machine projections DOWN, so fitted parts, class rules and the weather
+-- can actually reach the car. **One transport for both**, deliberately: an effect must not be able to arrive
+-- while the channel that reports feel is down, and two sockets would be two places for the sides to
+-- disagree about which is authoritative.
 --
 -- **The direction is inverted from the obvious one, and that is the whole trick** (L129, MASTER_TEST §AJ).
 -- A bundled WebUI page has no outbound network at all — `ws`, `wss`, `http` and `https` alike refused in
@@ -25,7 +32,11 @@ local Feedback = NcmCore.get("driver.feedback")
 
 local DEFAULT_URL = "http://127.0.0.1:38480/bridge.html"
 local HZ = 30                       -- the rate the platform's own observers run at; the wheel wants smooth
-local enabled, url = false, DEFAULT_URL
+-- **On by default, unlike the companion era.** The carrier ships WITH the world through RequiredMods, so
+-- for most players something IS listening, and requiring `/ncm.ffb on` before parts or weather could reach
+-- the car would be a trap. A player with no carrier costs a handful of failed connects and a log line.
+local enabled, url = true, DEFAULT_URL
+local attempts, MAX_ATTEMPTS = 0, 6
 local surface, surfaceReady = nil, false
 local sent, skipped = 0, 0
 
@@ -33,6 +44,10 @@ local sent, skipped = 0, 0
 -- device is reported as absent, because "no wheel detected" and "a wheel we could not identify" are different
 -- things to show a player, and only one of them is their problem to fix.
 local device = nil
+
+-- What the carrier plugin reports about itself, or nil if nothing is listening or it is the older companion
+-- (which knows nothing about projections and simply never sends this).
+local carrier = nil
 
 --- Read by the NCM panel (`client/panel.lua`) to draw the WHEEL tab. A plain snapshot, so the panel never
 --- reaches into this file's state or has to know a companion exists.
@@ -53,7 +68,7 @@ NcmClientFfbState = function()
     return {
         enabled = enabled, url = url,
         surface = surface ~= nil, connected = surfaceReady,
-        device = device, sent = sent, idle = skipped,
+        device = device, carrier = carrier, sent = sent, idle = skipped,
     }
 end
 
@@ -73,12 +88,27 @@ NcmClientFfbCommand = function(kind, payload)
     return false, "unknown_command"
 end
 
+--- The last projection set we pushed, by record, so an unchanged world costs nothing. Keyed by the same
+--- signature the server publishes with; a record that disappears is sent a restore rather than forgotten.
+local projected = {}
+
+--- Push one envelope to the carrier. The plugin applies it and interprets nothing -- which part moved which
+--- flat, and why, was decided server-side in `machine.projection`.
+local function pushProjection(envelope)
+    if not (surface and surfaceReady) then return false end
+    surface:send("ncm:machine.projection", envelope)
+    return true
+end
+
 local function tearDown(why)
     if surface then
         pcall(function() surface:destroy() end)
         log("bridge closed (%s) after %d frame(s), %d skipped", tostring(why), sent, skipped)
     end
-    surface, surfaceReady, device = nil, false, nil
+    surface, surfaceReady, device, carrier = nil, false, nil, nil
+    -- Forget what we pushed. The carrier restores its own originals when the socket drops, so re-sending on
+    -- reconnect is correct and re-sending nothing would leave a fresh carrier with no projection at all.
+    projected = {}
     announce()
 end
 
@@ -89,12 +119,18 @@ local function bringUp()
         zIndex = 1, transparent = true, visible = false,
     })
     if not page then
-        -- Not an error worth shouting about: "the companion is not running" is the ordinary case.
-        log("bridge unavailable (%s) — is the companion listening on %s?", tostring(reason), url)
-        enabled = false
+        -- Not an error worth shouting about: "nothing is listening" is an ordinary state, and on a fresh
+        -- launch it is usually just early -- the plugin's socket comes up while the game is still loading.
+        attempts = attempts + 1
+        if attempts >= MAX_ATTEMPTS then
+            log("no carrier or companion on %s after %d attempt(s) — giving up until /ncm.ffb on",
+                url, attempts)
+            enabled = false
+        end
         announce()
         return
     end
+    attempts = 0
     surface = page
     page:on("ncm:ffb.ready", function(info)
         surfaceReady = true
@@ -130,7 +166,21 @@ local function bringUp()
         log("device: %s | class=%s | rung=%s | armed=%s",
             device.name, device.class, tostring(device.rung), tostring(device.armed))
     end)
-    log("bridge surface created for %s; waiting for the companion", url)
+    -- The carrier reports what it did with a projection. Kept separate from `device` because "your wheel"
+    -- and "your car" are different questions and a player debugging one should not have to read the other.
+    page:on("ncm:carrier.health", function(h)
+        if type(h) ~= "table" then return end
+        carrier = {
+            version = tostring(h.version or "?"),
+            hook = h.hook and true or false,
+            applied = tonumber(h.applied) or 0,
+            records = tonumber(h.records) or 0,
+        }
+        announce()
+        log("carrier %s | hook=%s | %d flat(s) on %d record(s)",
+            carrier.version, tostring(carrier.hook), carrier.applied, carrier.records)
+    end)
+    log("bridge surface created for %s; waiting for a listener", url)
 end
 
 --- The car the local player is sitting in, or nil. Shared with the race sampler on purpose
@@ -224,6 +274,46 @@ CreateThread(function()
             if surface then tearDown("disabled") end
             Wait(1000)
         end
+    end
+end)
+
+--- Machine projections, pushed down the same socket the telemetry comes up.
+---
+--- Slow on purpose: the record carrier is **spawn-cached**, so a change reaches a car the next time one
+--- spawns and there is nothing to be gained by shouting it twice a second. 2 Hz is about latency to a fresh
+--- spawn, not about smoothness.
+CreateThread(function()
+    Wait(9000)
+    while true do
+        if enabled and surface and surfaceReady then
+            local ok, state = pcall(function() return GlobalState.ncmProjections end)
+            local records = (ok and type(state) == "table" and type(state.records) == "table")
+                and state.records or nil
+            if records then
+                for record, envelope in pairs(records) do
+                    if type(envelope) == "table" and type(envelope.record) == "table" then
+                        -- The signature is what the server changed, not what we think it means. Comparing
+                        -- flat counts would miss a multiplier that moved without the count changing.
+                        local sig = ("%s/%d/%s"):format(tostring(envelope.at),
+                                                        #(envelope.record.flats or {}),
+                                                        tostring(envelope.record.restore))
+                        if projected[record] ~= sig and pushProjection(envelope) then
+                            projected[record] = sig
+                        end
+                    end
+                end
+                -- A record the server stopped publishing keeps its altered flats until something says
+                -- otherwise, so say otherwise.
+                for record in pairs(projected) do
+                    if records[record] == nil then
+                        if pushProjection({ v = 1, record = { path = record, flats = {}, restore = true } }) then
+                            projected[record] = nil
+                        end
+                    end
+                end
+            end
+        end
+        Wait(500)
     end
 end)
 

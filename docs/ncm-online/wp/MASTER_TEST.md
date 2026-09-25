@@ -1202,3 +1202,38 @@ the day NCM's first real package exists.
 Passing AS proves NCM stopped publicly redistributing content it had not established the right to serve. It
 proves nothing about permission, which is a separate conversation with the author, and it does not authorise a
 substitute open-wheel mod - the owner ruled explicitly against substituting one now.
+
+## §AT - the NCM Carrier, from "does the game still launch" to "a car feels the weather" - **NOT RUN**
+
+`L146` / `IDEA-472`. The carrier is one RED4ext plugin carrying drive-model effects, final-command authority
+and force feedback. It is built and offline-green; nothing below has been run.
+
+**AT1 IS NOT OPTIONAL AND IT COMES FIRST.** A RED4ext plugin that fails badly does not degrade gracefully -
+RED4ext puts up a MessageBox and terminates, so the game does not launch at all, and the player's only clue
+is that Cyberpunk broke after installing NCM's mod. That failure reaches every player at the same moment.
+It is found by us, once, by hand, before the package is a join requirement (`IDEA-478`).
+
+**Everything here runs in NCM Online or on the desktop. Nothing requires Solo** (`L144`).
+
+| # | Operation | Expected | Result |
+|---|---|---|---|
+| §AT1 | **Copy `dist/ncm_carrier/red4ext/` into the game by hand. Do not declare anything. Launch Cyberpunk.** Read `<game>/red4ext/logs/` and `red4ext/plugins/ncm_carrier/ncm_carrier.log`. | **The game launches.** `ncm_carrier` appears in the RED4ext log as loaded. The carrier log names its version, whether the bridge is listening, whether the hook installed, and what device it found. A declined hook is a PASS - effects and force feedback do not depend on it. | **NOT RUN** |
+| §AT2 | Join Development with the carrier present. | `carrier_bridge` connects: the client log shows `carrier <version> | hook=... ` and the bridge reports a listener. The bridge is on by default now, so no `/ncm.ffb on` is needed. | **NOT RUN** |
+| §AT3 | Open the NCM panel, WHEEL/PEDALS tab. | The wheel is named, classified, and its rung shown against the ladder for that class. An unrecognised wheel reads `unknown` and gets the lowest ceiling - **it is not silently upgraded**. | **NOT RUN** |
+| §AT4 | `ncm.machine weather rain` on the server. Then **spawn a fresh car** and drive it. | The server publishes projections; the client pushes them; the carrier log reports `projection v1 on <record>: N applied`. The car has less lateral grip and longer braking. **Spawn-cached: a car already in the world does not change** - that is correct behaviour, not a failure. | **NOT RUN** |
+| §AT5 | `ncm.machine weather sunny`, then spawn again. Then disconnect. | Grip returns on the next spawn. On disconnect the carrier restores every captured original and says how many. **Verify by relaunching single-player later: the player's own game must be exactly as it was.** This is the row that protects someone's install from us. | **NOT RUN** |
+| §AT6 | One drive with force feedback armed. Then quit and read the carrier log. | Force is felt: weight building with speed, texture as the tyres let go, engine hum rising with revs. On shutdown the log prints `measured <channel>: peak ... over N frames` for every channel. **This closes `KB-106`** - if `suspLong`/`suspLat` peak far below 0.05 the road channel has been inaudible and `kRoadScale` is wrong. | **NOT RUN** |
+| §AT7 | Host the blob, `declare-carrier.py <dev-root> --version ... --sha256 ... --size ...`, restart Development, join through the launcher. | The manifest digest changes; the consent gate names **NCM Carrier** as executable content; the launcher projects it into `red4ext/plugins/ncm_carrier/`; the game launches and §AT2-§AT6 still hold. **This is NCM's first own package through its own pipeline.** | **NOT RUN** |
+
+### What passing §AT does and does not establish
+
+It establishes that NCM can ship native code of its own through its own delivery pipeline, that the record
+carrier works end to end, and that force feedback survived moving inside the game.
+
+It does **not** establish per-player differentiation - two drivers of the same model still share one record,
+which is Report 36's hardest constraint and the one that sits across the premise of a parts economy. It does
+not establish anti-cheat; a client that declines to apply a projection simply has more grip than everyone
+else and there is no witness (`IDEA-458`, `L135`). And it does not establish that the flat write is robust -
+`IDEA-477` records that this is the least-verified code in the plugin.
+
+**Production is a separate decision on a separate day.** `L146` does not authorise it.

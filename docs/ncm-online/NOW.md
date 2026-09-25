@@ -3,67 +3,98 @@
 > **STATUS: LEDGER** - living session memory, rewritten at the end of every working session.
 > Authority map: [INDEX.md](INDEX.md) - classified 2026-09-24 (L125).
 
-Last rewritten: **2026-09-25 - RB15 withdrawn and verified; repos clean and pushed; Engineering's first slice built.**
+Last rewritten: **2026-09-25 - the NCM Carrier built: one native mod for parts, chrome, weather and the wheel.**
 
-> **Claim before writing:** decisions through **L145**; MASTER_TEST through **2.19 / §AS**; next QA letter
-> **§AT**. BACKLOG next free **IDEA-472**; known issues through **KB-121** plus the pre-existing duplicates
-> **KB-87** and **L119**. Read the last row of each ledger, not this line (`KB-114`).
+> **Claim before writing:** decisions through **L146**; MASTER_TEST through **§AT**; next QA letter **§AU**.
+> BACKLOG next free **IDEA-479**; known issues through **KB-121** plus the pre-existing duplicates **KB-87**
+> and **L119**. Read the last row of each ledger, not this line (`KB-114`).
 
-## Next action: build. Two tracks, both unblocked.
+## Next action: build the DLL, then launch the game once, by hand.
 
-**Engineering - next step is migration 031.** `engineering.competency` is built and green
-(`ncm/core/engineering/competency.lua`, 15 tests): 15 skills, 12 families, the reducer, headroom, difficulty,
-relevance and the both-halves gating rule. Pure, not yet persisted or wired. Next is `IDEA-470` -
-`engineer_skill` and `engineer_family`, same shape as `driver_sr`, at most 27 rows per engineer ever - then one
-bench inspection operation and a command to run it.
+```
+git submodule update --init --recursive
+$env:VCPKG_ROOT = "<your vcpkg>"
+.\tools\build-carrier.ps1
+```
 
-**Wheel - next step is NCM's first own package.** The delivery pipeline is proven and currently carries two
-loaders and nothing else, which makes this the moment to ship NCM content through it. Start with a **CET Lua
-package**: executable class, so it exercises the real consent path, and it needs no C++ toolchain. Prove NCM
-ships its own content end to end; *then* add the RED4ext plugin, which is the only demonstrated path to HID,
-FFB and final-command interception (Report 36 3.2, 6.7). **Packaging first, wheel code second.**
+Then **§AT1, which is not optional**: copy `dist\ncm_carrier\red4ext\` into the game, launch, and read
+`red4ext\logs\` and `red4ext\plugins\ncm_carrier\ncm_carrier.log`. **The game must launch.** A RED4ext plugin
+that fails badly does not degrade - RED4ext shows a MessageBox and terminates - and that failure would reach
+every player at the same moment. We find it once, ourselves (`IDEA-478`).
 
-**Independent, whenever the wheel is on:** `KB-106`'s `ROAD_SCALE` drive. One drive, instrumentation already
-ships, blocked by nothing, and the last thing between the FFB work and an honest "done".
+Only after that: host the blob, `declare-carrier.py` against **Development**, restart, join. Production is a
+separate decision on a separate day.
+
+Expect to debug the flat write first (`IDEA-477`) and the OPEN//77 coexistence question second - OPEN//77 is
+itself a RED4ext plugin with its own vehicle adapter and nobody has ever asked whether a second one sharing
+the drive path is fine.
+
+## What was built this session
+
+**`ncm/carrier/`** - a RED4ext plugin. Loopback WebSocket bridge on 38480 serving the same page the Python
+companion served, so `carrier_bridge.lua` generalises rather than being replaced. TweakDB flat application
+with an originals ledger. SDL force feedback with `CEILING`/`clamp`/`slew`/rung transcribed verbatim (`L133`)
+and KB-103, KB-104 and IDEA-412 carried across. Final-command authority behind RTTI resolution that declines
+rather than guessing. **No ViGEm, no virtual gamepad** - the companion needed one because nothing in the game
+could read a wheel; this writes the final command directly.
+
+**`machine.flats` and `machine.projection`** - the one calculation, in pure Lua, 20 tests. Parts, wear,
+weather, chrome and class rules in; one versioned envelope out, with a trace naming every movement of every
+number. The plugin applies triples and interprets nothing (`L135`).
+
+**`server/machine.lua`** publishes projections through `GlobalState.ncmProjections`, the same path the class
+ceilings already use. **Rain is grip now, not a lowered speed limit** (`IDEA-476`) - but it must not go live
+before `KB-6`, because unsynced weather plus grip effects means two drivers racing under different rules
+without knowing it.
+
+Offline gate green. Nothing is compiled, packaged, declared or deployed.
 
 ## Live state
 
-- **Production:** RB15 and the NCM liveries **deleted from Warden by the owner** (`L145`). Public manifest
-  declares ArchiveXL 1.27.1 and TweakXL 1.11.4 only, digest `67ad384b...` (was `06ab5485...`). The loaders stay
-  staged so the pipeline is already correct the day NCM's first package exists. The `requiredMods.note` still
-  names RB15 and is stale - fix on the next config touch, not with a restart of its own.
-- **Development:** parked and restarted. `enabled=false`, `mods:[]`, empty-set digest, 40 resources, all four
-  NCM resources present.
-- **Repos:** both clean and pushed. `cyberpunk2077` @ `ef448fd`, `ncm-wheel` @ `52dd7de`. No release cut.
-  Production is reproducible from a commit (`KB-115` closed).
+- **Production:** untouched this session. ArchiveXL 1.27.1 + TweakXL 1.11.4, digest `67ad384b...`. The
+  `requiredMods.note` still names RB15 and is stale - fix on the next config touch, not with its own restart.
+- **Development:** parked, `enabled=false`, empty-set digest. Unchanged this session.
+- **Repos:** `cyberpunk2077` has a new submodule (`RED4ext.SDK`, MIT). `ncm-wheel` @ `52dd7de`, now reference
+  material rather than a shipping dependency.
 
 ## What is settled, so nobody re-opens it
 
-- **Delivery works; NCM's packages are unwritten.** Different problems (`L145`, `IDEA-471`). Transport,
-  consent, executable roots, projection, loader init and archive load all passed with real packages, evidenced
-  from the client's own logs. Do not resurrect "RequiredMods doesn't work", and do not call NCM's own hosted
-  delivery unproven.
-- **The AP section is closed.** AP1-AP4 pass; AP5/AP6 retired with their subject. **Nobody is to be asked to
-  drive an RB15.**
-- **No test may require Solo** (`L144`). A row that needs it is unrunnable as written, not "owed".
-- **Research before experiment** (`L143`). The AR probe is deferred and its question answered: the drive model
-  is **spawn-cached**.
-- **Surface C is the one open capability question** (`IDEA-464`): the live `WheeledPhysics` instance is a
-  per-instance copy of the drive-model record, fully mapped, and nothing found writes it. A code-reading task,
-  not an owner session.
+- **NCM owns native code** (`L146`). `L138`'s three questions are answered: mod-required world, yes; native
+  ownership, yes; companion as device layer, no. `L139` is **discharged** - but its naming discipline is not:
+  the command surface is `brake_command_authority`, never `native_brake_force`.
+- **Delivery works; NCM's packages are unwritten** (`L145`, `IDEA-471`). The carrier is the first one.
+- **Spawn-cached** (`L143`). Record effects reach a car at its next spawn, never mid-stint. Parts, weather and
+  class rules fit that honestly. Wear and expiring chrome do not - do not design them against the hope it
+  changes.
+- **Two drivers of the same model still share one record.** Report 36's hardest constraint, untouched by any
+  of this, and it sits directly across the premise of a parts economy.
+- **Four of the twelve families cannot be felt at all** (`IDEA-474`): cooling, transmission, electrical,
+  chassis. Enforced in code, refused by name.
+- **No test may require Solo** (`L144`). **Nobody is to be asked to drive an RB15** (`L145`).
+- **Surface C remains the one open capability question** (`IDEA-464`). A code-reading task, not an owner
+  session.
 
 ## Outstanding live QA
 
-- **AQ:** AQ1/AQ3 **LIVE PASS**. AQ2 (spawned in once?) and AQ4 (log out somewhere distinctive, log back in -
-  `L110` has never been observed working) are cheap and owed.
-- **AN / AO:** Gate 6 setPerformance and companion brake-authority proofs; not run.
-- **AM4-AM7, AL1-AL2, AK:** unchanged.
-- Still owed: IDEA-251 full Market live PASS, AH21 incident attribution, migration 028 fresh-world.
+- **§AT:** the carrier, AT1-AT7. Nothing run. AT1 gates everything else.
+- **§AQ:** AQ1/AQ3 **LIVE PASS**; AQ2 and AQ4 cheap and owed.
+- **`KB-106`'s `ROAD_SCALE`** is now folded into **§AT6** - the carrier prints the measured peaks on shutdown,
+  so one drive closes it.
+- **AN / AO:** Gate 6 setPerformance and brake-authority proofs; not run.
+- **AM4-AM7, AL1-AL2, AK** unchanged. Still owed: IDEA-251 Market live PASS, AH21 incident attribution,
+  migration 028 fresh-world.
+
+## Engineering, parked mid-track
+
+`engineering.competency` is built and green; next is `IDEA-470` - migration 031, `engineer_skill` and
+`engineer_family`, same shape as `driver_sr` - then one bench inspection operation. Untouched this session
+and blocked by nothing.
 
 ## Session records
 
-- **L144** no test may require Solo; **L145** RB15 removed and verified, Case B closed as moot.
-- **KB-120** the mod-flag scripts could only address Production; **KB-121** most of the AP evidence was already
-  on disk and the test design asked a human for it instead.
-- **IDEA-469** the competency slice, **IDEA-470** its two tables, **IDEA-471** pipeline versus packages.
-- Dev server restarted; both repos pushed; Online untouched by this session beyond read-only checks.
+- **L146** NCM owns native code; the carrier is one mod; the companion retires. `L50`/`L1` amended, `L139`
+  discharged, **KB-117 closed by retirement**.
+- **IDEA-472** the carrier; **473** NCM had already written these flats itself and nobody checked; **474** four
+  families cannot be felt; **475** one fact, one carrier; **476** rain as grip; **477** how a flat is actually
+  written; **478** launch it by hand first.
+- Online untouched. No deploy, no restart, no config change.

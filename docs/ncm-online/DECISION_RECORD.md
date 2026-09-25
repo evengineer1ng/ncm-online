@@ -1626,3 +1626,47 @@ Consequences, so nobody re-opens this:
   dependencies"* and is now stale; correct it on the next config touch, not with a restart of its own.
 - **The next package proves itself.** Whatever NCM ships first carries its own §AP-style receipt, and by then
   the whole pipeline is a known quantity rather than a question.
+
+## L146 - LOCKED OWNER RULING - NCM owns native code; the carrier is one mod and the companion retires
+
+Owner, 2026-09-25: *"plan the wheel package, but more than a wheel package, make it be the ncm mod which
+carries the ability for us to have part effects, chrome effects, weather driving effects like rain, whatever
+else we have planned in that vein. they all touch a similar cord. then lets actually build it and we will
+debug the issues of the final product, not every step along the way."*
+
+Asked directly, the owner chose the **full native plugin** and chose to **move force feedback into it now**.
+
+**This answers `L138`, open since Report 36.** (1) NCM becomes a mod-required world - it already is one, for
+two third-party loaders; now it requires one of NCM's own. (2) **NCM takes ownership of native code.**
+(3) The companion does **not** remain the FFB device layer; it is superseded by the carrier.
+
+### Why native, and why this is not merely the strongest option taken by default
+
+`IDEA-443` warns against choosing the most powerful layer by reflex, so the reasoning is recorded rather
+than assumed. There is a real gap and only one thing crosses it: **OPEN//77 resources have no TweakDB and no
+engine RTTI, and CET mods are not network-aware** (`L1`). Neither side can reach the other. A CET carrier
+would need the companion to relay for it, which means every NCM player - wheel or not - runs an executable
+the delivery pipeline can neither install nor start. A RED4ext plugin is the only component that is both
+network-capable and started automatically by the loader chain NCM already requires.
+
+It also satisfies Report 36 section 6.7's threshold rather than dodging it: the end state has **no separate
+GitHub download at all**, which is the condition the owner set for the migration being worth doing.
+
+### What is amended
+
+- **`L50` and `L1` described a SECURED server.** NCM runs unsecured with consented executable loaders and
+  has since section AP. The inert-only rule stands for *content*; it never governed NCM's own runtime.
+  Stated here so the contradiction is recorded rather than discovered later.
+- **`L139` is DISCHARGED, not ignored.** Its two conditions are met: section AR was answered by research
+  (`L143`, spawn-cached) and AP1-AP4 passed. Its naming discipline is **not** discharged and is carried into
+  the code: the command surface is `brake_command_authority`, never `native_brake_force`.
+- **Report 36 remains a capability assessment and its findings stand.** What changes is that the three
+  decisions it raised are now made. It is not promoted to a design document; this entry is the decision.
+- **`KB-117` closes by retirement.** Two divergent companions stop being a problem when neither is required.
+  Both stay on disk as the reference the port was made from - do not delete our work.
+
+### What is NOT decided here
+
+Production. The carrier is a Development artifact until it has launched the game on the owner's own machine
+and passed section AT. **A plugin that fails to load stops Cyberpunk launching entirely** - the one failure
+mode that reaches every player simultaneously - so it is found by us, once, by hand (`IDEA-478`).
