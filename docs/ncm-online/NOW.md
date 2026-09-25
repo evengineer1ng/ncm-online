@@ -3,54 +3,57 @@
 > **STATUS: LEDGER** — living session memory, rewritten at the end of every working session.
 > Authority map: [INDEX.md](INDEX.md) — classified 2026-09-24 (L125).
 
-Last rewritten: **2026-09-25 — full platform-freeroam eviction verified in Development; Online activation pending.**
+Last rewritten: **2026-09-25 — platform freeroam fully evicted from Development and Online.**
 
 > **Claim before writing:** decisions through **L132**; MASTER_TEST through **2.18 / §AM**; next QA letter
 > **§AN**. BACKLOG next free **IDEA-420**; known issues through **KB-102** plus the existing duplicate KB-87.
 > Historical §Z collision remains: qualify by section (2.14 Machine Index vs 2.16 Help).
 
-## Next action: promote the verified eviction without repeating the Kazami restart race
+## Next action: one client proves the player-facing result
 
-Development now excludes both `freeroam` and `open77_freeroam` from `resources.load` and no longer carries the
-`freeroam` discovery tag. The independent `open77_animations` resource remains. A clean Development restart at
-00:55 EDT proved: dependency audit green (36 explicit resources), neither freeroam resource discovered or
-started, animations and both NCM resources started, schema 30 / `pending=[]`, health 200, empty stderr and zero
-boot errors. The repository gate is green after the idempotency repair to the vendor-tree script.
+Connect to Online and run MASTER_TEST §AM4–§AM7: confirm there is no scripted death/respawn on join; prove
+`/freeroam`, `/car`, `/race`, `/footrace`, `/pvp` and `/dm` no longer exist or mutate the world; prove
+`/anim list`, one named animation and `/anim stop` still work; then die once and record the actual behavior.
+The expected current death workaround is reconnect, because NCM does not yet own respawn-after-death.
 
-The same change still needs to be staged and activated on Online. Before any restart: push the commit, take a
-fresh database/resource/config rollback set, verify the effective config, and query current players. Re-check
-immediately before restart. That narrows but does not close KB-102: the prior restart entered `Stopping` at
-04:39:23 UTC, accepted Kazami at 04:39:29, and kept the listener alive until systemd killed it at 04:40:53.
-There is no proven admission-drain mechanism yet; do not describe an empty preflight as a lock.
+Do not close KB-100 on boot evidence alone. The kill handler cannot have registered because the resource did
+not start, but the player experience still needs the live join observation beside it.
 
-## What changed (L132 / IDEA-416)
+## Deployment result
 
-`tools/staging/close-freeroam-sandbox.py` now enforces the whole boundary:
+Commits `833642b` and `0ea0def` are on `origin/main`. Fresh Online rollback artifacts are stamped
+`20260925-050408`: database dump (63 tables), NCM resource archive, `server.jsonc`, freeroam manifest and
+freeroam config.
 
-- remove `freeroam` and `open77_freeroam` from the load list;
-- remove the `freeroam` server tag;
-- keep `open77_animations` loaded;
-- retain the earlier restricted-command, PvP-off and race/PvP manifest edits as defence in depth;
-- print and validate the resulting load state; and
-- remain reversible and idempotent across upgrades.
+The production guard now reports:
 
-This removes the platform vehicle/weapon menu, `/freeroam`, `/car`, platform `/race`/`/footrace`, `/pvp`/`/dm`,
-the separate freeroam persistence/wallet resource and the forced kill-respawn on every join. `/anim <profile>`,
-`list`, `info` and `stop` remain. The no-argument animation picker leaves with freeroam.
+```
+freeroam loaded        = no
+open77_freeroam loaded = no
+open77_animations kept = yes
+freeroam server tag     = no
+load list OK: 36 resources, every dependency satisfied
+```
 
-## Honest lifecycle gap
+Online restarted at 05:09 UTC after the whitelist was confirmed enabled and the player set was empty. The
+normal SIGTERM path again took exactly 90 seconds, but admitted nobody. New boot: 39 resources started after
+platform expansion, zero freeroam discoveries/starts, animations and both NCM resources live, schema 30 /
+`pending=[]`, zero boot errors, service active and health 200. Canonical state remains under sole world identity
+`ncm-dev`: 16 drivers/bindings, 21 assets, 33 results, 32 ledger rows, 18 evidence and 18 discoveries.
 
-NCM does not yet own respawn-after-death. `open77_death` observes life state but does not respawn, and no NCM
-handler replaces freeroam's `/revive`/auto-respawn. Until that is built and tested, reconnecting is the honest
-workaround after death. This gap no longer vetoes the authority boundary.
+## Boundary now in force (L132 / IDEA-416)
 
-KB-101 also remains: NCM can save a not-yet-incarnated player's origin placeholder and later restore it. That
-is independent of freeroam and still needs the readiness/origin guards already recorded.
+The platform vehicle/weapon menu, `/freeroam`, platform racing/PvP commands, forced join kill and separate
+`open77_freeroam` persistence/wallet are absent from the load set. `open77_animations` stays; its direct/list/
+info/stop commands remain, while freeroam's no-argument picker leaves. The re-applicable guard must be run after
+each OPEN//77 upgrade because the vendor tree and config template can restore the removed surfaces.
+
+KB-101 remains independent: NCM can save a pre-incarnation origin placeholder and later restore it. Its
+readiness/origin guards are not part of this eviction.
 
 ## Live QA still owed
 
-- **§AM3–§AM7:** activate Online, verify boot, then use a real client to prove no join death, no sandbox
-  commands, animations still work, and record current death behavior.
+- **§AM4–§AM7:** live join, command absence, animation survival and current death behavior.
 - **§AL1–§AL2:** visually confirm the three Market offerings and repeated-open idempotency. §AL3 passed.
 - **§AK:** two-client Driver Card renderer handoff, presentation lifecycle and corrected distance scaling.
 - **Rig/FFB:** the outstanding physical/in-game checks named in BACKLOG IDEA-395–412.

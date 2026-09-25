@@ -947,7 +947,7 @@ bindings / 19 assets / 29 results / 23 ledger / 14 evidence / 14 discovery. Depl
 
 ---
 
-## §AM — platform freeroam eviction (2026-09-25) — **DEVELOPMENT PASS; ONLINE + CLIENT PASS OWED**
+## §AM — platform freeroam eviction (2026-09-25) — **DEVELOPMENT + ONLINE BOOT PASS; CLIENT PASS OWED**
 
 L132 / IDEA-416. The first containment pass was insufficient: `/freeroam`, the forced join kill and both
 freeroam resources still loaded. The re-applicable vendor-tree guard now also removes `freeroam` and
@@ -958,11 +958,19 @@ Development boot at 00:55 EDT: dependency audit `load list OK: 36 resources`; 38
 platform dependency expansion; zero freeroam resources discovered or started; `open77_animations`, `ncm_world`
 and `ncm_league` started; schema 30 / `pending=[]`; HTTP health 200; stderr empty; zero boot error matches.
 
+Online activation at 05:09 UTC followed commits `833642b` and `0ea0def` on `origin/main`, rollback set
+`20260925-050408`, a confirmed live whitelist and an empty player set. The normal restart took the platform's
+full 90-second SIGTERM timeout, but admitted no player. New boot: 39 resources started after platform expansion;
+zero freeroam resources discovered or started; animations and both NCM resources started; schema 30 /
+`pending=[]`; zero boot error matches; health 200. The guard remains idempotent and the 36-resource dependency
+audit passes. Current canonical counts are 16 drivers/bindings, 21 assets, 33 results, 32 ledger rows and 18
+knowledge evidence/discovery rows, all under the sole `ncm-dev` world identity.
+
 | # | Smallest live proof | PASS condition | State |
 |---|---|---|---|
 | §AM1 | Inspect the effective Development load list and dependency audit. | `freeroam=no`, `open77_freeroam=no`, `open77_animations=yes`; every loaded dependency present. | **PASS — script readback plus 36-resource dependency audit** |
 | §AM2 | Restart Development and inspect the complete boot log. | Neither freeroam resource is discovered/started; NCM and animations start; health 200; zero boot errors. | **PASS — 00:55 EDT** |
-| §AM3 | Promote the script/config result and restart Online only after a fresh player check. | Online starts without either freeroam resource, retains animations and NCM, stays schema-current and healthy. | **OWED** |
+| §AM3 | Promote the script/config result and restart Online only after a fresh player check. | Online starts without either freeroam resource, retains animations and NCM, stays schema-current and healthy. | **PASS — 05:09 UTC; zero freeroam discoveries/starts, animations + NCM live, schema 30, health 200, zero errors** |
 | §AM4 | Join Online once after §AM3. | No scripted death/respawn on join; NCM placement remains. | **OWED — live client** |
 | §AM5 | Try `/freeroam`, `/car`, `/race`, `/footrace`, `/pvp` and `/dm`. | None of the platform sandbox surfaces exists or mutates world state. | **OWED — live client** |
 | §AM6 | Try `/anim list`, one named animation and `/anim stop`. | Standalone animation command still works; no-argument picker absence is accepted. | **OWED — live client** |
