@@ -5,17 +5,22 @@
     python3 publish-carrier.py <server-root>                                   # show what is declared
     python3 publish-carrier.py <server-root> --remove                          # withdraw it
 
-**WARDEN OWNS THE STORE. THIS SCRIPT ONLY DECLARES.**
+**THE STORE IS THE SOURCE OF TRUTH. THIS SCRIPT DECLARES WHAT IS ALREADY IN IT.**
 
-An earlier version wrote the blob and its metadata into `.open77/mods/` by hand. It worked until the server
-restarted, and then the server **pruned both the store files and the declaration** -- silently, leaving an
-empty package list and an empty-set digest, while the Warden-imported RB15 entries beside them survived
-untouched (observed 2026-09-25). The store is the server's catalogue, not a drop folder.
+Getting a blob into the store is not this script's job and there is **more than one way to do it**: Warden's
+import at `http://127.0.0.1:11780`, or an operator placing files and configuring them the way
+`configure-required-mods-https.py` does for Production. Both are legitimate.
 
-So the order is: **import the zip in Warden (http://127.0.0.1:11780), then run this to declare it.** This
-script now verifies the blob is present before it writes anything, and refuses with instructions if it is
-not. `--import-blob` restores the old behaviour for an operator who knows why they want it; it is not the
-default and it is not recommended.
+What this script will not do any more is *invent* store contents. An earlier version wrote the blob and
+metadata by hand and declared them in the same breath; it served for one session and the entry was gone
+after the next restart (`KB-124`). **The mechanism was never established** -- it may have been a
+reconciliation against a catalogue, or a mismatch in the entry itself -- so the fix is not a theory about
+ownership, it is to stop guessing: read the store, declare exactly what is there.
+
+**That also fixes a bug guessing caused.** Warden derives its own id and version from the file name --
+`ncm-carrier-0.1.0.zip` became id `ncm-carrier-0-1-0` at version `1.0.0`, not `ncm-carrier` at `0.1.0`. A
+declaration naming an id the store does not hold can never resolve. So the id and version come **from the
+store metadata**, never from an assumption in this file.
 
 The server root is a PARAMETER (`KB-120`). Development is `tools/open77/server`; the Lightsail default is
 kept only so Production is not a special case. **Pass the root explicitly and read what you passed** -- this
@@ -249,7 +254,10 @@ def main():
         print("\n%s is NOT declared." % PACKAGE_ID)
         return 0
 
-    drop = set(args.drop) | {PACKAGE_ID}
+    # Any previously declared carrier goes, whatever id it was declared under -- an id that changed
+    # between imports is exactly how two declarations of the same package end up side by side.
+    drop = set(args.drop) | {PACKAGE_ID} | {i for i in (id_of(o) for o in objs)
+                                            if i and i.startswith(PACKAGE_ID)}
     kept = [o for o in objs if id_of(o) not in drop]
     dropped = [id_of(o) for o in objs if id_of(o) in drop and id_of(o) != PACKAGE_ID]
     if dropped:
@@ -308,14 +316,34 @@ def main():
             print("Expected sha256 once imported: %s" % info["sha256"])
             return 1
         else:
-            print("  blob present in the store -- declaring it")
+            print("  blob present in the store")
+
+        # The store entry is authoritative for `id` and `version`. Whoever imported it -- Warden, or an
+        # operator following the Production procedure -- decided those, and a declaration that disagrees
+        # names a package the server cannot resolve.
+        meta_path = os.path.join(store, "%s.json" % info["sha256"])
+        try:
+            with open(meta_path, encoding="utf-8") as fh:
+                meta = json.load(fh)
+        except (OSError, ValueError) as exc:
+            raise SystemExit("store metadata unreadable (%s): %s" % (meta_path, exc))
+
+        stored_id = meta.get("id")
+        stored_version = meta.get("version")
+        if not stored_id:
+            raise SystemExit("store entry has no id -- re-import it")
+        if stored_id != PACKAGE_ID:
+            print("  store calls it '%s' (not '%s') -- using the store's id" % (stored_id, PACKAGE_ID))
+        if stored_version != version:
+            print("  store version is '%s' (zip says '%s') -- using the store's" % (stored_version, version))
+        package_id, version = stored_id, stored_version or version
 
         # **No `capability` here.** It belongs in the store metadata and ONLY there:
         # `RequiredModConfiguration` has no such member and the server refuses to start with it present --
         # "The JSON property 'capability' could not be mapped to any .NET member". Learned the hard way on
         # 2026-09-25; `configure-required-mods-https.py` already filtered it out and this script did not.
         entry = {
-            "id": PACKAGE_ID,
+            "id": package_id,
             "source": "hosted",
             "displayName": DISPLAY_NAME,
             "version": version,

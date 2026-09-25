@@ -9,32 +9,38 @@ Last rewritten: **2026-09-25 - the carrier is built, hosted and live on Developm
 > BACKLOG next free **IDEA-479**; known issues through **KB-121** plus the pre-existing duplicates **KB-87**
 > and **L119**. Read the last row of each ledger, not this line (`KB-114`).
 
-## Next action: import the carrier in Warden, then declare it.
+## Next action: join Development.
 
-Two joins delivered **nothing**, and nothing NCM wrote ran. Both causes are found and fixed; what is left is
-one import you have to click.
+**Everything is in place.** The carrier is imported, declared and served; both causes of the two dead joins
+are fixed.
 
-1. Open **http://127.0.0.1:11780** and import `C:\Users\eveng\Documents\cyberpunk2077\dist\ncm-carrier-0.1.0.zip`.
-   Expected sha256 `7febfa6e794ca0748d6f03c325de8053d20beba403840e0883aa97fdea619286`.
-2. `python tools/staging/publish-carrier.py tools/open77/server --zip dist/ncm-carrier-0.1.0.zip --enable`
-   It verifies the blob is in the store and refuses with instructions if it is not.
-3. Restart Development, then join. Expect a consent prompt naming **NCM Carrier**, and
-   `modstack: ... N added` in the launcher log.
+Development: manifest digest `1e4f80c0...`, `enabled: true`, one package **`ncm-carrier-0-1-0` v1.0.0**,
+868,069 bytes, blob `7febfa6e...`, advertised over loopback. No script errors.
 
-**Why the first two joins delivered nothing** -- neither cause was the plugin:
+Expect on the join: a consent prompt naming **NCM Carrier** as executable content, `modstack: ... N added`
+in `%LOCALAPPDATA%/Open77/launcher.log`, `ncm_carrier` in `<game>/red4ext/logs/`, and a
+`red4ext/plugins/ncm_carrier/ncm_carrier.log` naming its version, whether the bridge is listening and what
+device it found. **A declined hook is still a PASS** -- effects and force feedback do not depend on it.
+
+That is **AT1**. If the game does not launch: `publish-carrier.py tools/open77/server --remove`, restart,
+rejoin -- and read `ncm_carrier.log`.
+
+**Why the first two joins delivered nothing** -- neither cause was the plugin, and nothing NCM wrote ran:
 
 - **`KB-125`**: the server advertised its blob URL as `http://10.0.0.70:11779/`, private-LAN plain HTTP,
   which launchers `.89`/`.100` null out before download, cache or hash. That is **`KB-112`**, which named
   Development as the remaining offender and was never acted on. Result: `OP77_WORLD_MODS_DIGEST=-`,
-  `0 added`, no consent prompt, **no error anywhere**. Fixed to loopback, and `set-download-url.py` now
-  refuses a non-loopback HTTP value rather than letting it be set again.
-- **`KB-124`**: the mod store is Warden's catalogue, not a drop folder. The hand-written entry served for
-  one session and was pruned on the next restart, taking the declaration with it. `publish-carrier.py` is
-  now declare-only.
+  `0 added`, no consent prompt, **no error anywhere**. Now loopback; `set-download-url.py` refuses a
+  non-loopback HTTP value rather than letting it be set again.
+- **`KB-124`**: a hand-written store entry vanished on restart. **Cause never established** -- the claim
+  that only Warden may fill the store was wrong, since Production's loaders went in without it. The likely
+  companion fault is `IDEA-483`: Warden derives its own id (`ncm-carrier-0-1-0`, not `ncm-carrier`), so a
+  declaration that restates an assumed id can never resolve. `publish-carrier.py` now reads the store and
+  declares exactly what it finds.
 
-**What the session actually showed about inputs** (`IDEA-482`): the launcher **removed 44 files and added
-none** -- ArchiveXL's and TweakXL's DLLs -- and RED4ext loaded exactly **one** plugin, Open77. The player was
-in the world with their RED4ext stack absent; that is what changed the feel. A join that delivers nothing is
+**What the dead joins showed about inputs** (`IDEA-482`): the launcher **removed 44 files and added none**
+-- ArchiveXL's and TweakXL's DLLs -- and RED4ext loaded exactly **one** plugin, Open77. The player was in the
+world with their RED4ext stack absent; that is what changed the feel. A join that delivers nothing is
 indistinguishable from one that delivers everything, and the cheapest fix is to compare what the launcher
 projected against what the server declared and show it in the panel.
 
@@ -101,8 +107,8 @@ the server Lua sandbox, so the projection publisher was dead and silent). `IDEA-
 
 ## Outstanding live QA
 
-- **§AT:** the carrier. **AT0 PASS**; **AT1 FAIL** -- the package was never offered (`KB-125`). Both
-  causes fixed; needs a Warden import and one more join. AT2-AT7 owed.
+- **§AT:** the carrier. **AT0 PASS**; **AT1 FAIL then re-armed** -- the package was never offered
+  (`KB-125`/`KB-124`), both causes fixed, imported and declared. AT1-AT7 need one join.
 - **§AQ:** AQ1/AQ3 **LIVE PASS**; AQ2 and AQ4 cheap and owed.
 - **`KB-106`'s `ROAD_SCALE`** is now folded into **§AT6** - the carrier prints the measured peaks on shutdown,
   so one drive closes it.
