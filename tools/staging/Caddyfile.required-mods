@@ -1,0 +1,7 @@
+{
+	auto_https disable_redirects
+}
+
+https://52-60-225-137.sslip.io:11779 {
+	reverse_proxy 127.0.0.1:11782
+}
