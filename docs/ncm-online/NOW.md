@@ -3,18 +3,19 @@
 > **STATUS: LEDGER** — living session memory, rewritten at the end of every working session.
 > Authority map: [INDEX.md](INDEX.md) — classified 2026-09-24 (L125).
 
-Last rewritten: **2026-09-24 — Driver Card distance hotfix proven offline and deployed to Development.**
-Production still runs the pre-hotfix card while this known revision is committed and pushed.
+Last rewritten: **2026-09-24 — Driver Card distance hotfix promoted through Development to Online.**
+Commit `80ad0aa` is on `origin/main` and the same resource revision is running in the persistent world.
 
 > **Claim before writing:** decisions through **L130**; MASTER_TEST through **2.18 / §AK**; next QA letter
 > **§AL**. BACKLOG next free **IDEA-414**; known issues through **KB-98** plus the existing duplicate KB-87.
 > Historical §Z collision remains: qualify by section (2.14 Machine Index vs 2.16 Help).
 
-## Next action: commit/push the Development revision, then promote it through the Online pipeline
+## Next action: visually re-test §AK6 with a WebUI-capable observing client
 
-The hotfix is deliberately following the normal path despite its size: full gate → Development restart →
-commit/push → fresh Online backup → `deploy-staging.ps1 -Target online` → service/schema/data/error checks.
-Do not copy individual files to Online and do not treat the current Development boot as a production result.
+Reconnect after the Online restart, face another streamed player, and walk from roughly 5 m toward the ordinary
+35 m plate limit. The card should remain full size nearby, shrink smoothly with distance, stay anchored above
+the player, and never grow relative to the body. This must be observed from a client whose WebUI host imported
+surfaces; the second local process used tonight cannot prove it because KB-4 fired before the card page ran.
 
 ## Driver Card hotfix
 
@@ -31,6 +32,11 @@ Card assertions and documentation authority.
 Development restarted at **21:18 EDT** with resource digest `9336284e…`, schema 30 / `pending=[]`, HTTP health
 200, zero stderr bytes and no boot-error matches. This is deployment evidence, not the still-owed visual PASS.
 
+Commit `80ad0aa` was pushed before production promotion. Fresh Online rollback artifacts were taken at
+`20260925-012200`: a 230 KB database dump containing 63 tables and a 493 KB resource-tree archive. The named
+`deploy-staging.ps1 -Target online` pipeline then published digest `e17702fa…` at 01:23 UTC. Service is active,
+health is 200, schema remains 30 with `pending=[]`, and the post-restart error count is zero.
+
 ## The owner's banner was not missing state
 
 Read-only Online evidence shows `baremetaleven` already has `ncm_default`, and the server published that public
@@ -42,11 +48,10 @@ altered and no native text fallback is being called a rich-card fix.
 
 ## Current Online baseline to preserve
 
-The owner-authorised promotion earlier tonight backed up both canonical data and the replaceable resource tree
-as `ncm-db-20260924-235549.sql.gz` and `ncm-resources-20260924-235549.tar.gz`. Online then advanced migrations
-024–030 and verified schema 30 / `pending=[]`, service active, zero errors, only `server_id = ncm-dev`, and stable
-counts: 13 drivers, 13 bindings, 19 assets, 29 results, 23 ledger rows, 14 evidence rows and 14 discoveries.
-Take a new backup before the hotfix promotion even though this patch has no schema or data write.
+The first owner-authorised promotion earlier tonight advanced migrations 024–030. The hotfix promotion changed
+no schema or canonical data: Online still has only `server_id = ncm-dev` and exactly 13 drivers, 13 bindings,
+19 assets, 29 results, 23 ledger rows, 14 evidence rows and 14 discoveries. `baremetaleven -> ncm_default`
+also remains intact. Both the original `20260924-235549` rollback pair and the fresh hotfix pair remain on-box.
 
 ## Other current work to preserve
 
