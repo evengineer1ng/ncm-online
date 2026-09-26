@@ -167,20 +167,41 @@ function NcmCompetition.publishCeilings()
     local ceilings = Class.recordCeilings()
     local n = 0
     for _ in pairs(ceilings) do n = n + 1 end
-    -- **KB-136: two shapes, and the map is the one that has never worked.** These ceilings have been
-    -- published since `KB-30`/D7 and no client has ever applied one, because `records` is keyed by TweakDB
-    -- record path and something between here and the client drops it. `entries` is the same data as a sorted
-    -- array -- `ncmCalendar`'s shape, the only one known to arrive. Clients prefer `entries`.
+    -- **KB-136, answered 2026-09-26: the state bag has a size limit** and `ncm_world`'s projection payload
+    -- was over it (`state_value_too_large`). This payload is far smaller -- three numbers per record -- so
+    -- size was probably never ITS problem, but it is published as a sorted array rather than a
+    -- record-path-keyed map for the same reason: one shape, the one `ncmCalendar` has always delivered, and
+    -- no duplicate copy riding along to inflate it. Clients prefer `entries` and still accept `records`.
     local entries = {}
     for record, profile in pairs(ceilings) do
         entries[#entries + 1] = { path = record, profile = profile }
     end
     table.sort(entries, function(a, b) return a.path < b.path end)
 
-    GlobalState.ncmCeilings = {
-        entries = entries,
-        records = ceilings,
-        at = math.floor(Open77.time.unix()),
-    }
-    log("class ceilings published: %d record(s) (entries + records)", n)
+    local payload = { entries = entries, at = math.floor(Open77.time.unix()) }
+    -- Never throw: a refused ceiling publish must be a log line, not a script error that takes the rest of
+    -- the function with it.
+    local ok, err = pcall(function() GlobalState.ncmCeilings = payload end)
+    if not ok then
+        log("class ceilings REFUSED by the state bag (%d record(s)): %s", n, tostring(err))
+        return
+    end
+    log("class ceilings published: %d record(s) as entries", n)
 end
+
+-- **Republish on a cadence, because publishing once may be why this never worked.** `publishCeilings` has
+-- only ever been called at boot -- before anyone is connected. Round 1 of the `KB-136` probe found that the
+-- only GlobalState payloads reaching clients are the ones whose contents CHANGE on every publish, which
+-- would mean a key written once, before any client exists, can never reach one. `at` already moves on every
+-- call, so simply calling this again is enough to test and to fix it.
+--
+-- Cheap: eleven records of three numbers. Delete the thread if the hypothesis is disproved, not before.
+CreateThread(function()
+    Wait(20000)
+    while true do
+        if NcmCompetition and NcmCompetition.publishCeilings then
+            pcall(NcmCompetition.publishCeilings)
+        end
+        Wait(20000)
+    end
+end)

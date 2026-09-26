@@ -19,6 +19,7 @@
 -- car someone is already driving. The design has to live with that rather than pretend otherwise.
 local Projection = NcmCore.get("machine.projection")
 local Weather = NcmCore.get("world.weather")
+local Json = NcmCore.get("vocabulary.json")
 
 local function log(fmt, ...) print(("[ncm_world/machine] " .. fmt):format(...)) end
 
@@ -105,29 +106,70 @@ function NcmMachine.recompute(why)
         end
     end
 
-    -- **KB-136: published in TWO shapes, deliberately.** `records` is a map keyed by TweakDB record path --
-    -- a key containing a `.` -- and no client has ever seen it. `entries` is the same data as an array, which
-    -- is the shape `ncmCalendar` uses and the only shape known to arrive. The client prefers `entries` and
-    -- falls back to `records`, so this is safe whichever one turns out to work, and `server/state_probe.lua`
-    -- is what decides which property actually mattered. Drop the map once the answer is in.
+    -- ------------------------------------------------------------------------------------------------
+    -- **KB-136 ANSWERED, 2026-09-26: the state bag has a SIZE limit and this payload was over it.**
+    --
+    -- The first honest error this bug ever produced was `state bag write refused: state_value_too_large`,
+    -- and `ncm_league/server/race.lua` hit the same wall on 2026-09-23. It was never a map-shape problem and
+    -- never the dots in the record path. The publish was simply refused, so a client saw nothing -- which is
+    -- indistinguishable from every other failure when the reader logs nothing either.
+    --
+    -- **What made it too large: `trace`.** `machine.projection` records one entry per flat movement --
+    -- carrier, layer, id, from, to, by -- so the audit trail is several times the size of the result, and it
+    -- was being shipped to every client eleven times over. **The carrier never reads it.** Nor does it read
+    -- `ceiling`, which reaches clients through `ncmCeilings` and `setPerformanceClass` instead.
+    --
+    -- So the wire form is now exactly what the carrier consumes and nothing else. The full envelope,
+    -- `trace` included, stays server-side where the reasoning belongs and can still be inspected with
+    -- `ncm.machine`. This is a smaller payload AND a better boundary: the audit trail was never the
+    -- client's business (`L135` -- the server composes, the carrier applies).
+    -- ------------------------------------------------------------------------------------------------
     local entries = {}
     for record, envelope in pairs(out) do
-        entries[#entries + 1] = { path = record, envelope = envelope }
+        local flats = {}
+        for _, f in ipairs(envelope.record and envelope.record.flats or {}) do
+            flats[#flats + 1] = { id = f.id, suffix = f.suffix, multiplier = f.multiplier }
+        end
+        entries[#entries + 1] = {
+            path = record,
+            flats = flats,
+            restore = (envelope.record and envelope.record.restore) or false,
+            at = envelope.at,
+        }
     end
-    -- Sorted, so two publications of the same fleet produce byte-identical payloads and a client can compare
-    -- them cheaply. `pairs` order is not stable and would make every republish look like a change.
+    -- Sorted, so two publications of the same fleet produce identical payloads and a client can compare them
+    -- cheaply. `pairs` order is not stable and would make every republish look like a change.
     table.sort(entries, function(a, b) return a.path < b.path end)
 
-    GlobalState.ncmProjections = {
-        version = Projection.ENVELOPE_VERSION,
-        entries = entries,
-        records = out,
-    }
+    local payload = { version = Projection.ENVELOPE_VERSION, entries = entries }
+
+    -- Measure before writing. The limit is not documented anywhere we can read, so the only way anyone will
+    -- ever know how close we are is if the number is in the log on every publish.
+    local okSize, encoded = pcall(Json.encode, payload)
+    local bytes = okSize and #encoded or -1
+
+    -- **Diagnostic, temporary, delete with the probe.** The payload this replaces -- the full envelopes,
+    -- `trace` and all -- is measured but never written, so we can state the ratio instead of guessing at it.
+    -- It matters because the old payload WAS accepted by the state bag (it logged success on 2026-09-26 at
+    -- 02:04 and 02:21) and still never reached a client. If a value can be written and silently not
+    -- replicated, the threshold for replication is lower than the threshold for acceptance, and the number
+    -- below is how we find out.
+    local okOld, oldEncoded = pcall(Json.encode, { version = Projection.ENVELOPE_VERSION, records = out })
+    log("payload: wire %d byte(s), full-envelope %d byte(s)", bytes, okOld and #oldEncoded or -1)
+
+    -- **Never throw.** The previous write was a bare assignment, so a refusal became a script error that
+    -- aborted `recompute` -- which is why the `cleared` bookkeeping above could never run either. A refusal
+    -- is now a named log line and the function completes.
+    local okWrite, writeErr = pcall(function() GlobalState.ncmProjections = payload end)
+    if not okWrite then
+        log("REFUSED by the state bag at %d byte(s): %s", bytes, tostring(writeErr))
+        log("  %d record(s) were not published. KB-136: the payload is over the size limit.", #entries)
+        return
+    end
 
     if changed > 0 or cleared > 0 then
-        log("published %d record(s) [%s]: %d changed, %d cleared, wetness %.2f",
-            (function() local n = 0; for _ in pairs(out) do n = n + 1 end; return n end)(),
-            tostring(why), changed, cleared, state.wetness)
+        log("published %d record(s) [%s]: %d changed, %d cleared, wetness %.2f, %d byte(s)",
+            #entries, tostring(why), changed, cleared, state.wetness, bytes)
     end
 end
 

@@ -331,13 +331,25 @@ CreateThread(function()
             -- KB-136: prefer the array shape, fall back to the map. Rebuilt into a record-keyed table so the
             -- loop below is unchanged -- the transport shape is a transport concern and should not leak into
             -- the logic that decides what to push.
+            -- KB-136: the wire form is now the carrier's own shape -- path, flats, restore -- with the
+            -- server-side `trace` and `ceiling` left behind, because shipping the audit trail to every
+            -- client is what pushed the payload over the state bag's size limit. Normalised here into the
+            -- record-keyed table the loop below already expected.
             local records = nil
             if ok and type(state) == "table" then
                 if type(state.entries) == "table" then
                     records = {}
                     for _, entry in ipairs(state.entries) do
                         if type(entry) == "table" and type(entry.path) == "string" then
-                            records[entry.path] = entry.envelope
+                            records[entry.path] = {
+                                v = state.version or 1,
+                                at = entry.at,
+                                record = {
+                                    path = entry.path,
+                                    flats = entry.flats or {},
+                                    restore = entry.restore or false,
+                                },
+                            }
                         end
                     end
                 elseif type(state.records) == "table" then

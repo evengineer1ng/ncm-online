@@ -52,22 +52,48 @@ local function deepPayload()
     return { version = "probe-1", entries = entries }
 end
 
+-- ROUND 2, 2026-09-26. Round 1 answered more than it was designed to. Every probe came back `nil` on the
+-- client while `ncmProjections` and `ncmCalendar` arrived -- and the two that arrived are the two whose
+-- payload CHANGES on every publish (`at` timestamps, `serverNow`). Every probe wrote a byte-identical value
+-- each time, and `ncmCeilings` is written once at boot and never again.
+--
+-- **So the hypothesis is no longer about shape, dots or size. It is that GlobalState replicates a CHANGE,
+-- and a client that joins later is never sent a snapshot of a key that has not changed since.** If true,
+-- `ncmCeilings` could never have worked: it is published once, before anybody is connected, and then never
+-- written again. That is a shipped feature that was unreachable by construction.
+--
+-- Round 2 tests exactly that, by varying ONE property: four payloads now carry a `tick` that increments on
+-- every publish, and `ncmProbeScalar` is deliberately left CONSTANT as the control.
+--
+--   scalar stays nil, the other four arrive   -> change-detection confirmed; shape, dots and size are fine
+--   dotted stays nil while map arrives        -> dotted keys matter as well
+--   deep stays nil while the others arrive    -> size matters as well
+--   nothing changes                           -> the hypothesis is wrong and the cause is elsewhere
+local tick = 0
+
 local function publish()
     -- Each write is its own pcall: if the state bag refuses one shape outright, that refusal is itself the
     -- answer and must not take the other four with it.
+    tick = tick + 1
     local results = {}
     local function put(key, value)
         local ok, err = pcall(function() GlobalState[key] = value end)
         results[#results + 1] = ("%s=%s"):format(key, ok and "written" or ("REFUSED:" .. tostring(err)))
     end
 
+    -- THE CONTROL. Constant forever, on purpose. If this one is still `nil` on a client while the others
+    -- have arrived, the answer is change-detection and nothing else.
     put("ncmProbeScalar", "ok")
-    put("ncmProbeArray",  { items = { 10, 20, 30 } })
-    put("ncmProbeMap",    { records = { alpha = 1, beta = 2 } })
-    put("ncmProbeDotted", { records = { [PROBE_RECORD] = 1 } })
-    put("ncmProbeDeep",   deepPayload())
 
-    log("published: %s", table.concat(results, " "))
+    local deep = deepPayload()
+    deep.tick = tick
+
+    put("ncmProbeArray",  { items = { 10, 20, 30 }, tick = tick })
+    put("ncmProbeMap",    { records = { alpha = 1, beta = 2 }, tick = tick })
+    put("ncmProbeDotted", { records = { [PROBE_RECORD] = 1 }, tick = tick })
+    put("ncmProbeDeep",   deep)
+
+    log("published tick %d: %s", tick, table.concat(results, " "))
 end
 
 CreateThread(function()
@@ -75,7 +101,7 @@ CreateThread(function()
     Wait(6000)
     publish()
     while true do
-        Wait(30000)
+        Wait(10000)
         publish()
     end
 end)

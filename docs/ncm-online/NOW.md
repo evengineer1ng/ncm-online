@@ -6,48 +6,28 @@
 Last rewritten: **2026-09-26 - Parts layers 1-3 built (`L150`); the `KB-136` discriminator and the architecture dump are built and awaiting one drive.**
 
 > **Claim before writing:** decisions through **L150**; MASTER_TEST through **§AV**; next QA letter **§AW**.
-> BACKLOG next free **IDEA-508**; known issues through **KB-143** plus pre-existing duplicate labels noted by
+> BACKLOG next free **IDEA-511**; known issues through **KB-145** plus pre-existing duplicate labels noted by
 > `KB-114`. Read the ledger tails before allocating an ID.
 
 ## One next action
 
-**Deploy Carrier 0.1.14, drive once, and read two answers off one session.** Both are built, gated and
-committed; neither has been published. This needs a restart window and the owner in the car.
+**Settle `KB-145` by reading NCM's own single-player mod, then re-running the dump against the vehicle
+record (`IDEA-508`).** Seven of the twenty-one flats `machine.flats` is prepared to write do not resolve on
+this build - including `lateral_grip` / `.frictionMulLateral`, which the vocabulary itself calls *"the grip
+field"*, and **four graded `ncm_sp`**, meaning NCM's own single-player mod is believed to have written them
+for months.
 
-**Answer 1 - why `KB-136` has never delivered a payload.** `server/state_probe.lua` publishes five payloads
-that vary one property at a time: a bare scalar, a table holding an array (`ncmCalendar`'s known-good shape),
-a string-keyed map, the same map keyed `Vehicle.v_...`, and an array of eleven realistic envelopes.
-`client/state_probe.lua` reports what each looks like on arrival - **including when the answer is `nil`**,
-which is the thing that has been missing. One line in the client log names the cause.
+Four flats cannot be both proven-in-production and non-existent, so one of two things is true: they live on
+a different parent record (the vehicle record, or nested in `wheelSetup`/`FrontPreset`/`BackPreset`), or the
+`ncm_sp` grade was inherited rather than verified. **Read `ncm-localized/.../MT_Ecosystem/modules/tuning.lua`
+first** - it is NCM's own code and already knows the answer, which makes this a reading task before it is a
+probing one.
 
-**The prime suspect is the dot.** Both payloads that have never arrived are keyed by TweakDB record path,
-which contains a `.`; the one that works has no dotted keys. If the state bag treats a key as a path, that is
-exactly where it breaks.
-
-**A candidate fix ships alongside rather than after.** `ncmCeilings` and `ncmProjections` now publish an
-`entries` array **in addition to** the map, and both client readers prefer `entries`, falling back to
-`records` and normalising back to a record-keyed table so nothing downstream changed. If shape is the cause,
-this drive diagnoses *and* repairs. If it is not, the probe still says which property is.
-
-**Answer 2 - the 254 unauthored architecture facts (`IDEA-507`).** `/ncm.archdump` on the client asks the
-carrier to read the game's own `vehDriveModelData` for every catalogue record and write
-`ncm_architecture_dump.json` beside its log. **Read-only: nothing is mutated, so `L148` is not engaged.** It
-also settles a second question worth more than the first - `machine.flats` grades six of its twenty flats
-`documented`, meaning *named in the schema but never written by NCM*, and those six include
-`frictionMulLateral`, the grip field. The dump turns `documented` into present-or-absent before any Part is
-designed on one.
-
-**Do not expect it to answer everything.** Drivetrain layout and propulsion may have no float flat at all, in
-which case the dump narrows the hand-authoring rather than eliminating it. Unresolved names are reported by
-absence and are evidence, not a schema.
-
-### What to do, in order
-
-1. Publish 0.1.14 and restart. **Then `chown` (`KB-138`).**
-2. Join, sit still, and read the client log for the `[ncm_world/probe]` line.
-3. Run `/ncm.archdump`, then send back `ncm_architecture_dump.json` and the probe line.
-4. If ceilings now apply, `client/main.lua` will say so - it has been silent on every path since `KB-30`/D7
-   shipped, which is why nobody noticed it never worked.
+**Why this is the next thing and not Parts.** `IDEA-505` says a Part declares the channel its felt effect
+terminates in, and `parts.ontology` derives the record channel straight from `machine.flats`. Seven wrong
+entries there means `expression()` is currently confident about families it should not be - the tyres family
+in particular, whose headline flat does not resolve. **Building Parts on that would put the error into the
+Part definitions rather than leaving it in one vocabulary file.**
 
 ## Production live state
 
