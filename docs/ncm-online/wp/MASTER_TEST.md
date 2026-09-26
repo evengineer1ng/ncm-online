@@ -1509,6 +1509,14 @@ Neither was known when §AZ was written, and §AZ-B is impossible without both.
   `38480`, so a second client has never had a bridge at all. Fixed in **0.1.22**: the carrier walks
   `38480-38483` and refuses any peer that is not its own process, so the two clients cannot cross-connect.
 
+> **§AZ-B IS BLOCKED as of 2026-09-26, and not by either of the rows below.** `KB-4`'s root cause is
+> now known: the second client's `Open77.WebHost.exe` loses a startup race for the GPU adapter, gets
+> `adapter_unknown_before_cef:starting_unpinned`, and dies -- so that client imports **0** WebUI surfaces
+> where a working one imports 17. **The carrier bridge is itself a WebUI surface**, so a client with no
+> WebHost has no bridge, no Parts and no telemetry regardless of ports or env vars. The race has no
+> configuration knob and lives in `Open77.dll`, so the next step is the launch-ordering experiment in
+> `KB-4`, not more NCM code. Everything else in §AZ-B is ready and waiting on it.
+
 **Check both before driving.** In each client's `ncm_carrier.log`: one should say `bridge listening on
 127.0.0.1:38480`, the other `...:38481 (port 38480 was taken -- another game instance?)`. In each client
 log, `carrier connected on http://127.0.0.1:<port>/bridge.html`, and **the two ports must differ**. A
