@@ -1522,6 +1522,35 @@ Neither was known when §AZ was written, and §AZ-B is impossible without both.
 log, `carrier connected on http://127.0.0.1:<port>/bridge.html`, and **the two ports must differ**. A
 `refused a bridge peer from pid ...` line is the guard working, not a fault.
 
+### §AZ-C -- ONE client, two Machines: the assertion that does not need a second player
+
+**Added 2026-09-26 because §AZ-B was blocked and most of it turns out not to need a second client at
+all.** The headline claim of `L155` point 1 is *`assetId` is the authoritative Parts key* -- that a setup
+follows the **Machine**, not the person driving it. That needs two **Machines**. It does not need two
+humans, and waiting for one was a framing error on my part.
+
+Parts are stored as `fitted[assetId]` and delivered through `bindingForAuthority(playerId)`, which refuses
+with `ambiguous_authority` if a player somehow holds two live Machines at once. So the supported shape is
+**sequential**, and sequential is enough: the driver is the constant, the Machine is the variable.
+
+| # | Operation | Expected | Result |
+|---|---|---|---|
+| §AZ15 | Take Machine A. `/ncm.setup power_unit 0.6`. Drive. | Noticeably slow. Log names A's `assetId`. | |
+| §AZ16 | Swap to Machine B. `/ncm.setup power_unit 1.6`. Drive. | Noticeably fast. Log names B's `assetId`, and `handling: binding asset=B ... entity=` shows a NEW entity. | |
+| §AZ17 | Swap back to A **without fitting anything**. | **A is still slow.** This is the whole test: the setup was stored against the Machine and came back with it, and nothing followed the driver. | |
+| §AZ18 | Swap to B again, still fitting nothing. | B is still fast. | |
+| §AZ19 | While in A, watch the log through the swap. | `handling: UNBOUND` on leaving, `BOUND` on the next Machine. No window where A's levers apply to B. | |
+| §AZ20 | Drive A slowly on a busy street and let traffic overtake you. | **The `KB-146` regression, solo.** Binding stays on A; `/ncm.status` keeps `binding=matched`. On 0.1.20 an overtaking car could steal the write. | |
+
+**What a PASS here means.** `assetId` is genuinely the Parts key and the per-instance channel is
+Machine-scoped, which is `L155` point 1 demonstrated and the precondition the Foundry identity spine was
+waiting on. Two Designs sharing one runtime record can therefore differ per Machine.
+
+**What it does NOT cover, and why §AZ-B still matters eventually:** concurrency. §AZ-C proves the setup
+follows the Machine across time; it cannot prove two Machines are independent *at the same instant*, that a
+passenger gets no binding, or that a physics-owner handover carries the right setup. Those are
+§AZ6/§AZ9/§AZ12 and they need a second human -- a real tester, not a second local client, given `KB-4`.
+
 ### §AZ-B -- two clients, which is the part that matters
 
 Two players, two **different** Machines. Give them opposite setups so a swap is unmistakable:
