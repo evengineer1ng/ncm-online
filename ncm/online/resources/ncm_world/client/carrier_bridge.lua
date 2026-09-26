@@ -692,6 +692,19 @@ RegisterCommand("ncm.setup", function(_, args)
     TriggerServerEvent("ncm:setup", args and args[1] or nil, args and args[2] or nil)
 end, false)
 
+--- `/ncm.topspeed <kph>` -- the capability spike for per-instance top speed.
+---
+--- Nothing in NCM has ever capped a top speed: the per-record path's payload has never reached a client
+--- (`server/state_probe.lua`), and the per-instance server call has never been made. This relays to a
+--- server that makes it for the first time. See `server/handling.lua` for what it answers.
+---
+--- Deliberately separate from `/ncm.setup`: this proves a PLATFORM capability, while `ncm.setup` drives
+--- NCM's own composition. Folding an unproven call into the command that already works would make one
+--- failure look like the other.
+RegisterCommand("ncm.topspeed", function(_, args)
+    TriggerServerEvent("ncm:topspeed", args and args[1] or nil)
+end, false)
+
 --- The server answers in chat as well (`Open77.chat.send`); this puts the same line in the client log,
 --- beside the bridge's own `handling:` lines, so one log shows what was asked for AND what was pushed.
 RegisterNetEvent("ncm:setup.result", function(message)

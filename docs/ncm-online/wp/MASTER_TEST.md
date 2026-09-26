@@ -1665,3 +1665,53 @@ forever. That means the server published an identity the client could resolve bu
 -- most likely `entityOf()` picked a field that is not the engine entity. The client logs which field name
 resolved, **once**; if that line never appears, the candidate list in `carrier_bridge.lua` is wrong and no
 amount of driving will produce a write. Check the log before concluding the channel is broken.
+
+## §BA - Does a top speed ceiling work AT ALL? - **AWAITING LIVE TEST**
+
+**This is a capability spike, not a feature test.** It answers whether the platform can cap one Machine's
+top speed, before any NCM design is built on the assumption that it can.
+
+### Why this section exists
+
+**Nothing in NCM has ever capped a top speed.** Traced 2026-09-26 after the owner challenged a claim that
+the mechanism worked:
+
+| Path | Status |
+|---|---|
+| `setPerformanceClass(record)` -- client, per-record | Called by `client/main.lua`, but `GlobalState.ncmCeilings` **has never reached a client**. `server/state_probe.lua`: *"class ceilings, a shipped feature, have never applied -- KB-30/D7 is silently dead."* Suspected cause: GlobalState replicates a CHANGE, and this key is written once at boot before anyone connects -- *"unreachable by construction"*. Its only producer was the RB15 class, disabled by `KB-144`. Last live run: **154 attempts, 0 applied** |
+| `ratedTopSpeed(record)` | **Client-only** -- absent from the server scripting assembly. The server cannot use it as a baseline |
+| `setPerformance(id, profile)` -- server, per-instance | **Present in the deployed binary** (`Open77.Server.Scripting.dll` carries `setPerformance` and `topSpeedKph`); both resources hold `world.vehicles`. **Never called by NCM -- zero call sites** |
+
+The 355 km/h figure in `class.lua` is a measured cliff written into a table. It was never enforced, and
+citing it as evidence the mechanism works was the error this section corrects.
+
+### The spike
+
+Command: `/ncm.topspeed <kph>` | `/ncm.topspeed clear`. Deliberately not wired into `parts.handling` --
+a spike proves a capability; composing it is a later step that needs a PASS to build on.
+
+| # | Operation | Expected | Result |
+|---|---|---|---|
+| §BA1 | `/ncm.topspeed` with no argument, seated in an NCM Machine. | Reports "no ceiling set by NCM" and the usage line. Proves the binding resolves and `setPerformance` **exists** -- a missing API is a named refusal here, not a silent failure. | |
+| §BA2 | `/ncm.topspeed 60`, then drive a long straight flat out. | **The car holds ~60 km/h.** This is the whole question. A refusal names its reason (`vehicle_not_found` would mean NCM Machines are not in the registry the call reads). | |
+| §BA3 | Same, watching the approach to the cap. | The taper rolls throttle off over the last 12 km/h rather than at the ceiling. **Does it read as a governor or as a stutter?** The platform refuses a taper under 3 km/h precisely because the limiter hunts; 12 is the default and this is the first look at how it feels. | |
+| §BA4 | `/ncm.topspeed 120`, drive again. | Cap moves to ~120. Proves it can be changed live, not only set once. | |
+| §BA5 | Get out, get back in, drive. | **Cap still ~120.** Ownership changes on every driver entry and exit; the evidence card claims the ceiling is replicated to every viewer rather than chased across that transition. This is the claim most worth checking. | |
+| §BA6 | Disconnect, reconnect, get back in the same Machine. | Cap survives, or it does not -- either answer is useful and neither is currently known. | |
+| §BA7 | `/ncm.topspeed clear`, drive. | Full top speed restored. Distinct from setting a high number: `nil` clears the ceiling outright. | |
+| §BA8 | Spawn a second Machine of the **same record**, cap only the first. | **Only the first is capped.** The call is keyed by vehicle id, so this should hold by construction -- and it is the same-record concurrency proof `IDEA-530` has been asking for. | |
+
+### What a PASS unlocks, and what a FAIL settles
+
+**PASS:** top speed becomes a declared number per Machine. The plan's Step 2 (an authored `topSpeedKph` in
+`data/vehicle_catalogue.lua`, populated once from a client-side `ratedTopSpeed` dump) and Step 6 (parts
+scaling it, with a class ruleset still winning) follow. `IDEA-530` closes.
+
+**FAIL:** *"top speed is not reachable on this platform"* is the honest answer and the top-speed half of
+the design is dropped rather than quietly reshaped. **Weather and the tyre thermal model do not depend on
+this and proceed either way.**
+
+**What this does NOT test:** anything about parts, composition or `parts.handling`. The spike calls the
+platform directly on purpose, so a platform failure and an NCM composition failure cannot be confused --
+which is the mistake `KB-144` made in the other direction, when eleven ceilings were refused because their
+target records were gone and the ceilings themselves were blamed.

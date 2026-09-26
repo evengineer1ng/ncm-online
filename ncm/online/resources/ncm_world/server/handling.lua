@@ -364,6 +364,121 @@ RegisterNetEvent("ncm:setup", function(family, effect)
     end
 end)
 
+-- ---------------------------------------------------------------------------------------------------
+-- `/ncm.topspeed` -- the CAPABILITY SPIKE for per-instance top speed
+-- ---------------------------------------------------------------------------------------------------
+--
+-- **Nothing in NCM has ever capped a top speed.** Traced 2026-09-26, and the result was worse than
+-- expected:
+--
+--   * `setPerformanceClass(record, prof)` -- the client, per-record form -- is called by
+--     `client/main.lua`, but its data source `GlobalState.ncmCeilings` HAS NEVER REACHED A CLIENT.
+--     `server/state_probe.lua` records it: *"class ceilings, a shipped feature, have never applied"*, and
+--     the leading hypothesis is that GlobalState replicates a CHANGE, so a key written once at boot before
+--     anybody connects is never sent to a later joiner -- "unreachable by construction". Its only producer
+--     was the RB15 class, disabled by `KB-144` when the car was withdrawn. Last live run: 154 attempts,
+--     zero applied, against records no client had.
+--   * `ratedTopSpeed(record)` is CLIENT-ONLY. It is not in the server scripting assembly, so the server
+--     cannot use it as a baseline even though its own card recommends it for picking a ceiling.
+--   * `setPerformance(id, profile)` -- the SERVER, per-instance form -- is present in the deployed binary
+--     (`Open77.Server.Scripting.dll` carries `setPerformance` and `topSpeedKph`) and both resources hold
+--     `world.vehicles`. **NCM has never called it. Zero call sites.**
+--
+-- So this command exists to answer four questions that are currently all guesses, before any design is
+-- built on top of them:
+--
+--   1. Does the call succeed on a server-spawned NCM Machine, or refuse with `vehicle_not_found`?
+--   2. Does the cap hold in the car, and does the taper read as a governor or as a stutter?
+--   3. Does it survive getting out and back in? Ownership changes on every driver entry and exit, and the
+--      evidence card claims the ceiling is replicated to every viewer rather than chased across that.
+--   4. Does it survive a reconnect?
+--
+-- **If this fails, the top-speed half of the plan is dead** and "top speed is not reachable on this
+-- platform" becomes the honest answer. Weather and the thermal model do not depend on it.
+--
+-- Deliberately NOT wired into `parts.handling`. A spike proves a capability; composing it into the parts
+-- pipeline is a later step that should only happen once there is a PASS to build on.
+local topSpeedApplied = {}   -- assetId -> the last kph asked for, so the command can report honestly
+
+RegisterNetEvent("ncm:topspeed", function(raw)
+    local pid = tonumber(source) or 0
+    if pid <= 0 then return end
+
+    local function tell(message)
+        pcall(Open77.chat.send, pid, "[NCM] " .. message)
+        pcall(TriggerClientEvent, "ncm:setup.result", pid, message)
+        log("player=%d <- %s", pid, message)
+    end
+
+    -- The platform surface has to be present before anything else is worth saying. `type()` rather than a
+    -- pcall on the call itself, so "the API is missing" and "the API refused" stay different answers.
+    if not (Open77.vehicles and type(Open77.vehicles.setPerformance) == "function") then
+        tell("refused: Open77.vehicles.setPerformance is not available on this server build")
+        return
+    end
+
+    local binding, bindingWhy
+    if NcmVehicleAccess and NcmVehicleAccess.bindingForAuthority then
+        binding, bindingWhy = NcmVehicleAccess.bindingForAuthority(pid)
+    else
+        bindingWhy = "vehicle_access_unavailable"
+    end
+    if not binding then
+        tell("refused: no single active NCM Machine is bound to this client's current physics authority ("
+            .. tostring(bindingWhy) .. ")")
+        return
+    end
+
+    if raw == nil or raw == "" then
+        local current = topSpeedApplied[binding.assetId]
+        tell(("asset %s: %s"):format(binding.assetId:sub(-6),
+            current and ("capped at %d km/h"):format(current) or "no ceiling set by NCM"))
+        tell("usage: ncm.topspeed <kph>, or `ncm.topspeed clear`. Try 60 on a long straight.")
+        return
+    end
+
+    -- Clearing is `nil`, and a profile asking for nothing clears too. Both are the platform's own contract;
+    -- this sends `nil` because it is the one the card documents first.
+    local clearing = (raw == "clear" or raw == "0" or tonumber(raw) == 0)
+    local kph = clearing and nil or tonumber(raw)
+    if not clearing and not kph then
+        tell("usage: ncm.topspeed <kph>, or `ncm.topspeed clear`")
+        return
+    end
+    -- The platform's stated envelope: 0..1000, and the taper is never zero -- below about 3 km/h the
+    -- limiter hunts around the ceiling and reads as stutter, which is why the client governor has refused
+    -- that band since it shipped. Checked here so a bad number is a sentence rather than a refusal code.
+    if kph and (kph < 0 or kph > 1000) then
+        tell("refused: topSpeedKph must be 0..1000")
+        return
+    end
+
+    local profile = kph and { topSpeedKph = kph, taperKph = 12.0 } or nil
+    local ok, accepted, reason = pcall(Open77.vehicles.setPerformance, binding.vehicleId, profile)
+
+    -- Three outcomes, kept apart on purpose: the call threw, the call returned false with a reason, or it
+    -- worked. Collapsing them is how "it doesn't work" gets recorded when the truth was "we lacked a
+    -- permission" -- and `KB-150` is this afternoon's standing reminder about destroying your own evidence.
+    if not ok then
+        tell("ERROR: setPerformance threw: " .. tostring(accepted))
+        log("SPIKE asset=%s vehicle=%s THREW %s",
+            binding.assetId, tostring(binding.vehicleId), tostring(accepted))
+        return
+    end
+    if accepted == false then
+        tell("REFUSED by the platform: " .. tostring(reason))
+        log("SPIKE asset=%s vehicle=%s REFUSED %s",
+            binding.assetId, tostring(binding.vehicleId), tostring(reason))
+        return
+    end
+
+    topSpeedApplied[binding.assetId] = kph
+    tell(clearing and "ceiling cleared -- full top speed restored"
+        or ("ceiling set to %d km/h (taper 12) -- drive a long straight and see whether it holds"):format(kph))
+    log("SPIKE asset=%s vehicle=%s ACCEPTED topSpeedKph=%s",
+        binding.assetId, tostring(binding.vehicleId), tostring(kph))
+end)
+
 --- A joining driver gets an explicit setup rather than nothing. Without this a fresh client has no
 --- `ncmHandling` key at all, and "no key" and "inert" would be indistinguishable to the reader.
 ---
