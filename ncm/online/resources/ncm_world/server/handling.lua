@@ -624,6 +624,80 @@ RegisterNetEvent("ncm:topspeed", function(raw)
         or ("ceiling set to %d km/h (taper 12) -- drive a long straight and see whether it holds"):format(kph))
     log("SPIKE asset=%s vehicle=%s ACCEPTED topSpeedKph=%s",
         binding.assetId, tostring(binding.vehicleId), tostring(kph))
+
+    -- ----------------------------------------------------------------- READ IT BACK
+    --
+    -- **ACCEPTED IS NOT APPLIED, and the first live run proved it.** `setPerformance` returned true for
+    -- `topSpeedKph = 40` and the car did not slow down at all. A call that succeeds and does nothing is
+    -- the worst shape a capability can have, because every log line says it worked.
+    --
+    -- So the spike reads the ceiling back. That splits one unanswerable question into two answerable ones:
+    -- if the server does NOT hold 40, the write did not stick and the problem is server-side; if it DOES
+    -- hold 40 and the car still runs away, the ceiling is stored and not enforced, and the problem is
+    -- between the server and the physics owner. Those have entirely different fixes and nothing else
+    -- distinguishes them.
+    if type(Open77.vehicles.getPerformance) == "function" then
+        local okRead, held = pcall(Open77.vehicles.getPerformance, binding.vehicleId)
+        if not okRead then
+            tell("read-back THREW: " .. tostring(held))
+        elseif type(held) ~= "table" then
+            tell(("read-back returned %s -- the server does NOT hold a ceiling for this vehicle")
+                :format(type(held)))
+        else
+            tell(("read-back: topSpeedKph=%s accelerationScale=%s taperKph=%s"):format(
+                tostring(held.topSpeedKph), tostring(held.accelerationScale), tostring(held.taperKph)))
+            log("SPIKE read-back asset=%s topSpeedKph=%s taperKph=%s", binding.assetId,
+                tostring(held.topSpeedKph), tostring(held.taperKph))
+        end
+    else
+        tell("no getPerformance on this build -- cannot tell 'stored' from 'enforced'")
+    end
+end)
+
+-- ---------------------------------------------------------------------------------------------------
+-- `/ncm.tyre` -- what the thermal model actually thinks
+-- ---------------------------------------------------------------------------------------------------
+--
+-- Added after the first live drive reported the gauge "stayed flat cold" through cornering and donuts.
+-- The plumbing was fine; the model settled at 54C in a donut, which reads as stone cold forever. **There
+-- was no way to see that from inside the game** -- the gauge showed a position and nothing showed the
+-- temperature, the load, or the ambient it was being pulled toward.
+--
+-- A gauge without a readout behind it can only ever tell you that something is wrong, never what.
+RegisterNetEvent("ncm:tyre.query", function()
+    local pid = tonumber(source) or 0
+    if pid <= 0 then return end
+    local function tell(message)
+        pcall(Open77.chat.send, pid, "[NCM] " .. message)
+        pcall(TriggerClientEvent, "ncm:setup.result", pid, message)
+        log("player=%d <- %s", pid, message)
+    end
+
+    local binding
+    if NcmVehicleAccess and NcmVehicleAccess.bindingForAuthority then
+        binding = NcmVehicleAccess.bindingForAuthority(pid)
+    end
+    if not binding then
+        tell("refused: no NCM Machine bound to this client's physics authority")
+        return
+    end
+
+    local temperature = NcmOdometer and NcmOdometer.tyreTemperature
+        and NcmOdometer.tyreTemperature(binding.assetId) or nil
+    if not temperature then
+        tell("no tyre temperature for this Machine yet -- the odometer has not sampled it")
+        return
+    end
+
+    local conditions = (NcmMachine and NcmMachine.state and NcmMachine.state()) or {}
+    tell(("tyre %s"):format(Thermal.explain(temperature)))
+    tell(("ambient %.1fC (weather=%s wetness=%.2f secondsOfDay=%s)"):format(
+        Thermal.ambient({ wetness = conditions.wetness, secondsOfDay = conditions.secondsOfDay }),
+        tostring(conditions.weather or "?"), tonumber(conditions.wetness) or 0,
+        tostring(math.floor(tonumber(conditions.secondsOfDay) or -1))))
+    tell(("window %.0fC +/- %.0f, so it costs nothing between %.0fC and %.0fC"):format(
+        Thermal.OPTIMUM, Thermal.HALF_WINDOW * 0.2,
+        Thermal.OPTIMUM - Thermal.HALF_WINDOW * 0.2, Thermal.OPTIMUM + Thermal.HALF_WINDOW * 0.2))
 end)
 
 --- A joining driver gets an explicit setup rather than nothing. Without this a fresh client has no

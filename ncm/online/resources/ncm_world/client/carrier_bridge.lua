@@ -701,6 +701,13 @@ end, false)
 --- Deliberately separate from `/ncm.setup`: this proves a PLATFORM capability, while `ncm.setup` drives
 --- NCM's own composition. Folding an unproven call into the command that already works would make one
 --- failure look like the other.
+--- `/ncm.tyre` -- the readout behind the gauge. The gauge shows a POSITION; this shows the degrees, the
+--- ambient it is being pulled toward, and the window. Added after a live drive where the needle sat on the
+--- bottom stop and there was no way to tell a broken feed from a cold tyre.
+RegisterCommand("ncm.tyre", function()
+    TriggerServerEvent("ncm:tyre.query")
+end, false)
+
 RegisterCommand("ncm.topspeed", function(_, args)
     TriggerServerEvent("ncm:topspeed", args and args[1] or nil)
 end, false)
@@ -727,19 +734,20 @@ RegisterCommand("ncm.ratedtopspeed", function()
         return
     end
     local Catalogue = NcmCore.get("data.vehicle_catalogue")
+    -- `Catalogue.allRecords()`, NOT `entry.record`. A conceptual machine owns a LIST of runtime records --
+    -- the base car, its `_player` variant, and ten liveries for the RB15 -- so there is no single `record`
+    -- field on an entry. Reading one returned nil for all 27 and the first dump printed zero rows.
+    local records = Catalogue.allRecords()
     local rows, missing = {}, 0
-    for _, entry in ipairs(Catalogue.entries()) do
-        local record = entry.record
-        if type(record) == "string" then
-            local ok, kph = pcall(api.ratedTopSpeed, record)
-            if ok and type(kph) == "number" then
-                rows[#rows + 1] = ("        %s = %d,"):format((record:gsub("[%.%-]", "_")),
-                    math.floor(kph + 0.5))
-            else
-                missing = missing + 1
-                rows[#rows + 1] = ("        -- %s = ?  (unresolved)"):format(
-                    (record:gsub("[%.%-]", "_")))
-            end
+    for _, record in ipairs(records) do
+        local ok, kph = pcall(api.ratedTopSpeed, record)
+        if ok and type(kph) == "number" then
+            rows[#rows + 1] = ("        %s = %d,"):format((record:gsub("[%.%-]", "_")),
+                math.floor(kph + 0.5))
+        else
+            missing = missing + 1
+            rows[#rows + 1] = ("        -- %s = ?  (%s)"):format((record:gsub("[%.%-]", "_")),
+                ok and "returned nil" or tostring(kph))
         end
     end
     table.sort(rows)

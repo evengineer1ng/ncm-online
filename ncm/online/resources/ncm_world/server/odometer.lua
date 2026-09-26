@@ -99,31 +99,36 @@ local function conditions()
     return { wetness = wetness, secondsOfDay = seconds }
 end
 
---- Lateral acceleration from two consecutive position samples, in m/s^2.
+--- Lateral acceleration, in m/s^2, from the vehicle's own heading.
 ---
---- Heading change over the interval gives yaw rate; `v * yawRate` is the centripetal term. It is coarse at
---- 1 Hz -- a flick of opposite lock inside one sample is invisible -- and it is the honest reading of what
---- this loop can see. A sharper signal exists in the Carrier and is not worth a second transport.
-local function lateralAccel(entry, prev, cur, dt)
-    if not prev or dt <= 0 then return 0 end
-    local dx, dy = cur.x - prev.x, cur.y - prev.y
-    if (dx * dx + dy * dy) < 0.25 then return 0 end      -- below half a metre, heading is noise
-    local heading = math.atan(dy, dx)
+--- **The snapshot reports `heading` (and `yaw`) directly**, so this reads the car's facing rather than
+--- inferring it from where the car has been. That distinction matters most in exactly the case that
+--- exposed it: a donut is a tight circle where the direction of TRAVEL and the direction the car is
+--- POINTING are not the same thing, and a position-derived heading understates the yaw rate badly.
+---
+--- Yaw rate times speed is the centripetal term. Still coarse at 1 Hz -- a flick of opposite lock inside
+--- one sample is invisible -- and still the honest reading of what this loop can see.
+local function lateralAccel(entry, cur, dt)
+    if dt <= 0 then return 0 end
+    local heading = cur and cur.headingRad
+    if not heading then return 0 end
     local state = thermal[entry.assetId]
-    local previousHeading = state and state.headingRad
+    local previous = state and state.headingRad
     if state then state.headingRad = heading end
-    if not previousHeading then return 0 end
-    local delta = heading - previousHeading
-    -- Wrap to [-pi, pi]; without this, crossing the discontinuity reads as a violent yaw that never
+    if not previous then return 0 end
+    local delta = heading - previous
+    -- Wrap to [-pi, pi]. Without this, crossing the discontinuity reads as a violent yaw that never
     -- happened and would cook a tyre on a straight road.
     while delta > math.pi do delta = delta - 2 * math.pi end
     while delta < -math.pi do delta = delta + 2 * math.pi end
-    local speed = cur.speedMps or (math.sqrt(dx * dx + dy * dy) / dt)
-    return math.abs(delta / dt) * speed
+    -- **A yaw rate past pi per sample ALIASES** and there is no way to recover the true value from two
+    -- samples a second apart. Rather than report a small number for a fast spin, treat a near-half-turn as
+    -- the most this can honestly claim to have seen.
+    return math.abs(delta / dt) * (cur.speedMps or 0)
 end
 
 --- Advance one Machine's tyre temperature. Called for every sampled asset, driven or not.
-local function thermalStep(entry, prev, cur, t)
+local function thermalStep(entry, cur, t)
     local assetId = entry.assetId
     local state = thermal[assetId]
     local ambient = Thermal.ambient(conditions())
@@ -139,7 +144,7 @@ local function thermalStep(entry, prev, cur, t)
     if dt <= 0 then return end
 
     local speed = cur and (cur.speedMps or 0) or 0
-    local load = cur and Thermal.load(speed, lateralAccel(entry, prev, cur, dt)) or 0
+    local load = cur and Thermal.load(speed, lateralAccel(entry, cur, dt)) or 0
 
     if dt > Thermal.MAX_STEP_SECONDS and load <= 0 then
         -- A long gap with nothing happening: closed-form, so a car parked for ten minutes ends up at
@@ -187,6 +192,16 @@ local function noteFields(snap)
     log("vehicle snapshot fields: %s", table.concat(keys, " "))
     log("speed reading %s -- %s", speedOf(snap) and "AVAILABLE" or "ABSENT",
         speedOf(snap) and "jitter is filtered by speed" or "falling back to the positional floor")
+end
+
+--- The vehicle's facing in radians, from the snapshot's own `heading` (degrees), with `yaw` as the second
+--- spelling. Absent rather than guessed when neither is present: a tyre model that invents a yaw rate
+--- would heat a tyre on a straight road.
+local function headingOf(snap)
+    if type(snap) ~= "table" then return nil end
+    local deg = tonumber(snap.heading) or tonumber(snap.yaw)
+    if not deg then return nil end
+    return math.rad(deg)
 end
 
 local function positionOf(snap)
@@ -343,17 +358,18 @@ local function step(entry, t)
         publish(entry.pid, nil)
         -- The tyres keep cooling with nobody aboard. This is the branch that makes temperature a property
         -- of the Machine rather than of the drive, and it costs one call.
-        thermalStep(entry, nil, nil, t)
+        thermalStep(entry, nil, t)
         -- Unreadable, gone, or nobody aboard. Break the chain so the next observation cannot be joined to
         -- this one across the gap.
         last[assetId] = nil
         return
     end
     noteFields(snap)
-    local cur = { assetId = assetId, x = p.x, y = p.y, z = p.z or 0, at = t, speedMps = speedOf(snap) }
+    local cur = { assetId = assetId, x = p.x, y = p.y, z = p.z or 0, at = t, speedMps = speedOf(snap),
+                  headingRad = headingOf(snap) }
     local prev = last[assetId]
     last[assetId] = cur
-    thermalStep(entry, prev, cur, t)
+    thermalStep(entry, cur, t)
     if not prev then return end
     local seg = Identity.segment(prev, cur)
     trace(assetId, prev, cur, seg)

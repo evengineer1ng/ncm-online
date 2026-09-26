@@ -93,6 +93,35 @@ return {
         T.ok(t <= M.MAX_C)
     end,
 
+    -- ------------------------------------------------------------------ the calibration that was missing
+    the_window_is_reachable_by_DRIVING_rather_than_only_by_racing = function(T)
+        local M = TH(T)
+        -- **The test written for the bug it would have caught.** The first live drive reported the gauge
+        -- "stayed flat cold" through cornering and donuts, and the plumbing was fine -- the model settled
+        -- at 54C in a donut and 55C in city cornering, both of them stone cold forever. Every earlier test
+        -- here checked a RATE or a BOUND, and none checked the EQUILIBRIUM, which is the only thing that
+        -- decides where a needle actually comes to rest.
+        local ambient = M.ambient({})
+        local function equilibrium(v, a)
+            local t = ambient
+            for _ = 1, 600 do t = M.step(t, M.load(v, a), ambient, 1.0, v) end
+            return t
+        end
+
+        -- Ordinary cornering has to be able to MOVE the needle off the stop, or the gauge is decoration.
+        T.ok(M.position(equilibrium(8, 11)) > -0.5,
+            "donuts must visibly warm a tyre, even without a slip term")
+        T.ok(M.position(equilibrium(15, 6)) > -0.5, "so must city cornering")
+        -- And brisk cornering has to actually reach the window, not merely approach it.
+        T.ok(M.position(equilibrium(20, 6)) > -0.2, "brisk cornering reaches the window")
+
+        -- The other half of the calibration: cruising must NOT heat a tyre, or the window means nothing.
+        T.ok(M.position(equilibrium(30, 0)) < -0.5,
+            "a straight-line cruise stays cold -- cornering is what cooks a tyre")
+        -- And overheating has to be reachable, or half the model is unreachable.
+        T.ok(M.position(equilibrium(30, 9)) > 0.5, "sustained hard cornering overheats")
+    end,
+
     a_parked_tyre_returns_to_ambient_and_stops_there = function(T)
         local M = TH(T)
         local t = 140

@@ -71,7 +71,25 @@ Core.define("parts.thermal", function(C)
     M.AIRFLOW_REF_SPEED = 40.0  -- m/s
 
     -- Heat in. `GAIN` is degrees per second at unit load; `load` is dimensionless and normalised below.
-    M.GAIN = 2.6
+    --
+    -- **Recalibrated 2026-09-26 from 2.6 after the first live drive, which reported the gauge "stayed flat
+    -- cold" through cornering AND donuts.** That was not a plumbing fault -- it was the model. What matters
+    -- for a gauge is not the heating rate, it is the EQUILIBRIUM where heating balances cooling, and at 2.6
+    -- that equilibrium was:
+    --
+    --   donuts (8 m/s, 1.1g)        54C   stone cold
+    --   city cornering (15 m/s)     55C   stone cold
+    --   highway cruise (30 m/s)     42C   stone cold
+    --   fast hard corner (30 m/s)   99C   hot
+    --
+    -- So the window was unreachable by anything except sustained 100 km/h+ cornering, and the needle sat on
+    -- the bottom stop in every kind of driving a person actually does. A gauge that only moves in one
+    -- regime is decoration.
+    --
+    -- **Set from the equilibrium, not from the slope**: brisk cornering (20 m/s, 0.75g) should settle just
+    -- above the window so the window is somewhere a driver ARRIVES at rather than a peak they graze, and
+    -- so that overheating is reachable by pushing harder.
+    M.GAIN = 4.6
     M.SPEED_REF = 30.0          -- m/s, the speed at which the longitudinal term reaches 1.0
     M.LATERAL_REF = 8.0         -- m/s^2, about 0.8 g, the lateral accel at which that term reaches 1.0
     M.WEIGHT_LATERAL = 0.75     -- cornering is what cooks a tyre

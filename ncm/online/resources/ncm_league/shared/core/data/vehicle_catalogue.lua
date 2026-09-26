@@ -152,12 +152,26 @@ Core.define("data.vehicle_catalogue", function(C)
 
     --- Which records still have no authored top speed. The dump command reports this so the gap is
     --- visible rather than silently meaning "uncapped forever".
-    function M.withoutTopSpeed()
+    --- Every runtime record NCM knows, sorted. **`entries` has no `record` field** -- a conceptual machine
+    --- owns a LIST of runtime records (`runtimeRecords`), because the base car, its `_player` variant and,
+    --- for the RB15, ten liveries are all one Machine. Reading `entry.record` returns nil for every entry,
+    --- which is exactly how the first top-speed dump produced zero rows.
+    function M.allRecords()
         local out = {}
         for _, entry in ipairs(entries) do
-            if entry.record and not M.topSpeedKph(entry.record) then out[#out + 1] = entry.record end
+            for _, record in ipairs(entry.runtimeRecords or {}) do out[#out + 1] = record end
         end
         table.sort(out)
+        return out
+    end
+
+    --- Which records still have no authored top speed, so the gap is visible rather than silently meaning
+    --- "uncapped forever".
+    function M.withoutTopSpeed()
+        local out = {}
+        for _, record in ipairs(M.allRecords()) do
+            if not M.topSpeedKph(record) then out[#out + 1] = record end
+        end
         return out
     end
     function M.count() return #entries end
