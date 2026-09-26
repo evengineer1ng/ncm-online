@@ -1342,3 +1342,43 @@ all unaffected and remain available.
 
 §AU stands in full. The lateral `gripScale` write is proven, reversible, per-instance and per-player, and
 none of tonight's negatives touch it. **The capability that shipped is the capability we keep.**
+
+## §AW - the force channel widened: two levers confirmed, one refuted, and the reason why - **AW1, AW2 PASS; AW3 NEGATIVE**
+
+`L151`. §AU proved one lever. §AV established the shape of the channel. §AW asks whether the same
+interception generalises, and the answer is yes for force along travel and **no, structurally, for anything
+needing a moment**.
+
+Driven on Production by the owner, Carrier **0.1.15**, one lever at a time with a return to inert between
+each. The carrier logged every change, so what was active is a record rather than a recollection.
+
+| # | Operation | Expected | Result |
+|---|---|---|---|
+| §AW1 | Scale the along-travel force component while it is PUSHING (`driveScale`), 0.50 / 1.50 / 1.90 / 2.00 / 0.30. | Acceleration changes; cornering grip does not. | **PASS.** Owner: *"drivescale confirmed accel, tried different things"*. Exercised across the full clamp range including both bounds. **This was never speculative and I should have said so earlier: the owner's own March 2026 anti-crawl hook does exactly this** -- decompose against velocity, remove only the forward-pushing component, let braking, drag and lateral pass through. `driveScale` is a re-implementation of something already proven on this engine. |
+| §AW2 | Scale the along-travel component while it is RETARDING (`brakeScale`), 0.50 / 2.00. | Stopping distance changes; power does not. | **PASS.** Owner: *"confirmed brake"*. The sign of the longitudinal component is a measured discriminator, not an assumption -- §AU4 had already shown it inverts under braking and resolves a tapped throttle as alternating per-second signs. |
+| §AW3 | Shift normal load LEFT/RIGHT, zero-sum (`rollBias` +0.30, the clamp maximum). | The car leans differently. §AV2 says expect no grip change; §AU3 saw these entries make a car sag, so attitude was the open question. | **NEGATIVE, and the write is proven to have fired.** Owner: *"harder to pin down, i could be convinced its changing but not totally certain"*. The log settles it: `writes=240/s` -- exactly four corners x 60 fps -- with left corners scaled x1.30 and right x0.70 on a stationary car (`v=0.0`, `z=[54 54 36 36]`, residual `-0.0`). Maximum bias, every frame, no lean. |
+
+### Why §AW3 failed, and why it closes the question rather than leaving it open
+
+**`force` at `+0x00` carries no position.** All sixteen per-contributor calls accumulate into one Vector3.
+A zero-sum redistribution of the four vertical entries therefore produces a **byte-identical net force**, and
+it cannot produce a moment because there is nowhere in that field for a moment to live.
+
+That single fact explains three separate results that had looked like three separate mysteries:
+
+- **§AV2** -- front/rear load shift, no change in lateral capability.
+- **§AW3** -- left/right load shift at maximum, no change in attitude.
+- **§AU3** -- scaling all four entries DOWN made the car sag. Not a suspension response: that write was not
+  zero-sum, so it simply removed upward force and the car sank.
+
+**The per-corner normal-load entries are dead as an actuator.** Not unproven -- refuted, with a mechanism.
+They remain excellent *telemetry* (`§AU3` identified the corners; weight transfer reads correctly), and
+nothing about reading them changes.
+
+**The consequence is a redirection, not a loss.** Anti-roll, yaw balance and brake bias are all **moments**,
+so they need a torque channel. `+0x0C` is the only unexamined `Vector3` in a `force / ??? / velocity /
+angularVelocity` layout -- exactly where a rigid body keeps its torque accumulator, inside the struct we
+already hold and already write. `IDEA-512` is the read-only probe that settles it, shipped in 0.1.16 with an
+oracle rather than a hope: integrating `torque_z` must yield a **positive, roughly constant** implied yaw
+inertia against the angular velocity at `+0x24`, and a field that merely varies proves nothing -- which is
+the trap `§AV3`'s quaternion fell into until variance tracking caught it.

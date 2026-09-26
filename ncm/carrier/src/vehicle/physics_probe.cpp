@@ -33,6 +33,30 @@ namespace {
 //   +0x180 BaseObject* vehicle      back-pointer to the owning vehicle, or junk if this is not a vehicle
 //   +0x1BC float    total_mass      kg  <- cross-checked against "does this look like a car"
 constexpr uint32_t kOffForce = 0x00;
+// ---------------------------------------------------------------------------------------------------
+// THE TORQUE CANDIDATE. Read-only in 0.1.16; nothing writes it.
+//
+// `force / ??? / velocity / angularVelocity` is the textbook rigid-body layout and `+0x0C` is the only
+// unexamined Vector3 in it -- three floats sitting exactly where a torque accumulator belongs, in a struct
+// we already hold a verified pointer to.
+//
+// **Why this matters more than it looks.** `force` at `+0x00` carries NO POSITION: all sixteen
+// per-contributor calls add into one triple. So a zero-sum redistribution of the four vertical wheel
+// entries is byte-identical in net force and cannot produce a moment -- there is nowhere in that field for
+// a moment to live. That is the single explanation for three separate results: §AV2's front/rear negative,
+// 0.1.15's left/right `rollBias` firing 240 writes a second on a parked car with no lean, and §AU3's "sag"
+// (which was scaling all four DOWN, breaking vertical equilibrium -- less upward force, not a suspension
+// response). The per-corner load entries are dead as an actuator, and moments must live somewhere else.
+//
+// If `+0x0C` is torque, then anti-roll, yaw balance and brake bias are all torque writes through the
+// interception we have already proven, and the unknown-signature `ApplyTorqueAtPosition` is unnecessary.
+//
+// **It is NOT claimed until measured**, because a plausible offset that reads plausible numbers is exactly
+// what §AV3's "orientation quaternion" was before the variance check killed it. The oracle here is the same
+// one that validated mass against `m*g*dt`: for a rigid body, `torque_z * dt` should integrate to
+// `I_zz * delta(angular velocity z)`. So the implied `I_zz` must come out POSITIVE and roughly CONSTANT
+// across a drive. A field that varies but yields a wandering or negative inertia is not torque.
+constexpr uint32_t kOffTorqueCandidate = 0x0C;
 constexpr uint32_t kOffVelocity = 0x18;
 constexpr uint32_t kOffAngularVelocity = 0x24;   // Vector3, rad/s -- 12 bytes past a verified field
 constexpr uint32_t kOffOrientation = 0x30;       // Quaternion (x,y,z,w)
@@ -294,6 +318,22 @@ std::atomic<int64_t> g_impulseSumX{0}, g_impulseSumY{0}, g_impulseSumZ{0};
 std::atomic<float> g_trackedVelX{0.0f}, g_trackedVelY{0.0f}, g_trackedVelZ{0.0f};
 std::atomic<bool> g_trackedVelOk{false};
 
+// The torque candidate, published from the deep read. Read-only.
+std::atomic<float> g_torqueX{0.0f}, g_torqueY{0.0f}, g_torqueZ{0.0f};
+std::atomic<bool> g_torqueOk{false};
+// Variance, because persistence alone passes a constant -- the §AV3 lesson, applied before the claim
+// rather than after it.
+std::atomic<uint32_t> g_torqueSamples{0};
+std::atomic<int64_t> g_torqueAbsSumZ{0};        // x1000
+std::atomic<int64_t> g_torqueMinZ{0}, g_torqueMaxZ{0};   // x1000
+// The oracle: sum(torque_z * dt) against delta(omega_z) gives an implied yaw inertia. Accumulated as
+// integers so two threads cannot tear a float.
+std::atomic<int64_t> g_torqueImpulseZ{0};       // x1000, sum of torque_z * dt
+std::atomic<int64_t> g_omegaZStart{0};          // x1000, first omega_z in the window
+std::atomic<bool> g_omegaZStarted{false};
+// Sign agreement with steering: a yaw torque should oppose or follow steer consistently, not at random.
+std::atomic<int64_t> g_torqueSteerAgree{0}, g_torqueSteerTotal{0};
+
 // Attitude, published from the deep read.
 std::atomic<float> g_angVelX{0.0f}, g_angVelY{0.0f}, g_angVelZ{0.0f};
 std::atomic<float> g_quatX{0.0f}, g_quatY{0.0f}, g_quatZ{0.0f}, g_quatW{1.0f};
@@ -485,6 +525,19 @@ bool readAttitude(const void* body, float* outAngular, float* outQuat) noexcept
         const auto* q = reinterpret_cast<const float*>(base + kOffOrientation);
         outAngular[0] = w[0]; outAngular[1] = w[1]; outAngular[2] = w[2];
         outQuat[0] = q[0]; outQuat[1] = q[1]; outQuat[2] = q[2]; outQuat[3] = q[3];
+        return true;
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        return false;
+    }
+}
+
+/// The torque candidate at `+0x0C`. Strictly read-only.
+bool readTorqueCandidate(const void* body, float* outXyz) noexcept
+{
+    __try {
+        const auto* t = reinterpret_cast<const float*>(
+            reinterpret_cast<const uint8_t*>(body) + kOffTorqueCandidate);
+        outXyz[0] = t[0]; outXyz[1] = t[1]; outXyz[2] = t[2];
         return true;
     } __except (EXCEPTION_EXECUTE_HANDLER) {
         return false;
@@ -790,6 +843,28 @@ void observe(void* body) noexcept
                     const float speedSq = vel[0] * vel[0] + vel[1] * vel[1];
                     if (speedSq < kMinSpeedForDirection * kMinSpeedForDirection) {
                         g_horizUndirected.fetch_add(1, std::memory_order_relaxed);
+                        // ------------------------------------------------- the standstill branch (0.1.16)
+                        // **Recovered from the owner's March 2026 anti-crawl work, which handled this and
+                        // 0.1.15 did not.** Below walking pace "along travel" has no meaning, so 0.1.15
+                        // bailed out entirely -- leaving `driveScale` inert under ~1.8 km/h. That is
+                        // precisely the regime the March fix existed for: each gear applies continuous
+                        // forward force down to a gear-dependent floor, so a car in 2nd would not drop
+                        // below ~21 km/h however hard it was braked. A power lever that switches itself off
+                        // at creep cannot express that.
+                        //
+                        // With no direction to decompose against, the March code scaled the whole
+                        // horizontal vector and so does this. It is the conservative choice: at a true
+                        // standstill there is no lateral component to protect.
+                        const float kCreep = g_driveScale.load(std::memory_order_relaxed);
+                        if (g_writesEnabled.load(std::memory_order_relaxed) &&
+                            std::fabs(kCreep - kGripScaleInert) > kGripScaleEpsilon) {
+                            if (writeForceXY(body, force[0] * kCreep, force[1] * kCreep)) {
+                                g_writes.fetch_add(1, std::memory_order_relaxed);
+                            } else {
+                                g_writeFaults.fetch_add(1, std::memory_order_relaxed);
+                                g_writesEnabled.store(false, std::memory_order_relaxed);
+                            }
+                        }
                         break;
                     }
                     const float inverse = 1.0f / std::sqrt(speedSq);
@@ -900,6 +975,49 @@ void observe(void* body) noexcept
         g_attitudeOk.store(true, std::memory_order_relaxed);
     } else {
         g_attitudeOk.store(false, std::memory_order_relaxed);
+    }
+
+    // ------------------------------------------------------ 0.1.16: the torque candidate at +0x0C
+    // Read-only. Sampled at the same instant as angular velocity so the oracle below compares two
+    // quantities from one moment rather than two -- the misaligned-sampling mistake KB-143 recorded.
+    float torque[3];
+    if (readTorqueCandidate(body, torque)) {
+        g_torqueX.store(torque[0], std::memory_order_relaxed);
+        g_torqueY.store(torque[1], std::memory_order_relaxed);
+        g_torqueZ.store(torque[2], std::memory_order_relaxed);
+        g_torqueOk.store(true, std::memory_order_relaxed);
+
+        const auto tz = static_cast<int64_t>(std::llround(torque[2] * 1000.0));
+        g_torqueSamples.fetch_add(1, std::memory_order_relaxed);
+        g_torqueAbsSumZ.fetch_add(tz < 0 ? -tz : tz, std::memory_order_relaxed);
+
+        int64_t lo = g_torqueMinZ.load(std::memory_order_relaxed);
+        while (tz < lo && !g_torqueMinZ.compare_exchange_weak(lo, tz, std::memory_order_relaxed)) {}
+        int64_t hi = g_torqueMaxZ.load(std::memory_order_relaxed);
+        while (tz > hi && !g_torqueMaxZ.compare_exchange_weak(hi, tz, std::memory_order_relaxed)) {}
+
+        // The oracle. For a rigid body, integrating torque_z over time gives I_zz * delta(omega_z), so the
+        // implied yaw inertia must come out positive and roughly constant. A field that merely VARIES
+        // proves nothing -- that was exactly the §AV3 trap.
+        if (g_attitudeOk.load(std::memory_order_relaxed)) {
+            if (!g_omegaZStarted.exchange(true, std::memory_order_relaxed)) {
+                g_omegaZStart.store(static_cast<int64_t>(std::llround(angular[2] * 1000.0)),
+                                    std::memory_order_relaxed);
+            }
+            // dt from the physics itself, not the OS clock: 1/60 is the measured frame time and the deep
+            // read is rate-limited to 1-in-16, so this is an approximation whose only job is to keep the
+            // implied inertia in a believable ORDER, not to be exact.
+            g_torqueImpulseZ.fetch_add(tz / 60, std::memory_order_relaxed);
+
+            const float steer = g_inSteer.load(std::memory_order_relaxed);
+            if (std::fabs(steer) > 0.10f && std::fabs(torque[2]) > 1e-3f) {
+                g_torqueSteerTotal.fetch_add(1, std::memory_order_relaxed);
+                if ((steer > 0.0f) == (torque[2] > 0.0f))
+                    g_torqueSteerAgree.fetch_add(1, std::memory_order_relaxed);
+            }
+        }
+    } else {
+        g_torqueOk.store(false, std::memory_order_relaxed);
     }
 
     // Velocity at a known instant, for the budget check. Same moment as everything else in this block.
@@ -1051,6 +1169,52 @@ void reportClassification(double speed)
     const uint32_t latPeak = g_latPeak.exchange(0, std::memory_order_relaxed);
     const uint32_t undirected = g_horizUndirected.exchange(0, std::memory_order_relaxed);
     const uint32_t directed = horizontal > undirected ? horizontal - undirected : 0;
+
+    // ------------------------------------------------------------- 0.1.16: the torque candidate verdict
+    //
+    // Three things have to hold together before `+0x0C` may be called torque, and any one of them failing
+    // is the answer. This prints all three rather than a conclusion, so the verdict is readable from the
+    // numbers instead of taken on trust.
+    {
+        const uint32_t n = g_torqueSamples.exchange(0, std::memory_order_relaxed);
+        const int64_t absSum = g_torqueAbsSumZ.exchange(0, std::memory_order_relaxed);
+        const int64_t lo = g_torqueMinZ.exchange(0, std::memory_order_relaxed);
+        const int64_t hi = g_torqueMaxZ.exchange(0, std::memory_order_relaxed);
+        const int64_t impulse = g_torqueImpulseZ.exchange(0, std::memory_order_relaxed);
+        const int64_t agree = g_torqueSteerAgree.exchange(0, std::memory_order_relaxed);
+        const int64_t total = g_torqueSteerTotal.exchange(0, std::memory_order_relaxed);
+        g_omegaZStarted.store(false, std::memory_order_relaxed);
+
+        if (n > 0) {
+            const double meanAbs = static_cast<double>(absSum) / (1000.0 * n);
+            const double spread = static_cast<double>(hi - lo) / 1000.0;
+            const double omega0 = static_cast<double>(g_omegaZStart.load(std::memory_order_relaxed)) / 1000.0;
+            const double omega1 = static_cast<double>(g_angVelZ.load(std::memory_order_relaxed));
+            const double dOmega = omega1 - omega0;
+            const double impulseZ = static_cast<double>(impulse) / 1000.0;
+            // Implied yaw inertia. Only meaningful when omega actually moved; a near-zero denominator
+            // produces a number that looks precise and means nothing, so it is withheld rather than shown.
+            const bool inertiaMeaningful = std::fabs(dOmega) > 0.05;
+            const double impliedIzz = inertiaMeaningful ? impulseZ / dOmega : 0.0;
+
+            NCM_INFO("torque? +0x0C n=%u meanAbsZ=%.3f spread=%.3f | dOmegaZ=%+.3f impulseZ=%+.3f "
+                     "impliedIzz=%s | steerSign %lld/%lld",
+                     n, meanAbs, spread, dOmega, impulseZ,
+                     inertiaMeaningful ? "see next" : "n/a (omega flat)",
+                     static_cast<long long>(agree), static_cast<long long>(total));
+            if (inertiaMeaningful) {
+                NCM_INFO("  impliedIzz=%.1f kg.m2 %s", impliedIzz,
+                         impliedIzz > 0.0 ? "(positive -- consistent with torque)"
+                                          : "(NEGATIVE -- not a torque about this axis)");
+            }
+            if (spread < 1e-3) {
+                NCM_WARN("  +0x0C is CONSTANT this window -- not an accumulator. Same trap as the §AV3 "
+                         "quaternion, caught by variance rather than by persistence.");
+            }
+        } else if (g_torqueOk.load(std::memory_order_relaxed) == false) {
+            NCM_INFO("torque? +0x0C unreadable this window");
+        }
+    }
 
     // ------------------------------------------------------------------------ TEST 1: attitude report
     //

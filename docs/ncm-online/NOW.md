@@ -5,37 +5,42 @@
 
 Last rewritten: **2026-09-26 - Parts layers 1-3 built (`L150`); the `KB-136` discriminator and the architecture dump are built and awaiting one drive.**
 
-> **Claim before writing:** decisions through **L151**; MASTER_TEST through **§AV**; next QA letter **§AW**.
-> BACKLOG next free **IDEA-512**; known issues through **KB-145** plus pre-existing duplicate labels noted by
+> **Claim before writing:** decisions through **L151**; MASTER_TEST through **§AW**; next QA letter **§AX**.
+> BACKLOG next free **IDEA-515**; known issues through **KB-145** plus pre-existing duplicate labels noted by
 > `KB-114`. Read the ledger tails before allocating an ID.
 
 ## One next action
 
-**Drive Carrier 0.1.15 and find out whether three new levers are real.** Built, gated, committed, not yet
-published. `L151` widens the proven force interception from one quantity to four, all per-instance and
-therefore **per-player on a shared model** - which is the constraint that had been written off as immovable.
+**Drive 0.1.16 and read one log line: is `+0x0C` the torque accumulator?**
 
-Set these in `ncm_carrier.json` (written automatically, hot-reloaded mid-session, 1.0/0.0 is inert):
+§AW confirmed `driveScale` and `brakeScale` live on Production and refuted `rollBias` -- and the refutation
+is the useful part. **`force` at `+0x00` carries no position**, so the four per-corner entries cannot express
+a moment, which is why three separate load-redistribution experiments all did nothing. That channel is
+closed with a mechanism rather than left open.
 
-| key | range | inert | what to feel for |
-|---|---|---|---|
-| `gripScale` | 0.3 - 1.5 | 1.0 | already proven |
-| `driveScale` | 0.3 - 2.0 | 1.0 | acceleration, without touching grip |
-| `brakeScale` | 0.3 - 2.0 | 1.0 | stopping power, without touching grip |
-| `rollBias` | -0.3 - 0.3 | 0.0 | how the car LEANS. positive loads the left |
+Moments must live somewhere, and `+0x0C` is the only unexamined `Vector3` in a `force / ??? / velocity /
+angularVelocity` layout -- inside the struct we already hold. If it is torque, then **anti-roll, yaw
+balance, brake bias and stability** all become writes through the interception already proven, and
+`ApplyTorqueAtPosition`'s unknown signature stops mattering.
 
-**Suggested order, one at a time, returning to inert between each:** `driveScale 0.5` then `1.5` on a
-straight; `brakeScale 0.5` from speed; `rollBias 0.25` through a constant-radius corner both ways.
+0.1.16 probes it **read-only**. Just drive normally, including some deliberate cornering both ways, and the
+reporter prints a verdict once a second:
 
-**What `rollBias` is actually testing.** §AV2 moved load front-to-rear and found no grip change, which killed
-load redistribution as a *grip* lever. It never tested left/right, and it says nothing about *attitude* -
-§AU3 saw these same entries make a car sag, so they do move the body. **Expect a change in lean, and expect
-no change in grip.** If the car leans differently, anti-roll is expressible and the suspension family has a
-real channel. If nothing happens at all, the normal-load entries are dead for every purpose and that is
-worth knowing once rather than suspecting forever.
+```
+torque? +0x0C n=.. meanAbsZ=.. spread=.. | dOmegaZ=.. impulseZ=.. impliedIzz=.. | steerSign a/b
+```
 
-**The honest caveat:** `driveScale` and `brakeScale` are near-certain (the longitudinal component is measured,
-signed, and already decomposed every frame). `rollBias` is the speculative one.
+Three conditions, all printed rather than summarised, and any one failing is the answer:
+
+- **spread > 0** -- a constant is not an accumulator. This is the §AV3 trap and variance is what catches it.
+- **impliedIzz positive and of believable order** -- integrating `torque_z` against `delta(omega_z)` from
+  `+0x24`. Negative or wandering means it is not a torque about that axis.
+- **steerSign consistent** -- a yaw torque should track steering, not arrive at random.
+
+Also in 0.1.16, both recovered from the March clutch artifact: the **standstill branch** that 0.1.15 was
+missing (`driveScale` was inert below ~1.8 km/h, precisely the regime the gear speed floor lives in), and
+`IDEA-513`/`IDEA-514` recording `DrivingForcesHelper::Apply` as a known-signature second hook and the
+per-gear speed floor as engine behaviour.
 
 ## Production live state
 
