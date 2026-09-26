@@ -29,7 +29,10 @@
 --                     Galena shares one set of values. Per-outing, not per-lap. Not per-player.
 --   * `instance`   -- the live per-instance force write proved in MASTER_TEST section AU (L148).
 --                     **Built and shipping.** Live, reversible, per-instance, per-player, no respawn.
---                     BUT: exactly ONE quantity today -- vehicle-level lateral grip. The narrow channel.
+--                     BUT: THREE quantities today -- lateral grip (AU5), drive force (AW1) and brake
+--                     force (AW2). Wider than it was, still the narrow channel: eight families have no
+--                     live expression at all, and moments (anti-roll, yaw balance) are refuted, not
+--                     pending -- see `per_corner` below.
 --   * `simulated`  -- NCM's own server-authoritative modelling. Always available, always safe, never felt
 --                     through the steering wheel. Lap-time modelling, wear, failure, eligibility, results.
 --   * `per_corner` -- **DOES NOT EXIST.** Front/rear balance, brake bias, anti-roll, per-corner tyre
@@ -38,8 +41,8 @@
 --                     axle load moved, under 5 percent change in lateral capability. `IDEA-503` bookmarks
 --                     the only surviving route (`insert1`) and it is not scheduled.
 --
--- **`record` is broad but shared and stale. `instance` is live and personal but one field wide.** They are
--- complements, not alternatives, and no family is served well by both today.
+-- **`record` is broad but shared and stale. `instance` is live and personal but three fields wide.** They
+-- are complements, not alternatives, and no family is served well by both today.
 --
 -- IDEA-505 is the rule this module enforces: a Part declares its channel, and nothing may promise a felt
 -- effect on `per_corner`. `M.declarationIsHonest` is that rule as an assertion rather than as prose,
@@ -92,9 +95,21 @@ Core.define("parts.ontology", function(C)
 
     M.CHANNEL_IDS = { "record", "instance", "simulated", "per_corner" }
 
-    -- The single quantity the live channel can move today. Named so that a caller asking "what can
-    -- `instance` do for suspension" gets `nil` instead of a hopeful guess.
-    M.INSTANCE_QUANTITIES = { tires = { "lateral_grip_vehicle" } }
+    -- The quantities the live channel can move today. Named so that a caller asking "what can `instance`
+    -- do for suspension" gets `nil` instead of a hopeful guess.
+    --
+    -- **Three, not one, since 2026-09-26.** This table said `tires` only, which was true of the day section
+    -- AU5 passed and stale from the moment section AW landed. `driveScale` and `brakeScale` were both driven
+    -- and confirmed by the owner on Production (sections AW1, AW2), so power_unit and brakes are live
+    -- families, and a designer asking this module was being told otherwise.
+    --
+    -- `parts.handling` holds the levers these map to and ASSERTS AT LOAD that the two tables agree, so this
+    -- one cannot drift again without a test failing.
+    M.INSTANCE_QUANTITIES = {
+        tires      = { "lateral_grip_vehicle" },          -- gripScale,  MASTER_TEST AU5
+        power_unit = { "longitudinal_force_driving" },    -- driveScale, MASTER_TEST AW1
+        brakes     = { "longitudinal_force_braking" },    -- brakeScale, MASTER_TEST AW2
+    }
 
     -- ---------------------------------------------------------------------------------------------
     -- The periodic table

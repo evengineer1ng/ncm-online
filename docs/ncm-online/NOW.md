@@ -3,224 +3,82 @@
 > **STATUS: LEDGER** - living session memory, rewritten at the end of every working session.
 > Authority map: [INDEX.md](INDEX.md) - classified 2026-09-24 (L125).
 
-Last rewritten: **2026-09-26 - Parts layers 1-3 built (`L150`); native-asset Foundry inventory direction captured as `IDEA-515`; the `KB-136` discriminator and the architecture dump are built and awaiting one drive.**
+Last rewritten: **2026-09-26 - `L152`: Parts reach a car. The instance channel now carries a driver's fitted
+components from the server to a live force, per player, and Carrier 0.1.20 is on Production awaiting §AY.**
 
-> **Claim before writing:** decisions through **L151**; MASTER_TEST through **§AX**; next QA letter **§AY**.
-> BACKLOG next free **IDEA-516**; known issues through **KB-145** plus pre-existing duplicate labels noted by
+> **Claim before writing:** decisions through **L152**; MASTER_TEST through **§AY**; next QA letter **§AZ**.
+> BACKLOG next free **IDEA-519**; known issues through **KB-145** plus pre-existing duplicate labels noted by
 > `KB-114`. Read the ledger tails before allocating an ID.
 
 ## One next action
 
-**Stop chasing moments by offset, and take the Parts work forward on the two levers that are proven.**
-
-§AX closed the torque hunt: `+0x0C` is not the yaw torque accumulator, across three read-only builds and
-four owner drives. The full reasoning is in §AX, including the caveat that it refutes *this offset sampled
-this way* rather than the existence of a torque channel.
-
-**What is proven and shipping, per-instance and therefore per-player on a shared model:**
-
-| lever | status |
-|---|---|
-| `gripScale` | PROVEN §AU5 |
-| `driveScale` | PROVEN §AW1 -- and the owner's March 2026 anti-crawl hook is prior art for it |
-| `brakeScale` | PROVEN §AW2 |
-
-That is three live levers covering tyres, power and brakes, none of which existed this morning, and which
-between them break the "two drivers in the same model cannot differ" constraint that Report 36 called the
-hardest one.
-
-**What is closed, with mechanisms rather than open questions:** per-corner load redistribution (§AV2, §AW3 --
-`force` carries no position), the orientation quaternion in `+0x20..+0x180` (§AV3), and `+0x0C` as torque
-(§AX).
-
-**If moments are picked up again**, the order is decided by an asymmetry rather than by appeal:
-`DrivingForcesHelper::Apply` has a **known** signature from the owner's own working code (`IDEA-513`);
-`ApplyTorqueAtPosition` does not. Read `tuning.lua` before probing anything (`IDEA-508`, `KB-145`).
-
-**The nearer-term item is `KB-145`:** seven of twenty-one `machine.flats` entries do not resolve, including
-the tyre family's headline flat, and `parts.ontology` derives its record channel straight from that file --
-so it is currently confident about families it should not be.
-
-## Production live state
-
-Verified directly against the server on 2026-09-26, not carried forward from notes.
-
-- Host `52.60.225.137`; server id `6b154fdc-d515-4903-97dd-df37cb966151`; unlisted and whitelisted
-  (`KB-137` closed).
-- OPEN//77 `2.31.13+op77.102 linux-x64`, protocol **1.40**. `ncm-server` **active**.
-- RequiredMods enabled/unsecured; sole declaration `ncm-carrier` **0.1.13**, 914,065 bytes, SHA-256
-  `4fa43a64dfbd52bd5429bb55ebd6e3eb65cc49d76a434412a2f7983f3a1eded4` - **re-read from
-  `/opt/ncm/server/server.jsonc`**, and verified byte-identical to the local artifact at the time of that
-  check. **The local `dist/ncm-carrier-0.1.13.zip` no longer matches:** a build was run before the version
-  was bumped, overwriting it. The stale file is renamed
-  `ncm-carrier-0.1.13-LOCAL-REBUILD-DO-NOT-PUBLISH.zip` so it cannot be published by mistake; Production
-  still holds the real 0.1.13 and rollback goes through `publish-carrier.py --remove`, not that file.
-  Manifest digest at
-  publish time was `0f82d831ef301bcd5acc7c2ab756443a2959704810624b6905a60077a954d7d6`; the manifest endpoint
-  did not answer from loopback during this check, so that digest is publish-time observed rather than
-  re-verified.
-- **0.1.14 is built and packaged but NOT published:** `dist/ncm-carrier-0.1.14.zip`, 920,222 bytes, SHA-256
-  `e7a0b6ba20b70a558e4cad0a32a6737793df40ea0685ada82bf96ee5cd6d1a0e`. It adds the read-only architecture
-  dump (`IDEA-507`) and carries the resource-side `KB-136` discriminator and candidate fix. Publishing it
-  needs one restart, and a `chown` afterwards.
-- **`KB-138` is currently satisfied:** `find /opt/ncm/server ! -user ubuntu` returns **0 files**. The `chown`
-  after the last publish was done.
-
-> **Every carrier publish still needs a `chown` afterwards (`KB-138`).** `publish-carrier.py` runs under
-> `sudo` and writes the blob, its metadata and `server.jsonc` back as `root:root`, partially recreating what
-> broke the whitelist. Run `sudo chown -R ubuntu:ubuntu /opt/ncm/server` after every publish and verify with
-> `find /opt/ncm/server ! -user ubuntu`. This belongs in section D of the runbook and in the publisher itself.
-
-## What changed this session
-
-Two sessions' work sits here: §AU built the capability, §AV established its shape. **Read §AV before designing
-anything physical.**
-
-### Native-asset Foundry direction captured
-
-`IDEA-515` records the owner's proposal to build Foundry output from existing Cyberpunk vehicle assets rather
-than new 3D models. The current NCM catalogue is an authored subset, not the game's inventory: 26 native
-machine identities comprise 21 four-wheel vehicles and five motorcycles, while the installed current game
-contains many more player, quest, tuned and appearance records. No vehicle was added and no architectural
-decision was made. The owed work is a provenance-aware record/entity/appearance/content-package inventory and
-a runtime validation matrix before any candidate becomes canonical or enters the economy.
-
-### The capability, unchanged and proven (§AU, `L148`)
-
-Live, per-instance, reversible mutation of vehicle physics on an already-spawned car - no respawn, no record
-edit, no TweakDB, no restart. Lateral grip scaled on the player's car only, hot-reloaded from config
-mid-session; at 0.30 the owner reported *"unmistakable, over the top understeer"*, at 1.00 an instant return
-to default physics. Interception at `RigidBody::Recalculate` (hash `593628708`), the force field decoded as
-sixteen per-contributor impulse writes per frame, the four corners identified as **FL, FR, RR, RL**, and the
-classifier validated by arithmetic across the twelve threads that drive one body.
-
-### The shape, established tonight (§AV, `L149`) - two negatives
-
-- **§AV2 NEGATIVE: the per-corner force entries are not a grip channel.** Shifting 20 percent of axle load,
-  zero-sum, changed lateral capability by under 5 percent. Stated precisely: this rules out *this channel as
-  a control surface*, not load-dependence in principle - the entries we scale may be suspension **output**
-  rather than the tyre model's **input**. Either way, front/rear balance, brake bias, anti-roll, per-corner
-  tyre temperature and downforce-as-grip are all unreachable this way. `IDEA-499` is refuted for this channel.
-- **§AV3 REFUTED: there is no orientation quaternion in `+0x20..+0x180`.** Every unit-norm candidate is
-  constant - inertia-tensor rows. No sideslip, no body-frame telemetry, no g-g diagram.
-- **§AV1 PASS: the write itself was correct.** Residuals 16.08 / 16.19 / 8.90 against a ~180 N.s gravity
-  impulse. It held vertical equilibrium exactly and did nothing, which is the cleanest possible form of a
-  negative result.
-
-### What that leaves, and where it is written down
-
-`insert1` is now **the only credible route to per-corner grip**, and it is bookmarked in full at `IDEA-503`
-with the ordered checks and the seven assets we hold that Report 36 did not when it called this UNPROVEN.
-**Check 0 ran the same day**, because the SDK header was already on disk and it cost one read:
-
-- **`insert1` is real.** `physics::VehiclePhysicsInsert1 insert1[4]`, 300 bytes per wheel, `insert1Count` at
-  `0x5C0`, `insert2[0]` asserted at `0x5E0`. The shorthand was right.
-- **It is not on the object the carrier holds, and the original step 1 would have failed.** `insert1` lives on
-  `WheeledPhysics`; our detour receives `vehiclePhysicsData`, and the header proves those are separate objects
-  (`Physics` holds a `PhysicsData*` at `+0x60`; `Physics::sub_50` sets its velocity *from* the data object).
-  **Revised step 1: get from `PhysicsData` to `WheeledPhysics` first**, and the verified `+0x180` back-pointer
-  is the candidate route.
-- **The configuration-versus-derived question is already answered in our favour.** Virtual slot `0x140`,
-  `LoadSomeVehiclePhysicsStuff(Handle<VehicleDriveModelData_Record>*)`, is annotated *"populates some
-  variables along with most of insert1"*. `insert1` is **fed from the drive-model record** - the signature of
-  configuration, and the opposite of `insert2`'s *WheelRuntimeData*.
-
-Two headers are worth reading before any code: `vehiclePhysicsInsert1.hpp` (it names the fields) and
-`vehiclePhysicsData.hpp` (it should explain our own verified `+0x18`, `+0x180` and `+0x1BC`). Neither was on
-disk. `IDEA-504` bookmarks the re-apply route and was amended the same day: `LoadSomeVehiclePhysicsStuff` is a
-better candidate than `SetupInsert()`. **Neither is scheduled, and neither is safe to call yet.**
-
-### Third-party vehicle hosting audit began
-
-The first nine vehicle bases from the Collection install/test cohort now have exact-source licensing rows in
-`docs/research/open77/NCM_SERVER_MOD_LICENSING_CATALOG.md`. **Zero are cleared for NCM-hosted delivery today.**
-Seven have a plausible written-permission path; the yellingintothevoid R34 and Formula Drift Supra are off the
-table today because their pages declare third-party assets and limit published add-ons to files that require
-the original Nexus mod. FZR's base is an ASK, but its runnable chain stays red until Arch V4 is independently
-cleared. The open-source loader layer remains separately hostable under its MIT notices. This continues
-`IDEA-468`'s package-custody rule, does not change `L149`, and changed no package or server state.
-
-## Parts - what exists
-
-**Layers 1-3 of 18_PARTS_ECOSYSTEM are built**, 38 tests green under Lua 5.4 and LuaJIT.
-
-### Compatibility, derived and never listed (`IDEA-506`)
-
-- **`parts.architecture`** - fourteen mechanical facets over closed vocabularies, one profile per vehicle.
-  **Every facet value carries a provenance**: `derived` (computed from the catalogue, true by construction),
-  `authored` (**none yet**) or `unknown`.
-- **`parts.compat`** - relates a component's constraints to a vehicle's architecture. **No fitment table
-  exists anywhere**, which is what makes vehicle #83 a one-row change instead of a thousand-row edit. A test
-  asserts it rather than a comment promising it.
-- **Three outcomes, not a boolean:** `fits`, `mismatch` (a real, permanent no) and `unknown_facet` (*nobody
-  has authored this yet*). Collapsing the last two would have produced a system that reports an empty world
-  and looks like it is working.
-- **Derived for free:** `axle_config`, `steering` and `platform` for all 27; the full motorcycle and Formula
-  architectures. **27 vehicles collapse to 22 platforms** - the Type-66 and its Nomad, the Shion and its
-  Nomad, the three Brennan Apollos and the two Yaiba Kusanagis each share one. `thorton_colby_pickup`
-  deliberately does not collapse into `thorton_colby`.
-- **Exact model fitment stays possible** through `fitsPlatforms`, in its own field so an audit can find every
-  component that needed an exception.
-
-### The periodic table (`L150`)
-
-- **`parts.ontology`** (`ncm/core/parts/ontology.lua`, 17 tests green under both interpreters). The component
-  periodic table: twelve families with meanings, subfamilies and what each abstracts away. It **reuses**
-  `engineering.competency.FAMILIES` rather than declaring a second list of twelve, and refuses to load if the
-  two ever disagree.
-- **The four expression channels, asserted rather than described.** `record` (TweakDB flat - built, broad,
-  but spawn-cached and shared across every instance of a model on a client), `instance` (the `L148` live grip
-  write - built, personal, one quantity wide), `simulated` (always available, never felt), and `per_corner`
-  (**declared absent**, with the refusal naming `IDEA-503`).
-- **`declarationIsHonest(family, channel)`** is `IDEA-505` as an assertion: a Part cannot claim a channel its
-  family does not have, and nothing can claim `per_corner`.
-- **The constraint Parts must design around**, now a passing test rather than a paragraph: **tyres are the
-  only family with a per-player felt expression.** Every other family that can be felt at all is felt through
-  the record channel, where two drivers in the same car model cannot differ from each other.
-- **Spec conflict 5 resolved:** a tyre asset is a **set of four**, not a corner and not an axle pair - partly
-  because motorsport already works that way, and partly because §AV2 means per-corner identity would be
-  identity without consequence. `axle_pair` and `corner` are named in the vocabulary as the migration steps
-  if `IDEA-503` ever lands.
-
-## Carrier proof status
-
-- **AT0, AT1 PASS.** Delivery, native load, script validation, world connection.
-- **AT2 PASS as of 0.1.2:** the typed health snapshot is sent on WebSocket connect and reaches NCM's own
-  client log. `KB-134`'s connecting half is closed; typed fields rather than a version-string shim are owed.
-- **AT3 not run.** `KB-140` means only the pad enumerates, so the panel has nothing real to draw.
-- **AT4 still blocked by `KB-136`.** Note §AU sidesteps its spawn-cached premise entirely.
-- **AU1-AU5 PASS.** See MASTER_TEST §AU.
-- **AV1 PASS, AV2 NEGATIVE, AV3 REFUTED.** See MASTER_TEST §AV. A negative is a result, not a gap.
-
-## Standing carrier constraints
-
-- **No input authority.** `KB-135` stands: no detour writes throttle, brake or steer, and neither `L148` nor
-  `L149` authorises one. `vehicle/hook.cpp` still asks RTTI for `throttleInput`/`brakeInput`/`steerInput`,
-  names that do not exist - the SDK calls them `acceleration` and `deceleration`. Its log wording was made
-  honest ("offsets resolved", not "installed"); the containment itself is still owed.
-- **No per-wheel friction.** §AV2 above.
-- **Only the XInput pad enumerates** (`KB-140`): the G29, the Thrustmaster pedals and the ESP32 rim are all
-  held exclusively and refuse `CreateFile` even with zero access rights. RawInput is the candidate route
-  (`IDEA-497`).
-- **`L"\\ncm_..."` has been written three times** (`KB-139`). All four wide path literals are audited and
-  correct; `IDEA-498` proposes a gate check so the fourth occurrence is refused rather than noticed.
-
-## Data boundary and rollback
-
-Unchanged (`L147`). Verified 63-table dump and operator-state archive at
-`/opt/ncm/backups/pre-carrier-prod-20260925T213201Z`. The pre-upgrade `.87` tree is retained at
-`/opt/ncm/backups/server-20260925T200746Z` and is where `access.json` was restored from.
-
-Carrier rollback is one command and needs no file hunting:
+**Drive §AY.** Eight numbered operations in `wp/MASTER_TEST.md`, all through `/ncm.setup`. Everything below
+is built, deployed and green; none of it is *done* until a live PASS sits beside it (`L69`).
 
 ```
-ssh -i C:\Users\eveng\.ssh\lightsail-ncm.pem ubuntu@52.60.225.137 \
-  'sudo python3 /tmp/publish-carrier.py /opt/ncm/server --remove && sudo systemctl restart ncm-server'
+/ncm.setup                      what can be felt at all
+/ncm.setup power_unit 1.5       then drive     -- acceleration
+/ncm.setup brakes 0.5           then brake     -- stopping distance
+/ncm.setup tires 1.3            then corner    -- grip
+/ncm.setup suspension 1.2       expect a NAMED REFUSAL, not silence
+/ncm.setup power_unit 9.0       expect clamp to 2.00, logged as CLAMPED
+/ncm.setup clear                back to standard
 ```
 
-## Working-tree caution
+## What changed today, and why it is the thing that was missing
 
-The tree is intentionally dirty and contains overlapping work from another coder. Preserve unrelated
-changes, especially `ncm/online/resources/ncm_world/server/main.lua`. The licensing pass added one OPEN//77
-research catalog, linked it from the research README and updated this session memory; it did not touch runtime
-code, packages or server state. Do not reset or blanket-checkout.
+Three force levers were proven live yesterday and this morning. **Nothing connected them to Parts.** They
+were readable only from `ncm_carrier.json` -- a file on one person's disk -- so a proven capability was
+reachable by the owner with a text editor and by nobody else.
+
+`L152` built the path end to end:
+
+```
+fitted parts -> parts.handling.compose -> player state bag -> client -> WebSocket -> applyHandling -> force
+```
+
+| lever | family | status |
+|---|---|---|
+| `gripScale` | tires | PROVEN §AU5, now reachable from a fitted part |
+| `driveScale` | power_unit | PROVEN §AW1 (owner's March anti-crawl hook is prior art) |
+| `brakeScale` | brakes | PROVEN §AW2 |
+
+**This is the per-player channel, and that answers the standing question** -- *"do we care about machine
+flats if it affects every car in the server?"* The record channel is keyed by RECORD, so one client cannot
+hold two setups for one model. The instance channel scales force on ONE BODY, the latched player vehicle,
+so two drivers in the same Galena with different engines feel different. Per-player by construction.
+
+**Nine families are refused rather than approximated.** Suspension, steering, aerodynamics and mass have no
+live quantity: moments need a torque channel and §AW3 refuted the per-corner load entries with a mechanism.
+A part naming one of them fails the whole compose with a named reason. `parts.ontology.INSTANCE_QUANTITIES`
+was corrected from one family to three, and `parts.handling` asserts at load that the two agree.
+
+## What does NOT exist, said plainly
+
+**There is no parts inventory.** Ownership, acquisition, fitting, wear and the garage UI are Parts layer 4
+and are not authorised. `server/handling.lua` holds an in-memory table and exposes `NcmHandling.setParts`
+for whatever eventually owns that truth; nothing persists across a restart (`IDEA-518`, recorded as
+deliberate). `/ncm.setup` fits synthetic components through **the same call the inventory will make**, so a
+§AY PASS is a PASS of the real mechanism rather than of a shortcut around it.
+
+Parts is not a game system yet. What exists is the half that was hardest and least certain: the one where a
+component changes how a car feels.
+
+## Live state
+
+- Carrier **0.1.20** on Production, manifest digest `b3e0f520...`, `requiredMods` enabled.
+- `ncm_world` deployed; `[ncm_world/handling] ready -- 3 live famil(ies) on the instance channel`.
+- `KB-138` chown run and verified: `find /opt/ncm/server ! -user ubuntu` is empty.
+- Gate green: 380 core tests, 183 resource files, docs authority OK.
+
+## Next after §AY
+
+1. **§AY itself.** A lever that moves in the log but not in the car is the failure this design is most
+   exposed to, and it is a different failure from §AW3's. Check both claims separately (`KB-142`).
+2. **`IDEA-516`** -- make the carrier log an unknown `cmd`. Three lines. The relay page whitelists event
+   names and `ncm:machine.handling` was nearly lost to it; the next message will hit the same wall silently.
+3. **`KB-145`** -- seven `machine.flats` entries do not resolve. Lower priority than it looked this morning
+   now that the instance channel carries Parts, but `parts.ontology` still derives its record channel from
+   that table, so wrong entries mean the ontology overstates what the record channel can do.
+4. **`IDEA-511`** -- build-script guard against overwriting a published dist version. Two collisions in one
+   day; a third is a matter of time.

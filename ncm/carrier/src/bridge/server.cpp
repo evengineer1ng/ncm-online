@@ -53,6 +53,12 @@ const char* kBridgeHtml = R"HTML(<!doctype html>
     // The carrier channel. One transport for telemetry and effects, so the two sides cannot disagree about
     // which is authoritative, and so an effect cannot arrive while the socket that reports feel is down.
     Open77.on("ncm:machine.projection", function (p) { relay({ cmd: "projection", projection: p || {} }); });
+    // L152: the driver's fitted parts as live force scales -- the INSTANCE channel, per-player.
+    // **This page whitelists every event it relays**, so a new message is dead on arrival until it is named
+    // here. That is worth a line of comment rather than a line of code: the failure is total and silent,
+    // and every other symptom (server composed it, client pushed it, carrier heard nothing) points away
+    // from this file.
+    Open77.on("ncm:machine.handling", function (p) { relay({ cmd: "handling", handling: p || {} }); });
     // IDEA-507: a read-only request for the game's own drive-model data. Mutates nothing.
     Open77.on("ncm:machine.archdump", function (p) { relay({ cmd: "archdump", records: (p && p.records) || [] }); });
   }
@@ -409,6 +415,33 @@ void Server::dispatch(const std::string& payload)
             }
         }
         onProjection_(out);
+        return;
+    }
+
+    if (cmd == "handling") {
+        if (!onHandling_) return;
+        const auto& h = msg["handling"];
+        if (!h.is_object()) return;
+
+        Handling out;
+        out.version = h.value("v", 1);
+        // A lever that is ABSENT is not the same as a lever set to 1.0. Absent means "the server said
+        // nothing about this one, leave it alone"; 1.0 means "explicitly inert". `parts.handling.wire()`
+        // always sends all three, so absence here is a malformed payload rather than a normal state -- but
+        // the distinction is kept because collapsing it is how a partial message silently detunes a car.
+        const auto& levers = h.contains("levers") ? h["levers"] : json::object();
+        if (levers.is_object()) {
+            if (levers.contains("gripScale") && levers["gripScale"].is_number()) {
+                out.hasGrip = true; out.grip = levers["gripScale"].get<double>();
+            }
+            if (levers.contains("driveScale") && levers["driveScale"].is_number()) {
+                out.hasDrive = true; out.drive = levers["driveScale"].get<double>();
+            }
+            if (levers.contains("brakeScale") && levers["brakeScale"].is_number()) {
+                out.hasBrake = true; out.brake = levers["brakeScale"].get<double>();
+            }
+        }
+        onHandling_(out);
         return;
     }
 

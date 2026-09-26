@@ -44,6 +44,7 @@ return {
     "parts/ontology.lua",
     "parts/architecture.lua",
     "parts/compat.lua",
+    "parts/handling.lua",
     "economy/markets.lua",
     "economy/production.lua",
     "economy/supply_profiles.lua",

@@ -1423,3 +1423,33 @@ build's address table but its signature is unknown, and `IDEA-513` records that
 `DrivingForcesHelper::Apply` (`1989218322`) has a **known** signature from the owner's own March 2026
 work -- `void __fastcall(uint64_t*, float)`, already hooked successfully on this engine. If moments are
 pursued again, that asymmetry should decide the order.
+
+## §AY - Parts reach a car: the instance channel, end to end - **AWAITING LIVE TEST**
+
+`L152`. §AU and §AW proved three force levers with a config file. §AY asks whether a **fitted part** can
+move them -- server-composed, per-player, over the wire -- which is the difference between a capability and
+a feature.
+
+Carrier **0.1.20** + `ncm_world` on Production. Command: `/ncm.setup`.
+
+| # | Operation | Expected | Result |
+|---|---|---|---|
+| §AY1 | `/ncm.setup` with no arguments. | Chat lists what is fitted (nothing), the three live families with their lever and evidence, and the nine that cannot be felt live. | |
+| §AY2 | `/ncm.setup power_unit 1.5`, then drive. | Acceleration increases. `ncm_carrier.log` shows `handling: driveScale 1.000 -> 1.500 (ACTIVE)`. **The whole chain is under test, not the lever** -- §AW1 already proved the lever. | |
+| §AY3 | `/ncm.setup brakes 0.5`, then brake hard. | Stopping distance lengthens; power unchanged from §AY2. Two parts now fitted and both expressed at once. | |
+| §AY4 | `/ncm.setup tires 1.3`, then corner. | Grip increases. All three levers active simultaneously from three independent parts. | |
+| §AY5 | `/ncm.setup suspension 1.2`. | **A named refusal in chat**, not silence and not a plausible number: suspension has no live quantity on the instance channel. Nothing fitted, nothing changed. | |
+| §AY6 | `/ncm.setup power_unit 9.0`. | Applied at **2.00**, the clamp maximum, and the log says `CLAMPED from 9.000`. A silently clamped setup is how a player loses trust. | |
+| §AY7 | `/ncm.setup clear`, then drive. | Every lever explicitly back to inert; the car feels standard again. Distinct from sending nothing, which would leave the last setup applied. | |
+| §AY8 | Fit a part, then `/ncm.ffb off` (drops the bridge). | `handling: cleared to inert` in the carrier log. A driver who loses the server keeps neither advantage nor penalty. | |
+
+**What a PASS here means and what it does not.** It means the path is real and Parts can change how a car
+feels, per player, live. It does **not** mean Parts exist as a game system: there is no inventory, no
+ownership, no acquisition and no wear, and `/ncm.setup` is a test instrument that fits synthetic components
+directly. What it tests is the mechanism the inventory will use, unchanged.
+
+**The failure mode worth watching for**, because it is the one this design is most exposed to: a lever that
+moves in the log but not in the car. That would mean the carrier applied a value the physics step never
+reached -- a different failure from §AW3's, where the write demonstrably fired and the channel was simply
+incapable of the effect. The log line and the felt result are two separate claims and `KB-142` is the
+standing reminder to check both.

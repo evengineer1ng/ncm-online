@@ -120,15 +120,23 @@ return {
         end
     end,
 
-    tyres_are_the_one_family_that_is_felt_live_and_per_player = function(T)
+    three_families_are_felt_live_and_per_player = function(T)
         local M = O(T)
-        local tyres = M.expression("tires")
-        T.eq(contains(tyres.channels, "instance"), true, "the L148 grip write lands on tyres")
-        T.eq(tyres.perPlayerFelt, true, "which is the only per-player felt expression NCM has")
-        -- Every other family is record-only, so two drivers in the same car cannot differ. Asserted because
-        -- it is the constraint most likely to be forgotten while designing a parts economy.
+        -- **This assertion was inverted on 2026-09-26 and the inversion is the point.** It used to read
+        -- "tyres are the ONE family felt live", which was true of the day section AU5 passed. Sections AW1
+        -- and AW2 then proved `driveScale` and `brakeScale` on Production, so power_unit and brakes joined
+        -- it. The gate caught the stale version, which is what the gate is for.
+        local live = { tires = true, power_unit = true, brakes = true }
+        for family in pairs(live) do
+            local e = M.expression(family)
+            T.eq(contains(e.channels, "instance"), true, family .. " has a live quantity")
+            T.eq(e.perPlayerFelt, true, family .. " can differ between two drivers of the same model")
+        end
+        -- Every OTHER family is record-only, so two drivers in the same car cannot differ through it. That
+        -- is still the constraint most likely to be forgotten while designing a parts economy, and it is
+        -- still true of nine of the twelve.
         for _, family in ipairs(M.FAMILIES) do
-            if family ~= "tires" then
+            if not live[family] then
                 T.eq(M.expression(family).perPlayerFelt, false,
                      family .. " cannot differ between two drivers of the same model")
             end
@@ -158,14 +166,19 @@ return {
         T.eq(ok, false, "cooling has no drive-model flat, so it cannot claim the record channel")
         T.eq(type(why) == "string", true, why or "")
 
-        local ok2 = M.declarationIsHonest("brakes", "instance")
-        T.eq(ok2, false, "brakes are not reachable through the one live quantity")
+        -- Was `brakes`, which section AW2 made reachable. `suspension` is the durable example: anti-roll
+        -- is a MOMENT, and section AW3 refuted the per-corner load entries with a mechanism rather than
+        -- leaving them untested, so this one will not quietly become true later.
+        local ok2 = M.declarationIsHonest("suspension", "instance")
+        T.eq(ok2, false, "suspension has no live quantity -- moments need a torque channel we do not have")
     end,
 
     honest_declarations_pass = function(T)
         local M = O(T)
         T.eq(M.declarationIsHonest("brakes", "record"), true, "brakes have flats")
         T.eq(M.declarationIsHonest("tires", "instance"), true, "tyres have the live grip write")
+        T.eq(M.declarationIsHonest("power_unit", "instance"), true, "and power_unit has driveScale (AW1)")
+        T.eq(M.declarationIsHonest("brakes", "instance"), true, "and brakes have brakeScale (AW2)")
         T.eq(M.declarationIsHonest("cooling", "simulated"), true,
              "and anything at all may be simulated -- that is the always-available answer")
     end,

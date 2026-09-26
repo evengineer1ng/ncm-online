@@ -485,6 +485,21 @@ constexpr float kRollBiasMax = 0.30f;
 
 std::atomic<float> g_driveScale{kGripScaleInert};
 std::atomic<float> g_brakeScale{kGripScaleInert};
+
+// ---------------------------------------------------------------------------------------------------
+// WHO OWNS THE THREE LEVERS (`L152`)
+// ---------------------------------------------------------------------------------------------------
+//
+// Two writers now want these: `ncm_carrier.json`, re-read once a second, and the server's composed Parts
+// setup arriving over the bridge. **Two writers on one value is not a design** -- a driver would fit an
+// engine, feel it, and lose it a second later when the config loop wrote 1.0 back over the top.
+//
+// So the setup takes ownership on arrival and keeps it for the session, or until the bridge drops. The
+// config file remains exactly what it has been: the bench-test path, for an A/B you can do in seconds
+// while nothing is publishing. It is not silently ignored -- the config loop says so, once.
+std::atomic<bool> g_handlingOwns{false};
+std::atomic<uint32_t> g_handlingApplied{0};
+std::atomic<bool> g_handlingNoticed{false};   // so "config ignored" is logged once, not 3600 times an hour
 std::atomic<float> g_rollBias{0.0f};
 
 /// A wheel entry's horizontal pair is the geometric projection of its own normal load -- proven, by the
@@ -1557,6 +1572,15 @@ void refreshGripScale()
                 return v < lo ? lo : (v > hi ? hi : v);
             };
 
+            // `L152`: a composed Parts setup outranks the file. Said once, then silent.
+            if (g_handlingOwns.load(std::memory_order_relaxed)) {
+                if (!g_handlingNoticed.exchange(true, std::memory_order_relaxed)) {
+                    NCM_INFO("ncm_carrier.json: gripScale/driveScale/brakeScale are now owned by the "
+                             "server's Parts setup and this file no longer drives them");
+                }
+                return;
+            }
+
             const float drive = readScale("driveScale", kDriveScaleMin, kDriveScaleMax);
             const float previousDrive = g_driveScale.load(std::memory_order_relaxed);
             if (std::fabs(drive - previousDrive) > kGripScaleEpsilon) {
@@ -1896,6 +1920,84 @@ uint64_t ticks() noexcept
 void noteReportedSpeed(double metresPerSecond) noexcept
 {
     g_reportedSpeed.store(metresPerSecond, std::memory_order_relaxed);
+}
+
+namespace {
+
+/// Clamp, store, and announce only when the value actually moved. Returns true if it moved.
+///
+/// The announcement is not decoration. `KB-142` was a lever that sat inert through three drives while
+/// everybody believed it was running, and the only reason it took three drives is that nothing ever said
+/// out loud what was being applied. Every change to a force scale is now a line in the log, and a clamp
+/// says it clamped -- which is `L148`'s fifth property written down rather than promised.
+bool storeLever(std::atomic<float>& cell, const char* name, double wanted, float lo, float hi) noexcept
+{
+    if (!std::isfinite(wanted)) {
+        NCM_INFO("handling: %s ignored, not a finite number", name);
+        return false;
+    }
+    float value = static_cast<float>(wanted);
+    const bool clamped = (value < lo) || (value > hi);
+    if (value < lo) value = lo;
+    if (value > hi) value = hi;
+
+    const float previous = cell.load(std::memory_order_relaxed);
+    if (std::fabs(value - previous) <= kGripScaleEpsilon) return false;
+
+    cell.store(value, std::memory_order_relaxed);
+    if (clamped) {
+        NCM_INFO("handling: %s %.3f -> %.3f (CLAMPED from %.3f to [%.2f, %.2f])", name,
+                 static_cast<double>(previous), static_cast<double>(value), wanted,
+                 static_cast<double>(lo), static_cast<double>(hi));
+    } else {
+        NCM_INFO("handling: %s %.3f -> %.3f (%s)", name, static_cast<double>(previous),
+                 static_cast<double>(value),
+                 std::fabs(value - kGripScaleInert) > kGripScaleEpsilon ? "ACTIVE" : "inert");
+    }
+    return true;
+}
+
+}  // namespace
+
+void applyHandling(bool hasGrip, double grip, bool hasDrive, double drive,
+                   bool hasBrake, double brake) noexcept
+{
+    // Ownership is taken on the FIRST setup, even one that is entirely inert. An all-inert setup is a
+    // meaningful statement -- "this driver has fitted nothing that can be felt" -- and it must not be
+    // quietly overwritten a second later by whatever happens to be in `ncm_carrier.json`.
+    if (!g_handlingOwns.exchange(true, std::memory_order_relaxed)) {
+        NCM_INFO("handling: the server's Parts setup now owns grip/drive/brake for this session");
+    }
+
+    int moved = 0;
+    if (hasGrip)  moved += storeLever(g_gripScale,  "gripScale",  grip,  kGripScaleMin,  kGripScaleMax)  ? 1 : 0;
+    if (hasDrive) moved += storeLever(g_driveScale, "driveScale", drive, kDriveScaleMin, kDriveScaleMax) ? 1 : 0;
+    if (hasBrake) moved += storeLever(g_brakeScale, "brakeScale", brake, kBrakeScaleMin, kBrakeScaleMax) ? 1 : 0;
+
+    g_handlingApplied.fetch_add(1, std::memory_order_relaxed);
+    if (moved == 0) {
+        // Not noise: a setup that changed nothing is the normal case once a driver stops fitting parts,
+        // and saying so distinguishes "we received it and it matched" from "it never arrived" -- which is
+        // exactly the ambiguity `KB-136` lived inside for weeks.
+        NCM_INFO("handling: setup #%u received, no lever moved",
+                 g_handlingApplied.load(std::memory_order_relaxed));
+    }
+}
+
+void clearHandling() noexcept
+{
+    if (!g_handlingOwns.load(std::memory_order_relaxed)) return;
+
+    // Restore BEFORE releasing ownership, so the config loop cannot observe a half-cleared state and write
+    // its own values into the gap.
+    storeLever(g_gripScale,  "gripScale",  kGripScaleInert, kGripScaleMin,  kGripScaleMax);
+    storeLever(g_driveScale, "driveScale", kGripScaleInert, kDriveScaleMin, kDriveScaleMax);
+    storeLever(g_brakeScale, "brakeScale", kGripScaleInert, kBrakeScaleMin, kBrakeScaleMax);
+
+    g_handlingOwns.store(false, std::memory_order_relaxed);
+    g_handlingNoticed.store(false, std::memory_order_relaxed);
+    NCM_INFO("handling: cleared to inert after %u setup(s); ncm_carrier.json drives the levers again",
+             g_handlingApplied.load(std::memory_order_relaxed));
 }
 
 std::string status()

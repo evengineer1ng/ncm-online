@@ -31,6 +31,24 @@ struct Projection {
     bool restore = false;                        // "put back what you captured" -- not the same as "apply nothing"
 };
 
+/// One handling setup -- the INSTANCE channel, which is the half of Parts that is per-player.
+///
+/// **This is not a Projection and the difference is the whole point.** A `Projection` writes TweakDB flats
+/// on a RECORD: shared by every instance of that model on this client, and spawn-cached, so it reaches a car
+/// when the car spawns. A `Handling` setup scales the force the solver is about to apply to ONE BODY -- the
+/// latched player vehicle -- live, in this client's own physics step. Two drivers in the same model with
+/// different engines feel different, which the record channel cannot do at all.
+///
+/// Three levers, because three is how many quantities have been driven and confirmed (MASTER_TEST AU5, AW1,
+/// AW2). `ncm/core/parts/handling.lua` composed this from the driver's fitted parts and the plugin
+/// interprets none of it (`L135`) -- it clamps and applies.
+struct Handling {
+    int version = 1;
+    bool hasGrip = false;  double grip = 1.0;    // across travel -- tyre grip
+    bool hasDrive = false; double drive = 1.0;   // along travel, pushing -- power delivery
+    bool hasBrake = false; double brake = 1.0;   // along travel, retarding -- stopping ability
+};
+
 /// One telemetry frame, the shape `driver.feedback.frame` produces. **A channel that could not be read is
 /// ABSENT, not zero** (`IDEA-361`) -- so every field is optional and `has*` means what it says.
 struct Frame {
@@ -63,6 +81,9 @@ public:
     /// `IDEA-507`: NCM asks the carrier to read the game's own drive-model data for a list of records and
     /// write it to a file. Read-only -- it mutates nothing, so `L148` is not engaged.
     void onArchDump(std::function<void(const std::vector<std::string>&)> fn) { onArchDump_ = std::move(fn); }
+    /// `L152`: the driver's fitted parts, as live force scales. A setup with every lever inert is how a
+    /// driver's parts are REMOVED -- distinct from never sending one, which leaves the last one applied.
+    void onHandling(std::function<void(const Handling&)> fn) { onHandling_ = std::move(fn); }
     void onFrame(std::function<void(const Frame&)> fn) { onFrame_ = std::move(fn); }
     void onDisconnect(std::function<void()> fn) { onDisconnect_ = std::move(fn); }
 
@@ -91,6 +112,7 @@ private:
 
     std::function<void(const Projection&)> onProjection_;
     std::function<void(const std::vector<std::string>&)> onArchDump_;
+    std::function<void(const Handling&)> onHandling_;
     std::function<void(const Frame&)> onFrame_;
     std::function<void()> onDisconnect_;
     std::function<void()> onConnect_;

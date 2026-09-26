@@ -92,6 +92,12 @@ end
 --- signature the server publishes with; a record that disappears is sent a restore rather than forgotten.
 local projected = {}
 
+--- The last handling setup we pushed, as a signature (`L152`). **Declared here rather than beside its own
+--- loop at the foot of the file** because `tearDown` below resets it, and a `local` declared after its
+--- reader binds that reader to a global instead -- the reset would then silently do nothing and a driver
+--- would lose their parts on any reconnect.
+local pushedHandling = nil
+
 --- Push one envelope to the carrier. The plugin applies it and interprets nothing -- which part moved which
 --- flat, and why, was decided server-side in `machine.projection`.
 local function pushProjection(envelope)
@@ -146,6 +152,10 @@ local function tearDown(why)
     -- Forget what we pushed. The carrier restores its own originals when the socket drops, so re-sending on
     -- reconnect is correct and re-sending nothing would leave a fresh carrier with no projection at all.
     projected = {}
+    -- Same reasoning for the handling setup, and it matters MORE here: the carrier calls `clearHandling()`
+    -- on disconnect, so after a reconnect it is genuinely inert and would stay that way until something
+    -- moved. A driver must not silently lose their parts because the socket blinked.
+    pushedHandling = nil
     announce()
 end
 
@@ -420,3 +430,81 @@ RegisterCommand("ncm.ffb", function(_, args)
     log("ffb %s | url=%s | surface=%s ready=%s | sent=%d idle=%d",
         enabled and "on" or "off", url, tostring(surface ~= nil), tostring(surfaceReady), sent, skipped)
 end, false)
+
+
+-- ---------------------------------------------------------------------------------------------------
+-- `L152`: the driver's fitted parts, pushed down the same socket (the INSTANCE channel)
+-- ---------------------------------------------------------------------------------------------------
+--
+-- The projection loop above carries the RECORD channel: TweakDB flats, per-record, spawn-cached, shared by
+-- every instance of that model on this client. This one carries the other half -- three force scales that
+-- land on ONE BODY, the car the local player is in, live and with no respawn.
+--
+-- **That is what makes Parts personal.** Two drivers in the same model with different engines feel
+-- different, because each client scales the forces of the car it is simulating and nothing is shared.
+--
+-- `KB-41` is why this reads its own bag rather than trusting a watcher's value: player bags are visible to
+-- every client and the selector fires for whoever changed. Polling our own is correct whatever shape the
+-- notification takes, which is the lesson `panel.lua` already paid for.
+local lastHandlingState = nil
+
+CreateThread(function()
+    Wait(9500)
+    while true do
+        if enabled and surface and surfaceReady then
+            local ok, bag = pcall(Open77.state.localPlayer)
+            local setup = nil
+            if ok and type(bag) == "table" and type(bag.ncmHandling) == "table" then
+                setup = bag.ncmHandling
+            end
+
+            -- Say what we saw, once per change. The projection loop went weeks with no evidence beyond
+            -- "nothing happened" (`KB-136`) precisely because it was silent on every path.
+            do
+                local seen
+                if not ok then seen = "PCALL_FAILED"
+                elseif setup == nil then seen = "no ncmHandling key"
+                elseif type(setup.levers) ~= "table" then seen = "malformed (no levers)"
+                else
+                    seen = ("grip=%.3f drive=%.3f brake=%.3f"):format(
+                        tonumber(setup.levers.gripScale) or 1,
+                        tonumber(setup.levers.driveScale) or 1,
+                        tonumber(setup.levers.brakeScale) or 1)
+                end
+                if seen ~= lastHandlingState then
+                    lastHandlingState = seen
+                    log("handling: %s", seen)
+                end
+            end
+
+            if type(setup) == "table" and type(setup.levers) == "table" then
+                -- The signature is the applied truth, not the paperwork: built from the three numbers, so
+                -- a republish with a new clock does not cost a message. Same rule the projection loop uses.
+                local sig = ("%s/%s/%s"):format(tostring(setup.levers.gripScale),
+                                                tostring(setup.levers.driveScale),
+                                                tostring(setup.levers.brakeScale))
+                if pushedHandling ~= sig then
+                    surface:send("ncm:machine.handling", { v = setup.v or 1, levers = setup.levers })
+                    pushedHandling = sig
+                    log("handling pushed: %s", sig)
+                end
+            end
+        end
+        Wait(500)
+    end
+end)
+
+--- `/ncm.setup` -- fit a synthetic part and feel it, before the parts economy exists.
+---
+--- The server holds the truth and does the composing; this only relays. See `server/handling.lua` for what
+--- it accepts. Deliberately a test instrument, and it drives the real mechanism rather than a shortcut
+--- around it -- `NcmHandling.setParts` is the same call the inventory will make.
+RegisterCommand("ncm.setup", function(_, args)
+    TriggerServerEvent("ncm:setup", args and args[1] or nil, args and args[2] or nil)
+end, false)
+
+--- The server answers in chat as well (`Open77.chat.send`); this puts the same line in the client log,
+--- beside the bridge's own `handling:` lines, so one log shows what was asked for AND what was pushed.
+RegisterNetEvent("ncm:setup.result", function(message)
+    log("setup: %s", tostring(message))
+end)

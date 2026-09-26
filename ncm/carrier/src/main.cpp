@@ -149,11 +149,21 @@ void onLoad()
         c.server->onArchDump([](const std::vector<std::string>& records) {
             ncm::vehicle::arch::dump(records);
         });
+        // `L152`: the per-machine half of Parts. `parts.handling` composed these from the driver's fitted
+        // components; the carrier clamps and applies and decides nothing (`L135`). Unlike a projection,
+        // this lands on ONE BODY -- the latched player vehicle -- so it is per-player by construction.
+        c.server->onHandling([](const ncm::bridge::Handling& h) {
+            ncm::vehicle::probe::applyHandling(h.hasGrip, h.grip, h.hasDrive, h.drive,
+                                               h.hasBrake, h.brake);
+        });
         c.server->onConnect([&c] { sendHealth(c); });
         c.server->onDisconnect([&c] {
             // The world went away. Put the player's game back the way we found it, immediately, without
             // waiting to be asked -- the resource may not get a chance to ask.
             c.tweaks.restoreAll();
+            // `L152`: and the live levers too. A driver who loses the server must not keep a stale
+            // advantage -- or a stale penalty -- from parts the world can no longer vouch for.
+            ncm::vehicle::probe::clearHandling();
             if (c.mixer) c.mixer->silence();
         });
         c.server->start();

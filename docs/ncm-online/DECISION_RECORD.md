@@ -1883,3 +1883,77 @@ reversible the way writing a float back is. That needs its own recon step and it
 
 **Basis.** The same interception point, classifier and SEH harness proven across Carrier 0.1.2-0.1.14 and
 live on Production. Shipped in 0.1.15.
+
+## L152 - EXECUTED - Parts reach a car, and the channel that carries them is the per-player one
+
+**Decided and built 2026-09-26**, on the owner's instruction not to stop at a bookmark: *"we said we were
+doing parts... we are not stopping until parts are in place, affecting cars."*
+
+**What was missing, precisely.** Three force levers were proven live on Production (`§AU5` grip, `§AW1`
+drive, `§AW2` brake) and Parts existed as an ontology, an architecture profile and a compatibility
+resolver. **Nothing connected them.** The levers were readable only from `ncm_carrier.json`, a file on the
+player's own disk, so the whole proven capability was reachable by one person with a text editor and by
+nobody else. There was no path from a fitted component to a force.
+
+**What this line authorises: that path, end to end.**
+
+```
+fitted parts -> parts.handling.compose -> player state bag -> client -> WebSocket -> applyHandling -> force
+```
+
+| piece | where | what it does |
+|---|---|---|
+| `parts.handling` | `ncm/core/parts/handling.lua` | pure; composes fitted parts into three clamped scales |
+| `NcmHandling` | `ncm_world/server/handling.lua` | per-player compose and publish to `ncmHandling` |
+| push loop | `ncm_world/client/carrier_bridge.lua` | reads its OWN bag (`KB-41`), pushes on change |
+| `cmd: handling` | `bridge/server.{hpp,cpp}` | a second message on the socket projections already use |
+| `applyHandling` | `vehicle/physics_probe.cpp` | clamps again, stores, logs every move |
+
+**Why the INSTANCE channel and not the record channel, stated as the answer to the owner's question**
+(*"do we care about machine flats if it affects every car in the server?"*). The record channel writes
+TweakDB flats keyed by RECORD: one client cannot hold two setups for one model. The instance channel scales
+the force the solver is about to apply to ONE BODY -- the latched player vehicle -- so it is **per-player by
+construction rather than by convention**. Two drivers in the same Galena with different engines feel
+different. That is the property Parts needed and the record channel cannot supply at any price.
+
+**Three families, and the other nine are refused rather than approximated.** `tires`, `power_unit` and
+`brakes` have proven quantities; suspension, steering, aerodynamics and mass have none, because anti-roll
+and yaw balance are **moments** and `§AW3` refuted the per-corner load entries with a mechanism. A part
+naming an inexpressible family gets a named refusal and the whole compose fails -- it is not silently
+dropped, because a driver paying for a component that does nothing, and nobody finding out for a month, is
+the failure `IDEA-505` exists to prevent. `parts.ontology.INSTANCE_QUANTITIES` was corrected from one family
+to three in the same change, and `parts.handling` now **asserts at load** that the two tables agree, so the
+ontology cannot quietly lie to a designer again.
+
+**Balance is not decided here and no number in the path is a design judgement.** 18_PARTS_ECOSYSTEM puts
+component balance, rarity and loot tiers explicitly out of scope, so each part states its own effect and the
+module's job is validation, combination, clamping and reporting. Combination is multiplicative within a
+lever -- which is the correct arithmetic for independent multipliers on one quantity and, more importantly,
+is **commutative**, so a composed setup cannot depend on the order a Lua table happens to iterate in.
+
+**Safety, as properties rather than promises.** Every one of `L148`'s five holds unchanged; this line adds
+three that are specific to taking orders from a socket:
+
+- **Clamped twice.** The server clamps while composing so it can tell a player their setup was capped; the
+  carrier clamps again because it does not trust the wire and should not.
+- **One owner per value.** A composed setup takes ownership of the three levers on arrival and
+  `ncm_carrier.json` stops driving them, saying so once in the log. Two writers on one value is not a
+  design -- the file's 1 Hz loop would otherwise erase a fitted engine a second after it arrived.
+- **Losing the server restores inert.** `clearHandling()` runs on bridge disconnect, so a driver keeps
+  neither a stale advantage nor a stale penalty from parts the world can no longer vouch for.
+
+**What does not exist, said plainly rather than implied.** There is **no parts inventory**: ownership,
+acquisition, fitting, wear and the garage UI are Parts layer 4 and are not authorised. `server/handling.lua`
+holds an in-memory table and exposes `NcmHandling.setParts` for whatever eventually owns that truth. Nothing
+persists across a restart, and a persistence schema written before the inventory it stores would be a guess.
+`/ncm.setup` drives the real mechanism -- the same call the inventory will make -- so a PASS is a PASS of the
+path and not of a shortcut around it.
+
+**One failure this nearly shipped with, kept because it is the instructive kind.** The WebUI relay page
+whitelists every event name it forwards. `ncm:machine.handling` was not in it, so the server would have
+composed correctly, the client would have pushed correctly, and the carrier would have heard nothing --
+every symptom pointing away from the one file at fault. Caught by reading the transport before deploying
+rather than by driving. It is the same shape as `KB-136` and the comment in that file now says so.
+
+**Basis.** `L135` (the server composes, the carrier applies, neither decides the other's business), `L148`
+and `L151`. Shipped in Carrier **0.1.20** and `ncm_world`, live on Production 2026-09-26.

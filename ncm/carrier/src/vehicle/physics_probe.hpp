@@ -88,6 +88,36 @@ uint64_t ticks() noexcept;
 /// Negative means "not in a car" or "not reported". This is the yardstick question 2 is measured against.
 void noteReportedSpeed(double metresPerSecond) noexcept;
 
+/// ---------------------------------------------------------------------------------------------------
+/// `L152`: THE DRIVER'S FITTED PARTS, AS LIVE FORCE SCALES.
+/// ---------------------------------------------------------------------------------------------------
+///
+/// `ncm/core/parts/handling.lua` composed these from what the driver has fitted; the plugin interprets
+/// none of it (`L135`). Three scales, because three quantities have been driven and confirmed: grip
+/// across travel (AU5), drive force along it (AW1), brake force along it (AW2).
+///
+/// **This is the channel that makes Parts personal.** It writes to one body -- the latched player vehicle
+/// -- in this client's own physics step, so it is per-player by construction rather than by convention.
+///
+/// Three properties worth stating because they are what make it safe to take orders from a socket:
+///
+///   * **Clamped here, again.** The server clamps while composing so it can warn a player; this clamps
+///     because it does not trust the wire and should not. A malformed or hostile payload cannot put a car
+///     on ice at 200 km/h.
+///   * **It takes precedence over `ncm_carrier.json`.** Once a setup has arrived, the config file stops
+///     driving these three levers for the session. Two writers on one value is not a design.
+///   * **Losing the server restores inert.** `clearHandling()` is called when the bridge drops, so a
+///     player does not keep a stale advantage -- or a stale penalty -- after the world goes away.
+///
+/// A non-finite value leaves that lever alone rather than zeroing it. Absent and inert are different
+/// claims, and so are absent and malformed.
+void applyHandling(bool hasGrip, double grip, bool hasDrive, double drive,
+                   bool hasBrake, double brake) noexcept;
+
+/// Return the three Parts levers to inert and hand them back to the config file. Called when the bridge
+/// drops, and safe to call when no setup was ever applied.
+void clearHandling() noexcept;
+
 /// One line, in the spirit of MtClutchDiag: everything the probe currently knows, cheap to call.
 std::string status();
 
