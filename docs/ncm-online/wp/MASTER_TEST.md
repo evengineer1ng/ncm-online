@@ -1495,6 +1495,25 @@ Carrier **0.1.21** + `ncm_world`. `/ncm.setup` unchanged.
 | §AZ4 | Drive past ordinary NPC traffic at speed, then let a traffic car overtake you. | **Nothing changes.** On 0.1.20 an overtaking car could steal the latch. `binding=matched` stays in `/ncm.status`. | |
 | §AZ5 | Stop the NCM resource, or `/ncm.ffb off`, while parts are fitted. | Socket loss -- `cleared to inert ... ncm_carrier.json drives the levers again`. Ownership genuinely returns, unlike §AZ2. | |
 
+### §AZ-B prerequisites -- two things that had to be fixed before this could run at all
+
+Neither was known when §AZ was written, and §AZ-B is impossible without both.
+
+- **`KB-4`** -- `tools/o77-client.ps1` launched the second client with `OP77_WORLD_SERVER=-` and
+  `OP77_WORLD_MODS_DIGEST=-`, placeholders guessed on 2026-09-19 and never revisited, while the launcher
+  passes a real world id and the server's real required-mods digest every time. The script now resolves
+  all of it from the launcher's own state. **Launch client 2 with it and read the line it prints at the
+  end**: it counts imported WebUI surfaces, which is the measurement `KB-4` was built on. 0 means the env
+  fix was not the cause and the row stands; anything above 0 retires it.
+- **`KB-147`** -- both instances load the same carrier from the same directory and could not both bind
+  `38480`, so a second client has never had a bridge at all. Fixed in **0.1.22**: the carrier walks
+  `38480-38483` and refuses any peer that is not its own process, so the two clients cannot cross-connect.
+
+**Check both before driving.** In each client's `ncm_carrier.log`: one should say `bridge listening on
+127.0.0.1:38480`, the other `...:38481 (port 38480 was taken -- another game instance?)`. In each client
+log, `carrier connected on http://127.0.0.1:<port>/bridge.html`, and **the two ports must differ**. A
+`refused a bridge peer from pid ...` line is the guard working, not a fault.
+
 ### §AZ-B -- two clients, which is the part that matters
 
 Two players, two **different** Machines. Give them opposite setups so a swap is unmistakable:

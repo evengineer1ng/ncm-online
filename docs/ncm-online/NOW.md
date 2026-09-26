@@ -14,7 +14,11 @@ locks its scope. §AY and §AZ both await the drive.**
 
 ## One next action
 
-**Drive §AZ-B, the two-client binding test.** It needs a second player and nothing else does. §AZ8 -- swap
+**Drive §AZ-B, the two-client binding test.** Both of its blockers are now fixed -- see §AZ-B
+prerequisites: `KB-4` (the second client was launched with placeholder world/digest env vars) and
+`KB-147` (two instances could not both bind the carrier's port). Launch client 2 with
+`tools\o77-client.ps1`; it prints the imported-WebUI-surface count that `KB-4` was measured on, so that
+row is settled by running it. It needs a second player and nothing else does. §AZ8 -- swap
 Machines and confirm the setup follows the **car**, not the driver -- is the assertion `L155` point 1 turns
 on, and the green light for the Foundry identity spine.
 

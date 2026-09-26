@@ -10,6 +10,11 @@
 #include <array>
 #include <charconv>
 #include <cstring>
+#include <vector>
+
+// `KB-147`: resolving which PROCESS is on the other end of a loopback socket.
+#include <iphlpapi.h>
+#pragma comment(lib, "iphlpapi.lib")
 
 using json = nlohmann::json;
 
@@ -72,6 +77,66 @@ const char* kBridgeHtml = R"HTML(<!doctype html>
 namespace {
 
 constexpr const char* kGuid = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
+
+// `KB-147`: how many consecutive ports the bridge will try before giving up. Two game instances is this
+// machine's measured ceiling (~4.2 GiB VRAM each), so four is the pair plus headroom -- and short enough
+// that the client's scan stays quick and its failure stays legible.
+constexpr uint16_t kPortSearchSpan = 4;
+
+// ---------------------------------------------------------------------------------------------------
+// `KB-147`: THE OTHER END MUST BE THIS GAME.
+// ---------------------------------------------------------------------------------------------------
+//
+// Two Cyberpunk instances on one PC each load this plugin, so each needs its own port. The moment the
+// port stops being a fixed constant, the client has to go looking for it -- and a client that scans
+// `38480, 38481, ...` will find **the other game's carrier** whenever that one bound first.
+//
+// That is not a harmless mix-up. The bridge carries force scales that the probe applies to a body in ITS
+// OWN process. A cross-connected client would send one player's Parts into the other player's physics,
+// on a body neither of them identified. `KB-146` was exactly this class of bug -- forces landing on a car
+// nobody chose -- and it would be reintroduced by the fix for `KB-147` if discovery were left unchecked.
+//
+// The client cannot prevent it: nothing in the game's Lua sandbox knows its own process id, so it has no
+// way to tell one loopback carrier from another. **The carrier can, and therefore must.** A loopback TCP
+// connection has an owning process on both ends, and Windows will name it.
+//
+// Refusing is safe in a way that guessing is not: a rejected client simply tries the next port and finds
+// its own carrier a second later.
+uint32_t peerProcessId(SOCKET client)
+{
+    sockaddr_in peer{};
+    int peerLen = sizeof(peer);
+    if (::getpeername(client, reinterpret_cast<sockaddr*>(&peer), &peerLen) == SOCKET_ERROR) return 0;
+    sockaddr_in local{};
+    int localLen = sizeof(local);
+    if (::getsockname(client, reinterpret_cast<sockaddr*>(&local), &localLen) == SOCKET_ERROR) return 0;
+
+    DWORD size = 0;
+    if (::GetExtendedTcpTable(nullptr, &size, FALSE, AF_INET, TCP_TABLE_OWNER_PID_CONNECTIONS, 0)
+        != ERROR_INSUFFICIENT_BUFFER) {
+        return 0;
+    }
+    std::vector<uint8_t> buffer(size);
+    if (::GetExtendedTcpTable(buffer.data(), &size, FALSE, AF_INET,
+                              TCP_TABLE_OWNER_PID_CONNECTIONS, 0) != NO_ERROR) {
+        return 0;
+    }
+
+    const auto* table = reinterpret_cast<const MIB_TCPTABLE_OWNER_PID*>(buffer.data());
+    for (DWORD i = 0; i < table->dwNumEntries; ++i) {
+        const auto& row = table->table[i];
+        // The peer's socket is the mirror image of ours: its local endpoint is our remote one.
+        if (row.dwLocalPort == static_cast<DWORD>(peer.sin_port) &&
+            row.dwRemotePort == static_cast<DWORD>(local.sin_port) &&
+            row.dwState == MIB_TCP_STATE_ESTAB) {
+            return static_cast<uint32_t>(row.dwOwningPid);
+        }
+    }
+    // Not found is NOT a rejection. The table is a snapshot and a just-accepted connection can be absent
+    // from it. Treating "I could not tell" as "wrong process" would break the ordinary single-client case
+    // to defend against a two-client one, so the caller admits it and says so.
+    return 0;
+}
 
 std::string idText(const json& value)
 {
@@ -314,30 +379,82 @@ void Server::run()
         return;
     }
 
-    sockaddr_in addr{};
-    addr.sin_family = AF_INET;
-    addr.sin_port = ::htons(port_);
-    // **Loopback only.** Not a hardening afterthought: this socket carries a player's vehicle telemetry and
-    // accepts instructions that change their handling. It has no business being reachable from a network.
-    ::inet_pton(AF_INET, "127.0.0.1", &addr.sin_addr);
+    // ----------------------------------------------------------------------------------- `KB-147`
+    // Walk a small range instead of insisting on one port. A second game instance on this PC loads this
+    // same plugin from this same directory, reads this same `ncm_carrier.json`, and would otherwise fail
+    // to listen at all -- which is why a second client has never had Parts, telemetry or force feedback.
+    //
+    // The range is deliberately short. Four is enough for the two instances this machine can run plus
+    // headroom, and a long scan would make the client's discovery slow and its failure mode vague.
+    const uint16_t first = port_;
+    SOCKET bound = INVALID_SOCKET;
+    int lastError = 0;
+    for (uint16_t candidate = first; candidate < first + kPortSearchSpan; ++candidate) {
+        SOCKET attempt = (bound == INVALID_SOCKET && candidate == first)
+            ? listener
+            : ::socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+        if (attempt == INVALID_SOCKET) { lastError = ::WSAGetLastError(); continue; }
 
-    if (::bind(listener, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) == SOCKET_ERROR ||
-        ::listen(listener, 1) == SOCKET_ERROR) {
-        // The overwhelmingly likely cause is the old Python companion still running on this port. Say so,
-        // because "address in use" sends someone hunting for the wrong thing.
-        NCM_ERR("port %u is unavailable -- is the old NCM Wheel Support companion still running?", port_);
-        ::closesocket(listener);
+        sockaddr_in addr{};
+        addr.sin_family = AF_INET;
+        addr.sin_port = ::htons(candidate);
+        // **Loopback only.** Not a hardening afterthought: this socket carries a player's vehicle
+        // telemetry and accepts instructions that change their handling. It has no business being
+        // reachable from a network.
+        ::inet_pton(AF_INET, "127.0.0.1", &addr.sin_addr);
+
+        if (::bind(attempt, reinterpret_cast<sockaddr*>(&addr), sizeof(addr)) != SOCKET_ERROR &&
+            ::listen(attempt, 1) != SOCKET_ERROR) {
+            bound = attempt;
+            port_ = candidate;
+            break;
+        }
+        lastError = ::WSAGetLastError();
+        if (attempt != listener) ::closesocket(attempt);
+    }
+
+    if (bound == INVALID_SOCKET) {
+        // **Say what was actually tried and what the OS actually said.** The old message named one
+        // speculative cause -- the retired Python companion -- for a generic errno, which is how a
+        // five-minute diagnosis becomes an hour of hunting a process that is not running.
+        NCM_ERR("no free port in 127.0.0.1:%u-%u (last winsock error %d). Another program may hold them, "
+                "or more game instances are running than this range allows.",
+                first, static_cast<unsigned>(first + kPortSearchSpan - 1), lastError);
+        if (listener != INVALID_SOCKET) ::closesocket(listener);
         ::WSACleanup();
         return;
     }
+    if (bound != listener) ::closesocket(listener);
+    listener = bound;
 
     socket_ = static_cast<uintptr_t>(listener);
     listening_ = true;
-    NCM_INFO("bridge listening on 127.0.0.1:%u", port_);
+    if (port_ == first) {
+        NCM_INFO("bridge listening on 127.0.0.1:%u", port_);
+    } else {
+        // Worth a distinct line: it is the only evidence that another instance is running, and it tells
+        // the reader why the client took a moment longer to connect.
+        NCM_INFO("bridge listening on 127.0.0.1:%u (port %u was taken -- another game instance?)",
+                 port_, first);
+    }
+
+    const uint32_t self = static_cast<uint32_t>(::GetCurrentProcessId());
 
     while (running_.load()) {
         SOCKET client = ::accept(listener, nullptr, nullptr);
         if (client == INVALID_SOCKET) break;
+
+        // `KB-147`: this carrier belongs to this game. A client scanning for its own bridge will knock on
+        // ours if we bound first, and serving it would put one player's Parts into the other player's
+        // physics. Zero means "could not determine" and is allowed through -- see `peerProcessId`.
+        const uint32_t peer = peerProcessId(client);
+        if (peer != 0 && peer != self) {
+            NCM_INFO("refused a bridge peer from pid %u -- this carrier serves pid %u only; that client "
+                     "should keep scanning for its own", peer, self);
+            ::closesocket(client);
+            continue;
+        }
+
         client_ = static_cast<uintptr_t>(client);
 
         std::string request(4096, '\0');

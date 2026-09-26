@@ -30,13 +30,41 @@ local function log(fmt, ...) print(("[ncm_world/client/ffb] " .. fmt):format(...
 -- nil global instead, the defect class that has bitten this codebase five times and that `luac -p` cannot see.
 local Feedback = NcmCore.get("driver.feedback")
 
-local DEFAULT_URL = "http://127.0.0.1:38480/bridge.html"
+-- ---------------------------------------------------------------------------------------------------
+-- `KB-147`: the carrier's port is no longer fixed, so this has to LOOK for it.
+-- ---------------------------------------------------------------------------------------------------
+--
+-- Two game instances on one PC each load the carrier from the same directory and read the same
+-- `ncm_carrier.json`. Only one can hold 38480, so the second walks up to the next free port -- which is
+-- why a second client has never had Parts, telemetry or force feedback at all.
+--
+-- **The danger this creates, and why it is the carrier that guards it:** if this client simply scanned
+-- until something answered, it would happily attach to the OTHER game's carrier whenever that one bound
+-- first, and start pushing this player's Parts into the other player's physics. Nothing in the Lua
+-- sandbox knows its own process id, so this side cannot tell two loopback carriers apart. The carrier
+-- can, and does -- it refuses any peer that is not its own process (`bridge/server.cpp`). This scan is
+-- therefore safe by construction: a wrong port is refused, not silently served.
+local PORT_BASE, PORT_SPAN = 38480, 4     -- must match `kPortSearchSpan` in `bridge/server.cpp`
+local portIndex = 0
+
+local function urlForIndex(i)
+    return ("http://127.0.0.1:%d/bridge.html"):format(PORT_BASE + (i % PORT_SPAN))
+end
+
+local DEFAULT_URL = urlForIndex(0)
 local HZ = 30                       -- the rate the platform's own observers run at; the wheel wants smooth
 -- **On by default, unlike the companion era.** The carrier ships WITH the world through RequiredMods, so
 -- for most players something IS listening, and requiring `/ncm.ffb on` before parts or weather could reach
 -- the car would be a trap. A player with no carrier costs a handful of failed connects and a log line.
 local enabled, url = true, DEFAULT_URL
 local attempts, MAX_ATTEMPTS = 0, 6
+-- The supervision loop runs at `HZ`, so this is about two seconds of a page that loaded but never
+-- handshook. Long enough not to trip on a slow first paint, short enough that a second client finds its
+-- own carrier within a few seconds of joining rather than after a minute of silence.
+local unreadyTicks, UNREADY_LIMIT = 0, 60
+-- Set by `/ncm.ffb url <url>`. An explicit address is an instruction, not a hint: once given, the scan
+-- stops so a deliberate override cannot be walked away from on the next failed connect.
+local pinnedUrl = nil
 local surface, surfaceReady = nil, false
 local sent, skipped = 0, 0
 
@@ -169,9 +197,16 @@ local function bringUp()
         -- Not an error worth shouting about: "nothing is listening" is an ordinary state, and on a fresh
         -- launch it is usually just early -- the plugin's socket comes up while the game is still loading.
         attempts = attempts + 1
+        -- `KB-147`: try the next port in the range before counting this as a real failure. Only a full
+        -- sweep that found nothing is evidence that no carrier is running; one dead port is not, and
+        -- treating it as one is what would leave a second client permanently without a bridge.
+        if not pinnedUrl then
+            portIndex = portIndex + 1
+            url = urlForIndex(portIndex)
+        end
         if attempts >= MAX_ATTEMPTS then
-            log("no carrier or companion on %s after %d attempt(s) — giving up until /ncm.ffb on",
-                url, attempts)
+            log("no carrier found on 127.0.0.1:%d-%d after %d attempt(s) — giving up until /ncm.ffb on",
+                PORT_BASE, PORT_BASE + PORT_SPAN - 1, attempts)
             enabled = false
         end
         announce()
@@ -182,7 +217,10 @@ local function bringUp()
     page:on("ncm:ffb.ready", function(info)
         surfaceReady = true
         announce()
-        log("companion connected: %s", type(info) == "table" and tostring(info.detail or "ok") or "ok")
+        -- Name the port. With a range in play this is the difference between "my carrier" and "somebody
+        -- else's", and it is the first thing worth knowing when two clients are being debugged at once.
+        log("carrier connected on %s: %s", url,
+            type(info) == "table" and tostring(info.detail or "ok") or "ok")
     end)
     page:on("ncm:ffb.closed", function(info)
         surfaceReady = false
@@ -302,6 +340,26 @@ CreateThread(function()
     while true do
         if enabled then
             if not surface then bringUp() end
+            -- **A page that loads but never says `ready` is its own failure**, distinct from a port with
+            -- nothing on it, and the old loop had no answer for it: `surface` was non-nil, so `bringUp`
+            -- was never called again and the client waited forever. That is exactly what a carrier
+            -- REFUSING us looks like from here (`KB-147`) -- the HTTP GET for the page succeeds, the
+            -- WebSocket is then closed because we are the wrong process -- so this path is now the
+            -- common one on a second client, not a corner case.
+            if surface and not surfaceReady then
+                unreadyTicks = unreadyTicks + 1
+                if unreadyTicks >= UNREADY_LIMIT then
+                    unreadyTicks = 0
+                    log("%s served a page but never connected -- trying the next port", url)
+                    tearDown("no handshake")
+                    if not pinnedUrl then
+                        portIndex = portIndex + 1
+                        url = urlForIndex(portIndex)
+                    end
+                end
+            else
+                unreadyTicks = 0
+            end
             if surface and surfaceReady then
                 local snap = ownSnapshot()
                 local frame = snap and Feedback.frame(snap, { at = Open77.time.monotonic() }) or nil
@@ -424,8 +482,16 @@ RegisterCommand("ncm.ffb", function(_, args)
         tearDown("command")
     elseif a == "url" and args[2] then
         url = tostring(args[2])
+        pinnedUrl = url
         tearDown("url changed")
-        log("companion url set to %s", url)
+        log("carrier url pinned to %s (port scan disabled; /ncm.ffb url auto to resume scanning)", url)
+    elseif a == "url" and not args[2] then
+        log("carrier url is %s (%s)", url, pinnedUrl and "pinned" or "scanning")
+    elseif a == "auto" then
+        pinnedUrl, portIndex = nil, 0
+        url = urlForIndex(0)
+        tearDown("scan resumed")
+        log("carrier url scanning resumed from %s", url)
     end
     log("ffb %s | url=%s | surface=%s ready=%s | sent=%d idle=%d",
         enabled and "on" or "off", url, tostring(surface ~= nil), tostring(surfaceReady), sent, skipped)
