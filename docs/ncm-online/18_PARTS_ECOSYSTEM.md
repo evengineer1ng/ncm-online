@@ -3,8 +3,16 @@
 > **STATUS: SPEC** - owner intent, captured and **NOT authorised for implementation**. Do not build from it; do not contradict it. Covers: *the procedural component/parts ecosystem*
 > Authority map: [INDEX.md](INDEX.md) - classified 2026-09-24 (L125)
 
-**Status: SPECIFICATION CAPTURED 2026-09-23. Nothing built, nothing authorised.** Spec 1 of a batch the owner
-is sending; capture-only until they say otherwise. This document is the faithful record of the spec plus a
+**Status: SPECIFICATION CAPTURED 2026-09-23.** Spec 1 of a batch the owner was sending; capture-only
+when written.
+
+> **AMENDED 2026-09-26 (`L150`): the first layer is now authorised and partly built.** The owner
+> authorised this document's own opening instruction -- *build the periodic table, the grammar, and the
+> factory* -- and `ncm/core/parts/ontology.lua` implements the periodic table. **Everything else in this
+> document remains SPEC and unauthorised:** R&D generation, manufacturing, supply, inventory, the
+> secondary market, barter and procedural naming. The banner stays SPEC for that reason. The condition
+> this document set on effects -- *"only after a separate audit of what Cyberpunk / OPEN//77 / NCM can
+> actually manipulate"* -- was met by MASTER_TEST §AU and §AV; see `IDEA-505` for the result. This document is the faithful record of the spec plus a
 first pass at which existing NCM primitives it should reuse — written now, while the connections are fresh,
 so the eventual implementation does not start by re-deriving them.
 

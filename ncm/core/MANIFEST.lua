@@ -41,6 +41,7 @@ return {
     "engineering/competency.lua",
     "machine/flats.lua",
     "machine/projection.lua",
+    "parts/ontology.lua",
     "economy/markets.lua",
     "economy/production.lua",
     "economy/supply_profiles.lua",

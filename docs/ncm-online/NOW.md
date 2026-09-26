@@ -5,21 +5,26 @@
 
 Last rewritten: **2026-09-26 - discovery of the physics surface closed with two clean negatives; Parts begins (`L149`, §AV).**
 
-> **Claim before writing:** decisions through **L149**; MASTER_TEST through **§AV**; next QA letter **§AW**.
+> **Claim before writing:** decisions through **L150**; MASTER_TEST through **§AV**; next QA letter **§AW**.
 > BACKLOG next free **IDEA-506**; known issues through **KB-143** plus pre-existing duplicate labels noted by
 > `KB-114`. Read the ledger tails before allocating an ID.
 
 ## One next action
 
-**Build Parts as the first consumer of the grip lever, and let Parts specify what it needs rather than
-guessing further.** This is the owner's sequencing instruction and it is now a ruling (`L149`): three
-experiments were authorised, all three ran, two came back negative, and the expected value of a fourth fell
-below the value of connecting the one capability we have.
+**Author the mechanical architecture profile, then the compatibility resolver** - layers 2 and 3 of
+18_PARTS_ECOSYSTEM, now that layer 1 exists. This is the spec's own conflict 4 and it is the prerequisite for
+everything downstream: *"`data.vehicle_catalogue` carries `category`, `classes` and `tags` - nothing like
+propulsion/transmission/axle architecture. This is new authoring against 27 existing catalogue entries, and
+it is the prerequisite for derived compatibility."*
 
-Start from `IDEA-505`, which is the rule that makes Parts shippable under uncertainty: **every Part declares
-which of three channels its felt effect terminates in** - vehicle-level live (the proven `gripScale` write,
-`L148`), NCM-simulated (server-authoritative, already safe, `IDEA-458`), or per-corner physical (does not
-exist today and may never, `IDEA-503`). The composer must refuse to promise a felt effect on the third.
+Compatibility must stay **derived, never listed**: a vehicle states its architecture, a component states its
+constraints, and the resolver relates them - so that adding vehicle #83 never means editing historical
+component definitions. Exact model-specific fitment must remain expressible for the components that genuinely
+need it.
+
+**Parts implementation is authorised but narrowly** (`L150`): the periodic table, the grammar and the
+compatibility factory. **Not** R&D generation, manufacturing, supply, inventory, the secondary market, barter
+or procedural naming - those stay SPEC and need their own authorisation when reached.
 
 **Expect Parts to run straight into `KB-136` and treat that as the point.** `gripScale` still comes from a
 JSON file a human edits (`IDEA-502`); nothing the server computes has ever reached the carrier. The first
@@ -82,11 +87,55 @@ classifier validated by arithmetic across the twelve threads that drive one body
 ### What that leaves, and where it is written down
 
 `insert1` is now **the only credible route to per-corner grip**, and it is bookmarked in full at `IDEA-503`
-with the ordered checks and, more usefully, the seven assets we hold now that Report 36 did not when it
-called this UNPROVEN - a live pointer to the struct at 60 Hz, two verified landmarks inside it, a shipped
-third-party write 12 bytes from one of them, proven corner identity to correlate against, an SEH harness, a
-gravity-residual oracle, and a patch-day address pre-check. `IDEA-504` bookmarks the riskier alternative
-(`SetupInsert()`). Neither is scheduled.
+with the ordered checks and the seven assets we hold that Report 36 did not when it called this UNPROVEN.
+**Check 0 ran the same day**, because the SDK header was already on disk and it cost one read:
+
+- **`insert1` is real.** `physics::VehiclePhysicsInsert1 insert1[4]`, 300 bytes per wheel, `insert1Count` at
+  `0x5C0`, `insert2[0]` asserted at `0x5E0`. The shorthand was right.
+- **It is not on the object the carrier holds, and the original step 1 would have failed.** `insert1` lives on
+  `WheeledPhysics`; our detour receives `vehiclePhysicsData`, and the header proves those are separate objects
+  (`Physics` holds a `PhysicsData*` at `+0x60`; `Physics::sub_50` sets its velocity *from* the data object).
+  **Revised step 1: get from `PhysicsData` to `WheeledPhysics` first**, and the verified `+0x180` back-pointer
+  is the candidate route.
+- **The configuration-versus-derived question is already answered in our favour.** Virtual slot `0x140`,
+  `LoadSomeVehiclePhysicsStuff(Handle<VehicleDriveModelData_Record>*)`, is annotated *"populates some
+  variables along with most of insert1"*. `insert1` is **fed from the drive-model record** - the signature of
+  configuration, and the opposite of `insert2`'s *WheelRuntimeData*.
+
+Two headers are worth reading before any code: `vehiclePhysicsInsert1.hpp` (it names the fields) and
+`vehiclePhysicsData.hpp` (it should explain our own verified `+0x18`, `+0x180` and `+0x1BC`). Neither was on
+disk. `IDEA-504` bookmarks the re-apply route and was amended the same day: `LoadSomeVehiclePhysicsStuff` is a
+better candidate than `SetupInsert()`. **Neither is scheduled, and neither is safe to call yet.**
+
+### Third-party vehicle hosting audit began
+
+The first nine vehicle bases from the Collection install/test cohort now have exact-source licensing rows in
+`docs/research/open77/NCM_SERVER_MOD_LICENSING_CATALOG.md`. **Zero are cleared for NCM-hosted delivery today.**
+Seven have a plausible written-permission path; the yellingintothevoid R34 and Formula Drift Supra are off the
+table today because their pages declare third-party assets and limit published add-ons to files that require
+the original Nexus mod. FZR's base is an ASK, but its runnable chain stays red until Arch V4 is independently
+cleared. The open-source loader layer remains separately hostable under its MIT notices. This continues
+`IDEA-468`'s package-custody rule, does not change `L149`, and changed no package or server state.
+
+## Parts - what exists
+
+- **`parts.ontology`** (`ncm/core/parts/ontology.lua`, 17 tests green under both interpreters). The component
+  periodic table: twelve families with meanings, subfamilies and what each abstracts away. It **reuses**
+  `engineering.competency.FAMILIES` rather than declaring a second list of twelve, and refuses to load if the
+  two ever disagree.
+- **The four expression channels, asserted rather than described.** `record` (TweakDB flat - built, broad,
+  but spawn-cached and shared across every instance of a model on a client), `instance` (the `L148` live grip
+  write - built, personal, one quantity wide), `simulated` (always available, never felt), and `per_corner`
+  (**declared absent**, with the refusal naming `IDEA-503`).
+- **`declarationIsHonest(family, channel)`** is `IDEA-505` as an assertion: a Part cannot claim a channel its
+  family does not have, and nothing can claim `per_corner`.
+- **The constraint Parts must design around**, now a passing test rather than a paragraph: **tyres are the
+  only family with a per-player felt expression.** Every other family that can be felt at all is felt through
+  the record channel, where two drivers in the same car model cannot differ from each other.
+- **Spec conflict 5 resolved:** a tyre asset is a **set of four**, not a corner and not an axle pair - partly
+  because motorsport already works that way, and partly because §AV2 means per-corner identity would be
+  identity without consequence. `axle_pair` and `corner` are named in the vocabulary as the migration steps
+  if `IDEA-503` ever lands.
 
 ## Carrier proof status
 
@@ -127,5 +176,6 @@ ssh -i C:\Users\eveng\.ssh\lightsail-ncm.pem ubuntu@52.60.225.137 \
 ## Working-tree caution
 
 The tree is intentionally dirty and contains overlapping work from another coder. Preserve unrelated
-changes, especially `ncm/online/resources/ncm_world/server/main.lua`. This session touched only
-`ncm/carrier/**` plus the ledgers. Do not reset or blanket-checkout.
+changes, especially `ncm/online/resources/ncm_world/server/main.lua`. The licensing pass added one OPEN//77
+research catalog, linked it from the research README and updated this session memory; it did not touch runtime
+code, packages or server state. Do not reset or blanket-checkout.

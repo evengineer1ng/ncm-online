@@ -1798,3 +1798,35 @@ that. Continuing to widen a capability nothing consumes would be the more expens
 **Basis.** MASTER_TEST §AV, three settings driven on Production by the owner on Carrier 0.1.13. Note that the
 first reading of §AV2 was a false positive caused by comparing maxima across unequal windows (`KB-143`); the
 negative is from duration-controlled percentiles and the correction is recorded rather than quietly applied.
+
+## L150 - EXECUTED - Parts implementation is authorised, bounded to the spec's own first instruction
+
+**Decided 2026-09-26 on the owner's instruction** to move into Parts after the ledger pass. This line exists
+because [18_PARTS_ECOSYSTEM.md](18_PARTS_ECOSYSTEM.md) carries **STATUS: SPEC** and says in terms *"Nothing
+built, nothing authorised... Do not build from it"*. Building from it without recording an authorisation
+would be precisely the silent authority decay `L125` and the docs gate exist to prevent.
+
+**What is authorised: the spec's own opening instruction and nothing past it.**
+
+> *Do not make the parts yet. Build the periodic table, the grammar, and the factory that can eventually
+> make them.*
+
+So: the mechanical ontology, the architecture profile, and the compatibility resolver. **Not** authorised by
+this line: R&D generation, manufacturing, supply, inventory, the secondary market, barter, procedural naming,
+or any individual part. Those stay SPEC and need their own authorisation when they are reached. The document
+keeps its SPEC banner for that reason -- the majority of it is still unauthorised owner intent.
+
+**Why now rather than after `KB-136`.** `L149` closed discovery on the grounds that the binding constraint
+had moved from what the carrier can do to what it is connected to. Parts is the consumer that specifies the
+connection, and the ontology layer needs no transport at all -- it is pure server-side vocabulary. The
+transport work (`KB-136`) becomes scheduled by a consumer rather than argued for in the abstract.
+
+**One condition the spec attached, now satisfied.** 18_PARTS_ECOSYSTEM ruled performance effects out of its
+first pass with a specific gate: *"Effects come only after a separate audit of what Cyberpunk / OPEN//77 /
+NCM can actually manipulate. Do not speculate them into the schema."* **MASTER_TEST SS-AU and SS-AV are that
+audit**, and `IDEA-505` is its result expressed as a schema rule. Effects themselves remain out of scope;
+what the ontology now carries is not an effect but an honest statement of *whether one is reachable at all*.
+
+**Basis.** `parts.ontology` reuses `engineering.competency.FAMILIES` rather than declaring a second list of
+twelve, derives the record channel from `machine.flats` rather than restating it, and refuses at load if
+either authority disagrees. Seventeen tests, green under Lua 5.4 and LuaJIT.
