@@ -14,6 +14,7 @@
 
 // `KB-147`: resolving which PROCESS is on the other end of a loopback socket.
 #include <iphlpapi.h>
+#include <tlhelp32.h>
 #pragma comment(lib, "iphlpapi.lib")
 
 using json = nlohmann::json;
@@ -102,6 +103,50 @@ constexpr uint16_t kPortSearchSpan = 4;
 //
 // Refusing is safe in a way that guessing is not: a rejected client simply tries the next port and finds
 // its own carrier a second later.
+/// Is `peerPid` this process, or something this process launched?
+///
+/// **The WebUI page does NOT run in the game process.** It runs in `Open77.WebHost.exe`, which the game
+/// spawns as a child, and CEF then spawns render processes as children of THAT. So the socket on the other
+/// end of the bridge belongs to a descendant, never to us -- and the first version of this check compared
+/// the peer against `GetCurrentProcessId()` and therefore **refused every legitimate connection there has
+/// ever been**. It looked like a working guard because its log line was plausible: *"refused a bridge peer
+/// from pid N"*, where N was our own WebHost.
+///
+/// Walking the parent chain keeps the property that matters -- a second game's WebHost still resolves to a
+/// different root and is still refused -- without rejecting our own. The walk is bounded because a parent
+/// chain can contain a cycle once pids are reused, and an unbounded walk in an accept loop is a hang.
+bool peerIsOurs(uint32_t peerPid, uint32_t self)
+{
+    if (peerPid == 0) return true;      // could not determine -- see peerProcessId
+    if (peerPid == self) return true;
+
+    const HANDLE snap = ::CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+    if (snap == INVALID_HANDLE_VALUE) return true;   // cannot tell; do not refuse on ignorance
+
+    std::vector<std::pair<uint32_t, uint32_t>> parents;   // pid, parent
+    PROCESSENTRY32W entry{};
+    entry.dwSize = sizeof(entry);
+    if (::Process32FirstW(snap, &entry)) {
+        do {
+            parents.emplace_back(static_cast<uint32_t>(entry.th32ProcessID),
+                                 static_cast<uint32_t>(entry.th32ParentProcessID));
+        } while (::Process32NextW(snap, &entry));
+    }
+    ::CloseHandle(snap);
+
+    uint32_t current = peerPid;
+    for (int depth = 0; depth < 8; ++depth) {
+        uint32_t parent = 0;
+        for (const auto& [pid, par] : parents) {
+            if (pid == current) { parent = par; break; }
+        }
+        if (parent == 0) return false;
+        if (parent == self) return true;
+        current = parent;
+    }
+    return false;
+}
+
 uint32_t peerProcessId(SOCKET client)
 {
     sockaddr_in peer{};
@@ -448,9 +493,9 @@ void Server::run()
         // ours if we bound first, and serving it would put one player's Parts into the other player's
         // physics. Zero means "could not determine" and is allowed through -- see `peerProcessId`.
         const uint32_t peer = peerProcessId(client);
-        if (peer != 0 && peer != self) {
-            NCM_INFO("refused a bridge peer from pid %u -- this carrier serves pid %u only; that client "
-                     "should keep scanning for its own", peer, self);
+        if (!peerIsOurs(peer, self)) {
+            NCM_INFO("refused a bridge peer from pid %u -- not in this game's process tree (pid %u); "
+                     "that client should keep scanning for its own carrier", peer, self);
             ::closesocket(client);
             continue;
         }
