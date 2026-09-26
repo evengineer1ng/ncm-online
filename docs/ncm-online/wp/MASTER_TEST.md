@@ -1453,3 +1453,23 @@ moves in the log but not in the car. That would mean the carrier applied a value
 reached -- a different failure from §AW3's, where the write demonstrably fired and the channel was simply
 incapable of the effect. The log line and the felt result are two separate claims and `KB-142` is the
 standing reminder to check both.
+
+### §AY amended by `L154`: eleven families, not three
+
+§AY5 was written when nine families were refused. `L154` allows approximation, so **suspension now works**
+and the refusal test moves to `steering`, which is the only family left that cannot reach a force. The
+table above stands with §AY5 reinterpreted, and these are added:
+
+| # | Operation | Expected | Result |
+|---|---|---|---|
+| §AY5 | `/ncm.setup steering 1.2` | **A named refusal** citing `KB-135`: response is not force magnitude and input authority is the driver's. **This replaces the old suspension case, which now passes instead of refusing.** | |
+| §AY9 | `/ncm.setup suspension 1.3`, then corner. | Grip increases (composes to about **x1.17** -- `1.30^0.6`). Chat says `[approximated]`. | |
+| §AY10 | `/ncm.setup aerodynamics 1.4`, then drive a straight and a corner. | **The trade, which is the headline of `L154`:** grip up (about **x1.18**) and top-end drive DOWN (about **x0.92**) from one part. A wing that added grip for free would make the system a joke. | |
+| §AY11 | `/ncm.setup aerodynamics 0.7`. | The trade **reverses**: grip about x0.84, drive about x1.09. Stripping aero is a real choice, not a penalty. | |
+| §AY12 | `/ncm.setup chassis 1.25`. | All three levers move together (about **x1.09** each) -- mass is the one approximation that genuinely touches everything. | |
+| §AY13 | `/ncm.setup aerodynamics` with **no multiplier**. | An explanation rather than a usage scold: the levers and their directions, why the mapping is defensible, and then `cannot:` lines -- including that it has **no speed dependence**. This is `losses` reaching a player. | |
+| §AY14 | Fit power_unit 1.25, tires 1.15, brakes 1.2, suspension 1.2, aerodynamics 1.3, chassis 1.1. | A believable complete car: grip clamps at **1.50** (wanted 1.52, and the clamp is logged), drive about **1.22**, brake about **1.25**, `[3 approximated]`. | |
+
+**What §AY13 is really testing.** Not a string. Whether the system can tell a player what a part will
+*not* do for them, in the same breath as what it will. `losses` is the whole of `IDEA-505` once
+approximation is allowed, and if it never reaches a human it is decoration.

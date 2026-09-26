@@ -110,37 +110,55 @@ return {
         end
     end,
 
-    the_four_unexpressed_families_cannot_be_felt = function(T)
+    a_family_with_no_drive_model_flat_may_still_be_felt_live = function(T)
         local M, flats = O(T), F(T)
+        -- **The point of this test inverted under `L154` and the old name was the giveaway.** It used to
+        -- assert that the four families with no drive-model flat "cannot be felt". That was a statement
+        -- about the RECORD channel being read as a statement about feel, and it stopped being true when
+        -- the instance channel learned to approximate.
+        --
+        -- What is still true, and worth pinning: having no flat means no RECORD expression, which is a
+        -- finding about `machine.flats` rather than a verdict on the family.
         for _, family in ipairs(flats.UNEXPRESSED_FAMILIES) do
             local expression = M.expression(family)
-            T.eq(expression.felt, false, family .. " cannot be felt through this carrier")
-            T.eq(#expression.channels, 1, family .. " has simulation and nothing else")
-            T.eq(expression.channels[1], "simulated", "")
+            T.eq(contains(expression.channels, "record"), false,
+                 family .. " has no drive-model flat, so no record channel")
+            if M.INSTANCE_QUANTITIES[family] then
+                T.eq(expression.felt, true, family .. " is still felt, live and per-player")
+                T.eq(expression.perPlayerFelt, true, "")
+            else
+                T.eq(expression.felt, false, family .. " genuinely cannot be felt at all")
+                T.eq(expression.channels[1], "simulated", "")
+            end
         end
     end,
 
-    three_families_are_felt_live_and_per_player = function(T)
+    eleven_families_are_felt_live_and_per_player = function(T)
         local M = O(T)
-        -- **This assertion was inverted on 2026-09-26 and the inversion is the point.** It used to read
-        -- "tyres are the ONE family felt live", which was true of the day section AU5 passed. Sections AW1
-        -- and AW2 then proved `driveScale` and `brakeScale` on Production, so power_unit and brakes joined
-        -- it. The gate caught the stale version, which is what the gate is for.
-        local live = { tires = true, power_unit = true, brakes = true }
-        for family in pairs(live) do
+        -- **This assertion has now been widened TWICE in one day, and the pattern is the lesson.** It
+        -- first read "tyres are the ONE family felt live" (true the day AU5 passed). Sections AW1 and AW2
+        -- made it three. `L154` then made it eleven, by allowing a family to be expressed APPROXIMATELY
+        -- onto a lever it does not literally own -- a suspension part raising usable grip is a coarse
+        -- model of a real effect, not a fabrication.
+        --
+        -- Both times the table was too NARROW, and both times the cause was a rule rather than a fact.
+        -- The gate caught both stale versions, which is what the gate is for.
+        local n = 0
+        for family in pairs(M.INSTANCE_QUANTITIES) do
+            n = n + 1
             local e = M.expression(family)
             T.eq(contains(e.channels, "instance"), true, family .. " has a live quantity")
             T.eq(e.perPlayerFelt, true, family .. " can differ between two drivers of the same model")
+            T.ok(M.INSTANCE_FIDELITY[family], family .. " declares whether it is direct or approximated")
         end
-        -- Every OTHER family is record-only, so two drivers in the same car cannot differ through it. That
-        -- is still the constraint most likely to be forgotten while designing a parts economy, and it is
-        -- still true of nine of the twelve.
-        for _, family in ipairs(M.FAMILIES) do
-            if not live[family] then
-                T.eq(M.expression(family).perPlayerFelt, false,
-                     family .. " cannot differ between two drivers of the same model")
-            end
-        end
+        T.eq(n, 11, "eleven of twelve families reach the live channel")
+
+        -- Steering is the one that does not, and it is refused for a MECHANISM rather than for
+        -- squeamishness: response is not force magnitude, and the only honest expression would be input
+        -- authority, which KB-135 reserves to the driver.
+        T.eq(M.INSTANCE_QUANTITIES.steering, nil, "steering has no live quantity")
+        T.eq(M.INSTANCE_REFUSED.steering, true, "and it is recorded as refused, not merely absent")
+        T.eq(contains(M.expression("steering").channels, "instance"), false, "")
     end,
 
     unknown_families_return_nil_rather_than_guessing = function(T)
@@ -166,11 +184,13 @@ return {
         T.eq(ok, false, "cooling has no drive-model flat, so it cannot claim the record channel")
         T.eq(type(why) == "string", true, why or "")
 
-        -- Was `brakes`, which section AW2 made reachable. `suspension` is the durable example: anti-roll
-        -- is a MOMENT, and section AW3 refuted the per-corner load entries with a mechanism rather than
-        -- leaving them untested, so this one will not quietly become true later.
-        local ok2 = M.declarationIsHonest("suspension", "instance")
-        T.eq(ok2, false, "suspension has no live quantity -- moments need a torque channel we do not have")
+        -- Was `brakes` (AW2 made it reachable), then `suspension` (`L154` made it reachable too, as an
+        -- approximation). `steering` is the durable example and the only one: it is refused for a
+        -- mechanism -- response is not force magnitude, and input authority is the driver's (`KB-135`) --
+        -- rather than for want of a proven lever, so it will not quietly become true the way the other
+        -- two did.
+        local ok2 = M.declarationIsHonest("steering", "instance")
+        T.eq(ok2, false, "steering cannot be expressed live at all")
     end,
 
     honest_declarations_pass = function(T)
@@ -179,6 +199,12 @@ return {
         T.eq(M.declarationIsHonest("tires", "instance"), true, "tyres have the live grip write")
         T.eq(M.declarationIsHonest("power_unit", "instance"), true, "and power_unit has driveScale (AW1)")
         T.eq(M.declarationIsHonest("brakes", "instance"), true, "and brakes have brakeScale (AW2)")
+        -- An APPROXIMATED expression is an honest declaration. That is the whole of `L154`: the dishonesty
+        -- was never coarseness, it was claiming a mechanism you do not have, and `parts.handling.EXPRESSION`
+        -- keeps that line by enumerating each family's losses.
+        T.eq(M.declarationIsHonest("suspension", "instance"), true,
+             "suspension reaches grip approximately, and approximately is allowed")
+        T.eq(M.declarationIsHonest("aerodynamics", "instance"), true, "as does a wing, both ways")
         T.eq(M.declarationIsHonest("cooling", "simulated"), true,
              "and anything at all may be simulated -- that is the always-available answer")
     end,
@@ -190,12 +216,34 @@ return {
     end,
 
     -- ------------------------------------------------------------------ the designer's diagnostic
-    inventory_splits_the_twelve_honestly = function(T)
-        local M = O(T)
+    every_family_can_now_be_felt_somehow_and_that_is_new = function(T)
+        local M, flats = O(T), F(T)
         local inventory = M.inventory()
         T.eq(#inventory.felt + #inventory.modelledOnly, 12, "every family lands on one side")
-        T.eq(#inventory.modelledOnly, 4, "four families are modelled-only, which is a finding not a gap")
-        T.eq(contains(inventory.modelledOnly, "cooling"), true, "")
+
+        -- **Was four modelled-only; `L154` left none, and the arithmetic is worth spelling out because
+        -- the result is stronger than anyone set out to achieve.** Four families have no drive-model flat
+        -- at all -- cooling, transmission, electrical, chassis -- and that used to mean they could not be
+        -- felt. Every one of them now reaches `driveScale` through an approximation. Steering, which
+        -- cannot reach the instance channel, turns out to HAVE a flat.
+        --
+        -- So the two channels cover the periodic table between them, from opposite ends, with no overlap
+        -- in the gaps. Nobody planned that; it is worth an assertion precisely because it is a coincidence
+        -- of two independent tables and would break silently.
+        T.eq(#inventory.modelledOnly, 0, "no family is stuck at simulation-only any more")
+
+        for _, family in ipairs(flats.UNEXPRESSED_FAMILIES) do
+            T.eq(M.INSTANCE_QUANTITIES[family] ~= nil, true,
+                 family .. " has no flat, so the instance channel is the only thing that can carry it")
+            T.eq(M.expression(family).perPlayerFelt, true, family .. " is felt live and per-player")
+        end
+
+        -- The converse, and the reason "felt" is not the same as "felt per-player": steering is reachable
+        -- only through the record channel, so it is shared by every instance of that model on a client and
+        -- two drivers cannot differ through it.
+        local steering = M.expression("steering")
+        T.eq(steering.felt, true, "steering has a drive-model flat")
+        T.eq(steering.perPlayerFelt, false, "but it is record-only, so it cannot be personal")
         T.eq(contains(inventory.felt, "tires"), true, "")
     end,
 }

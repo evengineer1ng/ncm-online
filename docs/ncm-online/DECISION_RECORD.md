@@ -1957,3 +1957,134 @@ rather than by driving. It is the same shape as `KB-136` and the comment in that
 
 **Basis.** `L135` (the server composes, the carrier applies, neither decides the other's business), `L148`
 and `L151`. Shipped in Carrier **0.1.20** and `ncm_world`, live on Production 2026-09-26.
+
+## L153 - LOCKED OWNER DIRECTION - Foundry is vehicle R&D over existing geometry
+
+**Owner direction, 2026-09-26. Architecture representation remains under review and no implementation is
+authorised by this line.** The prior AI/generative-geometry Foundry branch is abandoned. Foundry does not use
+AI-generated vehicle geometry, text/image-to-3D, procedural mesh synthesis, diffusion models, an AI Foreman,
+training-data provenance work or a GPU/model pipeline.
+
+### The three processes remain distinct
+
+1. **Parts R&D creates technology:** immutable component Design revisions inside the bounded Parts grammar.
+2. **Vehicle R&D / Foundry creates reproducible automobile Designs:** it selects from compatible component
+   Designs which legitimately existed and were accessible at that historical world time, on a previously
+   validated vehicle lineage/substrate.
+3. **Manufacturing creates physical assets:** it instantiates an already-released factory specification through
+   bounded batch/cadence/shelf-cap production. It does not design and does not reroll a BOM per Machine.
+
+Parts R&D is not reopened or replaced by this direction. Foundry consumes it.
+
+### The three content resources remain distinct
+
+- **Validated geometry/substrate breadth** establishes lineages. A new usable mesh is a rare new family tree and
+  is introduced deliberately, not exhausted on day one.
+- **Human-authored, runtime-valid appearance treatments** provide finite visual depth within each lineage. They
+  are reserved and allocated across derivative Designs, and low remaining runway must be observable.
+- **Procedurally evolving component technology** provides engineering depth over world history.
+
+Paint does not create an engineering Design. A Design may allow several factory appearances; each manufactured
+Machine receives one actual renderable factory treatment from that palette.
+
+### Historical and physical invariants
+
+- A released Vehicle Design revision freezes one factory BOM/specification, lineage, manufacturer,
+  collaborators, allowed factory palette and R&D provenance. A later change is a new Design revision, never an
+  edit of the old one.
+- Every stock Machine manufactured from that Design begins from the same engineering specification. Permitted
+  batch variation is only on dimensions explicitly allowed by the Design, such as factory appearance.
+- The Machine's later installed physical Parts, wear, repair, repaint, owner and history do not rewrite the
+  factory Design.
+- Lineage, Vehicle Design revision, production run, permanent physical `assetId`, current configuration and live
+  runtime entity are separate identities. The existing physical-asset model is preserved.
+- Vehicle R&D is deterministic/auditable and may produce nothing. Completing R&D, promoting a Design, releasing
+  it to an economy and repeating its manufacture are separate events.
+- Unreleased validated substrates are controlled content inventory. A game/internet vehicle count is not a
+  usable-NCM count; the installed game must be inventoried and candidates validated before admission.
+
+### What this line does not decide
+
+It does not name tables, repurpose `vehicleKey`, alter the current runtime-record uniqueness invariant, author a
+generation-zero BOM, approve a catalogue expansion, start a migration or authorise Foundry implementation.
+Those questions are reviewed in
+[38_FOUNDRY_VEHICLE_LINEAGE_ARCHITECTURE.md](38_FOUNDRY_VEHICLE_LINEAGE_ARCHITECTURE.md), which remains a
+**PROPOSAL** until the owner rules on it.
+
+## L154 - EXECUTED - approximation is allowed; claiming a mechanism you do not have is not
+
+**Decided 2026-09-26, hours after `L152`, on the owner's challenge:** *"why cant we approximate. strip
+pureness from 100% to 05%"*.
+
+> **Numbered L154, not L153.** A concurrent session claimed `L153` for the Foundry scope ruling while this
+> was being written. `IDEA-380` predicted exactly this -- `Next free ID` and the decision counter are
+> read-modify-writes on shared files with no lock -- and it has now happened for a decision line rather
+> than a backlog row. Renumbered before commit, so no duplicate reached the repository. **This is the sixth
+> time a rule kept only in prose has failed, and the fix is still an assertion, not more care.**
+
+**The challenge was right and the error was mine.** `L152` refused nine of the twelve families outright.
+Correcting it matters more than the code, because the mistake was a *category* one and it will recur in
+other forms.
+
+**What I conflated.** Two rules, one worth keeping and one invented:
+
+- **Worth keeping (`IDEA-505`, 18_PARTS_ECOSYSTEM 8.1):** *do not promise a felt effect a channel cannot
+  carry.* That is about honesty.
+- **What I actually enforced:** *do not express a family at all unless a lever literally IS its quantity.*
+  That is about exactness, it is far stricter, and it defends nothing.
+
+A stiffer suspension genuinely raises usable mechanical grip. A wing genuinely adds grip and genuinely
+costs straight-line speed. A lighter shell genuinely accelerates, stops and turns better. Expressing those
+through `gripScale` and `driveScale` is a **coarse model of a real effect**, not a fabrication. The
+fabrication would be calling a suspension part *roll balance* -- a MOMENT, refuted for this channel by
+`§AW3` with a mechanism.
+
+**So fidelity became a property of an expression rather than a gate on one.**
+
+| | families | meaning |
+|---|---|---|
+| `direct` | 3 | the lever IS the quantity: tyres, power unit, brakes (`§AU5`, `§AW1`, `§AW2`) |
+| `approximated` | 8 | a real effect, coarsely modelled onto levers it does not literally own |
+| refused | 1 | `steering`, and for a mechanism -- see below |
+
+**Where the honesty went: `losses`.** Every expression, including the three direct ones, must enumerate
+what it provably cannot do, and the module asserts at load that none is empty. That list is what a panel or
+a component description must read before promising anything. Examples, chosen because each is the thing a
+player would most reasonably expect and will not get: aerodynamics cannot express **speed dependence**
+(real downforce scales with v²; this is constant); cooling cannot express **time dependence**, which is
+the entire point of cooling; chassis cannot change **actual mass** (`total_mass` at `+0x1BC` is verified
+and deliberately unwritten); transmission has **no discrete gears**; every moment-shaped effect --
+anti-roll, brake bias, differential lock, torque split -- is named as a loss wherever it is adjacent.
+
+**The mechanism: `effect ^ weight`.** A family declares terms, each a lever and an exponent, and a part's
+effect is raised to it. Weight `1.0` is full coupling; `0.5` is partial (a 1.44 gearbox delivers 1.20 to
+the road); **`-0.25` is an inverse coupling**, which is how one number on a wing adds grip and costs drive
+force at once. Exponents rather than blend factors for a reason that is not aesthetic: `a^w * b^w =
+(a*b)^w`, so composition stays commutative and a car cannot depend on the order a Lua table iterates in.
+
+**The topology is physics; the weights are a first pass.** Which lever a family touches, and in which
+direction, is not a taste question -- drag opposes drive whatever anyone prefers. The exponents are honest
+starting values awaiting play data, in the same spirit as `machine.projection`'s `WET`, and no test pins
+one, because a test that did would turn tuning into a failure.
+
+**The one refusal, and why it is not squeamishness.** `steering` changes RESPONSE -- rack ratio, geometry,
+assistance -- not the magnitude of any force the interception reaches. The only honest expression would be
+input authority, and `KB-135` reserves throttle, brake and steer to the driver; `L148` did not authorise it
+and `L151` explicitly declined to. A part that says *sharper turn-in* and delivers *more grip* is
+describing a mechanism it does not have, which is the exact thing this line permits everywhere else
+because everywhere else the mechanism is real.
+
+**An unplanned result worth recording.** Four families have no drive-model flat at all (cooling,
+transmission, electrical, chassis) and every one of them now reaches `driveScale`. Steering, the one family
+the instance channel cannot carry, turns out to **have** a flat. The two channels therefore cover the
+periodic table between them with no family left at simulation-only -- down from four. Nobody designed that;
+it falls out of two independent tables, so `test_parts` now asserts it, because a coincidence that useful
+would otherwise break silently.
+
+**What did not change, and deliberately.** The carrier is untouched: still three levers, still the same
+clamps, still clamping again because it does not trust the wire. Approximation is entirely a server-side
+composition concern, which is `L135` working as intended -- the server composes, the carrier applies, and
+widening what NCM can say cost the plugin nothing.
+
+**Basis.** `L152`, and the owner's correction of it. Live on Production 2026-09-26 with Carrier 0.1.20
+unchanged; `ncm_world` reports `3 direct, 8 approximated, 1 refused`.

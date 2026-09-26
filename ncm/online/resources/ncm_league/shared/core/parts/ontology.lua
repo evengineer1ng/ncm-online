@@ -29,10 +29,12 @@
 --                     Galena shares one set of values. Per-outing, not per-lap. Not per-player.
 --   * `instance`   -- the live per-instance force write proved in MASTER_TEST section AU (L148).
 --                     **Built and shipping.** Live, reversible, per-instance, per-player, no respawn.
---                     BUT: THREE quantities today -- lateral grip (AU5), drive force (AW1) and brake
---                     force (AW2). Wider than it was, still the narrow channel: eight families have no
---                     live expression at all, and moments (anti-roll, yaw balance) are refuted, not
---                     pending -- see `per_corner` below.
+--                     THREE quantities -- lateral grip (AU5), drive force (AW1), brake force (AW2) --
+--                     but ELEVEN of the twelve families reach them, because a family may be expressed
+--                     APPROXIMATELY onto a lever it does not literally own (`L154`). Narrow in vocabulary,
+--                     wide in coverage. What it still cannot do is any MOMENT: anti-roll, yaw balance and
+--                     brake bias are refuted, not pending -- see `per_corner` below -- and every
+--                     approximation enumerates exactly what it loses.
 --   * `simulated`  -- NCM's own server-authoritative modelling. Always available, always safe, never felt
 --                     through the steering wheel. Lap-time modelling, wear, failure, eligibility, results.
 --   * `per_corner` -- **DOES NOT EXIST.** Front/rear balance, brake bias, anti-roll, per-corner tyre
@@ -95,21 +97,54 @@ Core.define("parts.ontology", function(C)
 
     M.CHANNEL_IDS = { "record", "instance", "simulated", "per_corner" }
 
-    -- The quantities the live channel can move today. Named so that a caller asking "what can `instance`
-    -- do for suspension" gets `nil` instead of a hopeful guess.
+    -- Which of the live channel's three quantities each family reaches.
     --
-    -- **Three, not one, since 2026-09-26.** This table said `tires` only, which was true of the day section
-    -- AU5 passed and stale from the moment section AW landed. `driveScale` and `brakeScale` were both driven
-    -- and confirmed by the owner on Production (sections AW1, AW2), so power_unit and brakes are live
-    -- families, and a designer asking this module was being told otherwise.
+    -- **Eleven of twelve families, not three, since `L154`.** This table has now been wrong twice in one
+    -- day in the same direction -- too narrow -- and both times the error was a rule rather than a fact.
+    -- It said `tires` only, which was true until section AW proved `driveScale` and `brakeScale`. It then
+    -- said three, because `parts.handling` refused to express a family unless a lever literally WAS its
+    -- quantity. That rule conflated "cannot be felt" with "cannot be felt exactly", and a suspension part
+    -- raising usable grip is a coarse model of a real effect rather than a fabrication.
     --
-    -- `parts.handling` holds the levers these map to and ASSERTS AT LOAD that the two tables agree, so this
-    -- one cannot drift again without a test failing.
+    -- **Fidelity, not admission, is what separates them.** `INSTANCE_FIDELITY` below says whether a
+    -- family's quantity is the lever itself or is modelled onto it, and `parts.handling.EXPRESSION`
+    -- carries the physical rationale and -- the part that matters -- the enumerated LOSSES: what a part in
+    -- that family provably cannot express. That list is where `IDEA-505`'s honesty requirement now lives.
+    --
+    -- `parts.handling` ASSERTS AT LOAD that these tables agree with its own, in both directions, so this
+    -- cannot drift a third time without a test failing.
     M.INSTANCE_QUANTITIES = {
-        tires      = { "lateral_grip_vehicle" },          -- gripScale,  MASTER_TEST AU5
-        power_unit = { "longitudinal_force_driving" },    -- driveScale, MASTER_TEST AW1
-        brakes     = { "longitudinal_force_braking" },    -- brakeScale, MASTER_TEST AW2
+        -- direct: the lever is the quantity
+        tires        = { "lateral_grip_vehicle" },             -- MASTER_TEST AU5
+        power_unit   = { "longitudinal_force_driving" },       -- MASTER_TEST AW1
+        brakes       = { "longitudinal_force_braking" },       -- MASTER_TEST AW2
+        -- approximated: a real effect, coarsely modelled
+        suspension   = { "lateral_grip_vehicle" },             -- body control -> usable grip
+        structure    = { "lateral_grip_vehicle" },             -- shell stiffness -> grip
+        aerodynamics = { "lateral_grip_vehicle",
+                         "longitudinal_force_driving" },       -- downforce adds grip, drag costs drive
+        transmission = { "longitudinal_force_driving" },       -- ratio and shift quality -> delivered torque
+        drivetrain   = { "longitudinal_force_driving" },       -- driveline losses -> torque at the road
+        cooling      = { "longitudinal_force_driving" },       -- thermal headroom sustains power
+        electrical   = { "longitudinal_force_driving" },       -- ignition and management -> power
+        chassis      = { "lateral_grip_vehicle",
+                         "longitudinal_force_driving",
+                         "longitudinal_force_braking" },       -- mass touches all three
     }
+
+    --- Is the quantity the lever itself, or a model of the family mapped onto it? A panel that says
+    --- "measured" where it should say "modelled" is the dishonesty this distinction exists to prevent.
+    M.INSTANCE_FIDELITY = {
+        tires = "direct", power_unit = "direct", brakes = "direct",
+        suspension = "approximated", structure = "approximated", aerodynamics = "approximated",
+        transmission = "approximated", drivetrain = "approximated", cooling = "approximated",
+        electrical = "approximated", chassis = "approximated",
+    }
+
+    --- The one family with no live expression, recorded with its mechanism rather than left absent.
+    --- Steering changes RESPONSE, not the magnitude of any force this channel reaches; the only honest
+    --- expression would be input authority, which `KB-135` reserves to the driver.
+    M.INSTANCE_REFUSED = { steering = true }
 
     -- ---------------------------------------------------------------------------------------------
     -- The periodic table

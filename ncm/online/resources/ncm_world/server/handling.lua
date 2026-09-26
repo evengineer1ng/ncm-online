@@ -51,9 +51,9 @@ local function publish(playerId, why)
 
     local setup, refusal = Handling.compose({ vehicle = playerId, parts = parts }, { at = now() })
     if not setup then
-        -- Named, never silent. A refusal means a part claims a family the live channel cannot express --
-        -- suspension asking for a force scale, say -- and a driver quietly getting nothing for a component
-        -- they paid for is far worse than a line in the log.
+        -- Named, never silent. A refusal now means one of two things -- a malformed effect, or a part in
+        -- the single family the live channel cannot express (`steering`, `KB-135`) -- and a driver quietly
+        -- getting nothing for a component they paid for is far worse than a line in the log.
         log("player=%d refused: %s", playerId, tostring(refusal))
         return false, refusal
     end
@@ -131,6 +131,7 @@ end)
 --
 --   ncm.setup                      -- what am I running, and what can be felt at all
 --   ncm.setup clear                -- remove everything, explicitly
+--   ncm.setup <family>             -- explain one family: its levers, why, and what it CANNOT do
 --   ncm.setup <family> <effect>    -- fit one synthetic part, e.g. `ncm.setup power_unit 1.4`
 --
 -- `effect` is a multiplier, not a balance decision. 18_PARTS_ECOSYSTEM puts component balance out of scope
@@ -150,18 +151,32 @@ RegisterNetEvent("ncm:setup", function(family, effect)
 
     if family == nil or family == "" then
         local inv = Handling.inventory()
-        local live = {}
-        for _, entry in ipairs(inv.live) do
-            live[#live + 1] = ("%s (%s, %s)"):format(entry.family, entry.lever, entry.evidence)
-        end
         local mine = {}
         for _, part in ipairs(NcmHandling.parts(pid)) do
             mine[#mine + 1] = ("%s x%.3f"):format(part.family, part.effect)
         end
-        tell(("fitted: %s | felt live: %s | not felt live: %s"):format(
-            #mine > 0 and table.concat(mine, ", ") or "nothing",
-            table.concat(live, ", "),
-            table.concat(inv.notLive, ", ")))
+        tell("fitted: " .. (#mine > 0 and table.concat(mine, ", ") or "nothing"))
+
+        local direct = {}
+        for _, d in ipairs(inv.direct) do direct[#direct + 1] = d.family end
+        tell("DIRECT (the lever is the quantity): " .. table.concat(direct, ", "))
+
+        -- Approximated families list the levers AND the direction, because a wing that costs top speed is
+        -- the interesting half and a player should see it before fitting one.
+        local approx = {}
+        for _, d in ipairs(inv.approximated) do
+            local bits = {}
+            for _, l in ipairs(d.levers) do
+                bits[#bits + 1] = (l.direction == "increases" and "+" or "-") .. l.lever
+            end
+            approx[#approx + 1] = ("%s (%s)"):format(d.family, table.concat(bits, " "))
+        end
+        tell("APPROXIMATED (a real effect, coarsely modelled): " .. table.concat(approx, ", "))
+
+        for _, d in ipairs(inv.refused) do
+            tell(("REFUSED %s: %s"):format(d.family, d.reason))
+        end
+        tell("`ncm.setup <family>` on its own explains one family and what it cannot do")
         return
     end
 
@@ -171,16 +186,27 @@ RegisterNetEvent("ncm:setup", function(family, effect)
         return
     end
 
-    -- Ask the module, never a hard-coded list here. If a fourth quantity is ever proven, this command
-    -- accepts it the moment `parts.handling` does.
-    local lever, why = Handling.leverFor(family)
-    if not lever then
+    -- Ask the module, never a hard-coded list here. If a fourth quantity is ever proven, or a family's
+    -- expression changes, this command follows without an edit.
+    local expression, why = Handling.expressionFor(family)
+    if not expression then
         tell("cannot: " .. tostring(why))
         return
     end
 
     local value = tonumber(effect)
     if not value then
+        -- No multiplier given: explain the family rather than scolding about usage. **This is where a
+        -- player learns what an approximation will not do for them**, which is the whole point of
+        -- `losses` -- it is the list of things they might reasonably expect and will not get.
+        local d = Handling.describe(family)
+        local bits = {}
+        for _, l in ipairs(d.levers) do
+            bits[#bits + 1] = ("%s %s"):format(l.direction, l.lever)
+        end
+        tell(("%s [%s]: %s"):format(family, d.fidelity, table.concat(bits, ", ")))
+        tell("why: " .. d.rationale)
+        for _, loss in ipairs(d.losses) do tell("  cannot: " .. loss) end
         tell(("usage: ncm.setup %s <multiplier>, e.g. 1.25"):format(family))
         return
     end
@@ -198,7 +224,10 @@ RegisterNetEvent("ncm:setup", function(family, effect)
         tell("refused: " .. tostring(refusal))
         return
     end
-    tell(("fitted test_%s x%.3f -> %s"):format(family, value, lever))
+    local levers = {}
+    for _, term in ipairs(expression.terms) do levers[#levers + 1] = term.lever end
+    tell(("fitted test_%s x%.3f [%s] -> %s"):format(
+        family, value, expression.fidelity, table.concat(levers, ", ")))
 end)
 
 --- A joining driver gets an explicit setup rather than nothing. Without this a fresh client has no
@@ -217,4 +246,8 @@ AddEventHandler("onPlayerReady", function(playerId)
     end)
 end)
 
-log("ready -- %d live famil(ies) on the instance channel", #Handling.inventory().live)
+do
+    local inv = Handling.inventory()
+    log("ready -- %d direct, %d approximated, %d refused on the instance channel",
+        #inv.direct, #inv.approximated, #inv.refused)
+end
