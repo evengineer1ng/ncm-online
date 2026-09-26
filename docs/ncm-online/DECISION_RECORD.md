@@ -1764,3 +1764,37 @@ its suspension rather than slide, and that mistake was caught by measurement rat
 build's own address table, the force field decoded and its units established, the four corners identified by
 three independent manoeuvres, and the classifier validated by arithmetic (60 gravity and 240 wheel calls per
 second at 60 fps, every run complete, across twelve threads). MASTER_TEST §AU.
+
+## L149 - EXECUTED - discovery of the physics surface closes here; Parts is the first consumer
+
+**Decided 2026-09-26 on the owner's sequencing instruction:** *three tests tonight then building real
+effects, parts will be first consumer*. All three ran (§AV). Two returned negatives. This line records that
+the negatives are accepted as answers rather than as reasons to keep digging.
+
+**What closes.**
+
+1. **Zero-sum axle load redistribution is withdrawn as an actuator** (§AV2). The write is safe and
+   arithmetically correct -- §AV1 proved it holds vertical equilibrium -- and it does nothing. It is not to be
+   revived, extended, or built on. `L148`'s note that writing the per-wheel normal loads makes a car sag was
+   the *first* objection to this channel; §AV2 is the second and the decisive one.
+2. **Body-frame telemetry is not offered** (§AV3). No sideslip, no g-g diagram, no body-frame accelerations,
+   until an orientation source is found outside the searched range.
+3. **`insert1` is bookmarked, not scheduled** (`IDEA-503`). It is the only surviving route to per-corner grip
+   and it is a project, not an evening. The right time to attempt it is once Parts has said which fields it
+   actually needs, so the search has a specification rather than a hope.
+
+**What this authorises next.** Parts, built on the capability §AU proved and nothing more: vehicle-level
+lateral grip, live and reversible (`L148`), plus NCM's own server-authoritative simulation (`IDEA-458`). Every
+Part declares which of the three channels its felt effect terminates in (`IDEA-505`), and the composer refuses
+to promise a felt effect on a channel that does not exist.
+
+**Why stop discovering here rather than after one more test.** Both remaining unknowns were answered in one
+sitting and both said no, so the expected value of the next experiment fell sharply -- what is left is
+`insert1`, which is expensive and currently unspecified. Against that, the proven capability has no consumer
+at all: `gripScale` still comes from a JSON file a human edits (`IDEA-502`). **The binding constraint moved
+from *what can the carrier do* to *what is the carrier connected to*,** and `KB-136` sits directly across
+that. Continuing to widen a capability nothing consumes would be the more expensive mistake.
+
+**Basis.** MASTER_TEST §AV, three settings driven on Production by the owner on Carrier 0.1.13. Note that the
+first reading of §AV2 was a false positive caused by comparing maxima across unequal windows (`KB-143`); the
+negative is from duration-controlled percentiles and the correction is recorded rather than quietly applied.

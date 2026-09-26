@@ -1301,3 +1301,44 @@ probe measures its own overhead. Driving seconds only: `k=1.00` (no writes) mean
 the classifier's `zero` count spiking from ~300 to 3,435 and once to 19,320 -- not the writes. If there is
 a cost anywhere it is the probe's *reading*, which is why `IDEA-501` proposes switching the measurement
 machinery off now that the measurements are done.
+
+## §AV - the three closing experiments: two negatives and a confirmed safety property - **AV1 PASS, AV2 NEGATIVE, AV3 REFUTED**
+
+`L149` / `IDEA-503`-`IDEA-505`. §AU proved a car can be made to slide on command. §AV asks the three questions
+that decide what the *shape* of that capability is, and therefore what Parts may be designed against. **Two of
+the three came back no.** That is the outcome they were run to produce, and it was cheaper to learn here than
+inside a half-built Brakes family.
+
+All three ran on Production with the owner driving, on Carrier **0.1.11 through 0.1.13**. Methodology for AV2
+was the owner's: *weaving in a straight line like a formula one car warming up tyres, except it is a poorly
+aerodynamic Galena*, with bias set to 0.00, +0.20 and -0.20 in that order.
+
+| # | Operation | Expected | Result |
+|---|---|---|---|
+| §AV1 | Shift load between the axles by scaling the four per-corner normal-load entries, holding their sum. Confirm the sum still negates gravity. | The residual against gravity stays near zero with a bias applied. If it drifts, the write is wrong and the log says so. | **PASS (0.1.13).** Mean absolute residual **16.08 / 16.19 / 8.90** across bias 0.00 / +0.20 / -0.20, against a gravity impulse of ~180 N.s. Statistically indistinguishable between settings and small against the quantity being redistributed. **The write was arithmetically correct.** It simply had no effect, which is AV2. No fault, no instability, no sag -- the failure mode that killed the naive version of this write in §AU3 did not recur. |
+| §AV2 | With the redistribution proven zero-sum, ask the binary that four Part families depend on: **is lateral force in this engine load-dependent?** | If it is, moving 20 percent of the load between axles moves grip between them, and balance, anti-roll, brake bias, per-corner tyre temperature and downforce-as-grip all become expressible without ever finding `insert1`. | **NEGATIVE (0.1.13) -- and the first reading was a false positive.** Duration-controlled lateral capability: bias 0.00 median **111.4** p75 114.2 p90 116.9; +0.20 median **116.8** p75 118.5 p90 119.0; -0.20 median **117.8** p75 120.0 p90 120.6. All within ~5 percent, and if anything the biased runs are marginally *higher*. Yaw-per-unit-steer regression is monotonic in the right direction in the mid speed band (+0.20 slope -0.227, 0.00 slope -0.345, -0.20 slope -0.485) but correlations are only -0.27 to -0.60, because weaving puts yaw out of phase with steer; **it is not load-bearing evidence either way.** **Shifting 20 percent of axle load changed nothing measurable.** |
+| §AV3 | Find the orientation quaternion in `+0x20..+0x180` on `vehiclePhysicsData`, to convert world-frame telemetry into body-frame and unlock sideslip. | A four-float group of unit norm that *varies* as the car turns. | **REFUTED (0.1.13).** Every unit-norm candidate in the range -- `+0x80`, `+0xC0/C4/C8/CC`, `+0x100/104/108` -- is **constant**. `quat-vary: every unit-norm candidate is CONSTANT -- none of them is an orientation`. Unit norm plus constancy is the signature of inertia-tensor rows, not attitude. `+0x30` was separately refuted earlier in the session. **There is no orientation quaternion in that range.** It is outside it, stored as a matrix rather than a quaternion, or lives on `vehicleBaseObject`. Note the discriminator itself had to be strengthened mid-session: persistence alone passes a constant, so variance tracking was added -- without it the identity rows would have been reported as an orientation. |
+
+### What §AV establishes
+
+**The per-corner force entries are not a grip channel.** Stated precisely, because the distinction matters:
+scaling those entries does not change lateral capability. That is **not** the same as *grip is
+load-independent in this engine*. The entries we scale may be the **output** of the suspension rather than
+the **input** the tyre model reads, in which case load-dependence exists and we were writing downstream of
+it. What §AV2 rules out is **this channel as a control surface**, which is the thing that had to be known
+before Parts began.
+
+**Consequence, and it is a real narrowing.** Zero-sum load redistribution is withdrawn as an actuator. No
+front/rear balance, no brake bias, no anti-roll, no per-corner tyre temperature and no downforce-as-grip
+through this route. `IDEA-499` moves from *plausible* to **refuted for this channel**. `insert1` is now the
+only credible per-corner route and is bookmarked in full at `IDEA-503`; `IDEA-505` tells Parts how to ship
+correctly whether or not it ever lands.
+
+**No body-frame telemetry.** Without attitude, sideslip angle, body-frame accelerations and any g-g diagram
+stay out of reach. Speed, world-frame velocity, angular velocity, per-corner load, driver inputs and mass are
+all unaffected and remain available.
+
+### What §AV does not change
+
+§AU stands in full. The lateral `gripScale` write is proven, reversible, per-instance and per-player, and
+none of tonight's negatives touch it. **The capability that shipped is the capability we keep.**
