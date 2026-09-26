@@ -3,32 +3,42 @@
 > **STATUS: LEDGER** - living session memory, rewritten at the end of every working session.
 > Authority map: [INDEX.md](INDEX.md) - classified 2026-09-24 (L125).
 
-Last rewritten: **2026-09-26 - `L156` is LIVE and provisionally PASSED, and `L157`/`L158`/`L159` are built,
-green and deployed.** Top speed, weather and tyre temperature all now exist end to end. Two defects were
-found and fixed on the way that had nothing to do with the new work: weather had **never** reached the
-mechanical path (`KB-151`), and the race HUD could blank itself silently with no log line (`KB-152`).
+Last rewritten: **2026-09-26 - the tyre gauge is LIVE and working, the road is now a separate body from
+the tyre (`L160`), and top speed has a finding rather than a feature (`L161`).**
 
-> **Claim before writing:** decisions through **L159**; MASTER_TEST through **§BD**; next QA letter **§BE**.
-> BACKLOG next free **IDEA-534**; known issues through **KB-152**. Read the ledger tails before allocating.
+The owner reported the gauge "working decently" after the weaving fix, and asked two questions that each
+produced a decision. **Does tyre warmth stack with weather?** It did, through ambient - but the ROAD had no
+grip of its own, so a hot track and a freezing track were identical once the tyre reached temperature.
+`L160` splits air from track, gives the road a `surface` layer, and keeps rain from being billed twice.
+**And: `driveScale` is not a top-speed lever.** The owner corrected a claim that the Galena drag runs
+proved one; they prove the opposite, and `L161` records why that null result is strong evidence.
+
+> **Claim before writing:** decisions through **L161**; MASTER_TEST through **§BE**; next QA letter **§BF**.
+> BACKLOG next free **IDEA-539**; known issues through **KB-152**. Read the ledger tails before allocating.
 
 ## One next action
 
-**Drive §BA -- the top speed capability spike.** It is the only thing in the stack whose mechanism is
-unproven, and it gates the rest of top speed.
+**Drive §BA -- the top speed capability spike.** Unchanged, and now more load-bearing rather than less:
+`L161` establishes that nothing NCM writes as a FORCE can raise a top speed, so `setPerformance` is the
+only candidate for moving a cap at all. The read-back is deployed and unrun.
 
 ```
-/ncm.topspeed            expect "no ceiling set by NCM" + usage
-/ncm.topspeed 60         drive a long straight -- DOES IT HOLD 60?
-/ncm.topspeed 120        does it change live?
-                         get out, get back in -- still 120?
-/ncm.topspeed clear
+/ncm.topspeed 40         expect ACCEPTED, then a read-back line
+/ncm.ratedtopspeed       run this SEATED IN A CAR -- it settles the argument form
 ```
 
-**Nothing in NCM has ever capped a top speed.** The per-record path's payload has never reached a client
-(`state_probe.lua`), its only producer was disabled by `KB-144`, and its last run was 154 attempts with
-zero applied. The per-instance server call is present in the deployed binary, is permitted, and had zero
-call sites until today. If §BA2 fails, top speed is not reachable on this platform and `L157` records that
-instead -- **weather and tyre temperature do not depend on it.**
+The read-back splits one unanswerable question into two answerable ones. **If the server does not hold 40,
+the write did not stick and the problem is server-side.** If it does hold 40 and the car still runs away,
+the ceiling is stored and not enforced - the same failure class as `GlobalState.ncmCeilings`, where the
+value existed and never replicated. Those have entirely different fixes and nothing else separates them.
+
+A second, cheaper run worth taking in the same session (`IDEA-538`): **`/ncm.setup brakes 2.0`, then a long
+straight.** `brakeScale` scales aerodynamic drag by accident, which would make it the only DOWNWARD top
+speed lever that exists today. Measure it before the drag/brake split deletes it.
+
+Everything else is deployed, green and waiting on a drive: §BB (tyre window), §BC (weather and time of
+day), §BE (the road as its own body). None of them needs a chat command - the server writes a thermal
+diagnostic every 5 s per moving car carrying `v / lat / load / T / pos / track / air / surf`.
 
 ## What is live right now and wants driving
 

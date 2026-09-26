@@ -211,9 +211,14 @@ local function thermalStep(entry, prev, cur, t)
         state.diagAt = state.diagAt or 0
         if t - state.diagAt >= 5 then
             state.diagAt = t
-            log("thermal asset=%s v=%.1f m/s lat=%.1f m/s2 load=%.3f T=%.1fC pos=%+.2f amb=%.1fC",
+            -- `track` and `air` are both printed because the whole point of `L160` is that they are
+            -- different numbers, and a diagnostic that showed one of them could not show that.
+            local world = conditions()
+            log("thermal asset=%s v=%.1f m/s lat=%.1f m/s2 load=%.3f T=%.1fC pos=%+.2f "
+                .. "track=%.1fC air=%.1fC surf=x%.3f",
                 tostring(assetId):sub(-6), speed, lateral, load, state.tempC,
-                Thermal.position(state.tempC) or 0, ambient)
+                Thermal.position(state.tempC) or 0, ambient, Thermal.airTemperature(world),
+                Thermal.surfaceMultiplier(ambient))
         end
     end
 

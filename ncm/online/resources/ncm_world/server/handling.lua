@@ -98,16 +98,33 @@ end
 local function contributorsFor(assetId)
     local out = {}
 
-    -- Weather. Neutral until `NcmMachine` has a real source; `machine.lua` currently only learns the
-    -- weather from a console command, which is the gap `IDEA-502` names.
-    local wetness = 0
+    -- Weather and the clock, from the live environment read `KB-151` added. Before that fix this was a
+    -- console command and nothing else, so `wetness` was permanently zero in production.
+    local wetness, secondsOfDay = 0, nil
     if NcmMachine and NcmMachine.state then
         local c = NcmMachine.state()
-        if type(c) == "table" then wetness = tonumber(c.wetness) or 0 end
+        if type(c) == "table" then
+            wetness = tonumber(c.wetness) or 0
+            secondsOfDay = tonumber(c.secondsOfDay)
+        end
     end
+
+    -- Rain, charged directly: water between the rubber and the road.
     out.weather = Handling.weatherContributor(wetness)
 
-    -- Tyre temperature, from the odometer's per-asset thermal state.
+    -- The ROAD, charged on its temperature alone (`L160`). Deliberately not given `wetness` as an input:
+    -- rain is already billed by the layer above, and reaches this one only by cooling the asphalt.
+    --
+    -- **Absent when the clock is unknown**, rather than defaulting to a mild afternoon. A server with no
+    -- environment feed then shows no surface layer at all, which is a visible absence in the trace --
+    -- where a plausible default would have read as a working feature. That is the `KB-151` lesson.
+    if secondsOfDay then
+        local trackC = Thermal.trackTemperature({ wetness = wetness, secondsOfDay = secondsOfDay })
+        out.surface = Handling.surfaceContributor(trackC)
+    end
+
+    -- The TYRE, which is a different body with a different clock. It reaches its own temperature by
+    -- working, and the road only sets what it is working against.
     if NcmOdometer and NcmOdometer.tyreTemperature then
         local temperature = NcmOdometer.tyreTemperature(assetId)
         if temperature then out.thermal = Handling.thermalContributor(temperature) end
@@ -690,9 +707,12 @@ RegisterNetEvent("ncm:tyre.query", function()
     end
 
     local conditions = (NcmMachine and NcmMachine.state and NcmMachine.state()) or {}
+    local world = { wetness = conditions.wetness, secondsOfDay = conditions.secondsOfDay }
     tell(("tyre %s"):format(Thermal.explain(temperature)))
-    tell(("ambient %.1fC (weather=%s wetness=%.2f secondsOfDay=%s)"):format(
-        Thermal.ambient({ wetness = conditions.wetness, secondsOfDay = conditions.secondsOfDay }),
+    -- Both bodies, because reporting one of them explains half of what the driver is feeling.
+    tell(("track %s   (air %.1fC)"):format(
+        Thermal.explainSurface(Thermal.trackTemperature(world)), Thermal.airTemperature(world)))
+    tell(("weather=%s wetness=%.2f secondsOfDay=%s"):format(
         tostring(conditions.weather or "?"), tonumber(conditions.wetness) or 0,
         tostring(math.floor(tonumber(conditions.secondsOfDay) or -1))))
     tell(("window %.0fC +/- %.0f, so it costs nothing between %.0fC and %.0fC"):format(

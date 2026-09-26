@@ -2277,3 +2277,92 @@ downward-only multiplier on `gripScale` and `brakeScale`.
 warmth or coolness + a window ... not pure accel for being in the window like an arbitrary stat boost, but
 inferred grip and braking differences, our best guess."* Owner-selected parameters: ~60 s to the window,
 15 percent at the extremes, temperature keeps cooling while parked.
+
+
+## L160 - LOCKED - The ROAD and the TYRE are two bodies, and neither is the other's proxy
+
+**Decision.** Track temperature is modelled as a body distinct from air temperature, and the road gets a
+grip layer of its own beside the tyre's.
+
+1. **Three temperatures, named separately.** `airTemperature` is the sky's number. `trackTemperature` is
+   air plus solar gain by day, minus clear-sky radiative loss by night, minus the heat standing water
+   carries away. `ambient` -- what the tyre exchanges heat with -- is an alias for the TRACK, because a
+   tyre is pressed against asphalt and not against the air above it.
+2. **Rain scales the radiative terms to zero rather than reducing them.** A wet road is neither sunlit nor
+   radiating to a clear sky; it is under cloud, wet, and pinned near the air. This is what makes "a warm
+   track" a state that weather can destroy outright.
+3. **`surface` is a new named layer** in `parts.handling.LAYERS`, between `weather` and `thermal`. That
+   order is the causal order: the sky decides what the road is, the road decides what the tyre is working
+   against, the tyre decides what the contact patch delivers.
+4. **`surfaceMultiplier` must not read wetness, and that is load-bearing.** Rain is already charged
+   directly by `weatherContributor`. If the road also charged for being wet, one weather state would be
+   billed three times and the model would collapse into "rain is everything". What the road charges for is
+   TEMPERATURE, which a dry winter morning has too. Asserted by a test whose name says so.
+5. **Asymmetric, and never a boost.** Cold asphalt costs 0.10 at the extreme, greasy hot asphalt 0.04.
+   1.00 at the optimum. "A warm track is grippier" and "a warm track is where you stop being charged" are
+   the same statement under `L156` point 3, and only the second is a ceiling NCM may write.
+6. **Absent rather than defaulted.** With no clock the surface layer does not appear at all, and
+   `trackTemperature({})` returns `AMBIENT_DEFAULT` with no daily term. A plausible guessed default would
+   read exactly like a working feature -- which is precisely how `KB-151` hid for as long as it did.
+7. `LOSSES` gives up "track temperature as distinct from air temperature", which is now modelled, and
+   gains the road's THERMAL INERTIA (here the asphalt responds to rain and to the clock instantly, where
+   real asphalt stays warm through a short shower) and the absence of shade, tunnels and bridge decks.
+
+**What it produces.** Brisk cornering, sustained, across the day:
+
+| condition | air | track | surface | tyre | position |
+|---|---|---|---|---|---|
+| 03:00 rain | 8 | **0** | 0.900 | 67 | -0.51 cold |
+| 09:00 dry | 20 | 20 | 0.986 | 87 | +0.06 window |
+| 15:00 rain | 24 | 16 | 0.975 | 83 | -0.05 window |
+| 15:00 dry | 28 | **44** | 0.993 | 111 | +0.75 hot |
+
+Compounded across all three environmental layers, grip runs 0.910 on a dry afternoon to 0.709 in
+pre-dawn rain. **An emergent result worth naming: rain on a hot afternoon puts tyres perfectly in the
+window and charges 18 percent for the water.** That was not designed; it fell out of two independent
+bodies, and it is the kind of trade the model exists to produce.
+
+**Basis.** Owner ruling, 2026-09-26: *"hot weather daytime sun should make tire warmer, while hot weather
+dqytime sun in it itself carries its own modifier for grip, so in essence, warm track is its own thing,
+while the tire model itself is its own. so a tire may be cold technically on a warm track, but then warms
+up quicker than a cold tire on a cold track."* This supersedes `L159` point 7's "day and night get no
+lever" in one respect only: day and night still get no lever **on the tyre**, and now get one on the
+**road**, which is a different body.
+
+
+## L161 - PROVISIONAL - Nothing NCM writes as a FORCE can raise a top speed
+
+**Decision.** Recorded as a finding, not a design. The instance carrier cannot raise top speed, and the
+evidence is the owner's own drag runs.
+
+**The trace.** Galena drag, 2026-09-26: stock 38.4 s, `power_unit 3.0` 36.7 s, `+ tires 1.5` 35.5 s.
+`L156`'s couplings capped the effective drive at 1.217 and then 1.575. Acceleration moved on every run.
+**Top speed did not move at all** -- the owner's report, and the correction that produced this line.
+
+**Why that is evidence and not merely a null result.** If the plateau were a DRAG EQUILIBRIUM, terminal
+velocity would go as the square root of drive force: 1.575x force is `sqrt(1.575) = 1.25`, a 25 percent
+higher top speed, which nobody could miss on a drag strip. An **identical** plateau under 1.575x force is
+not a force balance at all. It is a hard cap, enforced somewhere NCM's force write does not reach.
+
+**Consequences, stated plainly:**
+
+1. `driveScale` is an ACCELERATION lever and is not a top-speed lever. A previous session's claim that the
+   drag runs were "a proven top-speed mechanism" was wrong; they prove the opposite.
+2. **Top speed control can therefore only ever be DOWNWARD from a native cap**, by any mechanism available
+   to us. That is not a limitation of the implementation; it is the shape of the platform, and it happens
+   to agree with `L156` point 3 and `MAX_ACCELERATION_SCALE = 1.0`.
+3. `Open77.vehicles.setPerformance` is the only candidate for moving the cap itself, which makes the
+   `MASTER_TEST` BA spike more load-bearing rather than less. It currently returns ACCEPTED for
+   `topSpeedKph = 40` and does not slow the car; the `getPerformance` read-back is deployed and unrun.
+4. The reachable fallback, if BA fails, is **withholding drive near a target speed** -- a taper on
+   `driveScale` toward zero. That is a DIFFERENT operation from what the drag runs tested and is not
+   refuted by them, but it is also not yet proven. The carrier already computes `speedSq` per frame at the
+   write site (`vehicle/physics_probe.cpp`), so the input exists with no new read and no wire change.
+   Evaluating it per frame in the carrier would reopen the coefficient-evaluation question `IDEA-532`
+   raises, which is the honest cost and is recorded rather than hidden.
+5. **A measured cap may not become the authored baseline** (`IDEA-328`, `IDEA-331`). It may validate one.
+
+**Provisional** because point 3 is unrun. If BA passes, this line keeps points 1, 2 and 5 and drops 4.
+
+**Basis.** Owner correction, 2026-09-26: *"those three timed runs you quoted accelerated faster but all
+had same top speed."*

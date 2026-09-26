@@ -131,7 +131,11 @@ Core.define("parts.handling", function(C)
     --
     -- Order is declared, not iterated, because `pairs` is not deterministic and a setup that serialises
     -- differently on two runs would republish for nothing.
-    M.LAYERS = { "parts", "wear", "weather", "thermal", "chrome", "ruleset" }
+    --
+    -- `surface` sits between `weather` and `thermal` because that is the causal order a reader needs: the
+    -- sky decides what the road is, the road decides what the tyre can reach, and the tyre decides what
+    -- the contact patch delivers. The trace then reads top to bottom as the story of how grip got here.
+    M.LAYERS = { "parts", "wear", "weather", "surface", "thermal", "chrome", "ruleset" }
 
     --- Contributors other than `parts` supply plain per-lever multipliers. They are quantised before they
     --- reach a lever, and that is load-bearing rather than tidy: `signature()` formats at `%.4f` and
@@ -489,7 +493,8 @@ Core.define("parts.handling", function(C)
     -- share a draft. This is the guard that catches `IDEA-508` -- the day the two dead weather flats
     -- resolve again, wet grip would otherwise be applied on both carriers at once.
     Expression.assertOwns("instance", {
-        "grip_magnitude", "brake_magnitude", "drive_magnitude", "tyre_thermal", "aerodynamic_drag",
+        "grip_magnitude", "brake_magnitude", "drive_magnitude", "tyre_thermal", "surface_grip",
+        "aerodynamic_drag",
     }, "parts.handling")
     -- And top speed is emphatically NOT ours to write as a force. We compose the number; the ceiling
     -- carrier delivers it.
@@ -881,6 +886,32 @@ Core.define("parts.handling", function(C)
         if m > 1.0 then m = 1.0 end
         return {
             source = "tyre_thermal",
+            gripScale = m,
+            brakeScale = m,
+        }
+    end
+
+    --- Build the `surface` contributor from a TRACK temperature (`L160`).
+    ---
+    --- **The road is a separate body from the tyre and gets a separate layer.** An earlier draft let the
+    --- clock reach the car only through ambient, on the reasoning that a cold night acts by making tyres
+    --- hard to warm. That is true and it is not the whole of it: a cold road is less grippy than a warm
+    --- one for a tyre that is already at temperature, and no amount of warming the rubber recovers it.
+    ---
+    --- Three consequences worth being explicit about, because they are what the owner asked for:
+    ---
+    ---   * a tyre can be COLD on a WARM track, and it will warm quickly and then be on a good road;
+    ---   * a tyre can be IN THE WINDOW on a FREEZING track, and it will still be short of grip;
+    ---   * the two recover on different timescales -- the tyre in about a minute of driving, the road
+    ---     not until the weather or the hour changes.
+    ---
+    --- Downward-only, like every contributor. A warm road is not a bonus; a cold one is a cost.
+    function M.surfaceContributor(trackTemperatureC)
+        local m = Thermal.surfaceMultiplier(trackTemperatureC)
+        if type(m) ~= "number" or m ~= m then m = 1.0 end
+        if m > 1.0 then m = 1.0 end
+        return {
+            source = "track_surface",
             gripScale = m,
             brakeScale = m,
         }

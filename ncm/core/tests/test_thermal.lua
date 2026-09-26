@@ -202,6 +202,90 @@ return {
         T.ok(M.initial({}) < M.OPTIMUM, "a fresh car starts outside the window and has to earn it")
     end,
 
+    -- ------------------------------------------------------------------ the road is not the air
+
+    the_road_is_hotter_than_the_air_in_sun_and_colder_under_a_clear_night = function(T)
+        local M = TH(T)
+        local noonish = { secondsOfDay = 15 * 3600 }
+        local predawn = { secondsOfDay = 3 * 3600 }
+        T.ok(M.trackTemperature(noonish) > M.airTemperature(noonish) + 10,
+            "sun on asphalt runs far above air temperature -- that is why a warm track is a thing")
+        T.ok(M.trackTemperature(predawn) < M.airTemperature(predawn),
+            "and under a clear night sky the road radiates BELOW air, which is why road frost exists")
+    end,
+
+    rain_takes_the_sun_off_the_road = function(T)
+        local M = TH(T)
+        -- The owner's case: a warm track is its own state, and rain destroys it independently of the
+        -- direct grip penalty rain already carries.
+        local hour = { secondsOfDay = 15 * 3600 }
+        local dry = M.trackTemperature(hour)
+        hour.wetness = 1
+        local wet = M.trackTemperature(hour)
+        T.ok(dry - wet > 20, "a wet mid-afternoon is not a warm track, however bright the clock says it is")
+    end,
+
+    a_cold_tyre_warms_faster_on_a_warm_track = function(T)
+        local M = TH(T)
+        -- **This is the interaction the owner described and it has to be demonstrable, not asserted.**
+        -- Same car, same driving, same starting temperature; only the road differs.
+        local function after(seconds, ambient)
+            local temp = 20
+            for _ = 1, seconds do temp = M.step(temp, M.load(20, 6), ambient, 1.0, 20) end
+            return temp
+        end
+        local warmRoad = M.trackTemperature({ secondsOfDay = 15 * 3600 })
+        local coldRoad = M.trackTemperature({ secondsOfDay = 3 * 3600, wetness = 1 })
+        T.ok(warmRoad > coldRoad + 25, "the two roads must actually be different places")
+        T.ok(after(60, warmRoad) > after(60, coldRoad),
+            "a tyre on a warm track is further along after a minute of identical driving")
+        T.ok(M.position(after(600, warmRoad)) > M.position(after(600, coldRoad)),
+            "and it settles hotter, so the same driving lands in a different part of the window")
+    end,
+
+    the_two_bodies_are_independent = function(T)
+        local M = TH(T)
+        -- A tyre perfectly in its own window on a freezing road is still on a freezing road. If these
+        -- two ever collapse into one number the model has lost the distinction it was built for.
+        T.ok(near(M.gripMultiplier(M.OPTIMUM), 1.0), "the tyre is perfect")
+        T.ok(M.surfaceMultiplier(0) < 0.98, "and the road is still costing grip")
+        -- And the converse: a perfect road does not warm a tyre that is not being worked.
+        T.ok(M.surfaceMultiplier(M.SURFACE_OPTIMUM) > M.surfaceMultiplier(0), "a warm road is the good case")
+        T.ok(M.gripMultiplier(M.OPTIMUM - M.HALF_WINDOW) < 1.0,
+            "but a cold tyre on it is still a cold tyre")
+    end,
+
+    the_road_never_boosts_and_cold_costs_more_than_hot = function(T)
+        local M = TH(T)
+        for temp = -40, 120, 3 do
+            T.ok(M.surfaceMultiplier(temp) <= 1.0,
+                ("a %dC road must not be a boost -- L156 point 3 applies to the road too"):format(temp))
+        end
+        T.ok(M.surfaceMultiplier(0) < M.surfaceMultiplier(60),
+            "freezing asphalt costs more than greasy asphalt; the asymmetry is deliberate")
+        T.ok(M.surfaceMultiplier(nil) == 1.0, "and an unknown road charges nothing")
+    end,
+
+    the_surface_layer_does_not_read_wetness = function(T)
+        local M = TH(T)
+        -- **Load-bearing.** Rain is charged directly by `weatherContributor`. If the road also charged
+        -- for being wet, one weather state would be billed three times over.
+        local a = M.surfaceMultiplier(25)
+        local b = M.surfaceMultiplier(25)
+        T.ok(near(a, b), "surface grip is a function of temperature and nothing else")
+        -- The signature proves it: there is no conditions table to pass a wetness in.
+        T.ok(type(M.surfaceMultiplier) == "function")
+    end,
+
+    unknown_conditions_do_not_invent_a_time_of_day = function(T)
+        local M = TH(T)
+        T.ok(near(M.trackTemperature({}), M.AMBIENT_DEFAULT),
+            "no clock means no daily term, not a guessed noon")
+        T.ok(near(M.airTemperature({}), M.AMBIENT_DEFAULT), "the same for air")
+        -- A guessed default would read exactly like a working feature, which is how KB-151 hid.
+        T.ok(near(M.trackTemperature({ baseC = 5 }), 5), "an explicit base is honoured")
+    end,
+
     -- ------------------------------------------------------------------ honesty
     the_model_enumerates_what_it_cannot_do = function(T)
         local M = TH(T)
@@ -209,6 +293,11 @@ return {
         local all = table.concat(M.LOSSES, " "):lower()
         T.match(all, "per%-corner", "per-corner is refused and says so")
         T.match(all, "slip", "and slip velocity, which is the real heat source it proxies")
+        -- `L160` modelled track temperature, so it left this list. What replaced it is the road's
+        -- thermal INERTIA, which is the next honest thing this cannot do.
+        T.ok(not all:find("track temperature as distinct"),
+            "a loss that has been modelled must leave the list, or LOSSES becomes decoration")
+        T.match(all, "inertia", "and the loss that replaced it is named")
     end,
 
     explain_names_the_band_a_driver_is_in = function(T)

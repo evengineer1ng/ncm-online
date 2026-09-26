@@ -705,4 +705,37 @@ return {
             T.eq(M.REFUSED[family], nil, family .. " is not a refused family")
         end
     end,
+
+    -- ------------------------------------------------------------------ the surface layer (L160)
+
+    surface_is_a_named_layer_between_weather_and_thermal = function(T)
+        local M = T.Core.get("parts.handling")
+        local seen = {}
+        for index, layer in ipairs(M.LAYERS) do seen[layer] = index end
+        T.ok(seen.surface, "the road needs a layer of its own or it cannot be traced")
+        T.ok(seen.weather < seen.surface, "the sky decides what the road is")
+        T.ok(seen.surface < seen.thermal, "and the road decides what the tyre is working against")
+    end,
+
+    the_surface_contributor_withholds_and_never_adds = function(T)
+        local M = T.Core.get("parts.handling")
+        for temp = -40, 120, 5 do
+            local c = M.surfaceContributor(temp)
+            T.ok(c.gripScale <= 1.0 and c.brakeScale <= 1.0,
+                ("a %dC road must not add force"):format(temp))
+        end
+        T.ok(M.surfaceContributor(nil).gripScale == 1.0, "an unknown road is inert, not a penalty")
+        T.ok(M.surfaceContributor(0 / 0).gripScale == 1.0, "and NaN is not a loophole")
+    end,
+
+    surface_and_thermal_are_separate_facts_on_one_carrier = function(T)
+        local E = T.Core.get("machine.expression")
+        T.ok(E.carrierFor("surface_grip") == "instance", "the road expresses through the live write")
+        T.ok(E.carrierFor("tyre_thermal") == "instance", "so does the tyre")
+        T.ok(E.carrierFor("surface_grip") == E.carrierFor("tyre_thermal"),
+            "same carrier, because both are a live force scale")
+        -- Two facts, not one. They are separate because they can disagree: a tyre in its window on a
+        -- freezing road is a state the model must be able to represent.
+        T.ok(E.FACTS.surface_grip ~= E.FACTS.tyre_thermal, "and they are distinct entries")
+    end,
 }

@@ -57,7 +57,47 @@ Core.define("parts.thermal", function(C)
     -- extremes. 18_PARTS_ECOSYSTEM puts component balance out of scope, so none of these is a balance
     -- judgement -- they are the numbers that produce the requested feel and they are meant to be tuned.
 
+    -- **`AMBIENT_DEFAULT` is a TRACK temperature, not an air temperature**, because the road is what the
+    -- tyre actually exchanges heat with. It is the reading used when the clock and the sky are both
+    -- unknown, which is the only case where the two bodies collapse back into one number.
     M.AMBIENT_DEFAULT = 20.0    -- degrees C, a mild Night City afternoon
+
+    -- ---- air
+    M.AIR_SWING_C = 8.0         -- +/- this over a day. Night City, not a desert.
+    M.PEAK_HOUR = 15.0          -- the daily maximum, mid-afternoon rather than noon
+    M.AIR_WET_COOLING_C = 4.0   -- rain cools the air a little
+
+    -- ---- the road, which is NOT the air
+    --
+    -- Asphalt is not a thermometer for the sky. In sun it absorbs and runs far hotter than the air above
+    -- it -- 15 to 25 degrees is ordinary -- and under a clear night sky it RADIATES to space and runs
+    -- COLDER than the air, which is why road frost forms on nights when the air never reaches zero. Both
+    -- directions are real and the model carries both rather than treating night as "less day".
+    --
+    -- Rain removes the solar term entirely rather than reducing it: a wet road is not a sunlit road, and
+    -- standing water is a far better heat sink than moving air. **This is the whole of the owner's point
+    -- -- a warm track and a cold track are different places, and the tyre only learns about them through
+    -- how hard it has to work to stay warm.**
+    M.SOLAR_GAIN_C = 16.0       -- peak sun-on-asphalt gain over air, dry
+    M.NIGHT_RADIATION_C = 5.0   -- clear-sky radiative loss below air, dry
+    M.TRACK_WET_COOLING_C = 8.0 -- standing water on the surface
+
+    -- ---- the road's own grip
+    --
+    -- **A warm road is grippier than a cold one, and that is independent of the tyre on it.** A tyre
+    -- perfectly in its own window on a freezing road still has a freezing road. Expressed the same way as
+    -- the tyre window and for the same reason: an optimum that costs NOTHING, with a penalty either side.
+    -- "A warm track is better" and "a warm track is where you stop being charged" are the same statement
+    -- under `L156` point 3, and only the second one is a ceiling we are allowed to write.
+    --
+    -- Asymmetric on purpose. Cold asphalt is a real and large grip loss; hot asphalt goes slightly greasy
+    -- as the binder softens, which is a smaller effect and a much rarer one on these streets.
+    M.SURFACE_OPTIMUM = 32.0
+    M.SURFACE_COLD_SPAN = 32.0  -- 0C is fully cold
+    M.SURFACE_HOT_SPAN = 28.0   -- 60C is fully hot
+    M.SURFACE_COLD_DEPTH = 0.10
+    M.SURFACE_HOT_DEPTH = 0.04
+
     M.OPTIMUM = 85.0            -- the centre of the window
     M.HALF_WINDOW = 35.0        -- +/- this from OPTIMUM is "fully cold" / "fully hot"
     M.PENALTY = 0.15            -- grip and brake cost at either extreme, so x0.85
@@ -109,7 +149,10 @@ Core.define("parts.thermal", function(C)
         "SLIP velocity, which is the real heat source: this proxies contact-patch work, so it over-heats "
             .. "under pure rolling and under-heats a locked wheel",
         "brake temperature as a separate body -- discs and tyres share one number here",
-        "track temperature as distinct from air temperature",
+        "the road's THERMAL INERTIA: track temperature here responds to rain and to the clock instantly, "
+            .. "where real asphalt carries hours of stored heat and stays warm through a short shower",
+        "one road everywhere -- no shade, no tunnels, no bridge deck, and no difference between a "
+            .. "sunlit straight and the same corner under an overpass",
         "pressure, and therefore the pressure/temperature feedback loop that is most of real tyre work",
         "compound differences: there is one curve, and a soft and a hard tyre would need two",
     }
@@ -140,28 +183,101 @@ Core.define("parts.thermal", function(C)
         return M.WEIGHT_LONGITUDINAL * longitudinal + M.WEIGHT_LATERAL * lateral
     end
 
-    --- Ambient temperature for a set of world conditions.
+    local function wetnessOf(conditions)
+        return clamp(tonumber(conditions.wetness) or 0, 0, 1)
+    end
+
+    --- Where in the day we are, as `cos(phase - peak)`: +1 at `PEAK_HOUR`, -1 twelve hours later.
     ---
-    --- `wetness` 0..1 and `secondsOfDay` 0..86400. **Day/night reaches the car through here and nowhere
-    --- else** -- it gets no lever of its own, because a cooler night genuinely acts by making tyres harder
-    --- to warm rather than by making grip worse directly. Rain does both: it cools the surface and it
-    --- reduces grip, and only the first belongs in this function.
-    function M.ambient(conditions)
-        conditions = conditions or {}
-        local base = tonumber(conditions.baseC) or M.AMBIENT_DEFAULT
+    --- **Returns nil when the clock is unknown**, and every caller then omits its daily term rather than
+    --- assuming noon. A model that guesses the time of day would hand a server with no environment feed a
+    --- confident, wrong track temperature -- which is exactly the shape of `KB-151`, where weather read
+    --- as permanently dry and nothing said so.
+    local function daylight(conditions)
         local seconds = tonumber(conditions.secondsOfDay)
-        local out = base
-        if seconds then
-            -- Peak in mid-afternoon, trough before dawn. Amplitude is deliberately modest: this is Night
-            -- City, not a desert, and an 8 degree swing is enough to change a warm-up without dominating it.
-            local phase = ((seconds % 86400) / 86400) * 2 * math.pi
-            local peakPhase = (15 / 24) * 2 * math.pi        -- 15:00
-            out = out + 8.0 * math.cos(phase - peakPhase)
+        if not seconds or seconds ~= seconds then return nil end
+        local phase = ((seconds % 86400) / 86400) * 2 * math.pi
+        return math.cos(phase - (M.PEAK_HOUR / 24) * 2 * math.pi)
+    end
+
+    --- Air temperature. The sky's number.
+    ---
+    --- Nothing in the mechanical model reads this directly -- it exists because the track is defined
+    --- RELATIVE to it, and because a difference between two numbers is only meaningful if both are named.
+    function M.airTemperature(conditions)
+        conditions = conditions or {}
+        local out = tonumber(conditions.baseC) or M.AMBIENT_DEFAULT
+        local daily = daylight(conditions)
+        if daily then out = out + M.AIR_SWING_C * daily end
+        return out - M.AIR_WET_COOLING_C * wetnessOf(conditions)
+    end
+
+    --- **Track temperature: the road's own number, and the one the tyre actually feels.**
+    ---
+    --- Air plus solar gain by day, minus radiative loss by night, minus the heat standing water carries
+    --- away. Rain scales the radiative terms to zero because a wet road is neither sunlit nor radiating to
+    --- a clear sky -- it is under cloud, wet, and pinned near the air.
+    ---
+    --- The spread this produces is the point. Dry mid-afternoon reaches the low forties while a wet
+    --- pre-dawn sits near freezing, so the SAME driving warms a tyre into the window on one and leaves it
+    --- cold on the other, without the tyre model knowing anything about weather at all.
+    function M.trackTemperature(conditions)
+        conditions = conditions or {}
+        local w = wetnessOf(conditions)
+        local out = M.airTemperature(conditions)
+        local daily = daylight(conditions)
+        if daily then
+            local solar = M.SOLAR_GAIN_C * math.max(0, daily)
+            local radiated = M.NIGHT_RADIATION_C * math.max(0, -daily)
+            out = out + (solar - radiated) * (1 - w)
         end
-        local wetness = clamp(tonumber(conditions.wetness) or 0, 0, 1)
-        -- Standing water pulls heat out of a tyre far faster than cool air does.
-        out = out - 12.0 * wetness
-        return out
+        return out - M.TRACK_WET_COOLING_C * w
+    end
+
+    --- What the tyre exchanges heat with. **This is the track, not the air**, and the alias exists so that
+    --- every call site reads as the thermal statement it is rather than having to know which body it meant.
+    ---
+    --- Day, night and weather reach the tyre through here and nowhere else. None of them gets a lever on
+    --- the tyre: a cold night acts by making a tyre harder to warm, which is the real mechanism, rather
+    --- than by docking grip for driving after dark.
+    function M.ambient(conditions)
+        return M.trackTemperature(conditions)
+    end
+
+    --- Where the ROAD is against its own optimum: -1 fully cold, 0 best, +1 fully hot.
+    function M.surfacePosition(trackC)
+        local T = tonumber(trackC)
+        if not T or T ~= T then return nil end
+        if T < M.SURFACE_OPTIMUM then
+            return clamp((T - M.SURFACE_OPTIMUM) / M.SURFACE_COLD_SPAN, -1, 0)
+        end
+        return clamp((T - M.SURFACE_OPTIMUM) / M.SURFACE_HOT_SPAN, 0, 1)
+    end
+
+    --- The road's grip and brake multiplier. **Never above 1.0**, the same promise the tyre window makes.
+    ---
+    --- **This must not read wetness, and that is load-bearing.** Rain is already charged directly by
+    --- `parts.handling.weatherContributor`. If the road ALSO charged for being wet, a wet night would be
+    --- billed three times for one weather state and the model would collapse into "rain is everything".
+    --- What this charges for is TEMPERATURE, which a dry winter morning has too.
+    function M.surfaceMultiplier(trackC)
+        local x = M.surfacePosition(trackC)
+        if not x then return 1.0 end
+        local depth = (x < 0) and M.SURFACE_COLD_DEPTH or M.SURFACE_HOT_DEPTH
+        return 1.0 - depth * (x * x)
+    end
+
+    --- One human line about the road, matching `explain`'s register.
+    function M.explainSurface(trackC)
+        local x = M.surfacePosition(trackC)
+        if not x then return "track temperature unknown" end
+        local band
+        if x <= -0.66 then band = "FREEZING"
+        elseif x < -0.2 then band = "cold"
+        elseif x <= 0.2 then band = "warm"
+        elseif x < 0.66 then band = "hot"
+        else band = "GREASY" end
+        return ("%.0fC %s track (x%.3f grip)"):format(trackC, band, M.surfaceMultiplier(trackC))
     end
 
     --- Integrate one step. Returns the new temperature.
@@ -248,6 +364,25 @@ Core.define("parts.thermal", function(C)
         "fully hot must cost exactly PENALTY")
     assert(math.abs(M.gripMultiplier(M.OPTIMUM - M.HALF_WINDOW) - (1.0 - M.PENALTY)) < 1e-9,
         "fully cold must cost exactly PENALTY")
+    -- The road makes the same promise the tyre does: an optimum is the absence of a charge, never a boost.
+    for T = -40, 120, 2 do
+        assert(M.surfaceMultiplier(T) <= 1.0, "a warm track must not be a boost")
+    end
+    assert(math.abs(M.surfaceMultiplier(M.SURFACE_OPTIMUM) - 1.0) < 1e-9, "the best road costs nothing")
+    -- Cold must cost more than hot, or the asymmetry that motivated two spans is decorative.
+    assert(M.surfaceMultiplier(M.SURFACE_OPTIMUM - M.SURFACE_COLD_SPAN)
+        < M.surfaceMultiplier(M.SURFACE_OPTIMUM + M.SURFACE_HOT_SPAN),
+        "freezing asphalt must cost more than greasy asphalt")
+    -- A wet road can never be a hot road, whatever the hour.
+    for hour = 0, 23 do
+        local c = { secondsOfDay = hour * 3600 }
+        local dry = M.trackTemperature(c)
+        c.wetness = 1
+        assert(M.trackTemperature(c) < dry, "rain must cool the road at every hour of the day")
+    end
+    -- With no clock and no sky the two bodies collapse to one number, and it is the declared default.
+    assert(math.abs(M.trackTemperature({}) - M.AMBIENT_DEFAULT) < 1e-9,
+        "unknown conditions must not invent a daily term")
     assert(#M.LOSSES > 0, "a thermal model with no stated losses is the dishonest kind")
 
     return M

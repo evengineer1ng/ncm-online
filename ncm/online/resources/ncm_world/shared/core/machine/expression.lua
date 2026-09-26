@@ -122,6 +122,13 @@ Core.define("machine.expression", function(C)
             note = "Tyre temperature's effect on grip and braking. Whole-car; per-corner is refused by "
                 .. "parts.ontology and by MASTER_TEST AV2.",
         },
+        surface_grip = {
+            carrier = "instance",
+            note = "TRACK temperature's effect on grip and braking -- the road, not the tyre. A separate "
+                .. "fact from tyre_thermal and not a duplicate of it: a tyre sitting perfectly in its own "
+                .. "window on a freezing road still has a freezing road. One says how ready the rubber "
+                .. "is, the other says what it is being pressed against.",
+        },
         mass = {
             carrier = "record",
             note = "`.total_mass`. Alive on this build and not yet written by anything.",

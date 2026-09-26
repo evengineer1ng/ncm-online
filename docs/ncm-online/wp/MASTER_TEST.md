@@ -1772,3 +1772,36 @@ and until 2026-09-26 a throw anywhere in it blanked all of them with no log line
 | §BD2 | Break a payload shape deliberately and re-run. | The gate goes RED and names the failing assertion. | |
 | §BD3 | Drive with the HUD up; watch for `race:error` in the client log. | Silence. An error now has somewhere to appear, which is the whole point -- previously there was nowhere. | |
 | §BD4 | Join with driver inputs unreadable (no vehicle snapshot fields). | The cluster still shows, with the tyre gauge live and the pedals dashed. Previously an unreadable input hid the whole box and would have taken the gauge with it. | |
+
+
+## §BE - The road and the tyre are two different things - **AWAITING LIVE TEST**
+
+`L160`. The tyre model already worked; this section tests whether the ROAD is now a separate,
+felt thing from the rubber on it, and whether the two can be observed to disagree.
+
+**Nothing here needs a chat command while driving.** The server writes a thermal line every 5 s per moving
+car, and it now prints both bodies:
+
+```
+thermal asset=00000f v=19.8 m/s lat=7.4 m/s2 load=0.481 T=86.3C pos=+0.04 track=41.2C air=27.1C surf=x0.992
+```
+
+`track` and `air` must be DIFFERENT numbers in sun. If they are equal at midday the environment feed is
+not delivering `secondsOfDay` and the surface layer is absent rather than inert - which is the designed
+behaviour, not a bug, but it means this section cannot run.
+
+| # | Step | Expected | Result |
+|---|---|---|---|
+| BE1 | Sit in a car at midday, dry. Read one thermal log line. | `track` roughly 15C ABOVE `air`. Sun on asphalt is not air temperature. | |
+| BE2 | `/ncm.tyre` while parked. | Three lines: the tyre's own band, a `track ... (air ...)` line, and the raw `weather/wetness/secondsOfDay`. **Both bodies reported**, because one of them explains half of what is felt. | |
+| BE3 | `/ncm.machine weather rain`, wait for it to take, read a thermal line. | `track` COLLAPSES toward `air` and then below it - the solar term is removed outright, not reduced. `surf` falls. | |
+| BE4 | Same drive, dry midday vs dry pre-dawn (`/ncm.machine time`, if available; otherwise wait or compare sessions). | Tyre settles materially HOTTER at midday on identical driving. Model says 111C vs 74C at sustained brisk cornering. | |
+| BE5 | Warm the tyre into the window at midday, then trigger rain and keep driving. | The tyre does NOT instantly change - it has its own time constant - while `track` and `surf` move at once. **This is the whole point of the split: two bodies, two clocks.** | |
+| BE6 | Drive hard on a cold wet pre-dawn road with tyres already warmed into the window. | Still short of grip. A tyre in its window on a freezing road is a representable state and must not feel identical to a warm road. | |
+| BE7 | Watch for double-charging: compare `surf` in the log against wetness. | `surf` must respond to `track` only. Two conditions with the same track temperature and different wetness must show the SAME `surf`. `L160` point 4. | |
+
+**What would falsify the design rather than the implementation:** if BE5 shows the tyre tracking the road
+instantly, the two bodies are not independent and the split bought nothing. If BE6 feels identical to a
+warm road, `SURFACE_COLD_DEPTH` is too small to be a mechanic and should either grow or be removed - a
+layer nobody can feel is a layer that should not be traced.
+
