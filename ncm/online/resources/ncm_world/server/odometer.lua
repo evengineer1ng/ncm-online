@@ -99,36 +99,87 @@ local function conditions()
     return { wetness = wetness, secondsOfDay = seconds }
 end
 
---- Lateral acceleration, in m/s^2, from the vehicle's own heading.
+--- Cornering load, in m/s^2, from what a ONE HERTZ poll can honestly see.
 ---
---- **The snapshot reports `heading` (and `yaw`) directly**, so this reads the car's facing rather than
---- inferring it from where the car has been. That distinction matters most in exactly the case that
---- exposed it: a donut is a tight circle where the direction of TRAVEL and the direction the car is
---- POINTING are not the same thing, and a position-derived heading understates the yaw rate badly.
+--- ---------------------------------------------------------------------------------------------------
+--- WHY THERE ARE TWO ESTIMATORS AND NOT ONE
+--- ---------------------------------------------------------------------------------------------------
 ---
---- Yaw rate times speed is the centripetal term. Still coarse at 1 Hz -- a flick of opposite lock inside
---- one sample is invisible -- and still the honest reading of what this loop can see.
-local function lateralAccel(entry, cur, dt)
-    if dt <= 0 then return 0 end
-    local heading = cur and cur.headingRad
-    if not heading then return 0 end
+--- The obvious method -- change in heading over the interval, times speed -- has a failure mode that a
+--- live drive found immediately: **it cancels under oscillation.** A weaving car swings left, then right,
+--- and lands the next sample pointing almost where it started. The yaw rate was high the whole time and
+--- the NET heading change is near zero, so the model saw a car travelling in a straight line and kept its
+--- tyres stone cold. Sustained donuts have a related problem: past pi radians in one sample the wrap is
+--- genuinely ambiguous and a fast spin reads as a slow one.
+---
+--- The second estimator cannot cancel, because it measures a DISTANCE rather than an angle. A car that is
+--- turning covers more PATH than DISPLACEMENT: drive one second at 10 m/s in a straight line and you are
+--- 10 m away, but weave and you are 9 m away having still travelled 10 m of road. The deficit between the
+--- two is a direct measure of how much the car is not going straight, and it survives any amount of
+--- direction reversal inside the sample.
+---
+--- Inverting it: for an arc turned through `theta` in one sample, `displacement/path = sin(theta/2) /
+--- (theta/2)`, which for moderate angles is about `1 - theta^2 / 24`. So `theta ~= sqrt(24 * deficit)`.
+--- A weave is not a circular arc, but it gives the honest "the car turned about this much" answer that a
+--- signed heading delta throws away.
+---
+--- **Take whichever is larger.** Heading is the better estimator for a long steady corner, where the
+--- deficit over one second is tiny; the path deficit is the better one for weaving, donuts and anything
+--- that changes direction faster than the sample rate. Neither is right everywhere and the maximum is
+--- honest about that -- it reports the most cornering this poll can PROVE, not the most it can imagine.
+local function lateralAccel(entry, prev, cur, dt)
+    if dt <= 0 or not cur then return 0 end
+    local speed = cur.speedMps or 0
+    if speed < 1.0 then return 0 end
+
     local state = thermal[entry.assetId]
-    local previous = state and state.headingRad
-    if state then state.headingRad = heading end
-    if not previous then return 0 end
-    local delta = heading - previous
-    -- Wrap to [-pi, pi]. Without this, crossing the discontinuity reads as a violent yaw that never
-    -- happened and would cook a tyre on a straight road.
-    while delta > math.pi do delta = delta - 2 * math.pi end
-    while delta < -math.pi do delta = delta + 2 * math.pi end
-    -- **A yaw rate past pi per sample ALIASES** and there is no way to recover the true value from two
-    -- samples a second apart. Rather than report a small number for a fast spin, treat a near-half-turn as
-    -- the most this can honestly claim to have seen.
-    return math.abs(delta / dt) * (cur.speedMps or 0)
+
+    -- ---- estimator one: net heading change
+    local byHeading = 0
+    local heading = cur.headingRad
+    if heading then
+        local previous = state and state.headingRad
+        if state then state.headingRad = heading end
+        if previous then
+            local delta = heading - previous
+            while delta > math.pi do delta = delta - 2 * math.pi end
+            while delta < -math.pi do delta = delta + 2 * math.pi end
+            byHeading = math.abs(delta / dt) * speed
+        end
+    end
+
+    -- ---- estimator two: path travelled versus ground covered
+    local byDeficit = 0
+    if prev then
+        local dx, dy = cur.x - prev.x, cur.y - prev.y
+        local displacement = math.sqrt(dx * dx + dy * dy)
+        -- **The AVERAGE speed across the interval, not the instantaneous one at its end.** Using `speed`
+        -- here would make hard acceleration in a dead straight line read as cornering: the car ends the
+        -- second faster than it spent it, so `speed * dt` overstates the path and the surplus looks
+        -- exactly like a turn. That would have heated tyres on a drag strip.
+        local avg = ((prev.speedMps or speed) + speed) * 0.5
+        local path = avg * dt
+        if path > 0.5 then
+            local ratio = displacement / path
+            -- A deadband, because position and speed come from different samples and never agree perfectly.
+            -- Below two percent this is measurement noise, and noise times thirty metres a second would be
+            -- a violent phantom corner on an empty straight.
+            local deficit = 1.0 - ratio - 0.02
+            if deficit > 0 then
+                -- Past ~0.45 the chord approximation has broken down entirely -- a tight donut, or a spin
+                -- on the spot. Cap it rather than let the inversion run away.
+                if deficit > 0.45 then deficit = 0.45 end
+                local theta = math.sqrt(24 * deficit)
+                byDeficit = (theta / dt) * avg
+            end
+        end
+    end
+
+    return math.max(byHeading, byDeficit)
 end
 
 --- Advance one Machine's tyre temperature. Called for every sampled asset, driven or not.
-local function thermalStep(entry, cur, t)
+local function thermalStep(entry, prev, cur, t)
     local assetId = entry.assetId
     local state = thermal[assetId]
     local ambient = Thermal.ambient(conditions())
@@ -144,7 +195,27 @@ local function thermalStep(entry, cur, t)
     if dt <= 0 then return end
 
     local speed = cur and (cur.speedMps or 0) or 0
-    local load = cur and Thermal.load(speed, lateralAccel(entry, cur, dt)) or 0
+    local lateral = cur and lateralAccel(entry, prev, cur, dt) or 0
+    local load = cur and Thermal.load(speed, lateral) or 0
+
+    -- ----------------------------------------------------------------- what the model actually sees
+    --
+    -- **Added after two live drives where the gauge stayed cold and there was no way to tell why.** The
+    -- first was the model's equilibrium; the second is still open, and the difference between "the car is
+    -- barely cornering", "the yaw rate is aliasing at 1 Hz" and "lateral is reading zero" is invisible
+    -- from a grip number alone -- they all look like a cold tyre.
+    --
+    -- Every five seconds while occupied, so a sixty-second drive leaves twelve readable lines and a
+    -- parked server writes nothing. The owner cannot type commands while driving; this needs no typing.
+    if cur and speed > 1.0 then
+        state.diagAt = state.diagAt or 0
+        if t - state.diagAt >= 5 then
+            state.diagAt = t
+            log("thermal asset=%s v=%.1f m/s lat=%.1f m/s2 load=%.3f T=%.1fC pos=%+.2f amb=%.1fC",
+                tostring(assetId):sub(-6), speed, lateral, load, state.tempC,
+                Thermal.position(state.tempC) or 0, ambient)
+        end
+    end
 
     if dt > Thermal.MAX_STEP_SECONDS and load <= 0 then
         -- A long gap with nothing happening: closed-form, so a car parked for ten minutes ends up at
@@ -358,7 +429,7 @@ local function step(entry, t)
         publish(entry.pid, nil)
         -- The tyres keep cooling with nobody aboard. This is the branch that makes temperature a property
         -- of the Machine rather than of the drive, and it costs one call.
-        thermalStep(entry, nil, t)
+        thermalStep(entry, nil, nil, t)
         -- Unreadable, gone, or nobody aboard. Break the chain so the next observation cannot be joined to
         -- this one across the gap.
         last[assetId] = nil
@@ -369,7 +440,7 @@ local function step(entry, t)
                   headingRad = headingOf(snap) }
     local prev = last[assetId]
     last[assetId] = cur
-    thermalStep(entry, cur, t)
+    thermalStep(entry, prev, cur, t)
     if not prev then return end
     local seg = Identity.segment(prev, cur)
     trace(assetId, prev, cur, seg)

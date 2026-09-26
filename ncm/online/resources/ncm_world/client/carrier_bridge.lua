@@ -754,6 +754,30 @@ RegisterCommand("ncm.ratedtopspeed", function()
     log("---- paste into data/vehicle_catalogue.lua M.TOP_SPEED_KPH ----")
     for _, row in ipairs(rows) do log("%s", row) end
     log("---- %d record(s), %d unresolved ----", #rows, missing)
+
+    -- ----------------------------------------------------------------- which ARGUMENT does it want?
+    --
+    -- **The first dump returned nil for all 47 records.** The card's prose says "a vehicle's TweakDB
+    -- record" and its example passes a record path, but the PARAMETER IS NAMED `vehicleId` -- so the prose
+    -- and the signature disagree, and prose loses. Try the live id of the car the player is sitting in and
+    -- say which form answered, because a table that cannot be filled is the thing blocking top speed.
+    local own = NcmClientOwnVehicle and NcmClientOwnVehicle() or nil
+    local id = own and (own.id or own.vehicleId)
+    if not id then
+        log("ratedTopSpeed: sit in a car and run this again -- the live-id form is untested without one")
+        return
+    end
+    local okLive, live = pcall(api.ratedTopSpeed, id)
+    log("ratedTopSpeed(liveId=%s) -> %s%s", tostring(id),
+        okLive and tostring(live) or "THREW",
+        (okLive and type(live) == "number") and " km/h  <-- THIS is the accepted form" or "")
+    -- And the record of the car actually being sat in, so a record that IS resolvable can be told from a
+    -- record path being the wrong kind of argument entirely.
+    if own and own.record then
+        local okRec, byRecord = pcall(api.ratedTopSpeed, own.record)
+        log("ratedTopSpeed(record=%s) -> %s", tostring(own.record),
+            okRec and tostring(byRecord) or "THREW")
+    end
 end, false)
 
 --- The server answers in chat as well (`Open77.chat.send`); this puts the same line in the client log,
