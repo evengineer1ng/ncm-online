@@ -3,44 +3,43 @@
 > **STATUS: LEDGER** - living session memory, rewritten at the end of every working session.
 > Authority map: [INDEX.md](INDEX.md) - classified 2026-09-24 (L125).
 
-Last rewritten: **2026-09-26 - Parts layers 1-3 built (`L150`); the `KB-136` discriminator and the architecture dump are built and awaiting one drive.**
+Last rewritten: **2026-09-26 - Parts layers 1-3 built (`L150`); native-asset Foundry inventory direction captured as `IDEA-515`; the `KB-136` discriminator and the architecture dump are built and awaiting one drive.**
 
-> **Claim before writing:** decisions through **L151**; MASTER_TEST through **§AW**; next QA letter **§AX**.
-> BACKLOG next free **IDEA-515**; known issues through **KB-145** plus pre-existing duplicate labels noted by
+> **Claim before writing:** decisions through **L151**; MASTER_TEST through **§AX**; next QA letter **§AY**.
+> BACKLOG next free **IDEA-516**; known issues through **KB-145** plus pre-existing duplicate labels noted by
 > `KB-114`. Read the ledger tails before allocating an ID.
 
 ## One next action
 
-**Drive 0.1.16 and read one log line: is `+0x0C` the torque accumulator?**
+**Stop chasing moments by offset, and take the Parts work forward on the two levers that are proven.**
 
-§AW confirmed `driveScale` and `brakeScale` live on Production and refuted `rollBias` -- and the refutation
-is the useful part. **`force` at `+0x00` carries no position**, so the four per-corner entries cannot express
-a moment, which is why three separate load-redistribution experiments all did nothing. That channel is
-closed with a mechanism rather than left open.
+§AX closed the torque hunt: `+0x0C` is not the yaw torque accumulator, across three read-only builds and
+four owner drives. The full reasoning is in §AX, including the caveat that it refutes *this offset sampled
+this way* rather than the existence of a torque channel.
 
-Moments must live somewhere, and `+0x0C` is the only unexamined `Vector3` in a `force / ??? / velocity /
-angularVelocity` layout -- inside the struct we already hold. If it is torque, then **anti-roll, yaw
-balance, brake bias and stability** all become writes through the interception already proven, and
-`ApplyTorqueAtPosition`'s unknown signature stops mattering.
+**What is proven and shipping, per-instance and therefore per-player on a shared model:**
 
-0.1.16 probes it **read-only**. Just drive normally, including some deliberate cornering both ways, and the
-reporter prints a verdict once a second:
+| lever | status |
+|---|---|
+| `gripScale` | PROVEN §AU5 |
+| `driveScale` | PROVEN §AW1 -- and the owner's March 2026 anti-crawl hook is prior art for it |
+| `brakeScale` | PROVEN §AW2 |
 
-```
-torque? +0x0C n=.. meanAbsZ=.. spread=.. | dOmegaZ=.. impulseZ=.. impliedIzz=.. | steerSign a/b
-```
+That is three live levers covering tyres, power and brakes, none of which existed this morning, and which
+between them break the "two drivers in the same model cannot differ" constraint that Report 36 called the
+hardest one.
 
-Three conditions, all printed rather than summarised, and any one failing is the answer:
+**What is closed, with mechanisms rather than open questions:** per-corner load redistribution (§AV2, §AW3 --
+`force` carries no position), the orientation quaternion in `+0x20..+0x180` (§AV3), and `+0x0C` as torque
+(§AX).
 
-- **spread > 0** -- a constant is not an accumulator. This is the §AV3 trap and variance is what catches it.
-- **impliedIzz positive and of believable order** -- integrating `torque_z` against `delta(omega_z)` from
-  `+0x24`. Negative or wandering means it is not a torque about that axis.
-- **steerSign consistent** -- a yaw torque should track steering, not arrive at random.
+**If moments are picked up again**, the order is decided by an asymmetry rather than by appeal:
+`DrivingForcesHelper::Apply` has a **known** signature from the owner's own working code (`IDEA-513`);
+`ApplyTorqueAtPosition` does not. Read `tuning.lua` before probing anything (`IDEA-508`, `KB-145`).
 
-Also in 0.1.16, both recovered from the March clutch artifact: the **standstill branch** that 0.1.15 was
-missing (`driveScale` was inert below ~1.8 km/h, precisely the regime the gear speed floor lives in), and
-`IDEA-513`/`IDEA-514` recording `DrivingForcesHelper::Apply` as a known-signature second hook and the
-per-gear speed floor as engine behaviour.
+**The nearer-term item is `KB-145`:** seven of twenty-one `machine.flats` entries do not resolve, including
+the tyre family's headline flat, and `parts.ontology` derives its record channel straight from that file --
+so it is currently confident about families it should not be.
 
 ## Production live state
 
@@ -76,6 +75,15 @@ Verified directly against the server on 2026-09-26, not carried forward from not
 
 Two sessions' work sits here: §AU built the capability, §AV established its shape. **Read §AV before designing
 anything physical.**
+
+### Native-asset Foundry direction captured
+
+`IDEA-515` records the owner's proposal to build Foundry output from existing Cyberpunk vehicle assets rather
+than new 3D models. The current NCM catalogue is an authored subset, not the game's inventory: 26 native
+machine identities comprise 21 four-wheel vehicles and five motorcycles, while the installed current game
+contains many more player, quest, tuned and appearance records. No vehicle was added and no architectural
+decision was made. The owed work is a provenance-aware record/entity/appearance/content-package inventory and
+a runtime validation matrix before any candidate becomes canonical or enters the economy.
 
 ### The capability, unchanged and proven (§AU, `L148`)
 

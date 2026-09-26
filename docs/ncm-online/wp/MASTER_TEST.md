@@ -1382,3 +1382,44 @@ already hold and already write. `IDEA-512` is the read-only probe that settles i
 oracle rather than a hope: integrating `torque_z` must yield a **positive, roughly constant** implied yaw
 inertia against the angular velocity at `+0x24`, and a field that merely varies proves nothing -- which is
 the trap `§AV3`'s quaternion fell into until variance tracking caught it.
+
+## §AX - the torque candidate at `+0x0C`: three builds, and it does not validate - **REFUTED as a torque**
+
+`IDEA-512`. §AW3 established that `force` at `+0x00` carries no position, so moments cannot live there --
+which left the question of where they do live. `+0x0C` is the only unexamined `Vector3` in a
+`force / ??? / velocity / angularVelocity` layout, inside the struct the carrier already holds. This section
+is the attempt to confirm it, and the attempt failed.
+
+**All three builds were read-only. Nothing was written and `L151` was never engaged.**
+
+| # | Build | Sampling | Result |
+|---|---|---|---|
+| §AX1 | 0.1.16 | inside the deep-read block | **Invalid measurement.** The deep read is gated twice -- rate-limited 1-in-16 *and* only for the fastest body that window -- yielding 1-8 samples per second, each standing for 0.3-1s of elapsed time, each then multiplied by `dt = 1/60`. The integration was wrong by 20-60x and irregularly so. What survived: the field is **0.000 parked and reaches 71.5 under cornering load**, and its sign agrees with steering **127/165 = 77%** against 50% chance. Neither depends on the broken `dt`. |
+| §AX2 | 0.1.17 | on the gravity entry, once per frame | **`impulseZ = +0.000` in every window** while yaw moved by up to 1.4 rad/s. Not a refutation: the gravity entry is the **first** of the sixteen contributor calls, so it catches an accumulator empty. Zero at frame start and non-zero later is what `force` at `+0x00` does. This was *supporting* evidence wearing a null result's clothes. |
+| §AX3 | 0.1.18 | peak per frame, gravity entry as the frame BOUNDARY | **REFUTED.** `impulseZ` is now non-zero, so the sampler works -- but the implied yaw inertia across 45 windows is `positive 32/45 (71%)`, range `-109.0 .. +244.6`, mean `30.2`. A real yaw inertia for this 1100 kg car is ~1200-1500 kg.m2. Not constant, not consistently signed, and off by ~40x. |
+
+### What this establishes, and the honest limit of it
+
+**`+0x0C` is not the yaw torque accumulator.** Integrating it does not predict yaw acceleration, which is the
+only test that matters. The 71% positive rate is also close enough to §AX1's 77% steer-sign agreement to read
+as *"this field loosely tracks yaw direction"* rather than *"this field causes yaw"* -- and many quantities
+correlate with yaw without being its torque.
+
+**The limit, stated plainly: §AX3 stacks two unvalidated assumptions.** It assumes the frame PEAK equals the
+frame TOTAL, which holds only if the accumulator fills monotonically and is not consumed or reset mid-cycle.
+So this refutes *"this offset, sampled this way, is the yaw torque"*. It does not refute *"a torque channel
+exists somewhere"*, and it should not be cited as though it did.
+
+**The process finding is worth more than the result.** Twice in this series the instrument changed rather
+than the hypothesis, and both times the first reading looked like an answer -- §AX1's wandering inertia was
+the sampler, §AX2's clean zero was the sample point. `KB-143` records exactly this class of error and it was
+committed twice more one build after being written down. **Three builds and four owner drives spent, no
+conclusion reached, and the stopping decision is the correct output.**
+
+### Where moments go from here
+
+Not through more offset guessing. `ApplyTorqueAtPosition` (`3303544265`) is confirmed present in this
+build's address table but its signature is unknown, and `IDEA-513` records that
+`DrivingForcesHelper::Apply` (`1989218322`) has a **known** signature from the owner's own March 2026
+work -- `void __fastcall(uint64_t*, float)`, already hooked successfully on this engine. If moments are
+pursued again, that asymmetry should decide the order.

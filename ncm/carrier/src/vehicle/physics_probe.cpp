@@ -334,6 +334,42 @@ std::atomic<bool> g_omegaZStarted{false};
 // Sign agreement with steering: a yaw torque should oppose or follow steer consistently, not at random.
 std::atomic<int64_t> g_torqueSteerAgree{0}, g_torqueSteerTotal{0};
 
+// ---------------------------------------------------------------------------------------------------
+// 0.1.17: the torque oracle, sampled ONCE PER FRAME instead of once per second.
+//
+// 0.1.16 read the torque candidate inside the deep-read block, which is gated twice -- rate-limited
+// 1-in-16 AND only for whichever body is fastest that window. That yielded 1-8 samples a second, each
+// standing for 0.3-1s of elapsed time, and then multiplied each by dt = 1/60. **The integration was wrong
+// by a factor of twenty to sixty and irregularly so, which is why `impliedIzz` wandered and flipped sign.**
+// That number was never evidence about `+0x0C`; it was evidence about the sampler. Exactly the class of
+// error KB-143 records, committed again one build after writing it down.
+//
+// The fix was already proven and sitting unused: **the gravity entry fires exactly once per frame per
+// body** (§AU4 -- `grav=60` at 60 fps, repeatedly exact). Sampling there makes dt = 1/60 true rather than
+// assumed, and gives an exact frame count to divide by.
+// **0.1.18. The gravity entry was the WRONG instant, and the way it was wrong is the finding.**
+// 0.1.17 sampled once per frame on the gravity entry and got `impulseZ = +0.000` in every window while
+// yaw moved by up to 1.4 rad/s. 0.1.16, sampling at effectively random points in the cycle, saw the same
+// field reach 71.5. Both are true: **the gravity entry is the FIRST of the sixteen contributor calls**, so
+// it catches the accumulator empty. Zero at frame start, non-zero later, is what an accumulator does --
+// the same behaviour `force` at `+0x00` has, which is the field we already know accumulates across the
+// cycle.
+//
+// So sample on EVERY call for the tracked body and keep the frame's peak magnitude, snapshotting and
+// resetting it at the gravity entry -- which is now used as a frame BOUNDARY rather than as a sample
+// point. For a value that fills monotonically across the cycle, the peak is the frame's total.
+//
+// Cost: ~16 extra SEH float reads per frame on one body. That is not the KB-141 hazard, which was
+// `VirtualQuery` per access rather than the read itself; the span for this body is already validated.
+std::atomic<int64_t> g_tqFrameMaxAbs{0};    // x1000, |torque_z| peak within the current frame
+std::atomic<int64_t> g_tqFrameSigned{0};    // x1000, the signed value at that peak
+
+std::atomic<uint32_t> g_tqFrames{0};
+std::atomic<int64_t> g_tqSumZ{0};          // x1000, summed once per frame
+std::atomic<float> g_tqOmegaFirst{0.0f};
+std::atomic<float> g_tqOmegaLast{0.0f};
+std::atomic<bool> g_tqHaveFirst{false};
+
 // Attitude, published from the deep read.
 std::atomic<float> g_angVelX{0.0f}, g_angVelY{0.0f}, g_angVelZ{0.0f};
 std::atomic<float> g_quatX{0.0f}, g_quatY{0.0f}, g_quatZ{0.0f}, g_quatW{1.0f};
@@ -757,11 +793,40 @@ void observe(void* body) noexcept
                 t_wheelRun = 0;
             }
 
+            // Every call: track the frame's peak |torque_z|. Read-only.
+            {
+                float tqAny[3];
+                if (readTorqueCandidate(body, tqAny)) {
+                    const int64_t signed1000 = static_cast<int64_t>(std::llround(tqAny[2] * 1000.0));
+                    const int64_t abs1000 = signed1000 < 0 ? -signed1000 : signed1000;
+                    int64_t seen = g_tqFrameMaxAbs.load(std::memory_order_relaxed);
+                    while (abs1000 > seen &&
+                           !g_tqFrameMaxAbs.compare_exchange_weak(seen, abs1000,
+                                                                  std::memory_order_relaxed)) {}
+                    if (abs1000 >= seen) g_tqFrameSigned.store(signed1000, std::memory_order_relaxed);
+                }
+            }
+
             switch (kind) {
-                case Kind::Gravity:
+                case Kind::Gravity: {
                     g_cntGravity.fetch_add(1, std::memory_order_relaxed);
                     g_lastGravity.store(force[2], std::memory_order_relaxed);
+
+                    // The gravity entry is the frame BOUNDARY, not the sample. Close out the frame that
+                    // just ended: take its peak, add it to the window, then reset for the new frame.
+                    const int64_t frameTotal = g_tqFrameSigned.exchange(0, std::memory_order_relaxed);
+                    g_tqFrameMaxAbs.store(0, std::memory_order_relaxed);
+
+                    float om[3], q[4];
+                    if (readAttitude(body, om, q)) {
+                        g_tqFrames.fetch_add(1, std::memory_order_relaxed);
+                        g_tqSumZ.fetch_add(frameTotal, std::memory_order_relaxed);
+                        if (!g_tqHaveFirst.exchange(true, std::memory_order_relaxed))
+                            g_tqOmegaFirst.store(om[2], std::memory_order_relaxed);
+                        g_tqOmegaLast.store(om[2], std::memory_order_relaxed);
+                    }
                     break;
+                }
                 case Kind::Wheel: {
                     g_cntWheel.fetch_add(1, std::memory_order_relaxed);
                     const uint32_t corner = t_wheelRun;
@@ -1213,6 +1278,31 @@ void reportClassification(double speed)
             }
         } else if (g_torqueOk.load(std::memory_order_relaxed) == false) {
             NCM_INFO("torque? +0x0C unreadable this window");
+        }
+    }
+
+    // ------------------------------------------------- 0.1.17: the frame-rate torque oracle
+    {
+        const uint32_t frames = g_tqFrames.exchange(0, std::memory_order_relaxed);
+        const int64_t sumZ = g_tqSumZ.exchange(0, std::memory_order_relaxed);
+        const float om0 = g_tqOmegaFirst.load(std::memory_order_relaxed);
+        const float om1 = g_tqOmegaLast.load(std::memory_order_relaxed);
+        g_tqHaveFirst.store(false, std::memory_order_relaxed);
+
+        if (frames > 0) {
+            // Each sample is exactly one physics frame, so the integral is the sum times the frame time.
+            const double impulse = (static_cast<double>(sumZ) / 1000.0) / 60.0;
+            const double dOmega = static_cast<double>(om1) - static_cast<double>(om0);
+            // A near-zero denominator makes a precise-looking number that means nothing, so it is withheld.
+            if (std::fabs(dOmega) > 0.05) {
+                const double izz = impulse / dOmega;
+                NCM_INFO("torqueIzz: frames=%u impulseZ=%+.3f dOmegaZ=%+.3f -> Izz=%+.1f %s",
+                         frames, impulse, dOmega, izz,
+                         izz > 0.0 ? "(positive)" : "(NEGATIVE)");
+            } else {
+                NCM_INFO("torqueIzz: frames=%u impulseZ=%+.3f dOmegaZ=%+.3f -> withheld (yaw flat)",
+                         frames, impulse, dOmega);
+            }
         }
     }
 
