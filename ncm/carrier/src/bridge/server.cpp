@@ -349,6 +349,16 @@ void Server::serveWebSocket(uintptr_t clientHandle, const std::string& key)
     connected_ = true;
     NCM_INFO("NCM connected to the bridge");
 
+    // Introduce ourselves before reading anything. The page already routes `health` to the client's
+    // `ncm:carrier.health` handler, so this reaches NCM's own log without a resource change.
+    if (onConnect_) {
+        try {
+            onConnect_();
+        } catch (const std::exception& e) {
+            NCM_WARN("connection snapshot failed: %s", e.what());
+        }
+    }
+
     int opcode = 0;
     std::string payload;
     while (running_.load() && readFrame(client, opcode, payload)) {
@@ -423,7 +433,7 @@ void Server::dispatch(const std::string& payload)
     onFrame_(frame);
 }
 
-void Server::sendDevice(const std::string& payload)
+void Server::sendJson(const std::string& payload)
 {
     const auto client = client_.load();
     if (!client || !connected_.load()) return;

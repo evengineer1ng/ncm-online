@@ -75,6 +75,10 @@ public:
 private:
     void classifyAll();
     bool openHaptic();
+    /// Poll SDL until it reports a device or the detection window expires. Windows joystick detection is
+    /// asynchronous; reading the count on the line after init can return zero on a machine full of
+    /// hardware. `strategy` only names the attempt in the log.
+    int waitForDevices(const char* strategy);
 
     std::vector<Device> devices_;
     Controls controls_;

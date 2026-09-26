@@ -3,127 +3,109 @@
 > **STATUS: LEDGER** - living session memory, rewritten at the end of every working session.
 > Authority map: [INDEX.md](INDEX.md) - classified 2026-09-24 (L125).
 
-Last rewritten: **2026-09-25 - the carrier is built, hosted and live on Development; server upgraded to op77.102.**
+Last rewritten: **2026-09-26 - a car was made to slide on command, live, on an already-spawned vehicle (`L148`, §AU).**
 
-> **Claim before writing:** decisions through **L146**; MASTER_TEST through **§AT**; next QA letter **§AU**.
-> BACKLOG next free **IDEA-479**; known issues through **KB-121** plus the pre-existing duplicates **KB-87**
-> and **L119**. Read the last row of each ledger, not this line (`KB-114`).
+> **Claim before writing:** decisions through **L148**; MASTER_TEST through **§AU**; next QA letter **§AV**.
+> BACKLOG next free **IDEA-503**; known issues through **KB-140** plus pre-existing duplicate labels noted by
+> `KB-114`. Read the ledger tails before allocating an ID.
 
-## Next action: an owner decision on how Development is joined.
+## One next action
 
-**The input bug is fixed and it was never the carrier** (`KB-127`). A wedged `NCM-Wheel-Support.exe` had been
-running 16.3 hours with its bridge dead, still holding a ViGEm virtual Xbox 360 pad and feeding the game
-stale centred axes -- which is what a bipolar axis at rest becomes when mapped to 0..1, i.e. throttle, brake
-and steering all pinned near 50% while the car fights itself. Stopped; virtual pad count dropped 2 to 1 on
-the spot. Autostart renamed `NCM Wheel Support.lnk.disabled` -- rename back to restore.
+**Fix `KB-136` -- the projection transport -- because it is now the only thing between a working grip lever
+and rain that actually changes how a car drives.** The carrier can change lateral grip on a spawned car,
+live and reversibly (`L148`, §AU5). `machine.projection` already computes wetness and publishes 11 records.
+Not one has ever reached a client. Until that transport works, `gripScale` comes from a JSON file a human
+edits, which is a capability and not a feature (`IDEA-502`).
 
-**The carrier still has not been delivered, and the earlier URL diagnosis was wrong** (`KB-126`, `IDEA-485`).
-Development is `Visibility=Unlisted` and is joined by raw address, and a direct-IP join **never requests
-`/mods/v1/manifest`** -- the server log shows no such request during the join at all. Fixing `publicBaseUrl`
-was correct on its own merits and changed nothing. Three ways forward, and the first is the owner's call
-because it publishes a development box:
+The evidence gathered on 2026-09-25 narrows it sharply and is recorded in `KB-136`: in the same live
+session, `GlobalState.ncmCalendar` (array-shaped) **was** read successfully by the client, while both
+`GlobalState.ncmCeilings` and `GlobalState.ncmProjections` (maps keyed by record path) produced **total
+silence** -- no log line from either branch of the loop. Class ceilings are therefore silently broken too,
+which is a shipped feature nobody has noticed. Start by discriminating map-shape from payload size; the
+`client/race.lua` precedent (an entrant-targeted stream replacing nested session state) is the fallback.
 
-1. Set the world **Listed** so it resolves through the master with its mods digest.
-2. Find whether the launcher takes a world id or invite for an unlisted world.
-3. Test delivery on **Production**, where listing already works and §AP already proved the path.
+## Production live state
 
-**Do not spend more joins guessing.** The one distinguishing line is `OP77_WORLD_MODS_DIGEST` on the
-launcher command line: `-` means nothing was offered.
+- Host `52.60.225.137`; server id `6b154fdc-d515-4903-97dd-df37cb966151`; unlisted and **whitelisted again**
+  (`KB-137` closed: the tree was root-owned so Warden could not save; `chown -R ubuntu:ubuntu` plus a restore
+  of `access.json` from the `.87` backup fixed it, and a successful Warden write confirmed it live).
+- OPEN//77 `2.31.13+op77.102 linux-x64`, protocol **1.40**.
+- RequiredMods enabled/unsecured; sole declaration `ncm-carrier` **0.1.9**, executable, 907,490 bytes,
+  SHA-256 `e744a13fd504fdd826a1a5f479ecd7c1a4eaac5526680f762f7fc938d1fc3ac7`, digest
+  `71ae63e217d1e8bb06d56a281e799f16b4c7bc89da61892c9e4ed24722d0acf6`.
+- **0.1.10 is built and packaged but NOT published:** `dist/ncm-carrier-0.1.10.zip`, 908,510 bytes, SHA-256
+  `0b3f1a8421ebd7d0dde3e659c2a21f0e05ac8c10c0b24ea6a1acbb432a6c6be6`. It adds the self-written default
+  config (`IDEA-500`) and the `diagnostics` switch (`IDEA-501`). Publishing it needs one restart.
+- Boot is clean: `0 applied; pending=[]`; schedulers/race control started; 11 machine records published.
 
-**Ownership identifiers: answered** (`IDEA-484`). `license` is **not** the same string as NCM's binding key --
-the divergence warning fired on the first ordinary join, exactly as designed. Had NCM switched keys on the
-strength of the announcement, every existing driver would have orphaned into an empty garage. Steam and GOG
-were both absent, so ownership evidence is licence-only for this account.
+> **Every carrier publish needs a `chown` afterwards (`KB-138`).** `publish-carrier.py` runs under `sudo` and
+> writes the blob, its metadata and `server.jsonc` back as `root:root`, partially recreating what broke the
+> whitelist. Run `sudo chown -R ubuntu:ubuntu /opt/ncm/server` after every publish and verify with
+> `find /opt/ncm/server ! -user ubuntu`. This belongs in section D of the runbook and in the publisher itself.
 
-**Double spawn** (`IDEA-486`): `open77_appearance` restored the same player three times on one join. Platform
-code, observed not diagnosed, recorded so the next person starts from the log.
+## What changed this session - the carrier can now change physics
 
-## Ownership identifiers -- observing, not migrating
+Carrier **0.1.2 through 0.1.9**, all proven live on Production with the owner driving. Full evidence in
+MASTER_TEST **§AU**; the ruling that permits the write is `L148`.
 
-op77.102 added `Open77.players.identifiers()` with `license`, `steam` and `gog`. **NCM has not changed its
-binding key** (`IDEA-479`). `ncm_driver_binding.user_id` has been `GetPlayerIdentifier()` since M2.1 and
-every driver, profile, SR row and machine hangs off it; if `license` is a different string, switching would
-orphan every existing driver silently -- a missing binding just mints a new one and the player finds an empty
-garage. `identity.lua` now logs, once per player, whether `license` matches the key already in use, and
-shouts if it diverges. **Your next join answers it.** If they diverge, the migration is a backfilled second
-column, never an in-place key change.
+- **The interception point.** `RigidBody::Recalculate`, RED4ext hash `593628708`, whose argument **is** the
+  vehicle's `vehiclePhysicsData`. Recovered from the owner's March 2026 `ManualClutch` experiment and
+  re-verified against this build's own address table. The hash is checked on disk **before** anything
+  resolves it, because `UniversalRelocBase::Resolve` terminates the process on a miss and no `try`/`catch`
+  can intercept that (`IDEA-494`).
+- **`force` decoded.** Not a total: sixteen per-contributor writes per frame -- gravity once, four per-wheel
+  normal loads, a traction pair, a drag pair -- expressed as impulses (`IDEA-495`).
+- **The four corners identified:** `FL, FR, RR, RL`, a ring rather than row-major, from three independent
+  manoeuvres across two cars. Resting residual against gravity: `-0.0` (`IDEA-496`).
+- **Slot indexing refuted.** The callsite runs for one body from **twelve threads**. The thread guard caught
+  it; without it, `modal=14 (17/82)` would have been reported as a real stability figure and a write designed
+  on top of it. Replaced by stateless per-call classification, validated by arithmetic: `grav=60 wheel=240`,
+  60 complete runs, `other=0`, repeatedly exact at 60 fps.
+- **The first write.** Lateral grip scaled on the player's car only, hot-reloaded from config mid-session.
+  At 0.30 the owner reported "unmistakable -- unrealistic, over the top understeer"; at 1.00, instant return
+  to default physics. Writes cost no measurable frame rate (59.1 mean while writing, 55.6 while inert).
+- **`KB-140`:** every DirectInput/HID device on the rig is held exclusively -- the G29, the Thrustmaster
+  pedals and the ESP32 rim all refuse `CreateFile` even with zero access rights. Only the XInput pad is
+  reachable. RawInput never opens a device and is the candidate route (`IDEA-497`).
+- **`KB-139`:** `L"\ncm_..."` has now been written three times. All four wide path literals audited and
+  correct. `config.cpp` carried it silently until 0.1.2, so the config file had **never once loaded** before
+  this session.
 
-## What was built this session
+## What §AU does not establish
 
-**`ncm/carrier/`** - a RED4ext plugin. Loopback WebSocket bridge on 38480 serving the same page the Python
-companion served, so `carrier_bridge.lua` generalises rather than being replaced. TweakDB flat application
-with an originals ledger. SDL force feedback with `CEILING`/`clamp`/`slew`/rung transcribed verbatim (`L133`)
-and KB-103, KB-104 and IDEA-412 carried across. Final-command authority behind RTTI resolution that declines
-rather than guessing. **No ViGEm, no virtual gamepad** - the companion needed one because nothing in the game
-could read a wheel; this writes the final command directly.
+- **No per-wheel friction.** The lateral channel is vehicle-level; the addressable per-corner values are
+  normal loads, and scaling those makes a car sag rather than slide. Front/rear balance is out of reach
+  through this channel (`IDEA-499`).
+- **No connection to NCM.** See the next action above.
+- **No input authority.** `KB-135` stands: no detour writes throttle, brake or steer, and `L148` explicitly
+  does not authorise one. `vehicle/hook.cpp` still asks RTTI for `throttleInput`/`brakeInput`/`steerInput`,
+  names that do not exist -- the SDK calls them `acceleration` and `deceleration`. Its log wording was made
+  honest ("offsets resolved", not "installed"); the containment itself is still owed.
 
-**`machine.flats` and `machine.projection`** - the one calculation, in pure Lua, 20 tests. Parts, wear,
-weather, chrome and class rules in; one versioned envelope out, with a trace naming every movement of every
-number. The plugin applies triples and interprets nothing (`L135`).
+## Carrier proof status
 
-**`server/machine.lua`** publishes projections through `GlobalState.ncmProjections`, the same path the class
-ceilings already use. **Rain is grip now, not a lowered speed limit** (`IDEA-476`) - but it must not go live
-before `KB-6`, because unsynced weather plus grip effects means two drivers racing under different rules
-without knowing it.
+- **AT0, AT1 PASS.** Delivery, native load, script validation, world connection.
+- **AT2 PASS as of 0.1.2:** the typed health snapshot is sent on WebSocket connect and reaches NCM's own
+  client log. `KB-134`'s connecting half is closed; typed fields rather than a version-string shim are owed.
+- **AT3 not run.** `KB-140` means only the pad enumerates, so the panel has nothing real to draw.
+- **AT4 still blocked by `KB-136`.** Note §AU sidesteps its spawn-cached premise entirely.
+- **AU1-AU5 PASS.** See MASTER_TEST §AU.
 
-Offline gate green, **and it is now compiled, packaged, declared and serving on Development.** Two defects
-the offline gate could never have caught surfaced on the first live run and are fixed: `KB-122` (a
-`capability` field in the declaration stops the server booting) and `KB-123` (`os.time()` does not exist in
-the server Lua sandbox, so the projection publisher was dead and silent). `IDEA-481` records the gap:
-**the gate proves the calculation, and only a running server proves the wiring.**
+## Data boundary and rollback
 
-## Live state
+Unchanged (`L147`). Verified 63-table dump and operator-state archive at
+`/opt/ncm/backups/pre-carrier-prod-20260925T213201Z`. The pre-upgrade `.87` tree is retained at
+`/opt/ncm/backups/server-20260925T200746Z` and is where `access.json` was restored from.
 
-- **Production:** untouched this session. ArchiveXL 1.27.1 + TweakXL 1.11.4, digest `67ad384b...`. The
-  `requiredMods.note` still names RB15 and is stale - fix on the next config touch, not with its own restart.
-- **Development:** **op77.102** (upgraded 2026-09-25; load-list guard clean, freeroam sandbox re-closed per
-  `L131`). requiredMods **enabled and unsecured**, one package: `ncm-carrier 0.1.0`, digest `78c37893...`.
-  RB15 and the liveries dropped from the declaration (`L142`).
-- **Repos:** `cyberpunk2077` has a new submodule (`RED4ext.SDK`, MIT). `ncm-wheel` @ `52dd7de`, now reference
-  material rather than a shipping dependency.
+Carrier rollback is one command and needs no file hunting:
 
-## What is settled, so nobody re-opens it
+```
+ssh -i C:\Users\eveng\.ssh\lightsail-ncm.pem ubuntu@52.60.225.137 \
+  'sudo python3 /tmp/publish-carrier.py /opt/ncm/server --remove && sudo systemctl restart ncm-server'
+```
 
-- **NCM owns native code** (`L146`). `L138`'s three questions are answered: mod-required world, yes; native
-  ownership, yes; companion as device layer, no. `L139` is **discharged** - but its naming discipline is not:
-  the command surface is `brake_command_authority`, never `native_brake_force`.
-- **Delivery works; NCM's packages are unwritten** (`L145`, `IDEA-471`). The carrier is the first one.
-- **Spawn-cached** (`L143`). Record effects reach a car at its next spawn, never mid-stint. Parts, weather and
-  class rules fit that honestly. Wear and expiring chrome do not - do not design them against the hope it
-  changes.
-- **Two drivers of the same model still share one record.** Report 36's hardest constraint, untouched by any
-  of this, and it sits directly across the premise of a parts economy.
-- **Four of the twelve families cannot be felt at all** (`IDEA-474`): cooling, transmission, electrical,
-  chassis. Enforced in code, refused by name.
-- **No test may require Solo** (`L144`). **Nobody is to be asked to drive an RB15** (`L145`).
-- **Surface C remains the one open capability question** (`IDEA-464`). A code-reading task, not an owner
-  session.
+## Working-tree caution
 
-## Outstanding live QA
-
-- **§AT:** the carrier. **AT0 PASS**; **AT1 FAIL then re-armed** -- the package was never offered
-  (`KB-125`/`KB-124`), both causes fixed, imported and declared. AT1-AT7 need one join.
-- **§AQ:** AQ1/AQ3 **LIVE PASS**; AQ2 and AQ4 cheap and owed.
-- **`KB-106`'s `ROAD_SCALE`** is now folded into **§AT6** - the carrier prints the measured peaks on shutdown,
-  so one drive closes it.
-- **AN / AO:** Gate 6 setPerformance and brake-authority proofs; not run.
-- **AM4-AM7, AL1-AL2, AK** unchanged. Still owed: IDEA-251 Market live PASS, AH21 incident attribution,
-  migration 028 fresh-world.
-
-## Engineering, parked mid-track
-
-`engineering.competency` is built and green; next is `IDEA-470` - migration 031, `engineer_skill` and
-`engineer_family`, same shape as `driver_sr` - then one bench inspection operation. Untouched this session
-and blocked by nothing.
-
-## Session records
-
-- **L146** NCM owns native code; the carrier is one mod; the companion retires. `L50`/`L1` amended, `L139`
-  discharged, **KB-117 closed by retirement**.
-- **IDEA-479** ownership identifiers, observed not migrated; **480** the build needs no package manager;
-  **481** offline-green does not mean it runs. **KB-122**, **KB-123** found by running it.
-- **IDEA-472** the carrier; **473** NCM had already written these flats itself and nobody checked; **474** four
-  families cannot be felt; **475** one fact, one carrier; **476** rain as grip; **477** how a flat is actually
-  written; **478** superseded -- the manual pre-flight was extra QA on top of the path that actually ships,
-  and the hosted path is the more recoverable one.
-- Online untouched. No deploy, no restart, no config change.
+The tree is intentionally dirty and contains overlapping work from another coder. Preserve unrelated
+changes, especially `ncm/online/resources/ncm_world/server/main.lua`. This session touched only
+`ncm/carrier/**` plus the ledgers. Do not reset or blanket-checkout.

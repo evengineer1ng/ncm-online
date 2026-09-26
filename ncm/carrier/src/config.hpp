@@ -14,6 +14,9 @@ struct Config {
     uint16_t port = 38480;        // the port the companion used; the resource's DEFAULT_URL still points here
     bool enableHook = true;       // final-command authority; off leaves effects and feel working
     bool enableFfb = true;
+    // The read-only physics-step probe (`vehicle/physics_probe.hpp`). On by default because it writes
+    // nothing, but a player whose game misbehaves needs a way to switch it off without a new build.
+    bool enablePhysicsProbe = true;
 
     static Config load(const std::wstring& directory);
 };

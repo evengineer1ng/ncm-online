@@ -15,7 +15,7 @@ std::wstring g_path;
 void init(const std::wstring& dllDirectory)
 {
     std::lock_guard<std::mutex> lock(g_mutex);
-    g_path = dllDirectory + L"\ncm_carrier.log";
+    g_path = dllDirectory + L"\\ncm_carrier.log";
     // Truncate once per session so a log is about this run and not about every run ever.
     std::ofstream out(g_path, std::ios::trunc);
     out << "ncm_carrier " << NCM_CARRIER_VERSION << " log\n";

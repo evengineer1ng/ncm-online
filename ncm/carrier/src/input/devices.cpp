@@ -1,5 +1,6 @@
 #include "input/devices.hpp"
 
+#include "input/hid_scan.hpp"
 #include "log.hpp"
 
 #include <SDL.h>
@@ -61,27 +62,129 @@ double normalisePedal(int raw, int rest)
 
 Devices::~Devices() { close(); }
 
+/// How long to let SDL's detector find hardware before calling a zero a zero. Detection on Windows is
+/// asynchronous, so reading `SDL_NumJoysticks()` on the line after init can legitimately return 0 on a
+/// machine with four controllers plugged in.
+constexpr int kDetectWaitMs = 2000;
+constexpr int kDetectStepMs = 100;
+
+/// Wait, briefly, for SDL to report any device at all. Returns the final count.
+int Devices::waitForDevices(const char* strategy)
+{
+    for (int waited = 0; waited <= kDetectWaitMs; waited += kDetectStepMs) {
+        SDL_JoystickUpdate();  // events are ignored, so detection has to be pumped by hand
+        const int count = SDL_NumJoysticks();
+        if (count > 0) {
+            NCM_INFO("SDL [%s]: %d joystick(s) after %d ms", strategy, count, waited);
+            return count;
+        }
+        if (waited < kDetectWaitMs) SDL_Delay(kDetectStepMs);
+    }
+    NCM_WARN("SDL [%s]: still 0 joystick(s) after %d ms (last error: %s)", strategy, kDetectWaitMs,
+             SDL_GetError() && *SDL_GetError() ? SDL_GetError() : "none");
+    return 0;
+}
+
 bool Devices::open()
 {
-    // The game may already have initialised SDL. Initialising a subsystem twice is safe and reference
-    // counted; initialising SDL itself when the host owns it is not.
-    if (SDL_WasInit(SDL_INIT_JOYSTICK) == 0) {
-        if (SDL_InitSubSystem(SDL_INIT_JOYSTICK | SDL_INIT_HAPTIC) != 0) {
-            NCM_ERR("SDL joystick/haptic unavailable: %s", SDL_GetError());
+    // WHAT WENT WRONG ON 2026-09-25, AND WHY THE ANSWER IS A HINT AND NOT A DEVICE QUIRK.
+    //
+    // The carrier reported `devices none` on a machine with FOUR working controllers -- a Logitech G29
+    // wheelbase, Thrustmaster pedals, a custom ESP32 rim over Bluetooth, and an Xbox pad -- all healthy in
+    // Windows. Four vendors, three transports, zero seen. No per-device explanation survives that; only
+    // something that blinds the whole subsystem does.
+    //
+    // `SDL_HINT_JOYSTICK_THREAD` is documented as controlling "whether a separate thread should be used
+    // for handling joystick DETECTION and raw input messages on Windows", and it defaults to off -- which
+    // means detection rides on the message pump of whatever thread called init. We init from RED4ext's
+    // Running `OnEnter`, a game-engine state callback, and nothing promises that thread dispatches window
+    // messages to SDL's message-only window. Turning the hint on gives SDL its own pump and removes the
+    // dependency on the host's entirely.
+    //
+    // Ask Windows first, underneath DirectInput, so we know what SDL OUGHT to find before we judge what
+    // it did find. This is also where the exclusive-acquisition theory gets tested; see `hid_scan.hpp`.
+    const int expected = hid::logGameControllers();
+
+    // Hints must be set BEFORE the subsystem starts, so they go first.
+    SDL_SetHint(SDL_HINT_JOYSTICK_THREAD, "1");
+    // The game owns the foreground window, not us; without this SDL can decline to report devices it does
+    // not believe we are entitled to read.
+    SDL_SetHint(SDL_HINT_JOYSTICK_ALLOW_BACKGROUND_EVENTS, "1");
+
+    SDL_version linked;
+    SDL_GetVersion(&linked);
+    const uint32_t wasInit = SDL_WasInit(SDL_INIT_JOYSTICK);
+    NCM_INFO("SDL %u.%u.%u linked; joystick subsystem was %s before we touched it",
+             linked.major, linked.minor, linked.patch, wasInit ? "already up" : "down");
+
+    // **Joystick and haptic are initialised SEPARATELY, on purpose.** They used to be one call, so a
+    // machine whose haptic layer refused took the joysticks down with it and the carrier reported no
+    // hardware at all. A rig with no force feedback is still a rig we can read.
+    if (wasInit == 0) {
+        if (SDL_InitSubSystem(SDL_INIT_JOYSTICK) != 0) {
+            NCM_ERR("SDL joystick subsystem unavailable: %s -- no input this session", SDL_GetError());
             return false;
         }
         sdlOwned_ = true;
     }
+    if (SDL_InitSubSystem(SDL_INIT_HAPTIC) != 0) {
+        NCM_WARN("SDL haptic subsystem unavailable: %s -- reading devices anyway", SDL_GetError());
+    }
+
     SDL_JoystickEventState(SDL_IGNORE);  // we poll; events would fight the game's own pump
 
-    const int count = SDL_NumJoysticks();
+    int count = waitForDevices("default");
+
+    // Second strategy, and it is a DIAGNOSTIC as much as a fallback. RAWINPUT is SDL's default Windows
+    // backend; if turning it off finds hardware that leaving it on could not, the log says so plainly and
+    // the next build can stop guessing.
+    //
+    // **THE TRIGGER USED TO BE `count == 0`, AND THAT WAS THE BUG.** On 2026-09-25 SDL found the Xbox pad
+    // instantly and stopped, so the alternate backend was never tried on a rig that was missing three
+    // devices. "Found something" is not "found everything". Windows' own HID count is the yardstick now:
+    // if SDL is short of it, try the other backend before settling.
+    if (count < expected && sdlOwned_) {
+        NCM_WARN("retrying enumeration with SDL_JOYSTICK_RAWINPUT disabled");
+        SDL_QuitSubSystem(SDL_INIT_JOYSTICK);
+        SDL_SetHint(SDL_HINT_JOYSTICK_RAWINPUT, "0");
+        if (SDL_InitSubSystem(SDL_INIT_JOYSTICK) != 0) {
+            NCM_ERR("re-init without RAWINPUT failed: %s", SDL_GetError());
+            return false;
+        }
+        SDL_JoystickEventState(SDL_IGNORE);
+        count = waitForDevices("no-rawinput");
+    }
+
+    if (expected > 0 && count < expected) {
+        NCM_WARN("SDL sees %d of the %d game controller(s) Windows reports. The missing ones are not "
+                 "broken; something else in this process has them. See the HID read-handle results above.",
+                 count, expected);
+    }
+
+    if (count == 0) {
+        NCM_ERR("SDL reports no joystick of any kind. Windows device manager is the place to check next; "
+                "if hardware IS present this is a carrier defect, not a player problem.");
+        openHaptic();
+        return false;
+    }
+
     for (int i = 0; i < count; ++i) {
+        // Named BEFORE opening, so a device we cannot open is still identified in the log rather than
+        // vanishing. "A device we failed to read" and "no device" are different problems.
+        const char* indexName = SDL_JoystickNameForIndex(i);
+        char guid[64] = {};
+        SDL_JoystickGetGUIDString(SDL_JoystickGetDeviceGUID(i), guid, sizeof(guid));
+
         SDL_Joystick* js = SDL_JoystickOpen(i);
-        if (!js) continue;
+        if (!js) {
+            NCM_WARN("device %d \"%s\" [%s] could not be opened: %s", i,
+                     indexName ? indexName : "unnamed", guid, SDL_GetError());
+            continue;
+        }
 
         Device device;
         device.sdlIndex = i;
-        device.name = SDL_JoystickName(js) ? SDL_JoystickName(js) : "unknown";
+        device.name = SDL_JoystickName(js) ? SDL_JoystickName(js) : (indexName ? indexName : "unknown");
         device.joystick = reinterpret_cast<_SDL_Joystick*>(js);
         device.buttons = SDL_JoystickNumButtons(js);
 
@@ -95,8 +198,9 @@ bool Devices::open()
             device.axes.push_back(axis);
         }
         devices_.push_back(std::move(device));
-        NCM_INFO("device %d: \"%s\" (%d axes, %d buttons)", i, devices_.back().name.c_str(), axes,
-                 devices_.back().buttons);
+        NCM_INFO("device %d: \"%s\" [%s] (%d axes, %d buttons, %d hat(s))", i,
+                 devices_.back().name.c_str(), guid, axes, devices_.back().buttons,
+                 SDL_JoystickNumHats(js));
     }
 
     classifyAll();
@@ -135,6 +239,7 @@ bool Devices::openHaptic()
     // **Opening a haptic index is not the test -- creating an effect is** (`IDEA-407`). The owner's wheel
     // enumerates three times and the middle index opens while being able to produce nothing. So probe.
     const int count = SDL_NumHaptics();
+    NCM_INFO("SDL reports %d haptic device(s)", count);
     for (int i = 0; i < count; ++i) {
         SDL_Haptic* haptic = SDL_HapticOpen(i);
         if (!haptic) continue;

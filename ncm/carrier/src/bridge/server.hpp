@@ -63,10 +63,14 @@ public:
     void onFrame(std::function<void(const Frame&)> fn) { onFrame_ = std::move(fn); }
     void onDisconnect(std::function<void()> fn) { onDisconnect_ = std::move(fn); }
 
-    /// Send the device description upward, so the NCM panel can draw what the hardware actually is. Never
-    /// invented: an absent device is reported absent, because "no wheel detected" and "a wheel we could not
-    /// identify" are different things to show a player.
-    void sendDevice(const std::string& json);
+    /// Fired once per accepted WebSocket, AFTER the handshake and after `connected()` is true, so a
+    /// handler may send immediately. This is the missing half of `KB-134`: the carrier never introduced
+    /// itself because nothing was listening for the moment a peer appeared.
+    void onConnect(std::function<void()> fn) { onConnect_ = std::move(fn); }
+
+    /// Send one JSON text frame upward. Was `sendDevice`, which had no caller and named only one of the
+    /// two payloads the page already routes (`device` and `health`).
+    void sendJson(const std::string& json);
 
 private:
     void run();
@@ -85,6 +89,7 @@ private:
     std::function<void(const Projection&)> onProjection_;
     std::function<void(const Frame&)> onFrame_;
     std::function<void()> onDisconnect_;
+    std::function<void()> onConnect_;
 };
 
 /// The page served to the WebUI surface. Identical in behaviour to the companion's `BRIDGE_HTML`: it opens a

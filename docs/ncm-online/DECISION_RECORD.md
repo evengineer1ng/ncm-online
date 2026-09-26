@@ -1670,3 +1670,97 @@ GitHub download at all**, which is the condition the owner set for the migration
 Production. The carrier is a Development artifact until it has launched the game on the owner's own machine
 and passed section AT. **A plugin that fails to load stops Cyberpunk launching entirely** - the one failure
 mode that reaches every player simultaneously - so it is found by us, once, by hand (`IDEA-478`).
+
+## L147 - EXECUTED OWNER RULING - use whitelisted Production for the carrier proof; protect world data, accept code divergence
+
+Owner, 2026-09-25: the morning's two-server reconciliation was turbulent; code loss or temporary divergence is
+acceptable at this stage, but **the database rows representing the actual world and game state are not**. The
+immediate priority is getting the exact `dist/ncm-carrier-0.1.0.zip` into the whitelisted, unlisted NCM Online
+world so its real launcher delivery path can be tested. The owner will perform the final launcher/game checks.
+
+**Executed with the database as a hard boundary.** Before any Production mutation, a verified logical database
+dump and operator-state archive were created at
+`/opt/ncm/backups/pre-carrier-prod-20260925T195327Z`. The dump is gzip-valid, contains 63 tables, and has SHA-256
+`af60470a4958775cf13f21003cdf64e68c70d710125cf865eb370ceb02f7353e`; the operator archive lists cleanly and
+has SHA-256 `eccaff6a40cde90fa6cc40b9e5ab01a5029b90e342d1e4d8250b445a42fd4536`. No database migration was added or
+applied: Production booted with schema 001-030 and `0 applied; pending=[]`.
+
+**The environment choice is evidence-driven, not ceremonial.** Loopback HTTP is valid transport, but a raw-address
+join carries no master catalogue row and therefore no required-mod digest (`KB-126`). Production already has the
+routable master identity and trusted HTTPS path that section AP proved. The current resource tree was staged to
+Production, the carrier became its sole required package, and one controlled restart activated it. The public
+manifest and the master now agree on digest `78c37893896a5e93691019fd47ed051653bda256d53d8d59c0ba1a90da683583`,
+package `ncm-carrier` 0.1.0, executable classification, 868,069 bytes, and SHA-256
+`7febfa6e794ca0748d6f03c325de8053d20beba403840e0883aa97fdea619286`. NCM started without boot errors and
+published 11 machine projection records.
+
+The owner's first join receipt then exposed an independent platform-version gate: client protocol 1.40 versus
+Production `.87` protocol 1.35 (`invalid_server_packet:unsupported_version`). Production was upgraded to the
+same `2.31.13+op77.102` already exercised on Development. The 711-file Linux package verified before swap; the
+freeroam boundary and 41-resource load graph passed against the candidate before shutdown; the old platform tree
+is retained at `/opt/ncm/backups/server-20260925T200746Z`. Post-upgrade the master advertises protocol 1.40,
+the carrier declaration is unchanged, migrations remain `0 applied; pending=[]`, and NCM again publishes 11
+machine records.
+
+The first true cold launch then separated delivery from runtime. The launcher accepted the unsecured package,
+projected exactly its three files and started Cyberpunk with the declared digest; RED4ext explicitly loaded
+`NCM Carrier 0.1.0`. It then terminated during native script validation (`KB-132`). This is not evidence that
+`.102` alone rejects the game: the same `.102` client validated the same 1,288-reference script set with Open77
+alone earlier that afternoon. Carrier 0.1.0 did, however, violate RED4ext's documented lifecycle by touching SDL,
+threads, TweakDB and RTTI from `Main(Load)`, before game memory is ready. The smallest correction is Carrier 0.1.1:
+`Main(Load)` is registration-only; startup/teardown move to Running `OnEnter`/`OnExit`; and the malformed logger
+path is fixed (`KB-133`). This is a supported-boundary correction, not a declaration that causality is proven.
+
+Production now serves 0.1.1 as its sole package: 868,295 bytes, SHA-256
+`6966a75d228cb70105f6201aaff4a2ab60ca6681ba78d65ad40acad4d2306301`, manifest digest
+`e0ad7ec9091c2b23f69067addb318c3d9fe319fc5111eb0ff76c47949b1bbde2`. The public full download and Range
+response passed, the 41-resource dependency guard passed before restart, and the post-restart world again has
+`0 applied; pending=[]`, five series, race control and 11 machine projections. The next evidence is one owner cold
+launch; it either closes the lifecycle diagnosis or falsifies it without risking database state.
+
+The owner cold-launched at 20:25 UTC and **the lifecycle correction passed**. Launcher digest
+`e0ad7ec9...bbde2` was present, RED4ext loaded NCM Carrier 0.1.1, the game survived validation, Open77 reached
+active, Production recorded connected then ready, and the carrier's corrected local log recorded bridge startup
+and NCM connection. This closes the native delivery/startup question, not the feature question. Source/live
+reconciliation immediately found three honest next gaps: no device/health reply (`KB-134`), no actual input
+detour behind the “installed” log (`KB-135`), and no receipt for the 11 published record projections (`KB-136`).
+No performance or input effect is claimed until those channels produce their own receipts.
+
+**Reconciliation rule:** Production and Development code may diverge during this urgent proof and may later be
+made identical by replacing Development's code/resources with the chosen Production revision. That authority does
+not include copying, replacing, resetting, or otherwise reconciling either database. World rows remain canonical
+to their own environment. A later cleanup must choose and name a code revision; it may not treat a filesystem
+overwrite as permission to move game-state data.
+
+## L148 - EXECUTED - the carrier may write live vehicle physics, under five properties that make it safe
+
+**Decided 2026-09-26, owner approval given explicitly before the first write shipped.**
+
+Until 0.1.9 the carrier was read-only by policy. It now writes one thing: the component of a horizontal
+force entry perpendicular to the direction of travel, multiplied by `gripScale`. The along-travel component
+is passed through untouched, so a value below 1.0 is a wet road and not a slow car.
+
+The approval is not for "the carrier may write physics" in general. It is for writes that hold **all five**
+of these, each a property of the design rather than a promise:
+
+1. **Stateless.** Recomputed from the game's own value on every call. Nothing accumulates, so a missed call
+   or an unseen thread costs nothing. This is what makes it safe across the twelve threads that were found
+   to drive one body's physics.
+2. **Exactly reversible.** At 1.0 the reconstruction is the original vector identically, because there is no
+   stored original to drift from: `long*dir + lat*perp` **is** the decomposition of what was already there.
+   Confirmed live -- `gripScale 0.30 -> 1.00 (inert, no writes)`, and the owner felt default physics return.
+3. **Inert by default,** and the default is what ships.
+4. **Bounded.** Clamped to [0.3, 1.5]. A typo cannot put a car on ice at 200 km/h, and the clamp is logged.
+5. **Scoped and guarded.** The latched player vehicle only -- never traffic, never another player's car --
+   and every memory access runs under SEH, with one fault disabling writes for the session and saying so.
+
+**What this does not authorise.** Input-command authority remains refused (`KB-135`): writing a vehicle's
+throttle, brake or steer is a different surface with different failure modes and is not covered here.
+Neither is writing the per-wheel normal loads, which hold the car up -- scaling those makes a car sag into
+its suspension rather than slide, and that mistake was caught by measurement rather than by review
+(`IDEA-499`).
+
+**Basis.** Live-proven on Production across Carrier 0.1.2-0.1.9: the interception point verified against the
+build's own address table, the force field decoded and its units established, the four corners identified by
+three independent manoeuvres, and the classifier validated by arithmetic (60 gravity and 240 wheel calls per
+second at 60 fps, every run complete, across twelve threads). MASTER_TEST §AU.

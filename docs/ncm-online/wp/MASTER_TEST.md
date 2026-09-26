@@ -1203,12 +1203,14 @@ Passing AS proves NCM stopped publicly redistributing content it had not establi
 proves nothing about permission, which is a separate conversation with the author, and it does not authorise a
 substitute open-wheel mod - the owner ruled explicitly against substituting one now.
 
-## §AT - the NCM Carrier, from "does the game still launch" to "a car feels the weather" - **NOT RUN**
+## §AT - the NCM Carrier, from "does the game still launch" to "a car feels the weather" - **IN PROGRESS**
 
 `L146` / `IDEA-472`. The carrier is one RED4ext plugin carrying drive-model effects, final-command authority
 and force feedback. It is built and offline-green; nothing below has been run.
 
-**The carrier is hosted on Development and installed by the launcher. There is no manual copy step.**
+**The carrier is hosted on NCM Online and installed by the launcher. There is no manual copy step.** Development
+proved server wiring but its Unlisted/raw-address join has no master catalogue digest (`KB-126`), so the owner
+authorised the whitelisted Production world for the actual delivery proof (`L147`).
 An earlier draft of this section asked for one "for safety"; that was backwards and it was extra QA invented
 on top of the real thing (owner, 2026-09-25). The launcher path is the path that ships, so it is the path
 worth testing -- and it is also the more recoverable one, because the uninstall is already written:
@@ -1230,12 +1232,12 @@ first, always.
 
 | # | Operation | Expected | Result |
 |---|---|---|---|
-| §AT0 | Build, then **import the zip in Warden** (`http://127.0.0.1:11780`), then `publish-carrier.py <root> --zip ... --enable` to declare it. | The DLL builds; the package is stored as a blob on Development, declared, and requiredMods is un-parked with **RB15 and the liveries dropped** (`L142`). The server restarts and the manifest reports a new digest with `ncm-carrier` in it. | **PASS 2026-09-25.** ncm_carrier.dll 564,736 bytes, exports Main/Query/Supports. Package ncm-carrier-0.1.0.zip, 868,069 bytes, sha256 `7febfa6e...`, 3 files, root `red4ext/plugins`. Development manifest digest `78c37893...`, `enabled: true`, `ncm-carrier 0.1.0` the only declared package, note corrected. **Two defects found and fixed on the way:** `KB-122` (a `capability` field stops the server booting) and `KB-123` (`os.time()` does not exist in the server sandbox -- the projection publisher was dead and silent). Server then upgraded to **op77.102** and restarted clean: no script errors, machine.lua publishing 11 record(s). |
-| §AT1 | Launch Cyberpunk and join Development through the launcher. | The consent gate names **NCM Carrier** as executable content into `red4ext/plugins/`; the launcher projects it; **the game launches and the join completes.** `ncm_carrier` appears in `<game>/red4ext/logs/` as loaded, and `red4ext/plugins/ncm_carrier/ncm_carrier.log` names its version, whether the bridge is listening, whether the hook installed, and what device it found. **A declined hook is a PASS** - effects and force feedback do not depend on it. | **FAIL 2026-09-25 - the package was never offered.** Two joins. `OP77_WORLD_MODS_DIGEST=-` (empty) on the launcher command line; `modstack: projected 348 file(s) - 0 added, 0 repaired, **44 removed**`; no consent prompt; `red4ext/plugins/ncm_carrier` never created; RED4ext loaded **1 plugin (Open77)**. Cause `KB-125`: `publicBaseUrl` was private-LAN plain HTTP, which the launcher nulls (`KB-112`). Compounded by `KB-124`: the server had already pruned the hand-written store entry. **Nothing NCM wrote ran** - the input behaviour the owner noticed was the previous world layer being removed and not replaced. Fixed: loopback `publicBaseUrl`; Warden import before declaration. |
-| §AT2 | Still in the world, check the client log. | `carrier_bridge` connects: `carrier <version> | hook=...`. The bridge is on by default now, so no `/ncm.ffb on` is needed. | **NOT RUN** |
+| §AT0 | Build, store the exact zip, declare it as the sole required package, and restart the test world. | The DLL builds; the package is stored, declared, and requiredMods is enabled with **RB15 and the liveries absent** (`L142`). The server restarts and the manifest reports a new digest with `ncm-carrier` in it. | **PASS on Development and Production 2026-09-25; current build 0.1.1.** Production was protected first by a verified 63-table database dump and operator-state archive (`L147`). Carrier 0.1.1 is 868,295 bytes, SHA-256 `6966a75d...06301`, 3 files under `red4ext/plugins`; it replaced and pruned 0.1.0. Public HTTPS full download matched hash/size; Range returned 206 with the hash ETag; manifest digest is `e0ad7ec9...bbde2`. Post-restart: 41-resource graph green, zero migrations, no boot errors, 11 machine records. Tooling defects caught before activation: `KB-129`, `KB-130`. |
+| §AT1 | From a fully stopped game, launch Cyberpunk and join **NCM Online** through the launcher catalogue. | The consent gate names **NCM Carrier** as executable content into `red4ext/plugins/`; the launcher projects it before process start; **the game launches and the join completes.** `ncm_carrier` appears in `<game>/red4ext/logs/` as loaded, and `red4ext/plugins/ncm_carrier/ncm_carrier.log` names its version, whether the bridge is listening, whether the hook installed, and what device it found. **A declined hook is a PASS** - effects and force feedback do not depend on it. | **PASS ON PRODUCTION WITH 0.1.1, 2026-09-25 20:25 UTC.** Launcher used digest `e0ad7ec9...bbde2`; RED4ext loaded NCM Carrier 0.1.1; validation passed; Open77 reached active; server connected/ready; the plugin log exists and reports bridge up plus device inspection. The `.102` anti-piracy/file-verification change was not the direct failure: lifecycle timing was. The “hook installed” subclaim is invalidated separately by `KB-135` and is not counted as input proof. |
+| §AT2 | Still in the world, check the client log. | `carrier_bridge` connects: `carrier <version> | hook=...`. The bridge is on by default now, so no `/ncm.ffb on` is needed. | **PARTIAL PASS.** The client created the surface and logged `companion connected`; the carrier logged `NCM connected to the bridge`. Version/capability receipt is missing because 0.1.1 never calls its own device/health sender (`KB-134`). Transport is proven; typed handshake is not. |
 | §AT3 | Open the NCM panel, WHEEL/PEDALS tab. | The wheel is named, classified, and its rung shown against the ladder for that class. An unrecognised wheel reads `unknown` and gets the lowest ceiling - **it is not silently upgraded**. | **NOT RUN** |
 | §AT4 | `ncm.machine weather rain` on the server. Then **spawn a fresh car** and drive it. | The server publishes projections; the client pushes them; the carrier log reports `projection v1 on <record>: N applied`. The car has less lateral grip and longer braking. **Spawn-cached: a car already in the world does not change** - that is correct behaviour, not a failure. | **NOT RUN** |
-| §AT5 | `ncm.machine weather sunny`, then spawn again. Then disconnect. | Grip returns on the next spawn. On disconnect the carrier restores every captured original and says how many. **Verify by relaunching single-player later: the player's own game must be exactly as it was.** This is the row that protects someone's install from us. | **NOT RUN** |
+| §AT5 | `ncm.machine weather sunny`, then spawn again. Then disconnect and inspect the carrier log. | Grip returns on the next spawn. On disconnect the carrier restores every captured original and records the restoration count; a subsequent Online launch starts from clean originals before applying the current projection. **No Solo/profile switch is requested** (`L144`). | **NOT RUN** |
 | §AT6 | One drive with force feedback armed. Then quit and read the carrier log. | Force is felt: weight building with speed, texture as the tyres let go, engine hum rising with revs. On shutdown the log prints `measured <channel>: peak ... over N frames` for every channel. **This closes `KB-106`** - if `suspLong`/`suspLat` peak far below 0.05 the road channel has been inaudible and `kRoadScale` is wrong. | **NOT RUN** |
 | §AT7 | Disconnect, rebuild with any change, `-PublishDev` again, rejoin. | The digest changes, the launcher fetches the new blob rather than reusing the cached one, and the old carrier blob is pruned from the store. **This is the loop the whole thing exists to make cheap** - a code change reaches the game in one command and one join. | **NOT RUN** |
 
@@ -1252,3 +1254,50 @@ else and there is no witness (`IDEA-458`, `L135`). And it does not establish tha
 `IDEA-477` records that this is the least-verified code in the plugin.
 
 **Production is a separate decision on a separate day.** `L146` does not authorise it.
+
+## §AU - live per-instance vehicle physics, from "does the detour fire" to "a car slides on command" - **AU1-AU5 PASS on Production**
+
+`L148` / `IDEA-494`-`IDEA-499`. §AT asks whether a *record* projection reaches a car, and is blocked at
+`KB-136` because no projection has ever arrived. §AU is a different route to the same product goal, opened
+by re-reading the owner's March 2026 `ManualClutch` experiment: intercept the **physics step** instead of
+the **input step**, and change the force the solver is about to apply.
+
+**Every row below ran on NCM Online, on the whitelisted Production world, with the owner driving.** The
+first four rows are read-only; only AU5 writes, and only under `L148`'s five properties.
+
+The interception point is `RigidBody::Recalculate`, RED4ext address hash `593628708`, whose single argument
+**is** the vehicle's `vehiclePhysicsData`. The hash was verified present in this build's own
+`bin/x64/cyberpunk2077_addresses.json` *before* anything resolved it, because
+`UniversalRelocBase::Resolve` calls `ShowErrorAndTerminateProcess` on a miss -- a MessageBox and a dead
+process that no `try`/`catch` in the plugin can intercept. That pre-check is what keeps the carrier's
+cardinal rule intact on a patch day.
+
+| # | Operation | Expected | Result |
+|---|---|---|---|
+| §AU1 | Attach the detour and write nothing. Log tick rate, and for the fastest body its velocity, mass and the back-pointer at `+0x180`. | The detour fires; the argument is `PhysicsData`; velocity at `+0x18` tracks NCM's own speedometer and mass at `+0x1BC` looks like a car. | **PASS (0.1.2, 2026-09-25).** ~950-1000 calls/s while driving. `v=16.44 [ncm=16.44 d=+0.01]`, `v=24.69 [ncm=24.62 d=+0.07]`, `v=9.07 [ncm=9.07 d=+0.01]` across 0-25 m/s. `mass=1100 kg`, stable. Back-pointer stable for the whole session. One distinct body while driving, ten at world load -- this callsite runs for the player's car, not traffic. No faults, no crash. |
+| §AU2 | Capture consecutive calls on one body and read the shape of `force`. | Whatever `force` is, a run of consecutive calls shows it. | **PASS (0.1.3).** A period-16 cycle: one gravity entry, four per-wheel normal loads, a traction pair, a drag pair, zeros. Wheel entries summed to the negation of gravity in all three bursts (183/-184, 182/-182, 182/-182). Units are impulses: `1100 x 9.81 / 60 = 180 N.s` against 182-184 observed. **`force` is sixteen per-contributor writes per frame, not a total** (`IDEA-495`). |
+| §AU3 | Identify which wheel is which, and whether a slot keeps its meaning frame to frame. | Cornering separates left from right; braking separates front from rear. | **PASS for ordering; REFUTED for slots (0.1.4-0.1.5).** Ordering is **FL, FR, RR, RL** -- a ring, not row-major -- from three manoeuvres across two cars: (0,3) and (1,2) anti-phase under cornering, a sustained maximum-left loading (1,2), braking loading (0,1). Resting residual `-0.0`, front/rear ~60/40. **Slot indexing is dead:** the thread guard fired immediately and never stopped -- `RigidBody::Recalculate` runs for a single body from **twelve threads**, so cycle length came out 13/14/41/111/402/737 and `modal=14 (17/82)` was noise. Had the guard not existed, that figure would have been reported as a real measurement and a write designed on top of it. |
+| §AU4 | Replace the cycle model with per-call classification and validate it by arithmetic. | At 60 fps: ~60 gravity calls, ~240 wheel calls, ~60 complete four-wheel runs, nothing unclassified. | **PASS (0.1.6-0.1.8).** Repeatedly exact: `grav=60 wheel=240 | runs 60 complete, 0 short, 0 long | threads=12 | other=0`. Short runs appear only in the seconds containing hard cornering -- a wheel genuinely off the ground. The horizontal entries decompose cleanly against travel: longitudinal inverts sign under braking (`net=+14.4` accelerating, `net=-14.6` braking) and even resolves the owner's tapped throttle as alternating per-second signs; lateral sits at `avg=0.0-0.2 peak=0.1-2.3` in a straight line and `avg=12.7-19.4 peak=53.9-63.8` cornering. |
+| §AU5 | Scale the lateral component by `gripScale` on the player's car, hot-reloaded from config while the game runs. Then set it back to 1.0. | Grip falls without power falling. 1.0 restores default physics exactly, with no restart. | **PASS (0.1.9, 2026-09-26).** `gripScale 1.00 -> 0.70 (WRITING lateral force)` hot-loaded mid-session. `writes=250-320/s`, matching the directed `horiz` count exactly. At 0.70 the owner reported something subtly different but hard to judge; at **0.30, "unmistakable -- unrealistic, over the top understeer"**, which is the expected reading of uniform lateral loss on a front-steered car. `gripScale 0.30 -> 1.00 (inert, no writes)` and the owner reported **instant return to default physics**. No fault, no instability, `[WRITES DISABLED BY FAULT]` never appeared. |
+
+### What §AU establishes, and what it does not
+
+**It establishes live, per-instance, reversible mutation of vehicle physics on an already-spawned car** --
+no respawn, no record edit, no TweakDB, no restart. That is the constraint §AT was written around and it is
+now sidestepped rather than solved: the record path remains spawn-cached (third-party-confirmed), but the
+force path is not spawn-cached at all.
+
+**It does not establish per-wheel friction.** The lateral channel is vehicle-level; the per-corner values
+that *are* addressable are normal loads, and scaling those makes a car sag rather than slide. Front/rear
+balance is therefore out of reach through this channel (`IDEA-499`).
+
+**It does not connect to NCM.** `gripScale` comes from a JSON file a human edits. Wetness is computed and
+published server-side and has never reached the carrier (`KB-136`). Until that transport works, this is a
+capability rather than a feature (`IDEA-502`).
+
+**Frame-rate cost of the writes: none measurable.** `grav` per second is the physics frame count, so the
+probe measures its own overhead. Driving seconds only: `k=1.00` (no writes) mean 55.6, 21% below 55 frames;
+`k=0.30` (writing ~300/s) mean 59.1, 4% below 55. The dips track world streaming -- the same seconds show
+the classifier's `zero` count spiking from ~300 to 3,435 and once to 19,320 -- not the writes. If there is
+a cost anywhere it is the probe's *reading*, which is why `IDEA-501` proposes switching the measurement
+machinery off now that the measurements are done.
