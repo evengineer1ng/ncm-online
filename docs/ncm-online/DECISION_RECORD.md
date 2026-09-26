@@ -2169,3 +2169,111 @@ here is a design judgement.
 **Basis.** Owner ruling, 2026-09-26, on reviewing the `L154` expression table: *"most of these are just
 drive scale"*. The `derive custom formulas from our interactions between the 3 broader scales` framing is
 the owner's and is the substance of points 1 and 3. Live verification is MASTER_TEST §AY as amended.
+
+
+## L157 - LOCKED - Top speed is a DECLARED NUMBER per Machine, delivered by the governor
+
+**Decision.** Top speed is not an emergent physical quantity on this platform and NCM stops treating it as
+one. It is an authored number per car, scaled by parts, and delivered by the `ceiling` carrier --
+`Open77.vehicles.setPerformance(vehicleId, profile)` -- and never by the force write.
+
+1. The baseline is **authored**, in `data.vehicle_catalogue.TOP_SPEED_KPH`, populated once from
+   `Open77.vehicles.ratedTopSpeed` (a gearing rating, which is a SPECIFICATION) via the client-side
+   `/ncm.ratedtopspeed` dump. **An absent entry means NO CEILING, never a guessed one.**
+2. `parts.handling` composes a `topSpeedScale` from four families, clamped to **[0.80, 1.25]**. Two of the
+   four exponents are NEGATIVE: `aerodynamics` and `transmission` are both fitted to go faster and both
+   cost top speed, to drag and to gearing respectively.
+3. A **class ruleset always wins** when it is lower. Most-restrictive-wins, as `machine.projection`
+   already applies it. A part may not buy past a ruleset.
+4. **`accelerationScale` is never written.** The platform's rule -- and `machine.projection`'s
+   `MAX_ACCELERATION_SCALE = 1.0` -- is that the governor withholds and never adds. Raising a top speed
+   here lifts a ceiling NCM itself imposed; it does not add force. **This is what makes L157 need no new
+   authority to add power.**
+5. An observation may never become the baseline (`IDEA-328`, `IDEA-331`).
+
+**The state of the evidence, stated plainly.** When this was written **nothing in NCM had ever
+successfully capped a top speed.** `setPerformanceClass` is called by `client/main.lua` but its data
+source `GlobalState.ncmCeilings` has never reached a client (`server/state_probe.lua`: *"class ceilings, a
+shipped feature, have never applied"*), its only producer was the RB15 class disabled by `KB-144`, and its
+last live run was 154 attempts with zero applied. The 355 km/h figure in `class.lua` is a measured cliff
+written into a table and was never enforced. The per-instance server call was present in the deployed
+binary, permitted, and had **zero call sites**.
+
+So `/ncm.topspeed` (MASTER_TEST section BA) is a capability spike that proves or kills the mechanism, and
+this line is provisional on it. **If BA fails, top speed is not reachable on this platform** and that
+becomes the answer rather than a quietly reshaped design.
+
+**Basis.** Owner ruling, 2026-09-26: *"isnt top speed relatively arbitrary per car??? its not a physics
+problem"*, and the follow-up demand to trace the capability rather than cite a table row.
+
+
+## L158 - LOCKED - One mechanical fact, one carrier, enforced statically
+
+**Decision.** `machine.expression` holds a static map from mechanical fact to the single carrier that
+expresses it. Both composers assert against it at load. It is the cross-composer half of the rule
+`machine.projection` has always stated and could never fully enforce.
+
+1. `claim()` stays, and is not sufficient. It is **per-draft**: `projection.compose` and
+   `handling.compose` build separate drafts in separate modules, so neither guard can see the other. And
+   `applyWeather` never called it at all.
+2. **Wet grip and wet braking MAGNITUDE move to the instance carrier.** `slip_progression` and
+   `turn_friction` stay on the record, because a scalar force multiplier provably cannot express the shape
+   of a curve. Each carrier keeps the half it can actually carry.
+3. `parts.handling` gains named contributors on the same layer vocabulary the record carrier already uses
+   -- `parts, wear, weather, thermal, chrome, ruleset`. **`chrome` is therefore a named socket from day
+   one**, which is the chrome-hack onramp at no cost.
+4. Contributions are quantised to 0.01 before reaching a lever, because `signature()` formats at `%.4f`
+   and an unquantised drifting term would republish the state bag twice a second per driver.
+5. **An inert contributor is TRACED, never omitted.** A layer returning exactly 1.0 must be
+   distinguishable from a layer nobody wired up -- the `IDEA-516` failure class.
+
+**Why this is not hypothetical.** `KB-145` found seven dead flats, and two are `M.WET`'s largest entries:
+`lateral_grip` -> `.frictionMulLateral` (0.18) and `brake_friction` -> `.brakingFriction` (0.15). More than
+half of wet weather was already a silent no-op. **`IDEA-508` exists specifically to make those two resolve
+again**, and on that day wet grip would have been applied on both carriers at once, with nothing able to
+catch it.
+
+**A second defect found and fixed on the way.** `NcmMachine.setWeather` had exactly one caller and it was
+a console command; `ncm_world` never read `Open77.environment` at all, so `wetness` was permanently zero
+in production. That is upstream of `KB-136` -- fixing the transport would have delivered a correct payload
+saying "dry" forever. Now wired, with `world.environment` added to `ncm_world` and the read reporting its
+own outcome once, because a missing permission and a missing API are indistinguishable otherwise.
+
+**Basis.** Owner direction to build the systems end to end, 2026-09-26; `KB-145`, `IDEA-502`, `IDEA-508`,
+`IDEA-516`, Report 36 section 4.
+
+
+## L159 - LOCKED - Tyre temperature is a server-side per-Machine model; the window is a PENALTY
+
+**Decision.** Tyre temperature is modelled server-side, keyed to `assetId`, and expressed as a
+downward-only multiplier on `gripScale` and `brakeScale`.
+
+1. **One temperature for the whole car.** `parts.ontology` declares the `per_corner` channel does not
+   exist and names "per-corner tyre temperature" specifically; MASTER_TEST AV2 returned a clean negative;
+   `SERIALISATION_UNIT = { tires = SET }` already records the consequence. This is the only ontologically
+   legal shape, not the cheap one.
+2. **The multiplier never exceeds 1.00.** It is 1.00 in the window and 0.85 at both extremes. Being in the
+   window is the absence of a penalty, not a reward -- the owner's rule, and what lets this inherit `L156`
+   point 3 rather than needing authority to add force.
+3. **It touches grip AND brake directly.** An earlier draft assumed a reduced `gripScale` would propagate
+   through the `L156` couplings. **It does not**: at grip 0.85 the ceilings are 1.18 and 1.08, and a stock
+   car sits at 1.00 on both, so neither bites. The couplings are correct; they were never the propagation
+   mechanism.
+4. **Heat is WORK, not momentum.** `integral F dt` is kg m/s; heating is `integral F.v dt`. Without the
+   speed term a 30 km/h hairpin heats a tyre as much as a 200 km/h sweeper.
+5. **State lives with the Machine and keeps cooling in real time**, hosted by `odometer.lua` -- which
+   already polls every vehicle at 1 Hz, already resolves speed with an availability check, and is already
+   keyed by `assetId`. Long absences settle in closed form, so a car parked for ten minutes is cold rather
+   than five seconds cooler.
+6. Not carrier-side: the Carrier holds one bound body and has no per-entity map. Not client-side: snapshot
+   fields are `client_attested` and a client number feeding grip is forgeable for 15 percent of a car.
+7. **Day and night get no lever.** `secondsOfDay` feeds AMBIENT temperature, so a cold night makes tyres
+   harder to warm -- the real mechanism -- rather than applying a flat penalty for driving after dark.
+   Weather feeds the same term.
+8. The HUD gauge shows a POSITION in the window, not degrees, and draws **no needle at all** when the
+   temperature is unknown (`IDEA-361`).
+
+**Basis.** Owner direction, 2026-09-26: *"lets also try a method of tracking and modeling active tire
+warmth or coolness + a window ... not pure accel for being in the window like an arbitrary stat boost, but
+inferred grip and braking differences, our best guess."* Owner-selected parameters: ~60 s to the window,
+15 percent at the extremes, temperature keeps cooling while parked.

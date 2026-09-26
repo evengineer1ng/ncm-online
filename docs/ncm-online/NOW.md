@@ -3,60 +3,57 @@
 > **STATUS: LEDGER** - living session memory, rewritten at the end of every working session.
 > Authority map: [INDEX.md](INDEX.md) - classified 2026-09-24 (L125).
 
-Last rewritten: **2026-09-26 - `L156` rebuilt the Parts expression model and it is GREEN BUT NOT YET
-DEPLOYED.** Eleven families now point in eleven different directions in the three-lever space instead of
-four of them sharing one, and the levers constrain each other: drive and brake are capped against grip, so
-an engine is worth less until the tyres can carry it. `KB-150` fixed the carrier log (one file per process,
-Carrier 0.1.24) and §AZ-C PASSED, which settles `L155` point 1 and `KB-146` live.
+Last rewritten: **2026-09-26 - `L156` is LIVE and provisionally PASSED, and `L157`/`L158`/`L159` are built,
+green and deployed.** Top speed, weather and tyre temperature all now exist end to end. Two defects were
+found and fixed on the way that had nothing to do with the new work: weather had **never** reached the
+mechanical path (`KB-151`), and the race HUD could blank itself silently with no log line (`KB-152`).
 
-> **Claim before writing:** decisions through **L156**; MASTER_TEST through **§AZ**; next QA letter **§BA**.
-> BACKLOG next free **IDEA-534**; known issues through **KB-150** plus pre-existing duplicate labels noted
-> by `KB-114`. Read the ledger tails before allocating an ID.
+> **Claim before writing:** decisions through **L159**; MASTER_TEST through **§BD**; next QA letter **§BE**.
+> BACKLOG next free **IDEA-534**; known issues through **KB-152**. Read the ledger tails before allocating.
 
 ## One next action
 
-**Deploy the `L156` resource change, then drive §AY15-16.** The code is committed and the gate is green
-(400 core tests, 0 failed), but production is still running the `L154` table -- **nothing below is live
-until the resources sync**:
+**Drive §BA -- the top speed capability spike.** It is the only thing in the stack whose mechanism is
+unproven, and it gates the rest of top speed.
 
 ```
-powershell -NoProfile -ExecutionPolicy Bypass -File tools\deploy-staging.ps1
-ssh -i C:\Users\eveng\.ssh\lightsail-ncm.pem ubuntu@52.60.225.137 \
-    "sudo chown -R ubuntu:ubuntu /opt/ncm/server && find /opt/ncm/server ! -user ubuntu"
+/ncm.topspeed            expect "no ceiling set by NCM" + usage
+/ncm.topspeed 60         drive a long straight -- DOES IT HOLD 60?
+/ncm.topspeed 120        does it change live?
+                         get out, get back in -- still 120?
+/ncm.topspeed clear
 ```
 
-The `chown` is `KB-138` and the `find` must print nothing. **No carrier rebuild is needed** -- `L156` is
-entirely server-side composition and the wire is still three floats, so a client already on Carrier 0.1.24
-picks it up from the resource restart.
+**Nothing in NCM has ever capped a top speed.** The per-record path's payload has never reached a client
+(`state_probe.lua`), its only producer was disabled by `KB-144`, and its last run was 154 attempts with
+zero applied. The per-instance server call is present in the deployed binary, is permitted, and had zero
+call sites until today. If §BA2 fails, top speed is not reachable on this platform and `L157` records that
+instead -- **weather and tyre temperature do not depend on it.**
 
-Then, in game:
+## What is live right now and wants driving
 
-```
-/ncm.setup power_unit 2.0     -- expect drive 1.246, NOT 2.0, with the reason in chat   (AY15)
-/ncm.setup tires 1.4          -- same engine, now 1.545. THIS is the test.              (AY16)
-```
+| | |
+|---|---|
+| `/ncm.setup power_unit 2.0` then `tires 1.4` | §AY15/16 -- the engine gets stronger when you fit tyres |
+| `/ncm.setup transmission 1.4` vs `drivetrain 1.4` | §AY18 -- the two that used to be the same part |
+| Get in a car and watch the **TYRE** gauge | §BB -- cold, then a minute of hard cornering, then park |
+| `/ncm.machine weather rain` while driving | §BC2 -- grip falls on the car you are already in |
+| `/ncm.ratedtopspeed` | dumps the authored top-speed table for `§BA`/`L157` to use |
 
-§AY16 is the assertion `L156` exists for: fitting tyres made the engine stronger without touching the
-engine. If that lands, parts are a build rather than a menu.
+**Expect no top-speed ceiling until the catalogue is authored.** `data.vehicle_catalogue.TOP_SPEED_KPH` is
+deliberately EMPTY, and an absent entry means no ceiling rather than a guessed one. `/ncm.ratedtopspeed`
+prints the table to paste in.
 
-**§AY18 is the aliasing test.** `transmission 1.4` then `drivetrain 1.4`, back to back, cleared between.
-Nearly identical drive (1.183 vs 1.203); the difference is that transmission also brakes and drivetrain
-costs turn-in. Before `L156` these two were literally the same part with two names, which is the defect the
-whole line was written for.
+## What was corrected today, so nobody re-derives it
 
-**Expect four `L154` numbers to be wrong on purpose.** §AY1, §AY2, §AY6 and §AY14 were composed under the
-old rules; the `L156` amendment at the end of §AY restates each one. A tester working from the stale table
-will report a bug that is not one.
-
-## What §AZ still needs
-
-§AZ-C **PASSED** on 2026-09-26 -- Parts follow the Machine, not the driver, proven solo with two Machines
-and the carrier log naming each `assetId` and entity. §AZ-A is a two-minute solo pre-check.
-
-§AZ-B (§AZ6 / §AZ9 / §AZ12) needs a **second human**: concurrency, passenger-gets-no-binding, and physics
-handover cannot be shown sequentially. `KB-4` remains open -- the second local client still renders no UI,
-the race theory is retracted, and the decisive untested step is capturing the launcher-started process's
-`CommandLine` while a working client runs.
+- **The `L156` couplings do not propagate cold tyres.** At grip 0.85 the ceilings are 1.18 and 1.08 and a
+  stock car sits at 1.00 on both, so neither bites. Thermal touches grip **and** brake directly.
+- **Heat is work, not momentum.** `IDEA-532` claimed a `dt` the hook establishes at 1/60; there is no `dt`,
+  forces are impulses, and a heat model without a speed term treats a 30 km/h hairpin like a 200 km/h
+  sweeper.
+- **`brakeScale` currently scales aerodynamic drag**, because the write site discriminates by force sign,
+  not source. Brake parts silently move terminal velocity. Not yet fixed -- it needs a diagnostic pass in
+  the Carrier first, and it must land before thermal is allowed near `brakeScale` in anger.
 
 ## Then drive §AY
 

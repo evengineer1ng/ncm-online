@@ -150,16 +150,33 @@ return {
     -- ------------------------------------------------------------------ weather
     rain_is_expressed_as_grip_not_as_a_speed_limit = function(T)
         local env = envelope(T, { record = "Vehicle.test", weather = { wetness = 1.0 } })
-        T.eq(flatOf(env, "lateral_grip").multiplier < 1.0, true, "the contact patch, which is what rain touches")
-        T.eq(flatOf(env, "brake_friction").multiplier < 1.0, true, "")
+        -- Still the founding claim: rain acts on the contact patch, never as a speed limit. `IDEA-057`'s
+        -- ceiling approximation stays retired.
         T.eq(next(env.ceiling), nil,
-             "and NOT the top-speed ceiling -- IDEA-057's approximation is retired, not reproduced")
+             "NOT the top-speed ceiling -- IDEA-057's approximation is retired, not reproduced")
+        -- What this carrier expresses is the SHAPE of the let-go, which a scalar force write cannot do.
+        T.eq(flatOf(env, "slip_curve").multiplier < 1.0, true, "wet makes the let-go less progressive")
+        T.eq(flatOf(env, "turn_friction").multiplier < 1.0, true, "")
+    end,
+
+    the_record_carrier_no_longer_expresses_wet_grip_MAGNITUDE = function(T)
+        local env = envelope(T, { record = "Vehicle.test", weather = { wetness = 1.0 } })
+        -- **`L158`.** `lateral_grip` and `brake_friction` left this table for two reasons at once: both
+        -- write to flats `KB-145` proved do not resolve, so they were the two LARGEST weather effects and
+        -- both were silent no-ops; and the instance carrier expresses magnitude live, per Machine, on a
+        -- car that has already spawned -- which the spawn-cached record channel can never do.
+        T.eq(flatOf(env, "lateral_grip"), nil, "grip magnitude moved to the instance carrier")
+        T.eq(flatOf(env, "brake_friction"), nil, "and so did brake magnitude")
+        -- The guard that will catch it coming back the day IDEA-508 revives those flats.
+        local X = T.Core.get("machine.expression")
+        T.eq(X.mayExpress("grip_magnitude", "record"), false)
+        T.eq(X.mayExpress("slip_progression", "record"), true, "curve shape stayed")
     end,
 
     weather_is_continuous_so_damp_is_not_soaked = function(T)
         local damp = envelope(T, { record = "Vehicle.test", weather = { wetness = 0.25 } })
         local soaked = envelope(T, { record = "Vehicle.test", weather = { wetness = 1.0 } })
-        T.eq(flatOf(damp, "lateral_grip").multiplier > flatOf(soaked, "lateral_grip").multiplier, true, "")
+        T.eq(flatOf(damp, "slip_curve").multiplier > flatOf(soaked, "slip_curve").multiplier, true, "")
         T.eq(P(T).isEmpty(envelope(T, { record = "Vehicle.test", weather = { wetness = 0 } })), true,
              "a dry road asks the carrier for nothing at all")
     end,

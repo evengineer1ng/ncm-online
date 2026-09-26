@@ -38,12 +38,36 @@ Core.define("machine.projection", function(C)
     -- Wet weather, expressed as what water does to a contact patch rather than as a lowered speed limit.
     -- `wetness` is 0..1. Retires IDEA-057's ceiling approximation, which Report 34 section 8 grades
     -- semantically dishonest when presented as grip.
+    -- **Two entries left this table on 2026-09-26 (`L158`), and for two reasons at once.**
+    --
+    --   1. `lateral_grip` (0.18) and `brake_friction` (0.15) write to `.frictionMulLateral` and
+    --      `.brakingFriction`, and `KB-145` proved neither resolves on this build. They were the two
+    --      LARGEST weather effects and they were silent no-ops -- so more than half of wet weather was
+    --      already doing nothing.
+    --   2. The instance carrier expresses grip and brake magnitude live, per Machine, on a car that is
+    --      already spawned. The record carrier cannot: it is spawn-cached, so rain arriving mid-drive
+    --      never reached the car you were sitting in.
+    --
+    -- What stays is what the instance carrier provably CANNOT do: the SHAPE of the let-go. `slip_curve`
+    -- and `turn_friction` are curve geometry, and a scalar force multiplier has no way to express them.
+    -- That is the split -- each carrier keeps the half it can actually carry.
     M.WET = {
-        lateral_grip   = 0.18,   -- full wet removes 18% of lateral friction
-        slip_curve     = 0.12,   -- and makes the let-go less progressive
-        brake_friction = 0.15,
+        slip_curve     = 0.12,   -- wet makes the let-go less progressive
         turn_friction  = 0.12,
     }
+
+    -- **One mechanical fact, one carrier, checked at load (`L158`).** `claim()` below guards against one
+    -- contribution expressing the same fact twice inside a single draft; it cannot see the OTHER composer
+    -- at all, because `parts.handling` builds its own draft in its own module. This assertion is what
+    -- spans them, and it is what will fire the day `IDEA-508` makes the two dead weather flats resolve
+    -- again and somebody re-adds them to `M.WET`.
+    local Expression = C.get("machine.expression")
+    Expression.assertOwns("record", { "slip_progression", "turn_friction", "mass", "steering_geometry" },
+        "machine.projection")
+    for _, fact in ipairs({ "grip_magnitude", "brake_magnitude" }) do
+        assert(not Expression.mayExpress(fact, "record"),
+            "machine.projection must not express '" .. fact .. "': it moved to the instance carrier")
+    end
 
     local LAYERS = { "factory", "parts", "wear", "weather", "chrome", "ruleset" }
     local LAYER_ORDER = {}

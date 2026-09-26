@@ -705,6 +705,49 @@ RegisterCommand("ncm.topspeed", function(_, args)
     TriggerServerEvent("ncm:topspeed", args and args[1] or nil)
 end, false)
 
+--- `/ncm.ratedtopspeed` -- the one-off dump that fills `data.vehicle_catalogue`'s authored table.
+---
+--- `Open77.vehicles.ratedTopSpeed(record)` reads the record's own gearing and rated max RPM, so it is an
+--- AUTHORED SPECIFICATION rather than a measurement -- which is exactly why its output may be copied into
+--- the catalogue. `IDEA-328`/`IDEA-331` forbid the reverse: "highest observed 108 km/h" is evidence and
+--- "top speed 108" is a claim, and a number that crossed silently from one to the other would be a
+--- specification nobody authored.
+---
+--- **Client-side because the call is client-side.** It is absent from the server scripting assembly, which
+--- is why the catalogue holds copied numbers rather than calling this at runtime. Same pattern as
+--- `arch_dump.cpp`: dump for a human to read and author, never for the server to trust live.
+---
+--- The card also notes it returns the GEARING rating and not terminal velocity, "which torque and
+--- aerodynamic drag carry higher" -- so these numbers are a conservative baseline, and a Machine that
+--- lifts its governor above them is asking for something its own physics can actually deliver.
+RegisterCommand("ncm.ratedtopspeed", function()
+    local api = Open77.vehicles
+    if not (api and type(api.ratedTopSpeed) == "function") then
+        log("ratedTopSpeed: NOT AVAILABLE on this build -- the catalogue table cannot be filled from here")
+        return
+    end
+    local Catalogue = NcmCore.get("data.vehicle_catalogue")
+    local rows, missing = {}, 0
+    for _, entry in ipairs(Catalogue.entries()) do
+        local record = entry.record
+        if type(record) == "string" then
+            local ok, kph = pcall(api.ratedTopSpeed, record)
+            if ok and type(kph) == "number" then
+                rows[#rows + 1] = ("        %s = %d,"):format((record:gsub("[%.%-]", "_")),
+                    math.floor(kph + 0.5))
+            else
+                missing = missing + 1
+                rows[#rows + 1] = ("        -- %s = ?  (unresolved)"):format(
+                    (record:gsub("[%.%-]", "_")))
+            end
+        end
+    end
+    table.sort(rows)
+    log("---- paste into data/vehicle_catalogue.lua M.TOP_SPEED_KPH ----")
+    for _, row in ipairs(rows) do log("%s", row) end
+    log("---- %d record(s), %d unresolved ----", #rows, missing)
+end, false)
+
 --- The server answers in chat as well (`Open77.chat.send`); this puts the same line in the client log,
 --- beside the bridge's own `handling:` lines, so one log shows what was asked for AND what was pushed.
 RegisterNetEvent("ncm:setup.result", function(message)

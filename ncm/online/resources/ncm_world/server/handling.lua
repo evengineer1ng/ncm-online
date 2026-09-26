@@ -32,6 +32,8 @@
 -- What IS finished is the path: fitted parts -> composed setup -> player bag -> client -> carrier -> force.
 -- `/ncm.setup` drives it end to end today so the mechanism can be tested before the economy exists.
 local Handling = NcmCore.get("parts.handling")
+local Thermal = NcmCore.get("parts.thermal")
+local Catalogue = NcmCore.get("data.vehicle_catalogue")
 
 local function log(fmt, ...) print(("[ncm_world/handling] " .. fmt):format(...)) end
 local function now() return math.floor(Open77.time.unix()) end
@@ -44,6 +46,7 @@ local WIRE_VERSION = 2
 local fitted = {}
 -- Ephemeral delivery truth: playerId -> { assetId, vehicleId, sig }
 local delivered = {}
+local publishTyre   -- forward: defined below, called by publishBound
 
 local function validAssetId(assetId)
     return type(assetId) == "string" and #assetId > 0
@@ -82,6 +85,98 @@ local function publishUnbound(playerId, why, force)
         "unbound", why or "unbound")
 end
 
+--- The live, per-Machine contributors: everything that is NOT a fitted part.
+---
+--- Assembled here rather than stored, because they change on their own schedule -- weather on minutes,
+--- tyre temperature every second -- and a setup that cached them would go stale silently. The composition
+--- is cheap; staleness is not.
+---
+--- **Every contributor is returned even when inert.** A weather layer that vanishes when the road is dry
+--- is indistinguishable from a weather layer nobody wired up, which is the `IDEA-516` failure class -- and
+--- the weather seam ships deliberately neutral until the weather service passes its own live gate, so this
+--- is exactly the case where an absent contributor would hide a real defect for weeks.
+local function contributorsFor(assetId)
+    local out = {}
+
+    -- Weather. Neutral until `NcmMachine` has a real source; `machine.lua` currently only learns the
+    -- weather from a console command, which is the gap `IDEA-502` names.
+    local wetness = 0
+    if NcmMachine and NcmMachine.state then
+        local c = NcmMachine.state()
+        if type(c) == "table" then wetness = tonumber(c.wetness) or 0 end
+    end
+    out.weather = Handling.weatherContributor(wetness)
+
+    -- Tyre temperature, from the odometer's per-asset thermal state.
+    if NcmOdometer and NcmOdometer.tyreTemperature then
+        local temperature = NcmOdometer.tyreTemperature(assetId)
+        if temperature then out.thermal = Handling.thermalContributor(temperature) end
+    end
+
+    return out
+end
+
+--- Recompose a Machine's setup with its live contributors folded in.
+---
+--- `fitted[assetId].setup` holds the PARTS-ONLY composition, which is the durable truth. The live layers
+--- are applied on top at delivery time, so a change in the weather never rewrites what is installed.
+local function liveSetup(assetId)
+    local entry = fitted[assetId]
+    local parts = entry and entry.parts or {}
+    local input = contributorsFor(assetId)
+    input.vehicle = assetId
+    input.parts = parts
+    local setup = Handling.compose(input, { at = now() })
+    -- A refusal here would mean a contributor is malformed, not that the parts are. Fall back to the
+    -- stored parts-only setup rather than stranding the driver on whatever was last applied.
+    if not setup then return entry and entry.setup or Handling.clear(assetId, { at = now() }) end
+    return setup
+end
+
+-- ---------------------------------------------------------------------------------------------------
+-- The GOVERNOR (`L157`) -- top speed leaves by a different carrier than the levers
+-- ---------------------------------------------------------------------------------------------------
+--
+-- Top speed is not a force and is not written by the Carrier. It is an absolute km/h handed to the
+-- platform's own per-instance governor, `Open77.vehicles.setPerformance`, which is replicated to every
+-- viewer and survives the ownership change that happens on every driver entry and exit.
+--
+-- **`accelerationScale` is never written.** The platform's rule is that the governor withholds and never
+-- adds, and `machine.projection` enforces `MAX_ACCELERATION_SCALE = 1.0` for the same reason. Raising a
+-- top speed here lifts a ceiling NCM itself imposed; it does not add power. That distinction is the whole
+-- of `L157` and it is why this needs no new authority to add force.
+--
+-- Unproven live as of 2026-09-26 -- MASTER_TEST section BA is the capability spike, and nothing in NCM had
+-- ever successfully capped a top speed when this was written.
+local governed = {}   -- assetId -> the last kph applied, so an unchanged ceiling is not rewritten
+
+local function applyGovernor(assetId, vehicleId, record, setup)
+    if not (Open77.vehicles and type(Open77.vehicles.setPerformance) == "function") then return end
+
+    -- The baseline is the catalogue's AUTHORED number -- a specification. It is never a measurement:
+    -- `IDEA-328` draws that line explicitly ("highest observed" is evidence, "top speed" is a claim), and
+    -- a governor driven by an observation would convert one into the other silently.
+    local baseline = record and Catalogue.topSpeedKph(record) or nil
+    local kph = Handling.topSpeedKph(setup, baseline, nil)
+
+    -- No authored baseline means NO CEILING, not a guessed one. A governor invented from nothing is worse
+    -- than no governor: it would be wrong per car and nobody could tell it from a real limit.
+    local target = kph and math.floor(kph + 0.5) or nil
+    if governed[assetId] == target then return end
+    governed[assetId] = target
+
+    local profile = target and { topSpeedKph = target, taperKph = 12.0 } or nil
+    local ok, accepted, reason = pcall(Open77.vehicles.setPerformance, vehicleId, profile)
+    if not ok then
+        log("asset=%s governor THREW: %s", assetId, tostring(accepted))
+    elseif accepted == false then
+        log("asset=%s governor REFUSED: %s", assetId, tostring(reason))
+    else
+        log("asset=%s governor %s", assetId,
+            target and ("topSpeedKph=" .. target) or "cleared")
+    end
+end
+
 --- Publish the setup belonging to the exact asset/vehicle pair proven by vehicle_access.
 local function publishBound(playerId, binding, why, force)
     local pid = tonumber(playerId) or 0
@@ -91,7 +186,7 @@ local function publishBound(playerId, binding, why, force)
     end
 
     local entry = fitted[binding.assetId]
-    local setup = entry and entry.setup or Handling.clear(binding.assetId, { at = now() })
+    local setup = liveSetup(binding.assetId)
     local wire = Handling.wire(setup)
     wire.v = WIRE_VERSION
     wire.bound = true
@@ -111,6 +206,12 @@ local function publishBound(playerId, binding, why, force)
     local changed = not (delivered[pid] and delivered[pid].sig == sig)
     local ok, refusal = write(pid, wire, sig, why or "bound")
     if not ok then return false, refusal end
+
+    -- The governor rides the same reconcile, and outside the `changed` gate: it has its own idempotence
+    -- (`governed[assetId]`) and must survive a re-bind that did not move a lever.
+    applyGovernor(binding.assetId, binding.vehicleId, binding.record, setup)
+    publishTyre(pid, binding.assetId)
+
     if not changed then return true end
 
     log("asset=%s player=%d: %s", binding.assetId, pid, Handling.explain(setup))
@@ -130,6 +231,51 @@ local function publishBound(playerId, binding, why, force)
         end
     end
     return true
+end
+
+-- ---------------------------------------------------------------------------------------------------
+-- The tyre gauge feed
+-- ---------------------------------------------------------------------------------------------------
+--
+-- A TARGETED net event, not a state bag, and all three reasons matter:
+--
+--   * `Open77.state.player(pid)` is visible to the **whole routing bucket**, not to that player
+--     (`29_STATE_BAG_AUDIENCE_AUDIT`). `KB-97` already moved the odometer off a bag for this reason.
+--   * `ncmHandling` sits inside a 4,032-byte ceiling (`IDEA-509`) that NCM was running at 80 percent of.
+--   * A continuously varying field would defeat `write()`'s signature suppression and republish the bag
+--     twice a second per driver -- the defect recorded above as having already happened once.
+--
+-- Quantised to a hundredth and suppressed unless it moves, with a heartbeat every two seconds so a page
+-- that reloaded mid-drive recovers on its own -- the same shape `client/race.lua` already uses for driver
+-- inputs, for the same reasons.
+local tyreSent = {}   -- pid -> { key, at }
+
+local TYRE_HEARTBEAT_S = 2
+
+publishTyre = function(playerId, assetId)
+    local pid = tonumber(playerId) or 0
+    if pid <= 0 then return end
+    local temperature = NcmOdometer and NcmOdometer.tyreTemperature
+        and NcmOdometer.tyreTemperature(assetId) or nil
+
+    -- **Absent is not zero** (`IDEA-361`). A tyre whose temperature we could not derive must arrive as
+    -- nothing, so the gauge can draw a dash -- a needle resting mid-window is the most plausible-looking
+    -- wrong value this whole design can produce.
+    local payload
+    if temperature then
+        local position = Thermal.position(temperature)
+        payload = {
+            p = math.floor(position * 100 + 0.5) / 100,
+            m = math.floor(Thermal.gripMultiplier(temperature) * 1000 + 0.5) / 1000,
+        }
+    end
+
+    local key = payload and ("%.2f"):format(payload.p) or "none"
+    local state = tyreSent[pid]
+    local t = now()
+    if state and state.key == key and (t - state.at) < TYRE_HEARTBEAT_S then return end
+    tyreSent[pid] = { key = key, at = t }
+    pcall(TriggerClientEvent, "ncm:tyre", pid, payload or false)
 end
 
 --- Reconcile a delivery route from authoritative live-vehicle and driver state.
@@ -195,6 +341,7 @@ AddEventHandler("onPlayerDisconnected", function(playerId)
     local pid = tonumber(playerId) or 0
     if pid > 0 then
         delivered[pid] = nil
+        tyreSent[pid] = nil
         -- The asset-keyed fitted setup deliberately survives this resource session. Disconnect changes the
         -- delivery route, not what is installed in the physical Machine.
         log("player=%d disconnected, delivery forgotten; asset setup retained", pid)

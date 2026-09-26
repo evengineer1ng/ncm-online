@@ -121,6 +121,45 @@ Core.define("data.vehicle_catalogue", function(C)
     function M.entries() return entries end
     function M.byKey(key) return type(key) == "string" and byKey[key] or nil end
     function M.resolveRecord(record) return type(record) == "string" and byRecord[record] or nil end
+
+    -- ---------------------------------------------------------------------------------------------
+    -- AUTHORED TOP SPEED (`L157`)
+    -- ---------------------------------------------------------------------------------------------
+    --
+    -- **Top speed is a declared number per car, not an emergent one**, and this is where it is declared.
+    -- The governor that applies it (`Open77.vehicles.setPerformance`) takes an absolute km/h, so something
+    -- has to hold the baseline that a Machine's parts then scale.
+    --
+    -- **It is deliberately EMPTY until measured.** The platform exposes `Open77.vehicles.ratedTopSpeed`,
+    -- which reads the record's own gearing and rated RPM -- an authored specification rather than a
+    -- measurement, which is exactly the right kind of number and exactly why it may be copied in here.
+    -- But it is a CLIENT-side call and this is server-side data, so the values arrive by a one-off dump
+    -- (`/ncm.ratedtopspeed`) and are then authored, the same way `arch_dump.cpp` already dumps flats for
+    -- a human to read rather than for the server to trust at runtime.
+    --
+    -- **An absent entry means NO CEILING, never a guessed one.** A governor invented from nothing would be
+    -- wrong per car and indistinguishable from a real limit, which is worse than having none -- and
+    -- `IDEA-328`/`IDEA-331` are explicit that an observation must not quietly become a specification.
+    M.TOP_SPEED_KPH = {
+        -- Vehicle_v_standard2_thorton_galena = 160,
+    }
+
+    --- The authored top speed for a record, or nil when nobody has measured it yet.
+    function M.topSpeedKph(record)
+        if type(record) ~= "string" then return nil end
+        return M.TOP_SPEED_KPH[(record:gsub("[%.%-]", "_"))]
+    end
+
+    --- Which records still have no authored top speed. The dump command reports this so the gap is
+    --- visible rather than silently meaning "uncapped forever".
+    function M.withoutTopSpeed()
+        local out = {}
+        for _, entry in ipairs(entries) do
+            if entry.record and not M.topSpeedKph(entry.record) then out[#out + 1] = entry.record end
+        end
+        table.sort(out)
+        return out
+    end
     function M.count() return #entries end
     function M.slot(entry) return ("g%d:%03d"):format(M.generation, entry._slot or 0) end
     for i, e in ipairs(entries) do e._slot = i end

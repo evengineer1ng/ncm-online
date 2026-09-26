@@ -9,7 +9,12 @@ auto_start true
 -- network.events: state-bag writes (public driver view) and server-sent notifications.
 -- world.vehicles: issued cars are canonical vehicles created by the server (M2.2).
 -- ui.vanilla.map: /ncm.gps waypoint to the next venue (client).
-permissions { "database.access", "network.events", "state.write", "world.vehicles", "ui.vanilla.map", "ui.nameplates", "input.actions", "map.control", "players.teleport", "world.props", "world.npcs", "vehicles.read", "world.query" }
+-- world.environment: READ ONLY -- `getState` for weather and `secondsOfDay`, which the tyre thermal model
+--   turns into an ambient temperature (`L159`). `ncm_league` owns the weather PLAN and drives the sky;
+--   this resource only asks what the sky is currently doing. Added 2026-09-26: without it `getState`
+--   returned nil, and a missing permission is indistinguishable from a missing API unless the refusal
+--   reason is read -- which is why `machine.lua` now logs it.
+permissions { "database.access", "network.events", "state.write", "world.vehicles", "ui.vanilla.map", "ui.nameplates", "input.actions", "map.control", "players.teleport", "world.props", "world.npcs", "vehicles.read", "world.query", "world.environment" }
 
 -- Race HUD (M3.2): light tree, banner and race strip as our own WebUI page.
 web_ui_page "web/race.html"
@@ -63,10 +68,12 @@ shared_script "shared/core/competition/discoveries.lua"
 shared_script "shared/core/competition/machine_knowledge.lua"
 shared_script "shared/core/engineering/competency.lua"
 shared_script "shared/core/machine/flats.lua"
+shared_script "shared/core/machine/expression.lua"
 shared_script "shared/core/machine/projection.lua"
 shared_script "shared/core/parts/ontology.lua"
 shared_script "shared/core/parts/architecture.lua"
 shared_script "shared/core/parts/compat.lua"
+shared_script "shared/core/parts/thermal.lua"
 shared_script "shared/core/parts/handling.lua"
 shared_script "shared/core/economy/markets.lua"
 shared_script "shared/core/economy/production.lua"

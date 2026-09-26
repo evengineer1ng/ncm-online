@@ -89,6 +89,30 @@
     #inputs .ped em { font: 700 10px/1 var(--mono); font-style: normal; color: var(--dim); }
     #inputs .na .bar i { background: var(--line) !important; }
 
+    /* Tyre temperature (L159). A FOURTH FLEX ITEM inside #inputs rather than a panel of its own: the
+       bottom-left column is already #instr at 184px and #inputs at 252px, and #graph occupies the left
+       edge from roughly 325px up. A separate box at 320px clears the graph on 1440p and OVERLAPS IT ON
+       1080P, which is the more common resolution and not the one this was authored on.
+       Riding inside #inputs also makes it read as one instrument cluster with the pedals, which is what
+       "small and uninvasive near the odometer and inputs hud" asks for. */
+    #inputs .tyre { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+    #inputs .tyre .col { position: relative; width: 10px; height: 38px; background: rgba(255,255,255,0.09); border-radius: 3px; overflow: hidden; }
+    /* The WINDOW as a lit band rather than a line: it is a target to sit inside, so it needs width on the
+       gauge as well as in the model. Its height is the same fraction of the scale the model calls "in". */
+    #inputs .tyre .win { position: absolute; left: 0; right: 0; bottom: 40%; height: 20%; background: rgba(120,255,180,0.22); border-top: 1px solid rgba(120,255,180,0.45); border-bottom: 1px solid rgba(120,255,180,0.45); }
+    /* 500ms matches the 2 Hz feed exactly, so the needle moves continuously instead of stepping. */
+    #inputs .tyre .ndl { position: absolute; left: -2px; right: -2px; height: 2px; bottom: 50%; background: var(--text); border-radius: 1px; transition: bottom 500ms linear, background 500ms linear; }
+    #inputs .tyre.cold .ndl { background: #7fc4ff; }
+    #inputs .tyre.hot .ndl { background: var(--red); }
+    #inputs .tyre.good .ndl { background: var(--ok); }
+    /* Unknown draws NO NEEDLE AT ALL (IDEA-361). A needle resting mid-gauge is the most plausible-looking
+       wrong value this design can produce: it reads as "your tyres are perfect" when the truth is "we have
+       no idea". */
+    #inputs .tyre.na .ndl { display: none; }
+    #inputs .tyre.na .win { opacity: 0.25; }
+    #inputs .tyre b { font: 700 9px/1 var(--mono); letter-spacing: 0.12em; color: var(--dim); }
+    #inputs .tyre em { font: 700 10px/1 var(--mono); font-style: normal; color: var(--dim); }
+
     /* Live race graph (P40). VERTICAL, and deliberately small.
        It used to be a 1240px bar across the bottom of the screen, which sat on top of the speedometer. It now
        stands on the left edge, clear of the vanilla driving HUD (bottom-centre speed, bottom-right minimap)
@@ -129,6 +153,7 @@
       <div class="ped" id="inBrkPed"><div class="bar b"><i id="inBrk"></i></div><b>BRK</b><em id="inBrkPct">--</em></div>
       <div class="ped" id="inThrPed"><div class="bar t"><i id="inThr"></i></div><b>THR</b><em id="inThrPct">--</em></div>
     </div>
+    <div class="tyre na" id="inTyre"><div class="col"><div class="win"></div><div class="ndl" id="inTyreNdl"></div></div><b>TYRE</b><em id="inTyrePct">--</em></div>
   </div>
   <div id="instr" class="hidden"><div class="who" id="instrWho"></div><div class="odo" id="instrOdo"></div></div>
   <div id="graph" class="hidden"><span class="flag" id="graphFlag"></span><div class="line"></div><div id="dots"></div><span class="lbl">START</span></div>
@@ -287,9 +312,23 @@
         if (el.fill.style.height !== css) el.fill.style.height = css;
         text(el.pct, known ? Math.round(h) : "--");
       };
+      // Inputs and tyre state arrive independently and either can be absent. The cluster shows if EITHER
+      // is known -- hiding the whole box when inputs are unreadable would take the tyre gauge with it, and
+      // tyre temperature is server-derived and available even when the client snapshot is not.
+      let haveInputs = false, haveTyre = false;
+      const showCluster = () => inputs.classList.toggle("hidden", !(haveInputs || haveTyre));
+
       Open77.on("race:inputs", (v) => {
-        if (!v || v.off) { inputs.classList.add("hidden"); return; }
-        inputs.classList.remove("hidden");
+        if (!v || v.off) {
+          haveInputs = false;
+          setPedal(pedEls.throttle, null);
+          setPedal(pedEls.brake, null);
+          inWheel.classList.add("na");
+          showCluster();
+          return;
+        }
+        haveInputs = true;
+        showCluster();
         setPedal(pedEls.throttle, v.throttle);
         setPedal(pedEls.brake, v.brake);
         // Full lock is drawn at LOCK_DEG. Started at 120 and came down to 90 on owner QA: driving a real rig
@@ -301,6 +340,29 @@
         const deg = (st === null ? 0 : Math.max(-1, Math.min(1, st)) * LOCK_DEG).toFixed(1);
         const tf = "rotate(" + deg + "deg)";
         if (inWheelG.style.transform !== tf) inWheelG.style.transform = tf;
+      });
+
+      // Tyre temperature (L159). `p` is a POSITION in the window, -1 fully cold to +1 fully hot, NOT a
+      // temperature: the gauge should not need re-scaling every time the model's constants are tuned, and
+      // a driver reads "where am I" rather than "how many degrees".
+      const tyre = document.getElementById("inTyre");
+      const tyreNdl = document.getElementById("inTyreNdl");
+      const tyrePct = document.getElementById("inTyrePct");
+      Open77.on("race:tyre", (v) => {
+        const p = v && typeof v.p === "number" && isFinite(v.p) ? Math.max(-1, Math.min(1, v.p)) : null;
+        haveTyre = p !== null;
+        showCluster();
+        tyre.classList.toggle("na", p === null);
+        tyre.classList.toggle("cold", p !== null && p < -0.2);
+        tyre.classList.toggle("hot", p !== null && p > 0.2);
+        tyre.classList.toggle("good", p !== null && p >= -0.2 && p <= 0.2);
+        if (p === null) { text(tyrePct, "--"); return; }
+        const css = (((p + 1) / 2) * 100).toFixed(1) + "%";
+        if (tyreNdl.style.bottom !== css) tyreNdl.style.bottom = css;
+        // The grip multiplier as a percentage COST, because "you are giving up 6%" is the actionable
+        // reading and "0.94" is not.
+        const cost = typeof v.m === "number" && isFinite(v.m) ? Math.round((1 - v.m) * 100) : null;
+        text(tyrePct, cost === null ? "--" : (cost === 0 ? "OK" : "-" + cost + "%"));
       });
 
       // ---------------------------------------------------------------------------------------------
@@ -406,7 +468,32 @@
         })();
       });
 
-      Open77.on("race:state", apply);
+      // ---------------------------------------------------------------------------------------------
+      // The guard this page has never had
+      // ---------------------------------------------------------------------------------------------
+      //
+      // `panel.html` wraps every render in a `guard()` that catches, blanks cleanly and emits
+      // `panel:error`, and `tools/panel-render-check.js` fires payloads at it. This page had NEITHER: a
+      // throw anywhere inside `apply` vanished into CEF and took the whole race HUD with it -- lights,
+      // strip, board, graph, odometer and inputs together -- with no log line anywhere.
+      //
+      // That is a worse failure than the one `KB-61` was written for, and it went unnoticed because the
+      // race HUD never takes focus, so there was no soft-lock to make it obvious.
+      // `tools/race-render-check.js` is the harness; this is the seam it needs.
+      const guard = (what, fn) => {
+        try {
+          fn();
+          Open77.emit("race:drawn", { view: what });
+        } catch (e) {
+          Open77.emit("race:error", {
+            view: what,
+            message: (e && e.message) ? String(e.message) : String(e),
+            where: (e && e.stack) ? String(e.stack).split("\n")[1] || "" : "",
+          });
+        }
+      };
+
+      Open77.on("race:state", (s) => guard("state", () => apply(s)));
       Open77.ready();
       Open77.emit("race:ready", {});
     })();

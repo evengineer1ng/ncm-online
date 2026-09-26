@@ -127,6 +127,22 @@ if ($node -and (Test-Path $resRoot)) {
             Write-Host ("=== nameplate render check: {0} assertion(s), 0 bad" -f $passes)
         }
     }
+
+    # The RACE HUD. Added 2026-09-26 with `L159`: this page had no guard and no harness at all, and it
+    # carries the lights, strip, board, graph, odometer, driver inputs and the tyre gauge. A throw inside
+    # its render took every one of them, silently -- no log line, no error event, and no soft-lock to make
+    # it obvious, because the race HUD never takes focus.
+    $raceCheck = Join-Path $here 'race-render-check.js'
+    if ((Test-Path $raceCheck) -and (Test-Path $webRoot)) {
+        $rc = & node $raceCheck $webRoot 2>&1
+        if ($LASTEXITCODE -ne 0) {
+            $overall = 1
+            Write-Host '=== race render check FAILED'
+            $rc | Select-String -Pattern 'FAIL' | Select-Object -First 12 | ForEach-Object { Write-Host ("  {0}" -f $_) }
+        } else {
+            $rc | Select-String -Pattern '=== race render check:' | Select-Object -Last 1 | ForEach-Object { Write-Host ("{0}" -f $_) }
+        }
+    }
 } else {
     Write-Host '=== node not found: inline JavaScript gate skipped'
 }

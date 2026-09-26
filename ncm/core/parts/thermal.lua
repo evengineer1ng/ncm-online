@@ -167,6 +167,24 @@ Core.define("parts.thermal", function(C)
         return clamp(T + step * (heating - cooling), M.MIN_C, M.MAX_C)
     end
 
+    --- Cool for an arbitrary stretch with no load, in CLOSED FORM.
+    ---
+    --- `step` clamps `dt` so that a hitch or a resumed session cannot teleport a temperature, which is
+    --- right for the driving case and wrong for the parked one: a car left for ten minutes must end up at
+    --- ambient, not five seconds cooler. Newtonian cooling has an exact solution, so this needs no
+    --- iteration and no clamp -- `T_amb + (T - T_amb) * e^(-t/tau)` is correct for any elapsed time and
+    --- cannot overshoot below ambient however large it gets.
+    ---
+    --- **This is what makes "tyre temperature belongs to the Machine" cheap.** A parked asset costs one
+    --- exponential when somebody next looks at it, rather than a timer per car.
+    function M.cool(temperatureC, ambientC, seconds)
+        local T = clamp(tonumber(temperatureC) or M.AMBIENT_DEFAULT, M.MIN_C, M.MAX_C)
+        local ambient = clamp(tonumber(ambientC) or M.AMBIENT_DEFAULT, M.MIN_C, M.MAX_C)
+        local s = tonumber(seconds) or 0
+        if s ~= s or s <= 0 then return T end
+        return ambient + (T - ambient) * math.exp(-s / M.TAU_SECONDS)
+    end
+
     --- Where in the window is this temperature? -1 fully cold, 0 optimal, +1 fully hot.
     --- Exposed because a HUD needs the position, not the degrees, and a gauge that rescales itself when
     --- the constants are tuned is one fewer thing to keep in sync.

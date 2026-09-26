@@ -272,6 +272,18 @@ end
 local odoState = nil
 RegisterNetEvent("ncm:odo", function(v) odoState = (type(v) == "table") and v or nil end)
 
+-- Tyre temperature (`L159`). Its own channel and straight through to the page, for the same reason driver
+-- inputs have one: `race:state` is diffed and republished on race events, and folding a continuously
+-- changing value into it would defeat that throttling for every other consumer.
+--
+-- The server already quantises, suppresses an unchanged value and heartbeats every two seconds, so there
+-- is nothing to rate-limit here -- this is a relay, and adding a second filter would only make the two
+-- disagree. `false` means "not derivable", which the page draws as a dash and NOT as a needle at rest.
+RegisterNetEvent("ncm:tyre", function(v)
+    if not page then return end
+    pcall(function() page:send("race:tyre", (type(v) == "table") and v or false) end)
+end)
+
 local function instrumentState()
     local o = odoState
     if type(o) ~= "table" then return nil end

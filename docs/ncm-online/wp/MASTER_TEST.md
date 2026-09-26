@@ -1715,3 +1715,60 @@ this and proceed either way.**
 platform directly on purpose, so a platform failure and an NCM composition failure cannot be confused --
 which is the mistake `KB-144` made in the other direction, when eleven ceilings were refused because their
 target records were gone and the ceilings themselves were blamed.
+
+## §BB - Tyre temperature: the window, and what it costs - **AWAITING LIVE TEST**
+
+`L159`. One temperature for the whole car, server-side, keyed to `assetId`. The window is a **penalty, not
+a boost**: 1.00 in the window, 0.85 fully cold or fully overheated, on grip **and** brake.
+
+The gauge is the fourth item in the bottom-left input cluster, beside BRK and THR.
+
+| # | Operation | Expected | Result |
+|---|---|---|---|
+| §BB1 | Spawn a Machine, get in, do not move. Look at the cluster. | A **TYRE** bar appears with a lit window band and a needle near the BOTTOM -- a fresh car starts cold and has to earn the window. Reads `-15%` or close to it. | |
+| §BB2 | Drive hard for about a minute -- corners, not a straight. | The needle climbs into the lit band over roughly 60 s and the readout reaches **OK**. Cornering should warm it faster than cruising. | |
+| §BB3 | Compare the feel cold versus in-window. | **The point of the whole model.** Cold should understeer and stop worse; in the window should not feel *boosted*, it should feel like the penalty stopped. If being in the window feels like a power-up, the model is wrong. | |
+| §BB4 | Park for two minutes, then drive. | The needle falls back toward cold and the penalty returns. Cooling continues **while you are out of the car** -- temperature belongs to the Machine, not the drive. | |
+| §BB5 | Get out for ten minutes, come back. | Stone cold, at ambient. The long-absence path is closed-form rather than ticked, so this must not be "five seconds cooler". | |
+| §BB6 | Drive extremely hard for several minutes. | The needle goes past the window into **hot** and the penalty returns on the other side. Overheating costs the same 15% as freezing. | |
+| §BB7 | `/ncm.setup tires 1.4`, then repeat §BB2. | Tyre parts and tyre temperature compose: the thermal penalty multiplies the part, it does not replace it. | |
+| §BB8 | Watch the gauge before the first server tick after joining. | **A dash and NO NEEDLE** (`IDEA-361`). A needle resting mid-gauge would read as "your tyres are perfect" when the truth is "we have no reading". | |
+
+**What a PASS means.** Tyre state is a live, per-Machine mechanical property that interacts with fitted
+parts and with the weather, and it is legible to the driver without a menu.
+
+**What it explicitly does NOT model**, all enumerated in `parts.thermal.LOSSES`: per-corner or
+inside-shoulder temperature (`per_corner` does not exist), slip velocity (this proxies contact-patch work,
+so it over-heats under pure rolling), brake temperature as a separate body, track versus air temperature,
+pressure, and compound differences.
+
+## §BC - Weather and time of day reach a car - **AWAITING LIVE TEST**
+
+`L158`, `KB-151`. Weather had **never** reached the mechanical path: `setWeather` had one caller and it was
+a console command. Now wired, and verified reading live on 2026-09-26 (`weather=sunny secondsOfDay=43223`).
+
+| # | Operation | Expected | Result |
+|---|---|---|---|
+| §BC1 | Server log after a restart. | One line: `environment read OK: ... weather=<x> secondsOfDay=<n>`. If it says **UNAVAILABLE** or names a refusal, weather is not reaching anything and every step below is void. | |
+| §BC2 | `/ncm.machine weather rain`, then corner hard. | Grip falls live, **on the car you are already sitting in** -- the record channel could never do this (spawn-cached). | |
+| §BC3 | `/ncm.machine weather sunny`. | Grip returns. The effect is reversible and live in both directions. | |
+| §BC4 | `/ncm.setup` with rain set. | The weather contributor appears in the composition, and its contribution is visible rather than folded invisibly into the parts number. | |
+| §BC5 | Compare a dry night with a dry afternoon, over a warm-up. | **Day/night has no grip lever by design.** It acts through ambient temperature: tyres should warm more slowly at night and fall out of the window faster. Subtle, and the mechanism is the point. | |
+| §BC6 | Rain, then watch the tyre gauge over a minute. | Wet pulls heat out of the tyre: the needle sits lower and the window is harder to hold. Weather and thermal compose. | |
+
+**Known limitation, recorded rather than discovered later.** `wetnessOf` is still BINARY -- 1.0 for the
+`wet` family and 0 for everything else -- although `applyWeather` and the instance contributor are both
+linear in a continuous 0..1. Drizzle and a downpour are the same number today. The continuous half exists;
+only the source is coarse.
+
+## §BD - The race HUD cannot fail silently any more - **PARTIALLY OFFLINE**
+
+`KB-152`. `race.html` carries the lights, strip, board, graph, odometer, driver inputs and the tyre gauge,
+and until 2026-09-26 a throw anywhere in it blanked all of them with no log line.
+
+| # | Operation | Expected | Result |
+|---|---|---|---|
+| §BD1 | `tools/ncm-test.ps1`. | `=== race render check: 28 assertion(s), 0 bad`. | **PASS 2026-09-26 (offline)** |
+| §BD2 | Break a payload shape deliberately and re-run. | The gate goes RED and names the failing assertion. | |
+| §BD3 | Drive with the HUD up; watch for `race:error` in the client log. | Silence. An error now has somewhere to appear, which is the whole point -- previously there was nowhere. | |
+| §BD4 | Join with driver inputs unreadable (no vehicle snapshot fields). | The cluster still shows, with the tyre gauge live and the pedals dashed. Previously an unreadable input hid the whole box and would have taken the gauge with it. | |

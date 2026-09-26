@@ -183,8 +183,92 @@ function NcmMachine.setWeather(weatherId)
     NcmMachine.recompute("weather")
 end
 
+-- ---------------------------------------------------------------------------------------------------
+-- THE MISSING SOURCE -- weather never actually reached a car (`IDEA-502`)
+-- ---------------------------------------------------------------------------------------------------
+--
+-- `NcmMachine.setWeather` had exactly ONE caller when this was written, and it was a console command.
+-- `ncm_world` never read `Open77.environment`, never handled `onEnvironmentChanged`, and never spoke to
+-- `ncm_league`'s weather service. So the world's weather drove the sky and the Race Guide, and `wetness`
+-- here was permanently zero in production unless a host typed `/ncm.machine weather rain`.
+--
+-- That is upstream of, and separate from, the `KB-136` transport bug -- fixing the transport would have
+-- delivered a correct payload that said "dry" forever.
+--
+-- Reading the environment directly rather than calling into `ncm_league`: the environment IS the
+-- authority (`ncm_league` drives it and NCM reconciles to it), so reading the thing itself cannot
+-- disagree with it, while a cross-resource call could arrive before that resource has started.
+local reportedEnvironment = false
+
+--- Say ONCE what the environment read actually did.
+---
+--- Without this the seam is silent in exactly the way that let weather never reach a car for months: a
+-- `return` on an unavailable API and a `return` on a successful dry day look identical from the log, so
+--- "weather does nothing" cannot be told from "weather is not wired". The first read says which, names the
+--- fields it found, and then never speaks again.
+local function reportEnvironmentOnce(status, env)
+    if reportedEnvironment then return end
+    reportedEnvironment = true
+    if status ~= "ok" then
+        log("environment read %s -- WEATHER AND TIME OF DAY WILL NOT REACH ANY CAR", status)
+        return
+    end
+    local keys = {}
+    for k, v in pairs(env) do
+        if type(v) ~= "table" then keys[#keys + 1] = k .. "=" .. tostring(v) end
+    end
+    table.sort(keys)
+    log("environment read OK: %s", table.concat(keys, " "))
+end
+
+local function readEnvironment()
+    if not (Open77.environment and Open77.environment.getState) then
+        reportEnvironmentOnce("UNAVAILABLE (Open77.environment.getState is not a function)")
+        return
+    end
+    -- The platform returns `nil, reason` on a refusal, and the reason is the whole diagnosis: a missing
+    -- PERMISSION and a missing API read identically without it. `ncm_world` did not declare
+    -- `world.environment` when this was written, and `getState` answered nil for exactly that reason.
+    local ok, env, reason = pcall(Open77.environment.getState)
+    if not ok then
+        reportEnvironmentOnce("THREW: " .. tostring(env))
+        return
+    end
+    if type(env) ~= "table" then
+        reportEnvironmentOnce(("returned %s (%s)"):format(type(env), tostring(reason or "no reason given")))
+        return
+    end
+    reportEnvironmentOnce("ok", env)
+
+    -- Time of day is free -- it is already on this payload and nothing in NCM has ever read it. It does
+    -- not touch grip; it reaches the car through the tyre thermal model's AMBIENT term.
+    local seconds = tonumber(env.secondsOfDay)
+    if seconds then state.secondsOfDay = seconds end
+
+    if type(env.weather) == "string" then NcmMachine.setWeather(env.weather) end
+end
+
+AddEventHandler("onEnvironmentChanged", function()
+    readEnvironment()
+end)
+
+CreateThread(function()
+    -- The event is the fast path; the poll is the backstop. A resource that starts after the last
+    -- transition would otherwise never learn the weather at all, and `secondsOfDay` advances continuously
+    -- and has no event of its own.
+    Wait(4000)
+    while true do
+        pcall(readEnvironment)
+        Wait(10000)
+    end
+end)
+
 function NcmMachine.state()
-    return { weather = state.weather, wetness = state.wetness }
+    -- `secondsOfDay` rides along because the tyre thermal model reads conditions from ONE place, and
+    -- splitting "what the weather is" from "what time it is" would mean two sources that can disagree.
+    -- It reaches the car through AMBIENT TEMPERATURE and through nothing else -- a cold night makes tyres
+    -- harder to warm, which is the real mechanism, rather than a flat penalty for driving after dark.
+    return { weather = state.weather, wetness = state.wetness, secondsOfDay = state.secondsOfDay }
 end
 
 -- The ceilings are published by ncm_league at boot and can change with the calendar, so the fleet is not

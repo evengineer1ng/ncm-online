@@ -115,6 +115,22 @@ return {
         T.ok(near(M.step(85, 5, 20, -5, 0), 85), "and a negative one is not a time machine")
     end,
 
+    cooling_across_a_long_absence_is_exact_rather_than_clamped = function(T)
+        local M = TH(T)
+        -- `step` clamps dt so a hitch cannot teleport a temperature. That is right for driving and wrong
+        -- for parking: a car left for ten minutes must reach ambient, not five seconds cooler. So the
+        -- parked path is closed-form.
+        local tenMinutes = M.cool(120, 20, 600)
+        T.ok(near(tenMinutes, 20, 0.5), "ten minutes parked is stone cold")
+        local thirtySeconds = M.cool(120, 20, 30)
+        T.ok(thirtySeconds > 60 and thirtySeconds < 120, "half a minute is not")
+        T.ok(M.cool(120, 20, 1e9) >= 20, "and an arbitrarily long gap never overshoots below ambient")
+        T.ok(near(M.cool(85, 20, 0), 85), "a zero gap changes nothing")
+        T.ok(near(M.cool(85, 20, -10), 85), "and a negative one is not a time machine")
+        -- A cold car in a warm pit lane warms toward ambient, not only away from it.
+        T.ok(M.cool(0, 30, 600) > 25, "the same equation carries heat the other way")
+    end,
+
     temperature_stays_inside_its_bounds_under_abuse = function(T)
         local M = TH(T)
         local t = 85

@@ -62,7 +62,105 @@ local card = {}      -- assetId -> { name, ordinal }, likewise
 local shown = {}     -- pid -> the assetId last published, so the bag is written only when it changes
 local tracked = {}   -- vehicleId -> { assetId, pid } registered by any materialisation path
 
+-- ---------------------------------------------------------------------------------------------------
+-- TYRE TEMPERATURE (`L159`) -- here, because this loop already knows everything it needs
+-- ---------------------------------------------------------------------------------------------------
+--
+-- **Why the odometer hosts a thermal model.** It already polls every live vehicle once a second, already
+-- resolves speed with a runtime availability check and a positional fallback, already reads position, and
+-- is already keyed by `assetId`. A tyre model needs exactly those four things and nothing else, so putting
+-- it anywhere else would mean a second poll of the same vehicles for the same fields.
+--
+-- The alternatives were both worse:
+--
+--   * **The Carrier** holds ONE bound body at a time and has no per-entity map, so it structurally cannot
+--     keep a temperature for a car the driver just stepped out of. It also dies with the process.
+--   * **The client** has richer data -- throttle, brake, slip, at 20 Hz -- and every bit of it is
+--     `client_attested`. A number the client computes that then feeds back into grip is forgeable for 15
+--     percent of a car's cornering, which is precisely the property `IDEA-458` says must stay server-side.
+--
+-- Temperature belongs to the MACHINE, like mileage and like fitted Parts. Leaving the car does not reset
+-- it; it keeps cooling in real time, and a car found ten minutes later is stone cold.
 NcmOdometer = {}
+
+local Thermal = NcmCore.get("parts.thermal")
+
+local thermal = {}   -- assetId -> { tempC, at, headingRad }
+
+--- World conditions for the thermal model. Weather and time of day both act on AMBIENT rather than on grip
+--- directly, which is why neither needs a lever of its own: a cold night makes a tyre harder to warm, and
+--- that is the real mechanism rather than a flat penalty for driving after dark.
+local function conditions()
+    local wetness, seconds
+    if NcmMachine and NcmMachine.state then
+        local c = NcmMachine.state()
+        if type(c) == "table" then wetness, seconds = c.wetness, c.secondsOfDay end
+    end
+    return { wetness = wetness, secondsOfDay = seconds }
+end
+
+--- Lateral acceleration from two consecutive position samples, in m/s^2.
+---
+--- Heading change over the interval gives yaw rate; `v * yawRate` is the centripetal term. It is coarse at
+--- 1 Hz -- a flick of opposite lock inside one sample is invisible -- and it is the honest reading of what
+--- this loop can see. A sharper signal exists in the Carrier and is not worth a second transport.
+local function lateralAccel(entry, prev, cur, dt)
+    if not prev or dt <= 0 then return 0 end
+    local dx, dy = cur.x - prev.x, cur.y - prev.y
+    if (dx * dx + dy * dy) < 0.25 then return 0 end      -- below half a metre, heading is noise
+    local heading = math.atan(dy, dx)
+    local state = thermal[entry.assetId]
+    local previousHeading = state and state.headingRad
+    if state then state.headingRad = heading end
+    if not previousHeading then return 0 end
+    local delta = heading - previousHeading
+    -- Wrap to [-pi, pi]; without this, crossing the discontinuity reads as a violent yaw that never
+    -- happened and would cook a tyre on a straight road.
+    while delta > math.pi do delta = delta - 2 * math.pi end
+    while delta < -math.pi do delta = delta + 2 * math.pi end
+    local speed = cur.speedMps or (math.sqrt(dx * dx + dy * dy) / dt)
+    return math.abs(delta / dt) * speed
+end
+
+--- Advance one Machine's tyre temperature. Called for every sampled asset, driven or not.
+local function thermalStep(entry, prev, cur, t)
+    local assetId = entry.assetId
+    local state = thermal[assetId]
+    local ambient = Thermal.ambient(conditions())
+    if not state then
+        thermal[assetId] = { tempC = Thermal.initial(conditions()), at = t }
+        return
+    end
+    -- **Measured dt, never an assumed tick.** `SAMPLE_MS` is a minimum wait, not a period; a hitched
+    -- server that cooled a tyre by a whole second when 300 ms had passed would drift slowly and
+    -- invisibly, which is the worst way for a model to be wrong.
+    local dt = t - (state.at or t)
+    state.at = t
+    if dt <= 0 then return end
+
+    local speed = cur and (cur.speedMps or 0) or 0
+    local load = cur and Thermal.load(speed, lateralAccel(entry, prev, cur, dt)) or 0
+
+    if dt > Thermal.MAX_STEP_SECONDS and load <= 0 then
+        -- A long gap with nothing happening: closed-form, so a car parked for ten minutes ends up at
+        -- ambient rather than five seconds cooler.
+        state.tempC = Thermal.cool(state.tempC, ambient, dt)
+    else
+        state.tempC = Thermal.step(state.tempC, load, ambient, dt, speed)
+    end
+end
+
+--- The current tyre temperature for a Machine, cooled forward to NOW.
+---
+--- Lazily settled rather than ticked: an asset nobody is sampling still has a correct temperature the
+--- moment somebody asks, and that costs one exponential instead of a timer per car.
+function NcmOdometer.tyreTemperature(assetId)
+    local state = thermal[assetId]
+    if not state then return nil end
+    local elapsed = now() - (state.at or now())
+    if elapsed > 2 then return Thermal.cool(state.tempC, Thermal.ambient(conditions()), elapsed) end
+    return state.tempC
+end
 
 --- Where a live vehicle is, from the server's own snapshot. Two shapes are accepted because
 --- `vehicle_access.lua` already has to accept both.
@@ -243,6 +341,9 @@ local function step(entry, t)
     local p = positionOf(snap)
     if not p or not occupied(snap) then
         publish(entry.pid, nil)
+        -- The tyres keep cooling with nobody aboard. This is the branch that makes temperature a property
+        -- of the Machine rather than of the drive, and it costs one call.
+        thermalStep(entry, nil, nil, t)
         -- Unreadable, gone, or nobody aboard. Break the chain so the next observation cannot be joined to
         -- this one across the gap.
         last[assetId] = nil
@@ -252,6 +353,7 @@ local function step(entry, t)
     local cur = { assetId = assetId, x = p.x, y = p.y, z = p.z or 0, at = t, speedMps = speedOf(snap) }
     local prev = last[assetId]
     last[assetId] = cur
+    thermalStep(entry, prev, cur, t)
     if not prev then return end
     local seg = Identity.segment(prev, cur)
     trace(assetId, prev, cur, seg)
