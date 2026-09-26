@@ -3,19 +3,32 @@
 > **STATUS: LEDGER** - living session memory, rewritten at the end of every working session.
 > Authority map: [INDEX.md](INDEX.md) - classified 2026-09-24 (L125).
 
-Last rewritten: **2026-09-26 - Two independent threads. (1) Foundry architecture review 38 is complete and
-awaiting owner ruling; `L153` locks the existing-geometry scope and abandons the AI/generative branch; no
-Foundry implementation began. (2) `L152` built the path from a fitted part to a live force, and `L154` then
-widened it from three families to eleven by allowing approximation. Carrier 0.1.20 on Production awaiting
-§AY.**
+Last rewritten: **2026-09-26 - `L155` is ruled and its authorised prerequisite is BUILT AND DEPLOYED.
+Parts are now keyed by permanent `assetId`, and the Carrier writes force only to a positively identified
+body (`KB-146` FIXED, Carrier 0.1.21). Foundry review 38 still awaits the owner on representation; `L153`
+locks its scope. §AY and §AZ both await the drive.**
 
-> **Claim before writing:** decisions through **L153**; MASTER_TEST through **§AY**; next QA letter **§AZ**.
-> BACKLOG next free **IDEA-527**; known issues through **KB-145** plus pre-existing duplicate labels noted by
+> **Claim before writing:** decisions through **L155**; MASTER_TEST through **§AZ**; next QA letter **§BA**.
+> BACKLOG next free **IDEA-527**; known issues through **KB-146** plus pre-existing duplicate labels noted by
 > `KB-114`. Read the ledger tails before allocating an ID.
 
 ## One next action
 
-**Drive §AY.** Fourteen numbered operations in `wp/MASTER_TEST.md`, all through `/ncm.setup`. Everything
+**Drive §AZ-B, the two-client binding test.** It needs a second player and nothing else does. §AZ8 -- swap
+Machines and confirm the setup follows the **car**, not the driver -- is the assertion `L155` point 1 turns
+on, and the green light for the Foundry identity spine.
+
+§AZ-A is a solo pre-check and takes two minutes. **§AZ1 is a log assertion, not a feel one:** 0.1.20 and
+0.1.21 feel identical alone, so the line naming your `assetId` is the only thing that proves the binding.
+
+**If `binding=waiting` never becomes `matched`**, read the client log for the line naming which snapshot
+field resolved the engine entity. The vehicle snapshot's field name is not established anywhere in the
+repo, so `carrier_bridge.lua` tries six candidates and logs the winner once. No winner means the list is
+wrong and no amount of driving will produce a write.
+
+## Then drive §AY
+
+Fourteen numbered operations in `wp/MASTER_TEST.md`, all through `/ncm.setup`. Everything
 below is built, deployed and green; none of it is *done* until a live PASS sits beside it (`L69`).
 
 ```
@@ -55,6 +68,38 @@ per-instance configurations; exact appearance-recipe replication; distinct recor
 where record-channel separation is required; and the actual installed-game substrate inventory. No catalogue,
 schema, runtime package, server or database was changed by the review.
 
+## `L155` prerequisite: Machine-keyed Parts and a positive body binding -- SHIPPED
+
+The owner approved the ten-point package and authorised the prerequisite immediately. It is built, green
+and on Production. **Scope was held exactly where the ruling put it:** record cloning (point 4) and
+per-instance `setPerformance(id)` (point 9) remain experiments and did not leak into this patch.
+
+**`KB-146` was the reason this had to come first.** Every claim that the force write was *"scoped to the
+latched player vehicle"* -- in `L148`, `L151`, `L152` and the probe's own header -- was false. The latch
+condition was `mass > 200 && mass < 10000 && back != 0`, evaluated for whichever body was the window's
+fastest. There was no player check anywhere in the file. Four sections of live testing passed because in
+single-player your own car IS the fastest car-shaped body; put an AI racer or a leased peer car ahead of
+you and your Parts would have started scaling theirs, silently.
+
+**Three links, none inferred:**
+
+| link | proved by | file |
+|---|---|---|
+| `assetId` -> live `vehicleId` -> physics-authority player | server, from the platform lease table | `vehicle_access.bindingForAuthority` |
+| "I am really in that exact vehicle" | client, reading its own state (`KB-41`'s rule) | `client/carrier_bridge.lua` |
+| that vehicle -> the live `ent::EntityID` | client snapshot, then exact equality at `+0x180` -> `+0x48` | `vehicle/physics_probe.cpp` |
+
+The binding is a **2 s lease** re-sent at 2 Hz and expired on the physics thread itself, so a lost seat or
+ownership change cannot leave another Machine tuned. An NCM-authored unbind keeps `ncm_carrier.json`
+suppressed -- handing the levers back mid-session would let a stale bench value become a live car's
+handling at the moment NCM said it should have none. Socket loss, which is a different event, does return
+ownership. The fastest-body latch survives as **diagnostics only** and is disabled whenever a binding is
+expected.
+
+The engine entity crosses the wire as a **decimal string**: it is a 64-bit id passing through a WebUI page
+that re-serialises JSON in JavaScript, where every number is a double, and a rounded identity matches
+nothing.
+
 ## `L154`: approximation is allowed, and that took Parts from three families to eleven
 
 `L152` shipped in the morning refusing nine of the twelve families outright. The owner's challenge -- *"why
@@ -83,7 +128,7 @@ loss wherever it is adjacent.
 
 **The mechanism is `effect ^ weight`**, which is what lets one number on a wing add grip *and* cost drive
 force at once, and keeps composition commutative so a car cannot depend on table iteration order. The
-topology is physics; the weights are a first pass awaiting play data (`IDEA-519`).
+topology is physics; the weights are a first pass awaiting play data (`IDEA-527`).
 
 **An unplanned result:** the four families with no drive-model flat all now reach `driveScale`, and steering
 -- the one family the instance channel cannot carry -- turns out to have a flat. The two channels cover the

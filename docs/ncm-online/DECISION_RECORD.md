@@ -2088,3 +2088,38 @@ widening what NCM can say cost the plugin nothing.
 
 **Basis.** `L152`, and the owner's correction of it. Live on Production 2026-09-26 with Carrier 0.1.20
 unchanged; `ncm_world` reports `3 direct, 8 approximated, 1 refused`.
+
+## L155 - LOCKED OWNER RULING - Machine-keyed Parts and bounded derivative performance
+
+**Approved 2026-09-26 as a ten-point package, including immediate `assetId` keying and `KB-146` work.**
+
+1. Permanent Machine `assetId`, not player ID, is the authoritative key for fitted Parts and the resulting
+   current Machine configuration. Player identity is only the delivery/authority context for the Machine the
+   player currently controls.
+2. `KB-146` is a prerequisite defect: an active setup must positively bind `assetId -> current runtime vehicle
+   entity -> exact physics body`. Missing, stale or mismatched evidence restores inert. The Carrier must never
+   choose the fastest vehicle-shaped body as a fallback.
+3. Runtime record flats normally describe the shared substrate baseline. They are not the per-Machine channel
+   and cannot safely distinguish concurrent derivatives which share that substrate.
+4. A rare Design-level record clone is permitted when a released derivative genuinely requires record-channel
+   separation. This is an exceptional, scheduled content release rather than the default way to manufacture
+   descendants.
+5. A clone-backed release requires a distinct vehicle record **and** a distinct referenced drive-model record;
+   cloning only the vehicle record would leave the handling flats shared. Exact record names remain runtime
+   adapter/provenance detail, not semantic Vehicle Design identity.
+6. A derivative need not always produce a new felt runtime behaviour. Engineering, eligibility, economy,
+   collectability and history may distinguish it. Any simulated-only difference must be labelled honestly and
+   must not claim a physical effect the runtime does not express.
+7. Concurrent use is never forbidden merely because two Machines share a record or mesh. Instance-safe channels
+   carry current Machine effects; a required record-only distinction either earns a validated clone-backed
+   release or is not offered as a concurrent physical distinction.
+8. OPEN//77's per-instance `setPerformance(id)` surface is added to the experiment register. It is not adopted
+   until NCM proves authority, replication, ownership transfer, reset/reconnect and same-record concurrency on
+   the pinned build.
+9. Clone-backed Designs have operational weight: they require catalogue admission, build provenance, packaging,
+   restart/deployment and live validation. Treat them as deliberate content drops, not ordinary repeat mints.
+10. This line authorises the immediate Machine-keyed Parts/live-binding prerequisite only. It does not authorise
+    Foundry schema migration, record-clone production, catalogue expansion or economy release.
+
+**Basis.** Owner approval of the coordination package following the performance-channel review; `L153`, `L154`,
+`KB-146`, Proposal 38, and the existing permanent `vehicle_asset.asset_id` identity model.

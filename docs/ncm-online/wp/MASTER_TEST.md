@@ -1473,3 +1473,50 @@ table above stands with §AY5 reinterpreted, and these are added:
 **What §AY13 is really testing.** Not a string. Whether the system can tell a player what a part will
 *not* do for them, in the same breath as what it will. `losses` is the whole of `IDEA-505` once
 approximation is allowed, and if it never reaches a human it is decoration.
+
+## §AZ - the binding: Parts follow the Machine, not the fastest car - **AWAITING LIVE TEST**
+
+`KB-146`, `L155` point 2. §AY asked whether a fitted part can reach a force. §AZ asks the question §AY
+could not: **does it reach the RIGHT car?**
+
+Until now it did not, and nothing said so. The write went to whichever car-shaped body was most recently
+the fastest thing this client simulated. Every previous section passed because in single-player that body
+is always yours -- which is exactly why this needs a **two-client** test and cannot be proved alone.
+
+Carrier **0.1.21** + `ncm_world`. `/ncm.setup` unchanged.
+
+### §AZ-A -- one client, the regression the old build would fail
+
+| # | Operation | Expected | Result |
+|---|---|---|---|
+| §AZ1 | Fit `power_unit 1.5`, drive. Watch `ncm_carrier.log`. | `handling: BOUND to body ... asset=... entity=...`, then acceleration. **The log line naming your assetId is the actual pass** -- feel alone cannot distinguish this build from 0.1.20. | |
+| §AZ2 | Get out of the car and walk around. | `handling: unbound by NCM -- inert, bench config stays suppressed`. No writes while on foot. | |
+| §AZ3 | Get back in. | Re-BOUND, same asset, parts restored without re-fitting. | |
+| §AZ4 | Drive past ordinary NPC traffic at speed, then let a traffic car overtake you. | **Nothing changes.** On 0.1.20 an overtaking car could steal the latch. `binding=matched` stays in `/ncm.status`. | |
+| §AZ5 | Stop the NCM resource, or `/ncm.ffb off`, while parts are fitted. | Socket loss -- `cleared to inert ... ncm_carrier.json drives the levers again`. Ownership genuinely returns, unlike §AZ2. | |
+
+### §AZ-B -- two clients, which is the part that matters
+
+Two players, two **different** Machines. Give them opposite setups so a swap is unmistakable:
+A `driveScale 0.6`, B `driveScale 1.6`.
+
+| # | Operation | Expected | Result |
+|---|---|---|---|
+| §AZ6 | Both drive at once. | Each feels only their own. A's log names A's asset, B's names B's. | |
+| §AZ7 | **A overtakes B**, then B overtakes A. | No change to either. This is the defect's exact shape: on 0.1.20 the faster car could capture the slower driver's write. | |
+| §AZ8 | **Swap Machines.** A drives B's car and vice versa. | **The setup follows the MACHINE, not the driver.** A now feels 1.6. This is the single most important assertion for Foundry -- it is what "`assetId` is the authoritative Parts key" means in the seat. | |
+| §AZ9 | A becomes a passenger in B's car. | A gets no binding (`physicsOwner` is B). No double-tuning. | |
+| §AZ10 | A disconnects mid-drive and reconnects. | Binding re-established from `assetId`; correct setup returns without re-fitting. | |
+| §AZ11 | Despawn and re-CALL a Machine. | `dematerialized` unbinds immediately; `materialized` rebinds. | |
+| §AZ12 | Kill the NCM resource while both drive. | **Both cars go native within ~2 s**, by lease expiry rather than by being told. Log: `UNBOUND (the binding lease expired)`. | |
+
+### What a PASS means
+
+`assetId` is genuinely the Parts key, and the per-instance channel is safe for two Designs sharing one
+runtime record -- which is `L155` point 3's precondition and the green light for the Foundry identity spine.
+
+**The failure mode to watch for**, because it is the one this design cannot self-detect: `binding=waiting`
+forever. That means the server published an identity the client could resolve but no body ever matched it
+-- most likely `entityOf()` picked a field that is not the engine entity. The client logs which field name
+resolved, **once**; if that line never appears, the candidate list in `carrier_bridge.lua` is wrong and no
+amount of driving will produce a write. Check the log before concluding the channel is broken.

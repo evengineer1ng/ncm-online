@@ -149,11 +149,24 @@ void onLoad()
         c.server->onArchDump([](const std::vector<std::string>& records) {
             ncm::vehicle::arch::dump(records);
         });
-        // `L152`: the per-machine half of Parts. `parts.handling` composed these from the driver's fitted
-        // components; the carrier clamps and applies and decides nothing (`L135`). Unlike a projection,
-        // this lands on ONE BODY -- the latched player vehicle -- so it is per-player by construction.
+        // `L152` / `KB-146`: the per-machine half of Parts. The Carrier no longer guesses which body is
+        // the player's by choosing the fastest plausible car. A v2 message names the authoritative
+        // assetId and the live REDengine EntityID; the probe writes only after the latter exactly matches
+        // the EntityID reached through that body's vehicle back-pointer.
         c.server->onHandling([](const ncm::bridge::Handling& h) {
-            ncm::vehicle::probe::applyHandling(h.hasGrip, h.grip, h.hasDrive, h.drive,
+            if (!h.valid) {
+                NCM_WARN("handling refused and cleared to inert: %s",
+                         h.invalidReason.empty() ? "invalid v2 binding" : h.invalidReason.c_str());
+                ncm::vehicle::probe::clearHandling(false);
+                return;
+            }
+            if (!h.bound) {
+                ncm::vehicle::probe::clearHandling(false);
+                return;
+            }
+            ncm::vehicle::probe::applyHandling(h.assetId, h.vehicleId, h.authorityEpoch,
+                                               h.engineEntity,
+                                               h.hasGrip, h.grip, h.hasDrive, h.drive,
                                                h.hasBrake, h.brake);
         });
         c.server->onConnect([&c] { sendHealth(c); });

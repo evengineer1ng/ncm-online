@@ -96,8 +96,10 @@ void noteReportedSpeed(double metresPerSecond) noexcept;
 /// none of it (`L135`). Three scales, because three quantities have been driven and confirmed: grip
 /// across travel (AU5), drive force along it (AW1), brake force along it (AW2).
 ///
-/// **This is the channel that makes Parts personal.** It writes to one body -- the latched player vehicle
-/// -- in this client's own physics step, so it is per-player by construction rather than by convention.
+/// **This is the channel that makes Parts personal.** It writes only after `engineEntity` has positively
+/// matched the `ent::EntityID` on a physics body's vehicle back-pointer. Speed, mass and proximity are
+/// diagnostics, never identity. `assetId` remains the authoritative semantic identity and is retained in
+/// the bridge contract/log; `engineEntity` is only the adapter join to the current live body.
 ///
 /// Three properties worth stating because they are what make it safe to take orders from a socket:
 ///
@@ -111,12 +113,16 @@ void noteReportedSpeed(double metresPerSecond) noexcept;
 ///
 /// A non-finite value leaves that lever alone rather than zeroing it. Absent and inert are different
 /// claims, and so are absent and malformed.
-void applyHandling(bool hasGrip, double grip, bool hasDrive, double drive,
+void applyHandling(const std::string& assetId, const std::string& vehicleId,
+                   const std::string& authorityEpoch, uint64_t engineEntity,
+                   bool hasGrip, double grip, bool hasDrive, double drive,
                    bool hasBrake, double brake) noexcept;
 
 /// Return the three Parts levers to inert and hand them back to the config file. Called when the bridge
 /// drops, and safe to call when no setup was ever applied.
-void clearHandling() noexcept;
+/// `releaseBenchConfig=false` is an authoritative NCM unbind/refusal: stay inert and keep the bench config
+/// suppressed while the socket remains connected. Socket loss passes true and returns ownership.
+void clearHandling(bool releaseBenchConfig = true) noexcept;
 
 /// One line, in the spirit of MtClutchDiag: everything the probe currently knows, cheap to call.
 std::string status();

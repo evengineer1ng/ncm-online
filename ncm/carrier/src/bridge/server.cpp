@@ -8,6 +8,7 @@
 #include <ws2tcpip.h>
 
 #include <array>
+#include <charconv>
 #include <cstring>
 
 using json = nlohmann::json;
@@ -71,6 +72,40 @@ const char* kBridgeHtml = R"HTML(<!doctype html>
 namespace {
 
 constexpr const char* kGuid = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
+
+std::string idText(const json& value)
+{
+    if (value.is_string()) return value.get<std::string>();
+    if (value.is_number_unsigned()) return std::to_string(value.get<uint64_t>());
+    if (value.is_number_integer()) return std::to_string(value.get<int64_t>());
+    return {};
+}
+
+bool unsignedId(const json& value, uint64_t& out)
+{
+    if (value.is_number_unsigned()) {
+        out = value.get<uint64_t>();
+        return out != 0;
+    }
+    if (value.is_number_integer()) {
+        const auto signedValue = value.get<int64_t>();
+        if (signedValue <= 0) return false;
+        out = static_cast<uint64_t>(signedValue);
+        return true;
+    }
+    if (!value.is_string()) return false;
+
+    const auto text = value.get<std::string>();
+    if (text.empty()) return false;
+    const bool hex = text.size() > 2 && text[0] == '0' && (text[1] == 'x' || text[1] == 'X');
+    const char* first = text.data() + (hex ? 2 : 0);
+    const char* last = text.data() + text.size();
+    uint64_t parsed = 0;
+    const auto result = std::from_chars(first, last, parsed, hex ? 16 : 10);
+    if (result.ec != std::errc{} || result.ptr != last || parsed == 0) return false;
+    out = parsed;
+    return true;
+}
 
 // ---------------------------------------------------------------------------------------------------- sha1
 // RFC 3174. Needed only for the WebSocket handshake accept key.
@@ -424,11 +459,25 @@ void Server::dispatch(const std::string& payload)
         if (!h.is_object()) return;
 
         Handling out;
-        out.version = h.value("v", 1);
+        out.version = h.value("v", 0);
+        out.bound = h.value("bound", false);
+
+        // KB-146 contract. `assetId` is the authoritative Machine; `vehicleId` is useful evidence in a
+        // log but cannot be compared with a native pointer. `engineEntity` is sent as a decimal string so
+        // the WebUI's JavaScript JSON round-trip cannot round a 64-bit EntityID. `engineId` is accepted as
+        // a transition alias because character snapshots use that spelling; vehicle snapshots publish
+        // `engineEntity` and new senders should use the latter.
+        out.assetId = h.value("assetId", std::string());
+        if (h.contains("vehicleId")) out.vehicleId = idText(h["vehicleId"]);
+        if (h.contains("authorityEpoch")) out.authorityEpoch = idText(h["authorityEpoch"]);
+        const json* engine = nullptr;
+        if (h.contains("engineEntity")) engine = &h["engineEntity"];
+        else if (h.contains("engineId")) engine = &h["engineId"];
+
         // A lever that is ABSENT is not the same as a lever set to 1.0. Absent means "the server said
-        // nothing about this one, leave it alone"; 1.0 means "explicitly inert". `parts.handling.wire()`
-        // always sends all three, so absence here is a malformed payload rather than a normal state -- but
-        // the distinction is kept because collapsing it is how a partial message silently detunes a car.
+        // nothing about this one"; 1.0 means "explicitly inert". A v2 Machine setup is atomic, so all
+        // three are required. Keeping an old lever through a seat/asset change would apply one Machine's
+        // Parts to another and is therefore refused rather than interpreted.
         const auto& levers = h.contains("levers") ? h["levers"] : json::object();
         if (levers.is_object()) {
             if (levers.contains("gripScale") && levers["gripScale"].is_number()) {
@@ -441,6 +490,18 @@ void Server::dispatch(const std::string& payload)
                 out.hasBrake = true; out.brake = levers["brakeScale"].get<double>();
             }
         }
+
+        if (out.version != 2) out.invalidReason = "handling contract must be v2";
+        else if (!out.bound) out.valid = true;  // an explicit unbind is a valid request to become inert
+        else if (out.assetId.empty()) out.invalidReason = "bound handling has no assetId";
+        else if (out.vehicleId.empty()) out.invalidReason = "bound handling has no vehicleId";
+        else if (out.authorityEpoch.empty()) out.invalidReason = "bound handling has no authorityEpoch";
+        else if (!engine || !unsignedId(*engine, out.engineEntity))
+            out.invalidReason = "bound handling has no valid engineEntity";
+        else if (!(out.hasGrip && out.hasDrive && out.hasBrake))
+            out.invalidReason = "bound handling does not carry all three levers";
+        else out.valid = true;
+
         onHandling_(out);
         return;
     }

@@ -1,4 +1,4 @@
--- ncm_world / server / handling -- the per-machine half of Parts, published per player.
+-- ncm_world / server / handling -- the per-machine half of Parts, delivered to its current operator.
 --
 -- `machine.lua` composes the RECORD channel and publishes it to `GlobalState`, because rain falls on
 -- everyone's Quadra at once and a class ruleset is a property of the class. Its own header has said since
@@ -11,14 +11,13 @@
 -- This is that half. It does not wait any more, and it is not averaged into a record.
 --
 -- ---------------------------------------------------------------------------------------------------
--- WHY A PLAYER BAG AND NOT GlobalState
+-- WHY ASSET TRUTH THROUGH A PLAYER BAG
 -- ---------------------------------------------------------------------------------------------------
 --
--- The value IS per-player, so the carrier for it is per-player. `Open77.state.player(id):set(...)` is the
--- same mechanism `ncmPresentation` and `ncmOnboarding` already use, and it has two properties GlobalState
--- does not have here: a joining player's bag is written after they exist, so there is no late-joiner
--- snapshot problem (`KB-30`, and the way `KB-136`'s ceilings half actually failed), and one driver's setup
--- is not shipped to thirty clients that have no use for it.
+-- The truth is keyed by permanent `assetId`; the player bag is only the delivery route to whoever currently
+-- controls that Machine. `vehicle_access.lua` proves `assetId -> live vehicleId -> driverPlayerId`. This file
+-- never infers identity from player id, record, proximity or speed. A seat transfer moves delivery without
+-- moving the fitted setup, and no proven binding publishes an explicit inert/unbound envelope.
 --
 -- ---------------------------------------------------------------------------------------------------
 -- WHAT DOES NOT EXIST YET, STATED PLAINLY
@@ -26,7 +25,7 @@
 --
 -- **There is no parts inventory.** Ownership, acquisition, fitting, wear and the garage UI are Parts layer
 -- 4 and are not authorised. So this module does not invent one: it holds an in-memory table of what each
--- driver is currently running and exposes `NcmHandling.setParts` for whatever eventually owns that truth to
+-- asset is currently running and exposes `NcmHandling.setParts` for whatever eventually owns that truth to
 -- call. Nothing here persists across a restart, and that is correct rather than unfinished -- a persistence
 -- schema written before the inventory it stores would be a guess.
 --
@@ -39,85 +38,145 @@ local function now() return math.floor(Open77.time.unix()) end
 
 NcmHandling = NcmHandling or {}
 
--- playerId -> { parts = {...}, sig = "<signature>" }
+local WIRE_VERSION = 2
+-- Permanent Machine truth (in memory until Parts inventory/persistence exists):
+-- assetId -> { parts = {...}, setup = composed setup }
 local fitted = {}
+-- Ephemeral delivery truth: playerId -> { assetId, vehicleId, sig }
+local delivered = {}
 
---- Compose and publish one driver's setup. Cheap; only writes when the applied truth moved.
----
---- `why` is for the log. A publish nobody can explain is how `KB-142` survived three drives.
-local function publish(playerId, why)
-    local entry = fitted[playerId]
-    local parts = entry and entry.parts or {}
+local function validAssetId(assetId)
+    return type(assetId) == "string" and #assetId > 0
+end
 
-    local setup, refusal = Handling.compose({ vehicle = playerId, parts = parts }, { at = now() })
-    if not setup then
-        -- Named, never silent. A refusal now means one of two things -- a malformed effect, or a part in
-        -- the single family the live channel cannot express (`steering`, `KB-135`) -- and a driver quietly
-        -- getting nothing for a component they paid for is far worse than a line in the log.
-        log("player=%d refused: %s", playerId, tostring(refusal))
-        return false, refusal
-    end
+local function inertLevers()
+    return Handling.wire(Handling.clear(nil, { at = now() })).levers
+end
 
-    local sig = Handling.signature(setup)
-    if entry and entry.sig == sig then return true end
-
-    local wire = Handling.wire(setup)
-    local ok, err = pcall(function()
+local function write(playerId, wire, sig, why)
+    local current = delivered[playerId]
+    if current and current.sig == sig then return true end
+    local ok, accepted = pcall(function()
         return Open77.state.player(playerId):set("ncmHandling", wire)
     end)
-    if not ok then
-        -- `KB-136` is the standing reminder that a state-bag write can be REFUSED and look like silence.
-        -- This payload is three numbers and a version, so it will not hit the size limit, but the write is
-        -- still checked rather than assumed.
-        log("player=%d state bag write failed: %s", playerId, tostring(err))
+    if not ok or accepted == false then
+        log("player=%d state bag write failed: %s", playerId, tostring(ok and accepted or accepted))
         return false, "state_write_failed"
     end
+    delivered[playerId] = {
+        assetId = wire.assetId, vehicleId = wire.vehicleId, bound = wire.bound, sig = sig,
+    }
+    log("player=%d delivery=%s asset=%s vehicle=%s (%s)", playerId,
+        wire.bound and "BOUND" or "INERT", tostring(wire.assetId or "-"),
+        tostring(wire.vehicleId or "-"), tostring(why))
+    return true
+end
 
-    if entry then entry.sig = sig end
-    log("player=%d (%s): %s", playerId, tostring(why), Handling.explain(setup))
-    if #setup.clamped > 0 then
+--- Explicitly withdraw the native target and restore inert levers. Going silent is unsafe: the Carrier
+--- retains its last setup until told otherwise.
+local function publishUnbound(playerId, why, force)
+    local pid = tonumber(playerId) or 0
+    if pid <= 0 then return false, "bad_player" end
+    if force and delivered[pid] then delivered[pid].sig = nil end
+    return write(pid, { v = WIRE_VERSION, bound = false, levers = inertLevers() },
+        "unbound", why or "unbound")
+end
+
+--- Publish the setup belonging to the exact asset/vehicle pair proven by vehicle_access.
+local function publishBound(playerId, binding, why, force)
+    local pid = tonumber(playerId) or 0
+    if pid <= 0 or type(binding) ~= "table" or not validAssetId(binding.assetId)
+        or binding.vehicleId == nil then
+        return publishUnbound(pid, why or "bad binding", force)
+    end
+
+    local entry = fitted[binding.assetId]
+    local setup = entry and entry.setup or Handling.clear(binding.assetId, { at = now() })
+    local wire = Handling.wire(setup)
+    wire.v = WIRE_VERSION
+    wire.bound = true
+    wire.assetId = binding.assetId
+    wire.vehicleId = binding.vehicleId
+    wire.authorityEpoch = binding.authorityEpoch
+    wire.driverPlayerId = binding.driverPlayerId
+    wire.configurationRevision = entry and entry.revision or 0
+    wire.configurationSignature = Handling.signature(setup)
+    local sig = table.concat({ "bound", binding.assetId, tostring(binding.vehicleId),
+        tostring(binding.authorityEpoch), tostring(wire.configurationRevision),
+        wire.configurationSignature }, "|")
+    if force and delivered[pid] then delivered[pid].sig = nil end
+    local ok, refusal = write(pid, wire, sig, why or "bound")
+    if not ok then return false, refusal end
+
+    log("asset=%s player=%d: %s", binding.assetId, pid, Handling.explain(setup))
+    if setup.clamped and #setup.clamped > 0 then
         for _, c in ipairs(setup.clamped) do
-            log("player=%d CLAMPED %s: wanted %.3f, applied %.3f",
-                playerId, c.lever, c.wanted, c.applied)
+            log("asset=%s CLAMPED %s: wanted %.3f, applied %.3f",
+                binding.assetId, c.lever, c.wanted, c.applied)
         end
     end
     return true
 end
 
---- Set what this driver is running. **The API the parts inventory will call when it exists.**
----
---- `parts` is a list of `{ id = <string>, family = <ontology family>, effect = <multiplier> }`. Passing nil
---- or an empty list is how parts are removed, and it publishes an explicitly inert setup rather than simply
---- going quiet -- the carrier would keep the last one otherwise.
-function NcmHandling.setParts(playerId, parts, why)
+--- Reconcile a delivery route from authoritative live-vehicle and driver state.
+function NcmHandling.reconcilePlayer(playerId, why, force)
     local pid = tonumber(playerId) or 0
     if pid <= 0 then return false, "bad_player" end
-    fitted[pid] = fitted[pid] or {}
-    fitted[pid].parts = parts or {}
-    return publish(pid, why or "setParts")
+    local binding, refusal
+    if NcmVehicleAccess and NcmVehicleAccess.bindingForAuthority then
+        binding, refusal = NcmVehicleAccess.bindingForAuthority(pid)
+    else
+        refusal = "vehicle_access_unavailable"
+    end
+    if not binding then return publishUnbound(pid, why or refusal, force) end
+    return publishBound(pid, binding, why, force)
 end
 
---- What this driver is running, for a panel or a command to read back.
-function NcmHandling.parts(playerId)
-    local entry = fitted[tonumber(playerId) or 0]
+--- Set what one physical Machine is running. **This is the API a future Parts inventory will call.**
+---
+--- `parts` is a list of `{ id, family, effect }`. It is deliberately not persisted here. Validation occurs
+--- before replacing the previous setup, so one malformed component cannot poison an asset and strand its
+--- current operator on the last native state.
+function NcmHandling.setParts(assetId, parts, why)
+    if not validAssetId(assetId) then return false, "bad_asset" end
+    parts = parts or {}
+    if type(parts) ~= "table" then return false, "parts must be a table" end
+    local setup, refusal = Handling.compose({ vehicle = assetId, parts = parts }, { at = now() })
+    if not setup then
+        log("asset=%s refused: %s", assetId, tostring(refusal))
+        return false, refusal
+    end
+    local previous = fitted[assetId]
+    fitted[assetId] = { parts = parts, setup = setup, revision = (previous and previous.revision or 0) + 1 }
+
+    -- A parked asset can be configured without inventing an operator. If it is being driven, publish to
+    -- the proven current driver rather than to its owner or to whoever invoked the change.
+    if NcmVehicleAccess and NcmVehicleAccess.operatorForAsset then
+        local pid, binding = NcmVehicleAccess.operatorForAsset(assetId)
+        if pid and binding then return publishBound(pid, binding, why or "setParts", true) end
+    end
+    log("asset=%s stored in memory (%s); no proven current operator", assetId, tostring(why or "setParts"))
+    return true
+end
+
+function NcmHandling.parts(assetId)
+    local entry = validAssetId(assetId) and fitted[assetId] or nil
     return entry and entry.parts or {}
 end
 
---- Recompose and republish without changing what is fitted. For whatever later makes a setup depend on
---- something other than the parts list -- wear, a class rule, a penalty.
-function NcmHandling.recompute(playerId, why)
-    local pid = tonumber(playerId) or 0
-    if pid <= 0 then return false, "bad_player" end
-    if fitted[pid] then fitted[pid].sig = nil end
-    return publish(pid, why or "recompute")
+function NcmHandling.recompute(assetId, why)
+    if not validAssetId(assetId) then return false, "bad_asset" end
+    local entry = fitted[assetId]
+    return NcmHandling.setParts(assetId, entry and entry.parts or {}, why or "recompute")
 end
 
---- A driver left. Drop the record so a recycled player id cannot inherit somebody else's engine.
 AddEventHandler("onPlayerDisconnected", function(playerId)
     local pid = tonumber(playerId) or 0
-    if pid > 0 and fitted[pid] then
-        fitted[pid] = nil
-        log("player=%d disconnected, setup forgotten", pid)
+    if pid > 0 then
+        delivered[pid] = nil
+        -- The asset-keyed fitted setup deliberately survives this resource session. Disconnect changes the
+        -- delivery route, not what is installed in the physical Machine.
+        log("player=%d disconnected, delivery forgotten; asset setup retained", pid)
     end
 end)
 
@@ -149,13 +208,30 @@ RegisterNetEvent("ncm:setup", function(family, effect)
         log("player=%d <- %s", pid, message)
     end
 
+    -- The command is a test instrument for a physical Machine, not a character buff. Resolve the exact
+    -- active asset through server authority every time; no seat, no NCM asset, no current physics lease or
+    -- ambiguous lease is a named refusal and never a player-keyed fallback.
+    local binding, bindingWhy
+    if NcmVehicleAccess and NcmVehicleAccess.bindingForAuthority then
+        binding, bindingWhy = NcmVehicleAccess.bindingForAuthority(pid)
+    else
+        bindingWhy = "vehicle_access_unavailable"
+    end
+    if not binding then
+        tell("refused: no single active NCM Machine is bound to this client's current physics authority ("
+            .. tostring(bindingWhy) .. ")")
+        return
+    end
+    local assetId = binding.assetId
+
     if family == nil or family == "" then
         local inv = Handling.inventory()
         local mine = {}
-        for _, part in ipairs(NcmHandling.parts(pid)) do
+        for _, part in ipairs(NcmHandling.parts(assetId)) do
             mine[#mine + 1] = ("%s x%.3f"):format(part.family, part.effect)
         end
-        tell("fitted: " .. (#mine > 0 and table.concat(mine, ", ") or "nothing"))
+        tell(("asset %s fitted: %s"):format(assetId:sub(1, 8),
+            #mine > 0 and table.concat(mine, ", ") or "nothing"))
 
         local direct = {}
         for _, d in ipairs(inv.direct) do direct[#direct + 1] = d.family end
@@ -181,7 +257,7 @@ RegisterNetEvent("ncm:setup", function(family, effect)
     end
 
     if family == "clear" then
-        NcmHandling.setParts(pid, {}, "ncm.setup clear")
+        NcmHandling.setParts(assetId, {}, "ncm.setup clear")
         tell("setup cleared -- every lever explicitly back to inert")
         return
     end
@@ -214,12 +290,12 @@ RegisterNetEvent("ncm:setup", function(family, effect)
     local parts = {}
     -- One synthetic part per family: fitting the same family twice replaces rather than stacks, because a
     -- test instrument that quietly compounds is a test instrument that lies.
-    for _, part in ipairs(NcmHandling.parts(pid)) do
+    for _, part in ipairs(NcmHandling.parts(assetId)) do
         if part.family ~= family then parts[#parts + 1] = part end
     end
     parts[#parts + 1] = { id = "test_" .. family, family = family, effect = value }
 
-    local ok, refusal = NcmHandling.setParts(pid, parts, "ncm.setup " .. family)
+    local ok, refusal = NcmHandling.setParts(assetId, parts, "ncm.setup " .. family)
     if not ok then
         tell("refused: " .. tostring(refusal))
         return
@@ -242,8 +318,46 @@ AddEventHandler("onPlayerReady", function(playerId)
     if pid <= 0 then return end
     CreateThread(function()
         Wait(1500)
-        NcmHandling.setParts(pid, {}, "joined")
+        NcmHandling.reconcilePlayer(pid, "joined", true)
     end)
+end)
+
+-- Materialisation, removal, seat changes and authority hand-offs do not all have one host event. The access
+-- adapter emits the lifecycle edges it owns; a bounded poll reconciles the rest from the platform's
+-- authoritative lease table. Rewriting is signature-suppressed, so the steady state costs reads, not bags.
+AddEventHandler("ncm:vehicle:materialized", function()
+    if not (Open77.players and Open77.players.all) then return end
+    for _, playerId in ipairs(Open77.players.all()) do
+        NcmHandling.reconcilePlayer(playerId, "vehicle materialized", true)
+    end
+end)
+
+AddEventHandler("ncm:vehicle:dematerialized", function(assetId)
+    for playerId, route in pairs(delivered) do
+        if route.assetId == assetId then publishUnbound(playerId, "vehicle dematerialized", true) end
+    end
+end)
+
+CreateThread(function()
+    Wait(2000)
+    while true do
+        local seen = {}
+        if Open77.players and Open77.players.all then
+            for _, playerId in ipairs(Open77.players.all()) do
+                local pid = tonumber(playerId) or 0
+                if pid > 0 then
+                    seen[pid] = true
+                    NcmHandling.reconcilePlayer(pid, "authority reconciliation")
+                end
+            end
+        end
+        -- A player omitted from the current list may be between lifecycle events. Withdraw their target;
+        -- the disconnect handler will subsequently remove this delivery cache.
+        for pid in pairs(delivered) do
+            if not seen[pid] then publishUnbound(pid, "player unavailable") end
+        end
+        Wait(500)
+    end
 end)
 
 do

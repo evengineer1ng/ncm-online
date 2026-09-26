@@ -62,6 +62,10 @@ constexpr uint32_t kOffAngularVelocity = 0x24;   // Vector3, rad/s -- 12 bytes p
 constexpr uint32_t kOffOrientation = 0x30;       // Quaternion (x,y,z,w)
 constexpr uint32_t kOffVehicleBackPtr = 0x180;
 constexpr uint32_t kOffTotalMass = 0x1BC;
+// `vehicle::BaseObject` inherits `ent::Entity`; the SDK asserts `ent::Entity::entityID` at +0x48.
+// OPEN//77's vehicle snapshot publishes this same value as `engineEntity`. Unlike speed/mass/proximity,
+// exact identity equality is suitable for authorising a write.
+constexpr uint32_t kOffEntityID = 0x48;
 
 // Final-command fields on `vehicleBaseObject`, reached through the verified back-pointer at +0x180.
 // READ ONLY here -- `KB-135` refuses input authority and `L148` does not authorise it. These are read so
@@ -193,6 +197,34 @@ Kind classify(const float* f)
 }
 
 std::atomic<uintptr_t> g_trackedBody{0};   // latched once a body reads as a plausible vehicle
+
+// -------------------------------------------------------------------------------- authoritative binding
+//
+// KB-146: `g_trackedBody` is useful diagnostics, not identity. It was historically selected by the
+// fastest plausible vehicle and therefore must never authorise a force write. The bridge now supplies the
+// REDengine EntityID for the locally seated, asset-backed Machine. A body becomes writable only when its
+// vehicle back-pointer carries that exact ID. No pointer is accepted from Lua and no nearest/fastest
+// fallback exists.
+std::atomic<uint64_t> g_expectedEngineEntity{0};
+std::atomic<uintptr_t> g_boundBody{0};
+std::atomic<uintptr_t> g_boundVehicle{0};
+std::atomic<uint64_t> g_bindingExpiresAtMs{0};
+std::atomic<bool> g_bindingMatchedPending{false};
+std::atomic<bool> g_bindingLostPending{false};
+std::mutex g_bindingMetaMutex;
+std::string g_bindingAssetId;
+std::string g_bindingVehicleId;
+std::string g_bindingAuthorityEpoch;
+
+// The client publishes at 2 Hz. Four missed heartbeats is enough tolerance for an ordinary frame hitch
+// and short enough that a lost ownership/seat update cannot leave another Machine tuned indefinitely.
+constexpr uint64_t kBindingLeaseMs = 2000;
+
+uint64_t monotonicMs() noexcept
+{
+    return static_cast<uint64_t>(std::chrono::duration_cast<std::chrono::milliseconds>(
+        std::chrono::steady_clock::now().time_since_epoch()).count());
+}
 
 // Thread-local run state. No atomics: nothing here is shared, by construction.
 thread_local uint32_t t_wheelRun = 0;
@@ -549,6 +581,26 @@ bool readVelocity(const void* body, float* outXyz) noexcept
     }
 }
 
+/// Read the only native identity join used by handling. A physics body points at its owning
+/// `vehicle::BaseObject`; that object inherits `ent::Entity::entityID`. Both reads remain under SEH because
+/// Recalculate also receives non-vehicle/short rigid bodies. A miss is ordinary and never disables the
+/// diagnostic probe.
+bool readOwnerIdentity(const void* body, uintptr_t* outVehicle, uint64_t* outEntityId) noexcept
+{
+    __try {
+        const auto* base = reinterpret_cast<const uint8_t*>(body);
+        const auto vehicle = *reinterpret_cast<const uintptr_t*>(base + kOffVehicleBackPtr);
+        if (vehicle < 0x10000 || (vehicle & 0x7) != 0) return false;
+        const auto entityId = *reinterpret_cast<const uint64_t*>(vehicle + kOffEntityID);
+        if (entityId == 0) return false;
+        *outVehicle = vehicle;
+        *outEntityId = entityId;
+        return true;
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        return false;
+    }
+}
+
 /// Deep: force, mass and the vehicle back-pointer. Only for a body that has already read shallowly and has
 /// then become the fastest thing we have seen this second.
 bool readDeep(const void* body, float* outForceXyz, float* outMass, uintptr_t* outBackPtr) noexcept
@@ -738,6 +790,54 @@ void observe(void* body) noexcept
         return;
     }
 
+    // Resolve and continuously validate the positive binding. While waiting, this costs two guarded
+    // pointer reads per encountered body; once matched, only the bound body is revalidated. The expected
+    // EntityID is stored last by applyHandling(), so seeing it means the complete setup is published.
+    bool handlingAuthorised = false;
+    uint64_t expectedEntity = g_expectedEngineEntity.load(std::memory_order_acquire);
+    if (expectedEntity != 0 && monotonicMs() >= g_bindingExpiresAtMs.load(std::memory_order_acquire)) {
+        // Lease expiry executes on the physics thread and therefore cannot wait for the 1 Hz reporter.
+        // Atomics only: immediately disarm identity and levers; the reporter emits the human-readable line.
+        g_expectedEngineEntity.store(0, std::memory_order_release);
+        g_boundBody.store(0, std::memory_order_release);
+        g_boundVehicle.store(0, std::memory_order_relaxed);
+        g_gripScale.store(kGripScaleInert, std::memory_order_relaxed);
+        g_driveScale.store(kGripScaleInert, std::memory_order_relaxed);
+        g_brakeScale.store(kGripScaleInert, std::memory_order_relaxed);
+        g_rollBias.store(0.0f, std::memory_order_relaxed);
+        g_axleBias.store(0.0f, std::memory_order_relaxed);
+        g_bindingLostPending.store(true, std::memory_order_release);
+        expectedEntity = 0;
+    }
+    if (expectedEntity != 0) {
+        const uintptr_t currentlyBound = g_boundBody.load(std::memory_order_relaxed);
+        if (currentlyBound == 0 || currentlyBound == address) {
+            uintptr_t owner = 0;
+            uint64_t entityId = 0;
+            const bool read = readOwnerIdentity(body, &owner, &entityId);
+            if (read && entityId == expectedEntity &&
+                g_expectedEngineEntity.load(std::memory_order_acquire) == expectedEntity) {
+                if (currentlyBound == 0) {
+                    uintptr_t none = 0;
+                    if (g_boundBody.compare_exchange_strong(none, address, std::memory_order_acq_rel)) {
+                        g_boundVehicle.store(owner, std::memory_order_relaxed);
+                        // Keep the diagnostic classifier on the positively identified body too. This does
+                        // not grant authority; the gate below still does that independently.
+                        g_trackedBody.store(address, std::memory_order_relaxed);
+                        g_bindingMatchedPending.store(true, std::memory_order_release);
+                    }
+                }
+                handlingAuthorised = g_boundBody.load(std::memory_order_acquire) == address;
+            } else if (currentlyBound == address) {
+                uintptr_t stale = address;
+                if (g_boundBody.compare_exchange_strong(stale, 0, std::memory_order_acq_rel)) {
+                    g_boundVehicle.store(0, std::memory_order_relaxed);
+                    g_bindingLostPending.store(true, std::memory_order_release);
+                }
+            }
+        }
+    }
+
     // Distinct-body count for this window.
     const uint64_t stamp = (static_cast<uint64_t>(g_generation.load(std::memory_order_relaxed)) << 48) ^ address;
     const size_t slot = static_cast<size_t>((address >> 4) % kBodyTableSize);
@@ -864,7 +964,8 @@ void observe(void* body) noexcept
                     const float roll = g_rollBias.load(std::memory_order_relaxed);
                     const bool wantAxle = std::fabs(bias) > kGripScaleEpsilon;
                     const bool wantRoll = std::fabs(roll) > kGripScaleEpsilon;
-                    if (corner < kWheelCount && g_writesEnabled.load(std::memory_order_relaxed) &&
+                    if (handlingAuthorised && corner < kWheelCount &&
+                        g_writesEnabled.load(std::memory_order_relaxed) &&
                         (wantAxle || wantRoll)) {
                         const float front = g_axleFrontSum.load(std::memory_order_relaxed);
                         const float rear = g_axleRearSum.load(std::memory_order_relaxed);
@@ -936,7 +1037,7 @@ void observe(void* body) noexcept
                         // horizontal vector and so does this. It is the conservative choice: at a true
                         // standstill there is no lateral component to protect.
                         const float kCreep = g_driveScale.load(std::memory_order_relaxed);
-                        if (g_writesEnabled.load(std::memory_order_relaxed) &&
+                        if (handlingAuthorised && g_writesEnabled.load(std::memory_order_relaxed) &&
                             std::fabs(kCreep - kGripScaleInert) > kGripScaleEpsilon) {
                             if (writeForceXY(body, force[0] * kCreep, force[1] * kCreep)) {
                                 g_writes.fetch_add(1, std::memory_order_relaxed);
@@ -974,7 +1075,7 @@ void observe(void* body) noexcept
                     const bool wantGrip  = std::fabs(k - kGripScaleInert) > kGripScaleEpsilon;
                     const bool wantDrive = std::fabs(kDrive - kGripScaleInert) > kGripScaleEpsilon;
                     const bool wantBrake = std::fabs(kBrake - kGripScaleInert) > kGripScaleEpsilon;
-                    if (g_writesEnabled.load(std::memory_order_relaxed) &&
+                    if (handlingAuthorised && g_writesEnabled.load(std::memory_order_relaxed) &&
                         (wantGrip || wantDrive || wantBrake)) {
                         const float scaledLateral = wantGrip ? lateral * k : lateral;
                         float scaledLong = longitudinal;
@@ -1147,7 +1248,8 @@ void observe(void* body) noexcept
     // Latch this as THE vehicle once it reads like one: a car-shaped mass and a back-pointer to something.
     // Cycle tracking follows the latch, so slot numbering belongs to one body and not to whatever moved
     // fastest this second. Re-latching on a different body resets the numbering, which is correct.
-    if (mass > 200.0f && mass < 10000.0f && back != 0 &&
+    if (g_expectedEngineEntity.load(std::memory_order_relaxed) == 0 &&
+        mass > 200.0f && mass < 10000.0f && back != 0 &&
         g_trackedBody.load(std::memory_order_relaxed) != address) {
         g_trackedBody.store(address, std::memory_order_relaxed);
         // Nothing else to reset: the classifier holds no state that belongs to a particular body, and
@@ -1500,6 +1602,34 @@ void reportClassification(double speed)
 
 void reportOnce()
 {
+    // ------------------------------------------------------------------------------------- `KB-146`
+    // The physics thread may bind, lose or expire a binding at any moment, and it cannot log: the detour
+    // does no I/O by construction. It raises a flag; this is where that becomes a sentence.
+    //
+    // Reported BEFORE the early return below, because "0 calls this second" is exactly when a binding was
+    // most likely lost, and that is the line someone will be looking for.
+    if (g_bindingMatchedPending.exchange(false, std::memory_order_acq_rel)) {
+        std::string asset, vehicle;
+        {
+            std::lock_guard<std::mutex> guard(g_bindingMetaMutex);
+            asset = g_bindingAssetId;
+            vehicle = g_bindingVehicleId;
+        }
+        NCM_INFO("handling: BOUND to body %p -- asset=%s vehicle=%s entity=%llu; forces now apply to this "
+                 "Machine and no other",
+                 reinterpret_cast<void*>(g_boundBody.load(std::memory_order_relaxed)),
+                 asset.empty() ? "?" : asset.c_str(), vehicle.empty() ? "?" : vehicle.c_str(),
+                 static_cast<unsigned long long>(g_expectedEngineEntity.load(std::memory_order_relaxed)));
+    }
+    if (g_bindingLostPending.exchange(false, std::memory_order_acq_rel)) {
+        // Two causes, and they are worth telling apart: the identity stopped matching (the car despawned,
+        // or the body was recycled), or the 2 s lease ran out because NCM stopped heartbeating. Either way
+        // the levers are already inert -- the physics thread did that itself rather than waiting for us.
+        const bool armed = g_expectedEngineEntity.load(std::memory_order_relaxed) != 0;
+        NCM_WARN("handling: UNBOUND (%s) -- levers inert until a body matches again",
+                 armed ? "the bound body stopped matching" : "the binding lease expired");
+    }
+
     static uint64_t lastTicks = 0;
     const uint64_t total = g_ticks.load(std::memory_order_relaxed);
     const uint64_t delta = total - lastTicks;
@@ -1959,40 +2089,99 @@ bool storeLever(std::atomic<float>& cell, const char* name, double wanted, float
 
 }  // namespace
 
-void applyHandling(bool hasGrip, double grip, bool hasDrive, double drive,
+void applyHandling(const std::string& assetId, const std::string& vehicleId,
+                   const std::string& authorityEpoch, uint64_t engineEntity,
+                   bool hasGrip, double grip, bool hasDrive, double drive,
                    bool hasBrake, double brake) noexcept
 {
-    // Ownership is taken on the FIRST setup, even one that is entirely inert. An all-inert setup is a
-    // meaningful statement -- "this driver has fitted nothing that can be felt" -- and it must not be
-    // quietly overwritten a second later by whatever happens to be in `ncm_carrier.json`.
+    // ------------------------------------------------------------------------------------- `KB-146`
+    // **A setup without an identity is refused, not applied.** The whole defect this closes was that the
+    // carrier decided for itself which body was the player's, by choosing the fastest car-shaped thing it
+    // had seen. It now applies force only to the body whose `ent::EntityID` equals the one NCM published
+    // for this Machine, and if that number is missing there is nothing to match, so there is nothing to do.
+    if (engineEntity == 0) {
+        NCM_WARN("handling: refused -- no engineEntity, so no body can be positively identified");
+        clearHandling(false);
+        return;
+    }
+
     if (!g_handlingOwns.exchange(true, std::memory_order_relaxed)) {
         NCM_INFO("handling: the server's Parts setup now owns grip/drive/brake for this session");
     }
 
+    // Publish the human-readable identity BEFORE arming, so a log line written the instant the physics
+    // thread matches already names the right Machine.
+    {
+        std::lock_guard<std::mutex> guard(g_bindingMetaMutex);
+        g_bindingAssetId = assetId;
+        g_bindingVehicleId = vehicleId;
+        g_bindingAuthorityEpoch = authorityEpoch;
+    }
+
+    const uint64_t previous = g_expectedEngineEntity.load(std::memory_order_acquire);
+    if (previous != engineEntity) {
+        // A different Machine, a different body. Drop the old binding and every lever with it rather than
+        // letting one Machine's Parts survive into another -- which is exactly the seat-change failure.
+        g_boundBody.store(0, std::memory_order_release);
+        g_boundVehicle.store(0, std::memory_order_relaxed);
+        g_gripScale.store(kGripScaleInert, std::memory_order_relaxed);
+        g_driveScale.store(kGripScaleInert, std::memory_order_relaxed);
+        g_brakeScale.store(kGripScaleInert, std::memory_order_relaxed);
+        NCM_INFO("handling: binding asset=%s vehicle=%s epoch=%s entity=%llu",
+                 assetId.c_str(), vehicleId.c_str(), authorityEpoch.c_str(),
+                 static_cast<unsigned long long>(engineEntity));
+    }
+
+    // Levers first, identity last. The physics thread arms on `g_expectedEngineEntity`, so storing it last
+    // (with release ordering) guarantees a matched body never sees a half-published setup.
     int moved = 0;
     if (hasGrip)  moved += storeLever(g_gripScale,  "gripScale",  grip,  kGripScaleMin,  kGripScaleMax)  ? 1 : 0;
     if (hasDrive) moved += storeLever(g_driveScale, "driveScale", drive, kDriveScaleMin, kDriveScaleMax) ? 1 : 0;
     if (hasBrake) moved += storeLever(g_brakeScale, "brakeScale", brake, kBrakeScaleMin, kBrakeScaleMax) ? 1 : 0;
 
-    g_handlingApplied.fetch_add(1, std::memory_order_relaxed);
-    if (moved == 0) {
-        // Not noise: a setup that changed nothing is the normal case once a driver stops fitting parts,
-        // and saying so distinguishes "we received it and it matched" from "it never arrived" -- which is
-        // exactly the ambiguity `KB-136` lived inside for weeks.
-        NCM_INFO("handling: setup #%u received, no lever moved",
-                 g_handlingApplied.load(std::memory_order_relaxed));
+    g_bindingExpiresAtMs.store(monotonicMs() + kBindingLeaseMs, std::memory_order_release);
+    g_expectedEngineEntity.store(engineEntity, std::memory_order_release);
+
+    const uint32_t n = g_handlingApplied.fetch_add(1, std::memory_order_relaxed) + 1;
+    if (moved == 0 && previous == engineEntity && (n % 60) == 0) {
+        // This is a LEASE, so an unchanged setup arrives twice a second forever. Saying so every time
+        // would bury every other line; saying it never would lose the distinction `KB-136` was invisible
+        // inside -- "received and matched" versus "never arrived". Once every thirty seconds keeps both.
+        NCM_INFO("handling: heartbeat #%u, binding held, no lever moved", n);
     }
 }
 
-void clearHandling() noexcept
+void clearHandling(bool releaseBenchConfig) noexcept
 {
+    const bool wasArmed = g_expectedEngineEntity.exchange(0, std::memory_order_acq_rel) != 0;
+
+    // Disarm identity first: once `g_expectedEngineEntity` is zero the physics thread cannot authorise a
+    // write, so the levers below are being reset on something already inert. Order matters here in the
+    // opposite direction to `applyHandling`, and for the same reason.
+    g_boundBody.store(0, std::memory_order_release);
+    g_boundVehicle.store(0, std::memory_order_relaxed);
+
     if (!g_handlingOwns.load(std::memory_order_relaxed)) return;
 
-    // Restore BEFORE releasing ownership, so the config loop cannot observe a half-cleared state and write
-    // its own values into the gap.
     storeLever(g_gripScale,  "gripScale",  kGripScaleInert, kGripScaleMin,  kGripScaleMax);
     storeLever(g_driveScale, "driveScale", kGripScaleInert, kDriveScaleMin, kDriveScaleMax);
     storeLever(g_brakeScale, "brakeScale", kGripScaleInert, kBrakeScaleMin, kBrakeScaleMax);
+
+    {
+        std::lock_guard<std::mutex> guard(g_bindingMetaMutex);
+        g_bindingAssetId.clear();
+        g_bindingVehicleId.clear();
+        g_bindingAuthorityEpoch.clear();
+    }
+
+    if (!releaseBenchConfig) {
+        // **An authoritative unbind, not a lost socket.** NCM is connected and is telling us this client
+        // has no Machine to tune -- on foot, a passenger, ambiguous authority, a refused payload. Staying
+        // inert is the answer; handing the levers back to `ncm_carrier.json` would let a stale bench value
+        // silently become the car's handling at the precise moment NCM said it should have none.
+        if (wasArmed) NCM_INFO("handling: unbound by NCM -- inert, bench config stays suppressed");
+        return;
+    }
 
     g_handlingOwns.store(false, std::memory_order_relaxed);
     g_handlingNoticed.store(false, std::memory_order_relaxed);
@@ -2002,12 +2191,21 @@ void clearHandling() noexcept
 
 std::string status()
 {
-    char buffer[192];
+    // `KB-146`: the binding is the first thing anyone debugging handling needs, because "armed but never
+    // matched" and "not armed at all" are different faults with different causes, and both look like
+    // "my parts do nothing".
+    const char* binding = "none";
+    if (g_expectedEngineEntity.load(std::memory_order_relaxed) != 0) {
+        binding = g_boundBody.load(std::memory_order_relaxed) != 0 ? "matched" : "waiting";
+    }
+
+    char buffer[256];
     const int n = std::snprintf(
-        buffer, sizeof(buffer), "probe=%s ticks=%llu faults=%llu",
+        buffer, sizeof(buffer), "probe=%s ticks=%llu faults=%llu binding=%s",
         g_attached.load() ? (g_ticks.load() > 0 ? "ticking" : "silent") : "off",
         static_cast<unsigned long long>(g_ticks.load()),
-        static_cast<unsigned long long>(g_faults.load() + g_deepFaults.load()));
+        static_cast<unsigned long long>(g_faults.load() + g_deepFaults.load()),
+        binding);
     return n > 0 ? std::string(buffer, static_cast<size_t>(n)) : std::string("probe=?");
 }
 

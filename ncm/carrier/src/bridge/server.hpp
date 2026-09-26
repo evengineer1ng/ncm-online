@@ -43,7 +43,18 @@ struct Projection {
 /// AW2). `ncm/core/parts/handling.lua` composed this from the driver's fitted parts and the plugin
 /// interprets none of it (`L135`) -- it clamps and applies.
 struct Handling {
-    int version = 1;
+    int version = 2;
+    // KB-146: levers are not meaningful until they are bound to one authoritative physical Machine.
+    // `vehicleId` is OPEN//77's ephemeral id and is carried for diagnostics. `engineEntity` is the
+    // exact REDengine ent::EntityID published by the streamed vehicle snapshot; it is the join key the
+    // native probe can compare with vehicle::BaseObject::entityID without guessing a pointer.
+    bool bound = false;
+    bool valid = false;
+    std::string assetId;
+    std::string vehicleId;
+    std::string authorityEpoch;
+    uint64_t engineEntity = 0;
+    std::string invalidReason;
     bool hasGrip = false;  double grip = 1.0;    // across travel -- tyre grip
     bool hasDrive = false; double drive = 1.0;   // along travel, pushing -- power delivery
     bool hasBrake = false; double brake = 1.0;   // along travel, retarding -- stopping ability
@@ -81,8 +92,8 @@ public:
     /// `IDEA-507`: NCM asks the carrier to read the game's own drive-model data for a list of records and
     /// write it to a file. Read-only -- it mutates nothing, so `L148` is not engaged.
     void onArchDump(std::function<void(const std::vector<std::string>&)> fn) { onArchDump_ = std::move(fn); }
-    /// `L152`: the driver's fitted parts, as live force scales. A setup with every lever inert is how a
-    /// driver's parts are REMOVED -- distinct from never sending one, which leaves the last one applied.
+    /// `L152`: the driver's fitted parts, as live force scales. A v2 bound setup is also a short lease;
+    /// the sender must heartbeat the complete identity and levers while the binding remains authoritative.
     void onHandling(std::function<void(const Handling&)> fn) { onHandling_ = std::move(fn); }
     void onFrame(std::function<void(const Frame&)> fn) { onFrame_ = std::move(fn); }
     void onDisconnect(std::function<void()> fn) { onDisconnect_ = std::move(fn); }

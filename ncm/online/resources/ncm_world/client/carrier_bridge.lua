@@ -448,6 +448,110 @@ end, false)
 -- notification takes, which is the lesson `panel.lua` already paid for.
 local lastHandlingState = nil
 
+--- Candidate field names for the REDengine `ent::EntityID` on a streamed vehicle snapshot.
+---
+--- **The name is not established anywhere in this repository and that is why this is a list.** The
+--- character snapshot logged from a running client carries `engineId`; the vehicle snapshot has never been
+--- dumped. `arch_dump.cpp` set the precedent for this situation -- *an unresolved name is a result, and a
+--- resolved one is a discovery* -- so every candidate is tried in order, the winner is logged ONCE, and
+--- nothing is guessed. The Carrier accepts both spellings for the same reason.
+local ENTITY_FIELDS = { "engineEntity", "entityId", "entityID", "engineId", "entId", "handle" }
+local resolvedEntityField = nil
+
+--- Read the engine entity out of a vehicle snapshot, as a DECIMAL STRING.
+---
+--- **A string, deliberately.** This value is a 64-bit id and it crosses a WebUI page that parses and
+--- re-serialises JSON in JavaScript, where every number is a double: anything above 2^53 would come out
+--- silently rounded, and a rounded identity matches nothing. The Carrier parses the string back with
+--- `std::from_chars`.
+local function entityOf(snapshot)
+    if type(snapshot) ~= "table" then return nil end
+    for _, field in ipairs(ENTITY_FIELDS) do
+        local value = snapshot[field]
+        local text
+        if type(value) == "string" and value:match("^%d+$") and value ~= "0" then
+            text = value
+        elseif type(value) == "number" and value > 0 then
+            text = ("%.0f"):format(value)
+        end
+        if text then
+            if resolvedEntityField ~= field then
+                resolvedEntityField = field
+                log("handling: vehicle entity id resolves from '%s' (this is the discovery KB-146 needed)",
+                    field)
+            end
+            return text
+        end
+    end
+    return nil
+end
+
+--- Turn the server's published setup into the exact message the Carrier will accept, or into an explicit
+--- unbind. Returns `payload, reason`.
+---
+--- **Three independent links must all hold**, and the whole point of `KB-146` is that none of them is
+--- inferred from speed, mass or proximity:
+---
+---   1. the server names an `assetId` and the live `vehicleId` it has authority over;
+---   2. this client verifies it is really in that exact vehicle -- `KB-41`'s rule, applied to vehicles:
+---      never trust a value about yourself that you did not read yourself;
+---   3. the local snapshot yields the engine entity the native probe can compare against a body.
+---
+--- Any link missing produces an unbind, never a fallback. An unbind is a real message: going silent would
+--- leave the Carrier holding the last setup until its lease expired.
+local function resolveHandling(bagOk, setup)
+    local function unbound(reason)
+        return { v = 2, bound = false }, reason
+    end
+
+    if not bagOk then return unbound("PCALL_FAILED") end
+    if type(setup) ~= "table" then return unbound("no ncmHandling key") end
+    if setup.v ~= 2 then return unbound(("wire v%s, expected v2"):format(tostring(setup.v))) end
+    if not setup.bound then return unbound("server says unbound") end
+    if type(setup.levers) ~= "table" then return unbound("bound but no levers") end
+    if type(setup.assetId) ~= "string" or setup.assetId == "" then
+        return unbound("bound but no assetId")
+    end
+    if setup.vehicleId == nil then return unbound("bound but no vehicleId") end
+
+    -- Link 2. The seat is a claim; the vehicle is the proof. `seated()` above already learned that
+    -- `getPlayerSeat` is sticky, so the vehicle the server named is read directly and compared.
+    local okSeat, seat = pcall(Open77.vehicles.getPlayerSeat)
+    if not okSeat or type(seat) ~= "table" then return unbound("no seat") end
+    local mine = seat.vehicleId or seat.vehicle or seat.id
+    if mine == nil then return unbound("seat names no vehicle") end
+    if tostring(mine) ~= tostring(setup.vehicleId) then
+        -- Not an error: the server's view and ours disagree for a moment after a seat change or a call.
+        -- It IS a refusal to write, because this is precisely the case where the old code would have
+        -- tuned whatever car happened to be fastest.
+        return unbound(("seat=%s but server says %s"):format(tostring(mine), tostring(setup.vehicleId)))
+    end
+
+    local okVehicle, snapshot = pcall(Open77.vehicles.get, mine)
+    if not okVehicle or type(snapshot) ~= "table" then return unbound("vehicle not streamed to us") end
+
+    -- Link 3.
+    local entity = entityOf(snapshot)
+    if not entity then
+        return unbound("no engine entity on the vehicle snapshot (tried: "
+            .. table.concat(ENTITY_FIELDS, ", ") .. ")")
+    end
+
+    return {
+        v = 2,
+        bound = true,
+        assetId = setup.assetId,
+        vehicleId = tostring(setup.vehicleId),
+        authorityEpoch = tostring(setup.authorityEpoch or ""),
+        engineEntity = entity,
+        levers = setup.levers,
+    }, ("BOUND asset=%s vehicle=%s entity=%s grip=%.3f drive=%.3f brake=%.3f"):format(
+        setup.assetId:sub(1, 8), tostring(setup.vehicleId), entity,
+        tonumber(setup.levers.gripScale) or 1,
+        tonumber(setup.levers.driveScale) or 1,
+        tonumber(setup.levers.brakeScale) or 1)
+end
+
 CreateThread(function()
     Wait(9500)
     while true do
@@ -458,37 +562,22 @@ CreateThread(function()
                 setup = bag.ncmHandling
             end
 
+            local payload, seen = resolveHandling(ok, setup)
+
             -- Say what we saw, once per change. The projection loop went weeks with no evidence beyond
-            -- "nothing happened" (`KB-136`) precisely because it was silent on every path.
-            do
-                local seen
-                if not ok then seen = "PCALL_FAILED"
-                elseif setup == nil then seen = "no ncmHandling key"
-                elseif type(setup.levers) ~= "table" then seen = "malformed (no levers)"
-                else
-                    seen = ("grip=%.3f drive=%.3f brake=%.3f"):format(
-                        tonumber(setup.levers.gripScale) or 1,
-                        tonumber(setup.levers.driveScale) or 1,
-                        tonumber(setup.levers.brakeScale) or 1)
-                end
-                if seen ~= lastHandlingState then
-                    lastHandlingState = seen
-                    log("handling: %s", seen)
-                end
+            -- "nothing happened" (`KB-136`) precisely because it was silent on every path. With a binding
+            -- in the way there are more ways to end up inert, so the reason is part of the line.
+            if seen ~= lastHandlingState then
+                lastHandlingState = seen
+                log("handling: %s", seen)
             end
 
-            if type(setup) == "table" and type(setup.levers) == "table" then
-                -- The signature is the applied truth, not the paperwork: built from the three numbers, so
-                -- a republish with a new clock does not cost a message. Same rule the projection loop uses.
-                local sig = ("%s/%s/%s"):format(tostring(setup.levers.gripScale),
-                                                tostring(setup.levers.driveScale),
-                                                tostring(setup.levers.brakeScale))
-                if pushedHandling ~= sig then
-                    surface:send("ncm:machine.handling", { v = setup.v or 1, levers = setup.levers })
-                    pushedHandling = sig
-                    log("handling pushed: %s", sig)
-                end
-            end
+            -- **This is a LEASE, not an edit.** The Carrier disarms itself 2 s after the last accepted
+            -- message (`kBindingLeaseMs`), so an unchanged binding must still be re-sent twice a second.
+            -- Suppressing an identical payload the way the projection loop does would silently expire the
+            -- binding and leave the driver's Parts inert with nothing in any log to explain it.
+            surface:send("ncm:machine.handling", payload)
+            pushedHandling = seen
         end
         Wait(500)
     end

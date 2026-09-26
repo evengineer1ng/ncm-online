@@ -2,6 +2,10 @@
 -- Client physics probes are placement evidence, not ownership authority (L106).
 NcmVehicleAccess = {}
 local pending, locks, active, cooldown = {}, {}, {}, {}
+-- Runtime vehicle ids are ephemeral, but while an owned Machine is materialised this reverse index is the
+-- authoritative bridge from OPEN//77's live vehicle to NCM's permanent asset identity. Parts must never
+-- infer that identity from a record: two physical Machines (and, with Foundry, two Designs) can share one.
+local assetByVehicle = {}
 local seq = 0
 -- This first clearance envelope is only for the Base Market's small starter cars.
 -- Larger models need their own validated envelope, not a guess based on category.
@@ -74,6 +78,22 @@ local function clear(pid, request)
     if pending[pid] == request then pending[pid] = nil end
     if locks[request.assetId] == request then locks[request.assetId] = nil end
 end
+local function vehicleIndexKey(vehicleId)
+    if vehicleId == nil then return nil end
+    return tostring(vehicleId)
+end
+
+local function forgetActive(assetId, why)
+    local cur = active[assetId]
+    if not cur then return nil end
+    local key = vehicleIndexKey(cur.vehicleId)
+    if key and assetByVehicle[key] == assetId then assetByVehicle[key] = nil end
+    active[assetId] = nil
+    -- Same-resource lifecycle signal. Consumers receive permanent identity plus the exact ephemeral body
+    -- that ceased representing it; no client can forge this event.
+    TriggerEvent("ncm:vehicle:dematerialized", assetId, cur.vehicleId, why)
+    return cur
+end
 local function owner(pid, assetId)
     local profile = NcmIdentity.get(pid)
     if not profile or not MySQL.isReady() then return nil end
@@ -134,7 +154,7 @@ local function existing(pid, assetId)
         return true
     end
     TriggerEvent("ncm:collection:unregisterVehicle", cur.vehicleId)
-    active[assetId] = nil
+    forgetActive(assetId, "runtime missing")
     return false
 end
 
@@ -282,6 +302,8 @@ RegisterNetEvent("ncm:vehicle.probed", function(token, pose, why, shape)
             -- have been cleared. At materialise time we certainly know who asked; at disconnect we
             -- certainly know who left. Nothing in between needs to still be true.
             active[request.assetId] = {vehicleId=vid,driverId=profile.ncmDriverId,record=row.record,pid=pid}
+            assetByVehicle[vehicleIndexKey(vid)] = request.assetId
+            TriggerEvent("ncm:vehicle:materialized", request.assetId, vid, pid)
             TriggerEvent("ncm:collection:registerVehicle",vid,row.record,"owned_call",profile.ncmDriverId,"owned",request.assetId)
             print(("[ncm_world/access] materialized asset=%s runtime=%s"):format(request.assetId,tostring(vid)))
             feedback(pid,"Your vehicle has been called nearby. Look around before driving.",true)
@@ -318,7 +340,7 @@ local function reclaim(pid, why)
                 if NcmOdometer and NcmOdometer.release then pcall(NcmOdometer.release, assetId) end
                 TriggerEvent("ncm:collection:unregisterVehicle", cur.vehicleId)
                 pcall(Open77.vehicles.remove, cur.vehicleId)
-                active[assetId] = nil
+                forgetActive(assetId, why)
                 print(("[ncm_world/access] reclaimed asset=%s (%s); ownership unchanged")
                     :format(tostring(assetId):sub(1,8), tostring(why)))
             end
@@ -340,6 +362,62 @@ function NcmVehicleAccess.liveAssets()
     return out
 end
 
+--- The active representation of one persistent Machine, or nil.
+---
+--- A copy is returned so another subsystem cannot mutate the access registry by retaining the table.
+function NcmVehicleAccess.liveAsset(assetId)
+    local cur = type(assetId) == "string" and active[assetId] or nil
+    if not cur then return nil end
+    return { assetId = assetId, vehicleId = cur.vehicleId, pid = cur.pid,
+             driverId = cur.driverId, record = cur.record }
+end
+
+--- Resolve the persistent Machine this player's client is authoritatively simulating.
+---
+--- Driver and physics owner are not interchangeable: authority may briefly be held by a passenger/steward
+--- while another player occupies the driver seat. Force interception has to run on the physics owner, so
+--- delivery follows `Open77.vehicles.owner`, while a present human driver proves this is an operational car
+--- and not merely a parked stewardship lease. More than one candidate fails closed as ambiguous.
+function NcmVehicleAccess.bindingForAuthority(playerId)
+    local pid = tonumber(playerId) or 0
+    if pid <= 0 then return nil, "bad_player" end
+    local found
+    for assetId, cur in pairs(active) do
+        local okOwner, owner = pcall(Open77.vehicles.owner, cur.vehicleId)
+        if okOwner and type(owner) == "table" then
+            local physicsOwner = tonumber(owner.physicsOwner or owner.authorityPlayerId) or 0
+            local driver = tonumber(owner.driver) or 0
+            local epoch = tonumber(owner.epoch)
+            if physicsOwner == pid and driver > 0 and not owner.aiDriven and epoch then
+                if found then return nil, "ambiguous_authority" end
+                found = { assetId = assetId, vehicleId = cur.vehicleId, pid = pid,
+                    driverPlayerId = driver, authorityEpoch = epoch, record = cur.record }
+            end
+        end
+    end
+    if not found then return nil, "no_owned_active_asset" end
+    return found
+end
+
+-- Transitional name for callers written against the first asset-binding draft. It deliberately has the
+-- corrected physics-authority semantics above, not seat/operator semantics.
+NcmVehicleAccess.bindingForOperator = NcmVehicleAccess.bindingForAuthority
+
+--- Current authoritative operator of an active Machine, if one is proven.
+function NcmVehicleAccess.operatorForAsset(assetId)
+    local cur = type(assetId) == "string" and active[assetId] or nil
+    if not cur then return nil, "not_materialized" end
+    local okOwner, owner = pcall(Open77.vehicles.owner, cur.vehicleId)
+    if not okOwner or type(owner) ~= "table" then return nil, "owner_unavailable" end
+    local pid = tonumber(owner.physicsOwner or owner.authorityPlayerId) or 0
+    if pid <= 0 or (tonumber(owner.driver) or 0) <= 0 or owner.aiDriven then
+        return nil, "no_human_driven_authority"
+    end
+    local binding, why = NcmVehicleAccess.bindingForAuthority(pid)
+    if not binding or binding.assetId ~= assetId then return nil, why or "binding_mismatch" end
+    return pid, binding
+end
+
 AddEventHandler("onPlayerDisconnected", function(pid)
     pid=tonumber(pid) or 0
     if pending[pid] then clear(pid,pending[pid]) end
@@ -358,4 +436,9 @@ AddEventHandler("onResourceStop", function(name)
         TriggerEvent("ncm:collection:unregisterVehicle",cur.vehicleId)
         pcall(Open77.vehicles.remove,cur.vehicleId)
     end
+    -- Tell consumers to clear while the exact identities are still available. `pairs` cannot be mutated
+    -- safely while iterating on every Lua runtime, so collect the keys first.
+    local ids = {}
+    for assetId in pairs(active) do ids[#ids + 1] = assetId end
+    for _, assetId in ipairs(ids) do forgetActive(assetId, "resource stopping") end
 end)
