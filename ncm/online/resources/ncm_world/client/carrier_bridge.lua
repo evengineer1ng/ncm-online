@@ -642,8 +642,11 @@ local function resolveHandling(bagOk, setup)
         authorityEpoch = tostring(setup.authorityEpoch or ""),
         engineEntity = entity,
         levers = setup.levers,
-    }, ("BOUND asset=%s vehicle=%s entity=%s grip=%.3f drive=%.3f brake=%.3f"):format(
-        setup.assetId:sub(1, 8), tostring(setup.vehicleId), entity,
+    -- **The tail, not the head.** Truncating to the first 8 characters made both seeded fixtures read as
+    -- `10000000`, so the one log a player is most likely to look at could not tell two Machines apart --
+    -- during the very test whose whole point is that two Machines differ.
+    }, ("BOUND asset=..%s vehicle=%s entity=%s grip=%.3f drive=%.3f brake=%.3f"):format(
+        setup.assetId:sub(-6), tostring(setup.vehicleId), entity,
         tonumber(setup.levers.gripScale) or 1,
         tonumber(setup.levers.driveScale) or 1,
         tonumber(setup.levers.brakeScale) or 1)

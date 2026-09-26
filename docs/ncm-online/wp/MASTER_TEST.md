@@ -1522,7 +1522,44 @@ Neither was known when §AZ was written, and §AZ-B is impossible without both.
 log, `carrier connected on http://127.0.0.1:<port>/bridge.html`, and **the two ports must differ**. A
 `refused a bridge peer from pid ...` line is the guard working, not a fault.
 
-### §AZ-C -- ONE client, two Machines: the assertion that does not need a second player
+### §AZ-C -- ONE client, two Machines - **PASS 2026-09-26**
+
+**§AZ15-§AZ19 PASS.** Owner, Carrier 0.1.23: *"galena still gutless, maimai zipping around"* -- with the
+Galena at `driveScale 0.300` and the MaiMai at `1.600`, neither refitted. The carrier log corroborates every
+step rather than the feel standing alone:
+
+```
+14:20:15  binding asset=...0002  vehicle=12884901889  entity=10426251
+14:20:15  driveScale 1.000 -> 0.300 (ACTIVE)
+14:20:15  BOUND to body 000001B0EA183E30 -- forces now apply to this Machine and no other
+14:20:21  driveScale 0.300 -> 1.000 (inert)      <- left the car
+14:20:21  unbound by NCM -- inert, bench config stays suppressed
+14:20:25  binding asset=...0001  vehicle=8589934594  entity=10426266
+14:20:25  driveScale 1.000 -> 1.600 (ACTIVE)
+14:20:26  BOUND to body 000001B0E79C41F0
+```
+
+Two assets, two vehicle ids, two entity ids, two bodies, each carrying its own setup, with the levers
+returning to inert in between. `mass=960 kg` on the second bound body is the MaiMai. **`L155` point 1 is
+demonstrated: `assetId` is the authoritative Parts key and a setup follows the Machine, not the driver.**
+That is the precondition the Foundry identity spine was waiting on.
+
+`KB-146` is confirmed fixed in the same evidence -- the write reaches a positively identified body and goes
+inert when the binding drops, rather than following whatever car was fastest.
+
+**Two things the run also settled.** The `engineEntity` field name, which `carrier_bridge.lua` had to guess
+from six candidates, resolved on the first: `handling: vehicle entity id resolves from 'engineEntity'`. And
+the setup genuinely persists server-side across a disconnect -- the Galena was still gutless on rejoin with
+nothing refitted, which is `fitted[assetId]` outliving the delivery route exactly as intended.
+
+**What misled the owner for two sessions, worth recording because it is a testing trap rather than a
+defect.** Session 1 ran Carrier 0.1.22, where `KB-149` refused every bridge connection, so nothing applied.
+Session 2 ran 0.1.23 and worked, but a setup fitted to the MaiMai at 14:17:23 was left after sixteen seconds
+(`handling: no seat` at 14:17:40) without being driven. The result read as a one-session lag -- commands
+taking effect only on the NEXT join -- when it was a broken build followed by an untested change. **A
+perceived lag between action and effect is worth distrusting when the build changed in between.**
+
+### §AZ-C -- the steps
 
 **Added 2026-09-26 because §AZ-B was blocked and most of it turns out not to need a second client at
 all.** The headline claim of `L155` point 1 is *`assetId` is the authoritative Parts key* -- that a setup
