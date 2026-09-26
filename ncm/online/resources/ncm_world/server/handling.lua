@@ -105,8 +105,13 @@ local function publishBound(playerId, binding, why, force)
         tostring(binding.authorityEpoch), tostring(wire.configurationRevision),
         wire.configurationSignature }, "|")
     if force and delivered[pid] then delivered[pid].sig = nil end
+    -- `write()` suppresses an unchanged payload, and this must suppress with it. **It did not, and the
+    -- production log took two identical lines per second per driver, for as long as anyone sat in a car.**
+    -- A heartbeat is not news; only a change is.
+    local changed = not (delivered[pid] and delivered[pid].sig == sig)
     local ok, refusal = write(pid, wire, sig, why or "bound")
     if not ok then return false, refusal end
+    if not changed then return true end
 
     log("asset=%s player=%d: %s", binding.assetId, pid, Handling.explain(setup))
     if setup.clamped and #setup.clamped > 0 then

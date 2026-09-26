@@ -58,10 +58,26 @@ local HZ = 30                       -- the rate the platform's own observers run
 -- the car would be a trap. A player with no carrier costs a handful of failed connects and a log line.
 local enabled, url = true, DEFAULT_URL
 local attempts, MAX_ATTEMPTS = 0, 6
--- The supervision loop runs at `HZ`, so this is about two seconds of a page that loaded but never
--- handshook. Long enough not to trip on a slow first paint, short enough that a second client finds its
--- own carrier within a few seconds of joining rather than after a minute of silence.
-local unreadyTicks, UNREADY_LIMIT = 0, 60
+-- ---------------------------------------------------------------------------------------------------
+-- How long to let a page prove itself before moving to the next port (`KB-148`).
+-- ---------------------------------------------------------------------------------------------------
+--
+-- **This was 60 ticks and 60 ticks is TWO SECONDS**, because the supervision loop runs at `HZ` (30) --
+-- `Wait(1000 / HZ)` is 33 ms. A CEF surface has to be created, navigate to the carrier's page, boot its
+-- JavaScript and complete a WebSocket upgrade before it can emit `ncm:ffb.ready`, and that is nowhere
+-- near two seconds. So the scan tore down every attempt just before it could succeed and cycled forever,
+-- **including on a single-client machine where the very first port was the right one**. The carrier saw
+-- no telemetry at all (`ncm=n/a`) and Parts never arrived.
+--
+-- Twenty seconds is the backstop, not the mechanism. The mechanism is `ncm:ffb.closed` below: a page that
+-- reaches a port with nothing on it -- or one whose carrier REFUSES it because it belongs to another game
+-- (`KB-147`) -- closes quickly and says so, and three of those move us on in about six seconds. The
+-- backstop only covers a port that accepts and then goes silent, which nothing is known to do.
+local unreadyTicks, UNREADY_LIMIT = 0, 600
+-- Consecutive socket closes with no successful handshake in between. Three, not one, because the page
+-- retries every two seconds on its own and the FIRST attempt can legitimately lose a race with a carrier
+-- that is still coming up -- advancing on that would walk away from the correct port.
+local unreadyCloses, UNREADY_CLOSE_LIMIT = 0, 3
 -- Set by `/ncm.ffb url <url>`. An explicit address is an instruction, not a hint: once given, the scan
 -- stops so a deliberate override cannot be walked away from on the next failed connect.
 local pinnedUrl = nil
@@ -223,10 +239,20 @@ local function bringUp()
             type(info) == "table" and tostring(info.detail or "ok") or "ok")
     end)
     page:on("ncm:ffb.closed", function(info)
+        -- **A close BEFORE any successful handshake is the fast "wrong port" signal** (`KB-148`). A close
+        -- after one is an ordinary disconnect and must not move us: the carrier we already proved is still
+        -- the right one, and walking away from it because the game paused would lose Parts mid-drive.
+        local neverConnected = not surfaceReady
         surfaceReady = false
         device = nil
         announce()
-        log("companion dropped: %s", type(info) == "table" and tostring(info.detail or "?") or "?")
+        if neverConnected then
+            unreadyCloses = unreadyCloses + 1
+            log("carrier at %s closed before connecting (%d/%d)", url, unreadyCloses, UNREADY_CLOSE_LIMIT)
+        else
+            unreadyCloses = 0
+            log("carrier dropped: %s", type(info) == "table" and tostring(info.detail or "?") or "?")
+        end
     end)
     -- The companion is the only thing that can see the hardware, so it is the only thing that may describe
     -- it. `class` decides the ceiling (`driver.feedback`), and a class we do not recognise is NOT silently
@@ -348,9 +374,14 @@ CreateThread(function()
             -- common one on a second client, not a corner case.
             if surface and not surfaceReady then
                 unreadyTicks = unreadyTicks + 1
-                if unreadyTicks >= UNREADY_LIMIT then
-                    unreadyTicks = 0
-                    log("%s served a page but never connected -- trying the next port", url)
+                -- Either signal moves us on: repeated closes (fast, the usual case) or a long silence
+                -- (the backstop). `KB-148` -- the backstop alone, set too short, broke the ordinary
+                -- single-client case by never letting the first page finish its handshake.
+                if unreadyCloses >= UNREADY_CLOSE_LIMIT or unreadyTicks >= UNREADY_LIMIT then
+                    local why = unreadyCloses >= UNREADY_CLOSE_LIMIT
+                        and "refused or nothing listening" or "served a page but never connected"
+                    unreadyTicks, unreadyCloses = 0, 0
+                    log("%s: %s -- trying the next port", url, why)
                     tearDown("no handshake")
                     if not pinnedUrl then
                         portIndex = portIndex + 1
@@ -358,7 +389,7 @@ CreateThread(function()
                     end
                 end
             else
-                unreadyTicks = 0
+                unreadyTicks, unreadyCloses = 0, 0
             end
             if surface and surfaceReady then
                 local snap = ownSnapshot()
