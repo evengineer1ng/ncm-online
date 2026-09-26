@@ -42,6 +42,8 @@ return {
     "machine/flats.lua",
     "machine/projection.lua",
     "parts/ontology.lua",
+    "parts/architecture.lua",
+    "parts/compat.lua",
     "economy/markets.lua",
     "economy/production.lua",
     "economy/supply_profiles.lua",

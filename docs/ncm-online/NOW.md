@@ -6,25 +6,27 @@
 Last rewritten: **2026-09-26 - discovery of the physics surface closed with two clean negatives; Parts begins (`L149`, §AV).**
 
 > **Claim before writing:** decisions through **L150**; MASTER_TEST through **§AV**; next QA letter **§AW**.
-> BACKLOG next free **IDEA-506**; known issues through **KB-143** plus pre-existing duplicate labels noted by
+> BACKLOG next free **IDEA-508**; known issues through **KB-143** plus pre-existing duplicate labels noted by
 > `KB-114`. Read the ledger tails before allocating an ID.
 
 ## One next action
 
-**Author the mechanical architecture profile, then the compatibility resolver** - layers 2 and 3 of
-18_PARTS_ECOSYSTEM, now that layer 1 exists. This is the spec's own conflict 4 and it is the prerequisite for
-everything downstream: *"`data.vehicle_catalogue` carries `category`, `classes` and `tags` - nothing like
-propulsion/transmission/axle architecture. This is new authoring against 27 existing catalogue entries, and
-it is the prerequisite for derived compatibility."*
+**Fill the architecture profile from the running game with the carrier, rather than authoring 254 facts by
+hand (`IDEA-507`).** Layers 1-3 of 18_PARTS_ECOSYSTEM are built (`IDEA-506`), and the resolver works - but it
+knows only **124 of 378 (vehicle, facet) pairs, 33 percent**, because the rest live in `vehDriveModelData`
+and only a running game can read TweakDB.
 
-Compatibility must stay **derived, never listed**: a vehicle states its architecture, a component states its
-constraints, and the resolver relates them - so that adding vehicle #83 never means editing historical
-component definitions. Exact model-specific fitment must remain expressible for the components that genuinely
-need it.
+**The carrier already does that traversal.** `effects/tweak.cpp` resolves a vehicle record to its drive-model
+record and reads float flats off it. A read-only enumeration over the 27 catalogue records, dumped to a file,
+answers most of the profile from the game's own data instead of from anyone's memory of what a Galena is. It
+needs **no write, no new decision line and no risk** - `L148` is not involved because nothing is mutated.
+
+This is Parts consuming the carrier's ability to **read**, which is the more valuable half and was not the
+half anybody expected to need first.
 
 **Parts implementation is authorised but narrowly** (`L150`): the periodic table, the grammar and the
-compatibility factory. **Not** R&D generation, manufacturing, supply, inventory, the secondary market, barter
-or procedural naming - those stay SPEC and need their own authorisation when reached.
+compatibility factory - all three now exist. **Not** R&D generation, manufacturing, supply, inventory, the
+secondary market, barter or procedural naming; those stay SPEC and need their own authorisation when reached.
 
 **Expect Parts to run straight into `KB-136` and treat that as the point.** `gripScale` still comes from a
 JSON file a human edits (`IDEA-502`); nothing the server computes has ever reached the carrier. The first
@@ -118,6 +120,28 @@ cleared. The open-source loader layer remains separately hostable under its MIT 
 `IDEA-468`'s package-custody rule, does not change `L149`, and changed no package or server state.
 
 ## Parts - what exists
+
+**Layers 1-3 of 18_PARTS_ECOSYSTEM are built**, 38 tests green under Lua 5.4 and LuaJIT.
+
+### Compatibility, derived and never listed (`IDEA-506`)
+
+- **`parts.architecture`** - fourteen mechanical facets over closed vocabularies, one profile per vehicle.
+  **Every facet value carries a provenance**: `derived` (computed from the catalogue, true by construction),
+  `authored` (**none yet**) or `unknown`.
+- **`parts.compat`** - relates a component's constraints to a vehicle's architecture. **No fitment table
+  exists anywhere**, which is what makes vehicle #83 a one-row change instead of a thousand-row edit. A test
+  asserts it rather than a comment promising it.
+- **Three outcomes, not a boolean:** `fits`, `mismatch` (a real, permanent no) and `unknown_facet` (*nobody
+  has authored this yet*). Collapsing the last two would have produced a system that reports an empty world
+  and looks like it is working.
+- **Derived for free:** `axle_config`, `steering` and `platform` for all 27; the full motorcycle and Formula
+  architectures. **27 vehicles collapse to 22 platforms** - the Type-66 and its Nomad, the Shion and its
+  Nomad, the three Brennan Apollos and the two Yaiba Kusanagis each share one. `thorton_colby_pickup`
+  deliberately does not collapse into `thorton_colby`.
+- **Exact model fitment stays possible** through `fitsPlatforms`, in its own field so an audit can find every
+  component that needed an exception.
+
+### The periodic table (`L150`)
 
 - **`parts.ontology`** (`ncm/core/parts/ontology.lua`, 17 tests green under both interpreters). The component
   periodic table: twelve families with meanings, subfamilies and what each abstracts away. It **reuses**
