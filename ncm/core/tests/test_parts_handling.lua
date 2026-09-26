@@ -533,4 +533,176 @@ return {
             "so the couplings must be applied once on the product, not while walking the parts")
         T.eq(#forward.limited, #backward.limited, "and report identically")
     end,
+
+    -- ------------------------------------------------------------------ `L158`: contributors
+    parts_only_composition_is_unchanged_by_the_contributor_pipeline = function(T)
+        local M = H(T)
+        -- **The regression gate for the whole refactor.** Adding named contributors must not move a single
+        -- number for a car that has only parts fitted, or every earlier MASTER_TEST result is invalidated.
+        local setup = M.compose({ parts = {
+            { id = "e", family = "power_unit", effect = 1.40 },
+            { id = "t", family = "tires", effect = 1.20 },
+        } })
+        T.ok(near(setup.levers.gripScale, (1.40 ^ -0.10) * 1.20), "grip is exactly what L156 composed")
+        T.eq(#setup.limited, 1, "and the traction ceiling still bites in the same place")
+    end,
+
+    a_contributor_multiplies_the_levers_and_is_traced = function(T)
+        local M = H(T)
+        local setup = M.compose({
+            parts = { { id = "t", family = "tires", effect = 1.20 } },
+            weather = { source = "weather", gripScale = 0.90 },
+        })
+        T.ok(near(setup.levers.gripScale, 1.20 * 0.90), "the contributor composes onto the parts")
+        local found
+        for _, row in ipairs(setup.trace) do
+            if row.layer == "weather" then found = row end
+        end
+        T.ok(found, "and it appears in the trace")
+        T.eq(found.lever, "gripScale")
+        T.ok(near(found.multiplier, 0.90))
+    end,
+
+    an_inert_contributor_is_traced_rather_than_omitted = function(T)
+        local M = H(T)
+        -- **The `IDEA-516` failure class, guarded.** A contributor returning exactly 1.0 is otherwise
+        -- indistinguishable from a contributor nobody wired up -- and would be silently broken on the day
+        -- it is switched on. The weather seam ships neutral, so this is the property that makes it real.
+        local setup = M.compose({
+            parts = {},
+            weather = M.weatherContributor(0),
+        })
+        T.eq(M.isInert(setup), true, "a dry road changes nothing")
+        local seen = false
+        for _, row in ipairs(setup.trace) do
+            if row.layer == "weather" then
+                seen = true
+                T.eq(row.inert, true, "and it says out loud that it was inert")
+            end
+        end
+        T.eq(seen, true, "the neutral contribution is VISIBLE, not absent")
+    end,
+
+    contributors_compose_in_any_order = function(T)
+        local M = H(T)
+        local a = M.compose({ parts = { { id = "t", family = "tires", effect = 1.1 } },
+                              weather = { gripScale = 0.9 }, thermal = { gripScale = 0.95 } })
+        local b = M.compose({ thermal = { gripScale = 0.95 }, weather = { gripScale = 0.9 },
+                              parts = { { id = "t", family = "tires", effect = 1.1 } } })
+        T.eq(M.signature(a), M.signature(b), "multiplication is commutative and the pipeline must stay so")
+    end,
+
+    a_malformed_contributor_is_refused_by_name = function(T)
+        local M = H(T)
+        local setup, why = M.compose({ parts = {}, weather = { gripScale = -1 } })
+        T.eq(setup, nil)
+        T.match(why, "weather", "the refusal names the layer")
+        local s2, w2 = M.compose({ parts = {}, thermal = "hot" })
+        T.eq(s2, nil)
+        T.match(w2, "thermal")
+    end,
+
+    contributor_values_are_quantised_so_a_drifting_term_does_not_republish = function(T)
+        local M = H(T)
+        -- `signature()` formats at %.4f and `server/handling.lua` suppresses an unchanged payload on it.
+        -- A continuously varying thermal value would otherwise write the state bag twice a second per
+        -- driver forever -- a defect the server file records as having already happened once.
+        local a = M.compose({ parts = {}, thermal = { gripScale = 0.9412 } })
+        local b = M.compose({ parts = {}, thermal = { gripScale = 0.9433 } })
+        T.eq(M.signature(a), M.signature(b), "two values inside one quantum are one value")
+        local c = M.compose({ parts = {}, thermal = { gripScale = 0.92 } })
+        T.neq(M.signature(a), M.signature(c), "a real move still republishes")
+    end,
+
+    -- ------------------------------------------------------------------ `L159`: the thermal contributor
+    the_thermal_contributor_touches_grip_AND_brake = function(T)
+        local M, Th = H(T), T.Core.get("parts.thermal")
+        -- **A correction.** An earlier draft assumed a reduced gripScale would propagate into braking and
+        -- power through the L156 couplings. It does not: at grip 0.85 the ceilings are 1.18 and 1.08, and
+        -- a stock car sits at 1.00 on both, so neither bites.
+        local cold = M.thermalContributor(Th.OPTIMUM - Th.HALF_WINDOW)
+        T.ok(cold.gripScale < 1.0, "cold tyres cost grip")
+        T.ok(cold.brakeScale < 1.0, "AND braking, directly, because the couplings would not carry it")
+
+        local stock = M.compose({ parts = {}, thermal = cold })
+        T.ok(stock.levers.brakeScale < 1.0,
+            "so a stock car with cold tyres really does brake worse")
+        T.eq(#stock.limited, 0, "and no coupling was involved in delivering that")
+    end,
+
+    the_thermal_contributor_is_inert_in_the_window_and_never_a_boost = function(T)
+        local M, Th = H(T), T.Core.get("parts.thermal")
+        local hot = M.thermalContributor(Th.OPTIMUM)
+        T.ok(near(hot.gripScale, 1.0), "in the window there is no charge")
+        for t = -50, 250, 10 do
+            local c = M.thermalContributor(t)
+            T.ok(c.gripScale <= 1.0 and c.brakeScale <= 1.0,
+                ("%dC must never be a boost"):format(t))
+        end
+    end,
+
+    -- ------------------------------------------------------------------ `L157`: top speed
+    top_speed_is_composed_but_is_not_a_lever = function(T)
+        local M = H(T)
+        T.eq(M.LEVERS.topSpeedScale, nil, "it is not in the lever table")
+        local isLever = false
+        for _, id in ipairs(M.LEVER_IDS) do if id == "topSpeedScale" then isLever = true end end
+        T.eq(isLever, false, "nor in the declared lever order")
+        local setup = M.compose({ parts = { { id = "w", family = "aerodynamics", effect = 0.80 } } })
+        T.ok(setup.topSpeedScale > 1.0, "but stripping drag does raise it")
+        T.eq(M.wire(setup).topSpeedScale, nil,
+            "and it does NOT cross the wire -- the Carrier has no business with a governor")
+    end,
+
+    a_low_drag_part_raises_top_speed_and_a_wing_lowers_it = function(T)
+        local M = H(T)
+        local stripped = M.compose({ parts = { { id = "s", family = "aerodynamics", effect = 0.70 } } })
+        local winged = M.compose({ parts = { { id = "w", family = "aerodynamics", effect = 1.40 } } })
+        T.ok(stripped.topSpeedScale > 1.0, "less drag, more top end")
+        T.ok(winged.topSpeedScale < 1.0, "more downforce, less top end -- the same trade as the levers")
+        T.ok(winged.levers.gripScale > 1.0, "and the wing still buys grip, which is the point of fitting it")
+    end,
+
+    top_speed_is_clamped_to_a_governor_sized_range = function(T)
+        local M = H(T)
+        local absurd = M.compose({ parts = {
+            { id = "a", family = "aerodynamics", effect = 0.30 },
+            { id = "b", family = "power_unit", effect = 3.00 },
+            { id = "c", family = "transmission", effect = 2.00 },
+        } })
+        T.ok(absurd.topSpeedScale <= M.TOP_SPEED.max, "a governor that doubles top speed is not a governor")
+        T.ok(absurd.topSpeedScale >= M.TOP_SPEED.min)
+    end,
+
+    the_class_ruleset_always_beats_a_parts_ceiling = function(T)
+        local M = H(T)
+        local fast = M.compose({ parts = { { id = "s", family = "aerodynamics", effect = 0.70 } } })
+        local open = M.topSpeedKph(fast, 200, nil)
+        T.ok(open > 200, "with no class cap, parts raise the ceiling above the authored baseline")
+
+        local capped, why = M.topSpeedKph(fast, 200, 150)
+        T.eq(capped, 150, "a class cap wins whenever it is lower -- a part may not buy past a ruleset")
+        T.eq(why, "class", "and the answer says which rule decided")
+
+        local generous = M.topSpeedKph(fast, 200, 400)
+        T.ok(generous < 400, "a class cap that is higher than the machine does not RAISE it")
+    end,
+
+    top_speed_needs_an_authored_baseline_and_says_so_when_it_has_none = function(T)
+        local M = H(T)
+        -- The baseline is a SPECIFICATION from the catalogue, never a measurement. IDEA-328/331 draw that
+        -- line explicitly, and a governor driven by an observation would cross it silently.
+        T.eq(M.topSpeedKph(M.clear("v1"), nil, nil), nil, "no baseline, no ceiling -- not a guess")
+        T.eq(M.topSpeedKph(nil, 200, nil), 200, "and a missing setup is inert rather than an error")
+    end,
+
+    a_family_that_cannot_be_felt_cannot_move_the_governor_either = function(T)
+        local M = H(T)
+        -- Asserted at load; stated here because the failure would be silent. A refused family quietly
+        -- moving top speed would be a part that "does nothing" and secretly does something.
+        for family in pairs(M.TOP_SPEED_TERMS) do
+            T.ok(M.EXPRESSION[family], family .. " moves top speed and is also expressible")
+            T.eq(M.REFUSED[family], nil, family .. " is not a refused family")
+        end
+    end,
 }

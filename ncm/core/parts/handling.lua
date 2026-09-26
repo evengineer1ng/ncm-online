@@ -75,6 +75,8 @@ local Core = NcmCore
 
 Core.define("parts.handling", function(C)
     local Ontology = C.get("parts.ontology")
+    local Expression = C.get("machine.expression")
+    local Thermal = C.get("parts.thermal")
 
     local M = { version = "0.0.3" }
 
@@ -115,6 +117,68 @@ Core.define("parts.handling", function(C)
     -- Declared order, so a composed setup serialises identically every time. `pairs` over M.LEVERS would
     -- not, and a signature that changes without the value changing republishes for nothing.
     M.LEVER_IDS = { "gripScale", "driveScale", "brakeScale" }
+
+    -- ---------------------------------------------------------------------------------------------
+    -- CONTRIBUTORS: the same layer vocabulary the record carrier already uses (`L158`)
+    -- ---------------------------------------------------------------------------------------------
+    --
+    -- `machine.projection` has had `LAYERS = { factory, parts, wear, weather, chrome, ruleset }` since it
+    -- shipped, with a `contribute()` that writes down every movement of every number. The instance carrier
+    -- gets the same vocabulary rather than a parallel one, so a reader who understands one channel
+    -- understands both, and so that **`chrome` is a named layer here from the first day** -- which is the
+    -- whole of the chrome-hack onramp. A quickhack that degrades a rival's grip is not a new mechanism; it
+    -- is a contributor with a different source, and it costs nothing today to leave the socket in.
+    --
+    -- Order is declared, not iterated, because `pairs` is not deterministic and a setup that serialises
+    -- differently on two runs would republish for nothing.
+    M.LAYERS = { "parts", "wear", "weather", "thermal", "chrome", "ruleset" }
+
+    --- Contributors other than `parts` supply plain per-lever multipliers. They are quantised before they
+    --- reach a lever, and that is load-bearing rather than tidy: `signature()` formats at `%.4f` and
+    --- `server/handling.lua` suppresses an unchanged payload on it, so a continuously varying thermal term
+    --- would republish the state bag twice a second per driver forever. The comment at
+    --- `server/handling.lua` records that exact defect already happening once.
+    M.CONTRIBUTOR_QUANTUM = 0.01
+
+    local function quantise(v)
+        return math.floor(v / M.CONTRIBUTOR_QUANTUM + 0.5) * M.CONTRIBUTOR_QUANTUM
+    end
+
+    -- ---------------------------------------------------------------------------------------------
+    -- TOP SPEED: composed here, delivered by a different carrier (`L157`)
+    -- ---------------------------------------------------------------------------------------------
+    --
+    -- **Top speed is not a physics problem on this platform. It is an authored number per car.** It leaves
+    -- by the `ceiling` carrier -- `Open77.vehicles.setPerformance` -- not by the force write, so it is not
+    -- a lever and deliberately does not live in `M.LEVERS`. Composing it here anyway keeps one place where
+    -- a part's consequences are worked out.
+    --
+    -- The scale multiplies an authored baseline from `data.vehicle_catalogue`. Clamped tight: a governor
+    -- that can double a car's top speed is not a governor, and the platform's own rule is that the ceiling
+    -- withholds rather than adds -- raising this lifts a cap NCM imposed, it never adds force.
+    --
+    -- **Unproven live as of 2026-09-26.** MASTER_TEST section BA is the capability spike; nothing in NCM
+    -- had ever successfully capped a top speed when this was written.
+    M.TOP_SPEED = {
+        min = 0.80, max = 1.25, inert = 1.00,
+        fact = "top_speed_cap",
+        note = "Multiplies the catalogue's authored topSpeedKph. Delivered by the ceiling carrier.",
+    }
+
+    --- Which families move top speed, and by how much. Separate from `EXPRESSION` because these do not
+    --- reach a lever at all -- conflating them would put a `ceiling` fact in a table of `instance` facts,
+    --- which is exactly what `machine.expression` exists to prevent.
+    --
+    -- **Two of the four are NEGATIVE, and that is the interesting half.** A wing and a short gearbox are
+    -- both things a driver fits to go FASTER, and both cost top speed -- the first to drag, the second
+    -- because torque multiplication and terminal velocity are the same trade seen from two ends. A table
+    -- where every part raised every number would be a menu again.
+    M.TOP_SPEED_TERMS = {
+        aerodynamics = -0.35,  -- drag sets terminal velocity; the largest single influence, and it opposes
+        transmission = -0.10,  -- shorter gearing multiplies torque and brings the rev limit down the road
+        power_unit   =  0.20,  -- more power carries a car further up its own drag curve
+        chassis      =  0.08,  -- a lighter car sheds a little rolling resistance; smallest of the four
+    }
 
     -- ---------------------------------------------------------------------------------------------
     -- The expression table -- eleven families, eleven DIRECTIONS
@@ -420,6 +484,26 @@ Core.define("parts.handling", function(C)
             "family '" .. family .. "' has neither an instance expression nor a stated refusal")
     end
 
+    -- **Every fact this module expresses belongs to the instance carrier, checked statically (`L158`).**
+    -- `machine.projection`'s `claim()` cannot do this job: it is per-draft, and the two composers never
+    -- share a draft. This is the guard that catches `IDEA-508` -- the day the two dead weather flats
+    -- resolve again, wet grip would otherwise be applied on both carriers at once.
+    Expression.assertOwns("instance", {
+        "grip_magnitude", "brake_magnitude", "drive_magnitude", "tyre_thermal", "aerodynamic_drag",
+    }, "parts.handling")
+    -- And top speed is emphatically NOT ours to write as a force. We compose the number; the ceiling
+    -- carrier delivers it.
+    assert(Expression.carrierFor(M.TOP_SPEED.fact) == "ceiling",
+        "parts.handling composes top speed but it must be delivered by the ceiling carrier")
+
+    for family in pairs(M.TOP_SPEED_TERMS) do
+        assert(Ontology.isFamily(family),
+            "parts.handling gives top speed to '" .. family .. "', which is not a family")
+        assert(M.EXPRESSION[family],
+            "'" .. family .. "' moves top speed but has no live expression; a family that cannot be felt "
+            .. "must not silently move a governor either")
+    end
+
     for _, coupling in ipairs(M.COUPLINGS) do
         assert(M.LEVERS[coupling.lever], "coupling " .. coupling.id .. " caps an unknown lever")
         assert(M.LEVERS[coupling.from], "coupling " .. coupling.id .. " reads an unknown lever")
@@ -479,6 +563,7 @@ Core.define("parts.handling", function(C)
 
         local values, trace = {}, {}
         for _, id in ipairs(M.LEVER_IDS) do values[id] = M.LEVERS[id].inert end
+        local topSpeedScale = M.TOP_SPEED.inert
 
         local approximated = 0
         for index, part in ipairs(parts) do
@@ -508,10 +593,50 @@ Core.define("parts.handling", function(C)
                 applied[#applied + 1] = { lever = term.lever, weight = term.weight, by = contribution }
             end
 
+            -- Top speed rides the same `effect`, on its own exponent, and leaves by a different carrier.
+            local topTerm = M.TOP_SPEED_TERMS[part.family]
+            if topTerm then topSpeedScale = topSpeedScale * (effect ^ topTerm) end
+
             trace[#trace + 1] = {
                 part = part.id, family = part.family, effect = effect,
                 fidelity = expression.fidelity, applied = applied,
+                topSpeed = topTerm and (effect ^ topTerm) or nil,
             }
+        end
+
+        -- ----------------------------------------------------------------- the other contributors
+        --
+        -- Applied after parts and before the clamp, multiplicatively, so the whole composition stays
+        -- order-independent. Each one is traced even when it is INERT: a contributor that returns exactly
+        -- 1.0 is otherwise indistinguishable from a contributor nobody wired up, and that is the
+        -- `IDEA-516` failure -- a message composed correctly, pushed correctly, and heard by nobody.
+        for _, layer in ipairs(M.LAYERS) do
+            if layer ~= "parts" then
+                local supplied = input[layer]
+                if supplied ~= nil then
+                    if type(supplied) ~= "table" then
+                        return nil, layer .. " contributor must be a table"
+                    end
+                    for _, id in ipairs(M.LEVER_IDS) do
+                        local raw = supplied[id]
+                        if raw ~= nil then
+                            if type(raw) ~= "number" or raw ~= raw or raw <= 0 or raw == math.huge then
+                                return nil, ("%s.%s must be a finite positive multiplier, got %s")
+                                    :format(layer, id, tostring(raw))
+                            end
+                            local m = quantise(raw)
+                            values[id] = values[id] * m
+                            trace[#trace + 1] = {
+                                layer = layer, lever = id, by = supplied.source or layer,
+                                multiplier = m, inert = (math.abs(m - 1.0) < 1e-9),
+                            }
+                        end
+                    end
+                    if type(supplied.topSpeedScale) == "number" and supplied.topSpeedScale > 0 then
+                        topSpeedScale = topSpeedScale * supplied.topSpeedScale
+                    end
+                end
+            end
         end
 
         -- Clamp once, on the composed product -- not per part. Clamping each contribution would let three
@@ -558,7 +683,33 @@ Core.define("parts.handling", function(C)
             trace = trace,
             clamped = clamped,
             limited = limited,
+            -- Not a lever. Leaves by the `ceiling` carrier; `wire()` drops it, because the Carrier plugin
+            -- has no business with a governor the platform applies.
+            topSpeedScale = (function()
+                local v = topSpeedScale
+                if v < M.TOP_SPEED.min then return M.TOP_SPEED.min end
+                if v > M.TOP_SPEED.max then return M.TOP_SPEED.max end
+                return v
+            end)(),
         }
+    end
+
+    --- The absolute ceiling for a Machine, in km/h, or nil when NCM sets none.
+    ---
+    --- `baselineKph` is the catalogue's AUTHORED number -- a specification. It is never a measurement:
+    --- `IDEA-328`/`IDEA-331` draw that line explicitly ("highest observed" is evidence; "top speed" is a
+    --- claim), and a governor driven by an observation would convert one into the other silently.
+    ---
+    --- `classCapKph` wins whenever it is lower. A ruleset is the reason a class exists and a part may not
+    --- buy its way past one -- the same most-restrictive-wins rule `machine.projection` already applies.
+    function M.topSpeedKph(setup, baselineKph, classCapKph)
+        local baseline = tonumber(baselineKph)
+        local scale = (type(setup) == "table" and tonumber(setup.topSpeedScale)) or M.TOP_SPEED.inert
+        local out = baseline and (baseline * scale) or nil
+        local cap = tonumber(classCapKph)
+        if cap and cap > 0 and (not out or cap < out) then return cap, "class" end
+        if not out then return nil end
+        return out, "machine"
     end
 
     --- The inert setup: every lever at its no-op value. Distinct from "no setup at all", which leaves
@@ -570,6 +721,7 @@ Core.define("parts.handling", function(C)
         return {
             v = M.SETUP_VERSION, at = opts.at, vehicle = vehicle,
             levers = levers, approximated = 0, trace = {}, clamped = {}, limited = {},
+            topSpeedScale = M.TOP_SPEED.inert,
         }
     end
 
@@ -713,6 +865,49 @@ Core.define("parts.handling", function(C)
         for _, term in ipairs(expression.terms) do out[term.lever] = term.weight / largest end
         return out
     end
+
+    --- Build the `thermal` contributor from a tyre temperature (`L159`).
+    ---
+    --- **It touches grip AND brake directly, and that is a correction.** An earlier draft assumed a reduced
+    --- `gripScale` would propagate into braking and power through the `L156` couplings. It does not: at
+    --- `gripScale = 0.85` the ceilings are 1.18 and 1.08, and a stock car sits at 1.00 on both, so neither
+    --- bites. The couplings are still right; they were simply never the propagation mechanism.
+    ---
+    --- Downward-only, so it withholds and never adds -- a cold tyre costs grip, a tyre in the window is
+    --- merely not being charged for one.
+    function M.thermalContributor(temperatureC)
+        local m = Thermal.gripMultiplier(temperatureC)
+        if type(m) ~= "number" or m ~= m then m = 1.0 end
+        if m > 1.0 then m = 1.0 end
+        return {
+            source = "tyre_thermal",
+            gripScale = m,
+            brakeScale = m,
+        }
+    end
+
+    --- Build the `weather` contributor from a wetness in 0..1 (`L158`).
+    ---
+    --- **Grip magnitude moved here from the record carrier**, because two of `machine.projection`'s four
+    --- `WET` entries write to flats `KB-145` proved do not resolve -- including `.frictionMulLateral`,
+    --- the largest of them. More than half of wet weather was a silent no-op. What stays on the record is
+    --- `slip_curve` and `turn_friction`: the SHAPE of the let-go, which a scalar cannot express.
+    ---
+    --- Always returns a contributor, even at zero wetness, so the seam is visible in the trace rather than
+    --- absent from it.
+    function M.weatherContributor(wetness)
+        local w = tonumber(wetness) or 0
+        if w ~= w or w < 0 then w = 0 elseif w > 1 then w = 1 end
+        return {
+            source = "weather",
+            gripScale = 1.0 - (M.WET_DEPTH.gripScale * w),
+            brakeScale = 1.0 - (M.WET_DEPTH.brakeScale * w),
+        }
+    end
+
+    --- How much of each lever full wet removes. Carried over from `machine.projection`'s `M.WET`, whose
+    --- header is explicit that these are placeholders awaiting play data.
+    M.WET_DEPTH = { gripScale = 0.18, brakeScale = 0.15 }
 
     --- `direction` as a comparable string, rounded so floating-point noise cannot make two identical
     --- directions look different.
