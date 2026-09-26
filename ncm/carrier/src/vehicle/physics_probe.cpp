@@ -34,8 +34,19 @@ namespace {
 //   +0x1BC float    total_mass      kg  <- cross-checked against "does this look like a car"
 constexpr uint32_t kOffForce = 0x00;
 constexpr uint32_t kOffVelocity = 0x18;
+constexpr uint32_t kOffAngularVelocity = 0x24;   // Vector3, rad/s -- 12 bytes past a verified field
+constexpr uint32_t kOffOrientation = 0x30;       // Quaternion (x,y,z,w)
 constexpr uint32_t kOffVehicleBackPtr = 0x180;
 constexpr uint32_t kOffTotalMass = 0x1BC;
+
+// Final-command fields on `vehicleBaseObject`, reached through the verified back-pointer at +0x180.
+// READ ONLY here -- `KB-135` refuses input authority and `L148` does not authorise it. These are read so
+// Test 3's result can be normalised against what the driver was actually asking for; a yaw-rate change is
+// only evidence if the steering input was the same either side of it.
+constexpr uint32_t kOffInThrottle = 0x264;
+constexpr uint32_t kOffInBrake = 0x268;
+constexpr uint32_t kOffInSteer = 0x278;
+constexpr uint32_t kInputsDeepestRead = kOffInSteer + sizeof(float);
 
 // The deepest byte we ever touch. Anything claiming to be a PhysicsData must be at least this big; a
 // smaller rigid body would fault, which is why the deep read is both rare and guarded.
@@ -262,14 +273,119 @@ std::wstring g_configPath;
 /// frames/s mean while writing against 55.6 while inert -- so the reading is the only candidate left.
 std::atomic<bool> g_diagnostics{true};
 
-/// Write back the horizontal pair only. Z is never touched: it is what holds the car up, and scaling it
-/// would make the car sag rather than slide -- the mistake this whole line of work nearly made.
+// -------------------------------------------------------------------- TEST 2: does the force budget close?
+//
+// The vertical axis is known to close: four corner loads against one gravity entry, residual -0.0. The
+// HORIZONTAL axis has never been checked, and if it does not close there are contributors we are not
+// seeing -- which would undercut the force-channel model everything else is about to be built on.
+//
+// Summed over a one-second window rather than per frame, deliberately. Frames are not cleanly delimited
+// on any single thread (twelve of them), so a per-frame boundary would race; over ~60 frames a boundary
+// error is under 2% and the question is whether this closes at all, not to three decimal places.
+//
+// Sum(impulse)/mass should equal the measured change in velocity over the same window. At rest both
+// should be ~0, because the wheels already cancel gravity.
+constexpr double kImpulseScale = 1000000.0;   // millionths of N.s, rounded -- see the accumulation site
+std::atomic<int64_t> g_impulseSumX{0}, g_impulseSumY{0}, g_impulseSumZ{0};
+
+// Velocity of the TRACKED body, captured in the deep read. 0.1.11 differenced `g_bestVel`, which holds
+// the velocity at the moment of the fastest sample in a window rather than at report time -- two
+// misaligned instants differenced across a window boundary, which is not a measurement of anything.
+std::atomic<float> g_trackedVelX{0.0f}, g_trackedVelY{0.0f}, g_trackedVelZ{0.0f};
+std::atomic<bool> g_trackedVelOk{false};
+
+// Attitude, published from the deep read.
+std::atomic<float> g_angVelX{0.0f}, g_angVelY{0.0f}, g_angVelZ{0.0f};
+std::atomic<float> g_quatX{0.0f}, g_quatY{0.0f}, g_quatZ{0.0f}, g_quatW{1.0f};
+std::atomic<bool> g_attitudeOk{false};
+
+// Driver inputs, read through the back-pointer. Read only.
+std::atomic<float> g_inThrottle{0.0f}, g_inBrake{0.0f}, g_inSteer{0.0f};
+std::atomic<bool> g_inputsOk{false};
+
+/// Write back the horizontal pair only, for the lateral grip scale. Z is untouched on horizontal entries.
 bool writeForceXY(void* body, float fx, float fy) noexcept
 {
     __try {
         auto* f = reinterpret_cast<float*>(reinterpret_cast<uint8_t*>(body) + kOffForce);
         f[0] = fx;
         f[1] = fy;
+        return true;
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        return false;
+    }
+}
+
+// ------------------------------------------------------------------ TEST 3: zero-sum axle load bias
+//
+// THE QUESTION: is lateral force in this engine load-dependent? If it is, moving load between the axles
+// moves grip between them, and anti-roll, brake bias, front/rear balance, per-corner tyre temperature and
+// downforce all become expressible without ever finding `insert1`. If it is not, all of those collapse to
+// magnitude-only and two Part families need a different design. That binary is worth one experiment.
+//
+// **ZERO-SUM IS THE SAFETY PROPERTY, NOT A REFINEMENT.** The four corner loads sum to exactly the negation
+// of gravity -- residual pinned at -0.0 across twenty seconds of a parked car. Scaling them down makes the
+// car sag into its suspension; that was measured and rejected. Shifting load between axles while holding
+// the sum keeps vertical equilibrium exact, so the worst case here is that nothing happens.
+//
+// Per-call statelessness means one entry cannot see the others, so the shift is sized from the LAST
+// completed run's axle totals -- one frame stale at 60 Hz, which is 16 ms and irrelevant. The existing
+// residual line is the built-in check: if it stays near zero with a bias applied, the redistribution is
+// genuinely zero-sum. If it drifts, the write is wrong and the log says so without anyone having to guess.
+constexpr float kAxleBiasMax = 0.30f;
+constexpr float kRearScaleFloor = 0.30f;   // never invert or null a rear corner, whatever the arithmetic
+
+// ------------------------------------------------------- measuring the response, instead of sampling it
+//
+// THREE ATTEMPTS AT TEST 3 HAVE FAILED FOR THE SAME REASON IN DIFFERENT DISGUISES: reading one yaw value
+// and one steering value per second and hoping to compare them. Against a driver slamming the wheel to
+// +/-1.00 through hard turns, a 1 Hz sample of a transient is very nearly random -- 0.1.12 produced
+// yaw=-1.66 and yaw=+1.84 for the same steer=+1.00, which is not evidence of anything.
+//
+// The fix is to stop sampling and start MEASURING: accumulate the regression on the hot path across every
+// sample, and report the slope. Yaw per unit steer, least-squares through the origin, because zero steer
+// must mean zero yaw. That needs no steady-state cornering, tolerates any input the driver produces, and
+// gets better the messier the driving is rather than worse.
+//
+// Binned by speed, because yaw gain falls sharply with it -- pooling 5 m/s and 25 m/s would hide exactly
+// the effect we are looking for. Accumulators reset when the bias changes, so each setting gets its own
+// clean population and the two slopes are directly comparable.
+constexpr uint32_t kSpeedBins = 3;
+constexpr float kSpeedBinEdges[kSpeedBins - 1] = { 8.0f, 18.0f };   // m/s
+constexpr float kRegressionScale = 1000000.0;
+constexpr float kMinSteerForRegression = 0.10f;
+constexpr float kMinSpeedForRegression = 2.0f;
+
+std::atomic<uint32_t> g_regN[kSpeedBins];
+std::atomic<int64_t> g_regSteerYaw[kSpeedBins];   // sum of steer * yaw
+std::atomic<int64_t> g_regSteerSq[kSpeedBins];    // sum of steer^2
+std::atomic<int64_t> g_regYawSq[kSpeedBins];      // sum of yaw^2, for the correlation
+
+void resetRegression()
+{
+    for (uint32_t b = 0; b < kSpeedBins; ++b) {
+        g_regN[b].store(0, std::memory_order_relaxed);
+        g_regSteerYaw[b].store(0, std::memory_order_relaxed);
+        g_regSteerSq[b].store(0, std::memory_order_relaxed);
+        g_regYawSq[b].store(0, std::memory_order_relaxed);
+    }
+}
+
+std::atomic<float> g_axleBias{0.0f};       // + moves load to the front axle
+std::atomic<float> g_axleFrontSum{0.0f};   // last complete run, corners 0+1
+std::atomic<float> g_axleRearSum{0.0f};    // last complete run, corners 2+3
+
+/// A wheel entry's horizontal pair is the geometric projection of its own normal load -- proven, by the
+/// ratio holding constant across all four corners in every sample. So a load shift scales all three
+/// components together; scaling Z alone would leave the projection describing a load that is no longer
+/// there.
+bool writeForceXYZ(void* body, float fx, float fy, float fz) noexcept
+{
+    __try {
+        auto* f = reinterpret_cast<float*>(reinterpret_cast<uint8_t*>(body) + kOffForce);
+        f[0] = fx;
+        f[1] = fy;
+        f[2] = fz;
         return true;
     } __except (EXCEPTION_EXECUTE_HANDLER) {
         return false;
@@ -324,6 +440,35 @@ bool readDeep(const void* body, float* outForceXyz, float* outMass, uintptr_t* o
     }
 }
 
+/// Angular velocity and orientation. Read with the rest of the deep block, so they cost nothing extra.
+bool readAttitude(const void* body, float* outAngular, float* outQuat) noexcept
+{
+    __try {
+        const auto* base = reinterpret_cast<const uint8_t*>(body);
+        const auto* w = reinterpret_cast<const float*>(base + kOffAngularVelocity);
+        const auto* q = reinterpret_cast<const float*>(base + kOffOrientation);
+        outAngular[0] = w[0]; outAngular[1] = w[1]; outAngular[2] = w[2];
+        outQuat[0] = q[0]; outQuat[1] = q[1]; outQuat[2] = q[2]; outQuat[3] = q[3];
+        return true;
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        return false;
+    }
+}
+
+/// Throttle, brake and steer as the physics step sees them. Read only.
+bool readInputs(const void* vehicle, float* outThrottleBrakeSteer) noexcept
+{
+    __try {
+        const auto* base = reinterpret_cast<const uint8_t*>(vehicle);
+        outThrottleBrakeSteer[0] = *reinterpret_cast<const float*>(base + kOffInThrottle);
+        outThrottleBrakeSteer[1] = *reinterpret_cast<const float*>(base + kOffInBrake);
+        outThrottleBrakeSteer[2] = *reinterpret_cast<const float*>(base + kOffInSteer);
+        return true;
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        return false;
+    }
+}
+
 /// Force alone, at the lowest offset there is. Read on every call for the tracked body, so it stays as
 /// small as a guarded read can be.
 bool readForce(const void* body, float* outForceXyz) noexcept
@@ -339,6 +484,17 @@ bool readForce(const void* body, float* outForceXyz) noexcept
     }
 }
 
+// ------------------------------------------------------------------------------------ span cache
+//
+// `VirtualQuery` is a kernel transition, and 0.1.11 called it up to TWICE PER DEEP READ while deep reads
+// fired on every new speed record -- which during acceleration is very nearly every call. Physics kept its
+// ~55 Hz but the render thread was starved down to about 15 fps. The span for a given pointer does not
+// change while that object lives, so validate once per pointer and remember the answer.
+std::atomic<uintptr_t> g_spanCheckedBody{0};
+std::atomic<bool> g_spanBodyOk{false};
+std::atomic<uintptr_t> g_spanCheckedVehicle{0};
+std::atomic<bool> g_spanVehicleOk{false};
+
 /// Is this address committed and readable for the whole span we intend to touch? One VirtualQuery, done
 /// only before a deep read, never on the hot path.
 bool spanIsReadable(const void* address, size_t bytes) noexcept
@@ -352,6 +508,69 @@ bool spanIsReadable(const void* address, size_t bytes) noexcept
     const auto end = start + mbi.RegionSize;
     const auto want = reinterpret_cast<uintptr_t>(address) + bytes;
     return want <= end;
+}
+
+/// The same question, asked once per pointer. This is the fix for 0.1.11's frame-rate collapse.
+bool spanIsReadableCached(const void* address, size_t bytes, std::atomic<uintptr_t>& cachedPtr,
+                          std::atomic<bool>& cachedOk) noexcept
+{
+    const auto value = reinterpret_cast<uintptr_t>(address);
+    if (cachedPtr.load(std::memory_order_relaxed) == value) {
+        return cachedOk.load(std::memory_order_relaxed);
+    }
+    const bool ok = spanIsReadable(address, bytes);
+    cachedOk.store(ok, std::memory_order_relaxed);
+    cachedPtr.store(value, std::memory_order_relaxed);
+    return ok;
+}
+
+// ------------------------------------------------------------------------- TEST 1 retry: find the quaternion
+//
+// `+0x30` was refuted outright: |q| read 0.002 to 0.085 where a unit quaternion must read 1.000. The LTBF
+// layout is right about velocity (+0x18) and mass (+0x1BC), both verified, so the struct is not wholesale
+// wrong -- the quaternion simply is not there on 2.31.
+//
+// So stop trusting the header and search, with the oracle method that has worked every time tonight: scan
+// for four consecutive floats whose norm is 1.0, and count how often each candidate holds that property
+// across many samples. A run of four floats that is unit-norm by coincidence will not stay unit-norm while
+// the car turns; a quaternion will.
+constexpr uint32_t kQuatScanBegin = 0x20;
+constexpr uint32_t kQuatScanEnd = 0x180;   // stop before the back-pointer
+constexpr uint32_t kQuatCandidates = (kQuatScanEnd - kQuatScanBegin) / 4;
+
+std::atomic<uint32_t> g_quatHits[kQuatCandidates];
+std::atomic<uint32_t> g_quatSamples{0};
+std::atomic<bool> g_quatScanWanted{false};
+
+// **PERSISTENCE ALONE WAS THE WRONG DISCRIMINATOR, AND 0.1.12 PROVED IT.** Eight offsets held unit norm
+// in 100% of samples -- and a CONSTANT unit vector, or a row of an identity matrix, does that trivially.
+// Those offsets sit exactly where LTBF puts the inertia tensors, which for a rigid body are constant.
+// A quaternion is never constant while the car moves. So track the spread of each candidate's first
+// component: constants collapse to zero range and eliminate themselves.
+std::atomic<float> g_quatMin[kQuatCandidates];
+std::atomic<float> g_quatMax[kQuatCandidates];
+
+/// One pass over the candidate offsets. Rate-limited to once per second by the reporter, so its cost is
+/// irrelevant next to the deep read it rides along with.
+void scanForQuaternion(const void* body) noexcept
+{
+    __try {
+        const auto* base = reinterpret_cast<const uint8_t*>(body);
+        for (uint32_t i = 0; i < kQuatCandidates; ++i) {
+            const auto* f = reinterpret_cast<const float*>(base + kQuatScanBegin + i * 4);
+            const float norm = f[0] * f[0] + f[1] * f[1] + f[2] * f[2] + f[3] * f[3];
+            if (norm > 0.98f && norm < 1.02f) {
+                g_quatHits[i].fetch_add(1, std::memory_order_relaxed);
+                if (f[0] < g_quatMin[i].load(std::memory_order_relaxed))
+                    g_quatMin[i].store(f[0], std::memory_order_relaxed);
+                if (f[0] > g_quatMax[i].load(std::memory_order_relaxed))
+                    g_quatMax[i].store(f[0], std::memory_order_relaxed);
+            }
+        }
+        g_quatSamples.fetch_add(1, std::memory_order_relaxed);
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        // A short body: nothing to report, nothing to fix.
+    }
 }
 
 void disableObservation(const char* why)
@@ -398,9 +617,25 @@ void observe(void* body) noexcept
         float force[3];
         if (readForce(body, force)) {
             const Kind kind = classify(force);
-            // With diagnostics off, only the horizontal entries matter -- they are the only ones the write
-            // touches. Everything else returns immediately and costs a compare.
-            if (!diagnostics && kind != Kind::Horizontal) return;
+
+            // Every contributor, regardless of kind, into the budget. This is the whole point of Test 2:
+            // if we only counted the ones we recognise, a closure check would be circular.
+            //
+            // **ROUNDED, AND AT A MILLION.** 0.1.11 truncated toward zero at hundredths, across ~50,000
+            // accumulations a second. Truncation toward zero biases a mixed-sign sum DOWNWARD, by an
+            // amount of the same order as the signal -- which is exactly the direction that run's 0.10-0.20
+            // ratio went. That was a measurement artefact, not a finding about the engine.
+            if (diagnostics) {
+                g_impulseSumX.fetch_add(std::llround(static_cast<double>(force[0]) * kImpulseScale),
+                                        std::memory_order_relaxed);
+                g_impulseSumY.fetch_add(std::llround(static_cast<double>(force[1]) * kImpulseScale),
+                                        std::memory_order_relaxed);
+                g_impulseSumZ.fetch_add(std::llround(static_cast<double>(force[2]) * kImpulseScale),
+                                        std::memory_order_relaxed);
+            }
+
+            // With diagnostics off, only horizontal and wheel entries matter -- the two the writes touch.
+            if (!diagnostics && kind != Kind::Horizontal && kind != Kind::Wheel) return;
 
             // A run of consecutive wheel calls ends the moment anything else arrives. Closing it here,
             // rather than counting to four, is what makes a short run visible instead of silently
@@ -408,6 +643,9 @@ void observe(void* body) noexcept
             if (kind != Kind::Wheel && t_wheelRun > 0) {
                 if (t_wheelRun == kWheelCount) {
                     g_runsComplete.fetch_add(1, std::memory_order_relaxed);
+                    // Axle totals for the next run's load shift. One frame stale by construction.
+                    g_axleFrontSum.store(t_wheelZ[0] + t_wheelZ[1], std::memory_order_relaxed);
+                    g_axleRearSum.store(t_wheelZ[2] + t_wheelZ[3], std::memory_order_relaxed);
                     for (uint32_t w = 0; w < kWheelCount; ++w) {
                         g_cornerZ[w].store(t_wheelZ[w], std::memory_order_relaxed);
                         g_cornerXY[w].store(t_wheelXY[w], std::memory_order_relaxed);
@@ -430,15 +668,44 @@ void observe(void* body) noexcept
                     g_cntGravity.fetch_add(1, std::memory_order_relaxed);
                     g_lastGravity.store(force[2], std::memory_order_relaxed);
                     break;
-                case Kind::Wheel:
+                case Kind::Wheel: {
                     g_cntWheel.fetch_add(1, std::memory_order_relaxed);
-                    if (t_wheelRun < kWheelCount) {
-                        t_wheelZ[t_wheelRun] = force[2];
-                        t_wheelXY[t_wheelRun] =
+                    const uint32_t corner = t_wheelRun;
+                    if (corner < kWheelCount) {
+                        t_wheelZ[corner] = force[2];
+                        t_wheelXY[corner] =
                             std::sqrt(force[0] * force[0] + force[1] * force[1]);
                     }
                     ++t_wheelRun;
+
+                    // ------------------------------------------------------- TEST 3, the axle load shift
+                    const float bias = g_axleBias.load(std::memory_order_relaxed);
+                    if (corner < kWheelCount && g_writesEnabled.load(std::memory_order_relaxed) &&
+                        std::fabs(bias) > kGripScaleEpsilon) {
+                        const float front = g_axleFrontSum.load(std::memory_order_relaxed);
+                        const float rear = g_axleRearSum.load(std::memory_order_relaxed);
+                        // No axle totals yet, or a car in the air: no basis to size the shift from.
+                        if (front > 1.0f && rear > 1.0f) {
+                            // Front gains bias x front; rear must lose exactly that, which is a different
+                            // multiplier because the axles do not carry equal load (measured ~60/40).
+                            float scale;
+                            if (corner < 2) {
+                                scale = 1.0f + bias;
+                            } else {
+                                scale = 1.0f - (bias * front) / rear;
+                                if (scale < kRearScaleFloor) scale = kRearScaleFloor;
+                            }
+                            if (writeForceXYZ(body, force[0] * scale, force[1] * scale,
+                                              force[2] * scale)) {
+                                g_writes.fetch_add(1, std::memory_order_relaxed);
+                            } else {
+                                g_writeFaults.fetch_add(1, std::memory_order_relaxed);
+                                g_writesEnabled.store(false, std::memory_order_relaxed);
+                            }
+                        }
+                    }
                     break;
+                }
                 case Kind::Horizontal: {
                     g_cntHorizontal.fetch_add(1, std::memory_order_relaxed);
                     const float magnitude = std::sqrt(force[0] * force[0] + force[1] * force[1]);
@@ -506,7 +773,12 @@ void observe(void* body) noexcept
     g_bestVelY.store(vel[1], std::memory_order_relaxed);
     g_bestVelZ.store(vel[2], std::memory_order_relaxed);
 
-    if (!spanIsReadable(body, kDeepestRead)) {
+    // Rate-limited. Nothing the deep read produces is needed at contributor rate, and running it on every
+    // speed record is what cost 0.1.11 its frame rate. One in sixteen gives roughly 60 Hz against the
+    // observed ~1000 calls/s -- ample for telemetry, invisible in cost.
+    if ((g_ticks.load(std::memory_order_relaxed) & 0xF) != 0) return;
+
+    if (!spanIsReadableCached(body, kDeepestRead, g_spanCheckedBody, g_spanBodyOk)) {
         g_bestDeepOk.store(false, std::memory_order_relaxed);
         return;
     }
@@ -526,6 +798,65 @@ void observe(void* body) noexcept
     g_bestMass.store(mass, std::memory_order_relaxed);
     g_bestBackPtr.store(back, std::memory_order_relaxed);
     g_bestDeepOk.store(true, std::memory_order_relaxed);
+
+    // ------------------------------------------------------------- TEST 1, attitude and driver inputs
+    float angular[3], quat[4];
+    if (readAttitude(body, angular, quat)) {
+        g_angVelX.store(angular[0], std::memory_order_relaxed);
+        g_angVelY.store(angular[1], std::memory_order_relaxed);
+        g_angVelZ.store(angular[2], std::memory_order_relaxed);
+        g_quatX.store(quat[0], std::memory_order_relaxed);
+        g_quatY.store(quat[1], std::memory_order_relaxed);
+        g_quatZ.store(quat[2], std::memory_order_relaxed);
+        g_quatW.store(quat[3], std::memory_order_relaxed);
+        g_attitudeOk.store(true, std::memory_order_relaxed);
+    } else {
+        g_attitudeOk.store(false, std::memory_order_relaxed);
+    }
+
+    // Velocity at a known instant, for the budget check. Same moment as everything else in this block.
+    g_trackedVelX.store(vel[0], std::memory_order_relaxed);
+    g_trackedVelY.store(vel[1], std::memory_order_relaxed);
+    g_trackedVelZ.store(vel[2], std::memory_order_relaxed);
+    g_trackedVelOk.store(true, std::memory_order_relaxed);
+
+    // One scan pass per second, riding along with a deep read that is already happening.
+    if (g_quatScanWanted.exchange(false, std::memory_order_relaxed)) {
+        scanForQuaternion(body);
+    }
+
+    // The back-pointer is a vehicleBaseObject, a different and much larger object than this one, so its
+    // span gets its own check rather than riding on the one above.
+    auto* vehicle = reinterpret_cast<void*>(back);
+    if (spanIsReadableCached(vehicle, kInputsDeepestRead, g_spanCheckedVehicle, g_spanVehicleOk)) {
+        float inputs[3];
+        if (readInputs(vehicle, inputs)) {
+            g_inThrottle.store(inputs[0], std::memory_order_relaxed);
+            g_inBrake.store(inputs[1], std::memory_order_relaxed);
+            g_inSteer.store(inputs[2], std::memory_order_relaxed);
+            g_inputsOk.store(true, std::memory_order_relaxed);
+
+            // The regression, on the hot path, every sample. ~60 Hz rather than 1 Hz.
+            const float steer = inputs[2];
+            const float yaw = angular[2];
+            const float speed = std::sqrt(vel[0] * vel[0] + vel[1] * vel[1]);
+            if (std::fabs(steer) >= kMinSteerForRegression && speed >= kMinSpeedForRegression &&
+                std::isfinite(yaw)) {
+                uint32_t bin = 0;
+                while (bin < kSpeedBins - 1 && speed >= kSpeedBinEdges[bin]) ++bin;
+                g_regN[bin].fetch_add(1, std::memory_order_relaxed);
+                g_regSteerYaw[bin].fetch_add(
+                    std::llround(static_cast<double>(steer) * yaw * kRegressionScale),
+                    std::memory_order_relaxed);
+                g_regSteerSq[bin].fetch_add(
+                    std::llround(static_cast<double>(steer) * steer * kRegressionScale),
+                    std::memory_order_relaxed);
+                g_regYawSq[bin].fetch_add(
+                    std::llround(static_cast<double>(yaw) * yaw * kRegressionScale),
+                    std::memory_order_relaxed);
+            }
+        }
+    }
 
     // Latch this as THE vehicle once it reads like one: a car-shaped mass and a back-pointer to something.
     // Cycle tracking follows the latch, so slot numbering belongs to one body and not to whatever moved
@@ -633,6 +964,171 @@ void reportClassification(double speed)
     const uint32_t undirected = g_horizUndirected.exchange(0, std::memory_order_relaxed);
     const uint32_t directed = horizontal > undirected ? horizontal - undirected : 0;
 
+    // ------------------------------------------------------------------------ TEST 1: attitude report
+    //
+    // Which body axis is "forward" is MEASURED, not assumed: rotate each unit axis by the orientation and
+    // report its alignment with the direction of travel. Driving straight, exactly one should read ~1.0,
+    // and that one is forward. The same trick that proved velocity against the speedometer.
+    if (g_attitudeOk.load(std::memory_order_relaxed)) {
+        const float qx = g_quatX.load(std::memory_order_relaxed);
+        const float qy = g_quatY.load(std::memory_order_relaxed);
+        const float qz = g_quatZ.load(std::memory_order_relaxed);
+        const float qw = g_quatW.load(std::memory_order_relaxed);
+        const float vx = g_bestVelX.load(std::memory_order_relaxed);
+        const float vy = g_bestVelY.load(std::memory_order_relaxed);
+        const float planar = std::sqrt(vx * vx + vy * vy);
+
+        auto rotate = [&](float ax, float ay, float az, float* out) {
+            // v' = v + 2*cross(q.xyz, cross(q.xyz, v) + w*v)
+            const float tx = qy * az - qz * ay + qw * ax;
+            const float ty = qz * ax - qx * az + qw * ay;
+            const float tz = qx * ay - qy * ax + qw * az;
+            out[0] = ax + 2.0f * (qy * tz - qz * ty);
+            out[1] = ay + 2.0f * (qz * tx - qx * tz);
+            out[2] = az + 2.0f * (qx * ty - qy * tx);
+        };
+        float bx[3], by[3], bz[3];
+        rotate(1, 0, 0, bx);
+        rotate(0, 1, 0, by);
+        rotate(0, 0, 1, bz);
+
+        double dotX = 0.0, dotY = 0.0, dotZ = 0.0;
+        if (planar > 1.0f) {
+            const float nx = vx / planar, ny = vy / planar;
+            dotX = bx[0] * nx + bx[1] * ny;
+            dotY = by[0] * nx + by[1] * ny;
+            dotZ = bz[0] * nx + bz[1] * ny;
+        }
+        const double norm = std::sqrt(static_cast<double>(qx * qx + qy * qy + qz * qz + qw * qw));
+        NCM_INFO("  attitude: q=(%.3f %.3f %.3f %.3f) |q|=%.3f | angVel=(%.2f %.2f %.2f) rad/s | "
+                 "axis-vs-travel X=%.2f Y=%.2f Z=%.2f",
+                 static_cast<double>(qx), static_cast<double>(qy), static_cast<double>(qz),
+                 static_cast<double>(qw), norm,
+                 static_cast<double>(g_angVelX.load(std::memory_order_relaxed)),
+                 static_cast<double>(g_angVelY.load(std::memory_order_relaxed)),
+                 static_cast<double>(g_angVelZ.load(std::memory_order_relaxed)), dotX, dotY, dotZ);
+    } else {
+        NCM_WARN("  attitude: could not be read");
+    }
+
+    // ------------------------------------------------------- TEST 1 retry: quaternion candidate report
+    //
+    // Offsets that read unit-norm most of the time. Persistence is the discriminator: four floats that
+    // happen to sum to 1.0 once will not keep doing it while the car turns.
+    g_quatScanWanted.store(true, std::memory_order_relaxed);
+    {
+        const uint32_t samples = g_quatSamples.load(std::memory_order_relaxed);
+        if (samples >= 5) {
+            char line[512];
+            int written = std::snprintf(line, sizeof(line), "  quat-scan: %u sample(s), unit-norm at", samples);
+            int found = 0;
+            for (uint32_t i = 0; i < kQuatCandidates && found < 8; ++i) {
+                const uint32_t hits = g_quatHits[i].load(std::memory_order_relaxed);
+                if (hits * 10 >= samples * 9) {   // unit-norm in at least 90% of samples
+                    written += std::snprintf(line + written, sizeof(line) - static_cast<size_t>(written),
+                                             " +0x%X(%u/%u)", kQuatScanBegin + i * 4, hits, samples);
+                    ++found;
+                    if (written < 0 || static_cast<size_t>(written) >= sizeof(line)) break;
+                }
+            }
+            if (found == 0) {
+                NCM_INFO("  quat-scan: %u sample(s), NO offset held unit norm -- no quaternion in "
+                         "+0x%X..+0x%X", samples, kQuatScanBegin, kQuatScanEnd);
+            } else {
+                NCM_INFO("%s", line);
+            }
+
+            // The discriminator that 0.1.12 lacked: which unit-norm candidates actually MOVE. A constant
+            // -- an identity matrix row, a fixed axis -- collapses to zero spread and rules itself out.
+            char varying[512];
+            int vw = std::snprintf(varying, sizeof(varying), "  quat-vary:");
+            int varyingFound = 0;
+            for (uint32_t i = 0; i < kQuatCandidates && varyingFound < 6; ++i) {
+                const uint32_t hits = g_quatHits[i].load(std::memory_order_relaxed);
+                if (hits * 10 < samples * 9) continue;
+                const float spreadLo = g_quatMin[i].load(std::memory_order_relaxed);
+                const float spreadHi = g_quatMax[i].load(std::memory_order_relaxed);
+                if (spreadHi - spreadLo < 0.10f) continue;   // constant: not a quaternion
+                vw += std::snprintf(varying + vw, sizeof(varying) - static_cast<size_t>(vw),
+                                    " +0x%X[%.2f..%.2f]", kQuatScanBegin + i * 4,
+                                    static_cast<double>(spreadLo), static_cast<double>(spreadHi));
+                ++varyingFound;
+                if (vw < 0 || static_cast<size_t>(vw) >= sizeof(varying)) break;
+            }
+            if (varyingFound == 0) {
+                NCM_INFO("  quat-vary: every unit-norm candidate is CONSTANT -- none of them is an "
+                         "orientation");
+            } else {
+                NCM_INFO("%s", varying);
+            }
+        }
+    }
+
+    // ------------------------------------------------------------------ TEST 3: measured yaw response
+    //
+    // Slope of yaw against steer, per speed band, accumulated across every sample since the bias last
+    // changed. `r` is the correlation: a slope with low r is arithmetic, not a relationship.
+    {
+        char line[512];
+        int written = std::snprintf(line, sizeof(line), "  yawgain: bias=%+.2f",
+                                    static_cast<double>(g_axleBias.load(std::memory_order_relaxed)));
+        for (uint32_t b = 0; b < kSpeedBins; ++b) {
+            const uint32_t n = g_regN[b].load(std::memory_order_relaxed);
+            const double sy = static_cast<double>(g_regSteerYaw[b].load(std::memory_order_relaxed));
+            const double ss = static_cast<double>(g_regSteerSq[b].load(std::memory_order_relaxed));
+            const double yy = static_cast<double>(g_regYawSq[b].load(std::memory_order_relaxed));
+            const double slope = ss > 0.0 ? sy / ss : 0.0;
+            const double r = (ss > 0.0 && yy > 0.0) ? sy / std::sqrt(ss * yy) : 0.0;
+            const char* band = (b == 0) ? "slow" : (b == 1 ? "mid" : "fast");
+            written += std::snprintf(line + written, sizeof(line) - static_cast<size_t>(written),
+                                     " | %s n=%u slope=%+.3f r=%+.2f", band, n, slope, r);
+            if (written < 0 || static_cast<size_t>(written) >= sizeof(line)) break;
+        }
+        NCM_INFO("%s", line);
+    }
+
+    // ------------------------------------------------------------------ TEST 2: force budget closure
+    //
+    // Sum(impulse)/mass against the measured change in velocity over the same window. At rest both should
+    // be ~0, because the wheels already cancel gravity.
+    {
+        static float lastVx = 0.0f, lastVy = 0.0f, lastVz = 0.0f;
+        static bool havePrevious = false;
+
+        const double sx =
+            static_cast<double>(g_impulseSumX.exchange(0, std::memory_order_relaxed)) / kImpulseScale;
+        const double sy =
+            static_cast<double>(g_impulseSumY.exchange(0, std::memory_order_relaxed)) / kImpulseScale;
+        const double sz =
+            static_cast<double>(g_impulseSumZ.exchange(0, std::memory_order_relaxed)) / kImpulseScale;
+        const float vx = g_trackedVelX.load(std::memory_order_relaxed);
+        const float vy = g_trackedVelY.load(std::memory_order_relaxed);
+        const float vz = g_trackedVelZ.load(std::memory_order_relaxed);
+        const float mass = g_bestMass.load(std::memory_order_relaxed);
+
+        if (havePrevious && mass > 1.0f && g_trackedVelOk.load(std::memory_order_relaxed)) {
+            const double px = sx / mass, py = sy / mass, pz = sz / mass;
+            const double mx = vx - lastVx, my = vy - lastVy, mz = vz - lastVz;
+            const double predicted = std::sqrt(px * px + py * py + pz * pz);
+            const double measured = std::sqrt(mx * mx + my * my + mz * mz);
+            NCM_INFO("  budget: predicted dV=(%.2f %.2f %.2f)|%.2f  measured dV=(%.2f %.2f %.2f)|%.2f  "
+                     "ratio=%.2f", px, py, pz, predicted, mx, my, mz, measured,
+                     measured > 0.01 ? predicted / measured : 0.0);
+        }
+        lastVx = vx; lastVy = vy; lastVz = vz;
+        havePrevious = true;
+    }
+
+    if (g_inputsOk.load(std::memory_order_relaxed)) {
+        NCM_INFO("  inputs: throttle=%.2f brake=%.2f steer=%+.2f | axleBias=%+.2f front=%.0f rear=%.0f",
+                 static_cast<double>(g_inThrottle.load(std::memory_order_relaxed)),
+                 static_cast<double>(g_inBrake.load(std::memory_order_relaxed)),
+                 static_cast<double>(g_inSteer.load(std::memory_order_relaxed)),
+                 static_cast<double>(g_axleBias.load(std::memory_order_relaxed)),
+                 static_cast<double>(g_axleFrontSum.load(std::memory_order_relaxed)),
+                 static_cast<double>(g_axleRearSum.load(std::memory_order_relaxed)));
+    }
+
     if (directed > 0) {
         NCM_INFO("  horiz: %u directed, %u undirected | long avg=%.1f peak=%.1f net=%+.1f "
                  "| lat avg=%.1f peak=%.1f",
@@ -709,6 +1205,19 @@ void refreshGripScale()
             in >> j;
             wanted = j.value("gripScale", kGripScaleInert);
             g_diagnostics.store(j.value("diagnostics", true), std::memory_order_relaxed);
+            float bias = j.value("axleLoadBias", 0.0f);
+            if (!std::isfinite(bias)) bias = 0.0f;
+            if (bias < -kAxleBiasMax) bias = -kAxleBiasMax;
+            if (bias > kAxleBiasMax) bias = kAxleBiasMax;
+            const float previousBias = g_axleBias.load(std::memory_order_relaxed);
+            if (std::fabs(bias - previousBias) > kGripScaleEpsilon) {
+                g_axleBias.store(bias, std::memory_order_relaxed);
+                resetRegression();
+                NCM_INFO("axleLoadBias %+.2f -> %+.2f, yaw regression reset (%s)", static_cast<double>(previousBias),
+                         static_cast<double>(bias),
+                         std::fabs(bias) > kGripScaleEpsilon
+                             ? "SHIFTING load between axles, zero-sum" : "inert");
+            }
         }
     } catch (...) {
         // A half-saved file is the ordinary case when someone is editing it live. Keep the last good
@@ -847,6 +1356,37 @@ bool attach(void* pluginHandle, const void* sdkOpaque, const std::wstring& dllDi
     // by hand Windows' hidden extensions turned it into `ncm_carrier.json.json`. The plugin knows the
     // path, the schema and the defaults. Whatever it writes is exactly what it reads back, so the file is
     // self-documenting. An existing file is never touched.
+    //
+    // **AND MERGE MISSING KEYS INTO AN EXISTING FILE.** 0.1.11 shipped `axleLoadBias` and the experiment
+    // never ran, because the file already existed from 0.1.9, only-write-when-absent left it alone, and a
+    // missing key silently defaulted to inert. Nobody did anything wrong and nothing in the log said so.
+    // A settable surface that can silently not exist is worse than one that does not exist at all.
+    {
+        bool merged = false;
+        try {
+            std::ifstream in(g_configPath);
+            if (in) {
+                nlohmann::json j;
+                in >> j;
+                in.close();
+                if (j.is_object()) {
+                    if (!j.contains("gripScale")) { j["gripScale"] = 1.0; merged = true; }
+                    if (!j.contains("axleLoadBias")) { j["axleLoadBias"] = 0.0; merged = true; }
+                    if (!j.contains("diagnostics")) { j["diagnostics"] = true; merged = true; }
+                    if (merged) {
+                        std::ofstream out(g_configPath);
+                        if (out) {
+                            out << j.dump(2) << "\n";
+                            NCM_INFO("added missing key(s) to ncm_carrier.json -- every settable now "
+                                     "present and editable while the game runs");
+                        }
+                    }
+                }
+            }
+        } catch (...) {
+            NCM_WARN("ncm_carrier.json is unreadable -- leaving it alone, running on defaults");
+        }
+    }
     {
         std::ifstream probe(g_configPath);
         if (!probe) {
@@ -887,6 +1427,11 @@ bool attach(void* pluginHandle, const void* sdkOpaque, const std::wstring& dllDi
     g_target = reinterpret_cast<void*>(resolved);
 
     for (auto& slot : g_bodySlotStamp) slot.store(0, std::memory_order_relaxed);
+    for (uint32_t i = 0; i < kQuatCandidates; ++i) {
+        g_quatMin[i].store(FLT_MAX, std::memory_order_relaxed);
+        g_quatMax[i].store(-FLT_MAX, std::memory_order_relaxed);
+    }
+    resetRegression();
     for (uint32_t w = 0; w < kWheelCount; ++w) {
         g_wheelMin[w].store(FLT_MAX, std::memory_order_relaxed);
         g_wheelMax[w].store(-FLT_MAX, std::memory_order_relaxed);
