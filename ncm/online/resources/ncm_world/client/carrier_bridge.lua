@@ -100,6 +100,43 @@ local function pushProjection(envelope)
     return true
 end
 
+--- IDEA-507: ask the carrier to read the game's own drive-model data for every record NCM knows about and
+--- write it to a file beside its log. **Read-only** -- nothing is applied, nothing is mutated, and `L148` is
+--- not engaged. It exists because `parts.architecture` knows 124 of 378 (vehicle, facet) pairs and the rest
+--- live in `vehDriveModelData`, which only a running game can read.
+---
+--- Deliberately manual rather than automatic. It is a one-off measurement, not a feature, and a dump that
+--- fired on every join would rewrite the file while somebody was reading it.
+local function requestArchDump()
+    if not (surface and surfaceReady) then return false, "bridge_down" end
+
+    local catalogue = NcmCore and NcmCore.get and NcmCore.get("data.vehicle_catalogue") or nil
+    if not catalogue then return false, "no_catalogue" end
+
+    -- Every runtime record, not just one per machine: the `_player` variants and the RB15 liveries are
+    -- separate TweakDB records and may carry different drive models. Asking about all of them costs one
+    -- message and settles whether they differ.
+    local seen, records = {}, {}
+    for _, entry in ipairs(catalogue.entries()) do
+        for _, record in ipairs(entry.runtimeRecords or {}) do
+            if not seen[record] then
+                seen[record] = true
+                records[#records + 1] = record
+            end
+        end
+    end
+    table.sort(records)
+
+    surface:send("ncm:machine.archdump", { records = records })
+    log("architecture dump requested for %d record(s)", #records)
+    return true
+end
+
+RegisterCommand("ncm.archdump", function()
+    local ok, why = requestArchDump()
+    if not ok then log("architecture dump not sent: %s", tostring(why)) end
+end, false)
+
 local function tearDown(why)
     if surface then
         pcall(function() surface:destroy() end)
@@ -277,6 +314,10 @@ CreateThread(function()
     end
 end)
 
+-- KB-136 observability: the last thing the projection loop saw, so a change is logged once rather than
+-- every 500 ms.
+local lastProjectionState = nil
+
 --- Machine projections, pushed down the same socket the telemetry comes up.
 ---
 --- Slow on purpose: the record carrier is **spawn-cached**, so a change reaches a car the next time one
@@ -287,8 +328,39 @@ CreateThread(function()
     while true do
         if enabled and surface and surfaceReady then
             local ok, state = pcall(function() return GlobalState.ncmProjections end)
-            local records = (ok and type(state) == "table" and type(state.records) == "table")
-                and state.records or nil
+            -- KB-136: prefer the array shape, fall back to the map. Rebuilt into a record-keyed table so the
+            -- loop below is unchanged -- the transport shape is a transport concern and should not leak into
+            -- the logic that decides what to push.
+            local records = nil
+            if ok and type(state) == "table" then
+                if type(state.entries) == "table" then
+                    records = {}
+                    for _, entry in ipairs(state.entries) do
+                        if type(entry) == "table" and type(entry.path) == "string" then
+                            records[entry.path] = entry.envelope
+                        end
+                    end
+                elseif type(state.records) == "table" then
+                    records = state.records
+                end
+            end
+            -- Say what we saw, once per change. The loop used to be silent on every path, which is why
+            -- KB-136 went weeks with no evidence beyond "nothing happened".
+            do
+                local seen
+                if not ok then seen = "PCALL_FAILED"
+                elseif type(state) ~= "table" then seen = "absent(" .. type(state) .. ")"
+                elseif records == nil then seen = "no entries and no records field"
+                else
+                    local n = 0
+                    for _ in pairs(records) do n = n + 1 end
+                    seen = ("%d record(s) via %s"):format(n, type(state.entries) == "table" and "entries" or "records")
+                end
+                if seen ~= lastProjectionState then
+                    lastProjectionState = seen
+                    log("projections: %s", seen)
+                end
+            end
             if records then
                 for record, envelope in pairs(records) do
                     if type(envelope) == "table" and type(envelope.record) == "table" then

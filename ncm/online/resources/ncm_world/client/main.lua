@@ -71,6 +71,9 @@ local function governorApi()
     return v
 end
 
+-- KB-136 observability: the last thing the ceiling loop saw, logged on change only.
+local lastCeilingState = nil
+
 CreateThread(function()
     local applied = {}       -- record -> signature of the profile in force
     local warned = false
@@ -83,7 +86,38 @@ CreateThread(function()
             end
         else
             local ok, state = pcall(function() return GlobalState.ncmCeilings end)
-            local records = (ok and type(state) == "table" and type(state.records) == "table") and state.records or nil
+            -- KB-136: prefer the array shape, fall back to the map, and normalise back to a record-keyed
+            -- table so the application logic below does not care which arrived.
+            local records = nil
+            if ok and type(state) == "table" then
+                if type(state.entries) == "table" then
+                    records = {}
+                    for _, entry in ipairs(state.entries) do
+                        if type(entry) == "table" and type(entry.path) == "string" then
+                            records[entry.path] = entry.profile
+                        end
+                    end
+                elseif type(state.records) == "table" then
+                    records = state.records
+                end
+            end
+            -- This loop has run silently on every client since KB-30/D7 shipped and has never applied a
+            -- ceiling. Silence was the reason nobody noticed; it now reports what it saw, once per change.
+            do
+                local seen
+                if not ok then seen = "PCALL_FAILED"
+                elseif type(state) ~= "table" then seen = "absent(" .. type(state) .. ")"
+                elseif records == nil then seen = "no entries and no records field"
+                else
+                    local n = 0
+                    for _ in pairs(records) do n = n + 1 end
+                    seen = ("%d ceiling(s) via %s"):format(n, type(state.entries) == "table" and "entries" or "records")
+                end
+                if seen ~= lastCeilingState then
+                    lastCeilingState = seen
+                    log("ceilings: %s", seen)
+                end
+            end
             if records then
                 for record, prof in pairs(records) do
                     if type(prof) == "table" then

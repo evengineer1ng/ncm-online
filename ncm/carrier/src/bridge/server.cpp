@@ -53,6 +53,8 @@ const char* kBridgeHtml = R"HTML(<!doctype html>
     // The carrier channel. One transport for telemetry and effects, so the two sides cannot disagree about
     // which is authoritative, and so an effect cannot arrive while the socket that reports feel is down.
     Open77.on("ncm:machine.projection", function (p) { relay({ cmd: "projection", projection: p || {} }); });
+    // IDEA-507: a read-only request for the game's own drive-model data. Mutates nothing.
+    Open77.on("ncm:machine.archdump", function (p) { relay({ cmd: "archdump", records: (p && p.records) || [] }); });
   }
   connect();
 })();
@@ -407,6 +409,23 @@ void Server::dispatch(const std::string& payload)
             }
         }
         onProjection_(out);
+        return;
+    }
+
+    if (cmd == "archdump") {
+        if (!onArchDump_) return;
+        std::vector<std::string> records;
+        if (msg.contains("records") && msg["records"].is_array()) {
+            for (const auto& r : msg["records"]) {
+                if (r.is_string()) {
+                    auto path = r.get<std::string>();
+                    if (!path.empty()) records.push_back(std::move(path));
+                }
+            }
+        }
+        // An empty list is passed through rather than dropped: the dump logs that it was asked for nothing,
+        // which distinguishes "NCM sent a bad request" from "the message never arrived".
+        onArchDump_(records);
         return;
     }
 

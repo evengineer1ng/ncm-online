@@ -60,6 +60,9 @@ public:
     bool connected() const { return connected_.load(); }
 
     void onProjection(std::function<void(const Projection&)> fn) { onProjection_ = std::move(fn); }
+    /// `IDEA-507`: NCM asks the carrier to read the game's own drive-model data for a list of records and
+    /// write it to a file. Read-only -- it mutates nothing, so `L148` is not engaged.
+    void onArchDump(std::function<void(const std::vector<std::string>&)> fn) { onArchDump_ = std::move(fn); }
     void onFrame(std::function<void(const Frame&)> fn) { onFrame_ = std::move(fn); }
     void onDisconnect(std::function<void()> fn) { onDisconnect_ = std::move(fn); }
 
@@ -87,6 +90,7 @@ private:
     std::atomic<uintptr_t> client_{0};
 
     std::function<void(const Projection&)> onProjection_;
+    std::function<void(const std::vector<std::string>&)> onArchDump_;
     std::function<void(const Frame&)> onFrame_;
     std::function<void()> onDisconnect_;
     std::function<void()> onConnect_;

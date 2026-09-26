@@ -53,8 +53,19 @@ end
 --- NCM car uses would change someone's personal single-player car for no reason.
 local function fleet()
     local ok, ceilings = pcall(function() return GlobalState.ncmCeilings end)
-    if not ok or type(ceilings) ~= "table" or type(ceilings.records) ~= "table" then return {} end
-    return ceilings.records
+    if not ok or type(ceilings) ~= "table" then return {} end
+    -- KB-136: ceilings now publish as both a sorted `entries` array and the historical record-keyed map.
+    -- Read either, preferring the array, so that dropping the map once the transport question is settled is
+    -- a one-line deletion there rather than a silent empty fleet here.
+    if type(ceilings.entries) == "table" then
+        local out = {}
+        for _, entry in ipairs(ceilings.entries) do
+            if type(entry) == "table" and type(entry.path) == "string" then out[entry.path] = entry.profile end
+        end
+        return out
+    end
+    if type(ceilings.records) == "table" then return ceilings.records end
+    return {}
 end
 
 --- Compose and publish. Cheap enough to call on any change; it only writes what moved.
@@ -94,7 +105,24 @@ function NcmMachine.recompute(why)
         end
     end
 
-    GlobalState.ncmProjections = { version = Projection.ENVELOPE_VERSION, records = out }
+    -- **KB-136: published in TWO shapes, deliberately.** `records` is a map keyed by TweakDB record path --
+    -- a key containing a `.` -- and no client has ever seen it. `entries` is the same data as an array, which
+    -- is the shape `ncmCalendar` uses and the only shape known to arrive. The client prefers `entries` and
+    -- falls back to `records`, so this is safe whichever one turns out to work, and `server/state_probe.lua`
+    -- is what decides which property actually mattered. Drop the map once the answer is in.
+    local entries = {}
+    for record, envelope in pairs(out) do
+        entries[#entries + 1] = { path = record, envelope = envelope }
+    end
+    -- Sorted, so two publications of the same fleet produce byte-identical payloads and a client can compare
+    -- them cheaply. `pairs` order is not stable and would make every republish look like a change.
+    table.sort(entries, function(a, b) return a.path < b.path end)
+
+    GlobalState.ncmProjections = {
+        version = Projection.ENVELOPE_VERSION,
+        entries = entries,
+        records = out,
+    }
 
     if changed > 0 or cleared > 0 then
         log("published %d record(s) [%s]: %d changed, %d cleared, wetness %.2f",

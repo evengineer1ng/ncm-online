@@ -167,6 +167,20 @@ function NcmCompetition.publishCeilings()
     local ceilings = Class.recordCeilings()
     local n = 0
     for _ in pairs(ceilings) do n = n + 1 end
-    GlobalState.ncmCeilings = { records = ceilings, at = math.floor(Open77.time.unix()) }
-    log("class ceilings published: %d record(s)", n)
+    -- **KB-136: two shapes, and the map is the one that has never worked.** These ceilings have been
+    -- published since `KB-30`/D7 and no client has ever applied one, because `records` is keyed by TweakDB
+    -- record path and something between here and the client drops it. `entries` is the same data as a sorted
+    -- array -- `ncmCalendar`'s shape, the only one known to arrive. Clients prefer `entries`.
+    local entries = {}
+    for record, profile in pairs(ceilings) do
+        entries[#entries + 1] = { path = record, profile = profile }
+    end
+    table.sort(entries, function(a, b) return a.path < b.path end)
+
+    GlobalState.ncmCeilings = {
+        entries = entries,
+        records = ceilings,
+        at = math.floor(Open77.time.unix()),
+    }
+    log("class ceilings published: %d record(s) (entries + records)", n)
 end

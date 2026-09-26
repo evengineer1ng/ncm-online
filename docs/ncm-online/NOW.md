@@ -3,7 +3,7 @@
 > **STATUS: LEDGER** - living session memory, rewritten at the end of every working session.
 > Authority map: [INDEX.md](INDEX.md) - classified 2026-09-24 (L125).
 
-Last rewritten: **2026-09-26 - discovery of the physics surface closed with two clean negatives; Parts begins (`L149`, §AV).**
+Last rewritten: **2026-09-26 - Parts layers 1-3 built (`L150`); the `KB-136` discriminator and the architecture dump are built and awaiting one drive.**
 
 > **Claim before writing:** decisions through **L150**; MASTER_TEST through **§AV**; next QA letter **§AW**.
 > BACKLOG next free **IDEA-508**; known issues through **KB-143** plus pre-existing duplicate labels noted by
@@ -11,32 +11,43 @@ Last rewritten: **2026-09-26 - discovery of the physics surface closed with two 
 
 ## One next action
 
-**Fill the architecture profile from the running game with the carrier, rather than authoring 254 facts by
-hand (`IDEA-507`).** Layers 1-3 of 18_PARTS_ECOSYSTEM are built (`IDEA-506`), and the resolver works - but it
-knows only **124 of 378 (vehicle, facet) pairs, 33 percent**, because the rest live in `vehDriveModelData`
-and only a running game can read TweakDB.
+**Deploy Carrier 0.1.14, drive once, and read two answers off one session.** Both are built, gated and
+committed; neither has been published. This needs a restart window and the owner in the car.
 
-**The carrier already does that traversal.** `effects/tweak.cpp` resolves a vehicle record to its drive-model
-record and reads float flats off it. A read-only enumeration over the 27 catalogue records, dumped to a file,
-answers most of the profile from the game's own data instead of from anyone's memory of what a Galena is. It
-needs **no write, no new decision line and no risk** - `L148` is not involved because nothing is mutated.
+**Answer 1 - why `KB-136` has never delivered a payload.** `server/state_probe.lua` publishes five payloads
+that vary one property at a time: a bare scalar, a table holding an array (`ncmCalendar`'s known-good shape),
+a string-keyed map, the same map keyed `Vehicle.v_...`, and an array of eleven realistic envelopes.
+`client/state_probe.lua` reports what each looks like on arrival - **including when the answer is `nil`**,
+which is the thing that has been missing. One line in the client log names the cause.
 
-This is Parts consuming the carrier's ability to **read**, which is the more valuable half and was not the
-half anybody expected to need first.
+**The prime suspect is the dot.** Both payloads that have never arrived are keyed by TweakDB record path,
+which contains a `.`; the one that works has no dotted keys. If the state bag treats a key as a path, that is
+exactly where it breaks.
 
-**Parts implementation is authorised but narrowly** (`L150`): the periodic table, the grammar and the
-compatibility factory - all three now exist. **Not** R&D generation, manufacturing, supply, inventory, the
-secondary market, barter or procedural naming; those stay SPEC and need their own authorisation when reached.
+**A candidate fix ships alongside rather than after.** `ncmCeilings` and `ncmProjections` now publish an
+`entries` array **in addition to** the map, and both client readers prefer `entries`, falling back to
+`records` and normalising back to a record-keyed table so nothing downstream changed. If shape is the cause,
+this drive diagnoses *and* repairs. If it is not, the probe still says which property is.
 
-**Expect Parts to run straight into `KB-136` and treat that as the point.** `gripScale` still comes from a
-JSON file a human edits (`IDEA-502`); nothing the server computes has ever reached the carrier. The first
-Part that wants to be *felt* rather than *simulated* needs that transport, so the projection work is now
-scheduled by a consumer instead of being argued for in the abstract. `KB-136` holds the evidence that
-narrows it: in one live session `GlobalState.ncmCalendar` (array-shaped) was read successfully while both
-`ncmCeilings` and `ncmProjections` (maps keyed by record path) produced total silence. Class ceilings are
-therefore silently broken too, which is a shipped feature nobody has noticed. Discriminate map-shape from
-payload size first; the `client/race.lua` precedent - an entrant-targeted stream replacing nested session
-state - is the fallback.
+**Answer 2 - the 254 unauthored architecture facts (`IDEA-507`).** `/ncm.archdump` on the client asks the
+carrier to read the game's own `vehDriveModelData` for every catalogue record and write
+`ncm_architecture_dump.json` beside its log. **Read-only: nothing is mutated, so `L148` is not engaged.** It
+also settles a second question worth more than the first - `machine.flats` grades six of its twenty flats
+`documented`, meaning *named in the schema but never written by NCM*, and those six include
+`frictionMulLateral`, the grip field. The dump turns `documented` into present-or-absent before any Part is
+designed on one.
+
+**Do not expect it to answer everything.** Drivetrain layout and propulsion may have no float flat at all, in
+which case the dump narrows the hand-authoring rather than eliminating it. Unresolved names are reported by
+absence and are evidence, not a schema.
+
+### What to do, in order
+
+1. Publish 0.1.14 and restart. **Then `chown` (`KB-138`).**
+2. Join, sit still, and read the client log for the `[ncm_world/probe]` line.
+3. Run `/ncm.archdump`, then send back `ncm_architecture_dump.json` and the probe line.
+4. If ceilings now apply, `client/main.lua` will say so - it has been silent on every path since `KB-30`/D7
+   shipped, which is why nobody noticed it never worked.
 
 ## Production live state
 
@@ -47,10 +58,19 @@ Verified directly against the server on 2026-09-26, not carried forward from not
 - OPEN//77 `2.31.13+op77.102 linux-x64`, protocol **1.40**. `ncm-server` **active**.
 - RequiredMods enabled/unsecured; sole declaration `ncm-carrier` **0.1.13**, 914,065 bytes, SHA-256
   `4fa43a64dfbd52bd5429bb55ebd6e3eb65cc49d76a434412a2f7983f3a1eded4` - **re-read from
-  `/opt/ncm/server/server.jsonc` and byte-identical to `dist/ncm-carrier-0.1.13.zip`.** Manifest digest at
+  `/opt/ncm/server/server.jsonc`**, and verified byte-identical to the local artifact at the time of that
+  check. **The local `dist/ncm-carrier-0.1.13.zip` no longer matches:** a build was run before the version
+  was bumped, overwriting it. The stale file is renamed
+  `ncm-carrier-0.1.13-LOCAL-REBUILD-DO-NOT-PUBLISH.zip` so it cannot be published by mistake; Production
+  still holds the real 0.1.13 and rollback goes through `publish-carrier.py --remove`, not that file.
+  Manifest digest at
   publish time was `0f82d831ef301bcd5acc7c2ab756443a2959704810624b6905a60077a954d7d6`; the manifest endpoint
   did not answer from loopback during this check, so that digest is publish-time observed rather than
   re-verified.
+- **0.1.14 is built and packaged but NOT published:** `dist/ncm-carrier-0.1.14.zip`, 920,222 bytes, SHA-256
+  `e7a0b6ba20b70a558e4cad0a32a6737793df40ea0685ada82bf96ee5cd6d1a0e`. It adds the read-only architecture
+  dump (`IDEA-507`) and carries the resource-side `KB-136` discriminator and candidate fix. Publishing it
+  needs one restart, and a `chown` afterwards.
 - **`KB-138` is currently satisfied:** `find /opt/ncm/server ! -user ubuntu` returns **0 files**. The `chown`
   after the last publish was done.
 

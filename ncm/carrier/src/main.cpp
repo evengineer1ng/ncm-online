@@ -17,6 +17,7 @@
 #include "input/devices.hpp"
 #include "log.hpp"
 #include "vehicle/hook.hpp"
+#include "vehicle/arch_dump.hpp"
 #include "vehicle/physics_probe.hpp"
 
 #include <RED4ext/RED4ext.hpp>
@@ -25,6 +26,7 @@
 #include <atomic>
 #include <memory>
 #include <string>
+#include <vector>
 
 namespace {
 
@@ -141,6 +143,12 @@ void onLoad()
             // rather than as zero -- absent and stationary are different claims.
             ncm::vehicle::probe::noteReportedSpeed((f.hasSpeed && !f.idle) ? f.speed : -1.0);
         });
+        // IDEA-507: read the game's own drive-model data for a list of records and write it to a file.
+        // Read-only, so it needs no decision line and cannot leave the player's game altered. The list comes
+        // from NCM's vendored `data.vehicle_catalogue`, so the carrier never has to know what a car is.
+        c.server->onArchDump([](const std::vector<std::string>& records) {
+            ncm::vehicle::arch::dump(records);
+        });
         c.server->onConnect([&c] { sendHealth(c); });
         c.server->onDisconnect([&c] {
             // The world went away. Put the player's game back the way we found it, immediately, without
@@ -231,7 +239,7 @@ RED4EXT_C_EXPORT void RED4EXT_CALL Query(RED4ext::v1::PluginInfo* info)
 {
     info->name = L"NCM Carrier";
     info->author = L"Night City Motorsports";
-    info->version = RED4EXT_V1_SEMVER(0, 1, 13);
+    info->version = RED4EXT_V1_SEMVER(0, 1, 14);
     info->runtime = RED4EXT_V1_RUNTIME_VERSION_INDEPENDENT;  // see the note below
     info->sdk = RED4EXT_V1_SDK_VERSION_CURRENT;
 }
@@ -268,6 +276,8 @@ RED4EXT_C_EXPORT bool RED4EXT_CALL Main(RED4ext::v1::PluginHandle handle, RED4ex
             g_handle = handle;
             g_sdk = sdk;
             ncm::log::init(directoryOf(g_module));
+            // Same directory as the log and the config, so a dump lands where somebody already looks.
+            ncm::vehicle::arch::setOutputDirectory(directoryOf(g_module));
             NCM_INFO("registering lifecycle on sdk %d.%d", sdk ? sdk->runtime->major : 0,
                      sdk ? sdk->runtime->minor : 0);
 
