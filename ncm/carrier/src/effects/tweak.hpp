@@ -35,6 +35,19 @@ struct FlatChange {
     double multiplier = 1.0;
 };
 
+/// One change to ONE FLAT on the gear records hanging off a vehicle's engine data.
+///
+/// **Why gears are a separate type from `FlatChange`.** A drive-model flat has exactly one home per
+/// vehicle; a gear flat has one home PER GEAR, and the gears are an ordered array. `.maxSpeed` means
+/// nothing without saying which gear, and the two most useful operations address the array differently:
+/// removing the crawl floor touches EVERY gear, while lengthening the top of the box touches the last one.
+struct GearChange {
+    std::string id;         // NCM's stable name, for the trace
+    int gear = 0;           // 1-based index into `.gears`; 0 means EVERY gear; -1 means the LAST gear
+    std::string suffix;     // ".minSpeed", ".maxSpeed", ".torqueMultiplier", ".minEngineRPM", ...
+    double multiplier = 1.0;
+};
+
 struct ApplyResult {
     int applied = 0;
     int captured = 0;
@@ -47,6 +60,13 @@ public:
     /// Apply a projection to the drive model of one vehicle record. Idempotent: applying the same envelope
     /// twice produces the same values, because both apply against the captured originals.
     ApplyResult apply(const std::string& vehicleRecord, const std::vector<FlatChange>& flats);
+
+    /// Apply a projection to the GEAR CHAIN of one vehicle record.
+    ///
+    /// Same ledger, same capture-before-write rule, same multiplier-against-original semantics. The only
+    /// new thing is the traversal: `vehicle -> .vehEngineData -> .gears -> gear[i] -> suffix`, which is
+    /// the path NCM's own Manual Transmission work uses to zero the per-gear speed floor.
+    ApplyResult applyGears(const std::string& vehicleRecord, const std::vector<GearChange>& gears);
 
     /// Put back what was captured for one vehicle record, and forget it.
     int restore(const std::string& vehicleRecord);
@@ -78,5 +98,21 @@ uint64_t composeFlatId(uint64_t recordId, const std::string& suffix);
 /// Resolve the drive-model record a vehicle record points at: `.vehDriveModelData`, or `.bikeDriveModelData`
 /// for two wheels. Mirrors `tuning.lua:137-139`. Returns 0 when neither exists.
 uint64_t resolveDriveModel(const std::string& vehicleRecord);
+
+/// Resolve the ENGINE DATA record: `.vehEngineData`. Returns 0 when it does not exist.
+///
+/// **This is a sibling of the drive model, not a child of it, and that distinction cost us months.** The
+/// architecture dump has only ever probed `driveModel + suffix`, so every flat that actually lives on the
+/// engine data -- `maxRPM`, `engineMaxTorque`, `gearChangeTime` -- reads as ABSENT from a probe that was
+/// never going to find it. Engine data is also where the gears hang.
+uint64_t resolveEngineData(const std::string& vehicleRecord);
+
+/// Read the ordered `.gears` array off an engine-data record. Returns false when the flat is missing or
+/// is not an array of ids.
+///
+/// The array is `array<TweakDBID>` and every entry is a record in its own right, with its own flats. That
+/// is why a float-only probe cannot see a gearbox: there is no float at `engineData + ".gears"`, there is
+/// a list of records, and each one has to be visited.
+bool resolveGears(uint64_t engineDataId, std::vector<uint64_t>& out);
 
 }  // namespace ncm::effects

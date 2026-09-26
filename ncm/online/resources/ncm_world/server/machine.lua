@@ -130,9 +130,17 @@ function NcmMachine.recompute(why)
         for _, f in ipairs(envelope.record and envelope.record.flats or {}) do
             flats[#flats + 1] = { id = f.id, suffix = f.suffix, multiplier = f.multiplier }
         end
+        -- The gear chain rides the same wire and obeys the same size budget. Four numbers per entry, and
+        -- the floor fix is two entries for the whole car however many gears it has, because `gear = 0`
+        -- addresses the array rather than enumerating it.
+        local gears = {}
+        for _, g in ipairs(envelope.record and envelope.record.gears or {}) do
+            gears[#gears + 1] = { id = g.id, gear = g.gear, suffix = g.suffix, multiplier = g.multiplier }
+        end
         entries[#entries + 1] = {
             path = record,
             flats = flats,
+            gears = gears,
             restore = (envelope.record and envelope.record.restore) or false,
             at = envelope.at,
         }

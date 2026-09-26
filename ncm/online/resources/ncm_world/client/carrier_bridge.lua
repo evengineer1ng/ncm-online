@@ -446,6 +446,7 @@ CreateThread(function()
                                 record = {
                                     path = entry.path,
                                     flats = entry.flats or {},
+                                    gears = entry.gears or {},
                                     restore = entry.restore or false,
                                 },
                             }
@@ -489,7 +490,7 @@ CreateThread(function()
                 -- otherwise, so say otherwise.
                 for record in pairs(projected) do
                     if records[record] == nil then
-                        if pushProjection({ v = 1, record = { path = record, flats = {}, restore = true } }) then
+                        if pushProjection({ v = 1, record = { path = record, flats = {}, gears = {}, restore = true } }) then
                             projected[record] = nil
                         end
                     end
@@ -777,6 +778,106 @@ RegisterCommand("ncm.ratedtopspeed", function()
         local okRec, byRecord = pcall(api.ratedTopSpeed, own.record)
         log("ratedTopSpeed(record=%s) -> %s", tostring(own.record),
             okRec and tostring(byRecord) or "THREW")
+    end
+end, false)
+
+-- ---------------------------------------------------------------------------------------------------
+-- THE GEAR CHAIN
+-- ---------------------------------------------------------------------------------------------------
+--
+-- **Every gear declares a speed FLOOR, and the engine enforces it with forward force.** A car in a high
+-- gear has a high floor, so full brake from speed does not stop the car -- it brings the car down to the
+-- gear's `minSpeed` and holds it there. NCM's own Manual Transmission work found this and fixed it by
+-- zeroing the floor.
+--
+-- **Neither existing lever can reach it, and that is why this needed a new channel rather than a tune.**
+-- `brakeScale` only ever scales RETARDING force and the floor is a forward PUSH. `driveScale` does scale
+-- it, but it bottoms out at 0.30, so it can remove at most 70 percent of the floor -- and it takes the
+-- car's entire power delivery down with it. A car that cannot stop and a car with no engine are not a
+-- trade worth making.
+--
+-- Sent straight to the carrier rather than through the fleet publication, on purpose: `NcmMachine` composes
+-- projections from `GlobalState.ncmCeilings`, whose only producer was the class disabled by `KB-144`, so
+-- the fleet may currently be empty. This proves the MECHANISM against the car you are sitting in, which is
+-- the question, and leaves wiring it into the fleet as a separate and later thing.
+local function gearFloorCommand(args)
+    local own = NcmClientOwnVehicle and NcmClientOwnVehicle() or nil
+    local record = own and own.record
+    if not record then
+        log("gearfloor: sit in a car first -- there is no record to write against")
+        return
+    end
+
+    local restore = (args and args[1] == "off")
+    if restore then
+        if pushProjection({ v = 1, record = { path = record, flats = {}, gears = {}, restore = true } }) then
+            log("gearfloor OFF: asked the carrier to restore %s", tostring(record))
+        else
+            log("gearfloor: bridge is down, nothing sent")
+        end
+        return
+    end
+
+    local Projection = NcmCore.get("machine.projection")
+    local gears = {}
+    for _, change in ipairs(Projection.GEAR_FLOOR) do
+        gears[#gears + 1] = {
+            id = change.id, gear = change.gear,
+            suffix = change.suffix, multiplier = change.multiplier,
+        }
+    end
+
+    if pushProjection({ v = 1, record = { path = record, flats = {}, gears = gears } }) then
+        log("gearfloor ON: %d gear change(s) pushed for %s -- the carrier log says how many landed",
+            #gears, tostring(record))
+        log("gearfloor: now brake hard from speed in a high gear. Before this, the car stops at the "
+            .. "gear's minSpeed and crawls; after it, it should come to a stop.")
+    else
+        log("gearfloor: bridge is down, nothing sent")
+    end
+end
+
+RegisterCommand("ncm.gearfloor", function(_, args) gearFloorCommand(args) end, false)
+
+--- Read the gear chain of the car being sat in, and print it.
+---
+--- **`maxSpeed` and `minSpeed` are in METRES PER SECOND**, so the last gear's `maxSpeed` times 3.6 is the
+--- car's top speed in km/h. This is read-only: it writes nothing and proves only that the traversal
+--- `vehicle -> .vehEngineData -> .gears` resolves on this build, which nothing in NCM has ever tested.
+RegisterCommand("ncm.gears", function()
+    local own = NcmClientOwnVehicle and NcmClientOwnVehicle() or nil
+    local record = own and own.record
+    if not record then
+        log("gears: sit in a car first")
+        return
+    end
+
+    local engine = TweakDB:GetFlat(TweakDBID.new(record, ".vehEngineData"))
+    if not engine then
+        log("gears: %s has no .vehEngineData -- the traversal fails at step one", tostring(record))
+        return
+    end
+    local chain = TweakDB:GetFlat(TweakDBID.new(engine, ".gears"))
+    if type(chain) ~= "table" then
+        log("gears: engine data on %s has no readable .gears array (%s)",
+            tostring(record), type(chain))
+        return
+    end
+
+    log("---- gear chain for %s (%d gear(s)) ----", tostring(record), #chain)
+    for i, gearRef in ipairs(chain) do
+        local minS = TweakDB:GetFlat(TweakDBID.new(gearRef, ".minSpeed"))
+        local maxS = TweakDB:GetFlat(TweakDBID.new(gearRef, ".maxSpeed"))
+        local torque = TweakDB:GetFlat(TweakDBID.new(gearRef, ".torqueMultiplier"))
+        log("  gear %d: minSpeed=%s (%s km/h)  maxSpeed=%s (%s km/h)  torqueMul=%s",
+            i, tostring(minS), minS and ("%.0f"):format(minS * 3.6) or "?",
+            tostring(maxS), maxS and ("%.0f"):format(maxS * 3.6) or "?", tostring(torque))
+    end
+    -- The last gear is the one that decides top speed, so say so rather than making it be counted out.
+    local last = chain[#chain]
+    local topMs = last and TweakDB:GetFlat(TweakDBID.new(last, ".maxSpeed"))
+    if topMs then
+        log("---- TOP SPEED = last gear maxSpeed = %.1f m/s = %.0f km/h ----", topMs, topMs * 3.6)
     end
 end, false)
 

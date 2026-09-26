@@ -135,6 +135,17 @@ void onLoad()
             g_appliedFlats.fetch_add(r.applied, std::memory_order_relaxed);
             NCM_INFO("projection v%d on %s: %d applied, %d captured, %d refused",
                      p.version, p.record.c_str(), r.applied, r.captured, r.refused);
+
+            // The gear chain is reported SEPARATELY rather than summed into the line above. The two
+            // traversals fail for different reasons -- a missing drive model and a missing engine data are
+            // not the same fault -- and one combined count would hide whichever of them was zero.
+            if (!p.gears.empty()) {
+                const auto gr = c.tweaks.applyGears(p.record, p.gears);
+                g_appliedFlats.fetch_add(gr.applied, std::memory_order_relaxed);
+                NCM_INFO("gear chain v%d on %s: %d applied, %d captured, %d refused%s",
+                         p.version, p.record.c_str(), gr.applied, gr.captured, gr.refused,
+                         gr.resolved ? "" : " (NO GEAR CHAIN RESOLVED)");
+            }
         });
         c.server->onFrame([&c](const ncm::bridge::Frame& f) {
             if (c.mixer) c.mixer->feed(f);

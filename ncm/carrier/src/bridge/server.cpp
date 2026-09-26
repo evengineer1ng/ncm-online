@@ -611,6 +611,20 @@ void Server::dispatch(const std::string& payload)
                 if (!change.suffix.empty()) out.flats.push_back(std::move(change));
             }
         }
+
+        // The gear chain travels in the same message and on the same terms -- a multiplier against whatever
+        // this install's original was, never an absolute. `gear` addresses the array: 0 every gear, -1 the
+        // last one, otherwise 1-based.
+        if (record.contains("gears") && record["gears"].is_array()) {
+            for (const auto& g : record["gears"]) {
+                effects::GearChange change;
+                change.id = g.value("id", std::string());
+                change.gear = g.value("gear", 0);
+                change.suffix = g.value("suffix", std::string());
+                change.multiplier = g.value("multiplier", 1.0);
+                if (!change.suffix.empty()) out.gears.push_back(std::move(change));
+            }
+        }
         onProjection_(out);
         return;
     }

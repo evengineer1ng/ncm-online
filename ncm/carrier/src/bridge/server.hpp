@@ -26,8 +26,9 @@ namespace ncm::bridge {
 /// which part moved which flat, and why, was decided server-side in Lua (`L135`).
 struct Projection {
     int version = 1;
-    std::string record;                          // the drive-model record to write
-    std::vector<effects::FlatChange> flats;
+    std::string record;                          // the vehicle record to write against
+    std::vector<effects::FlatChange> flats;      // drive-model flats
+    std::vector<effects::GearChange> gears;      // gear-chain flats, via `.vehEngineData` -> `.gears`
     bool restore = false;                        // "put back what you captured" -- not the same as "apply nothing"
 };
 

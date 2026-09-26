@@ -81,7 +81,7 @@ Core.define("machine.projection", function(C)
         return {
             v = M.ENVELOPE_VERSION,
             at = at,
-            record = { path = recordPath, flats = {} },
+            record = { path = recordPath, flats = {}, gears = {} },
             ceiling = {},
             trace = {},
             _mult = {},          -- flatId -> running multiplier
@@ -296,13 +296,63 @@ Core.define("machine.projection", function(C)
         return draft, nil
     end
 
+    ---------------------------------------------------------------------------------------------------
+    -- THE GEAR CHAIN
+    ---------------------------------------------------------------------------------------------------
+    --
+    -- A gear is a TweakDB record in its own right, reached by `vehicle -> .vehEngineData -> .gears`, and it
+    -- declares a SPEED BAND: `minSpeed` to `maxSpeed`, in metres per second. The engine applies force to
+    -- keep the car inside the band of whichever gear it is in.
+    --
+    -- **The floor is not advisory, and that is a live defect in every NCM car.** A car in a high gear has a
+    -- high floor, and the engine pushes it back up to that floor however hard the brakes are applied -- so
+    -- full brake from speed does not bring a car to a stop, it brings it to the gear's minimum. NCM's own
+    -- Manual Transmission work found this and fixed it by zeroing the floor, which is what this does.
+    --
+    -- **Neither existing lever can reach it.** `brakeScale` only ever scales RETARDING force and the floor
+    -- is a forward PUSH. `driveScale` does scale it, but it bottoms out at 0.30, so it can remove at most
+    -- 70 percent of the floor -- and it takes the car's entire power delivery down with it. A car that
+    -- cannot stop and a car with no engine are not a trade worth making.
+    --
+    -- Multipliers, never absolutes, for the same reason every other flat here is a multiplier: the server
+    -- does not know what this install's original value is, and another mod may have changed it.
+    M.GEAR_FLOOR = {
+        { id = "gear_floor_speed", gear = 0, suffix = ".minSpeed",      multiplier = 0.0 },
+        { id = "gear_floor_rpm",   gear = 0, suffix = ".minEngineRPM",  multiplier = 0.0 },
+    }
+
+    --- Address the gear array: `0` every gear, `-1` the last one, otherwise 1-based.
+    ---
+    --- `-1` is the interesting one for top speed, because the car's ceiling is the LAST gear's `maxSpeed`
+    --- and nothing else. Lengthening the whole box and lengthening only the top of it are different cars.
+    M.GEAR_ALL, M.GEAR_LAST = 0, -1
+
+    --- Add one gear-chain change to an envelope, with the same trace discipline the flats get.
+    function M.contributeGear(envelope, layer, change, by)
+        if type(envelope) ~= "table" or type(change) ~= "table" then return false end
+        local record = envelope.record
+        if not record then return false end
+        record.gears = record.gears or {}
+        record.gears[#record.gears + 1] = {
+            id = change.id, gear = change.gear or 0,
+            suffix = change.suffix, multiplier = change.multiplier or 1.0,
+        }
+        envelope.trace = envelope.trace or {}
+        envelope.trace[#envelope.trace + 1] = {
+            carrier = "record", layer = layer or "parts",
+            id = ("gear[%s]%s"):format(tostring(change.gear or 0), tostring(change.suffix)),
+            to = change.multiplier, by = by or change.id,
+        }
+        return true
+    end
+
     --- An envelope that asks the carrier to put everything back. Distinct from an empty projection: "restore
     --- what you captured" and "apply nothing" are different instructions to something holding originals.
     function M.clear(recordPath, opts)
         opts = opts or {}
         return {
             v = M.ENVELOPE_VERSION, at = opts.at,
-            record = { path = recordPath, flats = {}, restore = true },
+            record = { path = recordPath, flats = {}, gears = {}, restore = true },
             ceiling = {}, trace = {},
         }
     end
@@ -313,6 +363,8 @@ Core.define("machine.projection", function(C)
         if envelope.record and envelope.record.restore then return false end
         local flats = envelope.record and envelope.record.flats
         if flats and #flats > 0 then return false end
+        local gears = envelope.record and envelope.record.gears
+        if gears and #gears > 0 then return false end
         return next(envelope.ceiling or {}) == nil
     end
 

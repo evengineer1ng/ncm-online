@@ -13,7 +13,7 @@
 #   .\ncm\carrier\fetch-deps.ps1
 #   .\tools\build-carrier.ps1 -PublishDev
 cmake_minimum_required(VERSION 3.21)
-project(ncm_carrier VERSION 0.1.24 LANGUAGES CXX)
+project(ncm_carrier VERSION 0.1.25 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
