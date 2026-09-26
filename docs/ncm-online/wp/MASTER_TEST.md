@@ -1430,7 +1430,11 @@ pursued again, that asymmetry should decide the order.
 move them -- server-composed, per-player, over the wire -- which is the difference between a capability and
 a feature.
 
-Carrier **0.1.20** + `ncm_world` on Production. Command: `/ncm.setup`.
+Carrier **0.1.24** + `ncm_world` on Production. Command: `/ncm.setup`.
+
+> **Read the `L156` amendment at the end of this section before running any step here.** Four expectations
+> in the tables below were written against earlier composition rules and are now wrong on purpose --
+> §AY1 (family counts), §AY2, §AY6 and §AY14. The amendment restates them.
 
 | # | Operation | Expected | Result |
 |---|---|---|---|
@@ -1473,6 +1477,54 @@ table above stands with §AY5 reinterpreted, and these are added:
 **What §AY13 is really testing.** Not a string. Whether the system can tell a player what a part will
 *not* do for them, in the same breath as what it will. `losses` is the whole of `IDEA-505` once
 approximation is allowed, and if it never reaches a human it is decoration.
+
+### §AY amended again by `L156`: eleven DIRECTIONS, and levers that constrain each other
+
+**Why this supersedes numbers above rather than adding to them.** `L154` gave nine families a single lever
+each, which left `transmission`, `drivetrain`, `cooling` and `electrical` pointing in the *identical*
+direction and differing only in magnitude -- one dial with four labels, which no player could tell apart.
+`L156` gives every family a direction in the three-lever space and then couples the levers: drive and brake
+are capped against grip.
+
+**No carrier change. No wire change.** The plugin still receives three floats and does not know any of this
+happened. Everything below is a server-side composition change, so a client already running Carrier 0.1.24
+tests it after a resource restart.
+
+**Two expectations from the `L154` table are now WRONG and are restated here**, because a tester working
+from a stale number reports a bug that is not one:
+
+| # | Operation | Was (`L154`) | **Now (`L156`)** | Result |
+|---|---|---|---|---|
+| §AY2 | `/ncm.setup power_unit 1.5` | drive **1.500** | drive **~1.29**, traction-limited, and chat says so. The engine is not being ignored -- it is being told it has no tyres | |
+| §AY6 | `/ncm.setup power_unit 9.0` | clamped to **2.00** | **BOTH rules fire and are reported separately**: clamped 9.000 -> 2.000, then limited 2.000 -> **~1.14** by `traction_ceiling` (grip has fallen to ~0.80 under engine mass). A clamp is the carrier's hard bound; a limit is one lever constraining another | |
+| §AY9 | suspension 1.3 -> grip x1.17 | grip **x1.155**, and now brake **x1.068**, drive **x1.027** | | |
+| §AY14 | complete car, grip **clamps** at 1.50 | grip **1.473**, drive **1.265**, brake **1.445**, `[3 approximated]`, **nothing clamped and nothing limited** -- a balanced build clears the ceilings, which is the shape the couplings are meant to reward | |
+
+New steps. Every number is the module's own output, not an estimate:
+
+| # | Operation | Expected | Result |
+|---|---|---|---|
+| §AY15 | `/ncm.setup power_unit 2.0` on stock tyres, then drive. | drive **1.246**, not 2.000. Chat: `driveScale held at x1.246 (asked x2.000) -- power that cannot be put down is not power; fit tyres...`. **The headline of `L156`.** | |
+| §AY16 | Then `/ncm.setup tires 1.4` and drive again. | Same engine, now **1.545**. Grip 1.306. **Fitting tyres made the engine stronger without touching the engine** -- the emergent build, and the single most important thing to feel here | |
+| §AY17 | `/ncm.setup clear`, then `/ncm.setup brakes 2.0`. | brake **1.200**, limited by `brake_grip_limit`. Past the tyre a bigger disc locks up rather than stops | |
+| §AY18 | `/ncm.setup clear`, `transmission 1.4`, drive and brake. Then `clear`, `drivetrain 1.4`, same. | **The aliasing test, live.** Both give nearly the same drive (1.183 vs 1.203). The difference: transmission also **brakes** (1.070) and costs no grip; drivetrain costs **turn-in** (grip 0.951) and does nothing for stopping. Before `L156` these were the same part | |
+| §AY19 | `/ncm.setup clear`, `tires 1.4`, then brake hard from speed. | Stopping distance **shortens** (brake 1.163). The old table had tyres not touching `brakeScale` at all, which was not a simplification but an error | |
+| §AY20 | `/ncm.setup` with no arguments. | A `CEILINGS at grip x1.00` line: drive up to x1.30, brake up to x1.20. **Headroom before the purchase**, not a post-mortem after it | |
+| §AY21 | `/ncm.setup power_unit` with no multiplier. | The explanation now ends with `limited by traction_ceiling -- power that cannot be put down is not power; fit tyres...`. A player is warned before spending | |
+| §AY22 | `/ncm.setup clear`, `cooling 1.4`, then `clear`, `electrical 1.4`. | **The honest weak case.** Both give drive (1.106 vs 1.125); only cooling touches brake (1.088), because ducting feeds the brakes. If these feel identical, that is a true result and `IDEA-532` is the answer -- these two are the thinnest distinction in the table and the documentation says so | |
+| §AY23 | `/ncm.setup aerodynamics 1.4`, then brake hard from speed. | Beyond the `L154` trade, brake is now **1.052**: the same drag that costs top end shortens the stop | |
+
+**What a PASS of §AY15-16 means.** That parts are no longer independent scalars. A build has a shape, the
+shape is legible to the player in chat, and the cheapest route to more power can be tyres rather than an
+engine. That is a car rather than a menu, out of the same three floats and no new plumbing.
+
+**What it still does not fix, stated so nobody claims it.** Every lever is a CONSTANT. A wing works
+identically in a car park and at 200; nothing heats, fades or wears; a gearbox has no discrete gears.
+`cooling` and `electrical` are separated by one modest brake term and little else. Those are the two
+recurring `losses` entries across the whole table, and `IDEA-532` -- state-dependent levers evaluated in the
+carrier from speed, load and time, all of which are already local variables at the write site -- is the work
+that would lift them. **`L156` is not a substitute for it; it is what was available without touching the
+plugin.**
 
 ## §AZ - the binding: Parts follow the Machine, not the fastest car - **AWAITING LIVE TEST**
 

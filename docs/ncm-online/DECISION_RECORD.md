@@ -2123,3 +2123,49 @@ unchanged; `ncm_world` reports `3 direct, 8 approximated, 1 refused`.
 
 **Basis.** Owner approval of the coordination package following the performance-channel review; `L153`, `L154`,
 `KB-146`, Proposal 38, and the existing permanent `vehicle_asset.asset_id` identity model.
+
+
+## L156 - LOCKED - Three levers is a SPACE: families are directions, and the levers constrain each other
+
+**Decision.** The instance channel expresses a component family as a **direction in the three-lever space**,
+not as an allocation of one lever, and after composition the levers **cap each other**.
+
+1. A family declares terms across any of `gripScale` / `driveScale` / `brakeScale`, with signed exponents.
+   Its `fidelity` describes its FIRST term -- its own quantity. Every other term is a coupling and is
+   modelled, whatever the primary fidelity says.
+2. **No two families may share a normalised direction.** Two families differing only in magnitude are one
+   part wearing two names. `parts.handling.directionKey` makes this checkable and the suite asserts it over
+   every expressed family.
+3. Two couplings are adopted, both applied once after composition and both **downward only**:
+   `traction_ceiling` caps `driveScale` at `0.50 + 0.80 * gripScale`, and `brake_grip_limit` caps
+   `brakeScale` at `0.40 + 0.80 * gripScale`. A rule that could RAISE a lever would invent force no part
+   paid for, so ceilings reduce and never add.
+4. A coupling ceiling is reported separately from a clamp, in the log and in chat, because "your engine is
+   worth 1.25 of the 2.00 you asked for" and "the carrier's hard bound cut you to 2.00" are different facts
+   about a car. Both name the rule that fired and what to do about it.
+5. A ceiling may never fall below the capped lever's own floor; asserted at load against the source lever's
+   minimum.
+6. `losses` continues to carry what a family provably cannot express. Two entries now recur across the
+   whole table and are the honest ceiling of this channel: **no speed dependence** and **no time
+   dependence**, because a lever is a constant.
+
+**What this corrects.** `L154` allowed approximation and then, in the same table, gave `transmission`,
+`drivetrain`, `cooling` and `electrical` the identical direction -- `driveScale` alone at 0.5, 0.5, 0.3 and
+0.3. Eleven families, eight distinguishable behaviours at best. The word "approximated" was carrying weight
+the arithmetic was not, and a player fitting one of those four could not have told it from another. Two
+ordinary couplings had also simply been missed: braking force is grip-limited (`tires` did not touch
+`brakeScale` at all, which is wrong rather than simple) and drag shortens a stop as well as costing top end.
+
+**What it deliberately does NOT do.** It does not touch the carrier, the wire, or the three-float payload;
+a client on Carrier 0.1.24 gets all of it from a resource restart. It does not make a lever a function of
+speed, load or time, which is what `cooling` and `electrical` actually need -- `IDEA-532` holds that design
+and this line is explicitly not a substitute for it.
+
+**Coefficients are a first pass.** The topology is physics -- drag opposes drive whatever anyone prefers --
+but the exponents and the two ceiling lines are starting values awaiting play data, in the same spirit as
+`machine.projection`'s `WET` table. 18_PARTS_ECOSYSTEM puts component balance out of scope and no number
+here is a design judgement.
+
+**Basis.** Owner ruling, 2026-09-26, on reviewing the `L154` expression table: *"most of these are just
+drive scale"*. The `derive custom formulas from our interactions between the 3 broader scales` framing is
+the owner's and is the substance of points 1 and 3. Live verification is MASTER_TEST §AY as amended.

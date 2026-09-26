@@ -3,56 +3,96 @@
 > **STATUS: LEDGER** - living session memory, rewritten at the end of every working session.
 > Authority map: [INDEX.md](INDEX.md) - classified 2026-09-24 (L125).
 
-Last rewritten: **2026-09-26 - `L155` is ruled and its authorised prerequisite is BUILT AND DEPLOYED.
-Parts are now keyed by permanent `assetId`, and the Carrier writes force only to a positively identified
-body (`KB-146` FIXED, Carrier 0.1.21). Foundry review 38 still awaits the owner on representation; `L153`
-locks its scope. §AY and §AZ both await the drive.**
+Last rewritten: **2026-09-26 - `L156` rebuilt the Parts expression model and it is GREEN BUT NOT YET
+DEPLOYED.** Eleven families now point in eleven different directions in the three-lever space instead of
+four of them sharing one, and the levers constrain each other: drive and brake are capped against grip, so
+an engine is worth less until the tyres can carry it. `KB-150` fixed the carrier log (one file per process,
+Carrier 0.1.24) and §AZ-C PASSED, which settles `L155` point 1 and `KB-146` live.
 
-> **Claim before writing:** decisions through **L155**; MASTER_TEST through **§AZ**; next QA letter **§BA**.
-> BACKLOG next free **IDEA-527**; known issues through **KB-146** plus pre-existing duplicate labels noted by
-> `KB-114`. Read the ledger tails before allocating an ID.
+> **Claim before writing:** decisions through **L156**; MASTER_TEST through **§AZ**; next QA letter **§BA**.
+> BACKLOG next free **IDEA-534**; known issues through **KB-150** plus pre-existing duplicate labels noted
+> by `KB-114`. Read the ledger tails before allocating an ID.
 
 ## One next action
 
-**Drive §AZ-B, the two-client binding test.** Both of its blockers are now fixed -- see §AZ-B
-prerequisites: `KB-4` (the second client was launched with placeholder world/digest env vars) and
-`KB-147` (two instances could not both bind the carrier's port). Launch client 2 with
-`tools\o77-client.ps1`; it prints the imported-WebUI-surface count that `KB-4` was measured on, so that
-row is settled by running it. It needs a second player and nothing else does. §AZ8 -- swap
-Machines and confirm the setup follows the **car**, not the driver -- is the assertion `L155` point 1 turns
-on, and the green light for the Foundry identity spine.
+**Deploy the `L156` resource change, then drive §AY15-16.** The code is committed and the gate is green
+(400 core tests, 0 failed), but production is still running the `L154` table -- **nothing below is live
+until the resources sync**:
 
-§AZ-A is a solo pre-check and takes two minutes. **§AZ1 is a log assertion, not a feel one:** 0.1.20 and
-0.1.21 feel identical alone, so the line naming your `assetId` is the only thing that proves the binding.
+```
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\deploy-staging.ps1
+ssh -i C:\Users\eveng\.ssh\lightsail-ncm.pem ubuntu@52.60.225.137 \
+    "sudo chown -R ubuntu:ubuntu /opt/ncm/server && find /opt/ncm/server ! -user ubuntu"
+```
 
-**If `binding=waiting` never becomes `matched`**, read the client log for the line naming which snapshot
-field resolved the engine entity. The vehicle snapshot's field name is not established anywhere in the
-repo, so `carrier_bridge.lua` tries six candidates and logs the winner once. No winner means the list is
-wrong and no amount of driving will produce a write.
+The `chown` is `KB-138` and the `find` must print nothing. **No carrier rebuild is needed** -- `L156` is
+entirely server-side composition and the wire is still three floats, so a client already on Carrier 0.1.24
+picks it up from the resource restart.
+
+Then, in game:
+
+```
+/ncm.setup power_unit 2.0     -- expect drive 1.246, NOT 2.0, with the reason in chat   (AY15)
+/ncm.setup tires 1.4          -- same engine, now 1.545. THIS is the test.              (AY16)
+```
+
+§AY16 is the assertion `L156` exists for: fitting tyres made the engine stronger without touching the
+engine. If that lands, parts are a build rather than a menu.
+
+**§AY18 is the aliasing test.** `transmission 1.4` then `drivetrain 1.4`, back to back, cleared between.
+Nearly identical drive (1.183 vs 1.203); the difference is that transmission also brakes and drivetrain
+costs turn-in. Before `L156` these two were literally the same part with two names, which is the defect the
+whole line was written for.
+
+**Expect four `L154` numbers to be wrong on purpose.** §AY1, §AY2, §AY6 and §AY14 were composed under the
+old rules; the `L156` amendment at the end of §AY restates each one. A tester working from the stale table
+will report a bug that is not one.
+
+## What §AZ still needs
+
+§AZ-C **PASSED** on 2026-09-26 -- Parts follow the Machine, not the driver, proven solo with two Machines
+and the carrier log naming each `assetId` and entity. §AZ-A is a two-minute solo pre-check.
+
+§AZ-B (§AZ6 / §AZ9 / §AZ12) needs a **second human**: concurrency, passenger-gets-no-binding, and physics
+handover cannot be shown sequentially. `KB-4` remains open -- the second local client still renders no UI,
+the race theory is retracted, and the decisive untested step is capturing the launcher-started process's
+`CommandLine` while a working client runs.
 
 ## Then drive §AY
 
-Fourteen numbered operations in `wp/MASTER_TEST.md`, all through `/ncm.setup`. Everything
-below is built, deployed and green; none of it is *done* until a live PASS sits beside it (`L69`).
+Twenty-three numbered operations in `wp/MASTER_TEST.md`, all through `/ncm.setup`. Everything below is
+built and green; **none of it is live until the deploy above runs**, and none of it is *done* until a live
+PASS sits beside it (`L69`). Every number here is the module's own output, read out of `parts.handling`
+rather than estimated.
 
 ```
-/ncm.setup                      what can be felt at all, split by fidelity
-/ncm.setup power_unit 1.5       then drive     -- acceleration        [direct]
-/ncm.setup brakes 0.5           then brake     -- stopping distance   [direct]
-/ncm.setup tires 1.3            then corner    -- grip                [direct]
-/ncm.setup suspension 1.3       then corner    -- grip x1.17          [approximated]
-/ncm.setup aerodynamics 1.4     grip x1.18 AND drive x0.92 -- the trade, from one part
-/ncm.setup aerodynamics 0.7     the trade REVERSES: grip x0.84, drive x1.09
-/ncm.setup chassis 1.25         all three levers x1.09 -- mass touches everything
-/ncm.setup aerodynamics         no multiplier: explains the family AND what it CANNOT do
+/ncm.setup                      what can be felt, split by fidelity, plus the CEILINGS line
+/ncm.setup power_unit 2.0       drive 1.246 -- NOT 2.0. Traction-limited, and chat says why   (AY15)
+/ncm.setup tires 1.4            the SAME engine now 1.545, grip 1.306 -- the build            (AY16)
+/ncm.setup clear
+/ncm.setup brakes 2.0           brake 1.200 -- a disc cannot beat the tyre                    (AY17)
+/ncm.setup clear
+/ncm.setup transmission 1.4     drive 1.183, brake 1.070, grip untouched                      (AY18)
+/ncm.setup clear
+/ncm.setup drivetrain 1.4       drive 1.203, grip 0.951 -- nearly the same power, opposite trade
+/ncm.setup clear
+/ncm.setup tires 1.4            brake 1.163 -- tyres shorten a stop. The old table missed this (AY19)
+/ncm.setup aerodynamics 1.4     grip 1.183, drive 0.919, brake 1.052 -- drag also stops you   (AY23)
+/ncm.setup aerodynamics 0.7     the trade REVERSES: grip 0.837, drive 1.093
+/ncm.setup chassis 1.4          all three x1.144 -- mass touches everything equally
+/ncm.setup power_unit           no multiplier: the family, its losses, AND the ceiling warning (AY21)
 /ncm.setup steering 1.2         expect a NAMED REFUSAL citing KB-135
-/ncm.setup power_unit 9.0       expect clamp to 2.00, logged as CLAMPED
+/ncm.setup power_unit 9.0       BOTH rules: clamped 9->2.00, then limited to ~1.14            (AY6)
 /ncm.setup clear                back to standard
 ```
 
-**§AY5 changed meaning.** It used to be `suspension`, which `L152` refused; `L154` makes suspension work,
-so the refusal case is now `steering` -- the one family left that cannot reach a force, and refused for a
-mechanism (`KB-135`) rather than for a missing lever.
+**The two that matter most.** §AY16 -- tyres making an untouched engine stronger -- is the whole of `L156`.
+§AY18 is the regression test for the defect it fixed: `transmission` and `drivetrain` were the identical
+direction at nearly identical magnitude, which is one part with two names.
+
+**§AY5 changed meaning twice.** It was `suspension`, which `L152` refused; `L154` makes suspension work, so
+the refusal case is `steering` -- the one family that cannot reach a force, refused for a mechanism
+(`KB-135`) rather than a missing lever. `L156` does not change that.
 
 ## Foundry architecture review — awaiting owner ruling
 

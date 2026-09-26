@@ -120,6 +120,15 @@ local function publishBound(playerId, binding, why, force)
                 binding.assetId, c.lever, c.wanted, c.applied)
         end
     end
+    -- `L156`. A coupling ceiling is not a clamp: the clamp is the carrier's hard bound, this is one lever
+    -- constraining another. Logged separately and by name, because "your engine is worth 1.25 of 2.00"
+    -- and "your engine was cut to the maximum the plugin allows" are different facts about a car.
+    if setup.limited and #setup.limited > 0 then
+        for _, l in ipairs(setup.limited) do
+            log("asset=%s LIMITED %s: wanted %.3f, applied %.3f by %s (%s=%.3f)",
+                binding.assetId, l.lever, l.wanted, l.applied, l.coupling, l.from, l.fromValue)
+        end
+    end
     return true
 end
 
@@ -167,6 +176,13 @@ end
 function NcmHandling.parts(assetId)
     local entry = validAssetId(assetId) and fitted[assetId] or nil
     return entry and entry.parts or {}
+end
+
+--- The composed setup for a Machine, or nil. Needed so a caller can report what the couplings did without
+--- recomposing and risking a different answer than the one that was actually published.
+function NcmHandling.setup(assetId)
+    local entry = validAssetId(assetId) and fitted[assetId] or nil
+    return entry and entry.setup or nil
 end
 
 function NcmHandling.recompute(assetId, why)
@@ -257,6 +273,25 @@ RegisterNetEvent("ncm:setup", function(family, effect)
         for _, d in ipairs(inv.refused) do
             tell(("REFUSED %s: %s"):format(d.family, d.reason))
         end
+
+        -- `L156`: headroom BEFORE the purchase. The levers do not move independently -- drive and brake
+        -- are capped against grip -- so a player deciding what to fit needs to know what the car can
+        -- currently absorb, not discover it afterwards from a limit message.
+        local current = NcmHandling.setup(assetId)
+        local levers = (current and current.levers) or Handling.clear(assetId).levers
+        local ceilings = Handling.ceilings(levers)
+        local headroom = {}
+        for _, id in ipairs(Handling.LEVER_IDS) do
+            if ceilings[id] then
+                headroom[#headroom + 1] = ("%s up to x%.2f (now x%.2f)"):format(
+                    id, ceilings[id], levers[id] or 1.0)
+            end
+        end
+        if #headroom > 0 then
+            tell(("CEILINGS at grip x%.2f: %s"):format(
+                levers.gripScale or 1.0, table.concat(headroom, ", ")))
+            tell("grip is what lifts them -- power and brakes act through the same contact patch")
+        end
         tell("`ncm.setup <family>` on its own explains one family and what it cannot do")
         return
     end
@@ -288,6 +323,10 @@ RegisterNetEvent("ncm:setup", function(family, effect)
         tell(("%s [%s]: %s"):format(family, d.fidelity, table.concat(bits, ", ")))
         tell("why: " .. d.rationale)
         for _, loss in ipairs(d.losses) do tell("  cannot: " .. loss) end
+        -- The ceiling that can bite this family, said before the money is spent rather than after.
+        for _, c in ipairs(d.constrainedBy or {}) do
+            tell(("  limited by %s -- %s; %s"):format(c.coupling, c.headline, c.advice))
+        end
         tell(("usage: ncm.setup %s <multiplier>, e.g. 1.25"):format(family))
         return
     end
@@ -306,9 +345,23 @@ RegisterNetEvent("ncm:setup", function(family, effect)
         return
     end
     local levers = {}
-    for _, term in ipairs(expression.terms) do levers[#levers + 1] = term.lever end
+    for _, term in ipairs(expression.terms) do
+        levers[#levers + 1] = (term.weight > 0 and "+" or "-") .. term.lever
+    end
     tell(("fitted test_%s x%.3f [%s] -> %s"):format(
-        family, value, expression.fidelity, table.concat(levers, ", ")))
+        family, value, expression.fidelity, table.concat(levers, " ")))
+
+    -- What the car ACTUALLY ended up with, which after `L156` is not always what was asked for. Reporting
+    -- only the request is how a player concludes the command does nothing: they fit a 2.0 engine, feel
+    -- 1.25, and have been told 2.0.
+    local composed = NcmHandling.setup(assetId)
+    if composed then
+        tell("now: " .. Handling.explain(composed))
+        for _, l in ipairs(composed.limited or {}) do
+            tell(("%s held at x%.3f (asked x%.3f) -- %s; %s"):format(
+                l.lever, l.applied, l.wanted, l.headline, l.advice))
+        end
+    end
 end)
 
 --- A joining driver gets an explicit setup rather than nothing. Without this a fresh client has no

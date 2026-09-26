@@ -111,25 +111,32 @@ Core.define("parts.ontology", function(C)
     -- carries the physical rationale and -- the part that matters -- the enumerated LOSSES: what a part in
     -- that family provably cannot express. That list is where `IDEA-505`'s honesty requirement now lives.
     --
+    -- **Widened a third time by `L156`, and for the opposite reason to the first two.** The earlier errors
+    -- were too FEW families. This one was too few QUANTITIES PER FAMILY: nine families named a single
+    -- lever, which left `transmission`, `drivetrain`, `cooling` and `electrical` pointing in the identical
+    -- direction and differing only in magnitude -- one dial with four labels. Three levers is a space, and
+    -- a family is a direction in it, so most families legitimately reach two or three.
+    --
     -- `parts.handling` ASSERTS AT LOAD that these tables agree with its own, in both directions, so this
-    -- cannot drift a third time without a test failing.
+    -- cannot drift again without a test failing.
+    local GRIP  = "lateral_grip_vehicle"
+    local DRIVE = "longitudinal_force_driving"
+    local BRAKE = "longitudinal_force_braking"
+
     M.INSTANCE_QUANTITIES = {
-        -- direct: the lever is the quantity
-        tires        = { "lateral_grip_vehicle" },             -- MASTER_TEST AU5
-        power_unit   = { "longitudinal_force_driving" },       -- MASTER_TEST AW1
-        brakes       = { "longitudinal_force_braking" },       -- MASTER_TEST AW2
-        -- approximated: a real effect, coarsely modelled
-        suspension   = { "lateral_grip_vehicle" },             -- body control -> usable grip
-        structure    = { "lateral_grip_vehicle" },             -- shell stiffness -> grip
-        aerodynamics = { "lateral_grip_vehicle",
-                         "longitudinal_force_driving" },       -- downforce adds grip, drag costs drive
-        transmission = { "longitudinal_force_driving" },       -- ratio and shift quality -> delivered torque
-        drivetrain   = { "longitudinal_force_driving" },       -- driveline losses -> torque at the road
-        cooling      = { "longitudinal_force_driving" },       -- thermal headroom sustains power
-        electrical   = { "longitudinal_force_driving" },       -- ignition and management -> power
-        chassis      = { "lateral_grip_vehicle",
-                         "longitudinal_force_driving",
-                         "longitudinal_force_braking" },       -- mass touches all three
+        -- direct: the lever is the family's own quantity, plus the couplings it genuinely has
+        tires        = { GRIP, BRAKE, DRIVE },   -- AU5; braking is grip-limited, traction likewise
+        power_unit   = { DRIVE, GRIP },          -- AW1; engine mass costs a little cornering
+        brakes       = { BRAKE },                -- AW2; the one genuinely pure direction
+        -- approximated: a real effect, coarsely modelled, pointing somewhere of its own
+        suspension   = { GRIP, BRAKE, DRIVE },   -- body control, most felt under weight transfer
+        structure    = { GRIP, BRAKE },          -- stiffness as grip and as consistency under load
+        aerodynamics = { GRIP, DRIVE, BRAKE },   -- downforce adds grip, drag costs drive AND shortens a stop
+        transmission = { DRIVE, BRAKE },         -- ratios multiply torque both ways: engine braking
+        drivetrain   = { DRIVE, GRIP },          -- a tighter driveline puts power down and costs turn-in
+        cooling      = { DRIVE, BRAKE },         -- thermal headroom, and ducting feeds the brakes
+        electrical   = { DRIVE },                -- honestly pure drive: the baseline the others differ FROM
+        chassis      = { GRIP, DRIVE, BRAKE },   -- mass touches all three, equally
     }
 
     --- Is the quantity the lever itself, or a model of the family mapped onto it? A panel that says

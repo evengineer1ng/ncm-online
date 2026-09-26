@@ -16,6 +16,13 @@
 --   4. An inverse coupling really is inverse -- a wing that adds grip must cost drive force, or the part
 --      is a free lunch.
 --   5. The wire form carries no audit trail (`KB-136`, the state bag size limit).
+--   6. **No two families point in the same DIRECTION** (`L156`). This is the one that would have caught
+--      the failure it was written for: four families were `driveScale` alone, differing only in how hard
+--      they pushed, which is one part wearing four names. Magnitudes are still deliberately untested --
+--      a direction is a design claim, a magnitude is a tuning value, and only one of those should fail a
+--      build.
+--   7. A coupling only ever REDUCES a lever. A rule that could raise one would be inventing force that
+--      no part paid for.
 local function H(T) return T.Core.get("parts.handling") end
 local function O(T) return T.Core.get("parts.ontology") end
 
@@ -153,15 +160,19 @@ return {
         T.eq(M.explain(setup), "inert")
     end,
 
-    a_direct_part_moves_its_lever_by_exactly_its_effect = function(T)
+    a_direct_part_moves_its_primary_lever_by_exactly_its_effect = function(T)
         local M = H(T)
         local setup = M.compose({ vehicle = "v1", parts = {
             { id = "eng_stage2", family = "power_unit", effect = 1.15 },
         } }, { at = 100 })
-        T.ok(near(setup.levers.driveScale, 1.15), "direct means the number arrives unchanged")
-        T.ok(near(setup.levers.gripScale, 1.00), "gripScale untouched")
-        T.ok(near(setup.levers.brakeScale, 1.00), "brakeScale untouched")
-        T.eq(setup.approximated, 0, "nothing was modelled")
+        T.ok(near(setup.levers.driveScale, 1.15),
+            "direct means the number arrives unchanged on the family's OWN quantity")
+        -- `L156`: a family reaches more than its own quantity. An engine is mass over an axle, so it
+        -- costs a little cornering -- power is a trade rather than a gift.
+        T.ok(setup.levers.gripScale < 1.00, "and a bigger engine costs a little grip")
+        T.ok(near(setup.levers.brakeScale, 1.00), "but a brake is not an engine's business")
+        T.eq(setup.approximated, 0, "the PRIMARY term was direct, so nothing counts as modelled")
+        T.eq(#setup.limited, 0, "and 1.15 is inside the stock traction ceiling of 1.30")
     end,
 
     an_approximated_part_moves_its_lever_by_effect_to_the_weight = function(T)
@@ -259,15 +270,17 @@ return {
         local M = H(T)
         -- Three legal parts, each individually well inside the bound, composing past it. Clamping each
         -- contribution separately would let this through with every step looking fine.
+        -- On `gripScale`, which takes no coupling ceiling -- so this tests the clamp and only the clamp.
+        -- Doing it on `driveScale` would now measure `traction_ceiling` instead, a different rule.
         local setup = M.compose({ parts = {
-            { id = "a", family = "power_unit", effect = 1.40 },
-            { id = "b", family = "power_unit", effect = 1.40 },
-            { id = "c", family = "power_unit", effect = 1.40 },
+            { id = "a", family = "tires", effect = 1.20 },
+            { id = "b", family = "tires", effect = 1.20 },
+            { id = "c", family = "tires", effect = 1.20 },
         } })
-        T.ok(near(setup.levers.driveScale, 2.00), "clamped to the carrier's maximum")
+        T.ok(near(setup.levers.gripScale, 1.50), "clamped to the carrier's maximum")
         T.eq(#setup.clamped, 1, "exactly one clamp recorded")
-        T.eq(setup.clamped[1].lever, "driveScale")
-        T.ok(setup.clamped[1].wanted > 2.7, "the value it WANTED is kept, not just the applied one")
+        T.eq(setup.clamped[1].lever, "gripScale")
+        T.ok(setup.clamped[1].wanted > 1.70, "the value it WANTED is kept, not just the applied one")
     end,
 
     a_clamp_is_visible_in_the_human_explanation = function(T)
@@ -287,6 +300,7 @@ return {
         local wire = M.wire(setup)
         T.eq(wire.trace, nil, "KB-136: the trace does not cross the wire")
         T.eq(wire.clamped, nil, "nor does the clamp record")
+        T.eq(wire.limited, nil, "nor the coupling record (`L156`) -- KB-136 applies to it too")
         T.eq(wire.vehicle, nil, "nor the server's own handle for the machine")
         T.ok(near(wire.levers.driveScale, setup.levers.driveScale), "the levers do")
         T.eq(wire.v, M.SETUP_VERSION, "and a version, so the carrier can refuse a shape it does not know")
@@ -334,11 +348,14 @@ return {
         local d = M.describe("aerodynamics")
         T.eq(d.expressible, true)
         T.eq(d.fidelity, M.APPROXIMATED, "a wing is modelled, and a panel must be able to say so")
-        T.eq(#d.levers, 2, "grip and drive")
+        T.eq(#d.levers, 3, "grip, drive and brake -- drag shortens a stop as well as costing top end")
         local directions = {}
         for _, l in ipairs(d.levers) do directions[l.lever] = l.direction end
         T.eq(directions.gripScale, "increases")
         T.eq(directions.driveScale, "decreases", "the trade is legible without reading the weights")
+        T.eq(directions.brakeScale, "increases", "and the same drag that costs top end helps it stop")
+        T.eq(d.levers[1].role, "primary", "the family's own quantity is first")
+        T.eq(d.levers[2].role, "coupling", "and the rest are couplings, always modelled")
         T.ok(#d.losses > 0, "and what it cannot do is part of the same answer")
 
         local refused = M.describe("steering")
@@ -354,5 +371,166 @@ return {
         T.eq(#inv.refused, 1)
         T.eq(#inv.direct + #inv.approximated + #inv.refused, #Ont.FAMILIES,
             "every family is accounted for, one way or another")
+    end,
+
+    -- ------------------------------------------------------------------ `L156`: directions, not lengths
+    no_two_families_point_in_the_same_direction = function(T)
+        local M, Ont = H(T), O(T)
+        -- **The test written for the bug it would have caught.** Before `L156`, `transmission`,
+        -- `drivetrain`, `cooling` and `electrical` were all `{ driveScale }` at 0.5, 0.5, 0.3 and 0.3 --
+        -- the same direction at four lengths, which is one part wearing four names. A player fitting one
+        -- could not tell it from another, because there was nothing to tell apart.
+        --
+        -- Direction is normalised so magnitude cannot disguise a duplicate. This fails on the OLD table
+        -- and passes on the new one, which is the only property worth having here.
+        local seen = {}
+        for _, family in ipairs(Ont.FAMILIES) do
+            if M.EXPRESSION[family] then
+                local key = M.directionKey(family)
+                T.ok(key, family .. " has a direction")
+                T.ok(not seen[key], family .. " points somewhere no other family already points"
+                    .. (seen[key] and " (collides with " .. seen[key] .. ")" or ""))
+                seen[key] = family
+            end
+        end
+    end,
+
+    the_two_families_that_used_to_be_copies_now_trade_differently = function(T)
+        local M = H(T)
+        -- `transmission` and `drivetrain` are both drive-primary at almost the same magnitude. What
+        -- separates them is the SIGN of their second term, and that is a difference felt in a corner.
+        local gears = M.compose({ parts = { { id = "g", family = "transmission", effect = 1.40 } } })
+        local diff  = M.compose({ parts = { { id = "d", family = "drivetrain",   effect = 1.40 } } })
+        T.ok(gears.levers.driveScale > 1.0 and diff.levers.driveScale > 1.0, "both deliver more drive")
+        T.ok(gears.levers.brakeScale > 1.0, "shorter gearing brakes the engine on the overrun")
+        T.ok(near(gears.levers.gripScale, 1.0), "and costs no grip")
+        T.ok(diff.levers.gripScale < 1.0, "a tighter driveline costs turn-in")
+        T.ok(near(diff.levers.brakeScale, 1.0), "and does nothing for stopping")
+    end,
+
+    a_tyre_shortens_a_stop_because_braking_is_grip_limited = function(T)
+        local M = H(T)
+        -- The old table had `tires` not touching `brakeScale` at all. That is not a simplification, it is
+        -- wrong: tyres are most of a stopping distance.
+        local setup = M.compose({ parts = { { id = "t", family = "tires", effect = 1.30 } } })
+        T.ok(setup.levers.brakeScale > 1.0, "better tyres stop the car sooner")
+        T.ok(setup.levers.driveScale > 1.0, "and put power down better")
+        T.ok(setup.levers.gripScale > setup.levers.brakeScale,
+            "but cornering is still where a tyre does most of its work")
+    end,
+
+    -- ------------------------------------------------------------------ `L156`: the couplings
+    a_big_engine_on_stock_tyres_is_traction_limited = function(T)
+        local M = H(T)
+        local setup = M.compose({ parts = { { id = "big", family = "power_unit", effect = 2.00 } } })
+        T.eq(#setup.limited, 1, "the ceiling bit exactly once")
+        local entry = setup.limited[1]
+        T.eq(entry.coupling, "traction_ceiling")
+        T.eq(entry.lever, "driveScale")
+        T.eq(entry.from, "gripScale", "and it names the lever that set the ceiling")
+        T.ok(entry.wanted > entry.applied, "it reduced, and kept what the parts asked for")
+        T.ok(near(setup.levers.driveScale, entry.applied), "the applied value is the ceiling")
+        T.ok(setup.levers.driveScale < 1.35, "a 2.0 engine on stock rubber is worth far less than 2.0")
+        T.ok(#entry.headline > 10 and #entry.advice > 10,
+            "and says what happened and what to do about it, not just that a number moved")
+    end,
+
+    fitting_tyres_lifts_the_ceiling_the_engine_was_hitting = function(T)
+        local M = H(T)
+        -- **The emergent build, which is the whole point of the couplings.** The engine is unchanged; what
+        -- changes is whether the car can use it.
+        local alone = M.compose({ parts = { { id = "big", family = "power_unit", effect = 2.00 } } })
+        local shod  = M.compose({ parts = {
+            { id = "big", family = "power_unit", effect = 2.00 },
+            { id = "t",   family = "tires",      effect = 1.40 },
+        } })
+        T.ok(shod.levers.driveScale > alone.levers.driveScale,
+            "the same engine delivers more once the tyres can carry it")
+        T.ok(shod.levers.gripScale > alone.levers.gripScale, "and the car corners better too")
+    end,
+
+    a_ceiling_only_ever_reduces_and_never_invents_force = function(T)
+        local M = H(T)
+        -- Tyres raise the drive ceiling well above what is fitted. If a coupling could push UP,
+        -- `driveScale` would arrive there having bought no engine at all -- a buff in a physics costume.
+        local setup = M.compose({ parts = { { id = "t", family = "tires", effect = 1.40 } } })
+        T.eq(#setup.limited, 0, "nothing was limited")
+        T.ok(setup.levers.driveScale < 1.10,
+            "drive force still comes only from what was fitted, never from the headroom")
+        local ceilings = M.ceilings(setup.levers)
+        T.ok(ceilings.driveScale > setup.levers.driveScale,
+            "the headroom is real and unused, which is exactly the state a panel should show")
+    end,
+
+    a_brake_cannot_beat_the_tyre_it_acts_through = function(T)
+        local M = H(T)
+        local setup = M.compose({ parts = { { id = "b", family = "brakes", effect = 2.00 } } })
+        T.eq(#setup.limited, 1)
+        T.eq(setup.limited[1].coupling, "brake_grip_limit")
+        T.ok(setup.levers.brakeScale < 1.25, "past the tyre, a bigger disc locks up rather than stops")
+        local shod = M.compose({ parts = {
+            { id = "b", family = "brakes", effect = 2.00 },
+            { id = "t", family = "tires",  effect = 1.40 },
+        } })
+        T.ok(shod.levers.brakeScale > setup.levers.brakeScale, "and tyres are what lift it")
+    end,
+
+    a_coupling_can_never_push_a_lever_below_its_own_floor = function(T)
+        local M = H(T)
+        -- Asserted at load too, but stated here because the failure mode would be silent: a ceiling under
+        -- the clamp floor leaves a value neither rule asked for.
+        for _, coupling in ipairs(M.COUPLINGS) do
+            local worst = coupling.base + coupling.slope * M.LEVERS[coupling.from].min
+            T.ok(worst >= M.LEVERS[coupling.lever].min,
+                coupling.id .. " stays above " .. coupling.lever .. "'s floor even at minimum grip")
+        end
+    end,
+
+    the_ceilings_helper_answers_before_the_money_is_spent = function(T)
+        local M = H(T)
+        local stock = M.ceilings(M.clear("v1").levers)
+        T.ok(near(stock.driveScale, 1.30), "a stock-tyred car can absorb a modest engine and no more")
+        T.ok(near(stock.brakeScale, 1.20), "and a modest brake")
+        local grippy = M.ceilings({ gripScale = 1.50, driveScale = 1.0, brakeScale = 1.0 })
+        T.ok(grippy.driveScale > stock.driveScale and grippy.brakeScale > stock.brakeScale,
+            "every further increment of power has to be bought with grip")
+    end,
+
+    a_limit_is_visible_in_the_human_explanation = function(T)
+        local M = H(T)
+        local setup = M.compose({ parts = { { id = "big", family = "power_unit", effect = 2.00 } } })
+        T.match(M.explain(setup), "LIMITED",
+            "a silently limited setup is the same betrayal as a silently clamped one")
+        T.match(M.explain(setup), "traction_ceiling", "and it names which rule did it")
+    end,
+
+    describe_warns_which_ceiling_can_bite_this_family = function(T)
+        local M = H(T)
+        local engine = M.describe("power_unit")
+        T.eq(#engine.constrainedBy, 1, "an engine is traction-limited")
+        T.eq(engine.constrainedBy[1].coupling, "traction_ceiling")
+        T.ok(#engine.constrainedBy[1].advice > 10, "with the remedy, stated before the purchase")
+        local brakes = M.describe("brakes")
+        T.eq(brakes.constrainedBy[1].coupling, "brake_grip_limit")
+        T.eq(#M.describe("structure").constrainedBy, 1, "structure reaches brake, so it can be limited")
+    end,
+
+    the_couplings_do_not_depend_on_the_order_parts_arrive_in = function(T)
+        local M = H(T)
+        -- A build where a ceiling actually bites, which is the case that would break if the couplings
+        -- were folded into the per-part loop rather than applied once at the end.
+        local list = {
+            { id = "a", family = "power_unit", effect = 1.80 },
+            { id = "b", family = "tires", effect = 1.20 },
+            { id = "c", family = "aerodynamics", effect = 1.30 },
+            { id = "d", family = "drivetrain", effect = 1.15 },
+        }
+        local reversed = {}
+        for i = #list, 1, -1 do reversed[#reversed + 1] = list[i] end
+        local forward, backward = M.compose({ parts = list }), M.compose({ parts = reversed })
+        T.ok(#forward.limited > 0, "the ceiling really does bite in this build")
+        T.eq(M.signature(forward), M.signature(backward),
+            "so the couplings must be applied once on the product, not while walking the parts")
+        T.eq(#forward.limited, #backward.limited, "and report identically")
     end,
 }
