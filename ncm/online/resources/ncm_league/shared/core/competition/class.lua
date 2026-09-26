@@ -31,8 +31,15 @@ Core.define("competition.class", function(C)
         -- NCM does not expect to be fixed. The ceiling is the permanent answer, not a stopgap, and the owner set
         -- it at 355 after measuring the cliff live (2026-09-22). The taper rolls throttle off before the cliff
         -- rather than at it, so the car never reaches the failure point under power.
+        --
+        -- **DISABLED 2026-09-26 (`KB-144`): the RB15 was withdrawn over licensing and is no longer installed.**
+        -- This class was the ONLY producer of record ceilings, so `recordCeilings()` was publishing eleven
+        -- entries for records that do not exist on any client -- which is why, the moment the `KB-136`
+        -- transport was fixed, every client refused all eleven (154 attempts, zero applied). The ceilings
+        -- were not broken; their target was gone. The definition is kept rather than deleted because the
+        -- measurement behind it is real and would have to be redone if the car ever returns.
         { id = "ncx_rb15", name = "NCX Formula (RB15)", packId = "ncm_pack_ncx", topSpeedKph = 355, accelScale = 1.0, taperKph = 20,
-          records = rb15Records(), enabled = true },
+          records = rb15Records(), enabled = false },
         { id = "kart", name = "Kart Cup", packId = "ncm_pack_street", topSpeedKph = 120, accelScale = 1.0, taperKph = 8,
           records = {}, enabled = false },
     }

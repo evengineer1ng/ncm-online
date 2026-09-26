@@ -153,18 +153,46 @@ return {
     class_ceilings_are_published_per_record = function(T)
         -- D7: the ceiling was data with no caller for months -- `performance()` was right and nothing asked it.
         -- The host applies the governor per vehicle RECORD, so this is the shape it actually needs.
+        --
+        -- **REWRITTEN 2026-09-26 (`KB-144`).** This test previously asserted that the RB15 family IS capped,
+        -- and it was correct when written. The RB15 has since been withdrawn over licensing, the class is
+        -- disabled, and a ceiling naming records no client has would be a bug rather than a feature -- which
+        -- is exactly what it was: once `KB-136` let ceilings reach a client, all eleven were refused, 154
+        -- attempts, zero applied. So the assertion is inverted rather than deleted, because "a disabled class
+        -- publishes nothing" is the property that now has to hold.
         local K = T.Core.get("competition.class")
         local c = K.recordCeilings()
-        T.ok(c["Vehicle.v_sport1_rb15_f1"] ~= nil, "the base RB15 record is capped")
-        T.eq(c["Vehicle.v_sport1_rb15_f1"].topSpeedKph, 355)
-        T.ok(c["Vehicle.v_sport1_rb15_f1_kimiko"] ~= nil, "and every livery, or a liveried car outruns the field")
+
+        T.eq(c["Vehicle.v_sport1_rb15_f1"], nil, "a disabled class publishes no ceiling for its records")
+        T.eq(c["Vehicle.v_sport1_rb15_f1_kimiko"], nil, "and none for its liveries either")
         T.eq(c["Vehicle.anything"], nil, "an open class caps nothing: it has no ceiling and no record list")
-        local n = 0
-        for _ in pairs(c) do n = n + 1 end
-        T.ok(n >= 11, "the whole RB15 family is covered, not just the base record")
+
+        -- The general rule, which is what actually protects the next class somebody enables: never publish a
+        -- ceiling that is not a real cap, and never let the governor be asked to scale throttle UP.
         for record, prof in pairs(c) do
             T.ok(prof.topSpeedKph > 0, "a published ceiling is always a real cap: " .. record)
             T.ok(prof.accelerationScale <= 1.0, "the governor only ever scales throttle down, never up")
+        end
+    end,
+
+    a_disabled_class_keeps_its_definition_but_publishes_nothing = function(T)
+        -- `KB-144`: the measurement behind the RB15 ceiling (355 km/h, taper 20, measured live on
+        -- 2026-09-22) is real and expensive, so disabling the class must not erase it. If the car ever
+        -- returns, flipping one flag has to be enough.
+        local K = T.Core.get("competition.class")
+        local rb15 = K.byId("ncx_rb15")
+        T.ok(rb15 ~= nil, "the definition survives the car being withdrawn")
+        T.eq(rb15.enabled, false, "but it is disabled")
+        T.eq(rb15.topSpeedKph, 355, "and the measured ceiling is still recorded")
+
+        -- `performance()` still DESCRIBES the class -- that is the surviving measurement and asking for it
+        -- is not the same as applying it. The gate on publication lives in `recordCeilings()`, which is the
+        -- only thing a client ever sees. Keeping the two apart is what lets a withdrawn car be restored by
+        -- flipping one flag instead of re-measuring a cliff.
+        T.ok(K.performance("ncx_rb15") ~= nil, "the profile is still describable")
+        local published = K.recordCeilings()
+        for _, record in ipairs(rb15.records) do
+            T.eq(published[record], nil, "but nothing is published for " .. record)
         end
     end,
 

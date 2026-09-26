@@ -1830,3 +1830,56 @@ what the ontology now carries is not an effect but an honest statement of *wheth
 **Basis.** `parts.ontology` reuses `engineering.competency.FAMILIES` rather than declaring a second list of
 twelve, derives the record channel from `machine.flats` rather than restating it, and refuses at load if
 either authority disagrees. Seventeen tests, green under Lua 5.4 and LuaJIT.
+
+## L151 - EXECUTED - the force channel is general, and the write widens from one lever to four
+
+**Decided 2026-09-26, on the owner's direct challenge:** *"why did we get the grip through c++ fields if we
+weren't going to actually use that methodology for more?"* The challenge was correct and this line records
+why, because the reasoning it corrected was mine.
+
+**What was wrong.** After `§AV`, NCM's capability was summarised as *one* live lever -- vehicle-level lateral
+grip -- and a list of things that "cannot" be done. That list conflated **one mechanism tried and refuted**
+with **never attempted**. Only one item on it was actually proven: scaling the existing per-corner
+normal-load entries does not change lateral capability (`§AV2`). Everything else was untested. In particular
+*"two drivers in the same car model cannot feel different"* is true of the **record** channel and has never
+been true of the **instance** channel -- which is the one `L148` opened.
+
+**The correction, stated plainly.** `gripScale` was never "the lateral lever". It was the smallest possible
+demonstration of a general mechanism: **intercept the force the solver is about to apply, decompose it,
+scale a component, write it back.** The along-travel component sat untouched in the same expression from the
+first day. So:
+
+| lever | acts on | expresses |
+|---|---|---|
+| `gripScale` | across-travel component | tyre grip (already proven, `§AU5`) |
+| `driveScale` | along-travel, when pushing | power delivery |
+| `brakeScale` | along-travel, when retarding | braking |
+| `rollBias` | left/right normal load, zero-sum | roll stiffness, anti-roll feel |
+
+Drive and brake are separate multipliers because they are separate Part families; one number could not
+express a car that gains power without gaining stopping ability.
+
+**`rollBias` is the axis `§AV2` never tested.** That experiment moved load front-to-rear and found no change
+in *grip*, which is why load redistribution is dead as a grip lever. It says nothing about left/right and
+nothing about **attitude** -- and `§AU3` separately observed that scaling these entries makes a car sag into
+its suspension, so they demonstrably do move the body. Roll is what an anti-roll bar is for. Expect a change
+in how the car leans and, on `§AV2`'s evidence, expect no change in how much grip it has. Those are
+different claims and the build is instrumented to tell them apart rather than to hope.
+
+**The authorisation.** `L148`'s five properties are unchanged and every new lever holds all five: stateless
+and recomputed from the game's own value each call; exactly reversible at the inert value because the
+reconstruction *is* the decomposition; inert by default and the default ships; bounded and clamped, with the
+clamp logged; scoped to the latched player vehicle under SEH, one fault disabling writes for the session.
+`L148` authorised the lateral component specifically, so this line extends that authorisation to the three
+new levers **under the same five properties and no others**.
+
+**Still not authorised, and not by this line.** Input-command authority (`KB-135`) -- throttle, brake and
+steer remain the driver's. And calling engine functions rather than writing fields: `ApplyForceAtPosition`
+(`611586815`), `ApplyTorqueAtPosition` (`3303544265`), `ApplyAirResistance` (`3489929719`) and
+`ApplyLowSpeedResistances` (`1695226878`) are all confirmed present in this build's address table, and they
+are the route to true per-corner forces and direct yaw authority -- but **their signatures are not
+established**, LTBF's headers expose only getters, and calling a function with hand-built arguments is not
+reversible the way writing a float back is. That needs its own recon step and its own decision line.
+
+**Basis.** The same interception point, classifier and SEH harness proven across Carrier 0.1.2-0.1.14 and
+live on Production. Shipped in 0.1.15.

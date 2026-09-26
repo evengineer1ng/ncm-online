@@ -5,29 +5,37 @@
 
 Last rewritten: **2026-09-26 - Parts layers 1-3 built (`L150`); the `KB-136` discriminator and the architecture dump are built and awaiting one drive.**
 
-> **Claim before writing:** decisions through **L150**; MASTER_TEST through **§AV**; next QA letter **§AW**.
-> BACKLOG next free **IDEA-511**; known issues through **KB-145** plus pre-existing duplicate labels noted by
+> **Claim before writing:** decisions through **L151**; MASTER_TEST through **§AV**; next QA letter **§AW**.
+> BACKLOG next free **IDEA-512**; known issues through **KB-145** plus pre-existing duplicate labels noted by
 > `KB-114`. Read the ledger tails before allocating an ID.
 
 ## One next action
 
-**Settle `KB-145` by reading NCM's own single-player mod, then re-running the dump against the vehicle
-record (`IDEA-508`).** Seven of the twenty-one flats `machine.flats` is prepared to write do not resolve on
-this build - including `lateral_grip` / `.frictionMulLateral`, which the vocabulary itself calls *"the grip
-field"*, and **four graded `ncm_sp`**, meaning NCM's own single-player mod is believed to have written them
-for months.
+**Drive Carrier 0.1.15 and find out whether three new levers are real.** Built, gated, committed, not yet
+published. `L151` widens the proven force interception from one quantity to four, all per-instance and
+therefore **per-player on a shared model** - which is the constraint that had been written off as immovable.
 
-Four flats cannot be both proven-in-production and non-existent, so one of two things is true: they live on
-a different parent record (the vehicle record, or nested in `wheelSetup`/`FrontPreset`/`BackPreset`), or the
-`ncm_sp` grade was inherited rather than verified. **Read `ncm-localized/.../MT_Ecosystem/modules/tuning.lua`
-first** - it is NCM's own code and already knows the answer, which makes this a reading task before it is a
-probing one.
+Set these in `ncm_carrier.json` (written automatically, hot-reloaded mid-session, 1.0/0.0 is inert):
 
-**Why this is the next thing and not Parts.** `IDEA-505` says a Part declares the channel its felt effect
-terminates in, and `parts.ontology` derives the record channel straight from `machine.flats`. Seven wrong
-entries there means `expression()` is currently confident about families it should not be - the tyres family
-in particular, whose headline flat does not resolve. **Building Parts on that would put the error into the
-Part definitions rather than leaving it in one vocabulary file.**
+| key | range | inert | what to feel for |
+|---|---|---|---|
+| `gripScale` | 0.3 - 1.5 | 1.0 | already proven |
+| `driveScale` | 0.3 - 2.0 | 1.0 | acceleration, without touching grip |
+| `brakeScale` | 0.3 - 2.0 | 1.0 | stopping power, without touching grip |
+| `rollBias` | -0.3 - 0.3 | 0.0 | how the car LEANS. positive loads the left |
+
+**Suggested order, one at a time, returning to inert between each:** `driveScale 0.5` then `1.5` on a
+straight; `brakeScale 0.5` from speed; `rollBias 0.25` through a constant-radius corner both ways.
+
+**What `rollBias` is actually testing.** §AV2 moved load front-to-rear and found no grip change, which killed
+load redistribution as a *grip* lever. It never tested left/right, and it says nothing about *attitude* -
+§AU3 saw these same entries make a car sag, so they do move the body. **Expect a change in lean, and expect
+no change in grip.** If the car leans differently, anti-roll is expressible and the suspension family has a
+real channel. If nothing happens at all, the normal-load entries are dead for every purpose and that is
+worth knowing once rather than suspecting forever.
+
+**The honest caveat:** `driveScale` and `brakeScale` are near-certain (the longitudinal component is measured,
+signed, and already decomposed every frame). `rollBias` is the speculative one.
 
 ## Production live state
 

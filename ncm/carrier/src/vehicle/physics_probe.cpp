@@ -374,6 +374,42 @@ void resetRegression()
 std::atomic<float> g_axleBias{0.0f};       // + moves load to the front axle
 std::atomic<float> g_axleFrontSum{0.0f};   // last complete run, corners 0+1
 std::atomic<float> g_axleRearSum{0.0f};    // last complete run, corners 2+3
+std::atomic<float> g_leftSum{0.0f};        // last complete run, corners 0+3 (FL, RL)
+std::atomic<float> g_rightSum{0.0f};       // last complete run, corners 1+2 (FR, RR)
+
+// ---------------------------------------------------------------------------------------------------
+// THE CHANNEL IS NOT ONE QUANTITY. Widening the proven write from lateral grip to four levers.
+// ---------------------------------------------------------------------------------------------------
+//
+// `gripScale` was the smallest possible demonstration that a horizontal force entry can be decomposed
+// against travel, one component scaled, and the vector put back -- statelessly, reversibly, on the player's
+// car only. **The along-travel component was sitting untouched in the same expression the whole time.**
+//
+//   `driveScale`  scales longitudinal force when it is PUSHING  -> power delivery, per player, live
+//   `brakeScale`  scales longitudinal force when it is RETARDING -> braking, per player, live
+//   `rollBias`    shifts normal load LEFT/RIGHT, zero-sum        -> roll stiffness / anti-roll feel
+//
+// Drive and brake are deliberately separate multipliers rather than one `longScale`. They belong to
+// different Part families -- an engine and a set of pads -- and a single number could not express a car that
+// gains power without gaining stopping ability, which is most of the interesting ones.
+//
+// **`rollBias` is the left/right axis `§AV2` never tested.** That experiment moved load front-to-rear and
+// found no change in lateral capability, which killed load redistribution as a GRIP lever. It did not test
+// left/right, and it does not speak to ATTITUDE at all -- `§AU3` separately observed that scaling these
+// entries makes a car sag into its suspension, so they demonstrably do move the body. Roll is what an
+// anti-roll bar is for, and this is the axis that would express it. Expect a change in how the car LEANS,
+// and on the evidence of `§AV2` expect no change in how much grip it has. Those are different claims and
+// this is built to tell them apart rather than to hope.
+//
+// Every one of these inherits `L148`'s five properties unchanged -- stateless, exactly reversible at the
+// inert value, inert by default, bounded, and scoped to the latched player vehicle under SEH.
+constexpr float kDriveScaleMin = 0.30f, kDriveScaleMax = 2.00f;
+constexpr float kBrakeScaleMin = 0.30f, kBrakeScaleMax = 2.00f;
+constexpr float kRollBiasMax = 0.30f;
+
+std::atomic<float> g_driveScale{kGripScaleInert};
+std::atomic<float> g_brakeScale{kGripScaleInert};
+std::atomic<float> g_rollBias{0.0f};
 
 /// A wheel entry's horizontal pair is the geometric projection of its own normal load -- proven, by the
 /// ratio holding constant across all four corners in every sample. So a load shift scales all three
@@ -646,6 +682,11 @@ void observe(void* body) noexcept
                     // Axle totals for the next run's load shift. One frame stale by construction.
                     g_axleFrontSum.store(t_wheelZ[0] + t_wheelZ[1], std::memory_order_relaxed);
                     g_axleRearSum.store(t_wheelZ[2] + t_wheelZ[3], std::memory_order_relaxed);
+                    // Corner ordering is a RING -- FL, FR, RR, RL -- proven across two cars in §AU3, so
+                    // left is 0+3 and right is 1+2. Row-major intuition gets this wrong, which is exactly
+                    // the mistake the ring ordering was established to prevent.
+                    g_leftSum.store(t_wheelZ[0] + t_wheelZ[3], std::memory_order_relaxed);
+                    g_rightSum.store(t_wheelZ[1] + t_wheelZ[2], std::memory_order_relaxed);
                     for (uint32_t w = 0; w < kWheelCount; ++w) {
                         g_cornerZ[w].store(t_wheelZ[w], std::memory_order_relaxed);
                         g_cornerXY[w].store(t_wheelXY[w], std::memory_order_relaxed);
@@ -678,22 +719,52 @@ void observe(void* body) noexcept
                     }
                     ++t_wheelRun;
 
-                    // ------------------------------------------------------- TEST 3, the axle load shift
+                    // --------------------------------------------- normal-load redistribution, two axes
+                    //
+                    // Front/rear (`axleLoadBias`, §AV2 -- NEGATIVE for grip) and left/right (`rollBias`,
+                    // never tested). Both zero-sum, so the four corners still sum to the negation of
+                    // gravity and the residual line stays the built-in check that they do.
+                    //
+                    // The two multiply rather than being applied in sequence, so a car can be asked for
+                    // front bias AND left bias at once and the arithmetic stays one write per entry.
                     const float bias = g_axleBias.load(std::memory_order_relaxed);
+                    const float roll = g_rollBias.load(std::memory_order_relaxed);
+                    const bool wantAxle = std::fabs(bias) > kGripScaleEpsilon;
+                    const bool wantRoll = std::fabs(roll) > kGripScaleEpsilon;
                     if (corner < kWheelCount && g_writesEnabled.load(std::memory_order_relaxed) &&
-                        std::fabs(bias) > kGripScaleEpsilon) {
+                        (wantAxle || wantRoll)) {
                         const float front = g_axleFrontSum.load(std::memory_order_relaxed);
                         const float rear = g_axleRearSum.load(std::memory_order_relaxed);
-                        // No axle totals yet, or a car in the air: no basis to size the shift from.
-                        if (front > 1.0f && rear > 1.0f) {
-                            // Front gains bias x front; rear must lose exactly that, which is a different
-                            // multiplier because the axles do not carry equal load (measured ~60/40).
-                            float scale;
-                            if (corner < 2) {
-                                scale = 1.0f + bias;
-                            } else {
-                                scale = 1.0f - (bias * front) / rear;
-                                if (scale < kRearScaleFloor) scale = kRearScaleFloor;
+                        const float left = g_leftSum.load(std::memory_order_relaxed);
+                        const float right = g_rightSum.load(std::memory_order_relaxed);
+                        // No totals yet, or a car in the air: no basis to size the shift from.
+                        const bool axleOk = front > 1.0f && rear > 1.0f;
+                        const bool rollOk = left > 1.0f && right > 1.0f;
+                        if ((wantAxle ? axleOk : true) && (wantRoll ? rollOk : true) &&
+                            (axleOk || rollOk)) {
+                            float scale = 1.0f;
+                            if (wantAxle && axleOk) {
+                                // Front gains bias x front; rear must lose exactly that, which is a
+                                // different multiplier because the axles do not carry equal load (~60/40).
+                                if (corner < 2) {
+                                    scale *= 1.0f + bias;
+                                } else {
+                                    float rearScale = 1.0f - (bias * front) / rear;
+                                    if (rearScale < kRearScaleFloor) rearScale = kRearScaleFloor;
+                                    scale *= rearScale;
+                                }
+                            }
+                            if (wantRoll && rollOk) {
+                                // Left is corners 0 and 3; right is 1 and 2. Same zero-sum arithmetic
+                                // against the side totals rather than the axle totals.
+                                const bool isLeft = (corner == 0 || corner == 3);
+                                if (isLeft) {
+                                    scale *= 1.0f + roll;
+                                } else {
+                                    float rightScale = 1.0f - (roll * left) / right;
+                                    if (rightScale < kRearScaleFloor) rightScale = kRearScaleFloor;
+                                    scale *= rightScale;
+                                }
                             }
                             if (writeForceXYZ(body, force[0] * scale, force[1] * scale,
                                               force[2] * scale)) {
@@ -736,14 +807,31 @@ void observe(void* body) noexcept
                     notePeak(g_latPeak, latAbs);
 
                     // ------------------------------------------------------------------- THE WRITE
+                    //
+                    // Three levers on one decomposition. `gripScale` acts across travel; `driveScale` and
+                    // `brakeScale` act along it, chosen by the SIGN of the longitudinal component -- which
+                    // §AU4 established inverts under braking and even resolves a tapped throttle as
+                    // alternating per-second signs, so the sign is a measured discriminator and not an
+                    // assumption.
                     const float k = g_gripScale.load(std::memory_order_relaxed);
+                    const float kDrive = g_driveScale.load(std::memory_order_relaxed);
+                    const float kBrake = g_brakeScale.load(std::memory_order_relaxed);
+                    const bool wantGrip  = std::fabs(k - kGripScaleInert) > kGripScaleEpsilon;
+                    const bool wantDrive = std::fabs(kDrive - kGripScaleInert) > kGripScaleEpsilon;
+                    const bool wantBrake = std::fabs(kBrake - kGripScaleInert) > kGripScaleEpsilon;
                     if (g_writesEnabled.load(std::memory_order_relaxed) &&
-                        std::fabs(k - kGripScaleInert) > kGripScaleEpsilon) {
-                        const float scaledLateral = lateral * k;
-                        // long*dir + lat*perp, with perp = (-dirY, dirX). At k = 1 this is the vector we
-                        // just took apart, put back together.
-                        const float newX = longitudinal * dirX + scaledLateral * -dirY;
-                        const float newY = longitudinal * dirY + scaledLateral * dirX;
+                        (wantGrip || wantDrive || wantBrake)) {
+                        const float scaledLateral = wantGrip ? lateral * k : lateral;
+                        float scaledLong = longitudinal;
+                        if (longitudinal > 0.0f) {
+                            if (wantDrive) scaledLong *= kDrive;
+                        } else if (wantBrake) {
+                            scaledLong *= kBrake;
+                        }
+                        // long*dir + lat*perp, with perp = (-dirY, dirX). With every multiplier at 1 this
+                        // is the vector we just took apart, put back together, identically.
+                        const float newX = scaledLong * dirX + scaledLateral * -dirY;
+                        const float newY = scaledLong * dirY + scaledLateral * dirX;
                         if (writeForceXY(body, newX, newY)) {
                             g_writes.fetch_add(1, std::memory_order_relaxed);
                         } else {
@@ -1205,6 +1293,49 @@ void refreshGripScale()
             in >> j;
             wanted = j.value("gripScale", kGripScaleInert);
             g_diagnostics.store(j.value("diagnostics", true), std::memory_order_relaxed);
+            // ---------------------------------------------------------- the three new levers
+            // Same discipline as `gripScale`: clamp on the way in, announce only on change, and say in the
+            // log whether the value is doing anything. A lever that is silently inert is how §AV2 came to
+            // be driven three times without ever running (`KB-142`).
+            auto readScale = [&j](const char* key, float lo, float hi) {
+                float v = j.value(key, kGripScaleInert);
+                if (!std::isfinite(v)) return kGripScaleInert;
+                return v < lo ? lo : (v > hi ? hi : v);
+            };
+
+            const float drive = readScale("driveScale", kDriveScaleMin, kDriveScaleMax);
+            const float previousDrive = g_driveScale.load(std::memory_order_relaxed);
+            if (std::fabs(drive - previousDrive) > kGripScaleEpsilon) {
+                g_driveScale.store(drive, std::memory_order_relaxed);
+                NCM_INFO("driveScale %.2f -> %.2f (%s)", static_cast<double>(previousDrive),
+                         static_cast<double>(drive),
+                         std::fabs(drive - kGripScaleInert) > kGripScaleEpsilon
+                             ? "SCALING longitudinal force under power" : "inert");
+            }
+
+            const float brake = readScale("brakeScale", kBrakeScaleMin, kBrakeScaleMax);
+            const float previousBrake = g_brakeScale.load(std::memory_order_relaxed);
+            if (std::fabs(brake - previousBrake) > kGripScaleEpsilon) {
+                g_brakeScale.store(brake, std::memory_order_relaxed);
+                NCM_INFO("brakeScale %.2f -> %.2f (%s)", static_cast<double>(previousBrake),
+                         static_cast<double>(brake),
+                         std::fabs(brake - kGripScaleInert) > kGripScaleEpsilon
+                             ? "SCALING longitudinal force under braking" : "inert");
+            }
+
+            float roll = j.value("rollBias", 0.0f);
+            if (!std::isfinite(roll)) roll = 0.0f;
+            if (roll < -kRollBiasMax) roll = -kRollBiasMax;
+            if (roll > kRollBiasMax) roll = kRollBiasMax;
+            const float previousRoll = g_rollBias.load(std::memory_order_relaxed);
+            if (std::fabs(roll - previousRoll) > kGripScaleEpsilon) {
+                g_rollBias.store(roll, std::memory_order_relaxed);
+                NCM_INFO("rollBias %+.2f -> %+.2f (%s)", static_cast<double>(previousRoll),
+                         static_cast<double>(roll),
+                         std::fabs(roll) > kGripScaleEpsilon
+                             ? "SHIFTING load left/right, zero-sum" : "inert");
+            }
+
             float bias = j.value("axleLoadBias", 0.0f);
             if (!std::isfinite(bias)) bias = 0.0f;
             if (bias < -kAxleBiasMax) bias = -kAxleBiasMax;
@@ -1371,6 +1502,9 @@ bool attach(void* pluginHandle, const void* sdkOpaque, const std::wstring& dllDi
                 in.close();
                 if (j.is_object()) {
                     if (!j.contains("gripScale")) { j["gripScale"] = 1.0; merged = true; }
+                    if (!j.contains("driveScale")) { j["driveScale"] = 1.0; merged = true; }
+                    if (!j.contains("brakeScale")) { j["brakeScale"] = 1.0; merged = true; }
+                    if (!j.contains("rollBias")) { j["rollBias"] = 0.0; merged = true; }
                     if (!j.contains("axleLoadBias")) { j["axleLoadBias"] = 0.0; merged = true; }
                     if (!j.contains("diagnostics")) { j["diagnostics"] = true; merged = true; }
                     if (merged) {
@@ -1395,6 +1529,15 @@ bool attach(void* pluginHandle, const void* sdkOpaque, const std::wstring& dllDi
                 out << "{\n"
                     << "  \"_comment\": \"Edited live: re-read once a second, no restart needed.\",\n"
                     << "  \"gripScale\": 1.0,\n"
+                    << "  \"driveScale\": 1.0,\n"
+                    << "  \"_driveScale\": \"longitudinal force under power, [0.3, 2.0]. "
+                       "1.0 is inert.\",\n"
+                    << "  \"brakeScale\": 1.0,\n"
+                    << "  \"_brakeScale\": \"longitudinal force under braking, [0.3, 2.0]. "
+                       "1.0 is inert.\",\n"
+                    << "  \"rollBias\": 0.0,\n"
+                    << "  \"_rollBias\": \"zero-sum left/right normal load, [-0.3, 0.3]. "
+                       "positive loads the LEFT. 0.0 is inert.\",\n"
                     << "  \"_gripScale\": \"lateral grip multiplier, clamped to [0.3, 1.5]. "
                        "1.0 is inert and writes nothing at all. Lower is a wet road, not a slow car -- "
                        "acceleration and braking are untouched.\",\n"
