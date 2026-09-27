@@ -3,6 +3,7 @@ NcmComponents={}
 local Cat=NcmCore.get("parts.catalogue")
 local Rnd=NcmCore.get("parts.rnd")
 local Handling=NcmCore.get("parts.handling")
+local Markets=NcmCore.get("economy.markets")
 local Json=NcmCore.get("vocabulary.json")
 local ids=NcmCore.get("vocabulary.ids")
 local hostRng=function() return math.random() end
@@ -82,6 +83,24 @@ function NcmComponents.factoryStatements(machineAssetId,vehicleKey,ownerId,creat
     return tx
 end
 
+-- The head of a Machine's configuration chain, or nil if it has none yet.
+--
+-- `machine_configuration` is append-only and `machine_configuration_current` is the single row that says
+-- which revision a Machine is running. Every caller that wanted this re-issued the SELECT inline, so the
+-- one question "what is this Machine configured as right now" had three spellings and no name.
+--
+-- It exists chiefly for `configuration_ref`, reserved unwritten on `session_result` (migration 024) and
+-- `vehicle_knowledge_evidence` (migration 028) because `31_CAPABILITY_AUDIT.md` section 6 proved there was
+-- no engine object to point at. Migration 031 built the NCM-authored record that section predicted; this is
+-- how the rest of the codebase reaches it.
+--
+-- **nil is a real answer** -- an unsupported Machine has no factory configuration -- and every caller must
+-- write NULL rather than substituting anything.
+function NcmComponents.currentConfiguration(machineAssetId)
+    if type(machineAssetId)~="string" or machineAssetId=="" then return nil end
+    return MySQL.scalar.await("SELECT configuration_id FROM machine_configuration_current WHERE machine_asset_id=?",{machineAssetId})
+end
+
 function NcmComponents.ensureMachine(machineAssetId,vehicleKey,ownerId,exposureM)
     if MySQL.scalar.await("SELECT configuration_id FROM machine_configuration_current WHERE machine_asset_id=?",{machineAssetId}) then return false,"already_configured" end
     if exposureM==nil then exposureM=MySQL.scalar.await("SELECT odometer_m FROM vehicle_asset WHERE asset_id=?",{machineAssetId}) end
@@ -121,11 +140,13 @@ local function allocate(d,n)
     local out={} for i=0,n-1 do out[#out+1]={global=g+i,maker=m+i,design=x+i} end return out
 end
 
-local function available(designId)
+-- How many unsold units of this Design one market is holding. On the READ path -- this is the
+-- "AVAILABLE n / ceiling" the player is shown -- so it takes the market rather than naming one.
+local function available(designId,marketId)
     return tonumber(MySQL.scalar.await([[SELECT COUNT(*) FROM component_market_inventory mi
       JOIN component_asset a ON a.asset_id=mi.asset_id
-      WHERE mi.market_id='base_market' AND mi.state='available' AND a.server_id=? AND a.design_id=?
-        AND a.ncm_driver_id IS NULL]],{serverId(),designId})) or 0
+      WHERE mi.market_id=? AND mi.state='available' AND a.server_id=? AND a.design_id=?
+        AND a.ncm_driver_id IS NULL]],{marketId or Markets.BASE_ID,serverId(),designId})) or 0
 end
 
 local function designFromRow(r)
@@ -232,24 +253,36 @@ function NcmComponents.start()
     CreateThread(function() Wait(12000) while true do local ok,e=pcall(NcmComponents.produce);if not ok then log("scheduler failed: %s",tostring(e)) end Wait(60000) end end)
 end
 
-function NcmComponents.marketOfferings(driverId,vehicleKeys)
+-- The components one MARKET is currently offering this driver.
+--
+-- `marketId` is a parameter and not a literal, which it used to be in both queries below. The vehicle half
+-- of this payload has always resolved stock through the driver's known-market set; the component half
+-- asked `base_market` by name, so the two halves of one screen disagreed about what a market is.
+--
+-- `17_MARKET_NETWORK.md` states the rule the literal broke: *"All query code must nevertheless accept a set
+-- of known/available marketIds; it must never call a singleton theShop or query all stock without market
+-- scope."* Nothing changes today -- Base Market is universally known, so every driver sees exactly what they
+-- saw before -- and that is the point: the second component market becomes authored data rather than a
+-- rewrite of this function and its caller.
+function NcmComponents.marketOfferings(driverId,marketId,vehicleKeys)
+    marketId=type(marketId)=="string" and marketId~="" and marketId or Markets.BASE_ID
     local rows=MySQL.query.await([[SELECT d.*,s.next_tick_at,s.batch,s.interval_sec
       FROM component_design d JOIN component_supply_state s ON s.design_id=d.design_id
-      WHERE s.server_id=? AND s.market_id='base_market' AND d.distribution='base' ORDER BY d.family,d.effect]],{serverId()}) or {}
+      WHERE s.server_id=? AND s.market_id=? AND d.distribution='base' ORDER BY d.family,d.effect]],{serverId(),marketId}) or {}
     local ownedKeys={}; for _,r in ipairs(MySQL.query.await("SELECT DISTINCT vehicle_key FROM vehicle_asset WHERE server_id=? AND ncm_driver_id=?",{serverId(),driverId}) or {}) do ownedKeys[#ownedKeys+1]=r.vehicle_key end
     local out={}
     for _,r in ipairs(rows) do local d=designFromRow(r); local s=Cat.SUPPLY[d.tier] or {ceiling=3}
         local nextAsset=MySQL.single.await([[SELECT a.asset_id,a.global_ordinal,a.maker_ordinal,a.design_ordinal,run.produced_at
           FROM component_market_inventory mi JOIN component_asset a ON a.asset_id=mi.asset_id
           LEFT JOIN component_manufacturing_run run ON run.run_id=a.run_id
-          WHERE mi.market_id='base_market' AND mi.state='available' AND a.server_id=? AND a.design_id=?
-          ORDER BY mi.listed_at,a.design_ordinal LIMIT 1]],{serverId(),d.designId})
+          WHERE mi.market_id=? AND mi.state='available' AND a.server_id=? AND a.design_id=?
+          ORDER BY mi.listed_at,a.design_ordinal LIMIT 1]],{marketId,serverId(),d.designId})
         local fit,ownedFit={},false
         for _,key in ipairs(vehicleKeys or Cat.STARTER_VEHICLES) do local x=Cat.resolve(d,key);fit[key]={compatible=x.compatible,reason=x.reason} end
         for _,key in ipairs(ownedKeys) do if Cat.resolve(d,key).compatible then ownedFit=true end end
-        d.available=available(d.designId);d.ceiling=s.ceiling;d.soldOut=d.available==0;d.nextBatch=tonumber(r.batch) or 0
+        d.available=available(d.designId,marketId);d.ceiling=s.ceiling;d.soldOut=d.available==0;d.nextBatch=tonumber(r.batch) or 0
         d.cadenceSec=tonumber(r.interval_sec);d.nextProductionAt=tonumber(r.next_tick_at);d.nextAsset=nextAsset
-        d.fitment=fit;d.ownedCompatible=ownedFit;out[#out+1]=d
+        d.fitment=fit;d.ownedCompatible=ownedFit;d.marketId=marketId;out[#out+1]=d
         local setup=Handling.compose({vehicle="market-preview",parts={{id=d.designId,family=d.family,effect=d.effect}}},{at=now()})
         if setup then d.projection={levers=setup.levers,topSpeedScale=setup.topSpeedScale,limited=setup.limited} end
     end
@@ -274,7 +307,13 @@ function NcmComponents.pushInventory(pid) local ok,p=pcall(NcmComponents.invento
 function NcmComponents.purchase(pid,marketId,assetId,idemKey)
     if not enabled() then return nil,"Parts economy is awaiting live QA." end
     local d=driver(pid);if not d then return nil,"no_driver" end
-    if marketId~="base_market" then return nil,"market_unknown" end
+    -- Knowledge and access, asked the same way the vehicle purchase asks them (`market.lua`), instead of
+    -- comparing the id to a literal. Identical behaviour while Base Market is the only market and everyone
+    -- knows it -- and it means restricted component distribution (`IDEA-298`) lands as authored data rather
+    -- than as a new branch here.
+    local access=NcmMarketKnowledge and NcmMarketKnowledge.state(d.ncmDriverId,marketId) or nil
+    if not access then return nil,"market_unknown" end
+    if not Markets.accessible(access.accessState) then return nil,"market_inaccessible" end
     local requestKey=tostring(idemKey or "");if requestKey=="" then requestKey=assetId end
     local t=now();local idem="component_purchase:"..serverId()..":"..requestKey
     local ok=MySQL.transaction.await({

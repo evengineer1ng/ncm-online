@@ -159,6 +159,9 @@ local function publish(rec, t)
         if sl then en.colour = sl.colour; en.number = sl.number; en.teamName = sl.teamName; en.teamShort = sl.teamShort end
     end
     v.serverNow = t
+    -- The route's IDENTITY, not just its name. A ghost is keyed by route, and `routeName` is a display string
+    -- that two routes may share; nothing client-side can recover the id from it.
+    v.routeId = rec.routeId
     v.routeName = rec.routeName
     v.seriesName = rec.seriesName
     v.slots = rec.slots
@@ -216,6 +219,7 @@ publishPractice = function(rec, t)
         en.toNextM = rec.toNext and rec.toNext[en.driverId] or nil
     end
     v.serverNow = t
+    v.routeId = rec.routeId
     v.routeName = rec.routeName
     v.seriesName = rec.seriesName
     v.formatId = "practice"
@@ -345,7 +349,11 @@ local function formSession(plan, spec, t, startsAt)
         s = Race.new({ sessionId = sessionId, eventId = e.eventId, startsAt = startsAt, gates = gates, entrants = specEntrants, rules = rules })
     end
     local rec = {
-        s = s, kernel = kernel, kind = kind, spec = spec, plan = plan, eventId = e.eventId, routeName = e.routeName, seriesName = e.seriesName,
+        -- `routeId` is the route's IDENTITY; `routeName` is a display string two routes may share. Only the
+        -- practice record carried the id, so anything keyed by route -- a ghost, a record, a leaderboard --
+        -- silently got nil from a race session. A time trial is a race, so it got nil too.
+        s = s, kernel = kernel, kind = kind, spec = spec, plan = plan, eventId = e.eventId,
+        routeId = e.routeId, routeName = e.routeName, seriesName = e.seriesName,
         organized = organized, disciplineId = e.disciplineId, course = course, slots = slots, slotOf = slotOf, playerOf = pmap,
         results = nil, completeReason = nil, doneAt = nil, lastPos = {}, toNext = {}, progressM = {}, correctedM = {},
         gridPoint = venueGrid(gates[1]) or { x = gates[1].x, y = gates[1].y, z = gates[1].z, heading = 0 },
@@ -439,6 +447,12 @@ local function machineFor(rec, driverId)
     return pid and seatedByPid[pid] or nil
 end
 
+--- Asset, basis, and the configuration that asset was in at GREEN. The third value fills
+--- `session_result.configuration_ref`, reserved unwritten since migration 024 because there was no record
+--- for it to name; migration 031 built one. It is latched, never read live -- see the GREEN handler.
+---
+--- All three degrade to unknown independently: a result may name a machine whose configuration was not
+--- readable, and that is a better row than one that guesses.
 local function attribution(rec, driverId)
     local assetId = machineFor(rec, driverId)
     local basis = assetId and "recorded" or "unknown"
@@ -446,9 +460,13 @@ local function attribution(rec, driverId)
     if not ok then
         -- Never write an attribution core refuses; record the gap and say why.
         log("attribution refused driver=%s: %s", tostring(driverId), tostring(why))
-        return "", "unknown"
+        return "", "unknown", ""
     end
-    return assetId or "", basis
+    -- Core validates the shape so a malformed id cannot reach a CHAR(36) column; a refusal means unknown,
+    -- and the empty string is the NULLIF sentinel the INSERTs already use.
+    local cfg = rec and rec.configOf and rec.configOf[driverId] or nil
+    if cfg ~= nil then cfg = NcmCore.get("competition.machine_knowledge").configurationRef(cfg) end
+    return assetId or "", basis, cfg or ""
 end
 
 -- Completion: persist, settle (zero eddies), announce
@@ -460,35 +478,24 @@ local function complete(rec, results, reason, t)
     local s = rec.s
     local plan = rec.plan
     plan.results[#plan.results + 1] = { kind = rec.kind, sessionId = s.sessionId, results = results }
-    pcall(function()
-        MySQL.update.await("UPDATE session SET state = 'complete', green_at = NULLIF(?, -1), completed_at = ?, complete_reason = ? WHERE session_id = ?",
-            { s.greenAt or -1, t, reason, s.sessionId })
-        for _, r in ipairs(results) do
-            local state = r.state
-            if state == "timed" then state = "finished" elseif state == "no_time" then state = "dns" end
-            MySQL.insert.await(
-                "INSERT INTO session_result (session_id, ncm_driver_id, entry_id, position, state, total_ms, penalty_ms, gap_ms, gates_done, gates_total, jump_start, dnf_reason, " ..
-                "corrected_ms, incident_ms, incident_count, best_ms, asset_id, attribution_basis) " ..
-                "VALUES (?, ?, NULLIF(?, ''), ?, ?, NULLIF(?, -1), ?, NULLIF(?, -1), ?, ?, ?, NULLIF(?, ''), NULLIF(?, -1), ?, ?, NULLIF(?, -1), NULLIF(?, ''), ?)",
-                { s.sessionId, r.driverId, r.entryId or "", r.position, state,
-                  r.totalSec and math.floor(r.totalSec * 1000) or -1, math.floor((r.penaltySec or 0) * 1000),
-                  r.gapSec and math.floor(r.gapSec * 1000) or -1, r.progress or 0, r.gatesTotal or 2, r.jumpStart and 1 or 0, r.dnfReason or "",
-                  r.correctedSec and math.floor(r.correctedSec * 1000) or -1, math.floor((r.incidentSec or 0) * 1000), r.incidentCount or 0,
-                  r.bestSec and math.floor(r.bestSec * 1000) or -1,
-                  attribution(rec, r.driverId) })
-            if r.entryId and rec.kind == "race" then
-                MySQL.update.await("UPDATE entry SET state = ? WHERE entry_id = ?", { r.state, r.entryId })
+    -- Economy v1 owns result + payout atomicity. Attribution is resolved here because race.lua owns the GREEN
+    -- latch; the money host receives explicit facts and never guesses which Machine produced a result.
+    for _, r in ipairs(results) do
+        r._assetId, r._basis, r._configurationRef = attribution(rec, r.driverId)
+    end
+    local settlements, settlementWhy = NcmEconomy.settle(rec, results, reason, t)
+    if not settlements then
+        log("ECONOMY SETTLEMENT FAILED session=%s: %s", s.sessionId, tostring(settlementWhy))
+        -- The operation is idempotent, so retry the complete transaction rather than writing compensations.
+        CreateThread(function()
+            for attempt = 1, 3 do
+                Wait(attempt * 1000)
+                local retry, why = NcmEconomy.settle(rec, results, reason, t)
+                if retry then settlements = retry; log("economy settlement recovered session=%s attempt=%d", s.sessionId, attempt); return end
+                log("economy retry failed session=%s attempt=%d: %s", s.sessionId, attempt, tostring(why))
             end
-            if rec.kind == "race" then
-                -- L21: the ledger exists from the first race; amounts are zero in the money-free world.
-                MySQL.insert.await(
-                    "INSERT INTO ledger (ncm_driver_id, server_id, kind, amount, ref, note) VALUES (?, ?, 'race_result', 0, ?, ?)",
-                    { r.driverId, serverId(), s.sessionId, ("%s %s %s%s"):format(
-                        (rec.kind == "race" and Core.get("driver.progression").isTimeTrial({ fieldSize = #results })) and "TT" or ("P" .. tostring(r.position)),
-                        r.state, rec.routeName or "", (r.incidentSec or 0) > 0 and (" +" .. r.incidentSec .. "s inc") or "") })
-            end
-        end
-    end)
+        end)
+    end
     if NcmTelemetry and NcmTelemetry.flush then pcall(NcmTelemetry.flush, rec, true) end
     if rec.kind == "race" then
         if NcmRecords and NcmRecords.refresh then pcall(NcmRecords.refresh) end
@@ -497,6 +504,49 @@ local function complete(rec, results, reason, t)
     -- L67 / IDEA-001: a race with a field of one is a TIME TRIAL. It is real, recorded and classified, but it is
     -- not won -- so it is never announced as a position. Core owns the predicate so host and rules agree.
     local timeTrial = (rec.kind == "race") and Core.get("driver.progression").isTimeTrial({ fieldSize = #results })
+    -- **A time trial gets a ghost; a contested race does not** (`L166`). A time trial IS the solo activity
+    -- practice is, under a different name and on the race kernel -- so the same rule applies to it. In a
+    -- contested race a ghost would be clutter among real competitors and could be read as another entrant,
+    -- which is the one presentation mistake this feature must not make.
+    --
+    -- Claimed at completion rather than at the finish gate because `timeTrial` is only knowable from the
+    -- finished field, and core owns that predicate. The client's buffer survives the end of its run, so an
+    -- invitation that arrives now still finds the poses.
+    if timeTrial and NcmGhost then
+        for _, r in ipairs(results) do
+            local pid = rec.playerOf and rec.playerOf[r.driverId] or nil
+            -- The machine was latched at GREEN, which is this session's start line; `attribution` reads that
+            -- latch rather than the seat now.
+            local assetId, _, configurationRef = attribution(rec, r.driverId)
+            -- **Refuse loudly rather than claim something unkeyable.** A claim with no route produced exactly
+            -- one symptom -- no ghost appeared - and the actual cause was a missing field three functions away.
+            -- The upload would have been refused by the manifest, but only if a client had recorded anything to
+            -- upload, and the same missing field stopped that too. So the refusal belongs here, first.
+            if r.state == "finished" and (rec.routeId == nil or rec.routeId == "") then
+                log("ghost NOT claimed for driver=%s: this session has no routeId (event=%s name=%s)",
+                    r.driverId, tostring(rec.eventId), tostring(rec.routeName))
+            elseif r.state == "finished" and r.finishAt and s.greenAt and pid then
+                NcmGhost.claim(r.driverId, {
+                    sessionId = s.sessionId, eventId = rec.eventId, routeId = rec.routeId or "",
+                    disciplineId = rec.disciplineId, rulesetId = rec.rulesetId, classId = rec.classId,
+                    laps = (rec.course and rec.course.laps) or 1,
+                    startedAt = s.greenAt, finishedAt = r.finishAt,
+                    elapsedMs = math.floor((r.totalSec or 0) * 1000),
+                    incidentMs = math.floor((r.incidentSec or 0) * 1000),
+                    rawMs = math.floor((r.finishAt - s.greenAt) * 1000),
+                    assetId = assetId ~= "" and assetId or nil,
+                    configurationRef = configurationRef ~= "" and configurationRef or nil,
+                    gatesDone = r.progress or 0, gatesTotal = r.gatesTotal or #s.gates,
+                })
+                TriggerClientEvent("ncm:ghost.invite", pid, {
+                    routeId = rec.routeId or "", elapsedMs = math.floor((r.totalSec or 0) * 1000),
+                    incidentMs = math.floor((r.incidentSec or 0) * 1000), kind = "time_trial",
+                })
+                log("time trial ghost invited driver=%s route=%s %dms", r.driverId, tostring(rec.routeId),
+                    math.floor((r.totalSec or 0) * 1000))
+            end
+        end
+    end
     local lines = {}
     for _, r in ipairs(results) do
         local what
@@ -539,16 +589,19 @@ local function complete(rec, results, reason, t)
         local pid = rec.playerOf[r.driverId]
         if pid then
             tell(pid, ("%s: %s · %s — %s"):format(rec.kind == "race" and "Result" or (rec.kind == "quali" and "Qualifying" or "Practice"), rec.seriesName or "", rec.routeName or "", lines[r.position]))
+            local receipt = settlements and settlements[r.driverId] or nil
+            if receipt then tell(pid, "Statement: " .. receipt.text .. " · BALANCE €$" .. tostring(receipt.balance)) end
             toast(pid, {
                 type = r.position == 1 and (r.state == "finished" or r.state == "timed") and "success" or "info",
-                title = ("%s · P%d of %d"):format(rec.kind == "race" and "RESULT" or string.upper(rec.kind), r.position, #results),
-                message = (rec.routeName or "") .. " · " .. ((r.state == "finished" or r.state == "timed") and fmtTime(r.correctedSec or r.totalSec or r.bestSec) or string.upper(r.state)),
+                title = timeTrial and "TIME TRIAL COMPLETE" or (("%s · P%d of %d"):format(rec.kind == "race" and "RESULT" or string.upper(rec.kind), r.position, #results)),
+                message = (receipt and ((receipt.net >= 0 and "+€$" or "-€$") .. math.abs(receipt.net) .. " · balance €$" .. receipt.balance))
+                    or ((rec.routeName or "") .. " · " .. ((r.state == "finished" or r.state == "timed") and fmtTime(r.correctedSec or r.totalSec or r.bestSec) or string.upper(r.state))),
                 icon = "NCM", durationMs = 15000,
             })
             if rec.kind == "race" then
                 pcall(function()
                     local bag = Open77.state.player(pid)
-                    bag:set("ncmResult", { sessionId = s.sessionId, position = r.position, of = #results, state = r.state, totalSec = r.totalSec, correctedSec = r.correctedSec, incidentSec = r.incidentSec, gapSec = r.gapSec, routeName = rec.routeName, at = t })
+                    bag:set("ncmResult", { sessionId = s.sessionId, position = r.position, of = #results, state = r.state, totalSec = r.totalSec, correctedSec = r.correctedSec, incidentSec = r.incidentSec, gapSec = r.gapSec, routeName = rec.routeName, settlement = receipt, at = t })
                     if not nextSpec then pcall(function() bag:clear("ncmEntry") end) end
                 end)
             end
@@ -587,13 +640,27 @@ local function handle(rec, events, t)
             -- Latch the machine each driver actually went racing in. At GREEN rather than at settlement,
             -- because the car is guaranteed to be under them here and may not be afterwards.
             rec.machineOf = {}
-            local named, anon = 0, 0
+            -- The CONFIGURATION each machine raced in, latched in the same breath and for the same reason.
+            -- `machine_configuration` is an append-only revision chain and `machine_configuration_current`
+            -- moves the moment a part is fitted, so reading the head at settlement would attribute the race
+            -- to whatever the car became afterwards. The question this column answers is *what was it when
+            -- it set that time*, and this is the only moment that can be known.
+            rec.configOf = {}
+            local named, anon, configured = 0, 0, 0
             for driverId, pid in pairs(rec.playerOf or {}) do
                 local assetId = seatedByPid[pid]
                 rec.machineOf[driverId] = assetId
                 if assetId then named = named + 1 else anon = anon + 1 end
+                if assetId and NcmComponents and NcmComponents.currentConfiguration then
+                    local ok, cfg = pcall(NcmComponents.currentConfiguration, assetId)
+                    -- A failed read leaves this UNKNOWN. It must never fall through to another machine's
+                    -- configuration or to the current head.
+                    rec.configOf[driverId] = ok and cfg or nil
+                    if rec.configOf[driverId] then configured = configured + 1 end
+                end
             end
-            log("session=%s machines at green: %d attributed, %d unknown", s.sessionId, named, anon)
+            log("session=%s machines at green: %d attributed, %d unknown, %d with a configuration",
+                s.sessionId, named, anon, configured)
             -- Deferred by one tick so the kernel is not re-entered while it is still emitting green.
             CreateThread(function() Wait(0); pcall(NcmRace.enforceEnteredMachine, rec, t) end)
         elseif e.type == "dns" then
@@ -1032,6 +1099,10 @@ function NcmRace.abortEvent(eventId, reason)
         end
     end
     if plan then retirePlan(plan, reason or "aborted") end
+    if NcmEconomy and NcmEconomy.refundEvent then
+        local ok, refunded = pcall(NcmEconomy.refundEvent, eventId, reason or "aborted")
+        if ok and (refunded or 0) > 0 then log("refunded %d paid entr(ies) for aborted event=%s", refunded, eventId) end
+    end
     clearPublication()
     byEvent[eventId] = "done"
     return n
@@ -1066,6 +1137,7 @@ function NcmRace.abort(reason)
             local events = rec.kernel.abort(rec.s, now(), reason or "aborted")
             if events then handle(rec, events, now()); publish(rec, now()); n = n + 1 end
             rec.nextSpec = nil   -- an abort ends the whole plan
+            if NcmEconomy and NcmEconomy.refundEvent then pcall(NcmEconomy.refundEvent, rec.eventId, reason or "aborted") end
         end
     end
     return n
@@ -1094,8 +1166,28 @@ end
 -- ---------------------------------------------------------------------------------------------
 --- One gate crossing, whoever saw it: the client's own detection (ncm:gate) or the server's telemetry stream
 --- (NcmRace.streamGate). `source` names the witness in the log; the kernel decides with the position given.
+--- The machine under this driver right now, with the configuration it is in, as a fact the kernel can latch.
+---
+--- Read at the START LINE for a timed run. `machineFor` on its own answers "the latch, or the seat right now",
+--- and for practice there is no latch -- so without this the car was only ever read when the SESSION closed,
+--- and a driver who left practice, refitted and came back had their lap credited to the wrong machine.
+local function machineNow(rec, driverId)
+    local assetId = machineFor(rec, driverId)
+    if not assetId then return nil end
+    local cfg = nil
+    if NcmComponents and NcmComponents.currentConfiguration then
+        local ok, c = pcall(NcmComponents.currentConfiguration, assetId)
+        -- A failed read leaves the configuration UNKNOWN; it must never fall through to another machine's.
+        if ok then cfg = c end
+    end
+    local ref = nil
+    if cfg ~= nil then ref = NcmCore.get("competition.machine_knowledge").configurationRef(cfg) end
+    return { assetId = assetId, configurationRef = ref }
+end
+
 function NcmRace.reportGate(rec, pid, driver, gateIndex, pos, t, source)
-    local res = rec.kernel.report(rec.s, { driverId = driver.ncmDriverId, gateIndex = tonumber(gateIndex), now = t, position = pos })
+    local res = rec.kernel.report(rec.s, { driverId = driver.ncmDriverId, gateIndex = tonumber(gateIndex), now = t, position = pos,
+        machine = machineNow(rec, driver.ncmDriverId) })
     if NcmScenario and NcmScenario.traced[driver.ncmDriverId] then
         log("TRACE gate report player=%d gate=%s via=%s pos=%s ok=%s %s", pid or -1, tostring(gateIndex), tostring(source), pos and ("%.1f,%.1f"):format(pos.x, pos.y) or "?", tostring(res.ok), tostring(res.reason or ""))
     end
@@ -1140,12 +1232,34 @@ function NcmRace.reportGate(rec, pid, driver, gateIndex, pos, t, source)
     elseif res.finished then
         toast(pid, { type = "success", title = "RUN " .. fmtTime(res.runSec), message = "best " .. fmtTime(res.bestSec), icon = "NCM", durationMs = 5000 })
         if rec.practice then
-            local r = rec.s.entrants[driver.ncmDriverId]
+            -- `incident_ms` used to read `r.run.incidentSec` HERE, one line after the kernel set `r.run = nil`
+            -- at the finish -- so it was written as 0 for every practice run ever recorded. The kernel now
+            -- returns the run's own incident time, which is the only place it still exists.
+            local incidentMs = math.floor((res.incidentSec or 0) * 1000)
+            local runMs = math.floor((res.runSec or 0) * 1000)
             pcall(function()
-                MySQL.insert.await("INSERT INTO practice_run (server_id, event_id, route_id, ncm_driver_id, session_id, run_ms, incident_ms, incident_count, at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                    { serverId(), rec.eventId, rec.routeId or "", driver.ncmDriverId, rec.s.sessionId, math.floor((res.runSec or 0) * 1000),
-                      math.floor(((r and r.run and r.run.incidentSec) or 0) * 1000), 0, math.floor(t) })
+                MySQL.insert.await("INSERT INTO practice_run (server_id, event_id, route_id, ncm_driver_id, session_id, run_started_at, run_finished_at, run_ms, incident_ms, incident_count, at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    { serverId(), rec.eventId, rec.routeId or "", driver.ncmDriverId, rec.s.sessionId,
+                      res.startedAt, res.finishedAt, runMs, incidentMs, 0, math.floor(t) })
             end)
+            -- What the SERVER saw, offered to the ghost host. The client may now upload the poses for this
+            -- lap and nothing else: every number a stored ghost carries comes from here, not from the client.
+            if NcmGhost and res.improved then
+                NcmGhost.claim(driver.ncmDriverId, {
+                    sessionId = rec.s.sessionId, eventId = rec.eventId, routeId = rec.routeId or "",
+                    disciplineId = rec.disciplineId, rulesetId = rec.rulesetId, classId = rec.classId,
+                    laps = 1, startedAt = res.startedAt, finishedAt = res.finishedAt,
+                    elapsedMs = runMs, incidentMs = incidentMs,
+                    rawMs = math.floor((res.rawSec or 0) * 1000),
+                    assetId = res.machine and res.machine.assetId or nil,
+                    configurationRef = res.machine and res.machine.configurationRef or nil,
+                    gatesDone = #rec.s.gates, gatesTotal = #rec.s.gates,
+                })
+                TriggerClientEvent("ncm:ghost.invite", pid, {
+                    routeId = rec.routeId or "", elapsedMs = runMs, incidentMs = incidentMs,
+                    record = res.machine and res.machine.assetId and NcmGhost.recordFor(res.machine.assetId) or nil,
+                })
+            end
             local board, timed, mine = Practice.leaderboard(rec.s), 0, nil
             for _, row in ipairs(board) do if row.timed then timed = timed + 1 end; if row.driverId == driver.ncmDriverId then mine = row end end
             if mine then tell(pid, ("Practice: P%d of %d timed · best %s · %d run(s). /ncm.practice for the board."):format(mine.position, timed, fmtTime(mine.bestSec), mine.runs or 0)) end
@@ -1254,7 +1368,7 @@ function NcmRace.practiceComplete(rec, results, reason, t)
         for _, r in ipairs(results) do
             if r.bestSec then
                 MySQL.insert.await(
-                    "INSERT INTO session_result (session_id, ncm_driver_id, entry_id, position, state, total_ms, penalty_ms, gates_done, gates_total, incident_ms, incident_count, best_ms, asset_id, attribution_basis) VALUES (?, ?, NULL, ?, 'finished', ?, 0, ?, ?, ?, ?, ?, NULLIF(?, ''), ?)",
+                    "INSERT INTO session_result (session_id, ncm_driver_id, entry_id, position, state, total_ms, penalty_ms, gates_done, gates_total, incident_ms, incident_count, best_ms, asset_id, attribution_basis, configuration_ref) VALUES (?, ?, NULL, ?, 'finished', ?, 0, ?, ?, ?, ?, ?, NULLIF(?, ''), ?, NULLIF(?, ''))",
                     { rec.s.sessionId, r.driverId, r.position, math.floor(r.bestSec * 1000), r.gatesTotal or 2, r.gatesTotal or 2,
                       math.floor((r.incidentSec or 0) * 1000), r.incidentCount or 0, math.floor(r.bestSec * 1000),
                       attribution(rec, r.driverId) })

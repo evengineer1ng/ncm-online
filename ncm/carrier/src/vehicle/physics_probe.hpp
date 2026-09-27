@@ -88,6 +88,11 @@ uint64_t ticks() noexcept;
 /// Negative means "not in a car" or "not reported". This is the yardstick question 2 is measured against.
 void noteReportedSpeed(double metresPerSecond) noexcept;
 
+/// The driver's brake pedal, 0..1, with the arrival time recorded so a stale value can be refused.
+/// `hasBrake == false` means "not told", which is NOT the same as "not braking" and is treated as
+/// braking at the write site.
+void noteBrakeInput(double pedal, bool hasBrake) noexcept;
+
 /// ---------------------------------------------------------------------------------------------------
 /// `L152`: THE DRIVER'S FITTED PARTS, AS LIVE FORCE SCALES.
 /// ---------------------------------------------------------------------------------------------------
@@ -116,7 +121,8 @@ void noteReportedSpeed(double metresPerSecond) noexcept;
 void applyHandling(const std::string& assetId, const std::string& vehicleId,
                    const std::string& authorityEpoch, uint64_t engineEntity,
                    bool hasGrip, double grip, bool hasDrive, double drive,
-                   bool hasBrake, double brake) noexcept;
+                   bool hasBrake, double brake, bool hasDrag, double drag,
+                   bool hasTopSpeed, double topSpeedKph) noexcept;
 
 /// Return the three Parts levers to inert and hand them back to the config file. Called when the bridge
 /// drops, and safe to call when no setup was ever applied.

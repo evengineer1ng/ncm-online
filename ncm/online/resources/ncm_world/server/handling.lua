@@ -167,6 +167,20 @@ end
 -- ever successfully capped a top speed when this was written.
 local governed = {}   -- assetId -> the last kph applied, so an unchanged ceiling is not rewritten
 
+-- ---------------------------------------------------------------------------------------------------
+-- A MANUAL governor target, per Machine, for the period before any baseline is authored.
+-- ---------------------------------------------------------------------------------------------------
+--
+-- `data.vehicle_catalogue.TOP_SPEED_KPH` is deliberately empty and `ratedTopSpeed` has not answered for a
+-- single record, so the composed target is nil for every car on the server today. That is correct -- `L157`
+-- says an absent entry means NO ceiling rather than a guessed one -- and it would also mean the taper
+-- could never be observed, which is not a good enough reason to invent numbers.
+--
+-- So the override is explicit, per asset, and says so in the log. It is the bench path, exactly like
+-- `ncm_carrier.json` is for the three levers: a way to feel a mechanism before the data that will drive
+-- it exists. When the catalogue is filled this stays as the tuning hook.
+local governOverride = {}
+
 local function applyGovernor(assetId, vehicleId, record, setup)
     if not (Open77.vehicles and type(Open77.vehicles.setPerformance) == "function") then return end
 
@@ -204,6 +218,21 @@ local function publishBound(playerId, binding, why, force)
 
     local entry = fitted[binding.assetId]
     local setup = liveSetup(binding.assetId)
+    -- ---- the GOVERNOR target (`L162`)
+    --
+    -- The record sets the headroom and the instance sets the car. A Machine's baseline top speed comes
+    -- from the catalogue, parts scale it, a class ruleset lowers it further when it is more restrictive,
+    -- and the carrier tapers drive to land on the result. Absent baseline means ungoverned -- we do not
+    -- invent a figure for a car nobody has authored one for.
+    -- Same baseline and same composition `applyGovernor` uses, so the platform ceiling and the carrier
+    -- taper can never disagree about what this Machine's top speed is supposed to be. If `MASTER_TEST` BA
+    -- ever proves `setPerformance` works, the two become belt and braces rather than rivals.
+    local baseline = binding.record and Catalogue.topSpeedKph(binding.record) or nil
+    setup.governedTopSpeedKph = baseline and Handling.topSpeedKph(setup, baseline, nil) or nil
+    -- An explicit override wins over the composed figure, and over its absence. Stated plainly so a
+    -- governed car is never mistaken for an authored one.
+    local override = governOverride[binding.assetId]
+    if override then setup.governedTopSpeedKph = override end
     local wire = Handling.wire(setup)
     wire.v = WIRE_VERSION
     wire.bound = true
@@ -380,6 +409,44 @@ end)
 --
 -- `effect` is a multiplier, not a balance decision. 18_PARTS_ECOSYSTEM puts component balance out of scope
 -- and nothing in this file pretends otherwise.
+--- `/ncm.govern <kph>` -- set this Machine's top speed target directly.
+---
+--- **This is the instance channel, not TweakDB.** It does not touch a record, it is not spawn-cached, it
+--- reaches only the car the caller is bound to, and it survives nothing -- losing the server returns the
+--- Machine to ungoverned. Two drivers in the same model can hold different targets at the same time,
+--- which is the whole thing the record channel could never do.
+RegisterNetEvent("ncm:govern", function(kph)
+    local pid = tonumber(source) or 0
+    if pid <= 0 then return end
+    local function tell(message)
+        pcall(Open77.chat.send, pid, "[NCM] " .. message)
+        pcall(TriggerClientEvent, "ncm:setup.result", pid, message)
+        log("player=%d <- %s", pid, message)
+    end
+
+    local binding = NcmVehicleAccess and NcmVehicleAccess.bindingForAuthority
+        and NcmVehicleAccess.bindingForAuthority(pid) or nil
+    if not binding then
+        tell("refused: no NCM Machine bound to this client's physics authority")
+        return
+    end
+
+    local target = tonumber(kph)
+    if target and target > 0 then
+        -- Bounded so a typo cannot govern a car to walking pace or to something the taper cannot express.
+        if target < 20 then target = 20 elseif target > 500 then target = 500 end
+        governOverride[binding.assetId] = target
+        tell(("governor set to %d km/h -- drive a long straight; the car should run out of legs rather "
+            .. "than hit a wall"):format(math.floor(target + 0.5)))
+    else
+        governOverride[binding.assetId] = nil
+        tell("governor cleared -- this Machine is ungoverned again")
+    end
+    -- Force a republish: the levers have not moved, and without this the unchanged-payload suppression
+    -- would swallow the change entirely.
+    NcmHandling.reconcilePlayer(pid, "governor", true)
+end)
+
 RegisterNetEvent("ncm:setup", function(family, effect)
     local pid = tonumber(source) or 0
     if pid <= 0 then return end

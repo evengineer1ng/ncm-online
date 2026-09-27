@@ -69,6 +69,36 @@ local function fleet()
     return {}
 end
 
+-- ---------------------------------------------------------------------------------------------------
+-- GEAR HEADROOM (`L162`): make every governed car DRAG-limited instead of GEAR-limited.
+-- ---------------------------------------------------------------------------------------------------
+--
+-- A car will not be pulled past the top of its last gear's speed band. That is why three drag runs at
+-- drive 1.000, 1.217 and 1.575 all finished at the same speed -- at the ceiling the drive force is already
+-- zero, so `driveScale` has nothing to multiply. Any lever-based top speed is dead while that is true.
+--
+-- So the record channel lifts the ceiling out of the way, once per model, and the instance channel places
+-- the real top speed inside the window by withholding drive. **Headroom above, authority below.** The
+-- record says what is possible; the Machine says what happens.
+--
+-- 1.45 is chosen to clear every authored figure with room to spare rather than to be exact. It does not
+-- need to be exact: nothing aims at it, the governor does the aiming, and a ceiling that is merely far
+-- enough away stops being a constraint at all.
+--
+-- **The honest risk, stated rather than buried:** a car of a governed model that is NOT bound to an NCM
+-- Machine runs ungoverned, and now runs to the RAISED ceiling -- so it is faster than stock. That is a
+-- real consequence of separating the two halves, it only reaches a car the player drives without a
+-- binding, and it is the reason the headroom and the governor must ship together and never separately.
+local GEAR_HEADROOM = 1.45
+
+--- **The headroom is ONE NUMBER on the wire, not one entry per record, and that is a size decision.**
+---
+--- There are 42 authored records. A gear entry each would add roughly 6 KB to a state bag whose measured
+--- ceiling is 4,032 bytes accepted / ~5,010 refused (`KB-136`) -- so the publish would be refused outright
+--- and every client would see nothing, which is precisely how `KB-136` presented the first time.
+---
+--- The client already carries the same vendored catalogue, so it can decide which records are authored
+--- without being told. Sending the multiplier alone is both smaller and harder to get out of step.
 --- Compose and publish. Cheap enough to call on any change; it only writes what moved.
 function NcmMachine.recompute(why)
     local records = fleet()
@@ -86,9 +116,13 @@ function NcmMachine.recompute(why)
             -- Named, never silent. A refusal here means the fleet or the ruleset is malformed, and a car
             -- quietly keeping last week's grip is far worse than a line in the log.
             log("refused for %s: %s", tostring(record), tostring(err))
-        elseif not Projection.isEmpty(envelope) then
+        end
+
+        if envelope and not Projection.isEmpty(envelope) then
             out[record] = envelope
-            local sig = tostring(#envelope.record.flats) .. "/" .. tostring(state.wetness)
+            -- The gear count belongs in the signature or a headroom-only envelope never looks changed.
+            local sig = ("%d/%d/%s"):format(#envelope.record.flats,
+                #(envelope.record.gears or {}), tostring(state.wetness))
             if published[record] ~= sig then
                 published[record] = sig
                 changed = changed + 1
@@ -149,7 +183,10 @@ function NcmMachine.recompute(why)
     -- cheaply. `pairs` order is not stable and would make every republish look like a change.
     table.sort(entries, function(a, b) return a.path < b.path end)
 
-    local payload = { version = Projection.ENVELOPE_VERSION, entries = entries }
+    -- One multiplier, applied client-side to every record the catalogue has authored a top speed for.
+    -- Absent would mean "leave every gearbox alone", which is the correct reading if this is ever removed.
+    local payload = { version = Projection.ENVELOPE_VERSION, entries = entries,
+        gearHeadroom = GEAR_HEADROOM }
 
     -- Measure before writing. The limit is not documented anywhere we can read, so the only way anyone will
     -- ever know how close we are is if the number is in the log on every publish.

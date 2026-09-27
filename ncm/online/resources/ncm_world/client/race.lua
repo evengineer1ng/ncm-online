@@ -112,6 +112,12 @@ end
 local Reading = NcmCore.get("competition.machine_knowledge").reading
 
 local page, pageReady = nil, false
+-- Declared HERE, with the other page state, because `pushInputs` -- defined far above the speedometer
+-- block that owns these -- writes `haveSpeedReading`. A `local` declared below its reader is captured as
+-- a nil GLOBAL instead, silently, and `luac -p` cannot see it. This file's own header names that defect
+-- class; it has cost this codebase five separate sessions.
+local speedoClaimed, lastSpeedoClaimAt = false, 0
+local haveSpeedReading = false
 local lastSent = nil
 local bannerUntil, bannerState = 0, nil
 
@@ -348,25 +354,115 @@ local function driverInputs()
     local t, b = read("throttle", 0, 1), read("brake", 0, 1)
     local st = read("steering", -1, 1)
     -- Nothing readable at all is not a neutral car; it is no car. Hide rather than show a resting cluster.
-    if t == nil and b == nil and st == nil then return nil end
-    return { throttle = quantise(t, 0.02), brake = quantise(b, 0.02), steering = quantise(st, 0.01) }
+    -- **Speed rides with the inputs rather than getting its own event.** It comes off the same snapshot,
+    -- at the same rate, and a second channel would be a second place for the two to disagree about
+    -- whether the player is in a car.
+    --
+    -- Quantised to 1 km/h: the readout has no decimals, and an unquantised value would defeat the
+    -- unchanged-state suppression below and push a message every frame.
+    -- `speedKph` is the platform's own conversion; `speed` is m/s and the fallback when it is absent.
+    local kph = Reading(v.speedKph)
+    if kph == nil and type(v.speed) == "number" then kph = v.speed * 3.6 end
+    if type(kph) == "number" then kph = math.floor(math.abs(kph) + 0.5) else kph = nil end
+
+    if t == nil and b == nil and st == nil and kph == nil then return nil end
+    return { throttle = quantise(t, 0.02), brake = quantise(b, 0.02), steering = quantise(st, 0.01),
+             kph = kph }
 end
 
 local function pushInputs()
     if not page or not pageReady then return end
     local v = driverInputs()
-    local key = v and (tostring(v.throttle) .. "/" .. tostring(v.brake) .. "/" .. tostring(v.steering)) or "off"
+    local key = v and (tostring(v.throttle) .. "/" .. tostring(v.brake) .. "/" .. tostring(v.steering)
+        .. "/" .. tostring(v.kph)) or "off"
     local nowM = Open77.time.monotonic()
     -- Resend an unchanged state every two seconds so a page that reloaded mid-drive recovers on its own.
     if key == lastInputs and (nowM - lastInputAt) < 2 then return end
     lastInputs, lastInputAt = key, nowM
+    -- **Proof a number reached the page**, not merely that the page exists. This is what the claim waits
+    -- on, so the vanilla dial is only ever taken away once ours has something to show in its place.
+    if v and type(v.kph) == "number" then haveSpeedReading = true end
     page:send("race:inputs", v or { off = true })
 end
+
+--- The ghost row, on its own channel for the same reason the driver inputs are (L166).
+---
+--- A ghost's delta changes continuously; folding it into `race:state` would defeat that payload's own
+--- throttling, which exists because it is diffed and republished on race events.
+---
+--- **It is never a standings row.** The ghost has no position, is not counted in the field, and is drawn
+--- separately from `#rows` -- a target, not an entrant. Giving it a `P` number is the one presentation
+--- mistake this feature must not make.
+local lastGhost = nil
+local function pushGhost()
+    if not page or not pageReady then return end
+    local g = NcmClientGhost and NcmClientGhost() or nil
+    local key = g and (tostring(g.mode) .. "/" .. tostring(g.present) .. "/" .. tostring(g.elapsedMs)
+        .. "/" .. tostring(g.deltaMs) .. "/" .. tostring(g.playing) .. "/" .. tostring(g.none)) or "off"
+    if key == lastGhost then return end
+    lastGhost = key
+    page:send("race:ghost", g or { present = false })
+end
+
+-- ---------------------------------------------------------------------------------------------
+-- THE VANILLA SPEEDOMETER LIES, AND IT CANNOT BE CORRECTED -- SO IT IS REPLACED (`IDEA-563`)
+-- ---------------------------------------------------------------------------------------------
+--
+-- Measured 2026-09-26 against the physics probe and against TweakDB's own authored gear ceiling,
+-- which agree with each other to within 2%:
+--
+--   stock Galena, flat out   29.5 m/s   = 66 mph true   -- vanilla dial read 90
+--   whole chain stretched    37.6 m/s   = 84 mph true   -- vanilla dial read past 135
+--
+-- It was wrong by x1.34 before NCM touched anything, and the error GREW every time the gear bands
+-- moved, so it is not reading ground speed. `Open77.hud.setVisible` controls VISIBILITY, not value --
+-- there is no way to correct the number, only to stop showing it.
+--
+-- **Freeroam's rule, inherited deliberately: never hide a vanilla widget unless the replacement is
+-- actually live.** A player with no speedometer is worse off than one with a wrong speedometer, so the
+-- claim waits for the page to be ready AND for a real reading to have arrived, and the claim is
+-- released on resource stop so a reload never leaves the HUD permanently missing a component.
+local function claimVanillaSpeedometer(claim)
+    if type(Open77.hud) ~= "table" or type(Open77.hud.setVisible) ~= "function" then
+        return false, "hud API unavailable"
+    end
+    local ok, accepted, result = pcall(Open77.hud.setVisible, "speedometer", not claim)
+    if ok and accepted then return true end
+    return false, tostring(ok and result or accepted)
+end
+
+local function reconcileSpeedometerClaim()
+    if speedoClaimed or not pageReady or not haveSpeedReading then return end
+    -- Throttled: a refusal must not become a once-per-tick retry storm in the client log.
+    local at = Open77.time.monotonic()
+    if (at - lastSpeedoClaimAt) < 2 then return end
+    lastSpeedoClaimAt = at
+    local ok, why = claimVanillaSpeedometer(true)
+    if ok then
+        speedoClaimed = true
+        log("vanilla speedometer hidden -- it reads roughly 2.6x true speed and cannot be corrected, "
+            .. "only replaced. NCM's km/h readout is the speedometer now.")
+    else
+        log("vanilla speedometer NOT hidden (%s) -- leaving it visible rather than leaving the driver "
+            .. "with no speed at all", tostring(why))
+    end
+end
+
+--- Give the component back. A resource that claims and never releases leaves the player's HUD short a
+--- widget with nothing on screen explaining why.
+AddEventHandler("onClientResourceStop", function(name)
+    if name ~= GetCurrentResourceName() or not speedoClaimed then return end
+    local ok, why = claimVanillaSpeedometer(false)
+    speedoClaimed = false
+    log("vanilla speedometer restored on stop (%s)", ok and "accepted" or tostring(why))
+end)
 
 CreateThread(function()
     Wait(4000)
     while true do
         pcall(pushInputs)
+        pcall(pushGhost)
+        pcall(reconcileSpeedometerClaim)
         -- 20 Hz while there is something to show, 2 Hz when out of a car. The platform's own observers run at
         -- 30 Hz; 20 is smooth to the eye for pedal travel and costs a third less traffic.
         Wait(lastInputs ~= "off" and 50 or 500)
@@ -803,6 +899,10 @@ CreateThread(function()
             for _, en in ipairs(g.entrants or {}) do
                 if (myPid and en.playerId == myPid) or (id and en.driverId == id) then me = en end
             end
+            -- Exported rather than re-derived. The seat/identity dance is the one thing a second consumer
+            -- must not copy: a second copy is a second place for it to drift out of agreement with the view
+            -- the driver is actually looking at (the same reason `NcmClientOwnVehicle` is a single accessor).
+            NcmClientMyEntrant = me
             if not me and g.sessionId and g.sessionId ~= notMine then
                 notMine = g.sessionId
                 log("session %s: not an entrant (localId=%s driverId=%s entrants=%d)", tostring(g.sessionId), tostring(myPid), tostring(id), #(g.entrants or {}))

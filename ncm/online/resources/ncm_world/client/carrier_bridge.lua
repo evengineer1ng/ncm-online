@@ -47,6 +47,91 @@ local Feedback = NcmCore.get("driver.feedback")
 local PORT_BASE, PORT_SPAN = 38480, 4     -- must match `kPortSearchSpan` in `bridge/server.cpp`
 local portIndex = 0
 
+-- ---------------------------------------------------------------------------------------------------
+-- **THE PORT SCAN'S SAFETY ARGUMENT HAD A HOLE, AND IT COST A WHOLE SESSION.**
+-- ---------------------------------------------------------------------------------------------------
+--
+-- The comment above says a wrong port is "refused, not silently served", because the Carrier rejects any
+-- peer that is not its own process. That is true of **one Carrier against another Carrier**. It says
+-- nothing about a THIRD program on the same port -- and there is one: `NCM.Wheel.Support.exe`, the
+-- retired companion the Carrier replaced, which speaks the same protocol on the same port and has no PID
+-- guard at all.
+--
+-- Observed 2026-09-26: the companion was already running, held 38480 AND the G29 exclusively, and the
+-- Carrier fell back to 38481 logging *"port 38480 was taken -- another game instance?"*. This client
+-- connected to 38480, logged `carrier connected`, showed a working wheel, and pushed every projection and
+-- every handling setup into a program that cannot apply any of them. Force feedback worked perfectly the
+-- whole time, which is exactly what made it invisible: the half that proves the link is the half the
+-- companion still does.
+--
+-- **The discriminator is `health.version`.** Only the Carrier sends one. If none arrives shortly after a
+-- successful handshake, we are talking to the companion, and saying so by name is worth more than any
+-- amount of re-testing the thing on the other end of the wrong socket.
+local peerIsCarrier, peerVersion = false, nil
+
+-- ---------------------------------------------------------------------------------------------------
+-- TWO PEERS, TWO SURFACES. The rig is proven; the Carrier is not. Neither has to lose.
+-- ---------------------------------------------------------------------------------------------------
+--
+-- `NCM.Wheel.Support.exe` and the Carrier speak the same protocol on the same port range, and the
+-- companion is the one that actually drives the owner's rig today. It binds 38480 first, so the Carrier
+-- walks up to 38481 -- and a single-surface client connects to whichever answered first, gets a perfectly
+-- working wheel, and silently throws every projection into a program with no TweakDB. That is exactly
+-- what happened on 2026-09-26 and it cost a session.
+--
+-- **The single-transport rule in this file's header assumed ONE peer could do both jobs.** It cannot any
+-- more, so the rule is narrowed rather than broken: FORCE FEEDBACK keeps its own surface and its own
+-- proven peer, and the MACHINE channel -- projections, handling, gear chain, arch dump -- gets a second
+-- surface that will only ever talk to something that identifies itself as the Carrier.
+--
+-- The original rationale for one transport was that an effect must not arrive while the channel that
+-- reports feel is down. That still holds WITHIN each channel, and across them it no longer can: the two
+-- jobs now live in two processes, so one socket could not have covered both however much we wanted it to.
+--
+-- **`health.version` is the discriminator.** Only the Carrier sends one. A peer that completes a
+-- handshake and never names a version is the companion, and the machine surface moves past it.
+-- ---------------------------------------------------------------------------------------------------
+-- **THE TWO CHANNELS NEED TWO SWITCHES, AND SHARING ONE COST A WHOLE AFTERNOON.**
+-- ---------------------------------------------------------------------------------------------------
+--
+-- `enabled` is the FORCE FEEDBACK switch. The panel's toggle writes it, and until now the supervisor
+-- loop's single `if enabled` gate governed BOTH surfaces -- so turning off a wheel effect also tore down
+-- the Machine channel, the Carrier saw the client disconnect, and it restored every flat it had written:
+--
+--   12:17:49  gear chain v1 on Galena: 14 applied, 14 captured
+--   12:18:13  NCM disconnected from the bridge
+--   12:18:13  restored 180 flat(s) to their original values
+--
+-- The driver then did three laps on stock gearing wondering what had broken. Nothing had: a force-feedback
+-- preference silently reverted the physics of all 42 cars, because one boolean meant two things.
+--
+-- **The Machine channel defaults ON and is not a peripheral preference.** Force feedback is optional --
+-- it needs a process NCM does not ship. Parts, gearing and the governor are the product.
+local machineEnabled = true
+local machineSurface, machineReady = nil, false
+-- **The machine channel must never open a socket to the FFB peer, and starting at index 0 did exactly
+-- that.** Both scans begin at 38480, so the machine surface connected to the wheel companion, displaced
+-- the FFB surface that was already talking to it, and only then walked on to find the Carrier -- taking
+-- force feedback down on the way past. Start one port up, and skip the FFB channel's port whenever the
+-- walk would land on it.
+local machineIndex, machineUrl = 1, nil
+local machineTicks = 0
+local MACHINE_GRACE_TICKS = 150            -- ~5 s at HZ, long enough for a real handshake plus a health
+
+--- Send on the MACHINE channel. Absent is refused rather than silently dropped: a projection that went
+--- nowhere must not look like one that was applied.
+---
+--- **Declared HERE, above every caller, and that is not tidiness.** The first version of this sat beside
+--- `bringUpMachine` two hundred lines down, so `pushProjection` -- defined above it -- captured a nil
+--- GLOBAL instead of this local and died with "attempt to call a nil value (global 'sendMachine')" the
+--- first time a gear command ran. This file's header names that defect class as having bitten the
+--- codebase five times and notes that `luac -p` cannot see it. Six.
+local function sendMachine(event, payload)
+    if not (machineSurface and machineReady and peerIsCarrier) then return false end
+    machineSurface:send(event, payload)
+    return true
+end
+
 local function urlForIndex(i)
     return ("http://127.0.0.1:%d/bridge.html"):format(PORT_BASE + (i % PORT_SPAN))
 end
@@ -120,7 +205,12 @@ end
 --- there is no second transport and no second place for the two sides to disagree about state.
 NcmClientFfbCommand = function(kind, payload)
     if kind == "enable" then
+        -- **FORCE FEEDBACK ONLY.** This switch does not reach the Machine channel and must never be
+        -- allowed to again: it used to, and a driver turning off wheel effects silently reverted the
+        -- gearing of every car in the world (see the note beside `machineEnabled`).
         enabled = (type(payload) == "table") and (payload.on and true or false) or false
+        log("force feedback %s by the panel -- the machine channel is unaffected",
+            enabled and "ON" or "OFF")
         announce()
         return true
     end
@@ -145,10 +235,168 @@ local pushedHandling = nil
 --- Push one envelope to the carrier. The plugin applies it and interprets nothing -- which part moved which
 --- flat, and why, was decided server-side in `machine.projection`.
 local function pushProjection(envelope)
-    if not (surface and surfaceReady) then return false end
-    surface:send("ncm:machine.projection", envelope)
-    return true
+    return sendMachine("ncm:machine.projection", envelope)
 end
+
+-- ---------------------------------------------------------------------------------------------------
+-- GEAR HEADROOM: lift every governed model's ceiling out of the governor's way (`L162`).
+-- ---------------------------------------------------------------------------------------------------
+--
+-- The server sends ONE multiplier. Which records it applies to is decided here, from the same vendored
+-- catalogue the server uses, because 42 record entries would not fit in the state bag that carries this
+-- (`KB-136`: 4,032 bytes accepted).
+--
+-- **Idempotent by record.** The carrier captures each flat's original before its first write and every
+-- later write multiplies that captured original, so re-sending is harmless -- but re-sending on every
+-- publish would still spend a message per record per tick, so the last applied multiplier is remembered.
+local gearHeadroomApplied = {}
+-- Declared here, ABOVE the worker thread that reads them. A `local` referenced from a function defined
+-- earlier in the file captures a nil global instead -- the defect this file's header names five times.
+local headroomWanted = false
+local HEADROOM_PER_TICK = 6        -- records per tick, so one pass never approaches a callback's budget
+local headroomAttempts = 0
+local HEADROOM_MAX_ATTEMPTS = 12   -- ~5 s of retries; past that it is not a transient and saying so is
+                                   -- more use than retrying forever
+
+--- **A refusal here is almost always TRANSIENT, and treating it as final was the defect.**
+---
+--- The script budget is shared with everything else running that tick, so the same call fits one moment
+--- and is refused the next. The first version logged and gave up, so a car silently went back to its
+--- stock ceiling for the rest of the session -- which read exactly like a regression somebody had
+--- introduced, because there was no way to tell a one-tick refusal from a broken build.
+---
+--- Logged once per attempt, capped, and the final line says it stopped rather than trailing off.
+local function retryHeadroom(why)
+    headroomAttempts = headroomAttempts + 1
+    if headroomAttempts >= HEADROOM_MAX_ATTEMPTS then
+        log("gear headroom GIVING UP after %d attempts: %s -- this Machine keeps the gearbox the game "
+            .. "shipped", headroomAttempts, tostring(why))
+        return
+    end
+    log("gear headroom deferred (attempt %d/%d): %s", headroomAttempts, HEADROOM_MAX_ATTEMPTS,
+        tostring(why))
+    headroomWanted = true              -- try again next tick, with a fresh budget
+end
+
+--- **Asking is not doing.** This only raises a flag; the worker below does the work, on its own thread.
+---
+--- `Open77` gives every callback a SCRIPT EXECUTION BUDGET, and the bind callback had already spent most
+--- of its own by the time it got here. Building `data.vehicle_catalogue` -- which pulls in the vehicle
+--- pool -- then blew it, and the whole headroom was refused with
+--- `vehicle_catalogue.lua:110: Open77 script execution budget exceeded`.
+---
+--- A `Wait()` yields and the next tick starts with a fresh budget, so the only way to do 42 records'
+--- worth of work is to spread it across ticks. That cannot happen inside a callback, which has to run to
+--- completion. Hence a flag here and a thread below.
+local function requestGearHeadroom()
+    headroomWanted = true
+end
+
+--- The worker. Resolves core lazily, one module per tick, then pushes in small batches.
+---
+--- **Idempotent by record.** The carrier captures each flat's original before its first write and later
+--- writes multiply that captured original, so a re-send is harmless -- but the applied map still stops
+--- this from spending 42 messages on every bind.
+CreateThread(function()
+    while true do
+        Wait(400)
+        if headroomWanted and machineSurface and machineReady and peerIsCarrier then
+            headroomWanted = false
+
+            -- **Warm the dependency tree ONE MODULE PER TICK.**
+            --
+            -- `parts.handling` requires `parts.ontology`, `machine.expression` and `parts.thermal`, and
+            -- `parts.thermal` runs 24-iteration self-check loops at module load. Asking for `handling`
+            -- cold therefore builds all four inside ONE callback, against Open77's per-callback script
+            -- budget -- which it fitted inside once and then did not, giving a car the stock ceiling back
+            -- with nothing on screen to say why. `Wait(0)` yields and the next tick starts fresh, so each
+            -- module gets a budget of its own and the last call finds everything already built.
+            for _, dependency in ipairs({ "parts.ontology", "machine.expression", "parts.thermal" }) do
+                pcall(function() return NcmCore.get(dependency) end)
+                Wait(0)
+            end
+
+            -- Each `pcall` is its own refusal with its own log line, because "the constant is missing"
+            -- and "the catalogue is missing" are different repairs.
+            local okParts, Parts = pcall(function() return NcmCore.get("parts.handling") end)
+            if not okParts then
+                retryHeadroom("parts.handling would not load -- " .. tostring(Parts))
+                goto continue
+            end
+            local factor = tonumber(Parts and Parts.GEAR_HEADROOM)
+            if not factor or factor <= 0 then
+                retryHeadroom("no multiplier (" .. tostring(Parts and Parts.GEAR_HEADROOM) .. ")")
+                goto continue
+            end
+
+            Wait(0)   -- fresh budget before the expensive one
+            local okCat, Catalogue = pcall(function() return NcmCore.get("data.vehicle_catalogue") end)
+            if not okCat or not Catalogue then
+                retryHeadroom("data.vehicle_catalogue unavailable -- "
+                    .. (okCat and "nil" or tostring(Catalogue)))
+                goto continue
+            end
+
+            Wait(0)
+            local okList, records = pcall(Catalogue.allRecords)
+            if not okList or type(records) ~= "table" then
+                retryHeadroom("allRecords failed -- " .. tostring(records))
+                goto continue
+            end
+
+            local pushed, skipped, since = 0, 0, 0
+            for _, record in ipairs(records) do
+                -- **Only records with an authored top speed.** A car nobody has written a figure for
+                -- keeps the gearbox the game shipped: lifting its ceiling with nothing governing it
+                -- would simply make it faster than stock (`L157`).
+                local okSpeed, authored = pcall(Catalogue.topSpeedKph, record)
+                if okSpeed and authored and gearHeadroomApplied[record] ~= factor then
+                    -- **The WHOLE chain, both ends, not just the top gear's ceiling.**
+                    --
+                    -- Lifting only gear 7 left the Galena with six gears spanning 20-25 km/h each and a
+                    -- seventh spanning 95-157: the car reached top gear at the same place it always had
+                    -- and then sat in one enormous ratio for the entire rest of its range. That is what
+                    -- `/ncm.gearcap` is FOR as a deliberate experiment, and it is the wrong shape for a
+                    -- permanent headroom -- it does not raise the gearbox, it just stretches its last
+                    -- ratio until the box is lopsided.
+                    --
+                    -- `gear = 0` is every gear (`tweak.cpp`), and scaling `minSpeed` with `maxSpeed`
+                    -- keeps each ratio's proportional span, so the box changes SIZE without changing
+                    -- SHAPE. That is a longer final drive: the same progression, further up the range.
+                    --
+                    -- Two changes, one contributor id. The carrier's ledger keys by gear and suffix, so
+                    -- each flat's original is captured once and every later write multiplies that
+                    -- original -- re-sending stays harmless.
+                    local ok = pushProjection({ v = 1, record = { path = record, flats = {}, gears = {
+                        { id = "gear_headroom", gear = 0, suffix = ".maxSpeed", multiplier = factor },
+                        { id = "gear_headroom", gear = 0, suffix = ".minSpeed", multiplier = factor },
+                    } } })
+                    if not ok then
+                        log("gear headroom INTERRUPTED after %d record(s) -- the machine channel "
+                            .. "stopped accepting; the rest stay gear-limited until the next bind", pushed)
+                        headroomWanted = true      -- unfinished work is not finished work
+                        break
+                    end
+                    gearHeadroomApplied[record] = factor
+                    pushed, since = pushed + 1, since + 1
+                    if since >= HEADROOM_PER_TICK then since = 0; Wait(0) end
+                elseif okSpeed and not authored then
+                    skipped = skipped + 1
+                end
+            end
+            headroomAttempts = 0        -- got all the way through; a later re-bind starts fresh
+            if pushed > 0 then
+                log("gear headroom x%.2f pushed for %d record(s), %d left stock -- each governed model "
+                    .. "becomes drag-limited rather than gear-limited. **Spawn-cached: call a FRESH car "
+                    .. "for it to take effect.**", factor, pushed, skipped)
+            else
+                log("gear headroom x%.2f: nothing to push (%d record(s) already at this factor)",
+                    factor, skipped)
+            end
+        end
+        ::continue::
+    end
+end)
 
 --- IDEA-507: ask the carrier to read the game's own drive-model data for every record NCM knows about and
 --- write it to a file beside its log. **Read-only** -- nothing is applied, nothing is mutated, and `L148` is
@@ -158,7 +406,7 @@ end
 --- Deliberately manual rather than automatic. It is a one-off measurement, not a feature, and a dump that
 --- fired on every join would rewrite the file while somebody was reading it.
 local function requestArchDump()
-    if not (surface and surfaceReady) then return false, "bridge_down" end
+    if not (machineSurface and machineReady and peerIsCarrier) then return false, "no_carrier" end
 
     local catalogue = NcmCore and NcmCore.get and NcmCore.get("data.vehicle_catalogue") or nil
     if not catalogue then return false, "no_catalogue" end
@@ -177,7 +425,9 @@ local function requestArchDump()
     end
     table.sort(records)
 
-    surface:send("ncm:machine.archdump", { records = records })
+    if not sendMachine("ncm:machine.archdump", { records = records }) then
+        return false, "no_carrier"
+    end
     log("architecture dump requested for %d record(s)", #records)
     return true
 end
@@ -201,6 +451,77 @@ local function tearDown(why)
     -- moved. A driver must not silently lose their parts because the socket blinked.
     pushedHandling = nil
     announce()
+end
+
+local function tearDownMachine(why)
+    if machineSurface then
+        pcall(function() machineSurface:destroy() end)
+        log("machine channel closed (%s) at %s", tostring(why), tostring(machineUrl))
+    end
+    machineSurface, machineReady = nil, false
+    peerIsCarrier, peerVersion = false, nil
+    machineTicks = 0
+    -- The carrier restores every flat it captured when its socket drops, so the gearboxes are back to
+    -- stock and the memo of what we pushed is now a lie. Forgetting is what makes the next publish redo it.
+    gearHeadroomApplied = {}
+    -- The Carrier restores its own originals when its socket drops, so everything we pushed has to be
+    -- pushed again on reconnect. Forgetting is what makes that happen.
+    projected = {}
+    pushedHandling = nil
+end
+
+--- The next port for the machine walk that is NOT the one force feedback is using.
+local function nextMachineUrl()
+    for _ = 1, PORT_SPAN do
+        local candidate = urlForIndex(machineIndex)
+        if candidate ~= url then return candidate end
+        machineIndex = machineIndex + 1
+    end
+    return urlForIndex(machineIndex)
+end
+
+local function bringUpMachine()
+    if machineSurface then return end
+    machineUrl = machineUrl or nextMachineUrl()
+    local page = WebUI.create({
+        entry = machineUrl, layer = "hud", width = 16, height = 16,
+        zIndex = 1, transparent = true, visible = false,
+    })
+    if not page then
+        machineIndex = machineIndex + 1
+        machineUrl = nextMachineUrl()
+        return
+    end
+    machineSurface = page
+    machineTicks = 0
+    page:on("ncm:ffb.ready", function()
+        machineReady = true
+        -- Ready is NOT proof. The companion reaches this point too. `peerIsCarrier` decides, and it is
+        -- only ever set by a health payload carrying a version.
+        log("machine channel handshook at %s -- waiting for a carrier version", tostring(machineUrl))
+    end)
+    page:on("ncm:ffb.closed", function()
+        machineReady = false
+        peerIsCarrier, peerVersion = false, nil
+    end)
+    page:on("ncm:carrier.health", function(h)
+        if type(h) == "table" and h.version and not peerIsCarrier then
+            peerIsCarrier, peerVersion = true, tostring(h.version)
+            log("MACHINE CHANNEL BOUND to the NCM Carrier %s at %s", peerVersion, tostring(machineUrl))
+            -- **Driven by the Carrier binding, NOT by the projection state bag.** That bag has never
+            -- reached a client -- every session logs `projections: absent(nil)`, the same way
+            -- `ncmCeilings` never arrived -- so anything that waited for it waited forever. The headroom
+            -- needs no server input: it is one constant from core, applied to the records this client's
+            -- own catalogue says are authored.
+            -- **Raise a flag; do not do the work here.** Resolving core inside this callback blew
+            -- Open77's per-callback script budget and the whole headroom was refused. The worker
+            -- thread spreads it over ticks, each with a fresh budget.
+            requestGearHeadroom()
+            -- Everything the server already decided has to be re-sent: this socket missed all of it.
+            projected = {}
+            pushedHandling = nil
+        end
+    end)
 end
 
 local function bringUp()
@@ -280,6 +601,9 @@ local function bringUp()
     -- The carrier reports what it did with a projection. Kept separate from `device` because "your wheel"
     -- and "your car" are different questions and a player debugging one should not have to read the other.
     page:on("ncm:carrier.health", function(h)
+        -- **This is the FFB peer's health and it may NOT set `peerIsCarrier`.** That flag belongs to the
+        -- machine channel alone; letting this socket set it would bind the gear chain to whatever is
+        -- driving the wheel, which is the exact confusion the two-surface split exists to end.
         if type(h) ~= "table" then return end
         carrier = {
             version = tostring(h.version or "?"),
@@ -364,15 +688,19 @@ end
 CreateThread(function()
     Wait(6000)
     while true do
-        if enabled then
-            if not surface then bringUp() end
+        if enabled or machineEnabled then
+            -- **The FFB surface is supervised only while FFB is on.** Everything in this branch that
+            -- touches `surface` is now behind its own flag, so the Machine channel below survives a
+            -- driver switching force feedback off.
+            if enabled and not surface then bringUp() end
             -- **A page that loads but never says `ready` is its own failure**, distinct from a port with
             -- nothing on it, and the old loop had no answer for it: `surface` was non-nil, so `bringUp`
             -- was never called again and the client waited forever. That is exactly what a carrier
             -- REFUSING us looks like from here (`KB-147`) -- the HTTP GET for the page succeeds, the
             -- WebSocket is then closed because we are the wrong process -- so this path is now the
             -- common one on a second client, not a corner case.
-            if surface and not surfaceReady then
+            if not enabled and surface then tearDown("force feedback switched off") end
+            if enabled and surface and not surfaceReady then
                 unreadyTicks = unreadyTicks + 1
                 -- Either signal moves us on: repeated closes (fast, the usual case) or a long silence
                 -- (the backstop). `KB-148` -- the backstop alone, set too short, broke the ordinary
@@ -391,25 +719,67 @@ CreateThread(function()
             else
                 unreadyTicks, unreadyCloses = 0, 0
             end
-            if surface and surfaceReady then
+            -- ---- the MACHINE channel, supervised beside the FFB one but on its own port walk
+            --
+            -- The companion answers and never names a version, so "handshook but not a Carrier" is the
+            -- EXPECTED state on 38480, not a fault. Walking past it is the whole mechanism.
+            if not machineEnabled and machineSurface then
+                tearDownMachine("machine channel switched off")
+            elseif machineEnabled and not machineSurface then
+                bringUpMachine()
+            elseif not peerIsCarrier then
+                machineTicks = machineTicks + 1
+                if machineTicks >= MACHINE_GRACE_TICKS then
+                    local why = machineReady and "handshook but never sent a carrier version (the wheel "
+                        .. "companion does this)" or "no handshake"
+                    log("%s: %s -- trying the next port for the Carrier", tostring(machineUrl), why)
+                    tearDownMachine(why)
+                    machineIndex = machineIndex + 1
+                    machineUrl = nextMachineUrl()
+                end
+            else
+                machineTicks = 0
+            end
+
+            -- **Built once, sent to whichever peers are up.** It used to be built only when the FFB
+            -- surface was ready, so switching force feedback off also stopped the Carrier's brake-pedal
+            -- and speed feed -- the very thing that separates drag from braking.
+            if (surface and surfaceReady) or (machineSurface and machineReady and peerIsCarrier) then
                 local snap = ownSnapshot()
                 local frame = snap and Feedback.frame(snap, { at = Open77.time.monotonic() }) or nil
                 if frame then
-                    surface:send("ncm:ffb.frame", frame)
+                    if surface and surfaceReady then surface:send("ncm:ffb.frame", frame) end
+                    -- **The Carrier needs this frame too, and for a different reason.** The FFB peer wants
+                    -- it to drive a wheel; the Carrier wants the brake PEDAL, which is the only thing that
+                    -- separates aerodynamic drag from braking at its force write site (`IDEA-538`), and
+                    -- the speed, which is the yardstick its probe checks itself against.
+                    --
+                    -- Splitting FFB onto its own surface silently cut this feed and the Carrier logged
+                    -- `ncm=n/a` on every sample for the rest of the session. Same frame, both peers.
+                    sendMachine("ncm:ffb.frame", frame)
                     sent = sent + 1
                 else
                     -- Out of the car, or the snapshot was unreadable. Say so explicitly rather than going
                     -- quiet: silence and "no force" are different instructions, and a companion holding the
                     -- last frame would keep pushing at a wheel whose car we can no longer see.
                     skipped = skipped + 1
-                    surface:send("ncm:ffb.idle", { v = Feedback.FRAME_VERSION })
+                    if surface and surfaceReady then
+                        surface:send("ncm:ffb.idle", { v = Feedback.FRAME_VERSION })
+                    end
+                    -- Idle must reach the Carrier as well, or a player who steps out of a car leaves it
+                    -- holding a stale pedal -- and a stale pedal reading "not braking" is exactly what
+                    -- would let real braking be scaled as drag.
+                    sendMachine("ncm:ffb.idle", { v = Feedback.FRAME_VERSION })
                 end
             end
             Wait(math.floor(1000 / HZ))
         else
             if surface then tearDown("disabled") end
+            if machineSurface then tearDownMachine("disabled") end
             Wait(1000)
         end
+        -- Both switches off is the only path that reaches the branch above, and it is deliberately hard
+        -- to arrive at: it needs force feedback off AND the machine channel explicitly off.
     end
 end)
 
@@ -456,6 +826,14 @@ CreateThread(function()
                     records = state.records
                 end
             end
+            -- Belt and braces: if the projection bag ever starts arriving, let it ask too. It never has,
+            -- which is why the carrier binding is the real trigger. **It only ASKS** -- the multiplier
+            -- comes from core either way, so the bag cannot become a second opinion on the number, and
+            -- doing the work here would blow this loop's script budget exactly as it blew the callback's.
+            if ok and type(state) == "table" and state.gearHeadroom then
+                requestGearHeadroom()
+            end
+
             -- Say what we saw, once per change. The loop used to be silent on every path, which is why
             -- KB-136 went weeks with no evidence beyond "nothing happened".
             do
@@ -646,11 +1024,15 @@ local function resolveHandling(bagOk, setup)
     -- **The tail, not the head.** Truncating to the first 8 characters made both seeded fixtures read as
     -- `10000000`, so the one log a player is most likely to look at could not tell two Machines apart --
     -- during the very test whose whole point is that two Machines differ.
-    }, ("BOUND asset=..%s vehicle=%s entity=%s grip=%.3f drive=%.3f brake=%.3f"):format(
+    }, ("BOUND asset=..%s vehicle=%s entity=%s grip=%.3f drive=%.3f brake=%.3f topSpeed=%s"):format(
         setup.assetId:sub(-6), tostring(setup.vehicleId), entity,
         tonumber(setup.levers.gripScale) or 1,
         tonumber(setup.levers.driveScale) or 1,
-        tonumber(setup.levers.brakeScale) or 1)
+        tonumber(setup.levers.brakeScale) or 1,
+        -- **Named even when absent.** The governor produced no carrier line at all and there was no way
+        -- to tell "the server never sent a target" from "the carrier ignored one", which are different
+        -- bugs in different processes.
+        setup.levers.topSpeedKph and (tostring(setup.levers.topSpeedKph) .. "kph") or "ABSENT")
 end
 
 CreateThread(function()
@@ -677,7 +1059,7 @@ CreateThread(function()
             -- message (`kBindingLeaseMs`), so an unchanged binding must still be re-sent twice a second.
             -- Suppressing an identical payload the way the projection loop does would silently expire the
             -- binding and leave the driver's Parts inert with nothing in any log to explain it.
-            surface:send("ncm:machine.handling", payload)
+            sendMachine("ncm:machine.handling", payload)
             pushedHandling = seen
         end
         Wait(500)
@@ -705,6 +1087,19 @@ end, false)
 --- `/ncm.tyre` -- the readout behind the gauge. The gauge shows a POSITION; this shows the degrees, the
 --- ambient it is being pulled toward, and the window. Added after a live drive where the needle sat on the
 --- bottom stop and there was no way to tell a broken feed from a cold tyre.
+--- `/ncm.govern <kph>` -- set this Machine's top speed, live, per car.
+---
+--- Not TweakDB and not spawn-cached: the carrier tapers drive as the target is approached, so the change
+--- is felt on the straight you are already on.
+RegisterCommand("ncm.govern", function(_, args)
+    local a = args and args[1]
+    if a == nil then
+        log("usage: /ncm.govern <kph>   or   /ncm.govern off")
+        return
+    end
+    TriggerServerEvent("ncm:govern", (tostring(a):lower() == "off") and 0 or tonumber(a))
+end, false)
+
 RegisterCommand("ncm.tyre", function()
     TriggerServerEvent("ncm:tyre.query")
 end, false)
@@ -839,11 +1234,37 @@ end
 
 RegisterCommand("ncm.gearfloor", function(_, args) gearFloorCommand(args) end, false)
 
---- Read the gear chain of the car being sat in, and print it.
+--- `/ncm.gears` -- read the gear chain of the car being sat in.
 ---
---- **`maxSpeed` and `minSpeed` are in METRES PER SECOND**, so the last gear's `maxSpeed` times 3.6 is the
---- car's top speed in km/h. This is read-only: it writes nothing and proves only that the traversal
---- `vehicle -> .vehEngineData -> .gears` resolves on this build, which nothing in NCM has ever tested.
+--- **Goes through the carrier, because the resource sandbox has no `TweakDB` global.** The first version of
+--- this command called `TweakDB:GetFlat` directly and died on `attempt to index a nil value (global
+--- 'TweakDB')` -- that is a Cyber Engine Tweaks global and this is not CET. Every TweakDB access NCM makes
+--- already goes through the carrier; this one forgot.
+---
+--- The answer lands in the CARRIER's log, not here, because it is a table and that is where the other
+--- TweakDB answers are written.
+--- Which program is on the other end of the bridge, and is it the one that can actually do anything?
+--- Both channels, named separately, because they are two sockets to two programs and the whole class of
+--- bug this command exists for is one of them working while the other quietly does not.
+RegisterCommand("ncm.carrier", function()
+    if surface and surfaceReady then
+        log("FFB channel:     connected at %s (%s)", tostring(url),
+            device and tostring(device.name) or "no device reported")
+    else
+        log("FFB channel:     NOT connected (url %s)", tostring(url))
+    end
+    if peerIsCarrier then
+        log("MACHINE channel: NCM Carrier %s at %s -- parts, weather and the gear chain CAN be applied",
+            tostring(peerVersion), tostring(machineUrl))
+    elseif machineSurface and machineReady then
+        log("MACHINE channel: %s answered but has not named a carrier version -- still walking the port "
+            .. "range. If this never settles, no Carrier is running.", tostring(machineUrl))
+    else
+        log("MACHINE channel: searching %d-%d for a Carrier (currently %s)",
+            PORT_BASE, PORT_BASE + PORT_SPAN - 1, tostring(machineUrl))
+    end
+end, false)
+
 RegisterCommand("ncm.gears", function()
     local own = NcmClientOwnVehicle and NcmClientOwnVehicle() or nil
     local record = own and own.record
@@ -851,34 +1272,101 @@ RegisterCommand("ncm.gears", function()
         log("gears: sit in a car first")
         return
     end
-
-    local engine = TweakDB:GetFlat(TweakDBID.new(record, ".vehEngineData"))
-    if not engine then
-        log("gears: %s has no .vehEngineData -- the traversal fails at step one", tostring(record))
+    if not (surface and surfaceReady) then
+        log("gears: bridge is down, nothing sent")
         return
     end
-    local chain = TweakDB:GetFlat(TweakDBID.new(engine, ".gears"))
-    if type(chain) ~= "table" then
-        log("gears: engine data on %s has no readable .gears array (%s)",
-            tostring(record), type(chain))
+    if not sendMachine("ncm:machine.geardump", { records = { record } }) then
+        log("gears: the machine channel is not bound to a Carrier -- run /ncm.carrier")
         return
     end
+    log("gears: asked the carrier to read %s -- the answer is in the CARRIER log", tostring(record))
+end, false)
 
-    log("---- gear chain for %s (%d gear(s)) ----", tostring(record), #chain)
-    for i, gearRef in ipairs(chain) do
-        local minS = TweakDB:GetFlat(TweakDBID.new(gearRef, ".minSpeed"))
-        local maxS = TweakDB:GetFlat(TweakDBID.new(gearRef, ".maxSpeed"))
-        local torque = TweakDB:GetFlat(TweakDBID.new(gearRef, ".torqueMultiplier"))
-        log("  gear %d: minSpeed=%s (%s km/h)  maxSpeed=%s (%s km/h)  torqueMul=%s",
-            i, tostring(minS), minS and ("%.0f"):format(minS * 3.6) or "?",
-            tostring(maxS), maxS and ("%.0f"):format(maxS * 3.6) or "?", tostring(torque))
+-- ---------------------------------------------------------------------------------------------------
+-- THE CEILING
+-- ---------------------------------------------------------------------------------------------------
+--
+-- **Top speed is the last gear's `maxSpeed`.** Not drag, not power. The engine will not pull a car past
+-- the band of the gear it is in, so the top of the last band is the top of the car -- which is exactly why
+-- three drag runs at 1.0, 1.217 and 1.575 drive all finished at the SAME speed. There was nothing left to
+-- multiply: at the ceiling the drive force is already gone.
+--
+-- Two different operations, because they are two different cars:
+--
+--   `/ncm.gearcap 1.2`    stretch ONLY the last gear. Same acceleration through the box, then a longer
+--                         run at the top. The cheapest possible top-speed change.
+--   `/ncm.gearing 1.2`    stretch the WHOLE chain, every gear's floor and ceiling together. That is a
+--                         longer final drive: higher top speed AND lazier acceleration, the real trade.
+--
+-- Multipliers against whatever this install's original was, never absolutes -- the same rule every other
+-- flat obeys, because the server does not know what the factory value is on this machine.
+local function pushGearChange(label, changes)
+    local own = NcmClientOwnVehicle and NcmClientOwnVehicle() or nil
+    local record = own and own.record
+    if not record then
+        log("%s: sit in a car first -- there is no record to write against", label)
+        return
     end
-    -- The last gear is the one that decides top speed, so say so rather than making it be counted out.
-    local last = chain[#chain]
-    local topMs = last and TweakDB:GetFlat(TweakDBID.new(last, ".maxSpeed"))
-    if topMs then
-        log("---- TOP SPEED = last gear maxSpeed = %.1f m/s = %.0f km/h ----", topMs, topMs * 3.6)
+    if pushProjection({ v = 1, record = { path = record, flats = {}, gears = changes } }) then
+        log("%s: %d gear change(s) pushed for %s -- the CARRIER log says how many landed",
+            label, #changes, tostring(record))
+    else
+        log("%s: bridge is down, nothing sent", label)
     end
+end
+
+local function gearMultiplierArg(args, label)
+    local mult = tonumber(args and args[1])
+    if args and args[1] == "off" then return nil, true end
+    if not mult or mult <= 0 then
+        log("usage: /%s <multiplier>   e.g. 1.25 for 25%% more, or 'off' to restore", label)
+        return nil, false
+    end
+    -- Bounded for the same reason every lever is: a typo that multiplied a gear by 100 would be a car
+    -- that never reaches its own first upshift.
+    if mult < 0.25 then mult = 0.25 elseif mult > 4.0 then mult = 4.0 end
+    return mult, false
+end
+
+--- Stretch the LAST gear only. The narrowest possible top-speed change.
+RegisterCommand("ncm.gearcap", function(_, args)
+    local mult, off = gearMultiplierArg(args, "ncm.gearcap")
+    if off then
+        local own = NcmClientOwnVehicle and NcmClientOwnVehicle() or nil
+        local record = own and own.record
+        if record and pushProjection({ v = 1, record = { path = record, flats = {}, gears = {}, restore = true } }) then
+            log("gearcap off: asked the carrier to restore %s", tostring(record))
+        end
+        return
+    end
+    if not mult then return end
+    pushGearChange("gearcap", {
+        { id = "ceiling_top_gear", gear = -1, suffix = ".maxSpeed", multiplier = mult },
+    })
+    log("gearcap: top gear maxSpeed x%.2f. Run /ncm.gears first and after to see the number move, "
+        .. "then drive a long straight.", mult)
+end, false)
+
+--- Stretch the WHOLE chain -- a longer or shorter final drive.
+RegisterCommand("ncm.gearing", function(_, args)
+    local mult, off = gearMultiplierArg(args, "ncm.gearing")
+    if off then
+        local own = NcmClientOwnVehicle and NcmClientOwnVehicle() or nil
+        local record = own and own.record
+        if record and pushProjection({ v = 1, record = { path = record, flats = {}, gears = {}, restore = true } }) then
+            log("gearing off: asked the carrier to restore %s", tostring(record))
+        end
+        return
+    end
+    if not mult then return end
+    -- Both ends of every band, or the bands stop meeting and a gear has a hole in front of it.
+    pushGearChange("gearing", {
+        { id = "gearing_max", gear = 0, suffix = ".maxSpeed", multiplier = mult },
+        { id = "gearing_min", gear = 0, suffix = ".minSpeed", multiplier = mult },
+    })
+    log("gearing: every gear x%.2f -- higher top speed AND lazier acceleration, which is the trade a "
+        .. "longer final drive actually makes.", mult)
 end, false)
 
 --- The server answers in chat as well (`Open77.chat.send`); this puts the same line in the client log,

@@ -10,6 +10,7 @@ local Core = NcmCore
 local Cal = Core.get("competition.calendar")
 local Entry = Core.get("competition.entry")
 local ids = Core.get("vocabulary.ids")
+local Json = Core.get("vocabulary.json")
 
 local function log(fmt, ...)
     print(("[ncm_league/calendar] " .. fmt):format(...))
@@ -155,13 +156,15 @@ local function persistEvent(e)
     MySQL.insert.await(
         "INSERT IGNORE INTO event (event_id, server_id, class, series_id, series_name, ruleset_id, route_id, route_name, " ..
         "starts_at, entry_opens_at, entry_closes_at, venue_x, venue_y, venue_z, venue_name, state, invitation, registration, seats_total, pack_id, " ..
-        "discipline_id, format_id, class_id, laps) " ..
-        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULLIF(?, ''), ?, ?, ?, ?)",
+        "discipline_id, format_id, class_id, laps, economy_id, economy_version, economy_json) " ..
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULLIF(?, ''), ?, ?, ?, ?, NULLIF(?, ''), ?, NULLIF(?, ''))",
         { e.eventId, serverId(), e.class or "calendar", e.seriesId, e.seriesName, e.rulesetId, e.routeId, e.routeName,
           math.floor(e.startsAt), math.floor(e.entryOpensAt), math.floor(e.entryClosesAt),
           e.venue.x, e.venue.y, e.venue.z, e.venue.name, e.state,
           e.invitation and 1 or 0, e.registration or "venue", e.seatsTotal or 0, e.packId or "",
-          e.disciplineId or "street_sprint", e.formatId or "sprint", e.classId or "street_open", e.laps or 1 })
+          e.disciplineId or "street_sprint", e.formatId or "sprint", e.classId or "street_open", e.laps or 1,
+          e.economy and e.economy.id or "", e.economy and e.economy.version or 0,
+          e.economy and Json.encode(e.economy) or "" })
 end
 
 --- Adopt a one-off event (organized/invitation) into the calendar: persist, index, publish.
@@ -200,6 +203,7 @@ local function restoreOrganized(t)
                     distanceM = route.distanceM, venueRadiusM = NcmPackNcx and NcmPackNcx.invitational.venueRadiusM or 40,
                     state = r.state, entries = {}, seatsTotal = tonumber(r.seats_total) or 0,
                     disciplineId = r.discipline_id or "ncx_formula", formatId = r.format_id or "sprint", classId = r.class_id or "ncx_rb15", laps = tonumber(r.laps) or 1,
+                    economy = NcmPackNcx and NcmPackNcx.invitational.economy or nil,
                 }
                 order[#order + 1] = r.event_id
                 if NcmOrganized and NcmOrganized.restore then NcmOrganized.restore(events[r.event_id]) end
@@ -223,7 +227,7 @@ local function loadPersisted(t)
         states[r.event_id] = { state = r.state, startsAt = tonumber(r.starts_at), entryOpensAt = tonumber(r.entry_opens_at), entryClosesAt = tonumber(r.entry_closes_at) }
     end
     local entries = MySQL.query.await(
-        "SELECT en.entry_id, en.event_id, en.ncm_driver_id, en.state, en.checked_in_at, en.registered_at, en.interested_at, en.team_id, en.seat_index FROM entry en " ..
+        "SELECT en.entry_id, en.event_id, en.ncm_driver_id, en.state, en.fee, en.checked_in_at, en.registered_at, en.interested_at, en.team_id, en.seat_index FROM entry en " ..
         "JOIN event ev ON ev.event_id = en.event_id WHERE ev.server_id = ? AND ev.starts_at >= ?",
         { serverId(), math.floor(t - 3600) }) or {}
     return states, entries
@@ -403,7 +407,7 @@ function NcmCalendar.start(series)
             table.sort(order, function(a, b) return events[a].startsAt < events[b].startsAt end)
             for _, r in ipairs(entries) do
                 local e = events[r.event_id]
-                if e then e.entries[r.ncm_driver_id] = { entryId = r.entry_id, state = r.state, checkedInAt = tonumber(r.checked_in_at), registeredAt = tonumber(r.registered_at), interestedAt = tonumber(r.interested_at), teamId = r.team_id, seatIndex = tonumber(r.seat_index) } end
+                if e then e.entries[r.ncm_driver_id] = { entryId = r.entry_id, state = r.state, fee = tonumber(r.fee) or 0, checkedInAt = tonumber(r.checked_in_at), registeredAt = tonumber(r.registered_at), interestedAt = tonumber(r.interested_at), teamId = r.team_id, seatIndex = tonumber(r.seat_index) } end
             end
             log("restored %d persisted event state(s), %d entr(ies)", (function() local n = 0 for _ in pairs(states) do n = n + 1 end return n end)(), #entries)
         else
@@ -477,6 +481,7 @@ local function enterPlayer(pid, eventId)
             position = p and p.fresh and p.position or nil,
             existingEntry = e.entries[driver.ncmDriverId],
             radiusM = e.venueRadiusM, rng = hostRng,
+            fee = (NcmCompetition.economyFor(e) or {}).entryFee or 0,
         })
         if not decision.ok then
             local why = decision.reason
@@ -497,18 +502,17 @@ local function enterPlayer(pid, eventId)
         -- gap IDEA-312 exists to close.
         en.assetId = enteredAsset
         if enteredAsset and not en.carNumber then en.carNumber = assignNumber(e.eventId, driver.ncmDriverId) end
-        local okDb, err = pcall(function()
-            if decision.upgraded then
-                -- interest from the Race Guide becomes the physical entry (P52/L48): same row, new state
-                MySQL.update.await("UPDATE entry SET state = 'checked_in', checked_in_at = ?, asset_id = NULLIF(?, ''), car_number = NULLIF(?, 0) WHERE entry_id = ?",
-                    { math.floor(en.checkedInAt), en.assetId or "", en.carNumber or 0, en.entryId })
-            else
-                MySQL.insert.await(
-                    "INSERT INTO entry (entry_id, event_id, ncm_driver_id, state, fee, checked_in_at, asset_id, car_number) VALUES (?, ?, ?, 'checked_in', ?, ?, NULLIF(?, ''), NULLIF(?, 0))",
-                    { en.entryId, e.eventId, driver.ncmDriverId, en.fee, math.floor(en.checkedInAt), en.assetId or "", en.carNumber or 0 })
-            end
-        end)
-        if not okDb then tell(pid, "Entry could not be recorded: " .. tostring(err)); return end
+        local okCall, paid, payWhy = pcall(NcmEconomy.checkIn, {
+            economy=NcmCompetition.economyFor(e), upgraded=decision.upgraded, entryId=en.entryId,
+            eventId=e.eventId, seriesId=e.seriesId, driverId=driver.ncmDriverId, checkedInAt=en.checkedInAt,
+            assetId=en.assetId, carNumber=en.carNumber,
+        })
+        if not okCall or not paid then
+            local why = okCall and tostring(payWhy or "insufficient balance") or tostring(paid)
+            tell(pid, "Entry refused: " .. why .. ". Check /ncm.balance.")
+            log("entry economic refusal player=%d event=%s reason=%s",pid,e.eventId,why)
+            return
+        end
         if sameEventPractice and NcmRace and NcmRace.practiceLeave then
             NcmRace.practiceLeave(e.eventId, driver.ncmDriverId, now(), "entered_race")
         end
@@ -521,8 +525,8 @@ local function enterPlayer(pid, eventId)
             eventId = e.eventId, state = "checked_in", routeName = e.routeName,
             startsAt = math.floor(e.startsAt),
             venue = { x = e.venue.x, y = e.venue.y, z = e.venue.z, name = e.venue.name } }) end)
-        tell(pid, ("You're in: %s · %s. Start in %s. Entry fee: 0 (first world)."):format(e.seriesName, e.routeName, Entry.countdown(e.startsAt - now())))
-        pcall(Open77.notifications.send, pid, { type = "success", title = "Entered", message = e.routeName .. " · start in " .. Entry.countdown(e.startsAt - now()), icon = "NCM", durationMs = 7000 })
+        tell(pid, ("You're in: %s · %s. Start in %s. Entry -€$%d · balance €$%d."):format(e.seriesName, e.routeName, Entry.countdown(e.startsAt - now()), paid.fee, paid.balance))
+        pcall(Open77.notifications.send, pid, { type = "success", title = "ENTERED · -€$"..paid.fee, message = e.routeName .. " · balance €$"..paid.balance, icon = "NCM", durationMs = 7000 })
         log("ENTERED player=%d driver=%s event=%s entry=%s dist=%.1fm%s", pid, driver.ncmDriverId, e.eventId, en.entryId, en.distanceM or -1, decision.upgraded and " (from interest)" or "")
         -- Navigation intent changes HERE, not at lights-out (owner QA 2026-09-23). The venue GPS has served
         -- its purpose the moment the driver is standing at the venue and entered; from now on the useful

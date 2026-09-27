@@ -44,7 +44,10 @@ def load_list():
 def manifests():
     """{resource name: (path, declared dependency names)} for every open77.lua under resources/."""
     out = {}
-    for dirpath, dirnames, filenames in os.walk(ROOT):
+    # Production deploys `resources/ncm` as a symlink to the staged resource tree.  Without
+    # followlinks the guard reports that the ncm/* load entry matches nothing even though the
+    # server follows that link normally, turning a safety check into a false restart blocker.
+    for dirpath, dirnames, filenames in os.walk(ROOT, followlinks=True):
         dirnames[:] = [d for d in dirnames if not d.startswith(".")]
         if "open77.lua" not in filenames:
             continue

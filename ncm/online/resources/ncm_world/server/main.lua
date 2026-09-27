@@ -427,6 +427,17 @@ local function restoreLocation(pid, driverId)
     -- owner reported -- paid on every single join, because the two positions usually agree.
     local okHere, here = pcall(Open77.players.get, pid)
     local current = okHere and type(here) == "table" and here.fresh and here.position or nil
+    -- **The guard is conditional, and that is the remaining hole.** `fresh` is exactly the field KB-113
+    -- records as unreliable -- the readiness sweep reported `in-world=yes` for a player it simultaneously
+    -- called CANNOT PLAY -- so when it reads false `current` is nil, `alreadyThere` never runs, and the
+    -- teleport fires unconditionally. That is the double spawn coming back without the fix being touched.
+    -- Say so in the log rather than inferring it later from a silence.
+    if not current then
+        log("location: driver=%s cannot be read before restore (ok=%s fresh=%s) -- the already-there guard " ..
+            "is being SKIPPED, so a second arrival is possible",
+            tostring(driverId):sub(1, 8), tostring(okHere),
+            tostring(type(here) == "table" and here.fresh or "?"))
+    end
     if current and Location.alreadyThere(current, pose) then
         log("location: driver=%s is already at %.1f,%.1f,%.1f -- no second arrival",
             tostring(driverId):sub(1, 8), pose.x, pose.y, pose.z)

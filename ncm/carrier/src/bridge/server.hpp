@@ -59,6 +59,10 @@ struct Handling {
     bool hasGrip = false;  double grip = 1.0;    // across travel -- tyre grip
     bool hasDrive = false; double drive = 1.0;   // along travel, pushing -- power delivery
     bool hasBrake = false; double brake = 1.0;   // along travel, retarding -- stopping ability
+    // The governor: an absolute km/h this Machine is tapered down to. NOT a lever -- it withholds drive
+    // near the target rather than scaling it everywhere, so top speed and acceleration stay separable.
+    bool hasDrag = false;     double drag = 0.0;        // retarding force while COASTING (aero drag)
+    bool hasTopSpeed = false; double topSpeedKph = 0.0;
 };
 
 /// One telemetry frame, the shape `driver.feedback.frame` produces. **A channel that could not be read is
@@ -68,6 +72,9 @@ struct Frame {
     bool hasEngine = false;    double engine = 0.0;      // rev ratio 0..1
     bool hasSpeed = false;     double speed = 0.0;       // m/s
     bool hasSteering = false;  double steering = 0.0;    // -1..1
+    // **The brake PEDAL, not brake force.** This is what separates drag from braking at the write site:
+    // a retarding force with the pedal at rest is drag by definition. See `physics_probe.cpp`.
+    bool hasBrake = false;     double brake = 0.0;       // 0..1
     bool hasSlipLong = false;  double slipLong = 0.0;
     bool hasSlipLat = false;   double slipLat = 0.0;
     bool hasSlipTotal = false; double slipTotal = 0.0;
@@ -93,6 +100,8 @@ public:
     /// `IDEA-507`: NCM asks the carrier to read the game's own drive-model data for a list of records and
     /// write it to a file. Read-only -- it mutates nothing, so `L148` is not engaged.
     void onArchDump(std::function<void(const std::vector<std::string>&)> fn) { onArchDump_ = std::move(fn); }
+    /// Read the gear chain of one or more vehicle records and log it. Read-only; `L148` is not engaged.
+    void onGearDump(std::function<void(const std::vector<std::string>&)> fn) { onGearDump_ = std::move(fn); }
     /// `L152`: the driver's fitted parts, as live force scales. A v2 bound setup is also a short lease;
     /// the sender must heartbeat the complete identity and levers while the binding remains authoritative.
     void onHandling(std::function<void(const Handling&)> fn) { onHandling_ = std::move(fn); }
@@ -124,6 +133,7 @@ private:
 
     std::function<void(const Projection&)> onProjection_;
     std::function<void(const std::vector<std::string>&)> onArchDump_;
+    std::function<void(const std::vector<std::string>&)> onGearDump_;
     std::function<void(const Handling&)> onHandling_;
     std::function<void(const Frame&)> onFrame_;
     std::function<void()> onDisconnect_;

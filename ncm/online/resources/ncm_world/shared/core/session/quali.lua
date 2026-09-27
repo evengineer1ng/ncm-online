@@ -130,7 +130,11 @@ Core.define("session.quali", function(C)
         if g.kind == "start" then
             if r.run and (req.now - r.run.startedAt) < s.rules.runRestartSec then return { ok = false, reason = "run_just_started" } end
             if not r.run and r.runs >= s.rules.maxRuns then return { ok = false, reason = "no_runs_left" } end
-            r.run = { startedAt = req.now, progress = 1, incidentSec = 0 }
+            -- **The machine is latched HERE, at the start line.** The host reads the seat once and the run
+            -- carries it to the finish. Practice attribution used to be read when the SESSION closed, so a
+            -- lap was credited to whatever car the driver happened to be sitting in minutes later -- and a
+            -- driver who leaves practice, refits and comes back is the ordinary case, not the edge one.
+            r.run = { startedAt = req.now, progress = 1, incidentSec = 0, machine = req.machine }
             r.runs = r.runs + 1
             r.progress = 1
             r.state = r.bestSec and "timed" or "running"
@@ -142,10 +146,23 @@ Core.define("session.quali", function(C)
         r.progress = req.gateIndex
         if g.kind == "finish" then
             local sec = (req.now - r.run.startedAt) + (r.run.incidentSec or 0)
+            local startedAt, machine, incidentSec = r.run.startedAt, r.run.machine, (r.run.incidentSec or 0)
+            local improved = not r.bestSec or sec < r.bestSec
             r.lastSec = sec
-            if not r.bestSec or sec < r.bestSec then r.bestSec = sec end
+            if improved then r.bestSec = sec end
             r.run = nil; r.progress = 0; r.state = "timed"
-            return { ok = true, gate = g, finished = true, runSec = sec, bestSec = r.bestSec }
+            -- **The interval leaves the kernel.** `r.run` is discarded on this line, and it held the only
+            -- record of WHEN the lap happened. Without the boundaries a finished lap is a duration with no
+            -- place in time, which is why no stored practice run could be located against the telemetry it
+            -- was driven through. `improved` travels with it so the client, the server and the HUD all learn
+            -- "this is a new best" from the kernel rather than each recomputing it.
+            -- `rawSec` is the pure gate-to-gate duration; `runSec` is the official time and includes the
+            -- incident penalty. Both are returned because they answer different questions, and a caller that
+            -- has to subtract one from the other to get the first is a caller that will eventually subtract
+            -- the wrong thing.
+            return { ok = true, gate = g, finished = true, runSec = sec, bestSec = r.bestSec,
+                     startedAt = startedAt, finishedAt = req.now, rawSec = req.now - startedAt,
+                     incidentSec = incidentSec, improved = improved, machine = machine }
         end
         return { ok = true, gate = g }
     end

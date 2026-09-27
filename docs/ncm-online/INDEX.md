@@ -38,18 +38,24 @@ corpus claiming migrations 001-007 while the schema was at 023.
 | Foundational primitives, contradictions, build sequencing | [24_FOUNDATION_RECONCILIATION.md](24_FOUNDATION_RECONCILIATION.md) | L123 |
 | Environments, promotion discipline (Online vs Development) | [16_ENVIRONMENTS.md](16_ENVIRONMENTS.md) | L112, L121 |
 | **Database schema** | CODE: `ncm/online/resources/ncm_league/server/schema/` | - |
+| Lap ghost replay | [39_GHOST_REPLAY.md](39_GHOST_REPLAY.md) | L166 |
 | Overall system shape | [01_ARCHITECTURE.md](01_ARCHITECTURE.md) | L28-L33 - see conflict C-1 |
 | Milestone vocabulary (M0-M12) only | [02_ROADMAP.md](02_ROADMAP.md) | L39-L42, L59-L63 |
 | Nodes, routes, ordered chains | [07_NODE_NETWORK.md](07_NODE_NETWORK.md) | - |
-| Economy intent | [08_ECONOMY.md](08_ECONOMY.md) | L84, L85 |
+| Economy v1 build contract | [40_ECONOMY_V1.md](40_ECONOMY_V1.md), supported by the ledger/refund audit in [08_ECONOMY.md](08_ECONOMY.md) | L84, L85, L165, L167-L169 |
 | Markets and market discovery | [17_MARKET_NETWORK.md](17_MARKET_NETWORK.md) | L106, L117 |
 | Player-scoped machine knowledge | [16_MACHINE_INDEX.md](16_MACHINE_INDEX.md) | - |
 | Discovery and collection | [13_VEHICLE_COLLECTION.md](13_VEHICLE_COLLECTION.md) | - |
 | Weather as world state | [11_WEATHER.md](11_WEATHER.md) | - |
 | Vehicle artwork | [15_GENERATION_1_VEHICLE_ARTWORK_MANIFEST.md](15_GENERATION_1_VEHICLE_ARTWORK_MANIFEST.md) | - |
 | Day-to-day operation of NCM Online | [OPS_STAGING.md](OPS_STAGING.md) | - |
+| Carrier follow-up and in-place Production package upgrade | [CARRIER_NEXT_STEPS_AND_UPGRADE.md](CARRIER_NEXT_STEPS_AND_UPGRADE.md) | L146-L147; KB-132-KB-136 |
 | QA instrumentation mapping | [wp/QA_INSTRUMENTATION.md](wp/QA_INSTRUMENTATION.md) | - |
 | Driver Card and Fingerprint direction | [DECISION_RECORD.md](DECISION_RECORD.md#l130--locked--driver-card-expression-and-fingerprint-authority-stay-separate) | L130 |
+| Foundry scope and invariants | [DECISION_RECORD.md](DECISION_RECORD.md#l153---locked-owner-direction---foundry-is-vehicle-rd-over-existing-geometry) | L153; representation awaits ruling in Proposal 38 |
+| Parts economy and fitting v1 | [DECISION_RECORD.md](DECISION_RECORD.md#l162---executed-in-code--live-gated---parts-becomes-a-conserved-economy-of-physical-assets) | L162-L163; deployed/enabled on private Online surface; MASTER_TEST §BF live evidence pending |
+| Observation vocabulary and observation provenance | [DECISION_RECORD.md](DECISION_RECORD.md#l164---executed-owner-ruling---the-first-observation-vocabulary-is-accepted-the-estimator-is-not) plus [31_CAPABILITY_AUDIT.md](31_CAPABILITY_AUDIT.md) §9 | L164; §9 accepted as authority, rest of 31 stays PROPOSAL; MASTER_TEST §BH pending |
+| Estimation, envelopes and confidence | **NOBODY - explicitly unbuilt** | L164 refuses it pending its own reviewed proposal (`IDEA-337`, `IDEA-338`) |
 
 ---
 
@@ -66,14 +72,14 @@ functional gain now that this map exists. Left alone deliberately.
 **C-3 - 02_ROADMAP.md sequencing vs 24 section 9.** Resolved by per-topic authority: 02 owns milestone
 vocabulary, 24 owns what happens next.
 
-**C-4 - Race Tags (IDEA-301).** The owner recalled it as a shipped post-race feature; the repository shows it
-was authored as a brick and never admitted, wired or tested. Owner ruled 2026-09-24 that the repository is
-correct and it should be integrated eventually. So bricks/assignments/B-089-race-tags.v1.md is SPEC (wanted,
-unbuilt) while the brick methodology itself is HISTORICAL (a closed experiment).
+**C-4 - Race Tags (IDEA-301), resolved by L169.** The owner recalled it as a shipped post-race feature; the
+repository proved it was only an authored brick. Economy v1 has now admitted the vocabulary through a pure
+runtime evaluator with separate capped presentation and authored bounty consumption. The original assignment
+remains a SPEC artifact; current runtime behavior is the code and current economic behavior is document 40.
 
 ---
 
-## Current (14)
+## Current (16)
 
 - [01_ARCHITECTURE.md](01_ARCHITECTURE.md) - overall system shape - SEE CONFLICT C-1 in INDEX.md
 - [02_ROADMAP.md](02_ROADMAP.md) - milestone vocabulary (M0-M12) ONLY; current sequencing is 24
@@ -87,10 +93,12 @@ unbuilt) while the brick methodology itself is HISTORICAL (a closed experiment).
 - [16_MACHINE_INDEX.md](16_MACHINE_INDEX.md) - player-scoped machine knowledge
 - [17_MARKET_NETWORK.md](17_MARKET_NETWORK.md) - markets, market discovery
 - [24_FOUNDATION_RECONCILIATION.md](24_FOUNDATION_RECONCILIATION.md) - foundational primitives, contradictions, sequencing
+- [40_ECONOMY_V1.md](40_ECONOMY_V1.md) - Economy v1 build contract: paid events, additional faucets, asset sinks and settlement
 - [OPS_STAGING.md](OPS_STAGING.md) - day-to-day operation of NCM Online
+- [CARRIER_NEXT_STEPS_AND_UPGRADE.md](CARRIER_NEXT_STEPS_AND_UPGRADE.md) - bounded Carrier follow-up and exact in-place Production package upgrade
 - [wp/QA_INSTRUMENTATION.md](wp/QA_INSTRUMENTATION.md) - mapping the QA corpus to instrumentation
 
-## Spec - owner intent, not authorised (10)
+## Spec - owner intent, not authorised (11)
 
 - [06_CHROME_ROSTER.md](06_CHROME_ROSTER.md) - vehicle cyberware / quickhack roster
 - [09_APPAREL.md](09_APPAREL.md) - apparel entitlement
@@ -101,9 +109,10 @@ unbuilt) while the brick methodology itself is HISTORICAL (a closed experiment).
 - [19_ENGINEERING.md](19_ENGINEERING.md) - engineering as a career
 - [20_WEAR_LIFECYCLE.md](20_WEAR_LIFECYCLE.md) - wear, condition and component lifecycle
 - [28_MACHINE_KNOWLEDGE.md](28_MACHINE_KNOWLEDGE.md) - machine knowledge, discovery, documentation, observation and estimation envelopes
-- [bricks/assignments/B-089-race-tags.v1.md](bricks/assignments/B-089-race-tags.v1.md) - Race Tags - owner wants it integrated eventually; NOT yet integrated (IDEA-301)
+- [39_GHOST_REPLAY.md](39_GHOST_REPLAY.md) - lap ghost replay: what a ghost is, what it wears, and why poses are not telemetry samples
+- [bricks/assignments/B-089-race-tags.v1.md](bricks/assignments/B-089-race-tags.v1.md) - original Race Tag component specification; admitted by L169, with runtime behavior now governed by code
 
-## Proposal - no authority until ruled (14)
+## Proposal - no authority until ruled (15)
 
 - [21_ENGINEERING_PROPOSAL.md](21_ENGINEERING_PROPOSAL.md) - engineering architecture - ACCEPTED; decisions live in L120
 - [22_WEAR_PROPOSAL.md](22_WEAR_PROPOSAL.md) - wear architecture - ACCEPTED; decisions live in L120
@@ -112,13 +121,16 @@ unbuilt) while the brick methodology itself is HISTORICAL (a closed experiment).
 - [27_ATTRIBUTION_AND_ORIGIN.md](27_ATTRIBUTION_AND_ORIGIN.md) - Stage 0 machine attribution and the origin retirement mechanics - awaiting a ruling
 - [29_STATE_BAG_AUDIENCE_AUDIT.md](29_STATE_BAG_AUDIENCE_AUDIT.md) - replication audience of NCM player state-bag mirrors - audited, corrections not applied
 - [30_MACHINE_KNOWLEDGE_DEEP_DIVE.md](30_MACHINE_KNOWLEDGE_DEEP_DIVE.md) - what the knowledge substrate already records, and the minimal additive change it needs
-- [31_CAPABILITY_AUDIT.md](31_CAPABILITY_AUDIT.md) - what the platform exposes or lets NCM derive about a machine, classified (`IDEA-339`)
+- [31_CAPABILITY_AUDIT.md](31_CAPABILITY_AUDIT.md) - what the platform exposes or lets NCM derive about a machine, classified (`IDEA-339`) - **§9 was RULED ON 2026-09-26 (`L164`) and is now authority**; the rest of the document remains a proposal. Its §6 finding (there are no engine components) stands and is now the *reason* `configuration_ref` is legitimate rather than the reason it was refused.
 - [32_PARTS_ENGINEERING_REENTRY_AUDIT.md](32_PARTS_ENGINEERING_REENTRY_AUDIT.md) - existing-system audit plus lineage, reconstruction-knowledge and fabrication-ceremony feasibility; owner rulings now live in L134 / Report 33
 - [33_PARTS_ENGINEERING_FINAL_RECONCILIATION.md](33_PARTS_ENGINEERING_FINAL_RECONCILIATION.md) - owner-ruling reconciliation, focused Gate 5 audit and Chrome/setPerformance Gate 6 proof plan
 - [34_GATE6_INPUT_AUTHORITY_REQUIRED_MOD_AUDIT.md](34_GATE6_INPUT_AUTHORITY_REQUIRED_MOD_AUDIT.md) - companion input authority, OPEN//77 control limits, required-world-mod delivery and additional Gate 6 carrier proofs
 - [35_REQUIREDMODS_FORENSIC_AUDIT.md](35_REQUIREDMODS_FORENSIC_AUDIT.md) - real RB15/livery package audit, exact public-HTTP `Unverifiable` cause, HTTPS correction and acceptance contract
 - [36_DRIVEABILITY_MOD_CARRIER_ASSESSMENT.md](36_DRIVEABILITY_MOD_CARRIER_ASSESSMENT.md) - whether a hosted mod can widen vehicle control past the three exposed performance fields and carry FFB natively; three engine surfaces, spawn-caching, multiplayer integrity, licensing (`IDEA-453`) - **revision 2** adds the research pass that answered §AR without an experiment. **Its three open decisions were ruled on 2026-09-25 (`L146`): NCM owns native code, the carrier is one mod, the companion retires.** The assessment's findings stand; the decision lives in `DECISION_RECORD.md`, not here.
 - [37_REPOSITORY_RECONCILIATION_SCHEDULE.md](37_REPOSITORY_RECONCILIATION_SCHEDULE.md) - **the single ordered execution schedule** for both repositories and both servers, including where the RB15 withdrawal safely lands - WRITTEN, NOT EXECUTED (`IDEA-459`)
+- [38_FOUNDRY_VEHICLE_LINEAGE_ARCHITECTURE.md](38_FOUNDRY_VEHICLE_LINEAGE_ARCHITECTURE.md) - repo-aware Foundry review: existing-mesh lineages, deterministic Vehicle R&D, immutable factory BOMs, finite appearance reservoirs and Design-keyed bounded production - **awaiting owner review; no implementation authorised** (`L153`, `IDEA-519`-`IDEA-526`)
+- [38_FOUNDRY_VEHICLE_LINEAGE_ARCHITECTURE.md](38_FOUNDRY_VEHICLE_LINEAGE_ARCHITECTURE.md) - vehicle lineage and procedural Vehicle R&D architecture review - **PROPOSAL, do not implement from it**. The owner invariants are `L153`; `L155` governs the narrower Machine-keyed Parts boundary.
+- [CARRIER_NEXT_STEPS_AND_UPGRADE.md](CARRIER_NEXT_STEPS_AND_UPGRADE.md) - **the canonical Carrier build/publish/verify/rollback runbook**. Every in-place Carrier replacement follows it; do not hand-copy the DLL and do not accept a warm reconnect as proof.
 
 ## Ledgers - living records (6)
 

@@ -9,6 +9,7 @@ local function log(fmt, ...) print(("[ncm_league/progression] " .. fmt):format(.
 local now = function() return Open77.time.unix() end
 local function serverId() return tostring((NcmCalendar and NcmCalendar.serverId and NcmCalendar.serverId()) or "ncm-dev") end
 local function tell(pid, text) if pid then pcall(Open77.chat.send, pid, "[NCM] " .. text) end end
+local BADGE_REWARDS = { first_finish = 100, first_time_trial = 100, first_win = 300 }
 
 --- Load a driver's dimension state from the tables (defaults when absent).
 function NcmProgression.load(driverId)
@@ -32,9 +33,9 @@ function NcmProgression.load(driverId)
 end
 
 local function save(driverId, st, newAcc, t)
-    if not MySQL.isReady() then return end
+    if not MySQL.isReady() then return false,"database_not_ready" end
     local sid = serverId()
-    pcall(function()
+    local ok,err=pcall(function()
         for disc, lic in pairs(st.licences) do
             MySQL.insert.await(
                 "INSERT INTO driver_licence (ncm_driver_id, server_id, discipline_id, level, clean_sessions, earned_at) VALUES (?, ?, ?, ?, ?, ?) " ..
@@ -59,6 +60,7 @@ local function save(driverId, st, newAcc, t)
         MySQL.update.await("UPDATE driver_profile SET sr = JSON_SET(COALESCE(sr, '{}'), '$.sr', ?, '$.incidents', ?) WHERE ncm_driver_id = ? AND server_id = ?",
             { st.sr.sr, st.sr.incidents, driverId, sid })
     end)
+    return ok,err
 end
 
 --- After a race session completes: every classified driver's dimensions move.
@@ -69,8 +71,20 @@ function NcmProgression.apply(rec, results, t)
         local st = NcmProgression.load(r.driverId)
         local before = st.sr.sr
         local newSt, deltas, newAcc = P.apply(st, r, ctx)
-        save(r.driverId, newSt, newAcc, t)
+        local saved,saveWhy = save(r.driverId, newSt, newAcc, t)
         local pid = rec.playerOf and rec.playerOf[r.driverId]
+        for _, a in ipairs(newAcc) do
+            local amount = BADGE_REWARDS[a.kind]
+            if amount and saved and NcmEconomy then
+                local ok, balance = NcmEconomy.reward(r.driverId, "badge_reward", amount,
+                    ("badge:%s:%s:unique:%s"):format(r.driverId, a.kind, serverId()),
+                    { ref=a.kind, note="Badge: "..a.kind:gsub("_"," "), sessionId=ctx.sessionId })
+                if ok and pid then
+                    tell(pid, ("Badge earned: %s · +€$%d · balance €$%d"):format(a.kind:gsub("_"," "), amount, balance or 0))
+                end
+            end
+        end
+        if not saved then log("driver=%s progression save failed; badge money withheld: %s",r.driverId:sub(1,8),tostring(saveWhy)) end
         local lic = newSt.licences[ctx.disciplineId]
         log("driver=%s sr %.2f -> %.2f licence %s (%d clean) accomplishments +%d", r.driverId:sub(1, 8), before, newSt.sr.sr, lic and lic.level or "-", lic and lic.clean or 0, #newAcc)
         if pid then

@@ -153,12 +153,62 @@ void onLoad()
             // going. A frame with no speed, or an idle frame, means "not in a car" and is reported as such
             // rather than as zero -- absent and stationary are different claims.
             ncm::vehicle::probe::noteReportedSpeed((f.hasSpeed && !f.idle) ? f.speed : -1.0);
+            // The brake PEDAL, which is what separates drag from braking at the write site. An idle frame
+            // withdraws it rather than reporting zero: "out of the car" must not read as "coasting", or a
+            // car nobody is driving would have its retarding force treated as drag.
+            ncm::vehicle::probe::noteBrakeInput(f.brake, f.hasBrake && !f.idle);
         });
         // IDEA-507: read the game's own drive-model data for a list of records and write it to a file.
         // Read-only, so it needs no decision line and cannot leave the player's game altered. The list comes
         // from NCM's vendored `data.vehicle_catalogue`, so the carrier never has to know what a car is.
         c.server->onArchDump([](const std::vector<std::string>& records) {
             ncm::vehicle::arch::dump(records);
+        });
+        // ---------------------------------------------------------------- THE GEAR CHAIN, read-only
+        //
+        // **Top speed is the last gear's `maxSpeed`, and it is in metres per second.** Nothing in NCM had
+        // ever looked at a gear, because `arch_dump` only ever asked for FLOATS at `driveModel + suffix`
+        // and the gears are an array of child records hanging off `.vehEngineData` -- a SIBLING of the
+        // drive model, not a child of it.
+        //
+        // This logs rather than replies because the answer is a table, the carrier log is already where
+        // the operator is looking, and a read that mutates nothing needs no round trip.
+        c.server->onGearDump([](const std::vector<std::string>& records) {
+            for (const auto& record : records) {
+                const uint64_t engine = ncm::effects::resolveEngineData(record);
+                if (engine == 0) {
+                    NCM_WARN("gears: '%s' has no .vehEngineData -- the traversal fails at step one",
+                             record.c_str());
+                    continue;
+                }
+                std::vector<uint64_t> chain;
+                if (!ncm::effects::resolveGears(engine, chain)) {
+                    NCM_WARN("gears: engine data on '%s' has no readable .gears array", record.c_str());
+                    continue;
+                }
+                NCM_INFO("---- gear chain for %s (%zu gear(s)) ----", record.c_str(), chain.size());
+                float top = 0.0f;
+                for (size_t i = 0; i < chain.size(); ++i) {
+                    float lo = 0.0f, hi = 0.0f, torque = 0.0f;
+                    const bool okLo = ncm::effects::readFlat(
+                        ncm::effects::composeFlatId(chain[i], ".minSpeed"), lo);
+                    const bool okHi = ncm::effects::readFlat(
+                        ncm::effects::composeFlatId(chain[i], ".maxSpeed"), hi);
+                    const bool okT = ncm::effects::readFlat(
+                        ncm::effects::composeFlatId(chain[i], ".torqueMultiplier"), torque);
+                    NCM_INFO("  gear %zu: minSpeed=%s maxSpeed=%s torqueMul=%s   (%.0f - %.0f km/h)",
+                             i + 1,
+                             okLo ? std::to_string(lo).c_str() : "ABSENT",
+                             okHi ? std::to_string(hi).c_str() : "ABSENT",
+                             okT ? std::to_string(torque).c_str() : "ABSENT",
+                             okLo ? lo * 3.6 : 0.0, okHi ? hi * 3.6 : 0.0);
+                    if (okHi) top = hi;
+                }
+                if (top > 0.0f) {
+                    NCM_INFO("---- TOP SPEED = last gear maxSpeed = %.1f m/s = %.0f km/h ----",
+                             top, top * 3.6);
+                }
+            }
         });
         // `L152` / `KB-146`: the per-machine half of Parts. The Carrier no longer guesses which body is
         // the player's by choosing the fastest plausible car. A v2 message names the authoritative
@@ -178,7 +228,8 @@ void onLoad()
             ncm::vehicle::probe::applyHandling(h.assetId, h.vehicleId, h.authorityEpoch,
                                                h.engineEntity,
                                                h.hasGrip, h.grip, h.hasDrive, h.drive,
-                                               h.hasBrake, h.brake);
+                                               h.hasBrake, h.brake, h.hasDrag, h.drag,
+                                               h.hasTopSpeed, h.topSpeedKph);
         });
         c.server->onConnect([&c] { sendHealth(c); });
         c.server->onDisconnect([&c] {
@@ -273,7 +324,7 @@ RED4EXT_C_EXPORT void RED4EXT_CALL Query(RED4ext::v1::PluginInfo* info)
 {
     info->name = L"NCM Carrier";
     info->author = L"Night City Motorsports";
-    info->version = RED4EXT_V1_SEMVER(0, 1, 18);
+    info->version = RED4EXT_V1_SEMVER(0, 1, 28);
     info->runtime = RED4EXT_V1_RUNTIME_VERSION_INDEPENDENT;  // see the note below
     info->sdk = RED4EXT_V1_SDK_VERSION_CURRENT;
 }

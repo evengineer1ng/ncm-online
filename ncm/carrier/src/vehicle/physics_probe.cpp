@@ -519,6 +519,84 @@ std::atomic<float> g_driveScale{kGripScaleInert};
 std::atomic<float> g_brakeScale{kGripScaleInert};
 
 // ---------------------------------------------------------------------------------------------------
+// THE GOVERNOR. Top speed as a speed-dependent taper on drive, not as a number written somewhere.
+// ---------------------------------------------------------------------------------------------------
+//
+// **Why this exists at all.** Three live drag runs at drive 1.000, 1.217 and 1.575 accelerated visibly
+// differently and finished at exactly the same speed. That is not a drag equilibrium -- a real one would
+// have moved terminal velocity by sqrt(1.575) = 1.25, which nobody could miss -- it is the GEARBOX. A car
+// will not be pulled past the top of its last gear's speed band, so at the ceiling the drive force is
+// already zero and `driveScale` has nothing left to multiply.
+//
+// So the design inverts: raise the gear ceiling once, per model, until the car is DRAG-limited rather
+// than gear-limited, and then place each Machine's real top speed inside that window by withholding
+// drive. The record sets the headroom; the instance sets the car.
+//
+// **Why a taper and not a flat scale.** `driveScale` alone is both acceleration AND top speed -- halve it
+// and the car is slower everywhere, which makes "a part that costs you 10 km/h at the top" impossible to
+// express without also gutting the launch. Tapering by SPEED separates them: full authority low down,
+// falling to nothing as the target is approached. That is also what a real drag-limited car does, and what
+// a rev limiter feels like, rather than a clamp that stops the car dead at a number.
+//
+// **Downward only, as everything here is.** The taper can only ever remove drive. It cannot push a car
+// past a ceiling it would not otherwise have reached, so it inherits `L156` point 3 and needs no new
+// authority to add force.
+//
+// Zero means no governor -- absent, not "a top speed of zero".
+std::atomic<float> g_topSpeedMps{0.0f};
+
+// How much of the approach is spent tapering. At 0.12 a car aimed at 200 km/h pulls at full authority to
+// 176 and then eases off, which reads as running out of legs rather than hitting a wall.
+constexpr float kTopSpeedTaper = 0.12f;
+
+// ---------------------------------------------------------------------------------------------------
+// DRAG IS NOT BRAKING, AND THE WRITE SITE COULD NOT TELL THEM APART (`IDEA-538`)
+// ---------------------------------------------------------------------------------------------------
+//
+// Retarding force was discriminated by SIGN alone, so aerodynamic drag was scaled by `brakeScale` along
+// with the brakes. Measured live 2026-09-26: `brakes 0.5` took the Galena from 131 to 139 km/h and
+// `brakes 0.3` to 142. Two independent points both imply this hook sees about 22% of the car's drag --
+// so a brake part silently moved terminal velocity, which is wrong on its face.
+//
+// **The discriminator is the driver's brake PEDAL, and it fails CLOSED.** A retarding force with the
+// pedal at rest is drag. Anything else -- pedal down, never told, or a value too old to trust -- is
+// treated as braking and keeps the brake lever, because the failure modes are not symmetric: scaling
+// drag as though it were braking costs a little top speed, while scaling braking as though it were drag
+// means a car that will not stop. Only one of those is worth risking on a dropped message.
+std::atomic<double> g_brakeInput{-1.0};          // <0 means "never told"
+std::atomic<uint64_t> g_brakeInputAtMs{0};
+constexpr uint64_t kBrakeInputStaleMs = 250;     // the feed runs at 30 Hz; this is ~7 missed frames
+constexpr float kBrakePedalRest = 0.02f;         // pedal noise floor, not a real application
+constexpr float kDragScaleMin = 0.50f, kDragScaleMax = 1.50f;
+std::atomic<float> g_dragScale{1.0f};
+
+/// True only when we are CONFIDENT the driver is not braking. Every uncertainty answers false.
+bool coastingConfidently(uint64_t nowMs) noexcept
+{
+    const double pedal = g_brakeInput.load(std::memory_order_relaxed);
+    if (!(pedal >= 0.0)) return false;                     // never told
+    const uint64_t at = g_brakeInputAtMs.load(std::memory_order_relaxed);
+    if (at == 0 || nowMs < at || (nowMs - at) > kBrakeInputStaleMs) return false;   // too old to trust
+    return pedal <= static_cast<double>(kBrakePedalRest);
+}
+// Below this there is no meaningful governor and the arithmetic stops being trustworthy.
+constexpr float kMinGovernedMps = 3.0f;
+
+/// The fraction of drive authority left at this speed. 1.0 well below the target, 0.0 at or past it.
+float governorAt(float speedMps) noexcept
+{
+    const float target = g_topSpeedMps.load(std::memory_order_relaxed);
+    if (!(target >= kMinGovernedMps)) return 1.0f;          // absent, zero or NaN -- no governor
+    if (speedMps >= target) return 0.0f;
+    const float taperStart = target * (1.0f - kTopSpeedTaper);
+    if (speedMps <= taperStart) return 1.0f;
+    const float span = target - taperStart;
+    if (!(span > 0.0f)) return 0.0f;
+    const float left = (target - speedMps) / span;
+    return left < 0.0f ? 0.0f : (left > 1.0f ? 1.0f : left);
+}
+
+// ---------------------------------------------------------------------------------------------------
 // WHO OWNS THE THREE LEVERS (`L152`)
 // ---------------------------------------------------------------------------------------------------
 //
@@ -1075,14 +1153,41 @@ void observe(void* body) noexcept
                     const bool wantGrip  = std::fabs(k - kGripScaleInert) > kGripScaleEpsilon;
                     const bool wantDrive = std::fabs(kDrive - kGripScaleInert) > kGripScaleEpsilon;
                     const bool wantBrake = std::fabs(kBrake - kGripScaleInert) > kGripScaleEpsilon;
+                    const float kDrag = g_dragScale.load(std::memory_order_relaxed);
+                    const bool wantDrag = std::fabs(kDrag - kGripScaleInert) > kGripScaleEpsilon;
+                    // The governor is computed from the speed we already decomposed against, so it costs
+                    // one square root that was going to happen anyway.
+                    const float speedNow = std::sqrt(speedSq);
+                    const float governor = governorAt(speedNow);
+                    // **A governor at full authority is not a reason to write.** It only becomes one when
+                    // it is actually withholding something, or the write path would engage on every frame
+                    // of every governed car for no change at all.
+                    const bool wantGovernor = governor < 1.0f;
                     if (handlingAuthorised && g_writesEnabled.load(std::memory_order_relaxed) &&
-                        (wantGrip || wantDrive || wantBrake)) {
+                        (wantGrip || wantDrive || wantBrake || wantDrag || wantGovernor)) {
                         const float scaledLateral = wantGrip ? lateral * k : lateral;
                         float scaledLong = longitudinal;
                         if (longitudinal > 0.0f) {
-                            if (wantDrive) scaledLong *= kDrive;
-                        } else if (wantBrake) {
-                            scaledLong *= kBrake;
+                            // Parts first, then the governor on top of them. Multiplication commutes, but
+                            // the ORDER is the story: the driver's engine decides how hard the car pulls,
+                            // and the governor decides how much of that pull survives at this speed.
+                            float alongDrive = wantDrive ? kDrive : 1.0f;
+                            if (wantGovernor) alongDrive *= governor;
+                            scaledLong *= alongDrive;
+                        } else {
+                            // **Retarding force -- and which KIND decides which lever.** Drag and braking
+                            // arrive here as the same negative number; only the pedal separates them.
+                            // `coastingConfidently` answers false for every uncertainty, so an unknown or
+                            // stale pedal keeps the brake lever and the car still stops.
+                            //
+                            // **The governor never touches retarding force**, of either kind. Scaling a
+                            // brake by a top-speed term would make a car harder to stop the faster it
+                            // went, which is the opposite of every intention here.
+                            if (coastingConfidently(monotonicMs())) {
+                                if (wantDrag) scaledLong *= kDrag;
+                            } else if (wantBrake) {
+                                scaledLong *= kBrake;
+                            }
                         }
                         // long*dir + lat*perp, with perp = (-dirY, dirX). With every multiplier at 1 this
                         // is the vector we just took apart, put back together, identically.
@@ -2052,6 +2157,19 @@ void noteReportedSpeed(double metresPerSecond) noexcept
     g_reportedSpeed.store(metresPerSecond, std::memory_order_relaxed);
 }
 
+void noteBrakeInput(double pedal, bool hasBrake) noexcept
+{
+    if (!hasBrake) {
+        // Withdraw rather than hold. A remembered pedal is exactly the value that would let a stale
+        // frame scale real braking as drag.
+        g_brakeInput.store(-1.0, std::memory_order_relaxed);
+        g_brakeInputAtMs.store(0, std::memory_order_relaxed);
+        return;
+    }
+    g_brakeInput.store(pedal, std::memory_order_relaxed);
+    g_brakeInputAtMs.store(monotonicMs(), std::memory_order_relaxed);
+}
+
 namespace {
 
 /// Clamp, store, and announce only when the value actually moved. Returns true if it moved.
@@ -2092,7 +2210,8 @@ bool storeLever(std::atomic<float>& cell, const char* name, double wanted, float
 void applyHandling(const std::string& assetId, const std::string& vehicleId,
                    const std::string& authorityEpoch, uint64_t engineEntity,
                    bool hasGrip, double grip, bool hasDrive, double drive,
-                   bool hasBrake, double brake) noexcept
+                   bool hasBrake, double brake, bool hasDrag, double drag,
+                   bool hasTopSpeed, double topSpeedKph) noexcept
 {
     // ------------------------------------------------------------------------------------- `KB-146`
     // **A setup without an identity is refused, not applied.** The whole defect this closes was that the
@@ -2137,7 +2256,29 @@ void applyHandling(const std::string& assetId, const std::string& vehicleId,
     int moved = 0;
     if (hasGrip)  moved += storeLever(g_gripScale,  "gripScale",  grip,  kGripScaleMin,  kGripScaleMax)  ? 1 : 0;
     if (hasDrive) moved += storeLever(g_driveScale, "driveScale", drive, kDriveScaleMin, kDriveScaleMax) ? 1 : 0;
+    if (hasDrag) moved += storeLever(g_dragScale, "dragScale", drag, kDragScaleMin, kDragScaleMax) ? 1 : 0;
     if (hasBrake) moved += storeLever(g_brakeScale, "brakeScale", brake, kBrakeScaleMin, kBrakeScaleMax) ? 1 : 0;
+
+    // The governor is a TARGET, not a lever, so it is stored rather than clamped into a lever's range.
+    // Absent leaves whatever was set; an explicit 0 withdraws it, which is how a Machine with no declared
+    // top speed runs ungoverned rather than stopped.
+    if (hasTopSpeed) {
+        const double mps = topSpeedKph / 3.6;
+        const float was = g_topSpeedMps.exchange(
+            (std::isfinite(mps) && mps > 0.0) ? static_cast<float>(mps) : 0.0f,
+            std::memory_order_relaxed);
+        const float now = g_topSpeedMps.load(std::memory_order_relaxed);
+        if (std::fabs(now - was) > 0.05f) {
+            if (now > 0.0f) {
+                NCM_INFO("handling: topSpeed %.1f -> %.1f km/h (governor taper %.0f%%)",
+                         static_cast<double>(was) * 3.6, static_cast<double>(now) * 3.6,
+                         static_cast<double>(kTopSpeedTaper) * 100.0);
+            } else {
+                NCM_INFO("handling: topSpeed withdrawn -- this Machine is ungoverned");
+            }
+            ++moved;
+        }
+    }
 
     g_bindingExpiresAtMs.store(monotonicMs() + kBindingLeaseMs, std::memory_order_release);
     g_expectedEngineEntity.store(engineEntity, std::memory_order_release);
@@ -2165,7 +2306,12 @@ void clearHandling(bool releaseBenchConfig) noexcept
 
     storeLever(g_gripScale,  "gripScale",  kGripScaleInert, kGripScaleMin,  kGripScaleMax);
     storeLever(g_driveScale, "driveScale", kGripScaleInert, kDriveScaleMin, kDriveScaleMax);
+    storeLever(g_dragScale, "dragScale", kGripScaleInert, kDragScaleMin, kDragScaleMax);
     storeLever(g_brakeScale, "brakeScale", kGripScaleInert, kBrakeScaleMin, kBrakeScaleMax);
+    // Losing the server must not leave a car governed forever.
+    g_topSpeedMps.store(0.0f, std::memory_order_relaxed);
+    g_brakeInput.store(-1.0, std::memory_order_relaxed);
+    g_brakeInputAtMs.store(0, std::memory_order_relaxed);
 
     {
         std::lock_guard<std::mutex> guard(g_bindingMetaMutex);

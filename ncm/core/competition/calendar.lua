@@ -24,6 +24,10 @@ Core.define("competition.calendar", function(C)
         end
         local w = s.entryWindow or {}
         if (w.opensMinutes or 15) <= (w.closesMinutes or 1) then return false, "invalid_entry_window" end
+        if s.economy ~= nil then
+            local ok, why = C.get("economy.settlement").validate(s.economy)
+            if not ok then return false, "invalid_economy:" .. tostring(why) end
+        end
         return true
     end
 
@@ -79,6 +83,9 @@ Core.define("competition.calendar", function(C)
                 formatId = series.formatId or "sprint",
                 classId = series.classId or "street_open",
                 laps = series.laps or 1,
+                -- L168: economics belong to the championship, and the event freezes the authored revision it
+                -- was posted under. Routes still own geography only.
+                economy = series.economy,
             }
             startsAt = startsAt + everySec
             k = k + 1

@@ -40,6 +40,18 @@ local function current(machineId)
     return head
 end
 
+--- The configuration id this Machine is running right now, or nil if it has none.
+---
+--- The same question `current()` answers, minus the items, exported because it is what `configuration_ref`
+--- needs: the observation producer records WHICH configuration a machine was in when it was measured, so a
+--- reading taken before a part was fitted stays attached to the configuration that produced it.
+--- `31_CAPABILITY_AUDIT.md` section 6 settled that this can only ever be an NCM-authored record; migration
+--- 031 built it. nil stays nil -- an unsupported Machine genuinely has none.
+function NcmComponentInstall.currentConfiguration(machineId)
+    local head=current(machineId)
+    return head and head.configuration_id or nil
+end
+
 function NcmComponentInstall.apply(machineId,why)
     local rows=MySQL.query.await([[SELECT DISTINCT a.asset_id,d.family,d.effect FROM machine_configuration_current x
       JOIN machine_configuration_item i ON i.configuration_id=x.configuration_id

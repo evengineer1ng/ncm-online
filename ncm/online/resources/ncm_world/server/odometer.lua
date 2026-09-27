@@ -179,6 +179,9 @@ local function lateralAccel(entry, prev, cur, dt)
 end
 
 --- Advance one Machine's tyre temperature. Called for every sampled asset, driven or not.
+-- Set by `thermalStep` and read by `step` immediately afterwards, single-threaded per sample.
+local observedLateral
+
 local function thermalStep(entry, prev, cur, t)
     local assetId = entry.assetId
     local state = thermal[assetId]
@@ -195,8 +198,11 @@ local function thermalStep(entry, prev, cur, t)
     if dt <= 0 then return end
 
     local speed = cur and (cur.speedMps or 0) or 0
+    -- Derived once and RETURNED, so the observation producer can record the same cornering load the tyre
+    -- model just felt rather than computing a second, subtly different one from the same two samples.
     local lateral = cur and lateralAccel(entry, prev, cur, dt) or 0
     local load = cur and Thermal.load(speed, lateral) or 0
+    observedLateral = cur and lateral or nil
 
     -- ----------------------------------------------------------------- what the model actually sees
     --
@@ -325,7 +331,14 @@ function NcmOdometer.track(assetId, vehicleId, pid)
 end
 
 function NcmOdometer.untrack(vehicleId)
-    if vehicleId ~= nil then tracked[vehicleId] = nil end
+    if vehicleId == nil then return end
+    local reg = tracked[vehicleId]
+    tracked[vehicleId] = nil
+    -- Memory only. The durable running best lives in `vehicle_knowledge_evidence` and the next sample of
+    -- this machine reads it back.
+    if reg and NcmObservation and NcmObservation.forget then
+        pcall(NcmObservation.forget, reg.assetId)
+    end
 end
 
 --- Everything to sample this tick: the access map plus anything registered. Keyed by vehicleId so a car
@@ -452,7 +465,15 @@ local function step(entry, t)
                   headingRad = headingOf(snap) }
     local prev = last[assetId]
     last[assetId] = cur
+    observedLateral = nil
     thermalStep(entry, prev, cur, t)
+    -- **The same facts, offered to the knowledge substrate before they are discarded** (31 section 9).
+    -- No extra snapshot read, no extra loop: `cur` and the cornering load are already here, and a
+    -- measurement not taken now cannot be taken later. Guarded because a failure to record what a car was
+    -- seen doing must never stop its odometer from advancing.
+    if NcmObservation and NcmObservation.sample then
+        pcall(NcmObservation.sample, entry, cur, observedLateral, t)
+    end
     if not prev then return end
     local seg = Identity.segment(prev, cur)
     trace(assetId, prev, cur, seg)

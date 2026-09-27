@@ -82,6 +82,7 @@ Core.define("competition.guide", function(C)
                     interested = interested, entered = entered, seatsTotal = e.seatsTotal or 0,
                     region = region, finishRegion = finishRegion, courseAdapter = adapter, startType = startType, summary = summary,
                     description = description,
+                    economy = e.economy,
                     myState = (mine and mine.state ~= "withdrawn") and mine.state or "none",
                     practice = pOpen and "open" or pWhy, myPracticeBest = pBest,
                     venue = e.venue and { x = e.venue.x, y = e.venue.y, z = e.venue.z } or nil,

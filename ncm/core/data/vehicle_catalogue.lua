@@ -140,14 +140,93 @@ Core.define("data.vehicle_catalogue", function(C)
     -- **An absent entry means NO CEILING, never a guessed one.** A governor invented from nothing would be
     -- wrong per car and indistinguishable from a real limit, which is worse than having none -- and
     -- `IDEA-328`/`IDEA-331` are explicit that an observation must not quietly become a specification.
+    -- ---------------------------------------------------------------------------------------------
+    -- AUTHORED top speeds, in km/h. **Specification, never measurement** (`IDEA-328`, `IDEA-331`).
+    -- ---------------------------------------------------------------------------------------------
+    --
+    -- Supplied by the owner 2026-09-27 from published figures for each car, one value per conceptual
+    -- machine and repeated for its `_player` variant, because the base car and the player car are
+    -- separate TweakDB records that may carry separate drive models.
+    --
+    -- **An absent record means UNGOVERNED, not zero** (`L157`). The five bikes are deliberately not
+    -- here: nobody has confirmed them, and a guessed figure would be indistinguishable from a real one
+    -- the moment it was written down. The RB15's twelve livery records are absent for the same reason
+    -- plus `L142`, which withdrew the car.
+    --
+    -- These are what the GOVERNOR aims at. They are not what the gearbox allows -- the gear chain is
+    -- deliberately raised above them so that each car is drag-limited rather than gear-limited, and the
+    -- governor then places the real ceiling by withholding drive. Headroom above, authority below.
     M.TOP_SPEED_KPH = {
-        -- Vehicle_v_standard2_thorton_galena = 160,
+        Vehicle_v_standard2_thorton_galena                         = 151,   -- Galena G240
+        Vehicle_v_standard2_thorton_galena_player                  = 151,   -- Galena G240
+        Vehicle_v_standard2_thorton_colby                          = 167,   -- Colby C125
+        Vehicle_v_standard2_thorton_colby_player                   = 167,   -- Colby C125
+        Vehicle_v_standard25_thorton_colby_pickup                  = 168,   -- Colby CX410 Butte
+        Vehicle_v_standard25_thorton_colby_pickup_player           = 168,   -- Colby CX410 Butte
+        Vehicle_v_standard25_villefort_columbus                    = 167,   -- Columbus V340-F Freight
+        Vehicle_v_standard25_villefort_columbus_player             = 167,   -- Columbus V340-F Freight
+        Vehicle_v_standard2_villefort_cortes                       = 193,   -- Cortes V5000 Valor
+        Vehicle_v_standard2_villefort_cortes_player                = 193,   -- Cortes V5000 Valor
+        Vehicle_v_standard2_makigai_maimai                         = 170,   -- MaiMai P126
+        Vehicle_v_standard2_makigai_maimai_player                  = 170,   -- MaiMai P126
+        Vehicle_v_standard2_archer_hella                           = 167,   -- Hella EC-D I360
+        Vehicle_v_standard2_archer_hella_player                    = 167,   -- Hella EC-D I360
+        Vehicle_v_standard25_mahir_supron                          = 165,   -- Supron FS3
+        Vehicle_v_standard25_mahir_supron_player                   = 165,   -- Supron FS3
+        Vehicle_v_standard3_chevalier_emperor                      = 194,   -- Emperor 620 Ragnar
+        Vehicle_v_standard3_chevalier_emperor_player               = 194,   -- Emperor 620 Ragnar
+        Vehicle_v_standard2_chevalier_thrax                        = 193,   -- Thrax 388 Jefferson
+        Vehicle_v_standard2_chevalier_thrax_player                 = 193,   -- Thrax 388 Jefferson
+        Vehicle_v_standard3_thorton_mackinaw                       = 181,   -- Mackinaw MTL1
+        Vehicle_v_standard3_thorton_mackinaw_player                = 181,   -- Mackinaw MTL1
+        Vehicle_v_sport2_quadra_type66                             = 254,   -- Type-66 640 TS
+        Vehicle_v_sport2_quadra_type66_player                      = 254,   -- Type-66 640 TS
+        Vehicle_v_sport2_quadra_type66_nomad                       = 315,   -- Type-66 Javelina
+        Vehicle_v_sport2_quadra_type66_nomad_player                = 315,   -- Type-66 Javelina
+        Vehicle_v_sport2_villefort_alvarado                        = 193,   -- Alvarado V4F 570 Delegate
+        Vehicle_v_sport2_villefort_alvarado_player                 = 193,   -- Alvarado V4F 570 Delegate
+        Vehicle_v_sport2_villefort_deleon                          = 191,   -- Deleon V410-S Coupe
+        Vehicle_v_sport2_villefort_deleon_player                   = 191,   -- Deleon V410-S Coupe
+        Vehicle_v_sport2_mizutani_shion                            = 281,   -- Shion MZ2
+        Vehicle_v_sport2_mizutani_shion_player                     = 281,   -- Shion MZ2
+        Vehicle_v_sport2_mizutani_shion_nomad                      = 300,   -- Shion Coyote
+        Vehicle_v_sport2_mizutani_shion_nomad_player               = 300,   -- Shion Coyote
+        Vehicle_v_sport1_herrera_outlaw                            = 294,   -- Herrera Outlaw
+        Vehicle_v_sport1_herrera_outlaw_player                     = 294,   -- Herrera Outlaw
+        Vehicle_v_sport1_quadra_turbo                              = 265,   -- Turbo-R 740
+        Vehicle_v_sport1_quadra_turbo_player                       = 265,   -- Turbo-R 740
+        Vehicle_v_sport1_rayfield_caliburn                         = 337,   -- Rayfield Caliburn
+        Vehicle_v_sport1_rayfield_caliburn_player                  = 337,   -- Rayfield Caliburn
+        Vehicle_v_sport1_rayfield_aerondight                       = 307,   -- Aerondight Guinevere
+        Vehicle_v_sport1_rayfield_aerondight_player                = 307,   -- Aerondight Guinevere
     }
 
     --- The authored top speed for a record, or nil when nobody has measured it yet.
     function M.topSpeedKph(record)
         if type(record) ~= "string" then return nil end
         return M.TOP_SPEED_KPH[(record:gsub("[%.%-]", "_"))]
+    end
+
+    --- The authored top speed for a conceptual MACHINE, or nil when none of its records carries one.
+    ---
+    --- `entries` has no `record` field -- a machine owns a LIST of runtime records, and the base car and
+    --- its `_player` variant are authored with the same figure because they are the same car. So the first
+    --- record that answers is the machine's declared figure.
+    ---
+    --- **This is a DECLARATION, never a measurement** (`L157`, `IDEA-328`, `IDEA-331`). It is what the
+    --- governor aims at, sourced from published figures. A surface that shows it must say so, because
+    --- `31_CAPABILITY_AUDIT.md` section 5 establishes that the rated figure and the observed one disagree
+    --- in a known direction -- torque and drag carry the real terminal velocity higher.
+    ---
+    --- nil means UNGOVERNED and UNRATED, never zero: the five bikes and the withdrawn RB15 have no
+    --- confirmed figure, and a guess would be indistinguishable from a real one.
+    function M.declaredTopSpeedKph(entry)
+        if type(entry) ~= "table" then return nil end
+        for _, record in ipairs(entry.runtimeRecords or {}) do
+            local kph = M.topSpeedKph(record)
+            if kph then return kph end
+        end
+        return nil
     end
 
     --- Which records still have no authored top speed. The dump command reports this so the gap is

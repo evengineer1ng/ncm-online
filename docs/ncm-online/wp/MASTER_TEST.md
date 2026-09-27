@@ -1835,3 +1835,205 @@ and felt outcomes one row at a time rather than converting deployment into a PAS
 **Offline evidence, not a live PASS:** 2026-09-26 catalogue/R&D tests pass under Lua 5.4 and LuaJIT; the
 panel render gate exercises split panes, mixed fitment, component provenance/warning, Parts Inventory and the
 eligible fit action. Transactional database concurrency and in-game handling remain deliberately unclaimed.
+
+## §BG - Drag split from braking; `dragScale` - **BUILT; AWAITING LIVE PASS**
+
+`IDEA-538`. The carrier's force write site discriminated retarding force by SIGN alone, so aerodynamic drag
+was scaled by `brakeScale` along with the brakes: a brake part silently moved terminal velocity, and
+`aerodynamics` had to book its drag against `driveScale`, pretending a wing reduces engine power.
+
+**The measurement that authorises the lever** (Galena, 2026-09-26, gear headroom x1.45 applied, `power_unit`
+at 1.0): `brakeScale 1.0` -> ~131 km/h, `0.5` -> 139 km/h, `0.3` (clamped from 0.1) -> 142 km/h. Solving
+`v(b)/v(1) = 1/sqrt((1-g) + g*b)` independently at each point gives `g = 0.224` and `g = 0.213` -- two
+different brake settings agreeing that this hook sees about **22%** of the car's drag. Drag is reachable.
+
+The discriminator is the driver's brake PEDAL, forwarded to the carrier on the machine channel at 30 Hz,
+and it **fails closed**: an unknown, stale (>250 ms) or depressed pedal keeps the brake lever. The failure
+modes are not symmetric -- scaling drag as braking costs a little top speed, scaling braking as drag means
+a car that will not stop.
+
+| # | Operation | Expected | Result |
+|---|---|---|---|
+| BG1 | Carrier 0.1.28 loaded; drive a car and check the log. | `ncm=` reports a speed rather than `n/a` -- the telemetry feed the FFB split had cut now reaches the Carrier again. | |
+| BG2 | `/ncm.setup brakes 0.5`, then a long straight at full throttle. | Terminal velocity is **unchanged** from stock. The brake lever no longer touches drag. | |
+| BG3 | From speed, brake hard with `brakes 0.5`. | Stopping distance is visibly longer than stock -- the brake lever still does its own job. | |
+| BG4 | `/ncm.setup aerodynamics 1.40`, then a long straight. | Terminal velocity **falls**; cornering grip rises. The wing's cost is now booked as drag. | |
+| BG5 | `/ncm.setup aerodynamics 0.80`, then a long straight. | Terminal velocity **rises** above stock. The trade runs both ways. | |
+| BG6 | Alt-tab or stall the client mid-brake so frames stop arriving, then brake. | The car still stops normally. A stale pedal must never let braking be scaled as drag. | |
+| BG7 | Step out of the car, then back in, and brake. | Braking is normal on the first application; the withdrawn pedal is not remembered as "coasting". | |
+
+## §BH - Machine knowledge, in the Machine Index - **AWAITING LIVE TEST**
+
+**Deployed with migration 033.** Restart first and expect schema **33**, `pending=[]`.
+
+**This section is driveable.** The owner's condition for validating it was that it be player-facing, so the
+evidence is now rendered: every owned Machine has an **OBSERVED - THIS MACHINE** block in the Machine Index.
+Rows 1-8 need no SQL at all. The `[me]` rows are confirmation, not the test.
+
+Offline evidence: **473 core tests** green under both interpreters, **126 panel render assertions**,
+`luac -p` clean over 201 resource files (205 minus the 4 resource manifests), docs authority green.
+
+**Owed and NOT run offline:** migration 033 applied twice against copies of the real table definitions.
+`NCM_DB_ROOT` was not injected in the authoring session, so 033 has no equivalent of the dry-run `§AI` did
+for 029. Run it first, or accept the boot as the first evidence and say so.
+
+| # | Do | Expect |
+|---|---|---|
+| **DRIVE IT** |||
+| §BH1 | Boot twice, then open Machine Index and select an owned Machine you have never driven. | **`OBSERVED - THIS MACHINE` / `Nothing observed yet`.** Absence is a legitimate state. It must not read `0 km/h`. |
+| §BH2 | Drive it above 30 km/h. Re-open the panel. | **`Highest speed observed  ·  96.4 km/h  ·  (-1235, 987)  ·  <date>`.** The coordinates are the feature, not decoration -- they are what lets you ask later whether that reading was a downhill. |
+| §BH3 | Drive faster, by more than 5 km/h. Re-open. | The figure **rises**. Drive slower: it does **not** fall. It is a floor on demonstrated capability, not a speedometer. |
+| §BH4 | Corner hard, then re-open. | A second row: **`Highest cornering load observed`**, in `m/s²`. Two characteristics, two units, neither borrowing the other's. |
+| §BH5 | On the same card, compare the two speed figures. | `Rated top speed  ·  167 km/h · DECLARED` in the metric block, and `Highest speed observed · 156.4 km/h` in the OBSERVED block. **They should disagree, and the observed one should be lower until you really try.** This is the two-source display -- if either is mislabelled, or if the observed figure ever appears marked `DECLARED`, stop and say so. |
+| §BH6 | Look at a Machine with no authored figure (a bike). | `Rated top speed · Not rated`. Never `0 km/h`. |
+| §BH7 | Sit **stationary** in a car for a full minute, then re-open the panel. | **No new observation, and no `0 km/h` row.** The tyre gauge and odometer behave exactly as before. This is `§AI15`'s invariant one layer up and it is the easiest thing in this pass to break. |
+| §BH8 | Restart the resource. Drive the same Machine slower than its recorded best, then beat it. | The stored figure **survives the restart** and only moves when you beat it. It was re-read from the table, not started from nothing. |
+| **CONFIRMATION (optional, `[me]`)** |||
+| §BH9 | `SELECT knowledge_kind, evidence_json, obs_x, observation_basis, ai_driven, configuration_ref FROM vehicle_knowledge_evidence WHERE knowledge_kind LIKE 'observed[_]%' ORDER BY observed_at DESC LIMIT 5;` | Typed body `{"kind":...,"value":...,"unit":"kph"}`, a real position, `server_measured`, and the configuration. The unit travels with the value. |
+| §BH10 | `SELECT COUNT(*) FROM vehicle_knowledge_evidence WHERE ai_driven IS NOT NULL;` before driving. | **0.** Nothing is backfilled; every pre-existing row keeps `ai_driven` NULL -- unknown, not `false`. |
+| §BH11 | `/ncm.observations` in the server console. | `wired=observed_lateral_accel,observed_speed_floor`, counters, and the four declared characteristics listed as `declared, no producer`. |
+| **CONFIGURATION PROVENANCE (`IDEA-542`)** |||
+| §BH12 | Finish a race. **[me]** `SELECT asset_id, attribution_basis, configuration_ref FROM session_result ORDER BY session_id DESC LIMIT 3;` | A real 36-char id matching that Machine's `machine_configuration_current`. A result with no latched machine keeps it NULL. |
+| §BH13 | **Fit a part, then race the same Machine again.** Compare the two rows. | **A different `configuration_ref`.** This is the entire point of the column: the earlier lap stays attached to the configuration that set it. If both match, the latch is reading the head at settlement rather than at GREEN. |
+| §BH14 | Watch the server log at GREEN. | `machines at green: N attributed, M unknown, K with a configuration`. |
+| **COMPONENT MARKET SCOPE (`IDEA-545`)** |||
+| §BH15 | Open the Parts market; buy a component. | Identical to before: same 25 Designs, same prices, same supply, purchase succeeds. **This change is meant to be invisible today** -- if anything looks different, that is the finding. |
+| **WATCH FOR ANYTHING** |||
+| §BH16 | Any `[ERR]` during boot or session; odometer, tyre gauge, race HUD, Market, toasts. | None, and all unchanged. Every addition here is additive and guarded. |
+
+### What a PASS establishes, and what it does not
+
+A PASS establishes that NCM **records and shows** what a machine has been seen doing, with the serialised
+machine, the position, the configuration and the authority that produced it -- the provenance `28` section 22
+calls irrecoverable -- and that a declaration and an observation can sit on one screen without being mistaken
+for each other.
+
+It establishes **nothing about estimation**. There is no envelope, no confidence and no inference, by ruling
+(`L164`). It says nothing about the four declared-but-unwired characteristics (`IDEA-544`), which are refused
+by their own producer check until a real producer exists. And it is not a claim about any model: every figure
+here belongs to one serialised machine (`28` section 11).
+
+## §BI - lap ghosts, PERSONAL BEST - **DEPLOYED ONLINE 2026-09-27 16:10 UTC; AWAITING LIVE PASS**
+
+Deployed: `replay.pose`, `replay.lap`, `data.vehicle_templates`, migration **034** (`ghost_lap`, plus
+`practice_run.run_started_at` / `run_finished_at` / `ghost_id`), `ncm_league/server/ghost.lua`,
+`ncm_world/client/ghost.lua`, the `race:ghost` HUD channel. Expected schema version after boot: **34**.
+
+Why it is driveable: a ghost needs nothing but a practice session on any route. Set a lap, cross the start
+again, and a car should be there. **Two claim paths need exercising, not one** -- practice runs on the
+time-attack kernel and a time trial is a race with a field of one on the race kernel, so §BI19-§BI22 are not a
+repeat of §BI1.
+
+**Offline evidence:** **492 core tests** green under both Lua 5.4 and LuaJIT (was 473), **46 race render
+assertions** (was 28), 126 panel render assertions, 26 nameplate assertions, `luac -p` clean over **210**
+resource files, `node --check` over 5 inline script blocks, cross-scope clean over 49 global references,
+docs authority green over 74 documents.
+
+**Deployed and verified on the live server (2026-09-27 16:10 UTC):**
+`migration 034 ghost_lap applied (2 statement(s))`, and `migration 033 observation_authority applied` in the
+same boot -- **033 had never reached Online before this deploy**, which closes the question of whether it was
+there and is worth noting against `§BH`. Boot was clean: `migrations: 2 applied`, `scheduler started: 5 series`,
+`race control started`, no WRN and no ERR. Schema confirmed directly against the live database: `ghost_lap`
+present with **26 columns**, `practice_run` carrying `run_started_at` / `run_finished_at` / `ghost_id`, and
+`schema_migrations` at **34:ghost_lap**.
+
+**Still owed, and the deploy does not substitute for it:** the **twice-applied** dry-run.
+034 applied **once**, forward, onto a database with real rows -- which is real evidence and is in one respect
+stronger than a scratch run, but it is not the replay proof. The runner writes the version row on success, so a
+restart will not replay it; only `tools/test-ghost-migration.ps1` exercises that path, and it still needs
+`NCM_DB_ROOT`, which is not injected. 034 is one `CREATE TABLE IF NOT EXISTS` and one
+`ALTER ... ADD COLUMN IF NOT EXISTS`, the replay-safe shape schema 019 requires -- but that remains an argument
+rather than a measurement.
+
+**Nothing about the ghost's visual model has been observed.** `props.create` returns a successful id for a
+model it cannot resolve (`KB-14`), so the candidate list in `data.vehicle_templates` is ordered guesswork
+until §BI2 says which string drew. That is why every attempt logs its model string and why a fallback draw is
+labelled on the HUD. **§BI2 is the step that decides whether the car is a car.**
+
+| # | Do | Expect |
+|---|---|---|
+| **DRIVE IT** |||
+| §BI1 | Open practice at any route and set one clean lap. | Server log: `[ncm_league/ghost] upload begin player=N ... parts=K`, then `stored ghost=<uuid> driver=... route=... <N>ms poses=<n> <bytes> bytes record=Vehicle....`. **Quote the byte count and the pose count.** The record must be the car you actually drove. |
+| §BI2 | Cross the start line again and look. | A car appears at the start and drives away from you. **Quote the client's `ghost prop id=... model=... candidate=i/n readback=...` line.** If the HUD shows `NO CAR MODEL`, the model fell through to `race.route_arrow` and you are chasing a road arrow -- that is a legible failure, not a PASS, and the candidate list needs the model string that does work. |
+| §BI3 | Drive straight through where the ghost is. | **Nothing.** No impact, no collision, no damage, no incident logged against either car. It is scenery you cannot touch. |
+| §BI4 | Follow it through the fastest direction change on the route. | The heading looks right the whole way and **never spins the wrong way round**. This is the `359 -> 1` seam live; the unit test covers the arithmetic, this covers whether the recorded yaw is the axis we think it is. |
+| §BI5 | Watch the HUD strip while chasing. | `PERSONAL BEST · <name>`, the recorded lap time, and a live `Δ` that goes **negative when you are ahead**. It must never appear as `P2` and never appear as a row in the standings board. |
+| §BI6 | Deliberately drive well off the racing line, then look at `Δ`. | A **dash**, not a number. Off the line the ghost has no time for where you are, and inventing one would be a confidently wrong instrument. |
+| §BI7 | Beat your own lap. | A **second** `stored ghost=` line with a new uuid, and the ghost you chase next lap is the faster one. `ghost_lap` gains a row; nothing is updated in place. |
+| §BI8 | Set a lap **slower** than your best. | `upload ... kept out: <N>ms does not beat the stored <M>ms`, and no new row. |
+| §BI9 | Reconnect, re-enter practice at the same route. | `[ncm_league/ghost] stream player=N id=... ghost=... poses=n packets=k` and the ghost replays. It survived the restart because it is a row, not a session buffer. |
+| §BI10 | Practice at a route you have never set a lap on. | `no stored ghost for route=<id>` on the client and **no row on the HUD**. An explicit absence, distinguishable from a ghost that failed to arrive. |
+| §BI11 | `/ncm.ghost off`, then cross the start. | No prop, no row. Then `/ncm.ghost personal` and it comes back. `/ncm.ghost session` should say it is not built yet rather than doing nothing. |
+| §BI12 | Leave the session, then stop the resource while a ghost is on screen. | The prop is gone in **both** cases. A resource that claims a prop and never releases it leaves scenery in the world with nothing explaining it. |
+| §BI13 | Have a second player stand at the start while your ghost replays. | They see **nothing**. The prop is client-local; a ghost is not a shared entity. |
+| **TIME TRIALS (`L166` point 7)** |||
+| §BI19 | Enter a posted event **alone** so it runs as a time trial, and finish it. | Server log: `time trial ghost invited driver=... route=... <N>ms`, then a `stored ghost=` line. A time trial is a race with a field of one, on the **race** kernel -- so this exercises a completely different claim path from §BI1, not the same one again. |
+| §BI20 | Run the same solo event a second time. | The ghost is **there from green**, not appearing several seconds into the lap. A time trial only becomes recordable at green, so the trace is requested during the countdown; if it shows up late, the prefetch is not working. |
+| §BI21 | Take a penalty during a solo time trial, then finish. | The lap is still stored, and `elapsed_ms` is the official time **including** the penalty while the poses span only the driving. The band check must not refuse it -- that is what the kernels' separate `raw` duration exists for. |
+| §BI22 | Now run an event with **two or more** drivers. | **No ghost, no ghost row, no invite line.** A contested race is excluded deliberately; a ghost among real competitors could be read as another entrant. |
+| **THE FIXED DEFECT (`KB-155`)** |||
+| §BI14 | Take a penalty during a practice lap, then finish it. | `practice_run.incident_ms` is **non-zero**. It has been written as 0 for every practice run ever recorded; the kernel now returns the run's own incident time. |
+| **CONFIRMATION (optional, `[me]`)** |||
+| §BI15 | `SELECT ghost_id, format, route_id, elapsed_ms, incident_ms, pose_count, pose_hz, record, run_started_at, run_finished_at FROM ghost_lap ORDER BY at DESC LIMIT 5;` | `format = 1`, a real `record`, `pose_count` well under 3000, and **`run_started_at` / `run_finished_at` both non-zero and ordered**. Those two columns are the whole point: no stored practice lap before this could be located in time at all. |
+| §BI16 | `SELECT run_started_at, run_finished_at, ghost_id FROM practice_run ORDER BY id DESC LIMIT 3;` | Populated, and `ghost_id` set on the row whose lap became a ghost. |
+| §BI17 | `SELECT JSON_VALID(poses_json), JSON_LENGTH(poses_json) FROM ghost_lap ORDER BY at DESC LIMIT 1;` | `1` and a length equal to `pose_count`. The `CHECK` constraint is declared; this is whether it is enforced. |
+| §BI18 | `/ncm.ghost` in the server console. | `claims pending=0`, the poses-per-packet figure, and the newest stored ghosts listed with their records. |
+| §BI23 | `SELECT discipline_id, laps, elapsed_ms, incident_ms, run_finished_at - run_started_at AS raw_s FROM ghost_lap ORDER BY at DESC LIMIT 5;` | For a penalised lap `elapsed_ms` **exceeds** `raw_s * 1000`, and both are present. If they are equal on a lap you were penalised for, the official time and the raw duration have been conflated. |
+
+### What a PASS establishes, and what it does not
+
+A PASS establishes that a lap can be recorded from the car, stored immutably with its interval and its
+machine, streamed back after a restart, and replayed as a non-colliding local body with a readable delta --
+on **both** kernels, in practice and in a solo time trial, and in neither case during a contested race.
+
+It does **not** establish: that the ghost looks like it should -- it is solid, it has no transparency, and it
+carries only a yaw, so it does not bank or pitch (`IDEA-561`); that a ghost is safe to hand to another driver
+(`SESSION BEST` and `ROUTE RECORD` are refused in code, not merely absent); or that a stored lap belongs to
+the geometry it replays against, since routes are re-authorable in place with no revision (`IDEA-562`).
+
+A ghost drawn from the fallback model is **not** a PASS of §BI2. It is the honest failure mode working.
+
+## §BJ - Economy v1 playable money loop - **BUILT LOCALLY; NOT DEPLOYED; AWAITING LIVE PASS**
+
+Scope: migration **035**, authored Street/GT/Hypercar/NCX economics, paid event check-in, solo and contested
+settlement, Race Tag bounties, personal-first Research submissions and the three existing unique-accomplishment
+rewards. Fuel, generalized player trade, research contracts/world-first calls and tiered Badges are outside this
+section because they are not built.
+
+**Offline evidence:** 504 core tests green under both Lua 5.4 and LuaJIT; 51 cross-scope references clean;
+17 QA-observer and 35 vehicle-access tests green; `luac -p` clean over 217 resource files; panel/nameplate/race
+render checks green at 129 / 26 / 46 assertions. The full gate was green before this section was appended and
+must be rerun after session-close bookkeeping.
+
+| # | Do | Expect | Result |
+|---|---|---|---|
+| §BJ1 | Deploy and boot twice, then inspect `schema_migrations`, `event`, `ledger`, `session_settlement` and `research_submission`. | Migration 035 applies once, the second boot is a no-op, all new columns/tables/indexes exist, and boot has no economy error. | **NOT RUN** |
+| §BJ2 | Open the Guide for a Street, GT, Hypercar and NCX event. | Entry, solo completion, contested completion, P1 and field rule match the authored scale; NCX says sponsored/free entry; practice remains free. | **NOT RUN** |
+| §BJ3 | Join as a new Driver and run `/ncm.balance`. | Exactly one €$10,000 starter grant exists and the command agrees with the ledger sum. Reconnect does not grant again. | **NOT RUN** |
+| §BJ4 | Check into a paid event, retry the command and reconnect before green. | Entry is debited exactly once; one `entry_fee:<event>:<driver>` ledger row exists and the existing entry is restored without another charge. | **NOT RUN** |
+| §BJ5 | Reduce balance below the fee and attempt check-in. | Refused with the required/current balance; neither an entry nor a debit row is created. | **NOT RUN** |
+| §BJ6 | Finish a posted event alone. | It settles as a time trial: the solo completion amount pays, no placement/P1 line exists, `time_trial=1`, and qualifying did not pay. | **NOT RUN** |
+| §BJ7 | Make that solo finish clean. | The authored `clean_run` bounty pays once, the statement itemises completion/tag/entry/net, and displayed balance equals the ledger sum. | **NOT RUN** |
+| §BJ8 | Repeat with contact or a penalty. | Factual negative/penalty Tags may describe the result, but no clean bounty or other unmapped Tag money is minted. | **NOT RUN** |
+| §BJ9 | Finish the same route/economy opportunity again in the same window. | The renewable completion path uses the authored repeat floor rather than paying the first-completion amount again. | **NOT RUN** |
+| §BJ10 | Finish with two or more Drivers. | It settles as contested: completion, exact placement, capped field and eligible clean lines add correctly; `time_trial=0`. | **NOT RUN** |
+| §BJ11 | Exercise P2/P3 and a short field. | Placement and per-entrant field amounts match authored data exactly and never exceed the field cap. | **NOT RUN** |
+| §BJ12 | Produce DNF, DNS and DSQ outcomes. | No purse line is paid for any of them; the paid entry remains spent unless the server/event aborts. | **NOT RUN** |
+| §BJ13 | Voluntarily withdraw, then re-enter the same event if still allowed. | Withdrawal does not refund; idempotency prevents a second fee for the already-created entry. | **NOT RUN** |
+| §BJ14 | Abort or administratively cancel a paid session. | Each affected paid entry is refunded exactly once and the itemised balance is correct. | **NOT RUN** |
+| §BJ15 | Stop the resource/server with an unresolved paid session, then boot. | Recovery refunds it exactly once; repeated boots do not create another refund. | **NOT RUN** |
+| §BJ16 | Earn first finish, first time trial and first win, then repeat each trigger. | €$100 / €$100 / €$300 pay only after progression persists and exactly once per Driver/server/accomplishment. | **NOT RUN** |
+| §BJ17 | Run `/ncm.research` after catalogue-only exposure and after physically discovering a Machine. | Catalogue exposure is absent; eligible physical identity/capability submissions are listed with amount and evidence. | **NOT RUN** |
+| §BJ18 | Submit one Research item twice, then improve/refit the same Machine characteristic and try again. | First accepted contribution and reward commit together; repeats produce neither a second contribution nor money. | **NOT RUN** |
+| §BJ19 | Reconcile a settled Driver/session directly in SQL. | `session_result`, `session_settlement.receipt_json`, typed ledger references and `SUM(ledger.amount)` agree exactly. | **NOT RUN** |
+| §BJ20 | Inspect a completed qualifying session. | Its result persists for sporting use, but it has no non-zero payout ledger row and cannot consume the race opportunity. | **NOT RUN** |
+| §BJ21 | Compare one equivalent finish across Street, GT and Hypercar authored tiers. | The configured 1× / 10× / 100× scale is applied without code changes or overflow; exact values remain tuning data. | **NOT RUN** |
+
+### What a PASS establishes, and what it does not
+
+A full PASS proves one Driver can begin with capital, enter and finish paid solo competition, earn through clean
+driving, finite Research and career firsts, and spend through the existing Machine/Parts markets without a human
+opponent or AI grid. It also proves the same settlement expands to contested fields and survives retries/restarts.
+
+It does not balance the long-run economy, validate million-eddie acquisition time, or prove sinks not yet built.
+Those require telemetry and sustained play after this transactional loop is live.

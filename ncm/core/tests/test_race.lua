@@ -36,6 +36,30 @@ local function before(g, m) return { x = g.x - g.dir.x * (m or 5), y = g.y - g.d
 local function after(g, m) return { x = g.x + g.dir.x * (m or 5), y = g.y + g.dir.y * (m or 5), z = g.z } end
 
 return {
+    -- A TIME TRIAL is a race with a field of one (L67 / IDEA-001), so its lap is stored as a ghost on exactly
+    -- the same terms as a practice lap -- and to locate it in time the result has to carry the finish INSTANT,
+    -- not only the duration. `totalSec` folds in the penalty, so the moment cannot be recovered by subtraction.
+    a_finished_result_carries_the_finish_instant = function(T)
+        local Race = T.Core.get("session.race")
+        local s, g = session(T, { entrants = { { driverId = "solo", entryId = "e1", slot = 1, display = "Solo" } } })
+        Race.mark(s, "solo", true)
+        Race.step(s, 970); Race.step(s, 995); Race.step(s, 1000)
+        T.eq(s.phase, "running", "green"); T.eq(s.greenAt, 1000)
+        Race.report(s, { driverId = "solo", gateIndex = 1, now = 1000.5, position = at(g[1]) })
+        local r = Race.report(s, { driverId = "solo", gateIndex = #g, now = 1061.25, position = at(g[#g]) })
+        T.eq(r.finished, true)
+
+        local results = Race.classify(s)
+        local mine = results[1]
+        T.eq(mine.driverId, "solo")
+        T.eq(mine.finishAt, 1061.25, "the instant the lap ended, not just how long it took")
+        T.eq(mine.finishAt - s.greenAt, 61.25, "so the interval is recoverable without arithmetic on totalSec")
+        T.eq(mine.gatesTotal, #g)
+
+        -- And core's own predicate agrees this is a time trial rather than a race that was won.
+        T.truthy(T.Core.get("driver.progression").isTimeTrial({ fieldSize = #results }))
+        T.falsy(T.Core.get("driver.progression").isTimeTrial({ fieldSize = 2 }))
+    end,
     kb23_crossings_and_green_are_dated_not_sampled = function(T)
         -- KB-23. Race times came back on round 100 ms boundaries while qualifying on the same route returned
         -- 1:04.964, so the same act -- crossing a line -- was being measured two different ways. Two causes,

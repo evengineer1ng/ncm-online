@@ -249,6 +249,10 @@ Core.define("session.race", function(C)
             out[i] = {
                 position = i, driverId = r.driverId, entryId = r.entryId, display = r.display,
                 state = r.state, totalSec = r.totalSec, penaltySec = r.penaltySec, jumpStart = r.jumpStart,
+                -- **The finish INSTANT, not just the duration** (L166). `totalSec` already folds in the penalty,
+                -- so a caller that needs to locate this lap in time cannot recover the moment it ended by
+                -- subtracting. A stored ghost needs the interval, and `greenAt` alone is only half of it.
+                finishAt = r.finishAt,
                 progress = r.progress, gatesTotal = #s.gates, teamId = r.teamId, seatIndex = r.seatIndex,
                 penalties = r.penalties,
                 incidentSec = r.incidentSec, incidentCount = r.incidentCount, incidents = r.incidents,

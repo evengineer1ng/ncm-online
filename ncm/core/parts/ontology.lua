@@ -122,6 +122,11 @@ Core.define("parts.ontology", function(C)
     local GRIP  = "lateral_grip_vehicle"
     local DRIVE = "longitudinal_force_driving"
     local BRAKE = "longitudinal_force_braking"
+    -- Retarding force while NOBODY IS BRAKING -- aerodynamic drag, which sets terminal velocity. Split
+    -- from `BRAKE` on 2026-09-26: the carrier discriminated retarding force by sign alone, so a brake
+    -- part silently moved top speed and `aerodynamics` had to book its drag against DRIVE, pretending a
+    -- wing reduces engine power. The carrier now separates them on the driver's brake pedal.
+    local DRAG  = "longitudinal_force_coasting"
 
     M.INSTANCE_QUANTITIES = {
         -- direct: the lever is the family's own quantity, plus the couplings it genuinely has
@@ -131,12 +136,12 @@ Core.define("parts.ontology", function(C)
         -- approximated: a real effect, coarsely modelled, pointing somewhere of its own
         suspension   = { GRIP, BRAKE, DRIVE },   -- body control, most felt under weight transfer
         structure    = { GRIP, BRAKE },          -- stiffness as grip and as consistency under load
-        aerodynamics = { GRIP, DRIVE, BRAKE },   -- downforce adds grip, drag costs drive AND shortens a stop
+        aerodynamics = { GRIP, DRAG, BRAKE },    -- downforce adds grip, drag costs TOP SPEED and shortens a stop
         transmission = { DRIVE, BRAKE },         -- ratios multiply torque both ways: engine braking
         drivetrain   = { DRIVE, GRIP },          -- a tighter driveline puts power down and costs turn-in
         cooling      = { DRIVE, BRAKE },         -- thermal headroom, and ducting feeds the brakes
         electrical   = { DRIVE },                -- honestly pure drive: the baseline the others differ FROM
-        chassis      = { GRIP, DRIVE, BRAKE },   -- mass touches all three, equally
+        chassis      = { GRIP, DRIVE, BRAKE, DRAG }, -- mass touches all four; drag least, and inversely
     }
 
     --- Is the quantity the lever itself, or a model of the family mapped onto it? A panel that says
@@ -256,9 +261,17 @@ Core.define("parts.ontology", function(C)
     -- ontology edit and a migration, not a redesign.
     M.UNIT = { COMPONENT = "component", SET = "set", AXLE_PAIR = "axle_pair", CORNER = "corner" }
 
-    M.SERIALISATION_UNIT = setmetatable({ tires = M.UNIT.SET }, {
-        __index = function() return M.UNIT.COMPONENT end,
-    })
+    -- **A plain table with the default in the accessor, NOT a metatable.** `setmetatable` does not
+    -- exist in the Open77 CLIENT Lua sandbox, and this line runs at module load -- so every client
+    -- `NcmCore.get("parts.ontology")` threw, which took `parts.handling` down with it (it requires
+    -- ontology at its own load), and every client caller of either silently got nil.
+    --
+    -- That is not hypothetical. It is why the gear headroom never applied: `carrier_bridge` asked for
+    -- `parts.handling` to read one constant, got a throw, and pushed zero records with no log to say so.
+    --
+    -- Only `M.serialisationUnit` reads this table, and it already rejects unknown families, so moving
+    -- the default into it is behaviour-identical for every caller.
+    M.SERIALISATION_UNIT = { tires = M.UNIT.SET }
 
     -- ---------------------------------------------------------------------------------------------
     -- Load-time agreement with the authorities this module borrows from
@@ -296,7 +309,8 @@ Core.define("parts.ontology", function(C)
 
     function M.serialisationUnit(family)
         if not FAMILY_SET[family] then return nil end
-        return M.SERIALISATION_UNIT[family]
+        -- The default a known family gets when the table does not name one. Was an `__index` metamethod.
+        return M.SERIALISATION_UNIT[family] or M.UNIT.COMPONENT
     end
 
     function M.isCompatibilityRoot(family) return family == M.COMPATIBILITY_ROOT end

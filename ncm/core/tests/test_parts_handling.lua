@@ -32,7 +32,9 @@ return {
     -- ------------------------------------------------------------------ the levers are evidence-backed
     every_lever_names_the_live_pass_that_authorises_it = function(T)
         local M = H(T)
-        T.eq(#M.LEVER_IDS, 3, "three proven levers -- the vocabulary is still three wide")
+        -- Four since 2026-09-26. `dragScale` split out of `brakeScale`, which had been scaling
+        -- aerodynamic drag as well as braking and therefore letting a brake part move top speed.
+        T.eq(#M.LEVER_IDS, 4, "four proven levers -- grip, drive, brake and drag")
         for _, id in ipairs(M.LEVER_IDS) do
             local lever = M.LEVERS[id]
             T.ok(lever, "lever " .. id .. " is declared")
@@ -188,7 +190,7 @@ return {
     end,
 
     -- ------------------------------------------------------------------ the inverse coupling
-    a_wing_adds_grip_and_costs_drive_force = function(T)
+    a_wing_adds_grip_and_costs_top_speed = function(T)
         local M = H(T)
         -- The single most important property of the approximation model: a part that gives must also take
         -- where physics says it takes. A wing that added grip for free would make the whole system a joke.
@@ -196,22 +198,28 @@ return {
             { id = "wing_gt", family = "aerodynamics", effect = 1.40 },
         } })
         T.ok(setup.levers.gripScale > 1.0, "downforce raises grip")
-        T.ok(setup.levers.driveScale < 1.0, "and drag costs drive force")
+        -- **Booked against DRAG, not against the engine.** A wing does not reduce engine power, and
+        -- expressing its cost as `driveScale` said exactly that -- a car that read slower on a dyno.
+        T.ok(setup.levers.dragScale > 1.0, "and the same wing costs top speed, as drag")
+        T.eq(setup.levers.driveScale, 1.0, "a wing leaves engine output alone")
         -- And the trade reverses for a part that REMOVES aero.
         local stripped = M.compose({ parts = {
             { id = "wing_off", family = "aerodynamics", effect = 0.80 },
         } })
         T.ok(stripped.levers.gripScale < 1.0, "less downforce, less grip")
-        T.ok(stripped.levers.driveScale > 1.0, "less drag, more drive -- the trade runs both ways")
+        T.ok(stripped.levers.dragScale < 1.0, "less drag, more top end -- the trade runs both ways")
     end,
 
-    a_mass_part_moves_all_three_levers_together = function(T)
+    a_mass_part_moves_every_lever_together = function(T)
         local M = H(T)
         local setup = M.compose({ parts = {
             { id = "lightweight_shell", family = "chassis", effect = 1.25 },
         } })
+        -- **"Improves" is not "goes up".** Three levers are forces the car wants more of and one is a
+        -- force it wants less of, so a single `> 1.0` loop would assert that more drag is an upgrade.
         for _, id in ipairs(M.LEVER_IDS) do
-            T.ok(setup.levers[id] > 1.0, id .. " improves -- a lighter car is better everywhere")
+            local better = (id == "dragScale") and (setup.levers[id] < 1.0) or (setup.levers[id] > 1.0)
+            T.ok(better, id .. " improves -- a lighter car is better everywhere, drag included")
         end
         T.match(table.concat(M.EXPRESSION.chassis.losses, " "), "MASS",
             "and it says plainly that it is not actually changing mass")
@@ -348,11 +356,11 @@ return {
         local d = M.describe("aerodynamics")
         T.eq(d.expressible, true)
         T.eq(d.fidelity, M.APPROXIMATED, "a wing is modelled, and a panel must be able to say so")
-        T.eq(#d.levers, 3, "grip, drive and brake -- drag shortens a stop as well as costing top end")
+        T.eq(#d.levers, 3, "grip, drag and brake -- drag shortens a stop as well as costing top end")
         local directions = {}
         for _, l in ipairs(d.levers) do directions[l.lever] = l.direction end
         T.eq(directions.gripScale, "increases")
-        T.eq(directions.driveScale, "decreases", "the trade is legible without reading the weights")
+        T.eq(directions.dragScale, "increases", "the trade is legible without reading the weights")
         T.eq(directions.brakeScale, "increases", "and the same drag that costs top end helps it stop")
         T.eq(d.levers[1].role, "primary", "the family's own quantity is first")
         T.eq(d.levers[2].role, "coupling", "and the rest are couplings, always modelled")
@@ -737,5 +745,62 @@ return {
         -- Two facts, not one. They are separate because they can disagree: a tyre in its window on a
         -- freezing road is a state the model must be able to represent.
         T.ok(E.FACTS.surface_grip ~= E.FACTS.tyre_thermal, "and they are distinct entries")
+    end,
+
+    -- ------------------------------------------------------------------ the governor (L162)
+
+    the_target_rides_the_wire_only_when_it_exists = function(T)
+        local M = T.Core.get("parts.handling")
+        local setup = M.clear("v")
+        local bare = M.wire(setup)
+        T.ok(bare.levers.topSpeedKph == nil,
+            "no target means UNGOVERNED -- absent, never a top speed of zero")
+        setup.governedTopSpeedKph = 151.4
+        local governed = M.wire(setup)
+        T.ok(governed.levers.topSpeedKph == 151,
+            "and a target is quantised to a whole km/h so it cannot republish on drift")
+    end,
+
+    a_governor_change_alone_must_republish = function(T)
+        local M = T.Core.get("parts.handling")
+        local a, b = M.clear("v"), M.clear("v")
+        b.governedTopSpeedKph = 200
+        -- `write()` suppresses an unchanged payload on this signature. If the target were missing from it,
+        -- a car whose levers held still while its top speed moved would never be told.
+        T.ok(M.signature(a) ~= M.signature(b), "the target belongs in the signature")
+        local c = M.clear("v"); c.governedTopSpeedKph = 200
+        T.ok(M.signature(b) == M.signature(c), "and equal targets still compare equal")
+    end,
+
+    every_authored_top_speed_is_a_plausible_car = function(T)
+        local C = T.Core.get("data.vehicle_catalogue")
+        local n = 0
+        for _, record in ipairs(C.allRecords()) do
+            local kph = C.topSpeedKph(record)
+            if kph then
+                n = n + 1
+                T.ok(kph >= 120 and kph <= 400,
+                    ("%s = %s km/h is outside anything a Night City car does"):format(record, tostring(kph)))
+            end
+        end
+        T.ok(n >= 40, "the authored table covers the cars, not a handful of them")
+        -- Base and `_player` are separate TweakDB records and must not disagree about the same car.
+        for _, record in ipairs(C.allRecords()) do
+            if record:find("_player$") then
+                local base = record:gsub("_player$", "")
+                local a, b = C.topSpeedKph(record), C.topSpeedKph(base)
+                if a or b then
+                    T.ok(a == b, ("%s and its base disagree (%s vs %s)"):format(record, tostring(a), tostring(b)))
+                end
+            end
+        end
+    end,
+
+    an_unauthored_record_is_ungoverned_rather_than_capped = function(T)
+        local C = T.Core.get("data.vehicle_catalogue")
+        -- The bikes are deliberately absent. A guessed figure would be indistinguishable from a real one.
+        T.ok(C.topSpeedKph("Vehicle.v_sportbike1_yaiba_kusanagi_tyger") == nil,
+            "bikes are unconfirmed and must stay absent")
+        T.ok(C.topSpeedKph("Vehicle.not_a_real_record") == nil, "and an unknown record is absent, not zero")
     end,
 }

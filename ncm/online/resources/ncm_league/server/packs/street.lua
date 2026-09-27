@@ -25,6 +25,24 @@
 -- routes would make it a Nomad-car street series wearing a rallycross name. It waits on route authoring
 -- (KB-46 is the same shape of gap for rolling starts). **NCX World Championship** is also absent: it wants an
 -- explicit calendar and `validateSeries` requires `cadence.everyMinutes >= 1` (IDEA-114).
+local function economy(scale, id)
+    scale = scale or 1
+    return {
+        id = id, version = 1,
+        entryFee = 50 * scale,
+        timeTrialCompletion = 250 * scale,
+        raceCompletion = 300 * scale,
+        repeatWindowSec = 86400,
+        fullRateCompletions = 1,
+        repeatFloor = 50 * scale,
+        placement = { [1] = 350 * scale, [2] = 150 * scale, [3] = 75 * scale },
+        fieldBonus = { perEntrant = 50 * scale, max = 250 * scale },
+        targets = {}, -- route-specific targets are deliberately off until authored times exist
+        tagBounties = { clean_run = 50 * scale, clean_race = 75 * scale },
+        maxTagBounty = 150 * scale,
+    }
+end
+
 NcmPackStreet = {
     packId = "ncm_pack_street",
     version = "0.1.0",
@@ -40,6 +58,7 @@ NcmPackStreet = {
             -- entry-performance road machinery: the ordinary classes, nothing exotic. Bikes and Nomad-only cars
             -- are out because this is the road-car championship, not because they are unwelcome elsewhere.
             eligibility = { classes = { "Muscle", "Sport", "Tech" }, prestigeMax = 2 },
+            economy = economy(1, "city_cup_v1"),
             capacity = 20,
             -- Eight point-to-point roots, rotated in order: series.routes[(k % #routes) + 1].
             -- The same pool is consumed by every championship below; a route may host several at different times.
@@ -65,6 +84,7 @@ NcmPackStreet = {
             cadence = { everyMinutes = 30, offsetMinutes = 10 },
             disciplineId = "street_sprint", formatId = "sprint", classId = "street_open", laps = 1,
             eligibility = { records = { "Vehicle.v_standard2_makigai_maimai" } },
+            economy = economy(1, "maimai_cup_v1"),
             capacity = 20,
             routes = {
                 { rootId = "root_hill_abode_505_1229__to__downtown_2362_117" },                 -- Snake in the Grass
@@ -87,6 +107,7 @@ NcmPackStreet = {
             cadence = { everyMinutes = 60, offsetMinutes = 25 },
             disciplineId = "street_sprint", formatId = "sprint", classId = "street_open", laps = 1,
             eligibility = { classes = { "Sport", "Muscle" }, prestigeMin = 3, prestigeMax = 4 },
+            economy = economy(10, "night_city_gt_v1"),
             capacity = 20,
             routes = {
                 { rootId = "root_tip_1035_3652__to__trench_2899_2711" },                        -- Ukulele
@@ -108,6 +129,7 @@ NcmPackStreet = {
             cadence = { everyMinutes = 180, offsetMinutes = 40 },
             disciplineId = "street_sprint", formatId = "sprint", classId = "street_open", laps = 1,
             eligibility = { classes = { "Sport" }, prestigeMin = 5 },
+            economy = economy(100, "hypercar_v1"),
             capacity = 20,
             routes = {
                 { rootId = "root_tip_1035_3652__to__trench_2899_2711" },                        -- Ukulele
@@ -129,6 +151,7 @@ NcmPackStreet = {
             -- the pool contains the RB15, so an open series would quietly let an NCX Formula car into a street
             -- drag race. Naming the classes is the fix; Formula is entered through NCX and nowhere else.
             eligibility = { classes = { "Muscle", "Sport", "Tech", "Nomad", "Bike" } },
+            economy = economy(1, "street_drag_v1"),
             capacity = 20,
             routes = {
                 { rootId = "root_vista_del_drag_900_751__to__japantown_crossway_373_0" },       -- B-line

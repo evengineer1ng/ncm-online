@@ -224,6 +224,13 @@ local function pushGuide(pid)
             car = carFacts(NcmCalendar.events[r.eventId], driverId),
             regs = { tier = r.tier, discipline = r.disciplineId, format = r.formatId, laps = r.laps,
                      startType = r.startType, capacity = r.seatsTotal, rulesetId = r.rulesetId },
+            economy = r.economy and {
+                id=r.economy.id, version=r.economy.version, entryFee=r.economy.entryFee,
+                timeTrialCompletion=r.economy.timeTrialCompletion, raceCompletion=r.economy.raceCompletion,
+                placement={p1=r.economy.placement[1],p2=r.economy.placement[2],p3=r.economy.placement[3]}, fieldBonus=r.economy.fieldBonus,
+                repeatFloor=r.economy.repeatFloor, tagBounties=r.economy.tagBounties,
+                maxTagBounty=r.economy.maxTagBounty,
+            } or nil,
             weather = eventWeather(wx, r.startsAt) }
     end
     -- A bare `pcall` here swallowed every publish failure, which is why an empty Race Guide was indistinguishable
@@ -232,6 +239,7 @@ local function pushGuide(pid)
     -- deploy 11 took the calendar from one series to five, so the row count roughly tripled.
     local payload = {
         rows = slim, at = math.floor(now()), serverNow = math.floor(now()),
+        balance = driverId and NcmEconomy and NcmEconomy.balanceOf(driverId) or nil,
         -- one bounded read model at payload top level, NOT forecast facts copied onto every row (11_WEATHER.md).
         -- `wx` stays server-side for eventWeather(); only the bounded projection goes on the wire.
         weather = weatherForClient(wx),

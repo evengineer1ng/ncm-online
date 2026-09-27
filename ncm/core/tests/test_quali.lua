@@ -6,6 +6,62 @@ end
 local function at(g) return { x = g.x, y = g.y } end
 
 return {
+    -- `rawSec` is the pure gate-to-gate duration and `runSec` is the official time. A caller that has to
+    -- subtract one from the other is a caller that will eventually subtract the wrong thing -- and for a time
+    -- trial on the race kernel the official time folds in a PENALTY as well, so the arithmetic differs by
+    -- session kind. Both are returned so nothing has to know which kind it is looking at.
+    raw_and_official_durations_are_both_reported = function(T)
+        local Q = T.Core.get("session.quali")
+        local g = gatesFor(T)
+        local s = Q.new({ sessionId = "p2", kind = "practice", startsAt = 100, windowSec = 400, gates = g,
+            entrants = { { driverId = "a", slot = 1 } } })
+        Q.step(s, 100)
+        Q.report(s, { driverId = "a", gateIndex = 1, now = 105, position = at(g[1]) })
+        Q.incident(s, "a", { kind = "car", band = 1, seconds = 3 }, 120)
+        local r = Q.report(s, { driverId = "a", gateIndex = 2, now = 165, position = at(g[2]) })
+        T.eq(r.rawSec, 60, "sixty seconds of driving")
+        T.eq(r.runSec, 63, "and a sixty-three second lap once the incident is paid")
+        T.eq(r.incidentSec, 3)
+        T.eq(r.finishedAt - r.startedAt, r.rawSec, "the interval and the raw duration agree")
+    end,
+    -- The run boundaries and the latched machine leave the kernel (L165). `r.run` is discarded at the finish
+    -- and it held the only record of WHEN the lap happened; without these a stored lap is a duration with no
+    -- place in time, which is why no practice run could be located against the telemetry it was driven
+    -- through. The machine is latched at the START line, not read when the session closes.
+    a_finished_run_reports_its_interval_and_its_machine = function(T)
+        local Q = T.Core.get("session.quali")
+        local g = gatesFor(T)
+        local s = Q.new({ sessionId = "p", kind = "practice", startsAt = 100, windowSec = 400, gates = g,
+            entrants = { { driverId = "a", slot = 1 } } })
+        Q.step(s, 100)
+        local shion = { assetId = "33333333-3333-4333-a333-333333333333", record = "Vehicle.v_sport2_mizutani_shion_player" }
+        T.eq(Q.report(s, { driverId = "a", gateIndex = 1, now = 105, position = at(g[1]), machine = shion }).runStarted, true)
+        local r = Q.report(s, { driverId = "a", gateIndex = 2, now = 165, position = at(g[2]) })
+        T.eq(r.finished, true)
+        T.eq(r.startedAt, 105, "the interval the lap occupies")
+        T.eq(r.finishedAt, 165)
+        T.eq(r.runSec, 60)
+        T.eq(r.incidentSec, 0)
+        T.eq(r.improved, true, "the kernel says whether this is a new best, so nobody recomputes it")
+        T.truthy(r.machine); T.eq(r.machine.record, "Vehicle.v_sport2_mizutani_shion_player")
+
+        -- A slower second run carries its own interval and is NOT an improvement.
+        local caliburn = { assetId = "55555555-5555-4555-8555-555555555555", record = "Vehicle.v_sport1_rayfield_caliburn_player" }
+        Q.report(s, { driverId = "a", gateIndex = 1, now = 200, position = at(g[1]), machine = caliburn })
+        local r2 = Q.report(s, { driverId = "a", gateIndex = 2, now = 290, position = at(g[2]) })
+        T.eq(r2.runSec, 90); T.eq(r2.startedAt, 200); T.eq(r2.finishedAt, 290)
+        T.eq(r2.improved, false, "a slower lap is not a new best")
+        T.eq(r2.bestSec, 60, "and the best is unchanged")
+        T.eq(r2.machine.record, "Vehicle.v_sport1_rayfield_caliburn_player",
+            "the car the driver refitted to between runs, latched at that run's own start")
+
+        -- An incident inside the run is reported separately from the raw duration, so a stored lap can say
+        -- what it was penalised for rather than only what it totalled.
+        Q.report(s, { driverId = "a", gateIndex = 1, now = 300, position = at(g[1]), machine = shion })
+        Q.incident(s, "a", { kind = "car", band = 1, seconds = 2 }, 310)
+        local r3 = Q.report(s, { driverId = "a", gateIndex = 2, now = 350, position = at(g[2]) })
+        T.eq(r3.runSec, 52); T.eq(r3.incidentSec, 2); T.eq(r3.improved, true)
+    end,
     windows_scale_with_the_route = function(T)
         -- Windows come from the route length, generous, rounded up to whole minutes (owner, 2026-09-21).
         local F = T.Core.get("competition.format")

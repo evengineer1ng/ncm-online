@@ -115,6 +115,8 @@ const CASES = [
   ["full row: car + regs + per-row weather", { rows: [rowBase({
       car: { summary: "one of 6 eligible cars", admits: 6, iOwn: 2, ok: true },
       regs: { tier: "street", discipline: "street_sprint", format: "sprint", laps: null, startType: "standing", capacity: 8, rulesetId: "street_sprint_v0" },
+      economy: { id: "city_cup_v1", version: 1, entryFee: 50, timeTrialCompletion: 250, raceCompletion: 300,
+        placement: { p1: 350, p2: 150, p3: 75 }, fieldBonus: { perEntrant: 50, max: 250 }, repeatFloor: 50 },
       weather: { w: "rain", family: "wet", conf: "HIGH", kind: "FORECAST", changes: true, soonAt: Math.floor(Date.now() / 1000) + 300 } })],
       serverNow: 1790000000, weather: READY_WX, capabilities: { weather: true, regs: true, carRequirements: true } }],
   ["driver owns NONE (L83 refusal path)", { rows: [rowBase({
@@ -179,6 +181,9 @@ check("car block states what to bring", /one of 6 eligible cars/.test(d), d.slic
 check("car block states the driver's own answer", /YOU OWN 2 OF THESE/.test(d));
 check("regs block is rendered", /REGULATIONS/.test(d) && /STREET SPRINT/.test(d));
 check("ruleset is named AND flagged as not-yet-published", /STREET_SPRINT_V0/.test(d) && /not yet published/.test(d));
+check("economy block exposes entry and solo payout", /ECONOMY/.test(d) && /€\$50/.test(d) && /€\$250/.test(d));
+check("economy block exposes race and P1 payout", /€\$300/.test(d) && /€\$350/.test(d));
+check("economy block says practice is free", /PRACTICE FREE/.test(d));
 check("forecast block shows the condition", /CONDITIONS AT START/.test(d) && /RAIN/.test(d));
 check("confidence is ORDINAL", /HIGH CONFIDENCE/.test(d));
 check("a changing race says so", /Conditions change during this race/.test(d));
@@ -436,6 +441,64 @@ emitted.length=0; ownedButtons.forEach(b=>b.click());
 check("CALL carries each exact assetId",emitted.filter(e=>e.name==="panel:vehicle.call").map(e=>e.data.assetId).join("|")===assetIds.slice(0,2).join("|"));
 fire("panel:collection",{slots:[{slot:1,discovered:true,owned:false,displayName:"Galena"}]});
 check("discovery alone offers no CALL",!dump(document.getElementById("collectionDetail")).join("|").includes("CALL VEHICLE"));
+
+// ---- THE SIX RESERVED BUYER METRICS (`L162` section 7).
+//
+// RATED TOP SPEED is the first to carry a number and it is AUTHORED, not measured. The capability audit
+// (section 5) establishes that the rated figure and the observed one disagree in a KNOWN direction, so a
+// player who cannot tell which they are reading has been misled -- `28` section 37 forbids authored
+// knowledge masquerading as observation. The DECLARED marker is therefore load-bearing, not decoration.
+fire("panel:collection",{slots:[{slot:1,discovered:true,owned:false,displayName:"Galena",declaredTopSpeedKph:151}]});
+let metricText=dump(document.getElementById("collectionDetail")).join("|");
+check("a declared top speed is shown as a declaration, never as a measurement",
+  /151 km\/h · DECLARED/.test(metricText),metricText.slice(0,400));
+check("the other five metrics stay honestly unrated",
+  (metricText.match(/Not rated/g)||[]).length===5,metricText.slice(0,400));
+
+// An absent figure must not become 0 km/h. The bikes and the withdrawn RB15 have no confirmed number and
+// a guess would be indistinguishable from a real one.
+fire("panel:collection",{slots:[{slot:1,discovered:true,owned:false,displayName:"Apollo"}]});
+metricText=dump(document.getElementById("collectionDetail")).join("|");
+check("an unrated machine says so rather than claiming zero",
+  (metricText.match(/Not rated/g)||[]).length===6&&!/DECLARED/.test(metricText),metricText.slice(0,400));
+
+// ---- OBSERVED EVIDENCE, AND THE TWO-SOURCE DISPLAY (`28` sections 7/9/33, `L164`).
+//
+// The single thing these assertions protect: a DECLARATION and an OBSERVATION must never be mistaken for
+// one another. `31` section 5 establishes they disagree in a known direction, so a screen that blurs them
+// is actively misleading -- and section 7 forbids an observation quietly becoming a specification.
+fire("panel:collection",{slots:[{slot:1,discovered:true,owned:true,displayName:"Hella",
+  declaredTopSpeedKph:167,
+  assets:[{assetId:assetIds[0],observations:[
+    {kind:"observed_speed_floor",label:"Highest speed observed",value:156.4,display:"km/h",
+     observedAt:1790201800,x:-1234.6,y:987.4,aiDriven:false},
+    {kind:"observed_lateral_accel",label:"Highest cornering load observed",value:9.12,display:"m/s²",
+     observedAt:1790201900,x:-1200.2,y:1000.9}]}]}]});
+let obsText=dump(document.getElementById("collectionDetail")).join("|");
+check("an observation is shown as evidence about this machine",/OBSERVED — THIS MACHINE/.test(obsText),obsText.slice(0,500));
+check("the observed value keeps its own unit",/156\.4 km\/h/.test(obsText),obsText.slice(0,500));
+check("cornering load renders in its own unit, not the speed one",/9\.1 m\/s²/.test(obsText),obsText.slice(0,500));
+// Section 9: coordinates, never manufactured prose about where it happened.
+check("an observation carries coordinates rather than invented place prose",/\(-1235, 987\)/.test(obsText),obsText.slice(0,500));
+// Section 7 / 31 section 5: both numbers on one screen, each unmistakably labelled.
+check("declaration and observation coexist and are labelled differently",
+  /167 km\/h · DECLARED/.test(obsText)&&/156\.4 km\/h/.test(obsText)&&!/156\.4 km\/h · DECLARED/.test(obsText),obsText.slice(0,500));
+
+// A machine nobody has driven says so. Absence is a legitimate state, and it is NOT zero.
+fire("panel:collection",{slots:[{slot:1,discovered:true,owned:true,displayName:"Hella",declaredTopSpeedKph:167,
+  assets:[{assetId:assetIds[0]}]}]});
+obsText=dump(document.getElementById("collectionDetail")).join("|");
+// The guard cannot look for "0 km/h": the LABEL "0–100 km/h" contains that substring. It looks for
+// the coordinate marker instead, which only ever appears on a rendered observation.
+check("an unobserved machine says nothing observed rather than zero",
+  /Nothing observed yet/.test(obsText)&&!/ · \(/.test(obsText),obsText.slice(0,500));
+
+// 31 section 7: platform AI at the wheel is not the Driver's achievement, and must be visible when known.
+fire("panel:collection",{slots:[{slot:1,discovered:true,owned:true,displayName:"Hella",
+  assets:[{assetId:assetIds[0],observations:[{kind:"observed_speed_floor",label:"Highest speed observed",
+    value:140,display:"km/h",observedAt:1790201800,x:1,y:2,aiDriven:true}]}]}]});
+check("an NPC-driven observation is marked as such",
+  /AI DRIVEN/.test(dump(document.getElementById("collectionDetail")).join("|")));
 
 // ---- PARTS ECONOMY. The market has two independently populated panes, and selecting a component must
 // project its server-authored fitment across every visible Machine without hiding an incompatible one.

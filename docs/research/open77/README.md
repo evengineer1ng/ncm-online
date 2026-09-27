@@ -37,6 +37,10 @@ Current identity recovery: [Driver Identity / Nameplate recovery audit](DRIVER_I
 — recovered three-layer Driver Card, provisional Fingerprint axes, banners/badges/profile history, present
 telemetry feasibility, OPEN//77 nameplate/WebUI/state-bag readiness, missing assets and the smallest honest Phase 2.
 
+Current content-rights register: [NCM server-mod licensing catalog](NCM_SERVER_MOD_LICENSING_CATALOG.md) - the
+package-by-package distinction between server-hosted delivery, written-permission candidates and content that
+is off the table today; Cohort 1 and its hard dependencies are the first audited batch.
+
 Evidence labels: **code verified** means static execution-path inspection, not a gameplay test; **documented** means an official external source; **proposal** means engineering judgment; **unknown** is not proof of absence. External capabilities must be rechecked against a pinned preview before implementation.
 
 ## Discrepancies worth knowing immediately

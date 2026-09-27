@@ -67,6 +67,15 @@ end
 function T.ok(cond, msg)
     if not cond then fail(msg or "expected truthy", 2) end
 end
+-- `truthy`/`falsy` are `ok` and its negation under the names the newer suites reach for. Added because
+-- `test_chunks` called both and the harness had neither, so two real assertions were being reported as
+-- harness errors rather than as results.
+function T.truthy(cond, msg)
+    if not cond then fail(msg or "expected truthy", 2) end
+end
+function T.falsy(cond, msg)
+    if cond then fail((msg and (msg .. ": ") or "") .. "expected falsy, got " .. show(cond), 2) end
+end
 function T.eq(actual, expected, msg)
     if actual ~= expected then
         fail((msg and (msg .. ": ") or "") .. "expected " .. show(expected) .. ", got " .. show(actual), 2)

@@ -110,13 +110,28 @@ Core.define("parts.handling", function(C)
             id = "brakeScale", quantity = "longitudinal_force_braking",
             min = 0.30, max = 2.00, inert = 1.00,
             evidence = "MASTER_TEST AW2",
-            note = "Force along travel while it is RETARDING. Stopping ability.",
+            note = "Force along travel while it is RETARDING and the driver is ON THE BRAKE.",
+        },
+        -- **Drag is not braking, and until 2026-09-26 this system could not say so.** The carrier's write
+        -- site discriminated retarding force by SIGN alone, so `brakeScale` scaled aerodynamic drag too:
+        -- `brakes 0.5` took the Galena from 131 to 139 km/h and `brakes 0.3` to 142. A brake part moved
+        -- terminal velocity, which is wrong on its face and made `aerodynamics` express drag through a
+        -- `driveScale` penalty -- pretending a wing reduces engine power, because drag had nowhere to go.
+        --
+        -- The carrier now separates them on the driver's brake PEDAL: retarding force with the pedal at
+        -- rest is drag, everything else is braking. Narrower bounds than the other three deliberately --
+        -- this sets terminal velocity, and a car whose drag halved would be a different vehicle.
+        dragScale = {
+            id = "dragScale", quantity = "longitudinal_force_coasting",
+            min = 0.50, max = 1.50, inert = 1.00,
+            evidence = "MASTER_TEST BG",
+            note = "Force along travel while it is RETARDING and NOBODY IS BRAKING. Terminal velocity.",
         },
     }
 
     -- Declared order, so a composed setup serialises identically every time. `pairs` over M.LEVERS would
     -- not, and a signature that changes without the value changing republishes for nothing.
-    M.LEVER_IDS = { "gripScale", "driveScale", "brakeScale" }
+    M.LEVER_IDS = { "gripScale", "driveScale", "brakeScale", "dragScale" }
 
     -- ---------------------------------------------------------------------------------------------
     -- CONTRIBUTORS: the same layer vocabulary the record carrier already uses (`L158`)
@@ -143,6 +158,23 @@ Core.define("parts.handling", function(C)
     --- would republish the state bag twice a second per driver forever. The comment at
     --- `server/handling.lua` records that exact defect already happening once.
     M.CONTRIBUTOR_QUANTUM = 0.01
+
+    --- How far the WHOLE gear chain is stretched above stock -- every gear's `minSpeed` and `maxSpeed`
+    --- together -- so a governed car is DRAG-limited rather than GEAR-limited and the governor has a
+    --- window to place a top speed inside.
+    ---
+    --- **The whole chain, not the top gear alone.** Lifting only the last ratio left the Galena with six
+    --- gears of 20-25 km/h each and a seventh of 95-157: the box kept its old shape and grew one
+    --- enormous ratio on the end. Scaling both ends of every gear changes the box's SIZE, not its SHAPE,
+    --- which is what a longer final drive actually is.
+    ---
+    --- Lives here, in core, because both halves must mean the same number and they run in different
+    --- processes: the server composes the governor target against it, and the CLIENT applies it, since
+    --- the projection state bag has never once reached a client (`projections: absent(nil)`).
+    ---
+    --- It does not need to be exact. Nothing aims at the ceiling -- the governor does the aiming -- so it
+    --- only has to be far enough away to stop being a constraint.
+    M.GEAR_HEADROOM = 1.45
 
     local function quantise(v)
         return math.floor(v / M.CONTRIBUTOR_QUANTUM + 0.5) * M.CONTRIBUTOR_QUANTUM
@@ -254,10 +286,14 @@ Core.define("parts.handling", function(C)
             -- Three signs at once, and the clearest case for exponents: a wing that adds grip must cost
             -- straight-line speed, or the part is a free lunch and the whole system is a joke. The brake
             -- term is the half originally missed -- drag retards the car whether or not anyone wanted it.
+            -- **`dragScale` replaces the old `driveScale = -0.25` proxy.** A wing does not reduce engine
+            -- power; it adds drag. Drag had no lever, so the cost was booked against the engine -- which
+            -- read the same on a dyno and completely different on a long straight. Now it is booked where
+            -- it belongs, and the brake term survives because a wing really does shorten a stop.
             terms = { { lever = "gripScale", weight = 0.50 },
-                      { lever = "driveScale", weight = -0.25 },
+                      { lever = "dragScale", weight = 0.40 },
                       { lever = "brakeScale", weight = 0.15 } },
-            rationale = "Downforce raises grip, drag costs drive force, and the same drag shortens a stop. "
+            rationale = "Downforce raises grip, drag costs top speed, and the same drag shortens a stop. "
                 .. "All three are real, all three are reachable, and the first two pull in opposite "
                 .. "directions -- which is the actual trade a wing makes.",
             losses = { "SPEED DEPENDENCE, which is the big one: real downforce and drag scale with v^2 "
@@ -267,12 +303,16 @@ Core.define("parts.handling", function(C)
         },
         chassis = {
             fidelity = M.APPROXIMATED,
+            -- The drag term is NEGATIVE and smaller: rolling resistance scales with mass, so a lighter
+            -- car does coast further -- but most of what holds a car back at speed is aerodynamic and
+            -- mass has nothing to say about that. Half the weight of the other three, deliberately.
             terms = { { lever = "gripScale", weight = 0.40 },
                       { lever = "driveScale", weight = 0.40 },
-                      { lever = "brakeScale", weight = 0.40 } },
+                      { lever = "brakeScale", weight = 0.40 },
+                      { lever = "dragScale", weight = -0.20 } },
             rationale = "Mass is the honest reading of a chassis part, and a lighter car accelerates, "
-                .. "stops and corners better in the same proportion. The one family whose direction is "
-                .. "legitimately equal on all three, because inertia does not care which way a car goes.",
+                .. "stops and corners better in the same proportion. Inertia does not care which way a "
+                .. "car goes -- but drag is aerodynamic, so it moves less and in the opposite sense.",
             losses = { "ACTUAL MASS -- total_mass at +0x1BC is a verified field we have chosen not to "
                        .. "write; this scales forces instead, which is not the same as changing inertia",
                        "centre of gravity and weight distribution",
@@ -745,12 +785,32 @@ Core.define("parts.handling", function(C)
     --- The wire form: what actually crosses to the client and down to the carrier. **Only what the plugin
     --- reads.** `trace`, `clamped` and `limited` stay server-side -- the carrier never looks at them, and
     --- KB-136 is the standing evidence that shipping an audit trail to every client is how a transport dies.
+    --- `governedTopSpeedKph` is the Machine's top speed TARGET, and it travels beside the three levers
+    --- rather than as one of them.
+    ---
+    --- **It is not a lever and must not be treated as one.** A lever is a dimensionless multiplier with an
+    --- inert value of 1.0; this is an absolute speed in km/h whose "inert" is ABSENT. It also reaches the
+    --- physics differently: the carrier withholds drive as the target is approached rather than scaling
+    --- force everywhere, which is the whole point -- `driveScale` alone cannot lower a top speed without
+    --- taking the acceleration with it, and a part that costs 10 km/h at the top should not also ruin the
+    --- launch.
+    ---
+    --- Absent means UNGOVERNED, never zero. A Machine with no declared top speed runs to whatever its
+    --- gearing and drag allow, which is the correct behaviour for a car nobody has authored a figure for
+    --- (`L157`: an absent entry means no ceiling, never a guessed one).
     function M.wire(setup)
         if type(setup) ~= "table" or type(setup.levers) ~= "table" then return nil end
         local levers = {}
         for _, id in ipairs(M.LEVER_IDS) do
             local value = setup.levers[id]
             if type(value) == "number" then levers[id] = value end
+        end
+        local target = tonumber(setup.governedTopSpeedKph)
+        if target and target > 0 then
+            -- Quantised like every other contributor, and for the same reason: `signature()` decides
+            -- whether to republish, and a target drifting in the third decimal would republish the wire
+            -- twice a second per driver forever.
+            levers.topSpeedKph = math.floor(target + 0.5)
         end
         return { v = setup.v or M.SETUP_VERSION, at = setup.at, levers = levers }
     end
@@ -763,6 +823,12 @@ Core.define("parts.handling", function(C)
         for _, id in ipairs(M.LEVER_IDS) do
             out[#out + 1] = ("%s=%.4f"):format(id, setup.levers[id] or M.LEVERS[id].inert)
         end
+        -- **The target belongs in the signature or a governor change never reaches the car.** `write()`
+        -- suppresses an unchanged payload, so a setup whose levers held still while its top speed moved
+        -- would be silently dropped -- which is exactly the shape of bug this file already carries a
+        -- comment about, one layer up.
+        local target = tonumber(setup.governedTopSpeedKph)
+        out[#out + 1] = ("topSpeedKph=%s"):format(target and math.floor(target + 0.5) or "none")
         return table.concat(out, "|")
     end
 

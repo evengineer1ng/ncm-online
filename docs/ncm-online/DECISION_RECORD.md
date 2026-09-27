@@ -7,7 +7,7 @@ Maintained during the orientation/interview phase. Every entry cites its basis. 
 
 Legend: **LOCKED** — owner-approved or forced by verified platform facts · **PROVISIONAL** — recommended, not yet approved · **OPEN** — needs the owner · **EXPERIMENT** — needs a measured result.
 
-Last updated: 2026-09-25 - L135 separates mechanical truth from host expression and keeps additional carriers experimental. Previous entries remain authoritative.
+Last updated: 2026-09-27 - L166 rules that a ghost is a replay and never a competitor, and that ghost poses are their own versioned format. Previous entries remain authoritative.
 
 ## Guiding principle (owner, 2026-09-19)
 
@@ -2435,3 +2435,238 @@ the current private pipeline; its safety and transaction gates remain binding.
 
 **Basis.** Owner correction, 2026-09-26: *"development is not our pipeline right now ... online is essentially
 development only accessible to me ... deploy"*.
+
+## L164 - EXECUTED OWNER RULING - the first observation vocabulary is accepted; the estimator is not
+
+**Decision.** The owner ruled on `31_CAPABILITY_AUDIT.md` on 2026-09-26, after the machine-discovery /
+market-discovery / scanning / machine-knowledge threads were read end to end against the code.
+
+**Section 9 of the audit is accepted as authority.** NCM may define its first typed observation vocabulary
+from the six characteristics that audit found safe -- observed speed, lateral acceleration, yaw rate and
+stability, slip angle, speed retention and gradient -- because every input is present, server-side and
+authoritative. The provenance work the audit's section 10 put ahead of it is built in the same pass.
+
+**The estimator is NOT accepted and is not built.** `30` section 6 and `31` section 10 both say the envelope
+mathematics get their own reviewed proposal, and its anti-midpoint (`IDEA-337`) and determinism
+(`IDEA-338`) invariants deserve that pass. Evidence accumulates first; inference is a later decision.
+
+### What this ruling makes true
+
+1. **Every characteristic is a demonstrated-capability floor.** `28` section 29: *"A lower bound on
+   demonstrated capability is not an upper bound on maximum."* This is what allows one reducer to serve all
+   six without any of them lying, and it is why `observed_speed_floor` keeps its existing name instead of
+   becoming `observed_speed_max`.
+2. **Two of six are wired; four are declared and refused.** The odometer's 1 Hz server loop already reads
+   speed and already derives cornering load, so those two have a real producer. The other four need
+   `velocity`/`angularVelocity` fields that loop does not read yet (`IDEA-544`). **A vocabulary entry with
+   an invented producer is worse than one with none**, and a core test asserts that exactly two are wired so
+   the gap cannot be closed by accident.
+3. **An empirical claim owes more than an identity reveal.** An observation kind must name its basis and
+   must attest a live physics owner, or core refuses it. Section 7's hazard -- an unowned car reads a
+   confident `0` because nothing is simulating it -- is now a refusal at the boundary rather than a caution
+   in a comment.
+4. **`ai_driven` is a tri-state.** Migration 033 adds it NULL-able and nothing defaults it. An NPC at the
+   wheel is not a driver's achievement, and a build that does not report the flag must leave the row saying
+   *unknown* rather than claiming a human drove.
+5. **No client-attested path.** The drivetrain half exists only client-side and is structurally an
+   attestation (`31` section 3). That basis stays declared and unused until there is a design for believing
+   an observer about somebody else's car.
+
+### `IDEA-359` is retired as an enforcement and preserved as a finding
+
+`machine_knowledge.configurationRef()` refused **every** value with `configuration_substrate_absent`, because
+the audit's section 6 proved build 2.31 has no component object -- no mod slots, no wheel types, no RTTI --
+for `configuration_ref` to name. **Migration 031 built the record that section predicted**, so the refusal
+has done its job and becomes a shape rule.
+
+The finding is unchanged and is now the *justification*: because there are no engine components, this column
+can only ever reference something NCM authored itself. Both reserved columns are filled -- `session_result`
+(024) and `vehicle_knowledge_evidence` (028).
+
+**A race result carries the configuration latched at GREEN, never the head at settlement.** `machine_configuration`
+is an append-only chain and its head moves the moment a part is fitted; reading it late would attribute a lap
+time to what the car became afterwards.
+
+### Correction recorded, because the owner made it
+
+An earlier report in this session framed Parts v1 as shipping *omniscient*, contradicting the knowledge
+design. **That was wrong.** Components are gated by needing to discover the market they are in, and Base
+Market is universally known, so every player seeing its parts is correct by design.
+
+The real defect was narrower and structural: the component query named `base_market` as a SQL literal while
+the vehicle half of the same payload resolved through the driver's known-market set, which is precisely what
+`17_MARKET_NETWORK.md` forbids (*"must never call a singleton theShop"*). Fixed in `IDEA-545`, with no
+behaviour change while one market exists.
+
+**Basis.** Owner, 2026-09-26: *"lets fill in the gaps with code where necessary and start building on this"*,
+plus the explicit ruling to build provenance and the first vocabulary while leaving the estimator alone, and
+the correction *"where is the contradiction?"*.
+
+## L165 - LOCKED OWNER DIRECTION / BALANCE OPEN - the launch economy works for one human and no AI grid
+
+**Direction.** NCM Online's burgeoning-world economy does not depend on AI drivers or immediate population.
+No AI-driver implementation is in the launch economy: an otherwise empty scheduled race runs for its human
+entrant and is classified as a time trial under `L67`. This parks `L36`'s AI-backfill default and the recent
+`IDEA-548` feasibility thread unless the owner deliberately reopens them; the research remains evidence, not
+scope.
+
+Both scheduled solo time trials and contested races are recurring money faucets. Ordinary races charge an
+entry fee. Whether the lowest-rung time trial charges an entry fee remains **OPEN**, with the owner's present
+lean being yes; free practice remains available and pays nothing. Championship/event economics continue to
+own the exact fee and payout tables under `L84`, and race purses do not have to equal collected fees.
+
+Cars and serialized Parts are the major durable sinks. Vehicle prices are intended to span an unusually wide
+persistent-world ladder, from the provisional €$2,500 MaiMai floor to highest-end Machines in the millions;
+the exact catalogue values and payout ratios remain balancing data. Fuel/refuelling and approximate
+NCM-authored fuel behaviour are an active design investigation, not authorised implementation.
+
+The already-specified generalized player trade surface remains the transfer authority for money, Machines and
+component assets in any combination. It redistributes value and preserves custody/provenance; it is not counted
+as a currency faucet and therefore cannot solve sparse-launch liquidity by itself.
+
+**Basis.** Owner economy review, 2026-09-27: time trials and races must pay; races have entry fees; lowest-rung
+time-trial fee undecided but leaning yes; no AI-driver implementation; fuel/refuelling under investigation;
+persistent-world vehicle ladder from a €$2,500 MaiMai to million-eddie high-end Machines; player trade already
+specified.
+
+## L166 - EXECUTED IN CODE / LIVE-GATED - a ghost is a replay, not a competitor
+
+**Decision.** NCM stores laps that real players drove and replays them as **ghosts**: a non-colliding car,
+local to one client, moving along a stored pose stream. A ghost is **never an entrant and never evidence**.
+
+### What this ruling makes true
+
+1. **A ghost cannot affect anything that is scored.** Not timing, not collision, not standings, not ratings,
+   not results, not settlement. It has no position, it is not counted in the field, and it is drawn outside
+   the standings table. Giving a ghost a `P` number would tell a driver there was a competitor who did not
+   exist, and is refused at the HUD by an offline assertion rather than by convention.
+2. **A ghost wears the car its lap was set in.** `vehicle_asset.record` is the model, and the machine is
+   latched when the **start line** is crossed. This supersedes the practice behaviour in which attribution
+   was read when the session *closed* -- a driver who left practice, refitted and came back had their lap
+   credited to the wrong machine. `session.quali` now latches at the start gate and returns the latch, the
+   run's interval and its incident time in the finish result.
+3. **Ghost poses are their own versioned format, separate from the telemetry sample.** `replay.pose.FORMAT`
+   is stored beside every lap and a reader that meets a format it does not know refuses it by name.
+   `telemetry.SAMPLE_FIELDS` is **not** extended: it is the incident/progress stream, it is sampled from the
+   driver's body rather than the car, it carries no heading, and its persisted form has no version column --
+   so changing it would have altered a stored format nobody can identify retrospectively, in three vendored
+   copies, to serve a consumer with different needs.
+4. **The poses are the client's; every number attached to them is the server's.** Only the client can see its
+   own car's heading, so the client sends the line. The time, the interval, the route and the machine all come
+   from the claim the race host writes when the server saw the lap finish. A client cannot upload poses for a
+   lap the server did not time, and its own claimed figures are used only to check that the poses plausibly
+   belong to that lap.
+5. **A stored ghost is immutable.** `ghost_lap` rows are inserted and never updated; a faster lap is a new
+   row and "my best" is a query. This is deliberate and load-bearing: it is what allows telemetry retention
+   to be introduced later without a cleanup silently deleting the laps a leaderboard rests on.
+6. **A ghost trace never touches a state bag.** A lap is roughly 45 KB against a measured ~4 KB ceiling
+   (`IDEA-509`). Both directions use `vocabulary.chunks`, and every push logs its encoded size.
+7. **Practice, qualifying and time trials get a ghost; a contested race does not.** A **time trial is a race
+   with a field of one** (`L67`, `IDEA-001`, `driver.progression.isTimeTrial`), so it arrives on the race
+   kernel with the race phases rather than as its own session kind -- and it is the same solo activity
+   practice is, so the same rule reaches it. In a contested race a ghost would be clutter among real
+   competitors and could be read as another entrant, so it is excluded deliberately rather than by omission.
+   The race kernel's result now carries the finish **instant**, not only the duration; `totalSec` folds in the
+   penalty, so the moment a lap ended was not recoverable by subtraction.
+8. **`PERSONAL BEST` is the only tier authorised.** `SESSION BEST` and `ROUTE RECORD` hand one driver's
+   racing line to another driver, which is a claim about a third party; both remain refused by
+   `replay.lap.eligible` until the server corroborates the line from its own observation **and** the driver
+   has opted in. Publishing a route record is opt-in because it exposes how someone drives.
+
+### What this ruling does not settle
+
+Route geometry is still unversioned -- `roots.register` replaces a route in place -- so a stored ghost can
+silently belong to different geometry than the one it replays against (`IDEA-562`). That is tolerable for a
+driver's own best and is a blocker for `ROUTE RECORD`. Presentation is also unsettled: props carry no opacity
+field and only a yaw, so this ghost is solid and does not bank or pitch (`IDEA-561`).
+
+**Basis.** Owner, 2026-09-27, on scope: *"Player lap ghosts are a much better near-term feature than AI
+racers"*; on the car: *"its not gonna be the players car model? it should be"*; on sequencing: *"stop with
+cheapest possible test bullshit, we are building it"*. Built and offline-green the same day; **no live PASS
+yet** -- `wp/MASTER_TEST.md §BI` (`L69`).
+
+## L167 - LOCKED OWNER DIRECTION / TAG ECONOMICS OPEN - evidence and accomplishments become faucets
+
+**Research exchange.** Players may voluntarily turn in legitimate discoveries and proof-bearing observations
+for NCM money. Payment attaches to an accepted, idempotent research submission, not to every automatic sample
+or every incremental best-value update. The evidence keeps its source Machine, basis, time, coordinates and
+configuration provenance. Turning it in does not rewrite an asset observation as model truth, and player-scoped
+knowledge is not silently published merely because it became economically useful. Exact contracts, eligible
+discovery sources, publication/consent policy and amounts remain open.
+
+**Badge rewards.** The scoped Badge ladder may award a fixed amount once per tier crossing. Badge entitlement,
+tier, display selection and money remain separate facts: hiding or displaying a Badge never pays, and a retry
+never pays twice. Unique non-tiered Badges may carry one authored flat reward. Exact tier values remain balance
+data; the Badge implementation itself is still unbuilt.
+
+**Race Tag bonuses remain a proposal, not a blanket rule.** The owner proposed extra money for Tags achieved in
+a race or time trial. `B-089-race-tags` currently defines Tags as ephemeral factual descriptors and includes
+negative or abusable outcomes as well as desirable ones. If adopted, the safe boundary is a separate
+championship/event or sponsor mapping from selected Tag ids to fixed bonuses plus a per-session cap. The pure Tag
+evaluator never writes money, and neither "one tag = one universal amount" nor payment for every Tag is authorised.
+
+**Basis.** Owner economy follow-up, 2026-09-27: research turn-ins for observations/discoveries, fixed Badge-tier
+money, and possible per-race/time-trial Race Tag bonuses.
+
+## L168 - LOCKED OWNER RULING - Economy v1 is the build contract, including selected Race Tag bounties
+
+The owner accepted the combined economy direction and instructed that it be written as the specification before
+implementation. [40_ECONOMY_V1.md](40_ECONOMY_V1.md) is therefore **CURRENT** and build-authorised. It governs
+the Economy v1 implementation while `08_ECONOMY.md` remains the ledger/refund audit and the asset, evidence,
+Badge and Race Tag documents retain authority over their own source facts.
+
+**Launch must work for one Driver.** Free practice remains free and pays nothing. Scheduled time trials and
+contested races both charge an authored fee and pay from separate tables; the provisional Street fee is €$50 for
+either form, so a lonely grid does not punish the player. A field of one receives time-trial completion/target
+money and never a ceremonial P1 payout. Exact values are balancing data and must be instrumented.
+
+**The additional faucets are accepted with boundaries.** Research pays only an explicit accepted submission of
+proof-bearing evidence; Badge money pays each earned tier once; a championship, event or sponsor may pay only an
+allow-listed factual Race Tag through a separate capped bounty mapping. The Race Tag evaluator remains pure and
+negative/contact/penalty or initially manipulable Tags do not pay. This resolves `L167`'s open Tag-economics
+branch without making Tags themselves rewards.
+
+**Cars and Parts remain the principal progression sinks.** Vehicle acquisition may also occur through exact
+prize assets, earn-to-own contracts, restoration projects, commissioned manufacture, organisation/sponsor awards
+and exceptional provenanced grants. Loaners/rentals are access, never ownership. Procedural Part primary prices
+are fixed at immutable Design birth from authored family, capability, complexity and interface factors; scarcity
+changes availability and secondary negotiation rather than engineering truth.
+
+**Fuel follows paid settlement, not vice versa.** Its intended cost is modest, approximately 5–10% of gross
+ordinary earnings, with a bankruptcy road back. Player trade is a value transfer, not a faucet. The shared
+idempotent ledger, atomic settlement and itemised statement are mandatory foundations for every non-zero path.
+
+**Basis.** Owner, 2026-09-27: *"These are strong additions"* and *"write the spec doc from your last two
+answers and then we build."* The provisional tables and unresolved tuning fields are recorded in document 40;
+authority to build does not make those first numbers permanent.
+
+## L169 - EXECUTED IN CODE / LIVE-GATED - Economy v1 creates a real solo income loop
+
+The owner rejected a narrow staged slice and authorised a broad learning implementation: *"time to implement,
+not a narrow provable slice which gets us nowhere quickly, we move fast and break things thats how we learn."*
+Economy v1 therefore lands as one connected local vertical rather than a resolver with no playable money loop.
+
+Migration 035 freezes authored event economics and adds typed ledger references, one settlement receipt per
+session/Driver and accepted Research contributions. A shared server economy service now owns the starter grant,
+balance, atomic paid check-in, idempotent result settlement, itemised statements, abort/restart refunds and
+generic one-time rewards. Solo scheduled events pay the time-trial table and never P1; contested events pay the
+race table. Qualification records a result but mints nothing. Street, GT, Hypercar and sponsor-funded NCX scales
+are authored data surfaced in the Guide.
+
+The dormant Race Tag vocabulary is integrated as a pure evaluator. Its complete `qualified` fact set is kept
+separate from the capped display set; settlement pays only explicitly mapped Tags and enforces a session cap.
+The launch maps pay clean driving, not negative/contact/penalty or position-manipulation outcomes.
+
+The Research Exchange has an explicit `/ncm.research` list/submit path for finite personal-first physical Machine
+discoveries and server-measured capability observations. Catalogue exposure does not pay, evidence remains
+provenanced, and a physical Machine/characteristic cannot mint money again through an incremental maximum or
+configuration revision. Existing unique accomplishments pay once after progression persists: first finish,
+first time trial and first win. This does **not** claim the tiered Badge reducer, authored research contracts or
+limited world-first calls.
+
+Fuel/refuelling and generalized player trade are not smuggled into this pass. Fuel follows measured paid-event
+economics; trade must preserve the already specified asset/custody and value-transfer boundaries. The complete
+offline gate is green. Migration/deployment, exact balances, duplicate/retry/restart behavior and receipts now
+owe live proof in MASTER_TEST §BJ before any row becomes validated.
+
+**Basis.** Owner implementation direction, 2026-09-27; `40_ECONOMY_V1.md`; `IDEA-564`-`IDEA-567`.

@@ -6,11 +6,15 @@
 > Primary-market scope is governed by [17_MARKET_NETWORK.md](17_MARKET_NETWORK.md): Base Market is one stable
 > `marketId`, inventory is market-scoped authored supply, and F6 is not an omniscient global shop.
 
-**Status:** the wider economy remains an audit/design. The first narrow non-zero slice is now built locally,
-not deployed: migration 017 adds ledger idempotency/provenance, Base Market grants €$10,000 once, and one atomic
-vehicle purchase debits the derived ledger balance. Fees, purses, recovery, loans and wider balance remain
-unimplemented. Decisions go in `DECISION_RECORD.md`, ideas in `BACKLOG.md`; this is the reasoning behind IDEA-117
-and its children.
+> **Implementation note, 2026-09-27:** [40_ECONOMY_V1.md](40_ECONOMY_V1.md) is now the CURRENT Economy v1
+> build contract (`L168`). This document remains the authority for the ledger-first intent and `L84`/`L85`
+> refund/atomicity rulings. Its current-state audit below is dated 2026-09-22; migration 017 has since landed
+> idempotency and non-zero Market/Part transactions.
+
+**Status at the time of this audit:** the first narrow non-zero slice had been built locally: migration 017 added
+ledger idempotency/provenance, Base Market granted €$10,000 once, and one atomic vehicle purchase debited the
+derived ledger balance. Fees, purses, recovery, loans and wider balance were unimplemented. Current build scope
+and values are in document 40; this audit is retained because its ledger/refund reasoning still governs.
 
 > Finishing races keeps you alive. Performing well moves you forward. Expensive ambitions pull money back out.
 > Mistakes create risk. Going broke gives you a road back, not free money.

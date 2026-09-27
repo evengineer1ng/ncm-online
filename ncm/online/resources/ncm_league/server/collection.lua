@@ -6,6 +6,8 @@ NcmCollection = {}
 local Catalogue = NcmCore.get("data.vehicle_catalogue")
 local Discoveries = NcmCore.get("competition.discoveries")
 local Knowledge = NcmCore.get("competition.machine_knowledge")
+local Observation = NcmCore.get("competition.observation")
+local Json = NcmCore.get("vocabulary.json")
 local ids = NcmCore.get("vocabulary.ids")
 local Seasons = NcmCore.get("competition.seasons")
 local registered, dwell, cache = {}, {}, {}
@@ -60,12 +62,67 @@ local function ownedKeys(driverId)
     return NcmOwnership.keys(driverId) or {}
 end
 
+--- **What this Driver has actually WITNESSED each of their machines doing** (`28` sections 7-9, `L164`).
+---
+--- One query for every owned machine, bucketed in Lua, rather than a query per asset per characteristic.
+--- The newest row per (asset, kind) is also the best one: the producer only ever writes a reading that beats
+--- the stored best, so `ORDER BY observed_at DESC` and first-wins is the running maximum by construction.
+---
+--- **This is evidence, and the payload says so.** It is never folded into the model dossier, never averaged
+--- across examples, and never turned into a specification -- section 11 is explicit that one modified machine
+--- observed at 121 km/h must not establish the model's top speed. Asset provenance is preserved all the way
+--- to the screen (section 34), which is what makes a later *"#47 wasn't stock"* answerable at all.
+---
+--- No observations is a legitimate answer and renders as such. It is not zero.
+local function observationsFor(driverId)
+    local ok, rows = pcall(MySQL.query.await, [[SELECT asset_id, knowledge_kind, evidence_json, observed_at,
+            obs_x, obs_y, obs_z, ai_driven, configuration_ref
+        FROM vehicle_knowledge_evidence
+        WHERE ncm_driver_id = ? AND server_id = ? AND asset_id IS NOT NULL AND knowledge_kind LIKE 'observed[_]%'
+        ORDER BY observed_at DESC]], { driverId, serverId() })
+    if not ok or type(rows) ~= "table" then return {} end
+    local byAsset = {}
+    for _, row in ipairs(rows) do
+        local kind = row.knowledge_kind
+        local c = Observation.characteristic(kind)
+        local bucket = byAsset[row.asset_id]
+        if c and not (bucket and bucket[kind]) then
+            local decoded = row.evidence_json and select(2, pcall(Json.decode, tostring(row.evidence_json))) or nil
+            local value = type(decoded) == "table" and tonumber(decoded.value) or nil
+            if value then
+                byAsset[row.asset_id] = bucket or {}
+                byAsset[row.asset_id][kind] = {
+                    kind = kind, label = c.label, value = value, display = c.display,
+                    observedAt = tonumber(row.observed_at),
+                    -- Coordinates, never authored prose. Section 9: *"Do not manufacture prose like
+                    -- 'observed on Recut'"* -- the player investigates the position themselves, and that is
+                    -- the whole research layer of section 10.
+                    x = tonumber(row.obs_x), y = tonumber(row.obs_y), z = tonumber(row.obs_z),
+                    -- An NPC at the wheel is not the Driver's achievement (section 7). nil stays unknown.
+                    aiDriven = row.ai_driven ~= nil and tonumber(row.ai_driven) == 1 or nil,
+                    configurationRef = row.configuration_ref,
+                }
+            end
+        end
+    end
+    -- Stable order so the panel never reshuffles between opens.
+    local out = {}
+    for assetId, kinds in pairs(byAsset) do
+        local list = {}
+        for _, obs in pairs(kinds) do list[#list + 1] = obs end
+        table.sort(list, function(a, b) return a.kind < b.kind end)
+        out[assetId] = list
+    end
+    return out
+end
+
 function NcmCollection.payload(playerId)
     local driver = NcmCalendar.resolveDriver(tonumber(playerId) or 0)
     if not driver then return nil, "no_driver" end
     local found, owned = load(driver.ncmDriverId), ownedKeys(driver.ncmDriverId)
     if not found then return nil, "collection_unavailable" end
     local examples = {}
+    local observed = observationsFor(driver.ncmDriverId)
     for _, asset in ipairs(NcmOwnership.list(driver.ncmDriverId)) do
         if asset.vehicleKey then
             examples[asset.vehicleKey] = examples[asset.vehicleKey] or {}
@@ -73,7 +130,8 @@ function NcmCollection.payload(playerId)
             table.insert(examples[asset.vehicleKey], { assetId = asset.assetId,
                 globalOrdinal=p and p.globalOrdinal or nil,makerOrdinal=p and p.makerOrdinal or nil,
                 modelOrdinal=p and p.modelOrdinal or nil,odometerM=p and p.odometerM or 0,
-                performance={topSpeedKph=false,zeroTo100S=false,braking100To0M=false,lateralGripG=false,massKg=false,powerToWeightKwT=false} })
+                performance={topSpeedKph=false,zeroTo100S=false,braking100To0M=false,lateralGripG=false,massKg=false,powerToWeightKwT=false},
+                observations = observed[asset.assetId] })
         end
     end
     local slots, discovered, ownedCount = {}, 0, 0
@@ -86,6 +144,11 @@ function NcmCollection.payload(playerId)
         if d or isOwned then
             slot.vehicleKey, slot.displayName, slot.manufacturer = e.vehicleKey, e.displayName, e.manufacturer
             slot.category, slot.categories, slot.tags, slot.source = e.category, e.categories, e.tags, e.source
+            -- The first of the six reserved buyer metrics to carry a real number (`L162` section 7: they
+            -- display `Not rated` until authoritative evidence or an accepted derivation exists). This one
+            -- is neither -- it is AUTHORED, the figure the governor aims at -- so the panel labels it a
+            -- declaration. nil stays nil and the slot keeps saying `Not rated`.
+            slot.declaredTopSpeedKph = Catalogue.declaredTopSpeedKph(e)
             if d then
                 slot.firstDiscoveredAt, slot.lastEncounterAt, slot.encounterCount = tonumber(d.first_discovered_at), tonumber(d.last_encounter_at), tonumber(d.encounter_count)
             else discovered = discovered + 1 end
@@ -206,6 +269,12 @@ function NcmCollection.revealIdentity(pid, vehicleKey, opts)
         evidenceKey = "identity:" .. entry.vehicleKey, kind = "identity_reveal", source = source,
         epistemic = opts.epistemic or (physical and "observed" or "published"), observedAt = t,
         basis = opts.basis or "server_measured",
+        -- Optional on this path and usually absent: a model identity reveal is about a MODEL, and the two
+        -- callers here (a proximity dwell, a Market card) are not looking at a configuration. It is accepted
+        -- so that a caller which does know one -- anything reading a specific owned Machine -- can say so
+        -- rather than dropping the fact. Core validates the shape; nil stays nil and means unknown.
+        configurationRef = opts.configurationRef,
+        aiDriven = opts.aiDriven,
     })
     if not evidence then return nil, evidenceWhy end
 
@@ -240,11 +309,16 @@ function NcmCollection.revealIdentity(pid, vehicleKey, opts)
         local committed = MySQL.transaction.await({
             { query = [[INSERT IGNORE INTO vehicle_knowledge_evidence
                 (evidence_id, evidence_key, ncm_driver_id, server_id, vehicle_key, asset_id,
-                 knowledge_kind, source_kind, epistemic_kind, observation_basis, observed_at, obs_x, obs_y, obs_z)
-                VALUES (?, ?, ?, ?, ?, NULLIF(?, ''), ?, ?, ?, NULLIF(?, ''), ?, NULLIF(?, -999999), NULLIF(?, -999999), NULLIF(?, -999999))]],
+                 knowledge_kind, source_kind, epistemic_kind, observation_basis, observed_at, obs_x, obs_y, obs_z,
+                 configuration_ref, ai_driven)
+                VALUES (?, ?, ?, ?, ?, NULLIF(?, ''), ?, ?, ?, NULLIF(?, ''), ?, NULLIF(?, -999999), NULLIF(?, -999999), NULLIF(?, -999999), NULLIF(?, ''), NULLIF(?, -1))]],
+              -- `ai_driven` is a TRI-STATE and -1 is its "unknown" sentinel, for the same reason the
+              -- coordinates need one: a nil truncates the params array. It cannot be 0, which means "a human
+              -- drove" -- the exact false claim migration 033 refuses to default to.
               values = { ids.uuid4(hostRng), evidence.evidenceKey, evidence.driverId, serverId(), evidence.vehicleKey,
                   assetId, evidence.kind, evidence.source, evidence.epistemic or "", evidence.basis or "",
-                  evidence.observedAt, ox, oy, oz } },
+                  evidence.observedAt, ox, oy, oz, evidence.configurationRef or "",
+                  evidence.aiDriven == nil and -1 or (evidence.aiDriven and 1 or 0) } },
             -- The three coordinates are absent from the UPDATE clause on purpose: they record where this
             -- model was FIRST met, and a later encounter must not move that (IDEA-360).
             { query = [[INSERT INTO vehicle_discovery

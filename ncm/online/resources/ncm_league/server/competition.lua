@@ -118,6 +118,13 @@ function NcmCompetition.eligibilityFor(e)
     return (s and s.eligibility) or {}
 end
 
+--- Frozen event economics, falling back to its championship only for older in-memory event shapes.
+function NcmCompetition.economyFor(e)
+    if e and type(e.economy) == "table" then return e.economy end
+    local s = e and e.seriesId and seriesById(e.seriesId) or nil
+    return s and s.economy or nil
+end
+
 --- Can this driver field a legal car for this event? Returns nil when they can, or a reason slug when they
 --- cannot (L83: refusal, never substitution). A ledger that cannot be read returns nil -- "we could not ask" is
 --- not "no", and locking someone out on a database hiccup would look exactly like a progression bug.

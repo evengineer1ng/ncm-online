@@ -22,16 +22,11 @@ local function truthy(v)
 end
 
 local function ensureStarter(driverId)
-    MySQL.insert.await([[INSERT IGNORE INTO ledger
-        (ncm_driver_id, server_id, kind, amount, currency, ref, note, idem_key)
-        VALUES (?, ?, 'starter_grant', ?, 'eddies', 'base_market', 'NCM starting balance', ?)]],
-        { driverId, serverId(), Markets.STARTER_GRANT, "starter:" .. serverId() .. ":" .. driverId })
+    return NcmEconomy.ensureStarter(driverId)
 end
 
 local function balanceOf(driverId)
-    return tonumber(MySQL.scalar.await(
-        "SELECT COALESCE(SUM(amount), 0) FROM ledger WHERE ncm_driver_id = ? AND server_id = ?",
-        { driverId, serverId() })) or 0
+    return NcmEconomy.balanceOf(driverId)
 end
 
 function NcmMarket.seed()
@@ -379,6 +374,12 @@ function NcmMarket.offerings(marketId)
             for _, row in ipairs(availableAssets(marketId, line.vehicleKey)) do
                 o.assetIds[#o.assetIds + 1] = row.asset_id
             end
+            -- The declared top speed, for the first of the six reserved buyer metrics. AUTHORED, not
+            -- measured (`L157`) -- the panel labels it so, because section 5 of the capability audit shows
+            -- the rated figure and the observed one disagree in a known direction. nil leaves the slot
+            -- reading `Not rated`.
+            local entry = Catalogue.byKey(line.vehicleKey)
+            o.declaredTopSpeedKph = entry and Catalogue.declaredTopSpeedKph(entry) or nil
             out[#out + 1] = o
         end
     end
@@ -439,10 +440,21 @@ function NcmMarket.payload(pid)
         o.eligible = true
         itemCount = itemCount + #(o.assetIds or {})
     end
-    local componentOfferings = NcmComponents and NcmComponents.marketOfferings
-        and NcmComponents.marketOfferings(d.ncmDriverId, (function()
-            local keys={} for _,o in ipairs(offerings) do keys[#keys+1]=o.vehicleKey end return keys
-        end)()) or {}
+    -- **Components resolve through the same known-market set as vehicles.** They used to bypass this loop
+    -- entirely and ask `base_market` by name, so one screen held two different ideas of what a market is.
+    -- Nothing changes while Base Market is the only one; the point is that a second component market is now
+    -- authored data rather than a rewrite. Each row carries the market that offers it, so a part can say
+    -- where it came from -- the vehicle half has done that since the display name bug.
+    local componentOfferings = {}
+    if NcmComponents and NcmComponents.marketOfferings then
+        local keys = {} for _, o in ipairs(offerings) do keys[#keys + 1] = o.vehicleKey end
+        for _, market in ipairs(known) do
+            for _, c in ipairs(NcmComponents.marketOfferings(d.ncmDriverId, market.marketId, keys)) do
+                c.marketName = market.displayName
+                componentOfferings[#componentOfferings + 1] = c
+            end
+        end
+    end
     -- **`vehicleOfferings` is not sent any more: it WAS `offerings`, under a second name, in the same
     -- message.** The page never needed it on the wire -- it assigns `marketData.vehicleOfferings =
     -- marketData.offerings` itself in both of its receive paths -- so shipping it doubled the vehicle

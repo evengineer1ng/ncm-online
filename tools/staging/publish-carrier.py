@@ -56,7 +56,11 @@ def describe_zip(path):
         raise SystemExit("%s is not a zip archive" % path)
 
     with zipfile.ZipFile(path) as archive:
-        names = [n for n in archive.namelist() if not n.endswith("/")]
+        # Compress-Archive writes Windows separators into ZIP entry names. Warden normalises those before
+        # classifying roots; do the same here or a valid red4ext/plugins package is recorded with no roots
+        # and its directory entry is counted as a file.
+        normalised = [n.replace("\\", "/") for n in archive.namelist()]
+        names = [n for n in normalised if not n.endswith("/")]
         bad = archive.testzip()
         if bad:
             raise SystemExit("corrupt entry in archive: %s" % bad)

@@ -4,7 +4,7 @@
 > Authority map: [INDEX.md](INDEX.md) - classified 2026-09-24 (L125)
 
 Day-to-day recipe for the staging server. Facts: Ubuntu 24.04, 2 vCPU / 4 GB, static IP `52.60.225.137`,
-OPEN//77 `2.31.13+op77.87 linux-x64`, server id `6b154fdc-d515-4903-97dd-df37cb966151`, name "NCM Online",
+OPEN//77 `2.31.13+op77.102 linux-x64`, server id `6b154fdc-d515-4903-97dd-df37cb966151`, name "NCM Online",
 unlisted. Layout `/opt/ncm/{server,resources/ncm,mods,logs}`; systemd unit `ncm-server` (`Restart=always`, so any
 exit — including a Warden restart — comes straight back in 5 s). MariaDB 10.11 on the box, db `ncm`, user
 `ncm@127.0.0.1`; the password lives only in `/opt/ncm/server.env` (mode 600) and is never printed.
@@ -71,6 +71,33 @@ animations must say `yes`, and the dependency guard must still pass.
 The eviction deliberately removes the forced join death. It also removes freeroam's respawn-after-death and
 the no-argument animation picker. Until NCM owns those paths, reconnect is the respawn workaround and
 `/anim <profile>`, `/anim list`, `/anim info` and `/anim stop` are the supported animation surface.
+
+### The access list is upgrade-fragile — check it every time (KB-52, KB-137)
+
+The whitelist and ban list live in `/opt/ncm/server/access.json`, at the root of the vendor-owned tree, written
+by the server at runtime and **absent from the package manifest**. An upgrade that does not carry it forward
+takes the whitelist down silently: the server is `active`, Warden loads, nothing logs a complaint, and the world
+sits open until someone notices. It has now happened twice.
+
+Two things must hold after any upgrade, and `upgrade-open77.sh` asserts both:
+
+```
+ssh -i C:\Users\eveng\.ssh\lightsail-ncm.pem ubuntu@52.60.225.137 \
+  'ls -l /opt/ncm/server/access.json; stat -c "%A %U:%G %n" /opt/ncm/server'
+```
+
+- **`access.json` exists.** If it does not, the previous copy is in the upgrade backup
+  (`/opt/ncm/backups/server-<stamp>/access.json`) — restore that rather than retyping identities.
+- **The tree root is owned by the systemd service user** (`ubuntu`), not `root`. The server saves the access
+  list by writing `access.json.tmp` beside it and renaming, so a `root:root` working directory makes every
+  Warden access change fail with *"access list could not be saved; identity was not added"* — while the Warden
+  API still returns `200` and only the audit log records `ok:false`. A tree becomes root-owned by running the
+  upgrade under `sudo`; the script now repairs this before the swap.
+
+**Order matters when rebuilding a whitelist by hand:** add the identities first, enable the whitelist second.
+Enabling with an empty list disconnects and refuses everyone, the owner included. The owner's identity is
+`ae3e440b-1384-4337-ba01-3bcc0a369d95` (easporks); the second test client, ncmtester2, is
+`d82ed6cf-c5cb-4dd8-8473-3a1d0057d3b7`.
 
 **A player can join after an empty-server check while systemd is already stopping the old process (KB-102).**
 Re-check immediately before every restart, but do not call that a drain lock. A supported maintenance/admission
@@ -149,16 +176,22 @@ Post-upgrade health, in one line each: `migrations: N applied` → `ownership le
 `ncm_world started v…` → `class ceilings published` → `scheduler started: 5 series`. If the series line is
 missing, NCM did not start.
 
-## Required mods (state as of 2026-09-25 15:00 UTC)
-Imported in Warden and on disk: `rb15-f1-inert-v10` 10.0.0, `ncm-rb15-liveries` 1.0.0 (both INERT),
-`archivexl` 1.27.1, `tweakxl` 1.11.4 (executable). **Enabled on the whitelisted Online world**:
-`requiredMods.enabled=true, unsecured=true`, digest
-`06ab5485585f57f29cb5a1ad30b3e99bcdbd99985216765f76e7d01a268c90a7`. The owner authorised this production
-proof and owns the remaining launcher/game checks (L137 / MASTER_TEST §AP).
+## Required mods (state as of 2026-09-25 20:24 UTC)
+
+The canonical Carrier build/publish/verify/rollback procedure is
+[CARRIER_NEXT_STEPS_AND_UPGRADE.md](CARRIER_NEXT_STEPS_AND_UPGRADE.md). Use it for every in-place Carrier
+replacement; do not manually copy the DLL or use a warm reconnect as acceptance.
+
+**Enabled on the whitelisted Online world:** `requiredMods.enabled=true, unsecured=true`; sole declared package
+`ncm-carrier` 0.1.1 (executable), 868,295 bytes, SHA-256
+`6966a75d228cb70105f6201aaff4a2ab60ca6681ba78d65ad40acad4d2306301`; digest
+`e0ad7ec9091c2b23f69067addb318c3d9fe319fc5111eb0ff76c47949b1bbde2`. RB15, NCM liveries, ArchiveXL and
+TweakXL are not declared. The owner authorised this Production proof under `L147` and owns the remaining
+launcher/game checks in MASTER_TEST section AT.
 
 Caddy owns public TCP 11779 with a trusted certificate for `52-60-225-137.sslip.io`; OPEN//77 listens only on
-`127.0.0.1:11782`. The master row relays four HTTPS blob URLs and the correct executable/inert classifications.
-External full downloads of all four blobs matched declared size/SHA-256 and ETag; RB15 Range returned 206.
+`127.0.0.1:11782`. The master row relays the carrier HTTPS blob URL and executable classification. An external
+full download matched the release ZIP's declared size/SHA-256; Range returned 206 with the hash ETag.
 Warden stayed on loopback. `sslip.io` is an interim proof hostname, not permanent owned infrastructure
 (`IDEA-452`). Certificate observed: Let's Encrypt, TLS 1.3, expires 2026-12-24; Caddy renews automatically.
 
@@ -180,6 +213,8 @@ Deployment artifacts and rollback:
 
 - checked-in Caddy config: `tools/staging/Caddyfile.required-mods`;
 - checked-in idempotent dry-run/apply guard: `tools/staging/configure-required-mods-https.py`;
+- pre-carrier database/operator backup: `/opt/ncm/backups/pre-carrier-prod-20260925T195327Z`;
+- pre-`.102` platform tree: `/opt/ncm/backups/server-20260925T200746Z`;
 - server config backup: `/opt/ncm/backups/required-mods-https-20260925T145252Z/server.jsonc`;
 - prior Caddyfile backup: `/opt/ncm/backups/required-mods-https-prestage-20260925T145252Z/Caddyfile`;
 - health: `systemctl is-active caddy ncm-server`, then independently GET the public manifest and one Range;
@@ -194,4 +229,5 @@ Deployment artifacts and rollback:
 3. `sudo systemctl start ncm-server`, open the tunnel, finish Warden onboarding at `http://127.0.0.1:11790`
    (game port 11778, public endpoint `52.60.225.137:11778`, unlisted, licence key from the DPAPI store).
 4. `tools\deploy-staging.ps1` — applies `database.enabled=true` and `"ncm/*"` to `resources.load`, syncs, restarts.
-5. Re-import the four mod zips in Warden if hosted delivery is being tested again.
+5. Publish the current NCM-owned package set from release artifacts; do not restore deleted RB15/livery or
+   obsolete loader declarations from historical backups.

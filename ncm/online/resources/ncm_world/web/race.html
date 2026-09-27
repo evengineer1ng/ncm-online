@@ -15,6 +15,9 @@
       --red-glow: rgba(255, 42, 60, 0.75);
       --ok: #4fe3a9;
       --warn: #f5c95c;
+      /* The ghost's own colour, distinct from every state colour on this HUD so a ghost row can never be
+         mistaken for a flag, a penalty or a result. */
+      --ghost: #9aa8ff;
       --display: "Rajdhani", "Bahnschrift Condensed", "Bahnschrift SemiCondensed", "Arial Narrow", "Segoe UI", sans-serif;
       --mono: "IBM Plex Mono", "Cascadia Mono", "Consolas", ui-monospace, monospace;
     }
@@ -51,6 +54,20 @@
     #strip.done .eyebrow { color: var(--ok); }
 
     /* Results board: every entrant, centre of the screen after the flag. */
+    /* The ghost row. Sits ABOVE the board and is not a row in it: a ghost is a target, not an entrant, so it
+       is never given a position and never counted in the field (L166). */
+    #ghost { position: absolute; top: 286px; left: 50%; transform: translateX(-50%); min-width: 760px;
+             background: var(--panel); border: 1px solid var(--line); border-left: 3px solid var(--ghost);
+             border-radius: 10px; padding: 7px 18px; display: flex; align-items: baseline; gap: 16px; }
+    #ghost .lbl { font-size: 12px; letter-spacing: .14em; color: var(--ghost); text-transform: uppercase; }
+    #ghost .who { font-size: 13px; opacity: .8; }
+    #ghost .time { font-size: 17px; font-variant-numeric: tabular-nums; margin-left: auto; }
+    /* Ahead and behind must be distinguishable at a glance and never by colour alone -- the sign carries it. */
+    #ghost .delta { font-size: 17px; font-variant-numeric: tabular-nums; min-width: 86px; text-align: right; }
+    #ghost .delta.ahead { color: var(--ok); }
+    #ghost .delta.behind { color: var(--red); }
+    #ghost .delta.na { opacity: .45; }
+    #ghost .warn { font-size: 11px; letter-spacing: .1em; color: var(--warn); }
     #board { position: absolute; top: 340px; left: 50%; transform: translateX(-50%); min-width: 760px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px 22px; }
     #board .title { display: flex; align-items: center; gap: 8px; font: 700 16px/1 var(--mono); letter-spacing: 0.2em; color: var(--ok); text-transform: uppercase; margin-bottom: 10px; }
     #board .title .ncm-glyph { width: 22px; height: 22px; }
@@ -79,6 +96,13 @@
     /* 80ms is just over one 20 Hz sample, so motion is continuous without lagging behind the hands. */
     #inputs .wheel g { transition: transform 80ms linear; transform-origin: 0 0; }
     #inputs .wheel.na { opacity: 0.28; }
+    /* The km/h readout. Every number in NCM is km/h and the vanilla dial is mph, so without this the
+       driver converts in their head on every run -- which is exactly where confidence leaks. Deliberately
+       NOT a dial: the vanilla speedometer is still there and drawing a second one would be noise. */
+    #inputs .spd { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; flex: 0 0 auto; min-width: 58px; }
+    #inputs .spd .val { font: 700 22px/1 var(--mono); color: var(--fg); font-variant-numeric: tabular-nums; }
+    #inputs .spd .val.na { color: var(--dim); opacity: 0.5; }
+    #inputs .spd .unit { font: 600 9px/1 var(--mono); letter-spacing: .16em; color: var(--dim); }
     #inputs .peds { display: flex; gap: 8px; flex: 0 0 auto; }
     #inputs .ped { display: flex; flex-direction: column; align-items: center; gap: 3px; }
     #inputs .bar { position: relative; width: 10px; height: 38px; background: rgba(255,255,255,0.09); border-radius: 3px; overflow: hidden; }
@@ -144,9 +168,12 @@
     <span class="dim" id="dim"></span>
   </div>
   <div id="banner" class="hidden"></div>
+  <div id="ghost" class="hidden"><span class="lbl" id="ghostLabel"></span><span class="who" id="ghostWho"></span><span class="time" id="ghostTime"></span><span class="delta na" id="ghostDelta">--</span><span class="warn hidden" id="ghostWarn"></span></div>
   <div id="board" class="hidden"><div class="title"><span id="boardIcon"></span><span id="boardTitle"></span></div><table><tbody id="rows"></tbody></table></div>
   <div id="inputs" class="hidden">
     <div class="wheel" id="inWheel"><svg viewBox="-24 -24 48 48" width="40" height="40" aria-hidden="true"><g id="inWheelG"><circle r="20" fill="none" stroke="currentColor" stroke-width="3.2"/><line x1="-19.5" y1="-3" x2="19.5" y2="-3" stroke="currentColor" stroke-width="2.8"/><line x1="0" y1="-3" x2="0" y2="19.5" stroke="currentColor" stroke-width="2.8"/><circle r="3.2" fill="currentColor"/></g></svg></div>
+    <!-- km/h, because every number NCM composes is km/h and the vanilla dial is mph. -->
+    <div class="spd"><span class="val na" id="inSpd">--</span><span class="unit">KM/H</span></div>
     <div class="peds">
       <!-- Brake LEFT of throttle: pedal-box order, so the panel reads the way the feet are arranged
            (owner QA, 2026-09-24). -->
@@ -298,6 +325,7 @@
       // would defeat its own throttling. `off` (or an absent field) means "not read", and renders as a dash
       // rather than as a resting pedal -- a confidently wrong instrument is worse than an absent one.
       const inputs = document.getElementById("inputs");
+      const spdVal = document.getElementById("inSpd");
       const inWheel = document.getElementById("inWheel");
       const inWheelG = document.getElementById("inWheelG");
       const pedEls = {
@@ -319,7 +347,15 @@
       const showCluster = () => inputs.classList.toggle("hidden", !(haveInputs || haveTyre));
 
       Open77.on("race:inputs", (v) => {
+        // **Unknown renders as a dash, never as zero** (`IDEA-361`). A stationary car and a car we cannot
+        // read are different claims, and 0 km/h is a measurement.
+        const setSpeed = (kph) => {
+          const ok = typeof kph === "number" && isFinite(kph);
+          spdVal.textContent = ok ? String(Math.round(kph)) : "--";
+          spdVal.classList.toggle("na", !ok);
+        };
         if (!v || v.off) {
+          setSpeed(null);
           haveInputs = false;
           setPedal(pedEls.throttle, null);
           setPedal(pedEls.brake, null);
@@ -329,6 +365,7 @@
         }
         haveInputs = true;
         showCluster();
+        setSpeed(v.kph);
         setPedal(pedEls.throttle, v.throttle);
         setPedal(pedEls.brake, v.brake);
         // Full lock is drawn at LOCK_DEG. Started at 120 and came down to 90 on owner QA: driving a real rig
@@ -493,6 +530,55 @@
         }
       };
 
+      // The ghost row arrives on its own channel at 20 Hz, deliberately NOT inside `race:state` -- the delta
+      // changes continuously and would defeat that payload's throttling. An absent or non-playing ghost shows
+      // a dash rather than a stale number: a confidently wrong delta is worse than an absent one.
+      const ghostEl = document.getElementById("ghost");
+      const ghostLabel = document.getElementById("ghostLabel");
+      const ghostWho = document.getElementById("ghostWho");
+      const ghostTime = document.getElementById("ghostTime");
+      const ghostDelta = document.getElementById("ghostDelta");
+      const ghostWarn = document.getElementById("ghostWarn");
+
+      const lapTime = (ms) => {
+        if (typeof ms !== "number" || !(ms > 0)) return "--";
+        const t = ms / 1000;
+        const m = Math.floor(t / 60);
+        const sec = t - m * 60;
+        return m > 0 ? m + ":" + (sec < 10 ? "0" : "") + sec.toFixed(3) : sec.toFixed(3);
+      };
+      const deltaText = (ms) => {
+        if (typeof ms !== "number") return "--";
+        return (ms < 0 ? "-" : "+") + (Math.abs(ms) / 1000).toFixed(3);
+      };
+
+      const applyGhost = (g) => {
+        if (!g || g.present !== true) {
+          ghostEl.classList.add("hidden");
+          return;
+        }
+        ghostEl.classList.remove("hidden");
+        ghostLabel.textContent = g.label || "GHOST";
+        ghostWho.textContent = g.display ? String(g.display) : "";
+        ghostTime.textContent = lapTime(g.elapsedMs);
+        const hasDelta = g.playing === true && typeof g.deltaMs === "number";
+        ghostDelta.textContent = hasDelta ? "Δ " + deltaText(g.deltaMs) : "--";
+        // classList, not `className =`: assigning the whole attribute would silently drop any class another
+        // part of this page had put on the element, and it is the harder of the two to test.
+        ghostDelta.classList.toggle("ahead", hasDelta && g.deltaMs < 0);
+        ghostDelta.classList.toggle("behind", hasDelta && g.deltaMs >= 0);
+        ghostDelta.classList.toggle("na", !hasDelta);
+        // A ghost drawn from the fallback model is a MISSING TEMPLATE, not a missing feature. Say so on the
+        // HUD rather than leaving a driver to wonder why their car is a road arrow.
+        if (g.fallbackModel === true) {
+          ghostWarn.textContent = "NO CAR MODEL";
+          ghostWarn.classList.remove("hidden");
+        } else {
+          ghostWarn.classList.add("hidden");
+        }
+      };
+
+      Open77.on("race:ghost", (g) => guard("ghost", () => applyGhost(g)));
       Open77.on("race:state", (s) => guard("state", () => apply(s)));
       Open77.ready();
       Open77.emit("race:ready", {});

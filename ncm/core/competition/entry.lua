@@ -40,7 +40,7 @@ Core.define("competition.entry", function(C)
                 state = "checked_in",
                 checkedInAt = req.now,
                 interestedAt = ex and ex.interestedAt or nil,
-                fee = 0, -- L21: money-free first world
+                fee = math.max(0, math.floor(tonumber(req.fee) or 0)),
                 distanceM = d,
             },
         }

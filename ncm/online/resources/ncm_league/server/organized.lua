@@ -193,6 +193,7 @@ function NcmOrganized.post(routeLabel, minutes, opts)
         formatId = opts.formatId or inv.formatId or "sprint",
         classId = opts.classId or inv.classId or "ncx_rb15",
         laps = opts.laps or inv.laps or 1,
+        economy = inv.economy,
         startType = opts.startType, formationM = opts.formationM, paceKph = opts.paceKph,
     }
     local roster = Teams.newRoster(e.eventId)

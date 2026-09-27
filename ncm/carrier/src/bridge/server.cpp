@@ -68,6 +68,9 @@ const char* kBridgeHtml = R"HTML(<!doctype html>
     Open77.on("ncm:machine.handling", function (p) { relay({ cmd: "handling", handling: p || {} }); });
     // IDEA-507: a read-only request for the game's own drive-model data. Mutates nothing.
     Open77.on("ncm:machine.archdump", function (p) { relay({ cmd: "archdump", records: (p && p.records) || [] }); });
+    // The gear chain, read-only. **The resource sandbox has no `TweakDB` global** -- that is a CET thing and
+    // this is not CET -- so a gear read has to come through here like every other TweakDB access.
+    Open77.on("ncm:machine.geardump", function (p) { relay({ cmd: "geardump", records: (p && p.records) || [] }); });
   }
   connect();
 })();
@@ -665,6 +668,14 @@ void Server::dispatch(const std::string& payload)
             if (levers.contains("brakeScale") && levers["brakeScale"].is_number()) {
                 out.hasBrake = true; out.brake = levers["brakeScale"].get<double>();
             }
+            // Optional, unlike the three levers: a Machine with no declared top speed runs ungoverned,
+            // and that is a legitimate state rather than a malformed setup.
+            if (levers.contains("dragScale") && levers["dragScale"].is_number()) {
+                out.hasDrag = true; out.drag = levers["dragScale"].get<double>();
+            }
+            if (levers.contains("topSpeedKph") && levers["topSpeedKph"].is_number()) {
+                out.hasTopSpeed = true; out.topSpeedKph = levers["topSpeedKph"].get<double>();
+            }
         }
 
         if (out.version != 2) out.invalidReason = "handling contract must be v2";
@@ -679,6 +690,18 @@ void Server::dispatch(const std::string& payload)
         else out.valid = true;
 
         onHandling_(out);
+        return;
+    }
+
+    if (cmd == "geardump") {
+        if (!onGearDump_) return;
+        std::vector<std::string> records;
+        if (msg.contains("records") && msg["records"].is_array()) {
+            for (const auto& r : msg["records"]) {
+                if (r.is_string()) records.push_back(r.get<std::string>());
+            }
+        }
+        onGearDump_(records);
         return;
     }
 
@@ -714,6 +737,7 @@ void Server::dispatch(const std::string& payload)
     frame.engine = num(msg, "engine", frame.hasEngine);
     frame.speed = num(msg, "speed", frame.hasSpeed);
     frame.steering = num(msg, "steering", frame.hasSteering);
+    frame.brake = num(msg, "brake", frame.hasBrake);
     frame.slipLong = num(msg, "slipLong", frame.hasSlipLong);
     frame.slipLat = num(msg, "slipLat", frame.hasSlipLat);
     frame.slipTotal = num(msg, "slipTotal", frame.hasSlipTotal);

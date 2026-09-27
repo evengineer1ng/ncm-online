@@ -589,6 +589,26 @@
         return b;
       }
 
+      function economyBlock(r) {
+        const e = r && r.economy;
+        if (!e || typeof e !== "object") return null;
+        const cash = n => "€$" + Number(n || 0).toLocaleString();
+        const pairs = [
+          ["ENTRY", cash(e.entryFee)], ["SOLO FINISH", "+" + cash(e.timeTrialCompletion)],
+          ["RACE FINISH", "+" + cash(e.raceCompletion)], ["P1", "+" + cash(e.placement && e.placement.p1)],
+        ];
+        const b = blockEl("ECONOMY", "completed");
+        const grid = document.createElement("div"); grid.className = "regs-grid";
+        for (const [k,v] of pairs) {
+          const cell=document.createElement("div"), lab=document.createElement("b"), val=document.createElement("span");
+          lab.textContent=k; val.textContent=v; cell.append(lab,val); grid.append(cell);
+        }
+        b.append(grid);
+        const field=e.fieldBonus||{};
+        lineEl(b,"muted").textContent="FIELD +"+cash(field.perEntrant)+" / ENTRANT · CAP "+cash(field.max)+" · PRACTICE FREE";
+        return b;
+      }
+
       // 11_WEATHER.md: the detail-card forecast block. Ordinal confidence, never a percentage.
       function weatherBlock(r, now) {
         const w = r && r.weather;
@@ -656,7 +676,7 @@
         // The information layer, in the order a driver decides in: can I enter, what are the rules, what will
         // it be like. Each returns null when its data is absent, and null entries are dropped rather than
         // rendered as empty boxes.
-        const blocks = [carBlock(r), regsBlock(r), weatherBlock(r, now)].filter(Boolean);
+        const blocks = [carBlock(r), regsBlock(r), economyBlock(r), weatherBlock(r, now)].filter(Boolean);
         guideDetail.append(kicker, title, series, region, hero, facts, desc, ...blocks, practice, action, future);
       }
 
@@ -820,12 +840,78 @@
           collectionDetail.append(id,serial,call,note);
           const fitted=(componentData.parts||[]).filter(p=>p.machine_asset_id===asset.assetId&&p.location_kind==="installed");
           if(fitted.length){const label=document.createElement("div");label.className="dossier-label";label.textContent="INSTALLED CONFIGURATION";collectionDetail.append(label);for(const p of fitted){const x=document.createElement("div");x.className="dossier-value";x.textContent=(p.code||p.design_id)+" · "+String(p.family||"").replaceAll("_"," ").toUpperCase();collectionDetail.append(x);}}
+          const obs=observedRows(asset);
+          if(obs){
+            const label=document.createElement("div");label.className="dossier-label";
+            label.textContent="OBSERVED — THIS MACHINE";collectionDetail.append(label);
+            for(const [k,val] of obs){
+              const l=document.createElement("div");l.className="dossier-label";l.textContent=k;
+              const x=document.createElement("div");x.className="dossier-value";x.textContent=val;
+              collectionDetail.append(l,x);
+            }
+          } else {
+            // Absence is a legitimate state and says so plainly. It is NOT zero, and it is not an error:
+            // nothing has been witnessed yet. Drive it.
+            const l=document.createElement("div");l.className="dossier-label";l.textContent="OBSERVED — THIS MACHINE";
+            const x=document.createElement("div");x.className="dossier-value";x.textContent="Nothing observed yet";
+            collectionDetail.append(l,x);
+          }
         }
-        const metrics=[["Rated top speed","Not rated"],["0–100 km/h","Not rated"],["100–0 braking","Not rated"],["Lateral grip","Not rated"],["Mass","Not rated"],["Power-to-weight","Not rated"]];
+        const metrics=buyerMetrics(v);
         for(const pair of metrics){const l=document.createElement("div");l.className="dossier-label";l.textContent=pair[0];const x=document.createElement("div");x.className="dossier-value";x.textContent=pair[1];collectionDetail.append(l,x);}
         for (const pair of [["Category",(v.categories||[v.category]).filter(Boolean).join(" / ")],["Status",v.owned?"OWNED · DISCOVERED":"DISCOVERED"],["Source",String(v.source||"native").toUpperCase()],["First encounter",v.firstDiscoveredAt?new Date(v.firstDiscoveredAt*1000).toLocaleString():"—"],["Encounters",v.encounterCount||1]]) {
           const l=document.createElement("div"); l.className="dossier-label"; l.textContent=pair[0]; const x=document.createElement("div"); x.className="dossier-value"; x.textContent=pair[1]; collectionDetail.append(l,x);
         }
+      }
+      // ---- OBSERVED EVIDENCE (`28` sections 7-12, `L164`).
+      //
+      // **This is the half of the Machine Index that makes it a knowledge system rather than a catalogue.**
+      // `Highest speed observed: 156 km/h` is EVIDENCE about one serialised machine; `Rated top speed:
+      // 167 km/h` is a DECLARATION about the model. Section 7 forbids silently converting the first into
+      // the second, so they are rendered in different places, with different wording, and neither is ever
+      // averaged into the other.
+      //
+      // Position is shown as coordinates, never as authored prose -- section 9 is explicit that
+      // "observed on Recut" must not be manufactured. The coordinates ARE the feature: several high-speed
+      // readings at different places is what lets a player ask whether one of them was a downhill
+      // (section 10), and that investigation is the point.
+      function observedRows(asset){
+        const list=Array.isArray(asset&&asset.observations)?asset.observations:[];
+        if(!list.length) return null;
+        return list.map(o=>{
+          const value=Number(o.value);
+          if(!Number.isFinite(value)) return null;
+          const unit=o.display?(" "+o.display):"";
+          const where=(Number.isFinite(Number(o.x))&&Number.isFinite(Number(o.y)))
+            ? ("  ·  (" + Math.round(Number(o.x)) + ", " + Math.round(Number(o.y)) + ")") : "";
+          const when=Number.isFinite(Number(o.observedAt))
+            ? ("  ·  " + new Date(Number(o.observedAt)*1000).toLocaleDateString()) : "";
+          // An NPC at the wheel is not the Driver's achievement (`31` section 7). Unknown says nothing.
+          const who=o.aiDriven===true?"  ·  AI DRIVEN":"";
+          return [o.label||o.kind, (Math.round(value*10)/10)+unit+where+when+who];
+        }).filter(Boolean);
+      }
+
+      // The six reserved buyer metrics (`L162` section 7). They hold permanent positions and read
+      // `Not rated` until authoritative evidence or an accepted derivation exists.
+      //
+      // RATED TOP SPEED is the first to carry a number, and it is AUTHORED -- the published figure the
+      // governor aims at (`L157`) -- so it is marked DECLARED. That marker is not decoration: section 5 of
+      // the capability audit establishes that the rated figure and the observed one disagree in a KNOWN
+      // direction, because torque and drag carry real terminal velocity higher. A player who cannot tell
+      // which of the two they are reading has been misled, and `28` section 37 forbids exactly that --
+      // authored knowledge must never masquerade as something observed.
+      //
+      // An absent figure still reads `Not rated`. The bikes and the withdrawn RB15 have no confirmed
+      // number, and a guess would be indistinguishable from a real one.
+      function ratedTopSpeed(kph){
+        const n=Number(kph);
+        return (Number.isFinite(n)&&n>0)?(Math.round(n)+" km/h · DECLARED"):"Not rated";
+      }
+      function buyerMetrics(v){
+        return [["Rated top speed",ratedTopSpeed(v&&v.declaredTopSpeedKph)],["0–100 km/h","Not rated"],
+                ["100–0 braking","Not rated"],["Lateral grip","Not rated"],["Mass","Not rated"],
+                ["Power-to-weight","Not rated"]];
       }
       function renderCollection(d) {
         if (d) collectionData=d;
@@ -951,9 +1037,7 @@
         const pairs = [["PRICE", eddies(o.price)],
                        ["AVAILABLE", Number(o.available || 0) + " / " + Number(o.ceiling || 0)],
                        ["STATE", o.soldOut ? "SOLD OUT" : "IN STOCK"],
-                       ["RATED TOP SPEED", "Not rated"], ["0–100 KM/H", "Not rated"],
-                       ["100–0 BRAKING", "Not rated"], ["LATERAL GRIP", "Not rated"],
-                       ["MASS", "Not rated"], ["POWER-TO-WEIGHT", "Not rated"]];
+                       ...buyerMetrics(o).map(([k, val]) => [k.toUpperCase(), val])];
         // Supply is stated, not implied. The batch is what the next event MAY make -- capped by whatever
         // capacity is free at that moment, and by whoever buys in the meantime. Never phrased as a promise.
         pairs.push(["NEXT PRODUCTION", untilText(o.nextProductionAt, now)]);

@@ -196,6 +196,65 @@ fire("race:tyre", false);
 fire("race:inputs", { off: true });
 check(cluster.classList.contains("hidden"), "and with neither known it hides");
 
+// ---------------------------------------------------------------- the ghost row (L166)
+//
+// The presentation rule this guards is not cosmetic: a ghost must never read as an entrant. It has no
+// position, it is not in the field, and it is drawn outside `#rows`. If a ghost ever appears as `P2` a driver
+// is being told there was a competitor who did not exist.
+check(typeof events["race:ghost"] === "function", "race:ghost has a handler");
+
+const ghostEl = document.getElementById("ghost");
+const ghostDelta = document.getElementById("ghostDelta");
+const ghostTime = document.getElementById("ghostTime");
+const ghostWarn = document.getElementById("ghostWarn");
+const ghostRows = document.getElementById("rows");
+
+fire("race:ghost", { present: false, mode: "personal" });
+check(ghostEl.classList.contains("hidden"), "no ghost means no row");
+
+const rowsBefore = ghostRows.children.length;
+fire("race:ghost", {
+  present: true, mode: "personal", label: "PERSONAL BEST", display: "baremetaleven",
+  elapsedMs: 102318, deltaMs: -216, playing: true,
+});
+check(!ghostEl.classList.contains("hidden"), "a loaded ghost draws its row");
+check(ghostTime.textContent === "1:42.318", "the recorded lap time, formatted: " + ghostTime.textContent);
+check(ghostDelta.textContent.indexOf("-0.216") >= 0, "the delta, signed: " + ghostDelta.textContent);
+check(ghostDelta.classList.contains("ahead"), "a negative delta is ahead");
+check(!/P\d/.test(ghostEl.textContent || ""),
+  "the ghost row carries no position -- it is a target, not an entrant");
+check(ghostRows.children.length === rowsBefore,
+  "and drawing it adds nothing to the standings table");
+
+fire("race:ghost", { present: true, label: "PERSONAL BEST", elapsedMs: 102318, deltaMs: 431, playing: true });
+check(ghostDelta.classList.contains("behind"), "a positive delta is behind");
+check(ghostDelta.textContent.indexOf("+0.431") >= 0, "and is shown with its sign: " + ghostDelta.textContent);
+
+// A loaded ghost that is not currently replaying has no delta to report, and a stale number would be a
+// confidently wrong instrument -- the same rule the driver inputs follow.
+fire("race:ghost", { present: true, label: "PERSONAL BEST", elapsedMs: 102318, deltaMs: -216, playing: false });
+check(ghostDelta.textContent === "--", "a ghost that is not playing shows a dash, not the last delta");
+check(ghostDelta.classList.contains("na"), "and is marked unknown");
+
+fire("race:ghost", { present: true, label: "PERSONAL BEST", elapsedMs: 102318, playing: true });
+check(ghostDelta.textContent === "--", "a missing delta is a dash too");
+
+// Sub-minute laps must not be shown as "0:xx".
+fire("race:ghost", { present: true, label: "SESSION BEST", elapsedMs: 42318, deltaMs: 0, playing: true });
+check(ghostTime.textContent === "42.318", "a sub-minute lap drops the minute field: " + ghostTime.textContent);
+
+// A fallback model means the record has no authored template. Say so, rather than leaving a driver to wonder
+// why they are chasing a road arrow.
+fire("race:ghost", { present: true, label: "PERSONAL BEST", elapsedMs: 1000, playing: true, fallbackModel: true });
+check(!ghostWarn.classList.contains("hidden"), "a fallback model is reported on the HUD");
+fire("race:ghost", { present: true, label: "PERSONAL BEST", elapsedMs: 1000, playing: true, fallbackModel: false });
+check(ghostWarn.classList.contains("hidden"), "and a real model says nothing");
+
+fire("race:ghost", null);
+check(true, "a null ghost payload does not throw");
+fire("race:ghost", {});
+check(ghostEl.classList.contains("hidden"), "an empty ghost payload hides the row");
+
 // ---------------------------------------------------------------- source-text assertions
 //
 // Cheap, and they catch the class of mistake a stub DOM cannot: a value written straight into the page.

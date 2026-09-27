@@ -3,72 +3,67 @@
 > **STATUS: LEDGER** - living session memory, rewritten at the end of every working session.
 > Authority map: [INDEX.md](INDEX.md) - classified 2026-09-24 (L125).
 
-Last rewritten: **2026-09-26 - Parts economy/UI v1 and the `KB-153` bounded Market stream are deployed and
-enabled on the private Online development surface (`L162`, `L163`). The first live panel PASS remains owed.**
+Last rewritten: **2026-09-27 - The broad Economy v1 vertical is built locally and offline-green (`L169`,
+`IDEA-564`-`IDEA-567`), not deployed.** It includes migration 035; authored Street/GT/Hypercar/NCX economics;
+one centralized host money service; paid event check-in; atomic solo/contested settlement and refunds; itemized
+statements; Race Tag evaluation and capped clean-driving bounties; explicit personal-first Research submissions;
+and once-only rewards for the three existing unique accomplishments. Fuel, generalized player trade, Research
+contracts/world-first calls and tiered Badges remain unbuilt. Lap ghosts, Parts and Machine Knowledge remain on
+the previously deployed Online tree with their live test sections still owed.
 
-> **Claim before writing:** decisions through **L163**; MASTER_TEST through **§BF**; next QA letter **§BG**.
-> BACKLOG next free **IDEA-540**; known issues through **KB-153**. Read ledger tails before allocating.
+> **Claim before writing:** decisions through **L169**; MASTER_TEST through **§BJ**; next QA letter **§BK**.
+> BACKLOG next free **IDEA-568**; known issues through **KB-155**. Read ledger tails before allocating.
+>
+> The next-free guard matters: overlapping 2026-09-26/27 sessions previously made this block stale several
+> times (`IDEA-380`). The docs gate asserts ID uniqueness and the BACKLOG next-free line.
 
 ## One next action
 
-**Open Market for the first live 25-component reassembly PASS.** The six-file `KB-153` patch is live after an
-empty-server restart; after the panel draws, continue §BF1-§BF3 database audits and the first purchase.
+**Deploy the current local Economy v1 build to Development and run MASTER_TEST §BJ as one connected loop.**
+Confirm migration 035 and boot first, then exercise starter balance, paid/denied/duplicate check-in, solo and
+contested settlement, qualifying-without-payout, clean and dirty Tags, repeat floor, abort/restart refunds,
+unique-Badge rewards and explicit Research submissions. Reconcile the resulting receipts, typed ledger rows and
+balances directly in SQL. Do not promote to Online merely because the offline gate is green.
 
-1. Apply forward migrations 031-032 and boot twice.
-2. Audit that existing vehicle identity/history is untouched.
-3. Verify deterministic factory backfill: exactly 11 component assets, 19 occupied interfaces and one current
-   configuration for every existing MaiMai, Galena and Hella; replay creates nothing; original exposure equals
-   the Machine odometer.
-4. Audit the 25 immutable launch Designs, exact prices/effects/supply and the 7/8/7 Sport fitment counts.
+The previously deployed live queue remains owed and is not displaced: §BI for ghosts, §BH for Machine Knowledge,
+§AZ for Parts, plus twice-applied migration dry-runs for 033-035 when `NCM_DB_ROOT` is available.
 
-Online is presently the development/test surface and Parts ships enabled there (`L163`); do not create another
-environment split for this work. Continue BF4-BF17 on Online after the database audits. The emergency live
-tunable may park purchases/fitting, but lack of a completed QA row is recorded as awaiting evidence rather than
-used to hide the deployed surface (`L69`).
+## Economy v1 - built locally 2026-09-27 (`L168`, `L169`, document 40)
 
-## What was built this session
-
-- Migrations 031-032 add immutable component Designs/revisions, manufacturing runs, physical assets, three
-  serial histories, custody/transfers, supply/R&D state, multi-position configuration revisions and operations.
-- `parts.catalogue` defines the 25 launch Designs, nineteen interfaces, exact Base Market economics and authored
-  starter compatibility. Unresolved compatibility cannot enter primary distribution.
-- `parts.rnd` and the server scheduler implement deterministic maker evaluations, quantized bounded effects,
-  novelty/no-design outcomes, deterministic pricing and invisible undistributed specialist outcomes.
-- Production mints physical assets; Market aggregates by Design and purchases claim the oldest exact unit.
-- Existing supported Machines backfill deterministic factory originals without invented historical serials.
-  Future manufactured Machines and all eleven factory assets/configuration commit in the same transaction.
-- Base Market now has independently scrollable Machine/Component panes, a persistent detail panel and an
-  on-by-default fitment overlay that keeps both compatible and incompatible cars visible.
-- Machine Index has MACHINES / PARTS INVENTORY tabs, component provenance, availability/fitment projection and
-  a 900 ms hold-to-fit transaction. Displaced assets return to inventory; required interfaces cannot be empty.
-- Vehicle cards reserve six performance metrics and say `Not rated`. Relative part projections disclose
-  DIRECT/MODELLED fidelity and limitations instead of fabricating absolute performance.
-- Odometer flushes advance installed component exposure in the same durable operation. There is no wear effect.
-- Market payload v2 separates vehicle/component streams; inventory has its own stream. Persistent configuration
-  hydrates the existing `NcmHandling.setParts` seam on restart and world reconciliation paths.
+- Launch now has a genuine one-human income loop. A scheduled field of one uses time-trial completion/target
+  economics and never receives P1; fields of two or more use contested completion, placement and field bonuses.
+- Free practice and qualifying mint nothing. Scheduled paid events freeze their authored economics, charge at
+  check-in, and settle through one idempotent transactional service with itemized receipts.
+- Street begins at €$50 entry, €$250 solo completion and €$300 contested completion. GT and Hypercar use authored
+  10× and 100× scales; NCX is sponsor-funded with free entry. All numbers remain observable tuning data.
+- Repeating the same route/economy opportunity in its window receives the authored repeat floor instead of an
+  unlimited first-completion payment. DNF/DNS/DSQ receive no purse.
+- Race Tags are factual first: the runtime evaluator emits all qualified facts separately from its capped display
+  set. Settlement consumes only an authored allow-list and cap; initial money rewards clean driving, not negative,
+  contact, penalty, placement-duplicate or position-manipulation Tags.
+- `/ncm.research` lists and submits finite personal-first physical identity and server-measured capability
+  evidence. Catalogue exposure and incremental maxima/configuration revisions cannot farm money.
+- Existing first-finish, first-time-trial and first-win accomplishments pay €$100 / €$100 / €$300 exactly once,
+  after progression persists. The five-tier Badge reducer is not built.
+- Cars and serialized Parts remain the principal progression sinks. Player trade will redistribute existing
+  assets/value; fuel should follow measured event economics and retain a bankruptcy road back.
 
 ## Offline evidence
 
-- Core gate: **458 passed, 0 failed**, including five launch catalogue/R&D tests.
-- QA observer: **17 passed, 0 failed**; vehicle access: **35 passed, 0 failed**.
-- Panel render: green, including split market panes, mixed fitment overlay, exact next-unit serial, future-planning
-  warning, factory-original inventory and eligible hold-to-fit.
-- Nameplate/race render checks green; documentation authority reports 74 valid documents and 419 unique ledger IDs.
-- Final full gate: **ALL GREEN under every interpreter** after session-close bookkeeping.
+- Core: **504 passed, 0 failed** under Lua 5.4 and LuaJIT.
+- Cross-scope: **51 checked, 0 bad**; QA observer **17 / 0**; vehicle access **35 / 0**.
+- `luac -p`: **217 resource files, 0 bad**.
+- Render checks: panel **129**, nameplate **26**, race **46**, all green.
+- Documentation authority: **76 valid documents, 446 unique ledger IDs**. The final complete repository gate is
+  **ALL GREEN under every interpreter** after session-close bookkeeping.
 
 ## Still live and unchanged
 
-The previous driving work remains owed: §BA top-speed capability/read-back, §AY serialized seam equivalence,
-§BB tyre window, §BC weather/time and §BE road-vs-tyre. §BF16 deliberately depends on §AY and §BA before any
-paid performance claim ships. Useful commands remain:
-
-```
-/ncm.topspeed 40
-/ncm.ratedtopspeed
-/ncm.setup power_unit 2.0
-/ncm.setup tires 1.4
-/ncm.setup brakes 2.0
-```
-
-The accidental `brakeScale`/aerodynamic-drag coupling (`IDEA-538`) is still open and should be measured before
-it is split. No Parts code in this session changes the carrier's proven three-lever boundary.
+- Ghosts are deployed PERSONAL BEST only under `L166`; §BI remains awaiting live driving proof, including the
+  exact vehicle visual, non-collision, heading seam, penalty time and both practice/time-trial claim paths.
+- Machine Knowledge migration 033 and the first typed observation vocabulary are deployed under `L164`; §BH and
+  the twice-applied dry-run remain owed. No estimator, envelopes or confidence were added.
+- Parts economy/UI v1 is deployed under `L162`-`L163`; §AZ and later performance work remain owed. Economy v1 did
+  not change the Carrier's proven three-lever boundary or resolve the brakeScale/drag coupling (`IDEA-538`).
+- Useful live commands remain `/ncm.topspeed 40`, `/ncm.ratedtopspeed`, `/ncm.setup power_unit 2.0`,
+  `/ncm.setup tires 1.4` and `/ncm.setup brakes 2.0`.
