@@ -19,16 +19,27 @@ the previously deployed Online tree with their live test sections still owed.
 
 ## One next action
 
-**Deploy the current local Economy v1 build to Development and run MASTER_TEST §BJ as one connected loop.**
-Confirm migration 035 and boot first, then exercise starter balance, paid/denied/duplicate check-in, solo and
-contested settlement, qualifying-without-payout, clean and dirty Tags, repeat floor, abort/restart refunds,
-unique-Badge rewards and explicit Research submissions. Reconcile the resulting receipts, typed ledger rows and
-balances directly in SQL. Do not promote to Online merely because the offline gate is green.
+**Run a time trial twice, then run MASTER_TEST §BJ.**
 
-The previously deployed live queue remains owed and is not displaced: §BI for ghosts, §BH for Machine Knowledge,
-§AZ for Parts, plus twice-applied migration dry-runs for 033-035 when `NCM_DB_ROOT` is available.
+**Ghosts first, because the last attempt found a defect rather than a result.** The owner ran a time trial on
+the cut at 16:41 UTC and saw nothing (`KB-156`): a race session record carried `routeName` but never `routeId`,
+so every time trial was unkeyable -- the client refused the session, recorded no poses, and prefetched nothing,
+while the host claimed with an empty route. `ghost_lap` was confirmed empty, so nothing was mis-stored. Fixed
+and redeployed 16:55 UTC; both ends now name the missing key instead of failing silently. Read the server line
+first: `time trial ghost invited ... route=<a real id>`, never `route=nil`. **Two runs are needed** -- the first
+stores the ghost, the second is the first one that can show it. Then §BI2: find out whether it draws as a car.
 
-## Economy v1 - built locally 2026-09-27 (`L168`, `L169`, document 40)
+**Economy v1 is ON ONLINE, not only local.** Migration 035 applied at 16:55 UTC in the same deploy that carried
+the `KB-156` fix, because `deploy-staging.ps1` ships the working tree rather than a selected change. The owner
+accepted that promotion. So §BJ runs against Online: confirm boot, then starter balance, paid/denied/duplicate
+check-in, solo and contested settlement, qualifying-without-payout, clean and dirty Tags, repeat floor,
+abort/restart refunds, unique-Badge rewards and explicit Research submissions, reconciling receipts, typed
+ledger rows and balances in SQL.
+
+The rest of the live queue is not displaced: §BH for Machine Knowledge, §AZ for Parts, plus twice-applied
+migration dry-runs for 033-035 when `NCM_DB_ROOT` is available.
+
+## Economy v1 - deployed to Online 2026-09-27 16:55 UTC (`L168`, `L169`, document 40)
 
 - Launch now has a genuine one-human income loop. A scheduled field of one uses time-trial completion/target
   economics and never receives P1; fields of two or more use contested completion, placement and field bonuses.

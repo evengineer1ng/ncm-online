@@ -47,31 +47,55 @@ local pending = nil      -- in-flight download
 local lastDeltaMs = nil
 local haveNone = false   -- the server said explicitly that there is no stored ghost here
 
---- The session I am actually in, and only when it is a timed one.
----
---- Ghosts are for practice, qualifying and time trials. In a live race a ghost is visual clutter among real
---- competitors and could be read as another entrant, which is exactly the confusion this feature must not
---- create -- so there is no race branch here at all.
 --- Which ghost-eligible activity this session is, IGNORING its phase, or nil.
 ---
 --- Separate from `timedView` because the two questions have different answers at different moments. A time
 --- trial only becomes *recordable* at green -- which is the same instant its run starts -- so if the stored
 --- ghost were requested then, it would arrive after the lap had already begun and nothing would be drawn for
 --- it. The trace has to be asked for while the lights are still on.
+--- Sessions already complained about, so a missing field is reported once rather than twenty times a second.
+local warnedRouteless = {}
+
 local function ghostKind(g)
     if type(g) ~= "table" then return nil end
-    if type(g.routeId) ~= "string" or g.routeId == "" then return nil end
-    local kind = g.kind or (g.formatId == "practice" and "practice" or nil)
-    if kind == "practice" or kind == "quali" then return kind end
-    if kind == "race" and #(g.entrants or {}) <= 1 then return "time_trial" end
-    return nil
+    local raw = g.kind or (g.formatId == "practice" and "practice" or nil)
+    local kind
+    if raw == "practice" or raw == "quali" then
+        kind = raw
+    elseif raw == "race" and #(g.entrants or {}) <= 1 then
+        -- **A TIME TRIAL is a race with a field of one** (`driver.progression.isTimeTrial`, L67 / `IDEA-001`).
+        -- It is the same solo activity as practice under a different name, so it gets a ghost. A CONTESTED
+        -- race does not: there a ghost is clutter among real competitors and could be read as another entrant.
+        kind = "time_trial"
+    else
+        return nil
+    end
+
+    -- **Say it when the session cannot be keyed.** A ghost is keyed by route, and a view without a `routeId`
+    -- silently produces no recording, no prefetch and no ghost -- which is indistinguishable from the feature
+    -- being broken. It happened: race sessions published only `routeName` and every time trial came through
+    -- unkeyable. One line, once per session, so the next instance is a diagnosis instead of a search.
+    if type(g.routeId) ~= "string" or g.routeId == "" then
+        local sid = tostring(g.sessionId or g.eventId or "?")
+        if not warnedRouteless[sid] then
+            warnedRouteless[sid] = true
+            log("session %s is a %s but carries NO routeId -- no ghost can be keyed to it (route name %s)",
+                sid, tostring(kind), tostring(g.routeName))
+        end
+        return nil
+    end
+    return kind
 end
 
+--- The session I am in, and only when it is a ghost-eligible one in a RECORDABLE phase.
+---
+--- `ghostKind` answers which activity this is regardless of phase; this adds the phase gate. The two are
+--- separate because a time trial only becomes recordable at green, which is the instant its run begins -- so
+--- the trace has to be requested on the first answer, not this one.
 local function timedView()
     local g = NcmClientView
-    if type(g) ~= "table" then return nil end
-    if type(g.routeId) ~= "string" or g.routeId == "" then return nil end
-    local kind = g.kind or (g.formatId == "practice" and "practice" or nil)
+    local kind = ghostKind(g)
+    if not kind then return nil end
 
     -- Practice and qualifying run on the time-attack kernel: one phase, `open`, and a run is bounded by the
     -- start and finish gates.
@@ -80,18 +104,9 @@ local function timedView()
         return g, kind
     end
 
-    -- **A TIME TRIAL is a race with a field of one** (`driver.progression.isTimeTrial`, L67 / `IDEA-001`), so
-    -- it arrives here as `kind = "race"` on the race kernel with the race phases -- not as its own kind. It is
-    -- the same solo activity as practice under a different name, so it gets a ghost.
-    --
-    -- A CONTESTED race does not. There a ghost would be visual clutter among real competitors and could be
-    -- read as another entrant, which is the one presentation mistake this feature must not make.
-    if kind == "race" and #(g.entrants or {}) <= 1 then
-        if g.phase ~= "running" and g.phase ~= "finishing" then return nil end
-        return g, "time_trial"
-    end
-
-    return nil
+    -- A time trial runs on the race kernel, so it has the race phases.
+    if g.phase ~= "running" and g.phase ~= "finishing" then return nil end
+    return g, kind
 end
 
 --- One pose, or nothing at all.

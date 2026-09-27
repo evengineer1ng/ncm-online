@@ -1929,7 +1929,15 @@ assertions** (was 28), 126 panel render assertions, 26 nameplate assertions, `lu
 resource files, `node --check` over 5 inline script blocks, cross-scope clean over 49 global references,
 docs authority green over 74 documents.
 
-**Deployed and verified on the live server (2026-09-27 16:10 UTC):**
+**First live attempt FAILED and the fix is deployed (`KB-156`).** The owner ran a time trial on the cut at
+16:41 UTC and saw no ghost. Cause: a race session record carried `routeName` but never `routeId`, so the client
+refused the session, recorded nothing, prefetched nothing, and the host claimed with an empty route. `ghost_lap`
+was confirmed empty -- nothing was mis-stored. Fixed and redeployed **16:55 UTC**; both ends now log the missing
+key by name rather than failing silently. **§BI is unchanged and entirely unrun** -- that attempt produced a
+defect, not a result.
+
+**Deployed and verified on the live server (2026-09-27 16:10 UTC, redeployed 16:55 UTC with `KB-156` and
+migration 035):**
 `migration 034 ghost_lap applied (2 statement(s))`, and `migration 033 observation_authority applied` in the
 same boot -- **033 had never reached Online before this deploy**, which closes the question of whether it was
 there and is worth noting against `§BH`. Boot was clean: `migrations: 2 applied`, `scheduler started: 5 series`,
@@ -1966,7 +1974,8 @@ labelled on the HUD. **§BI2 is the step that decides whether the car is a car.*
 | §BI11 | `/ncm.ghost off`, then cross the start. | No prop, no row. Then `/ncm.ghost personal` and it comes back. `/ncm.ghost session` should say it is not built yet rather than doing nothing. |
 | §BI12 | Leave the session, then stop the resource while a ghost is on screen. | The prop is gone in **both** cases. A resource that claims a prop and never releases it leaves scenery in the world with nothing explaining it. |
 | §BI13 | Have a second player stand at the start while your ghost replays. | They see **nothing**. The prop is client-local; a ghost is not a shared entity. |
-| **TIME TRIALS (`L166` point 7)** |||
+| **TIME TRIALS (`L166` point 7) -- `KB-156` was found here on the first live attempt** |||
+| §BI0 | Before anything else: run one time trial and read the server log. | `time trial ghost invited driver=... route=<a real route id> <N>ms` -- **`route=nil` is `KB-156`** and means no ghost can be keyed to the session. Deploy 2026-09-27 16:55 UTC is the first build where a race record carries `routeId` at all. |
 | §BI19 | Enter a posted event **alone** so it runs as a time trial, and finish it. | Server log: `time trial ghost invited driver=... route=... <N>ms`, then a `stored ghost=` line. A time trial is a race with a field of one, on the **race** kernel -- so this exercises a completely different claim path from §BI1, not the same one again. |
 | §BI20 | Run the same solo event a second time. | The ghost is **there from green**, not appearing several seconds into the lap. A time trial only becomes recordable at green, so the trace is requested during the countdown; if it shows up late, the prefetch is not working. |
 | §BI21 | Take a penalty during a solo time trial, then finish. | The lap is still stored, and `elapsed_ms` is the official time **including** the penalty while the poses span only the driving. The band check must not refuse it -- that is what the kernels' separate `raw` duration exists for. |
