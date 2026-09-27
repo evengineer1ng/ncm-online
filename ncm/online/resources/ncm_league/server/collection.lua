@@ -69,7 +69,11 @@ function NcmCollection.payload(playerId)
     for _, asset in ipairs(NcmOwnership.list(driver.ncmDriverId)) do
         if asset.vehicleKey then
             examples[asset.vehicleKey] = examples[asset.vehicleKey] or {}
-            table.insert(examples[asset.vehicleKey], { assetId = asset.assetId })
+            local p=NcmProvenance and NcmProvenance.of and NcmProvenance.of(asset.assetId) or nil
+            table.insert(examples[asset.vehicleKey], { assetId = asset.assetId,
+                globalOrdinal=p and p.globalOrdinal or nil,makerOrdinal=p and p.makerOrdinal or nil,
+                modelOrdinal=p and p.modelOrdinal or nil,odometerM=p and p.odometerM or 0,
+                performance={topSpeedKph=false,zeroTo100S=false,braking100To0M=false,lateralGripG=false,massKg=false,powerToWeightKwT=false} })
         end
     end
     local slots, discovered, ownedCount = {}, 0, 0

@@ -191,6 +191,15 @@
     .collection-count { text-align:right; font:700 22px/1.35 var(--mono); color:var(--accent); }
     .collection-count small { display:block; color:var(--dim); font-size:13px; letter-spacing:.14em; }
     .collection-layout { display:grid; grid-template-columns:minmax(0,1fr) 390px; gap:18px; flex:1; min-height:0; }
+    .collection-tabs { display:flex;gap:8px;margin:0 0 10px;flex:none; }
+    .collection-tabs button.active { color:var(--accent);border-color:var(--accent);box-shadow:inset 0 -3px var(--accent); }
+    .part-tile { position:relative;min-height:142px;text-align:left;padding:13px;background:rgba(3,12,20,.84); }
+    .part-tile.installed { border-color:#9a7bff; }
+    .part-status { margin-top:8px;font:700 11px/1.2 var(--mono);letter-spacing:.09em;color:var(--dim); }
+    .part-status.factory { color:#9a7bff; }
+    .fit-machine { border:1px solid var(--line);padding:10px;margin-top:8px;cursor:pointer; }
+    .fit-machine.ok { border-color:var(--ok); }
+    .fit-machine.no { border-color:var(--warn); }
     #collection { display:flex; flex-direction:column; }
     #guide, #market, #collection, #help { box-sizing:border-box; }
     .guide-head, .guide-tabs, .collection-head, .market-head, .wheel-head { flex-shrink:0; }
@@ -229,8 +238,13 @@
     .market-head { display:flex; justify-content:space-between; align-items:end; margin-bottom:18px; }
     .market-head h1 { font-size:54px; margin:4px 0; }
     .market-balance { font:700 28px/1 var(--mono); color:var(--accent); }
-    .market-body { flex:1; min-height:0; display:grid; grid-template-columns:minmax(0,1.15fr) minmax(0,1fr); gap:16px; }
-    .market-grid { min-height:0; overflow:auto; display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; align-content:start; }
+    .market-body { flex:1; min-height:0; display:grid; grid-template-columns:minmax(0,1fr) 390px; gap:16px; }
+    .market-stock { min-height:0;display:grid;grid-template-rows:minmax(0,2fr) minmax(0,3fr);gap:12px; }
+    .market-pane { min-height:0;display:flex;flex-direction:column;border:1px solid var(--line);padding:9px;background:rgba(2,10,18,.45); }
+    .market-pane-head { flex:none;display:flex;justify-content:space-between;align-items:center;margin-bottom:7px;font:700 12px/1 var(--mono);letter-spacing:.13em;color:var(--dim); }
+    .market-pane-head button { padding:7px 10px;font-size:11px; }
+    .market-grid { min-height:0; overflow:auto; display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:9px; align-content:start; }
+    .parts-grid { min-height:0;overflow:auto;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;align-content:start; }
     .market-detail { min-height:0; overflow:auto; border:1px solid var(--line); border-radius:10px; padding:18px; }
     .market-item.selected { border-color:var(--accent); box-shadow:inset 0 0 0 1px var(--accent); }
     .market-item .stock { font:700 13px/1 var(--mono); letter-spacing:.1em; margin-top:6px; }
@@ -241,10 +255,19 @@
     .market-assets { margin-top:10px; display:flex; flex-direction:column; gap:8px; }
     .market-assets .asset-row { display:flex; justify-content:space-between; align-items:center; gap:10px; border:1px solid var(--line); border-radius:8px; padding:8px 10px; }
     .market-assets .asset-row .aid { font:500 11px/1 var(--mono); color:var(--dim); overflow:hidden; text-overflow:ellipsis; }
-    .market-item { border:1px solid var(--line); background:rgba(2,10,18,.72); padding:22px; min-height:250px; }
-    .market-item h2 { margin:8px 0; font-size:32px; }
-    .market-item .price { color:var(--accent); font:700 28px/1 var(--mono); margin:24px 0 14px; }
+    .market-item { border:1px solid var(--line); background:rgba(2,10,18,.72); padding:12px; min-height:132px;position:relative; }
+    .market-item h2 { margin:6px 0; font-size:22px; }
+    .market-item .price { color:var(--accent); font:700 20px/1 var(--mono); margin:12px 0 8px; }
     .market-item button { width:100%; }
+    .market-item.fit-yes { border-color:var(--ok);box-shadow:inset 0 0 0 1px var(--ok); }
+    .market-item.fit-no { border-color:var(--warn);box-shadow:inset 0 0 0 1px var(--warn); }
+    .fit-badge { position:absolute;right:7px;top:7px;font:800 10px/1 var(--mono);letter-spacing:.08em; }
+    .fit-yes .fit-badge { color:var(--ok); }.fit-no .fit-badge { color:var(--warn); }
+    .component-card { min-height:118px;padding:10px; }
+    .component-card h2 { font-size:17px;margin:5px 0; }
+    .component-card .price { font-size:17px;margin:8px 0 5px; }
+    .warning-box { border:1px solid var(--warn);color:var(--warn);padding:10px;margin:10px 0;font:700 12px/1.45 var(--mono); }
+    .hold-btn.holding { background:linear-gradient(90deg,var(--accent) var(--hold,0%),transparent var(--hold,0%)); }
     .collection-wall { overflow:auto; display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); grid-auto-rows:150px; gap:10px; padding:10px; border:1px solid var(--line); background:rgba(2,10,18,.56); }
     .vehicle-tile { position:relative; overflow:hidden; padding:14px; text-align:left; border-radius:4px; background:linear-gradient(145deg,rgba(34,216,226,.09),rgba(255,255,255,.025)); }
     .vehicle-tile::after { content:""; position:absolute; right:-20px; bottom:-28px; width:130px; height:75px; border:2px solid currentColor; border-radius:70% 20% 22% 28%; opacity:.10; transform:skewX(-13deg); }
@@ -291,6 +314,7 @@
     <div id="collection" class="card hidden">
       <div class="close">ESC · close</div>
       <div class="collection-head"><div><div class="eyebrow">Night City Motorsports</div><h1 id="collectionTitle">Vehicle Collection</h1><div class="sub">The machines inhabiting our Night City.</div></div><div class="collection-count" id="collectionCount"></div></div>
+      <div class="collection-tabs"><button id="machinesTab" class="active">MACHINES</button><button id="partsTab">PARTS INVENTORY</button></div>
       <div class="collection-layout"><div class="collection-wall" id="collectionWall"></div><aside class="vehicle-dossier" id="collectionDetail"></aside></div>
       <div class="ncm-bottom" id="collectionNav"></div>
     </div>
@@ -307,7 +331,10 @@
     <div id="market" class="card hidden">
       <div class="close">ESC · close</div>
       <div class="market-head"><div><div class="eyebrow">Night City Motorsports · Commercial Network</div><h1>Base Market</h1><div class="sub">Real stock. Every machine is an individual.</div></div><div class="market-balance" id="marketBalance"></div></div>
-      <div class="market-body"><div class="market-grid" id="marketGrid"></div><div class="market-detail" id="marketDetail"></div></div>
+      <div class="market-body"><div class="market-stock">
+        <section class="market-pane"><div class="market-pane-head"><span>MACHINES</span><button id="fitmentToggle">FITMENT OVERLAY · ON</button></div><div class="market-grid" id="marketGrid"></div></section>
+        <section class="market-pane"><div class="market-pane-head"><span>COMPONENTS</span><span>PHYSICAL · SERIALIZED STOCK</span></div><div class="parts-grid" id="marketPartsGrid"></div></section>
+      </div><div class="market-detail" id="marketDetail"></div></div>
       <div class="ncm-bottom" id="marketNav"></div>
     </div>
     <div id="help" class="card hidden">
@@ -340,6 +367,8 @@
       const collectionDetail = document.getElementById("collectionDetail");
       const collectionCount = document.getElementById("collectionCount");
       const collectionTitle = document.getElementById("collectionTitle");
+      const machinesTab = document.getElementById("machinesTab");
+      const partsTab = document.getElementById("partsTab");
       const wheelCard = document.getElementById("wheel");
       const wheelNav = document.getElementById("wheelNav");
       const wheelStatus = document.getElementById("wheelStatus");
@@ -352,6 +381,8 @@
       const guideNav = document.getElementById("guideNav");
       const marketNav = document.getElementById("marketNav");
       const marketGrid = document.getElementById("marketGrid");
+      const marketPartsGrid = document.getElementById("marketPartsGrid");
+      const fitmentToggle = document.getElementById("fitmentToggle");
       const marketBalance = document.getElementById("marketBalance");
       let mode = null;          // "questionnaire" | "inbox" | "guide" | "market" | "collection" | "wheel" | null
       let guideTick = null;
@@ -361,6 +392,15 @@
       const text = (el, v) => { el.textContent = String(v == null ? "" : v); };
       const glyph = (name, label) => NcmGlyph.create(name, label);
       const routeGlyph = (r) => /circuit|oval|lap/i.test((r.discipline || "") + " " + (r.format || "")) ? "circuit" : "point_to_point";
+      const uuid4 = () => (window.crypto && window.crypto.randomUUID) ? window.crypto.randomUUID()
+        : "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, c => { const r=Math.random()*16|0; return (c==="x"?r:(r&3|8)).toString(16); });
+      function holdAction(btn, action) {
+        let timer=null,started=0,raf=null;
+        const stop=()=>{ if(timer)clearTimeout(timer);timer=null;if(raf)cancelAnimationFrame(raf);raf=null;btn.classList.remove("holding");btn.style.setProperty("--hold","0%"); };
+        const tick=()=>{ const p=Math.min(100,(performance.now()-started)/9);btn.style.setProperty("--hold",p+"%");if(timer)raf=requestAnimationFrame(tick); };
+        const start=(e)=>{ if(btn.disabled||timer)return;if(e&&e.type==="keydown"&&!['Enter',' '].includes(e.key))return;if(e)e.preventDefault();started=performance.now();btn.classList.add("holding");raf=requestAnimationFrame(tick);timer=setTimeout(()=>{stop();action();},900); };
+        btn.classList.add("hold-btn");btn.addEventListener("pointerdown",start);btn.addEventListener("pointerup",stop);btn.addEventListener("pointerleave",stop);btn.addEventListener("pointercancel",stop);btn.addEventListener("keydown",start);btn.addEventListener("keyup",stop);btn.addEventListener("blur",stop);
+      }
 
 
       // The NCM shell nav. ONE definition, rendered into whichever panel is open, so a surface can never be
@@ -747,8 +787,9 @@
         setCallState(d.state === "ok" ? "ok" : (d.state === "pending" ? "pending" : "fail"), d.message || "");
       });
 
-      // ---- vehicle collection
+      // ---- Machine Index: Machines and serialized Parts Inventory share one owned-asset surface.
       let collectionData = { slots: [], discovered: 0, total: 0, owned: 0 }, selectedCollectionSlot = null;
+      let componentData = { parts: [], machines: [], states: {}, partsEnabled:false }, collectionMode="machines", selectedPart=null, selectedFitMachine=null;
       function renderCollectionDetail(v) {
         collectionDetail.innerHTML = "";
         if (!v || !v.discovered) {
@@ -761,6 +802,7 @@
         collectionDetail.append(eyebrow,title,visual);
         for (const asset of (Array.isArray(v.assets) ? v.assets : [])) {
           const id=document.createElement("div"); id.className="asset-id"; id.textContent="ASSET " + asset.assetId;
+          const serial=document.createElement("div");serial.className="part-status";serial.textContent=asset.globalOrdinal?("NCM #"+asset.globalOrdinal+" · MAKER #"+asset.makerOrdinal+" · MODEL #"+asset.modelOrdinal):"SERIAL NOT RECOVERABLE";
           const call=document.createElement("button"); call.textContent="CALL VEHICLE"; call.className="call-btn";
           const note=document.createElement("div"); note.className="call-note";
           // React on the press itself. The server's answer arrives later over `panel:vehicle.result`; until
@@ -775,14 +817,19 @@
             if(callTimer) clearTimeout(callTimer);
             callTimer=setTimeout(()=>{ if(callBtn===call) setCallState("fail","No answer from the server. Try again."); },12000);
           });
-          collectionDetail.append(id,call,note);
+          collectionDetail.append(id,serial,call,note);
+          const fitted=(componentData.parts||[]).filter(p=>p.machine_asset_id===asset.assetId&&p.location_kind==="installed");
+          if(fitted.length){const label=document.createElement("div");label.className="dossier-label";label.textContent="INSTALLED CONFIGURATION";collectionDetail.append(label);for(const p of fitted){const x=document.createElement("div");x.className="dossier-value";x.textContent=(p.code||p.design_id)+" · "+String(p.family||"").replaceAll("_"," ").toUpperCase();collectionDetail.append(x);}}
         }
+        const metrics=[["Rated top speed","Not rated"],["0–100 km/h","Not rated"],["100–0 braking","Not rated"],["Lateral grip","Not rated"],["Mass","Not rated"],["Power-to-weight","Not rated"]];
+        for(const pair of metrics){const l=document.createElement("div");l.className="dossier-label";l.textContent=pair[0];const x=document.createElement("div");x.className="dossier-value";x.textContent=pair[1];collectionDetail.append(l,x);}
         for (const pair of [["Category",(v.categories||[v.category]).filter(Boolean).join(" / ")],["Status",v.owned?"OWNED · DISCOVERED":"DISCOVERED"],["Source",String(v.source||"native").toUpperCase()],["First encounter",v.firstDiscoveredAt?new Date(v.firstDiscoveredAt*1000).toLocaleString():"—"],["Encounters",v.encounterCount||1]]) {
           const l=document.createElement("div"); l.className="dossier-label"; l.textContent=pair[0]; const x=document.createElement("div"); x.className="dossier-value"; x.textContent=pair[1]; collectionDetail.append(l,x);
         }
       }
       function renderCollection(d) {
         if (d) collectionData=d;
+        if(collectionMode==="parts"){renderPartsInventory();return;}
         collectionTitle.textContent=collectionData.label||"Vehicle Collection";
         const slots=Array.isArray(collectionData.slots)?collectionData.slots:[];
         collectionCount.innerHTML=(collectionData.discovered||0)+" / "+(collectionData.total||slots.length)+" DISCOVERED<small>"+(collectionData.owned||0)+" OWNED · GENERATION "+(collectionData.generation||1)+"</small>";
@@ -802,6 +849,31 @@
       }
       Open77.on("panel:collection", (d) => { if (mode === "collection") renderCollection(d); });
 
+      function serialText(p){return p.global_ordinal?(`#${p.global_ordinal} · MAKER #${p.maker_ordinal} · DESIGN #${p.design_ordinal}`):"FACTORY ORIGINAL · SERIAL NOT RECOVERABLE";}
+      function renderPartDetail(p){
+        collectionDetail.innerHTML="";if(!p){collectionDetail.innerHTML='<div class="guide-empty">Select a serialized component.</div>';return;}
+        const maker=document.createElement("div");maker.className="eyebrow";maker.textContent=p.display_manufacturer||"Factory";
+        const title=document.createElement("div");title.className="detail-title";title.textContent=p.code||p.design_id;
+        const sub=document.createElement("div");sub.className="sub";sub.textContent=(p.subtitle||"")+" · "+String(p.family||"").replaceAll("_"," ").toUpperCase();collectionDetail.append(maker,title,sub);
+        for(const pair of [["SERIAL",serialText(p)],["EFFECT",Number(p.effect||1).toFixed(2)+" · "+String(p.fidelity||"modelled").toUpperCase()],["STATUS",String(p.location_kind||"storage").toUpperCase()],["EXPOSURE",Number(p.exposure_m||0).toLocaleString()+" m"]]){const l=document.createElement("div");l.className="dossier-label";l.textContent=pair[0];const v=document.createElement("div");v.className="dossier-value";v.textContent=pair[1];collectionDetail.append(l,v);}
+        if(p.location_kind==="installed"){const n=document.createElement("div");n.className="warning-box";n.textContent="INSTALLED ON MACHINE "+p.machine_asset_id+". Fit another compatible system to displace it.";collectionDetail.append(n);return;}
+        const machines=Array.isArray(componentData.machines)?componentData.machines:[];
+        for(const m of machines){const fit=m.fitment&&m.fitment[p.asset_id];const st=(componentData.states||{})[m.asset_id]||{eligible:false,state:"checking",reason:"Checking Machine state…"};const row=document.createElement("div");row.className="fit-machine "+(fit&&fit.compatible&&st.eligible?"ok":"no");row.textContent=(fit&&fit.compatible?"✓ ":"⊘ ")+String(m.vehicle_key||"Machine")+" · "+String(m.asset_id).slice(0,8)+" · "+(fit&&fit.compatible?st.reason:(fit&&fit.reason)||"Does not fit");row.addEventListener("click",()=>{selectedFitMachine=m.asset_id;renderPartDetail(p);});if(selectedFitMachine===m.asset_id)row.style.boxShadow="inset 0 0 0 2px var(--accent)";collectionDetail.append(row);}
+        const target=machines.find(m=>m.asset_id===selectedFitMachine);const fit=target&&target.fitment&&target.fitment[p.asset_id];const st=target&&(componentData.states||{})[target.asset_id];
+        if(target&&fit&&fit.compatible&&st&&st.eligible){const b=document.createElement("button");b.className="detail-action";b.textContent="HOLD TO FIT TO MACHINE";holdAction(b,()=>{b.disabled=true;b.textContent="FITTING…";Open77.emit("panel:component.install",{componentAssetId:p.asset_id,machineAssetId:target.asset_id,idempotencyKey:uuid4()});});collectionDetail.append(b);}
+      }
+      function renderPartsInventory(){
+        collectionTitle.textContent="Machine Index";machinesTab.classList.remove("active");partsTab.classList.add("active");const parts=Array.isArray(componentData.parts)?componentData.parts:[];collectionCount.innerHTML=parts.length+" COMPONENTS<small>STORED AND INSTALLED · SERIALIZED ASSETS</small>";collectionWall.innerHTML="";collectionWall.style.gridTemplateColumns="repeat(4,minmax(0,1fr))";
+        if(!selectedPart&&parts.length)selectedPart=parts[0].asset_id;
+        for(const p of parts){const b=document.createElement("button");b.className="part-tile "+(p.location_kind==="installed"?"installed ":"")+(p.asset_id===selectedPart?"selected":"");const m=document.createElement("div");m.className="vehicle-maker";m.textContent=p.display_manufacturer||"Factory";const n=document.createElement("div");n.className="vehicle-name";n.textContent=p.code||p.design_id;const meta=document.createElement("div");meta.className="vehicle-meta";meta.textContent=String(p.family||"").replaceAll("_"," ");const s=document.createElement("div");s.className="part-status "+(p.factory_original?"factory":"");s.textContent=(p.factory_original?"FACTORY ORIGINAL · ":"")+String(p.location_kind||"storage").toUpperCase();b.append(m,n,meta,s);b.addEventListener("click",()=>{selectedPart=p.asset_id;selectedFitMachine=null;renderPartsInventory();});collectionWall.append(b);}
+        renderPartDetail(parts.find(p=>p.asset_id===selectedPart)||parts[0]);
+      }
+      machinesTab.addEventListener("click",()=>{collectionMode="machines";machinesTab.classList.add("active");partsTab.classList.remove("active");collectionWall.style.gridTemplateColumns="repeat(6,minmax(0,1fr))";renderCollection(null);});
+      partsTab.addEventListener("click",()=>{collectionMode="parts";renderPartsInventory();});
+      Open77.on("panel:components",d=>{componentData=Object.assign(componentData,d||{});if(mode==="collection"&&collectionMode==="parts")renderPartsInventory();});
+      Open77.on("panel:component.states",d=>{componentData.states=d||{};if(mode==="collection"&&collectionMode==="parts")renderPartsInventory();});
+      Open77.on("panel:component.install.result",()=>{if(mode==="collection"&&collectionMode==="parts")renderPartsInventory();});
+
       // ---- market network (Base Market is the first source, never a global catalogue)
       // ---- Base Market.
       //
@@ -809,8 +881,12 @@
       // standing on it. The old renderer drew assets, so selling the only MaiMai removed the MaiMai from the
       // Market instead of selling it out. Cards are offerings now and never disappear; the detail pane is
       // where the individual assets live, because an assetId is still what a purchase names.
-      let marketData = { markets: [], offerings: [], items: [], balance: 0, currency: "eddies", loading: true };
-      let selectedOffering = null;
+      let marketData = { markets: [], offerings: [], vehicleOfferings: [], componentOfferings: [], itemCount: 0, balance: 0, currency: "eddies", loading: true };
+      // **`|| []` is not a guard against this.** An empty Lua table serialises to JSON `{}`, not `[]`, and
+      // `{}` is TRUTHY -- so `(x || []).find(...)` throws "find is not a function" the moment the server
+      // has no component offerings to send. That blanked the whole market panel.
+      const partsList = () => Array.isArray(marketData.componentOfferings) ? marketData.componentOfferings : [];
+      let selectedOffering = null, selectedComponent = null, hoveredComponent = null, selectedPreviewVehicle = null, fitmentOverlay = true;
       const eddies = (n) => "€$" + Number(n || 0).toLocaleString();
       // Whole minutes, then hours. Never a countdown to the second: production is an authored cadence, not a
       // promise precise enough to justify one.
@@ -834,9 +910,32 @@
 
       function marketNow() { return Number(marketData.serverNow || 0) || Math.floor(Date.now() / 1000); }
 
+      function pct(v) { const n = (Number(v || 1) - 1) * 100; return (n >= 0 ? "+" : "") + n.toFixed(1) + "%"; }
+      function renderPartMarketDetail(box, p) {
+        const cars = Array.isArray(marketData.vehicleOfferings) && marketData.vehicleOfferings.length ? marketData.vehicleOfferings : (marketData.offerings || []);
+        if (!selectedPreviewVehicle && cars.length) selectedPreviewVehicle = cars[0].vehicleKey;
+        const fit = p.fitment && p.fitment[selectedPreviewVehicle];
+        const maker = document.createElement("div"); maker.className = "vehicle-maker"; maker.textContent = p.manufacturer || p.makerKey || "NCM";
+        const name = document.createElement("h2"); name.textContent = p.code || p.designId;
+        const cat = document.createElement("div"); cat.className = "sub"; cat.textContent = (p.subtitle || "") + " · " + String(p.family || "").replaceAll("_", " ").toUpperCase();
+        box.append(maker, name, cat);
+        const spec = document.createElement("div"); spec.className = "market-spec";
+        const pairs = [["PRICE", eddies(p.price)], ["EFFECT", Number(p.effect || 1).toFixed(2)], ["FIDELITY", String(p.fidelity || "modelled").toUpperCase()], ["AVAILABLE", Number(p.available || 0) + " / " + Number(p.ceiling || 0)], ["NEXT PRODUCTION", untilText(p.nextProductionAt, marketNow())], ["NEXT BATCH", "up to " + Number(p.nextBatch || 0)], ["CADENCE", "about every " + cadenceText(p.cadenceSec)], ["TARGET", selectedPreviewVehicle || "—"], ["FITMENT", fit ? (fit.compatible ? "✓ FITS" : "⊘ DOES NOT FIT") : "UNAVAILABLE"]];
+        const levers = p.projection && p.projection.levers;
+        if (levers) { pairs.push(["GRIP", pct(levers.gripScale)], ["DRIVE FORCE", pct(levers.driveScale)], ["BRAKE FORCE", pct(levers.brakeScale)]); if (p.projection.topSpeedScale) pairs.push(["TOP-SPEED SCALE", pct(p.projection.topSpeedScale)]); }
+        for (const pair of pairs) { const b=document.createElement("b");b.textContent=pair[0];const s=document.createElement("span");s.textContent=pair[1];spec.append(b,s); } box.append(spec);
+        const limits=document.createElement("div");limits.className="line muted";limits.textContent=(p.fidelity==="direct"?"DIRECT: the primary lever is the component's quantity. ":"MODELLED: a coarse projection onto verified force levers. ")+"Absolute vehicle metrics remain Not rated until authoritative baselines exist.";box.append(limits);
+        if (!p.ownedCompatible) { const w=document.createElement("div");w.className="warning-box";w.textContent="YOU OWN NO COMPATIBLE MACHINE. Purchase is allowed for future planning; this component cannot currently be fitted.";box.append(w); }
+        const a=p.nextAsset;
+        if (a) { const ser=document.createElement("div");ser.className="asset-id";ser.textContent="NEXT UNIT · NCM "+a.global_ordinal+" · MAKER "+a.maker_ordinal+" · DESIGN "+a.design_ordinal;box.append(ser);const buy=document.createElement("button");const afford=Number(marketData.balance||0)>=Number(p.price||0);buy.className="detail-action";buy.disabled=!afford||!marketData.partsEnabled;buy.textContent=!marketData.partsEnabled?"AWAITING LIVE QA":(afford?"HOLD TO PURCHASE":"INSUFFICIENT FUNDS");if(!buy.disabled)holdAction(buy,()=>{buy.disabled=true;buy.textContent="PURCHASING…";Open77.emit("panel:component.purchase",{marketId:"base_market",assetId:a.asset_id,idempotencyKey:uuid4()});});box.append(buy); }
+        else { const e=document.createElement("div");e.className="guide-empty";e.textContent="SOLD OUT · production continues.";box.append(e); }
+      }
+
       function renderMarketDetail() {
         const box = document.getElementById("marketDetail");
         box.innerHTML = "";
+        const part = partsList().find(x => x.designId === (hoveredComponent || selectedComponent));
+        if (part) { renderPartMarketDetail(box, part); return; }
         const offers = Array.isArray(marketData.offerings) ? marketData.offerings : [];
         const o = offers.find(x => x.vehicleKey === selectedOffering);
         if (!o) {
@@ -851,7 +950,10 @@
         const spec = document.createElement("div"); spec.className = "market-spec";
         const pairs = [["PRICE", eddies(o.price)],
                        ["AVAILABLE", Number(o.available || 0) + " / " + Number(o.ceiling || 0)],
-                       ["STATE", o.soldOut ? "SOLD OUT" : "IN STOCK"]];
+                       ["STATE", o.soldOut ? "SOLD OUT" : "IN STOCK"],
+                       ["RATED TOP SPEED", "Not rated"], ["0–100 KM/H", "Not rated"],
+                       ["100–0 BRAKING", "Not rated"], ["LATERAL GRIP", "Not rated"],
+                       ["MASS", "Not rated"], ["POWER-TO-WEIGHT", "Not rated"]];
         // Supply is stated, not implied. The batch is what the next event MAY make -- capped by whatever
         // capacity is free at that moment, and by whoever buys in the meantime. Never phrased as a promise.
         pairs.push(["NEXT PRODUCTION", untilText(o.nextProductionAt, now)]);
@@ -890,7 +992,7 @@
           const buy = document.createElement("button");
           buy.textContent = afford ? "PURCHASE" : "INSUFFICIENT FUNDS";
           buy.disabled = !afford;
-          buy.addEventListener("click", () => { buy.disabled = true; buy.textContent = "PURCHASING…";
+          if (afford) holdAction(buy, () => { buy.disabled = true; buy.textContent = "PURCHASING…";
             Open77.emit("panel:market.purchase", { marketId: o.marketId, assetId: assetId }); });
           row.append(aid, buy); list.append(row);
         }
@@ -899,6 +1001,7 @@
 
       function selectOffering(key) {
         selectedOffering = key;
+        selectedPreviewVehicle = key;
         // Selecting an offering and looking at it is a legitimate encounter with the model, stocked or not.
         // The server decides whether that is a discovery; this only reports what the player did.
         Open77.emit("panel:market.inspect", { marketId: "base_market", vehicleKey: key });
@@ -909,11 +1012,14 @@
         if (d) marketData=d;
         marketBalance.textContent=eddies(marketData.balance);
         marketGrid.innerHTML="";
-        const offers=Array.isArray(marketData.offerings)?marketData.offerings:[];
+        marketPartsGrid.innerHTML="";
+        const offers=Array.isArray(marketData.vehicleOfferings)&&marketData.vehicleOfferings.length?marketData.vehicleOfferings:(Array.isArray(marketData.offerings)?marketData.offerings:[]);
         if(!offers.length){const e=document.createElement("div");e.className="guide-empty";e.textContent=marketData.loading?"Loading current stock…":"Base Market carries nothing right now.";marketGrid.append(e);renderMarketDetail();return;}
         if(!offers.some(o=>o.vehicleKey===selectedOffering)) selectedOffering=offers[0].vehicleKey;
         for(const o of offers){
-          const card=document.createElement("div");card.className="market-item"+(o.vehicleKey===selectedOffering?" selected":"");
+          const part=partsList().find(x=>x.designId===(hoveredComponent||selectedComponent));const fit=part&&part.fitment&&part.fitment[o.vehicleKey];
+          const card=document.createElement("div");card.className="market-item"+(o.vehicleKey===selectedOffering?" selected":"")+(fitmentOverlay&&fit?(fit.compatible?" fit-yes":" fit-no"):"");
+          card.dataset.vehicleKey=o.vehicleKey;
           const source=document.createElement("div");source.className="eyebrow";source.textContent=o.marketName||o.marketId;
           const maker=document.createElement("div");maker.className="vehicle-maker";maker.textContent=o.manufacturer||"NCM";
           const name=document.createElement("h2");name.textContent=o.displayName||o.vehicleKey;
@@ -924,12 +1030,33 @@
           stock.textContent=o.soldOut?("SOLD OUT · 0 / "+Number(o.ceiling||0)):("AVAILABLE "+Number(o.available||0)+" / "+Number(o.ceiling||0));
           const price=document.createElement("div");price.className="price";price.textContent=eddies(o.price);
           card.append(source,maker,name,meta,stock,price);
+          if(fitmentOverlay&&fit){const badge=document.createElement("div");badge.className="fit-badge";badge.textContent=fit.compatible?"✓ FITS":"⊘ DOES NOT FIT";card.append(badge);}
           card.addEventListener("click",()=>selectOffering(o.vehicleKey));
           marketGrid.append(card);
         }
+        const parts=partsList();
+        for(const p of parts){
+          const card=document.createElement("div");card.tabIndex=0;card.className="market-item component-card"+(p.designId===selectedComponent?" selected":"");
+          const maker=document.createElement("div");maker.className="vehicle-maker";maker.textContent=p.manufacturer||p.makerKey;
+          const name=document.createElement("h2");name.textContent=p.code||p.designId;
+          const meta=document.createElement("div");meta.className="sub";meta.textContent=String(p.tier||"").toUpperCase()+" · "+String(p.family||"").replaceAll("_"," ");
+          const stock=document.createElement("div");stock.className="stock"+(p.soldOut?" out":"");stock.textContent=p.soldOut?"SOLD OUT":("AVAILABLE "+p.available+" / "+p.ceiling);
+          const price=document.createElement("div");price.className="price";price.textContent=eddies(p.price);card.append(maker,name,meta,stock,price);
+          const choose=()=>{selectedComponent=p.designId;hoveredComponent=null;if(!selectedPreviewVehicle&&offers.length)selectedPreviewVehicle=offers[0].vehicleKey;renderMarket(null);};
+          card.addEventListener("click",choose);card.addEventListener("mouseenter",()=>{hoveredComponent=p.designId;updateFitPreview();});card.addEventListener("mouseleave",()=>{hoveredComponent=null;updateFitPreview();});card.addEventListener("focus",()=>{hoveredComponent=p.designId;updateFitPreview();});card.addEventListener("blur",()=>{hoveredComponent=null;updateFitPreview();});marketPartsGrid.append(card);
+        }
         renderMarketDetail();
       }
+      function updateFitPreview(){
+        const p=partsList().find(x=>x.designId===(hoveredComponent||selectedComponent));
+        for(const card of marketGrid.children||[]){card.classList.remove("fit-yes","fit-no");for(const old of Array.from(card.children||[])){if(old.className==="fit-badge")old.remove();}const fit=p&&p.fitment&&p.fitment[card.dataset.vehicleKey];if(fitmentOverlay&&fit){card.classList.add(fit.compatible?"fit-yes":"fit-no");const badge=document.createElement("div");badge.className="fit-badge";badge.textContent=fit.compatible?"✓ FITS":"⊘ DOES NOT FIT";card.append(badge);}}
+        renderMarketDetail();
+      }
+      fitmentToggle.addEventListener("click",()=>{fitmentOverlay=!fitmentOverlay;fitmentToggle.textContent="FITMENT OVERLAY · "+(fitmentOverlay?"ON":"OFF");renderMarket(null);});
       Open77.on("panel:market", (d) => { if (mode === "market") guard("market", () => renderMarket(d)); });
+      Open77.on("panel:market.head",d=>{marketData=Object.assign(marketData,d||{});if(mode==="market")guard("market",()=>renderMarket(null));});
+      Open77.on("panel:market.vehicles",d=>{marketData.offerings=d&&d.offerings||[];marketData.vehicleOfferings=marketData.offerings;if(mode==="market")guard("market",()=>renderMarket(null));});
+      Open77.on("panel:market.components",d=>{marketData.componentOfferings=d&&d.componentOfferings||[];if(mode==="market")guard("market",()=>renderMarket(null));});
       for(const tab of document.querySelectorAll("[data-panel-nav]")) tab.addEventListener("click",()=>{
         const target=tab.dataset.panelNav;if(target===mode)return;Open77.emit("panel:navigate",{panel:target});
       });
@@ -945,10 +1072,6 @@
       // an obligation that rots.
       let helpData = null, helpReportBox = null;
       let reportId = null, reportBusy = false;
-
-      const uuid4 = () => (window.crypto && window.crypto.randomUUID) ? window.crypto.randomUUID()
-        : "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
-            const r = Math.random() * 16 | 0; return (c === "x" ? r : (r & 0x3 | 0x8)).toString(16); });
 
       function helpSection(title) {
         const sec = document.createElement("div"); sec.className = "help-sec";
@@ -1178,7 +1301,9 @@
         try {
           if (what === "guide") return (guideData.rows || []).length;
           if (what === "collection") return (collectionData.slots || []).length;
-          if (what === "market") return (marketData.items || []).length;
+          // `itemCount` is a number on the wire now. It used to be the length of a list of every
+          // purchasable asset, shipped in full so this line could call `.length` on it.
+          if (what === "market") return Number(marketData.itemCount || 0);
           if (what === "inbox") return ((lastInboxData || {}).items || []).length;
         } catch (_) {}
         return -1;
@@ -1524,7 +1649,7 @@
       Open77.on("panel:list.begin", (d) => {
         if (!d || !d.id) return;
         pending[d.id] = { name: d.name, listKey: d.listKey, n: d.n, head: d.head || {}, items: [], got: 0 };
-        headSeen = 1; partsExpected = Number(d.n) || 0;   // KB-65: what we were promised
+        headSeen = 1; partsExpected += Number(d.n) || 0;   // several typed streams may compose one screen
       });
       Open77.on("panel:list.part", (d) => {
         if (!d || !d.id) return;
@@ -1540,6 +1665,9 @@
         if (p.name === "panel:guide") { if (mode === "guide") guard("guide", () => renderGuide(value)); }
         else if (p.name === "panel:collection") { if (mode === "collection") guard("collection", () => renderCollection(value)); }
         else if (p.name === "panel:market") { if (mode === "market") guard("market", () => renderMarket(value)); }
+        else if (p.name === "panel:market.vehicles") { marketData.offerings=value.offerings||[];marketData.vehicleOfferings=marketData.offerings;if(mode==="market")guard("market",()=>renderMarket(null)); }
+        else if (p.name === "panel:market.components") { marketData.componentOfferings=value.componentOfferings||[];if(mode==="market")guard("market",()=>renderMarket(null)); }
+        else if (p.name === "panel:components") { componentData=Object.assign(componentData,value||{});if(mode==="collection"&&collectionMode==="parts")guard("collection",()=>renderPartsInventory()); }
         else if (p.name === "panel:inbox") { lastInboxData = value; if (mode === "inbox") guard("inbox", () => renderInbox(value)); }
       });
 

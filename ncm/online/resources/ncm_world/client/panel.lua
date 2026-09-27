@@ -4,6 +4,7 @@
 -- has a chat twin (/ncm.q, /ncm.inbox, /ncm.read, /ncm.accept) so a client whose page cannot take input still works.
 local Core = NcmCore
 local Q = Core.get("onboarding.questionnaire")
+local Chunks = Core.get("vocabulary.chunks")
 
 local function log(fmt, ...) print(("[ncm_world/client/panel] " .. fmt):format(...)) end
 
@@ -16,6 +17,8 @@ local lastGuide = nil
 local lastResults = nil
 local lastCollection = nil
 local lastMarket = nil
+local lastComponents = nil
+local marketWire = nil
 
 -- KB-61. Focus is the dangerous part of this file.
 --
@@ -114,11 +117,12 @@ local chunkSeq = 0
 
 --- Send `value` to the page, splitting its list field when it is long enough to risk the drop.
 --- `listKey` is the field holding the big array ("rows", "slots", "items").
-local function sendBig(name, value, listKey)
+local function sendBig(name, value, listKey, rowsPerChunk)
     if not (page and pageReady) then return end
     if type(value) ~= "table" then return end
     local list = value[listKey]
-    if type(list) ~= "table" or #list <= ROWS_PER_CHUNK then
+    rowsPerChunk = math.max(1, math.floor(tonumber(rowsPerChunk) or ROWS_PER_CHUNK))
+    if type(list) ~= "table" or #list <= rowsPerChunk then
         page:send(name, value)
         return
     end
@@ -129,18 +133,31 @@ local function sendBig(name, value, listKey)
 
     chunkSeq = chunkSeq + 1
     local id = tostring(chunkSeq)
-    local n = math.ceil(#list / ROWS_PER_CHUNK)
+    local n = math.ceil(#list / rowsPerChunk)
     page:send("panel:list.begin", { id = id, name = name, listKey = listKey, n = n, head = head })
-    wantChunks = n          -- KB-65: promised vs delivered, measured on both ends
+    wantChunks = wantChunks + n          -- several typed streams may compose one screen
     for i = 1, n do
         local part = {}
-        for j = (i - 1) * ROWS_PER_CHUNK + 1, math.min(i * ROWS_PER_CHUNK, #list) do
+        for j = (i - 1) * rowsPerChunk + 1, math.min(i * rowsPerChunk, #list) do
             part[#part + 1] = list[j]
         end
         page:send("panel:list.part", { id = id, i = i, items = part })
         sentChunks = sentChunks + 1
     end
-    log("sendBig: %s split into %d batch(es) of <=%d", name, n, ROWS_PER_CHUNK)
+    log("sendBig: %s split into %d batch(es) of <=%d", name, n, rowsPerChunk)
+end
+
+local function sendMarket(value)
+    if not (page and pageReady) or type(value)~="table" then return end
+    local head={}
+    for k,v in pairs(value) do
+        if k~="items" and k~="offerings" and k~="vehicleOfferings" and k~="componentOfferings" then head[k]=v end
+    end
+    page:send("panel:market.head",head)
+    sendBig("panel:market.vehicles",{offerings=value.vehicleOfferings or value.offerings or {}},"offerings")
+    -- Component rows carry fitment, projection and next-asset provenance. One per WebUI message keeps the
+    -- second hop bounded too; the server->client stream is independently bounded by the same rule.
+    sendBig("panel:market.components",{componentOfferings=value.componentOfferings or {}},"componentOfferings",1)
 end
 
 local function questionsForPage()
@@ -185,9 +202,11 @@ end
 local function showCollection()
     if not page or not pageReady then return end
     TriggerServerEvent("ncm:collection")
+    TriggerServerEvent("ncm:component.inventory.request")
     setOpen("collection")   -- BEFORE the send: the page can answer panel:drawn faster than the next line runs
     page:send("panel:show", { panel = "collection" })
     sendBig("panel:collection", lastCollection or { slots = {}, loading = true }, "slots")
+    if lastComponents then sendBig("panel:components",lastComponents,"parts") end
 end
 
 -- Help. Opened by `/ncm help` (server sets the `ncmHelp` bag) rather than by a key: three of NCM's four
@@ -208,7 +227,7 @@ local function showMarket()
     TriggerServerEvent("ncm:market")
     setOpen("market")
     page:send("panel:show", { panel = "market" })
-    sendBig("panel:market", lastMarket or { items = {}, markets = {}, loading = true }, "items")
+    sendMarket(lastMarket or { vehicleOfferings = {}, componentOfferings = {}, markets = {}, loading = true })
 end
 
 --- The WHEEL tab (`IDEA-399`).
@@ -305,6 +324,12 @@ AddEventHandler("onClientResourceStart", function(name)
         if type(d) == "table" and d.marketId and d.assetId then
             TriggerServerEvent("ncm:market.purchase", d.marketId, d.assetId)
         end
+    end)
+    page:on("panel:component.purchase",function(d)
+        if type(d)=="table" and d.assetId then TriggerServerEvent("ncm:component.purchase",tostring(d.marketId or "base_market"),tostring(d.assetId),tostring(d.idempotencyKey or "")) end
+    end)
+    page:on("panel:component.install",function(d)
+        if type(d)=="table" and d.componentAssetId and d.machineAssetId then TriggerServerEvent("ncm:component.install",tostring(d.componentAssetId),tostring(d.machineAssetId),tostring(d.idempotencyKey or "")) end
     end)
     -- Selecting an offering is a player-facing encounter with that model, which the server may treat as a
     -- Machine Index discovery. The client only reports the act; it never decides that anything was learned.
@@ -413,6 +438,16 @@ RegisterNetEvent("ncm:collection.payload", function(value)
     if page and pageReady and open == "collection" then sendBig("panel:collection", value, "slots") end
 end)
 
+RegisterNetEvent("ncm:component.inventory",function(value)
+    if type(value)~="table" then return end
+    lastComponents=value
+    local ids={};for _,m in ipairs(type(value.machines)=="table" and value.machines or {}) do ids[#ids+1]=m.asset_id end
+    TriggerServerEvent("ncm:component.state.request",ids)
+    if page and pageReady and open=="collection" then sendBig("panel:components",value,"parts") end
+end)
+RegisterNetEvent("ncm:component.state",function(value) if page and pageReady then page:send("panel:component.states",type(value)=="table" and value or {}) end end)
+RegisterNetEvent("ncm:component.install.result",function(value) if page and pageReady then page:send("panel:component.install.result",type(value)=="table" and value or {}) end end)
+
 -- The Machine Index's CALL VEHICLE button needs to react; a toast behind the open panel is not a reaction.
 RegisterNetEvent("ncm:vehicle.result", function(value)
     if page and pageReady then page:send("panel:vehicle.result", type(value) == "table" and value or {}) end
@@ -428,10 +463,48 @@ RegisterNetEvent("ncm:report.result", function(value)
     if page and pageReady then page:send("panel:report.result", type(value) == "table" and value or {}) end
 end)
 
+local function finishMarketWire()
+    local s=marketWire
+    if not s or not Chunks.complete(s.vehicles) or not Chunks.complete(s.components) then return end
+    local vehicles,vehicleWhy=Chunks.collect(s.vehicles)
+    local components,componentWhy=Chunks.collect(s.components)
+    if not vehicles or not components then
+        log("market stream %s refused at assembly: %s/%s",tostring(s.id),tostring(vehicleWhy),tostring(componentWhy))
+        marketWire=nil;return
+    end
+    local value=s.head
+    value.offerings=vehicles;value.vehicleOfferings=vehicles;value.componentOfferings=components;value.loading=false
+    lastMarket=value;marketWire=nil
+    log("market stream complete id=%s vehicles=%d components=%d",tostring(s.id),#vehicles,#components)
+    if page and pageReady and open=="market" then sendMarket(value) end
+end
+
+RegisterNetEvent("ncm:market.stream.begin",function(meta)
+    if type(meta)~="table" or type(meta.id)~="string" then return end
+    local head=type(meta.head)=="table" and meta.head or {}
+    head.offerings={};head.vehicleOfferings={};head.componentOfferings={};head.loading=true
+    marketWire={id=meta.id,head=head,vehicles=Chunks.receiver(meta.vehicleParts),components=Chunks.receiver(meta.componentParts)}
+    lastMarket=head
+    log("market stream begin id=%s packets=%d+%d",meta.id,marketWire.vehicles.expected,marketWire.components.expected)
+    if page and pageReady and open=="market" then sendMarket(head) end
+    finishMarketWire() -- the empty-market case has no part events
+end)
+
+RegisterNetEvent("ncm:market.stream.part",function(part)
+    local s=marketWire
+    if not s or type(part)~="table" or tostring(part.id or "")~=s.id then return end
+    local rx=part.kind=="vehicles" and s.vehicles or (part.kind=="components" and s.components or nil)
+    if not rx then return end
+    local accepted,why=Chunks.accept(rx,part.index,part.items)
+    if accepted==nil then log("market stream %s bad %s part %s: %s",s.id,tostring(part.kind),tostring(part.index),tostring(why)) end
+    finishMarketWire()
+end)
+
+-- Legacy one-packet receive stays for one mixed-version restart window. New servers never emit it.
 RegisterNetEvent("ncm:market.payload", function(value)
     if type(value) ~= "table" then return end
     lastMarket = value
-    if page and pageReady and open == "market" then sendBig("panel:market", value, "items") end
+    if page and pageReady and open == "market" then sendMarket(value) end
 end)
 
 --- Re-read our own player bag and apply one key. A change on somebody else's bag lands here too, so this must

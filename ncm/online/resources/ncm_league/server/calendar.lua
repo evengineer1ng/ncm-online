@@ -45,6 +45,17 @@ local settings = Open77.tunables.declare({
     telemetryDebug = { value = 0, type = "integer", min = 0, max = 1, apply = "live" },
     incidentBaseSec = { value = 2, type = "number", min = 0.5, max = 10, unit = "s", apply = "live" },
     sessionGapSec = { value = 90, type = "integer", min = 30, max = 600, unit = "s", apply = "live" },
+    -- Parts economy (`server/components.lua`). **They live here because a second `declare` in this resource
+    -- replaces the first**, which is the rule stated at the top of this block -- and `components.lua`
+    -- learned it the hard way: its own declaration silently wiped `serverId` and `environment`, and the
+    -- calendar started failing on reads that had worked for a week.
+    --
+    -- `restart` is NOT a valid apply timing on this platform. The three accepted values are `live`,
+    -- `next_round` and `next_match`, and the declaration is REJECTED outright for anything else -- which
+    -- takes the whole resource down with it, so this is not a soft failure.
+    partsEnabled = { value = true, type = "boolean", apply = "live" },
+    partsReleaseEpoch = { value = 0, type = "number", apply = "next_match" },
+    partsRndSecret = { value = "ncm-dev-parts", type = "string", apply = "next_match" },
 })
 NcmCalendar.settings = settings
 

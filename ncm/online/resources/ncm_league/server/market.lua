@@ -5,6 +5,7 @@ local Markets = NcmCore.get("economy.markets")
 local Production = NcmCore.get("economy.production")
 local Supply = NcmCore.get("economy.supply_profiles")
 local Json = NcmCore.get("vocabulary.json")
+local Chunks = NcmCore.get("vocabulary.chunks")
 local Catalogue = NcmCore.get("data.vehicle_catalogue")
 local ids = NcmCore.get("vocabulary.ids")
 local hostRng = function() return math.random() end
@@ -251,6 +252,11 @@ local function runDue(line, state, t)
                     and NcmOwnership.manufacture(record, { allocationId = runKey, allocationSlot = slot,
                                                            ordinal = ordinals[slot] }) or nil
                 if assetId then
+                    if NcmComponents and NcmComponents.ensureMachine then
+                        local owner = nil
+                        local okParts, partsWhy = NcmComponents.ensureMachine(assetId, line.vehicleKey, owner)
+                        if okParts == nil then log("factory components failed asset=%s: %s",assetId:sub(1,8),tostring(partsWhy)) end
+                    end
                     local okList = pcall(function()
                         MySQL.insert.await([[INSERT IGNORE INTO market_inventory
                             (market_id, asset_id, price, state, listed_at) VALUES (?, ?, ?, 'available', ?)]],
@@ -417,19 +423,33 @@ function NcmMarket.payload(pid)
             offerings[#offerings + 1] = o
         end
     end
-    -- `items` is retained for one purpose: it is the flat list of individually purchasable assets, which is
-    -- still what a purchase names (L99). It is derived from the offerings so the two can never disagree.
-    local items = {}
+    -- **`items` used to be a third copy of the vehicle list and it is gone.**
+    --
+    -- It was a flat row per purchasable asset -- ten fields, every one of them already present on the
+    -- offering it was derived from -- and the reason given was that "an assetId is still what a purchase
+    -- names" (`L99`). That is true and it does not need this table: the page purchases from the OFFERING
+    -- it rendered (`panel.html`: `emit("panel:market.purchase", { marketId: o.marketId, assetId })`,
+    -- where `assetId` comes from that offering's own `assetIds`). The only thing that ever read `items`
+    -- was a length, for a badge.
+    --
+    -- So the count travels and the rows do not.
+    local itemCount = 0
     for _, o in ipairs(offerings) do
         o.affordable = balance >= o.price
         o.eligible = true
-        for _, assetId in ipairs(o.assetIds or {}) do
-            items[#items + 1] = { marketId = o.marketId, marketName = o.marketName, assetId = assetId,
-                vehicleKey = o.vehicleKey, category = o.category, price = o.price,
-                manufacturer = o.manufacturer, displayName = o.displayName, available = true, eligible = true }
-        end
+        itemCount = itemCount + #(o.assetIds or {})
     end
-    return { markets = markets, offerings = offerings, items = items, balance = balance,
+    local componentOfferings = NcmComponents and NcmComponents.marketOfferings
+        and NcmComponents.marketOfferings(d.ncmDriverId, (function()
+            local keys={} for _,o in ipairs(offerings) do keys[#keys+1]=o.vehicleKey end return keys
+        end)()) or {}
+    -- **`vehicleOfferings` is not sent any more: it WAS `offerings`, under a second name, in the same
+    -- message.** The page never needed it on the wire -- it assigns `marketData.vehicleOfferings =
+    -- marketData.offerings` itself in both of its receive paths -- so shipping it doubled the vehicle
+    -- half of this payload to tell the client something it was about to write down anyway.
+    return { version = 2, markets = markets, offerings = offerings,
+        componentOfferings = componentOfferings, itemCount = itemCount, balance = balance,
+        partsEnabled = NcmComponents and NcmComponents.enabled and NcmComponents.enabled() or false,
         currency = "eddies", serverNow = now() }
 end
 
@@ -457,10 +477,55 @@ function NcmMarket.inspect(pid, marketId, vehicleKey)
         source = "primary_market", assetId = first and first.asset_id or nil })
 end
 
+--- Roughly how large a payload is, per section, without paying for a second encode of the whole thing.
+--- Measured rather than estimated: `KB-136` was a size limit nobody could see because nothing printed a
+--- number, and the same class of bug is not worth having twice.
+local function payloadBytes(payload)
+    local okAll, all = pcall(Json.encode, payload)
+    if not okAll then return -1, "" end
+    local parts = {}
+    for _, key in ipairs({ "offerings", "componentOfferings", "markets" }) do
+        local okPart, encoded = pcall(Json.encode, payload[key] or {})
+        parts[#parts + 1] = ("%s=%d"):format(key, okPart and #encoded or -1)
+    end
+    return #all, table.concat(parts, " ")
+end
+
+local marketStreamSeq = 0
+local MARKET_ROWS_PER_PACKET = 1
+
 function NcmMarket.push(pid)
     local ok, payload = pcall(NcmMarket.payload, pid)
-    if ok and payload then TriggerClientEvent("ncm:market.payload", pid, payload)
-    else log("payload failed player=%s: %s", tostring(pid), tostring(payload)) end
+    if not ok or not payload then
+        log("payload failed player=%s: %s", tostring(pid), tostring(payload))
+        return
+    end
+    local bytes, breakdown = payloadBytes(payload)
+    -- One line per push, because "the market does not load" and "the market is too large to send" look
+    -- identical from a chair and are different bugs.
+    log("payload player=%s %d bytes (%s offerings=%d components=%d)", tostring(pid), bytes, breakdown,
+        #(payload.offerings or {}), #(payload.componentOfferings or {}))
+    -- The 25 component offerings made the once-small NET EVENT itself the packet that disappeared. Client-side
+    -- WebUI chunking cannot rescue a payload that never reached the client, so bound this hop independently.
+    local head = {}
+    for k,v in pairs(payload) do
+        if k ~= "offerings" and k ~= "vehicleOfferings" and k ~= "componentOfferings" then head[k] = v end
+    end
+    local vehicles = Chunks.partition(payload.offerings or {}, MARKET_ROWS_PER_PACKET)
+    local components = Chunks.partition(payload.componentOfferings or {}, MARKET_ROWS_PER_PACKET)
+    marketStreamSeq = marketStreamSeq + 1
+    local streamId = tostring(now()) .. ":" .. tostring(marketStreamSeq) .. ":" .. tostring(pid)
+    TriggerClientEvent("ncm:market.stream.begin", pid, {
+        id=streamId, head=head, vehicleParts=#vehicles, componentParts=#components,
+    })
+    for i,items in ipairs(vehicles) do
+        TriggerClientEvent("ncm:market.stream.part", pid, {id=streamId,kind="vehicles",index=i,items=items})
+    end
+    for i,items in ipairs(components) do
+        TriggerClientEvent("ncm:market.stream.part", pid, {id=streamId,kind="components",index=i,items=items})
+    end
+    log("stream player=%s id=%s packets=%d+%d rows-per-packet=%d", tostring(pid),streamId,
+        #vehicles,#components,MARKET_ROWS_PER_PACKET)
 end
 
 function NcmMarket.purchase(pid, marketId, assetId)
@@ -498,6 +563,9 @@ function NcmMarket.purchase(pid, marketId, assetId)
             WHERE a.asset_id=? AND mi.market_id=? AND mi.state='sold' AND mi.sold_to_driver_id=?
               AND a.ncm_driver_id IS NULL]],
           values = { d.ncmDriverId, marketId, t, assetId, marketId, d.ncmDriverId } },
+        { query = [[UPDATE component_asset SET ncm_driver_id=?, acquired_at=COALESCE(acquired_at,?)
+            WHERE machine_asset_id=? AND location_kind='installed' AND ncm_driver_id IS NULL]],
+          values = { d.ncmDriverId, t, assetId } },
         { query = [[INSERT IGNORE INTO vehicle_asset_transfer
             (transfer_id, idem_key, server_id, asset_id, from_driver_id, to_driver_id, kind, market_id, amount, occurred_at)
             SELECT ?, ?, ?, mi.asset_id, NULL, ?, 'primary_purchase', mi.market_id, mi.price, ?

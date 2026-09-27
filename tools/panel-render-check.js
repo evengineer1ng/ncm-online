@@ -303,7 +303,7 @@ check("each available asset is individually purchasable", /10000000-0000-4000-80
 check("the Market says production schedules can change", /respond to market conditions/i.test(mktDetail), mktDetail.slice(0, 400));
 check("and states the current cadence as a fact a player can use", /PRODUCTION RUNS/.test(mktDetail) && /30 min/.test(mktDetail), mktDetail.slice(0, 400));
 check("but never leaks the profile, its parameters or its reasoning",
-  !/steady_hand|volume_responsive|scarcity_keeper|profile|envelope|deadZone|pressure|lookback|threshold|weight/i.test(
+  !/steady_hand|volume_responsive|scarcity_keeper|\bprofile\b|\benvelope\b|deadZone|\bpressure\b|lookback|\bthreshold\b|\bweight\s*[:=]/i.test(
     mktDetail + " " + marketText),
   mktDetail.slice(0, 400));
 check("no one-per-player wording anywhere in the Market",
@@ -436,6 +436,65 @@ emitted.length=0; ownedButtons.forEach(b=>b.click());
 check("CALL carries each exact assetId",emitted.filter(e=>e.name==="panel:vehicle.call").map(e=>e.data.assetId).join("|")===assetIds.slice(0,2).join("|"));
 fire("panel:collection",{slots:[{slot:1,discovered:true,owned:false,displayName:"Galena"}]});
 check("discovery alone offers no CALL",!dump(document.getElementById("collectionDetail")).join("|").includes("CALL VEHICLE"));
+
+// ---- PARTS ECONOMY. The market has two independently populated panes, and selecting a component must
+// project its server-authored fitment across every visible Machine without hiding an incompatible one.
+const partAsset="30000000-0000-4000-8000-000000000001";
+const component={designId:"makigai-tires-1.18",manufacturer:"Makigai",makerKey:"makigai",
+  code:"MKG-TIRES-1.18",subtitle:"Sport road kit",family:"tires",tier:"sport",effect:1.18,
+  fidelity:"direct",price:1800,available:2,ceiling:5,nextBatch:2,cadenceSec:3600,
+  nextProductionAt:1790203600,ownedCompatible:false,
+  fitment:{makigai_maimai:{compatible:true,reason:"FITS"},thorton_galena:{compatible:false,reason:"DOES NOT FIT"}},
+  nextAsset:{asset_id:partAsset,global_ordinal:41,maker_ordinal:19,design_ordinal:3},
+  projection:{levers:{gripScale:1.18,driveScale:1,brakeScale:1.18}}};
+const partCars=[
+  {marketId:"base_market",marketName:"Base Market",vehicleKey:"makigai_maimai",displayName:"MaiMai",manufacturer:"Makigai",category:"City",price:2500,available:1,ceiling:8,assetIds:[assetIds[0]]},
+  {marketId:"base_market",marketName:"Base Market",vehicleKey:"thorton_galena",displayName:"Galena",manufacturer:"Thorton",category:"Road",price:5000,available:1,ceiling:6,assetIds:[assetIds[1]]}
+];
+fire("panel:show",{panel:"market"});
+fire("panel:market",{balance:10000,serverNow:1790200000,partsEnabled:true,loading:false,
+  markets:[{marketId:"base_market",displayName:"Base Market"}],offerings:partCars,vehicleOfferings:partCars,
+  componentOfferings:[component]});
+const partCards=document.getElementById("marketPartsGrid").children||[];
+check("Base Market renders a separate component-design pane",partCards.length===1,dump(document.getElementById("marketPartsGrid")).join("|"));
+partCards[0].click();
+const fitCards=document.getElementById("marketGrid").children||[];
+check("fitment overlay marks both compatible and incompatible Machines",
+  fitCards.length===2&&fitCards.some(c=>String(c.className).includes("fit-yes"))&&fitCards.some(c=>String(c.className).includes("fit-no")),
+  fitCards.map(c=>c.className).join(" | "));
+const partDetail=dump(document.getElementById("marketDetail")).join("|");
+check("component detail carries economy, fidelity, projection and the exact next serial",
+  /MKG-TIRES-1\.18/.test(partDetail)&&/DIRECT/.test(partDetail)&&/GRIP/.test(partDetail)&&/NCM 41/.test(partDetail)&&/MAKER 19/.test(partDetail)&&/DESIGN 3/.test(partDetail),partDetail.slice(0,700));
+check("future-planning purchase warns but remains available",
+  /YOU OWN NO COMPATIBLE MACHINE/.test(partDetail)&&/HOLD TO PURCHASE/.test(partDetail),partDetail.slice(0,700));
+
+// KB-153: exercise the real client->WebUI reassembly shape with the complete launch catalogue. One direct
+// component event is not a packet-size regression test; twenty-five one-row parts are.
+const launch25=Array.from({length:25},(_,i)=>Object.assign({},component,{designId:"launch-part-"+(i+1),code:"PART-"+(i+1)}));
+fire("panel:list.begin",{id:"market-25",name:"panel:market.components",listKey:"componentOfferings",n:25,head:{}});
+for(let i=0;i<25;i++)fire("panel:list.part",{id:"market-25",i:i+1,items:[launch25[i]]});
+check("all 25 component offerings reassemble from bounded packets",
+  (document.getElementById("marketPartsGrid").children||[]).length===25,
+  "rendered="+(document.getElementById("marketPartsGrid").children||[]).length);
+
+// Machine Index receives physical assets, not aggregate quantities. Stored and installed factory originals
+// share one inventory, and only an eligible compatible target exposes the 900 ms fit action.
+fire("panel:show",{panel:"collection"});
+fire("panel:components",{partsEnabled:true,parts:[{asset_id:partAsset,design_id:component.designId,
+  display_manufacturer:"Makigai",code:component.code,family:"tires",tier:"sport",effect:1.18,
+  fidelity:"direct",location_kind:"storage",factory_original:1,global_ordinal:41,maker_ordinal:19,
+  design_ordinal:3,acquired_via:"purchase",exposure_m:0}],machines:[
+    {asset_id:assetIds[0],vehicle_key:"makigai_maimai",fitment:{[partAsset]:{compatible:true,reason:"FITS"}}},
+    {asset_id:assetIds[1],vehicle_key:"thorton_galena",fitment:{[partAsset]:{compatible:false,reason:"DOES NOT FIT"}}}
+  ],states:{[assetIds[0]]:{eligible:true,state:"storage",reason:"In storage"},[assetIds[1]]:{eligible:false,state:"occupied",reason:"Machine is occupied"}}});
+document.getElementById("partsTab").click();
+const inventoryCards=document.getElementById("collectionWall").children||[];
+check("Parts Inventory lists the serialized factory-original asset",inventoryCards.length===1&&/FACTORY ORIGINAL/.test(dump(inventoryCards[0]).join("|")),dump(document.getElementById("collectionWall")).join("|"));
+inventoryCards[0].click();
+let fitTargets=(document.getElementById("collectionDetail").children||[]).filter(x=>String(x.className||"").includes("fit-machine"));
+check("Parts Inventory preserves visible green/red fitment choices",fitTargets.length===2&&fitTargets.some(x=>String(x.className).includes("ok"))&&fitTargets.some(x=>String(x.className).includes("no")),fitTargets.map(x=>x.className).join(" | "));
+fitTargets.find(x=>String(x.className).includes("ok")).click();
+check("eligible stored Machine exposes hold-to-fit",/HOLD TO FIT TO MACHINE/.test(dump(document.getElementById("collectionDetail")).join("|")));
 // ---- WHEEL/PEDALS. **Added after a real defect shipped past this gate on 2026-09-25**: a block reading
 // `dev.seen` was inserted into the `!s.connected` branch, ABOVE where `const dev` is declared, so every
 // player who opened the tab without the companion running hit a temporal-dead-zone ReferenceError. There

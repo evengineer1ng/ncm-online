@@ -4,6 +4,7 @@
 return {
     "vocabulary/ids.lua",
     "vocabulary/json.lua",
+    "vocabulary/chunks.lua",
     "vocabulary/provenance.lua",
     "competition/driver.lua",
     "data/vehicle_pool.lua",
@@ -45,6 +46,8 @@ return {
     "parts/ontology.lua",
     "parts/architecture.lua",
     "parts/compat.lua",
+    "parts/catalogue.lua",
+    "parts/rnd.lua",
     "parts/thermal.lua",
     "parts/handling.lua",
     "economy/markets.lua",

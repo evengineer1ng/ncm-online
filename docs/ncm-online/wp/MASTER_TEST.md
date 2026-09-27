@@ -1805,3 +1805,33 @@ instantly, the two bodies are not independent and the split bought nothing. If B
 warm road, `SURFACE_COLD_DEPTH` is too small to be a mechanic and should either grow or be removed - a
 layer nobody can feel is a layer that should not be traced.
 
+
+## §BF - Parts economy and serialized fitting v1 - **DEPLOYED ONLINE; AWAITING LIVE PASS**
+
+`L162`, `L163`. Online is the current private development surface and `ncm_league.partsEnabled` defaults
+**true** there. Deployment is complete; this section still proves migrations, conservation, backfill, recovery
+and felt outcomes one row at a time rather than converting deployment into a PASS.
+
+| # | Operation | Expected | Result |
+|---|---|---|---|
+| BF1 | Apply migrations 031-032 on the private Online development surface, restart twice. | Both migrations apply once; second boot is clean; all pre-existing vehicle identity/ownership/serial/result history is unchanged. | |
+| BF2 | Run the factory backfill twice and audit counts. | Every existing MaiMai, Galena and Hella has exactly 11 factory component assets, 19 occupied interfaces and one current revision; the replay creates nothing. Original exposure equals the Machine odometer; unknown historical serial/run/installer/time remains unknown. | |
+| BF3 | Audit the launch catalogue. | Exactly 25 immutable Designs with the specified makers, prices, 1.08/1.18/1.30 effects, ceilings, initial stock, batches and cadences. Street/Premium fit all three starters; Sport counts are MaiMai 7, Galena 8, Hella 7. | |
+| BF4 | With Parts enabled on Online, open Base Market at 1820×960 with keyboard/mouse, controller and touch-equivalent selection. | Three-column Machine pane above, independently scrollable component pane below, persistent detail at right. Hover/focus/selection parity; every car stays visible with icon + text + green/red outline. | |
+| BF5 | Inspect a component and its next unit. | Maker/code/subtitle/family/tier, exact effect, DIRECT/MODELLED limitation, price/stock/ceiling/batch/cadence/time and exact global/maker/design serial plus run provenance agree with database truth. | |
+| BF6 | Inspect all three starter cars. | Six reserved metrics are present and say `Not rated`; no placeholder absolute performance number appears. Relative setup projections remain visible and labelled. | |
+| BF7 | With no compatible owned Machine, buy a part after the warning; release the hold before 900 ms once, then complete it. | Cancellation spends nothing. Completed hold buys one exact FIFO asset, debits one `component_purchase`, transfers custody once and refreshes Market/Inventory. No extra modal or harder confirmation appears. | |
+| BF8 | Double-submit the same purchase and race two buyers for the final unit; separately test insufficient funds. | One asset/one debit/one transfer only; one buyer wins stale stock; retries are idempotent; failed transactions roll back completely. | |
+| BF9 | Select a stored compatible part in Parts Inventory and inspect two owned Machines, including an incompatible or unavailable target. | Cards show serialized status/provenance and `FACTORY ORIGINAL` where applicable. Fitment and parked/occupied availability are distinct; incompatible, moving, occupied, unreadable or unowned targets cannot expose a valid fit commit. | |
+| BF10 | Fit to a parked, unoccupied Machine; retry the same idempotency key. | One immutable configuration revision is created, all kit positions move atomically, the component effect composes once, displaced factory/aftermarket assets return to Parts Inventory, and the retry creates nothing. | |
+| BF11 | Reinstall a displaced factory original, then repeat with two examples of the same model. | The swap is reversible through compatible assets; each physical Machine retains an isolated configuration and handling result. | |
+| BF12 | Fit while dematerialized, restart resources/server, reconnect, materialize and transfer authority. | Every path restores exactly the persisted configuration through `NcmHandling.setParts`; no stale in-memory setup survives and no installed asset appears in two places. | |
+| BF13 | Drive a configured Machine through odometer flushes, including restart/reconnect boundaries. | Machine distance and every installed component exposure advance in the same durable operation, with neither lost nor duplicated metres. No wear consequence fires. | |
+| BF14 | Allow/accelerate production through several batches, including concurrent lines. | Physical assets are minted to runs; global/maker/design ordinals are unique and contiguous for successful allocations; shelf never exceeds ceiling; FIFO order survives restart. | |
+| BF15 | Run isolated accelerated R&D clocks across restart boundaries. | Maker first offsets/cadence are respected; the same evaluation cannot reroll; no historical catch-up burst; effects stay quantized/bounded; `no_design`, novelty rejection and undistributed specialist outcomes all occur and persist. | |
+| BF16 | Fit representative Street 1.08, Sport 1.18 and Premium 1.30 DIRECT and MODELLED Parts, then run the existing §AY setup drives and §BA top-speed validation. | The serialized assets produce the same bounded composition as the proven setup seam. Claims match felt/read-back evidence; no paid absolute top-speed claim ships ahead of §BA. | |
+| BF17 | Disable Parts live after testing. | Purchase/install controls return to `AWAITING LIVE QA`; existing assets/configurations remain conserved and readable; no destructive rollback occurs. | |
+
+**Offline evidence, not a live PASS:** 2026-09-26 catalogue/R&D tests pass under Lua 5.4 and LuaJIT; the
+panel render gate exercises split panes, mixed fitment, component provenance/warning, Parts Inventory and the
+eligible fit action. Transactional database concurrency and in-game handling remain deliberately unclaimed.

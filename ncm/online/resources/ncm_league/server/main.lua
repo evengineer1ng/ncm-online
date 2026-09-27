@@ -68,6 +68,11 @@ AddEventHandler("onResourceStart", function(name)
                 -- first tick see an empty market and manufacture stock the seed was about to insert.
                 if marketOk and NcmMarket.start then NcmMarket.start() end
             end
+            if NcmComponents and NcmComponents.seed then
+                local partsOk, partsWhy=NcmComponents.seed()
+                if not partsOk then log("Parts economy unavailable: %s",tostring(partsWhy))
+                elseif NcmComponents.start then NcmComponents.start() end
+            end
             NcmCalendar.start(NcmPackStreet.series)
             NcmRace.start()
             pcall(NcmRecords.refresh)

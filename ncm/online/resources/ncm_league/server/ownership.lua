@@ -172,6 +172,12 @@ local function insertAsset(driverId, record, via, grantedBy)
             paint = { primary = paintPrimary, secondary = paintSecondary },
         }
     end
+    if NcmComponents and NcmComponents.ensureMachine then
+        local ok, why = NcmComponents.ensureMachine(assetId, vehicleKey, driverId)
+        if not ok and why ~= "unsupported_machine" and why ~= "already_configured" then
+            log("factory configuration failed asset=%s: %s", assetId:sub(1, 8), tostring(why))
+        end
+    end
     return assetId
 end
 
@@ -227,16 +233,24 @@ function NcmOwnership.manufacture(record, opts)
     local ord = type(opts.ordinal) == "table" and opts.ordinal or nil
     local origin = ord and Identity.ORIGIN.PRODUCTION or (opts.origin or Identity.ORIGIN.GRANT)
     local producedAt = math.floor(now())
+    local insertQuery = "INSERT INTO vehicle_asset (asset_id, server_id, ncm_driver_id, vehicle_key, record, class, " ..
+        "acquired_via, acquired_at, allocation_id, allocation_slot, paint_primary, paint_secondary, " ..
+        "origin, manufacturer_key, production_ordinal, maker_ordinal, model_ordinal, produced_at) " ..
+        "VALUES (?, ?, NULL, ?, ?, ?, NULL, ?, ?, NULLIF(?, ''), ?, ?, ?, NULLIF(?, ''), " ..
+        "NULLIF(?, 0), NULLIF(?, 0), NULLIF(?, 0), ?)"
+    local insertValues = { assetId, serverId(), vehicleKey, record, primaryClass, producedAt,
+        opts.allocationId or "production", opts.allocationSlot or "", paintPrimary, paintSecondary,
+        origin, ord and ord.manufacturerKey or "",
+        ord and ord.global or 0, ord and ord.maker or 0, ord and ord.model or 0, producedAt }
     local ok, err = pcall(function()
-        MySQL.insert.await(
-            "INSERT INTO vehicle_asset (asset_id, server_id, ncm_driver_id, vehicle_key, record, class, " ..
-            "acquired_via, acquired_at, allocation_id, allocation_slot, paint_primary, paint_secondary, " ..
-            "origin, manufacturer_key, production_ordinal, maker_ordinal, model_ordinal, produced_at) " ..
-            "VALUES (?, ?, NULL, ?, ?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            { assetId, serverId(), vehicleKey, record, primaryClass, producedAt,
-              opts.allocationId or "production", opts.allocationSlot, paintPrimary, paintSecondary,
-              origin, ord and ord.manufacturerKey or nil,
-              ord and ord.global or nil, ord and ord.maker or nil, ord and ord.model or nil, producedAt })
+        local factory = NcmComponents and NcmComponents.factoryStatements and
+            NcmComponents.factoryStatements(assetId, vehicleKey, nil, producedAt, 0) or nil
+        if factory then
+            table.insert(factory, 1, { query = insertQuery, values = insertValues })
+            if not MySQL.transaction.await(factory) then error("vehicle_and_factory_configuration_transaction") end
+        else
+            MySQL.insert.await(insertQuery, insertValues)
+        end
     end)
     if not ok then return nil, "db:" .. tostring(err) end
     if ord then

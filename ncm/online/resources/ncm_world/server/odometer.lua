@@ -401,8 +401,15 @@ end
 local function flush(assetId, metres, t)
     if not assetId or (metres or 0) < 1 then return end
     local ok, err = pcall(function()
-        MySQL.update.await("UPDATE vehicle_asset SET odometer_m = odometer_m + ?, odometer_at = ? WHERE asset_id = ?",
-            { math.floor(metres), math.floor(t or now()), assetId })
+        local delta, at = math.floor(metres), math.floor(t or now())
+        local committed, why = MySQL.transaction.await({
+            { query = "UPDATE vehicle_asset SET odometer_m = odometer_m + ?, odometer_at = ? WHERE asset_id = ?",
+              values = { delta, at, assetId } },
+            { query = [[UPDATE component_asset SET exposure_m = exposure_m + ?
+                WHERE machine_asset_id = ? AND location_kind = 'installed']],
+              values = { delta, assetId } },
+        })
+        if not committed then error(why or "odometer transaction refused") end
     end)
     if not ok then log("checkpoint failed asset=%s: %s", tostring(assetId):sub(1, 8), tostring(err)) end
     -- Keep the cached durable figure in step, so the reading never jumps backwards at a checkpoint.

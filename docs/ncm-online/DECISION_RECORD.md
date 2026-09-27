@@ -2366,3 +2366,72 @@ not a force balance at all. It is a hard cap, enforced somewhere NCM's force wri
 
 **Basis.** Owner correction, 2026-09-26: *"those three timed runs you quoted accelerated faster but all
 had same top speed."*
+
+
+## L162 - EXECUTED IN CODE / LIVE-GATED - Parts becomes a conserved economy of physical assets
+
+**Decision.** The owner authorised Parts economy/UI v1 after the seven OPEN//77 assessments were reviewed.
+The implementation may create immutable component Designs, discrete manufacturing runs and serialized
+physical component assets; expose a 25-Design Base Market catalogue; persist Machine configurations; and let
+an owner purchase and fit compatible Parts through the existing `NcmHandling.setParts(assetId, parts)` seam.
+It remains **production-disabled by default** until migration, conservation, restart and live handling evidence
+is recorded in §BF. Building it is not a live PASS (`L69`).
+
+The v1 boundaries are locked:
+
+1. **One asset, one custody.** A component is on a market shelf, in owned storage, installed, consumed or
+   disposed. Market quantity is an aggregate view over physical assets, never an abstract counter. FIFO
+   purchase claims one exact asset and all purchase/fitting work is idempotent and transactional.
+2. **Fitment is authored server truth.** Nineteen stable positions describe the supported interfaces. A
+   full-system kit may occupy several positions atomically but contributes its effect once. Unresolved
+   compatibility cannot enter Base Market; clients receive only decisive public results and reasons.
+3. **A configuration is immutable history.** Fitting creates a new Machine configuration revision and moves
+   every displaced component to ordinary Parts Inventory. Required positions cannot be empty. The target must
+   be owned and either dematerialized or authoritatively stationary and unoccupied; unreadable runtime state
+   fails closed.
+4. **Factory history is not invented.** Existing MaiMai, Galena and Hella assets receive deterministic factory
+   components and revision 1 without changing vehicle identity/history. Existing odometer distance becomes
+   original-component exposure; unrecoverable historical serial/run/installer/time remains unknown. Future
+   manufacture commits the Machine and its eleven factory components/configuration in the same transaction.
+5. **R&D cannot expand the physics grammar.** Manufacturer evaluations are deterministic, versioned and
+   restart-stable, may legitimately yield `no_design`, and can only vary bounded effect/fitment/trade-offs in
+   already supported families. Private seeds/personality inputs never reach clients. Only decisive Base-line
+   outcomes with broad starter compatibility enter Base Market supply; specialists remain undistributed.
+6. **UI warns; it does not forbid planning.** The Market keeps every car visible and overlays text/icon plus
+   green/red fitment. Buying for an unowned or incompatible future Machine remains the same 900 ms hold action.
+   Machine Index gains Parts Inventory and the equivalent keyboard/controller/touch selection path.
+7. **No invented performance ratings.** The six buyer metrics have permanent UI positions but display
+   `Not rated` until authoritative evidence or an accepted derivation exists. Relative component projections
+   carry DIRECT/MODELLED fidelity and limitations; they do not fabricate absolute car performance.
+8. Player R&D, secondary trading/barter, repair, wear consequences and steering Parts are outside v1. Exposure
+   is recorded now so wear can be introduced later without reconstructing use.
+
+**Implementation.** Forward migrations 031-032; `parts.catalogue` and `parts.rnd`; typed component services in
+`ncm_league` and `ncm_world`; Market payload v2 with separate vehicle/component streams; Machine Index Parts
+Inventory; world-side install-state authority; odometer-coupled exposure; resource hydration and reconciliation.
+`ncm_league.partsEnabled` defaults false and is republished live to the world/UI.
+
+**Evidence at decision time.** Catalogue/R&D pure tests pass under both supported Lua interpreters; the panel
+render harness covers the split stock panes, mixed fitment overlay, serial provenance, future-planning warning,
+factory-original inventory and eligible hold-to-fit. No database migration, concurrency, restart or physical
+handling claim is marked live until §BF records it.
+
+**Basis.** Owner plan, 2026-09-26: *"the first parts are acquirable in base market and equippable to your car"*,
+followed by the explicit Parts Economy and UI v1 implementation instruction.
+
+
+## L163 - EXECUTED OWNER RULING - Online is the current development surface; deploy Parts there enabled
+
+**Decision.** There is no second active environment in the present pipeline. NCM Online is unlisted,
+whitelisted to the owner/test identities, and is the place where this feature is developed and proved. Do not
+delay Parts behind a hypothetical separate Development deployment or split the pipeline further. Deploy the
+tested resource set to Online with `ncm_league.partsEnabled=true` by default; retain the live tunable as an
+emergency park, not as the normal shipped state.
+
+This changes **where §BF runs**, not what constitutes evidence. Deployment and successful boot are not live
+gameplay PASSes (`L69`). Migration/backfill/conservation checks and purchase, fitting, restart and felt handling
+rows still receive evidence individually on Online. Production promotion language in `L162` is superseded for
+the current private pipeline; its safety and transaction gates remain binding.
+
+**Basis.** Owner correction, 2026-09-26: *"development is not our pipeline right now ... online is essentially
+development only accessible to me ... deploy"*.
