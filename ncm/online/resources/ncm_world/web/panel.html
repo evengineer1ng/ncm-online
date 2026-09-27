@@ -203,6 +203,8 @@
     #collection { display:flex; flex-direction:column; }
     #guide, #market, #collection, #help { box-sizing:border-box; }
     .guide-head, .guide-tabs, .collection-head, .market-head, .wheel-head { flex-shrink:0; }
+    .guide-balance { font:800 22px/1 var(--mono);color:var(--accent);text-align:right; }
+    .guide-balance small { display:block;margin-top:6px;font:700 9px/1 var(--mono);letter-spacing:.14em;color:var(--dim); }
     .wheel-head h2 { margin: 0 0 4px; font: 700 22px/1 var(--mono); letter-spacing: .14em; }
     .wheel-head .sub { font: 700 13px/1.3 var(--mono); letter-spacing: .1em; color: var(--dim); margin-bottom: 16px; }
     .wheel-row { display: flex; align-items: baseline; gap: 14px; padding: 9px 0; border-bottom: 1px solid var(--line); }
@@ -267,6 +269,8 @@
     .component-card h2 { font-size:17px;margin:5px 0; }
     .component-card .price { font-size:17px;margin:8px 0 5px; }
     .warning-box { border:1px solid var(--warn);color:var(--warn);padding:10px;margin:10px 0;font:700 12px/1.45 var(--mono); }
+    .market-feedback { flex:none;border:1px solid var(--accent);color:var(--accent);padding:9px 12px;margin:-8px 0 10px;font:800 12px/1.3 var(--mono);letter-spacing:.07em; }
+    .market-feedback.bad { border-color:var(--warn);color:var(--warn); }
     .hold-btn.holding { background:linear-gradient(90deg,var(--accent) var(--hold,0%),transparent var(--hold,0%)); }
     .collection-wall { overflow:auto; display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); grid-auto-rows:150px; gap:10px; padding:10px; border:1px solid var(--line); background:rgba(2,10,18,.56); }
     .vehicle-tile { position:relative; overflow:hidden; padding:14px; text-align:left; border-radius:4px; background:linear-gradient(145deg,rgba(34,216,226,.09),rgba(255,255,255,.025)); }
@@ -282,6 +286,132 @@
     .dossier-silhouette { height:210px; margin:18px 0; border:1px solid var(--line); display:grid; place-items:center; color:var(--accent); font-size:72px; background:radial-gradient(circle at 50% 60%,rgba(34,216,226,.15),transparent 58%); }
     .dossier-label { font:700 11px/1 var(--mono); color:var(--dim); letter-spacing:.14em; text-transform:uppercase; margin-top:16px; }
     .dossier-value { font-size:20px; margin-top:5px; }
+    /* DRIVER FILE. A quiet persistent surface, not another notification centre: present tense first, history
+       second, and definitions only beside the door they explain. */
+    #driver { width:1540px;height:900px;max-height:900px;padding:28px 32px;display:flex;flex-direction:column;overflow:hidden; }
+    .driver-head { display:flex;justify-content:space-between;align-items:end;margin-bottom:18px; }
+    .driver-head h1 { font-size:58px;margin:3px 0; }
+    .driver-balance { font:800 36px/1 var(--mono);color:var(--accent);text-align:right; }
+    .driver-balance small { display:block;margin-top:8px;font:700 11px/1 var(--mono);letter-spacing:.15em;color:var(--dim); }
+    .driver-grid { flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);grid-template-rows:auto minmax(0,1fr);gap:14px; }
+    .driver-now { grid-column:1 / -1;border:1px solid color-mix(in srgb,var(--accent) 60%,var(--line));padding:20px 22px;background:linear-gradient(110deg,rgba(34,216,226,.12),rgba(3,11,20,.86) 58%); }
+    .driver-now .signal { font:800 12px/1 var(--mono);letter-spacing:.18em;color:var(--accent); }
+    .driver-now h2 { font-size:36px;margin:7px 0 8px;text-transform:uppercase; }
+    .driver-now p { margin:4px 0;font-size:18px;line-height:1.35;max-width:1120px; }
+    .driver-now .next { color:var(--warn);font:700 14px/1.5 var(--mono);margin-top:10px; }
+    .driver-panel { min-height:0;overflow:auto;border:1px solid var(--line);padding:16px 18px;background:rgba(3,11,20,.78); }
+    .driver-panel h3 { margin:0 0 12px;font:800 13px/1 var(--mono);letter-spacing:.16em;color:var(--dim); }
+    .driver-marks { display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:14px; }
+    .driver-mark { border:1px solid var(--line);padding:11px; }
+    .driver-mark b { display:block;font:800 24px/1 var(--mono);color:var(--text); }
+    .driver-mark span { display:block;margin-top:6px;font:700 10px/1.2 var(--mono);letter-spacing:.12em;color:var(--dim); }
+    .trace-row { display:grid;grid-template-columns:92px 1fr auto;gap:10px;align-items:baseline;padding:9px 0;border-bottom:1px solid var(--line); }
+    .trace-row .money { font:800 15px/1 var(--mono);color:var(--ok); }
+    .trace-row .money.out { color:var(--warn); }
+    .trace-row .when { font:600 10px/1 var(--mono);color:var(--dim); }
+    .trace-row .what { font:600 14px/1.3 var(--mono); }
+    .badge-rack { display:flex;gap:8px;flex-wrap:wrap;margin:12px 0 16px; }
+    .earned-badge { border:1px solid var(--ok);color:var(--ok);padding:8px 10px;font:800 11px/1 var(--mono);letter-spacing:.1em; }
+    .earned-badge.shown::after { content:" · ON CARD";color:var(--accent); }
+    .door { border:1px solid var(--line);padding:11px;margin-top:8px;cursor:pointer;text-align:left;width:100%; }
+    .door b { display:block;color:var(--accent);font:800 12px/1 var(--mono);letter-spacing:.13em; }
+    .door span { display:block;margin-top:5px;color:var(--text);font:600 13px/1.35 var(--mono); }
+    #driver, #guide, #market, #collection, #help { box-sizing:border-box; }
+    /* ===== SHARED FOCUS AFFORDANCE (ncm-nav.js) ==========================================
+       A separate ring element, not an outline, because focus has to be legible over ANY backdrop --
+       a dark plate, a bright hero, a moving street. A subtle colour change is not enough, and the ring
+       is drawn ABOVE the card so it cannot be clipped by a scroll container.
+       It is hidden under the mouse (body[data-ncm-input="mouse"]) so a pointer user never sees a
+       second, competing cursor. */
+    .ncm-focus-ring {
+      position: fixed; left: 0; top: 0; z-index: 99; pointer-events: none; opacity: 0;
+      border: 2px solid var(--accent); border-radius: 3px;
+      box-shadow: 0 0 0 1px rgba(0,0,0,.85), 0 0 12px rgba(34,216,226,.45);
+      transition: transform 90ms cubic-bezier(.2,0,0,1), width 90ms cubic-bezier(.2,0,0,1),
+                  height 90ms cubic-bezier(.2,0,0,1), opacity 90ms linear;
+    }
+    body[data-ncm-input="mouse"] .ncm-focus-ring { opacity: 0 !important; }
+    /* A second, in-flow cue so focus survives even if the ring element fails to position. */
+    body:not([data-ncm-input="mouse"]) .ncm-focused { background: rgba(34,216,226,.10); }
+
+    /* ===== SESSION LANDING PANEL ========================================================== */
+    #landing { display: flex; flex-direction: column; gap: 14px; }
+    #landing.hidden { display: none; }
+    .landing-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; }
+    .landing-head h1 { margin: 4px 0 2px; }
+    /* No hero art exists yet. Absent, this is a composed type-only header rather than an empty box. */
+    .landing-hero { flex: 0 0 210px; height: 74px; background-size: cover; background-position: 50% 40%;
+      border: 1px solid var(--line); clip-path: polygon(0 0,100% 0,100% 100%,12px 100%,0 calc(100% - 12px)); }
+    .landing-hero:not([style*="url"]) {
+      background-image: repeating-linear-gradient(115deg, rgba(34,216,226,.07) 0 10px, transparent 10px 20px);
+    }
+
+    /* The contract. Given the loudest treatment on the panel on purpose: it is the promise the alpha makes. */
+    .landing-contract { position: relative; padding: 13px 18px 13px 22px; background: rgba(255,89,100,.07);
+      border: 1px solid rgba(255,89,100,.42); }
+    .landing-contract::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 3px; background: var(--red); }
+    .landing-contract b { display: block; font: 800 20px/1.15 var(--display); letter-spacing: .04em; color: #ffb3b8; }
+    .landing-contract p { margin: 5px 0 0; font-size: 13px; color: var(--text); }
+    .landing-contract small { display: block; margin-top: 5px; font-size: 12px; color: var(--dim); }
+    .landing-contract em { display: block; margin-top: 7px; font-size: 12px; font-style: italic; color: #9fe8d6; }
+
+    .landing-grid { display: grid; grid-template-columns: 1.15fr 1fr; gap: 20px; }
+    .landing-col { min-width: 0; }
+    .landing-caps { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 8px; }
+    .cap { padding: 7px 9px; border: 1px solid var(--line); border-left: 2px solid var(--ok);
+      background: rgba(255,255,255,.02); }
+    .cap b { display: block; font: 700 12px/1.25 var(--display); letter-spacing: .02em; }
+    .cap span { display: block; margin-top: 2px; font: 400 10px/1.4 var(--mono); color: var(--dim); }
+    .cap.partial { border-left-color: var(--warn); }
+    .cap.partial span { color: #f0cf85; }
+    .cap.soon { border-left-color: var(--line); opacity: .5; }
+    .cap.soon b::after { content: " · SOON"; font: 700 9px/1 var(--mono); letter-spacing: .12em; color: var(--dim); }
+
+    .landing-new { margin-top: 8px; }
+    .landing-new .row { padding: 6px 0; border-bottom: 1px solid var(--line); }
+    .landing-new .row:last-child { border-bottom: 0; }
+    .landing-new .row b { font: 700 11px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
+    .landing-new .row p { margin: 3px 0 0; font-size: 12px; color: var(--text); }
+
+    .landing-log { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+    .landing-scroll { flex: 1; min-height: 120px; overflow-y: auto; overflow-x: hidden;
+      margin-top: 8px; padding-right: 12px; }
+    .landing-scroll::-webkit-scrollbar { width: 10px; }
+    .landing-scroll::-webkit-scrollbar-thumb { background: var(--line); border-radius: 5px; }
+    /* The scroll container is focusable so a pad/keyboard user can reach and scroll it as one unit. */
+    .landing-scroll:focus-visible { outline: none; }
+
+    .rel { margin-bottom: 8px; border: 1px solid var(--line); background: rgba(255,255,255,.015); }
+    .rel > button { width: 100%; display: flex; align-items: center; gap: 10px; cursor: pointer;
+      padding: 8px 11px; border: 0; background: transparent; color: var(--text); text-align: left; }
+    .rel > button .date { font: 700 10px/1 var(--mono); letter-spacing: .1em; color: var(--dim); flex: 0 0 74px; }
+    .rel > button .name { font: 700 13px/1.2 var(--display); flex: 1; }
+    .rel > button .chev { font: 700 11px/1 var(--mono); color: var(--dim); }
+    .rel > button .tag { font: 700 9px/1 var(--mono); letter-spacing: .12em; padding: 2px 5px;
+      color: var(--ok); border: 1px solid var(--ok); }
+    .rel .body { display: none; padding: 2px 11px 10px 85px; }
+    .rel.open .body { display: block; }
+    .rel.open > button .chev::before { content: "\2212"; }
+    .rel:not(.open) > button .chev::before { content: "+"; }
+    .rel .item { padding: 4px 0; font-size: 12px; color: var(--text); }
+    .rel .item i { display: block; font: 700 10px/1.4 var(--mono); letter-spacing: .1em;
+      text-transform: uppercase; font-style: normal; color: var(--accent); }
+
+    .landing-foot { display: flex; align-items: center; justify-content: space-between; gap: 18px;
+      padding-top: 12px; border-top: 1px solid var(--line); }
+    .landing-hint { font: 400 11px/1.5 var(--mono); color: var(--dim); }
+    .landing-go { display: inline-flex; align-items: center; gap: 10px; cursor: pointer;
+      padding: 10px 18px; color: #071013; background: var(--accent); border: 1px solid var(--accent);
+      font: 800 13px/1 var(--display); letter-spacing: .1em; }
+    .landing-go .key { font: 700 10px/1 var(--mono); letter-spacing: .08em; padding: 3px 6px;
+      background: rgba(0,0,0,.28); border: 1px solid rgba(0,0,0,.35); }
+    .landing-go:hover { background: #4ee6ee; }
+
+    @media (max-width: 1100px) {
+      .landing-grid { grid-template-columns: 1fr; }
+      .landing-caps { grid-template-columns: 1fr; }
+      .landing-hero { display: none; }
+    }
   </style>
 </head>
 <body class="closed">
@@ -297,9 +427,15 @@
       <div class="bar"><div id="qBar"></div></div>
       <div class="hint">Click an answer, or press A / B / C / D. Chat works too: /ncm.q a</div>
     </div>
+    <div id="driver" class="card hidden">
+      <div class="close">ESC · close</div>
+      <div class="driver-head"><div><div class="eyebrow">Night City Motorsports · Persistent Driver Record</div><h1 id="driverTitle">Driver File</h1><div class="sub">The city remembers what you do.</div></div><div class="driver-balance" id="driverBalance">—<small>AVAILABLE</small></div></div>
+      <div class="driver-grid"><section class="driver-now" id="driverNow"></section><section class="driver-panel" id="driverTrace"></section><section class="driver-panel" id="driverDoors"></section></div>
+      <div class="ncm-bottom" id="driverNav"></div>
+    </div>
     <div id="guide" class="card hidden">
       <div class="close">ESC · close</div>
-      <div class="guide-head"><div><div class="eyebrow">Night City Motorsports</div><h1>Race Guide</h1><div class="sub">Find a race. Hit the road.</div></div><div style="display:flex;align-items:center;gap:18px"><div class="wx-ribbon hidden" id="guideWx"></div><div class="guide-clock" id="guideClock"></div></div></div>
+      <div class="guide-head"><div><div class="eyebrow">Night City Motorsports</div><h1>Race Guide</h1><div class="sub">Find a race. Know the deal. Hit the road.</div></div><div style="display:flex;align-items:center;gap:18px"><div class="guide-balance" id="guideBalance"></div><div class="wx-ribbon hidden" id="guideWx"></div><div class="guide-clock" id="guideClock"></div></div></div>
       <div class="guide-tabs"><button data-guide-tab="schedule" class="active">SCHEDULE</button><button data-guide-tab="mine">MY RACES</button><button data-guide-tab="past">PAST RESULTS</button></div>
       <div class="guide-layout"><div class="schedule" id="guideList"></div><aside class="event-detail" id="guideDetail"></aside></div>
       <div class="ncm-bottom" id="guideNav"></div>
@@ -313,7 +449,7 @@
     </div>
     <div id="collection" class="card hidden">
       <div class="close">ESC · close</div>
-      <div class="collection-head"><div><div class="eyebrow">Night City Motorsports</div><h1 id="collectionTitle">Vehicle Collection</h1><div class="sub">The machines inhabiting our Night City.</div></div><div class="collection-count" id="collectionCount"></div></div>
+      <div class="collection-head"><div><div class="eyebrow">Night City Motorsports</div><h1 id="collectionTitle">Machine Index</h1><div class="sub">What you have learned. What you own. What the evidence can honestly say.</div></div><div class="collection-count" id="collectionCount"></div></div>
       <div class="collection-tabs"><button id="machinesTab" class="active">MACHINES</button><button id="partsTab">PARTS INVENTORY</button></div>
       <div class="collection-layout"><div class="collection-wall" id="collectionWall"></div><aside class="vehicle-dossier" id="collectionDetail"></aside></div>
       <div class="ncm-bottom" id="collectionNav"></div>
@@ -330,7 +466,8 @@
 
     <div id="market" class="card hidden">
       <div class="close">ESC · close</div>
-      <div class="market-head"><div><div class="eyebrow">Night City Motorsports · Commercial Network</div><h1>Base Market</h1><div class="sub">Real stock. Every machine is an individual.</div></div><div class="market-balance" id="marketBalance"></div></div>
+      <div class="market-head"><div><div class="eyebrow">Night City Motorsports · Commercial Network</div><h1>Base Market</h1><div class="sub">Local physical stock. Buying moves this exact machine or part into your file.</div></div><div class="market-balance" id="marketBalance"></div></div>
+      <div class="market-feedback hidden" id="marketFeedback"></div>
       <div class="market-body"><div class="market-stock">
         <section class="market-pane"><div class="market-pane-head"><span>MACHINES</span><button id="fitmentToggle">FITMENT OVERLAY · ON</button></div><div class="market-grid" id="marketGrid"></div></section>
         <section class="market-pane"><div class="market-pane-head"><span>COMPONENTS</span><span>PHYSICAL · SERIALIZED STOCK</span></div><div class="parts-grid" id="marketPartsGrid"></div></section>
@@ -343,8 +480,49 @@
       <div class="help-scroll" id="helpScroll"></div>
       <div class="ncm-bottom" id="helpNav"></div>
     </div>
+
+    <!-- SESSION LANDING PANEL. Not a message box: the first thing NCM says, every session, during alpha.
+         It is a mode of this page rather than a new WebUI surface, because a resource may hold only eight
+         (`kMaximumWebSurfaces`) and NCM already holds seven. It is also the reference implementation for
+         mouse/keyboard/gamepad parity -- the changelog is the hard case, so it is the one worth proving. -->
+    <div id="landing" class="card hidden">
+      <div class="landing-head">
+        <div>
+          <div class="eyebrow" id="landingEyebrow">NCM ONLINE // ALPHA</div>
+          <h1>Night City Motorsports</h1>
+          <div class="sub" id="landingSub"></div>
+        </div>
+        <div class="landing-hero" id="landingHero" aria-hidden="true"></div>
+      </div>
+
+      <div class="landing-contract" id="landingContract" role="note"></div>
+
+      <div class="landing-grid">
+        <section class="landing-col">
+          <div class="eyebrow">What you can do today</div>
+          <div class="landing-caps" id="landingCaps"></div>
+        </section>
+        <section class="landing-col">
+          <div class="eyebrow">What's new</div>
+          <div class="landing-new" id="landingNew"></div>
+        </section>
+      </div>
+
+      <section class="landing-log">
+        <div class="eyebrow">Development changelog</div>
+        <div class="landing-scroll" id="landingScroll" tabindex="-1"></div>
+      </section>
+
+      <div class="landing-foot">
+        <div class="landing-hint" id="landingHint"></div>
+        <button class="landing-go" id="landingDismiss" data-nav>
+          <span class="key" data-ncm-prompt="back">ESC</span><span>CONTINUE</span>
+        </button>
+      </div>
+    </div>
   </div>
   <script src="glyphs.js"></script>
+  <script src="ncm-nav.js"></script>
   <script>
     (() => {
       "use strict";
@@ -357,10 +535,18 @@
       const qBar = document.getElementById("qBar");
       const inboxList = document.getElementById("inboxList");
       const inboxSub = document.getElementById("inboxSub");
+      const driverCard = document.getElementById("driver");
+      const driverTitle = document.getElementById("driverTitle");
+      const driverBalance = document.getElementById("driverBalance");
+      const driverNow = document.getElementById("driverNow");
+      const driverTrace = document.getElementById("driverTrace");
+      const driverDoors = document.getElementById("driverDoors");
+      const driverNav = document.getElementById("driverNav");
       const guideCard = document.getElementById("guide");
       const guideList = document.getElementById("guideList");
       const guideDetail = document.getElementById("guideDetail");
       const guideClock = document.getElementById("guideClock");
+      const guideBalance = document.getElementById("guideBalance");
       const guideWx = document.getElementById("guideWx");
       const collectionCard = document.getElementById("collection");
       const collectionWall = document.getElementById("collectionWall");
@@ -375,6 +561,7 @@
       const wheelBody = document.getElementById("wheelBody");
       const marketCard = document.getElementById("market");
       const helpCard = document.getElementById("help");
+      const landingCard = document.getElementById("landing");
       const helpScroll = document.getElementById("helpScroll");
       const helpBuild = document.getElementById("helpBuild");
       const helpNav = document.getElementById("helpNav");
@@ -384,7 +571,8 @@
       const marketPartsGrid = document.getElementById("marketPartsGrid");
       const fitmentToggle = document.getElementById("fitmentToggle");
       const marketBalance = document.getElementById("marketBalance");
-      let mode = null;          // "questionnaire" | "inbox" | "guide" | "market" | "collection" | "wheel" | null
+      const marketFeedback = document.getElementById("marketFeedback");
+      let mode = null;          // "questionnaire" | "inbox" | "driver" | "guide" | "market" | "collection" | "wheel" | null
       let guideTick = null;
       let questions = [], version = 1, index = 0, answers = [];
       let pointerSeen = false;
@@ -406,7 +594,7 @@
       // The NCM shell nav. ONE definition, rendered into whichever panel is open, so a surface can never be
       // present in one panel's tab strip and missing from another's. Add a surface here and it appears
       // everywhere at once; that is the whole point.
-      const SHELL_TABS = [["guide", "RACE GUIDE"], ["market", "MARKET"], ["collection", "MACHINE INDEX"], ["wheel", "WHEEL/PEDALS"], ["help", "HELP"]];
+      const SHELL_TABS = [["driver", "DRIVER FILE"], ["guide", "RACE GUIDE"], ["market", "MARKET"], ["collection", "MACHINE INDEX"], ["wheel", "WHEEL/PEDALS"], ["help", "HELP"]];
       function renderNav(container, current) {
         if (!container) return;
         container.innerHTML = "";
@@ -426,14 +614,201 @@
         document.body.classList.toggle("closed", !which);
         qCard.classList.toggle("hidden", which !== "questionnaire");
         inboxCard.classList.toggle("hidden", which !== "inbox");
+        driverCard.classList.toggle("hidden", which !== "driver");
         guideCard.classList.toggle("hidden", which !== "guide");
         collectionCard.classList.toggle("hidden", which !== "collection");
         marketCard.classList.toggle("hidden", which !== "market");
         wheelCard.classList.toggle("hidden", which !== "wheel");
         helpCard.classList.toggle("hidden", which !== "help");
+        landingCard.classList.toggle("hidden", which !== "landing");
         if (SHELL_TABS.some(tab => tab[0] === which)) renderNav(document.getElementById(which + "Nav"), which);
         if (which !== "guide" && guideTick) { clearInterval(guideTick); guideTick = null; }
+
+        // ---- shared navigation scope -------------------------------------------------------------
+        // One place, so every mode gets keyboard and gamepad navigation instead of each screen growing
+        // its own. `clear()` first because a mode change replaces the scope rather than nesting one.
+        if (window.NcmNav) {
+          NcmNav.clear();
+          if (which) {
+            NcmNav.push({
+              id: which,
+              root: document.getElementById(which) || root,
+              // The dismiss control is first focus on the landing panel, so a pad or keyboard player can
+              // leave immediately instead of tabbing through a changelog to find the way out.
+              first: which === "landing" ? "#landingDismiss" : null,
+              scroller: document.getElementById(
+                which === "landing" ? "landingScroll" : which === "help" ? "helpScroll" : "") || null,
+              // Back is ALSO resolved in Lua and does not wait for this. See client/nav_input.lua.
+              onBack: () => Open77.emit("panel:closed", {}),
+            });
+            NcmNav.paintPrompts();
+          }
+        }
       }
+
+      // ---- SESSION LANDING PANEL -----------------------------------------------------------------
+      // Renders only what core/player/landing.lua validated. No copy decisions live here: the contract,
+      // the capability list and the changelog are all authored data, so a release never touches markup.
+      let landingData = null;
+      function renderLanding(d) {
+        if (d) landingData = d;
+        const s = landingData || {};
+        const el = (id) => document.getElementById(id);
+
+        const contract = s.contract || {};
+        el("landingEyebrow").textContent = contract.eyebrow || "NCM ONLINE // ALPHA";
+        const current = s.currentRelease;
+        el("landingSub").textContent = current
+          ? (current.title + " · " + current.date + (current.build ? " · " + current.build : ""))
+          : "Development build";
+
+        el("landingHero").style.backgroundImage = s.hero ? 'url("' + s.hero + '")' : "";
+
+        const box = el("landingContract");
+        box.replaceChildren();
+        const strong = document.createElement("b"); strong.textContent = contract.headline || "";
+        const body = document.createElement("p"); body.textContent = contract.body || "";
+        const detail = document.createElement("small"); detail.textContent = contract.detail || "";
+        const promise = document.createElement("em"); promise.textContent = contract.promise || "";
+        box.append(strong, body, detail, promise);
+
+        // Capabilities. A `partial` row states its limit out loud, because a half-feature advertised whole
+        // is how a player discovers the gap by being confused.
+        const caps = el("landingCaps");
+        caps.replaceChildren(...(s.capabilities || []).map((c) => {
+          const cell = document.createElement("div");
+          cell.className = "cap " + (c.state || "live");
+          const name = document.createElement("b"); name.textContent = c.label || "";
+          cell.append(name);
+          const line = c.state === "partial" ? c.limit : c.detail;
+          if (line) { const sub = document.createElement("span"); sub.textContent = line; cell.append(sub); }
+          return cell;
+        }));
+
+        // What's new: the newest release's headed items, which is the human summary rather than the log.
+        const fresh = el("landingNew");
+        const items = (current && current.items) || [];
+        fresh.replaceChildren(...items.slice(0, 5).map((item) => {
+          const row = document.createElement("div"); row.className = "row";
+          if (item.heading) { const h = document.createElement("b"); h.textContent = item.heading; row.append(h); }
+          const p = document.createElement("p"); p.textContent = item.text || ""; row.append(p);
+          return row;
+        }));
+        if (!items.length) {
+          const row = document.createElement("div"); row.className = "row";
+          const p = document.createElement("p"); p.textContent = "No release notes yet."; row.append(p);
+          fresh.replaceChildren(row);
+        }
+
+        // Changelog. Newest expanded, the rest collapsed, each header a real focusable button so the whole
+        // history is reachable by keyboard and pad -- the reason this panel is the reference implementation.
+        const log = el("landingScroll");
+        log.replaceChildren(...(s.releases || []).map((r) => {
+          const wrap = document.createElement("div");
+          wrap.className = "rel" + (r.expanded ? " open" : "");
+          const head = document.createElement("button");
+          head.setAttribute("data-nav", "");
+          head.setAttribute("aria-expanded", r.expanded ? "true" : "false");
+          const date = document.createElement("span"); date.className = "date"; date.textContent = r.date;
+          const name = document.createElement("span"); name.className = "name";
+          name.textContent = r.title + (r.build ? "  " + r.build : "");
+          head.append(date, name);
+          if (r.isNew) { const tag = document.createElement("span"); tag.className = "tag"; tag.textContent = "NEW"; head.append(tag); }
+          const chev = document.createElement("span"); chev.className = "chev"; head.append(chev);
+          head.addEventListener("click", () => {
+            const open = wrap.classList.toggle("open");
+            head.setAttribute("aria-expanded", open ? "true" : "false");
+            if (window.NcmNav) NcmNav.refresh();
+          });
+          const bodyEl = document.createElement("div"); bodyEl.className = "body";
+          for (const item of r.items || []) {
+            const line = document.createElement("div"); line.className = "item";
+            if (item.heading) { const i = document.createElement("i"); i.textContent = item.heading; line.append(i); }
+            line.append(document.createTextNode(item.text || ""));
+            bodyEl.append(line);
+          }
+          wrap.append(head, bodyEl);
+          return wrap;
+        }));
+
+        const counted = (s.capabilities || []).filter((c) => c.state !== "soon").length;
+        el("landingHint").textContent = s.firstSession
+          ? (counted + " things you can do right now. The Race Guide is where a season starts.")
+          : (s.newReleaseCount > 0
+              ? (s.newReleaseCount + " release" + (s.newReleaseCount === 1 ? "" : "s") + " since you were last here.")
+              : "Nothing new since your last session.");
+
+        // The watermark moves only once the panel has actually drawn, so an open that never rendered
+        // cannot silently mark releases as read.
+        Open77.emit("panel:landing.seen", {});
+      }
+
+      // One dismiss path for all three input methods: the mouse clicks it, Enter/Space activates it through
+      // the nav layer (it is first focus), and pad CONFIRM activates it the same way. Pad BACK and Escape
+      // close through the host's own path instead, which is why neither is wired here.
+      document.getElementById("landingDismiss").addEventListener("click", () => {
+        show(null);
+        Open77.emit("panel:closed", { panel: "landing" });
+      });
+
+      // ---- Driver File: durable answers to "what changed, what is mine, and what should I do now?"
+      let driverData = null;
+      const cash = n => "€$" + Number(n || 0).toLocaleString();
+      const makeMark = (value, label) => {
+        const box=document.createElement("div");box.className="driver-mark";
+        const b=document.createElement("b");b.textContent=String(value);const s=document.createElement("span");s.textContent=label;
+        box.append(b,s);return box;
+      };
+      function renderDriver(d) {
+        if (d) driverData=d;
+        const s=driverData||{};
+        if (s.loading) {
+          driverTitle.textContent="Driver File";driverBalance.innerHTML="—<small>AVAILABLE</small>";
+          driverNow.innerHTML='<div class="signal">READING THE CITY…</div><h2>Pulling your current file.</h2>';
+          driverTrace.innerHTML="";driverDoors.innerHTML="";return;
+        }
+        const who=s.driver||{},col=s.collection||{},stats=s.stats||{},c=s.commitment||{};
+        driverTitle.textContent=(who.display||"Driver")+(who.number?"  #"+who.number:"");
+        driverBalance.innerHTML="";driverBalance.append(document.createTextNode(cash(s.balance)));
+        const av=document.createElement("small");av.textContent="AVAILABLE · EVERY CREDIT HAS A TRACE";driverBalance.append(av);
+        driverNow.innerHTML="";
+        const signal=document.createElement("div");signal.className="signal";signal.textContent=c.eyebrow||"RIGHT NOW";
+        const title=document.createElement("h2");title.textContent=c.title||"Choose the next story.";
+        const detail=document.createElement("p");detail.textContent=c.detail||"";
+        const next=document.createElement("div");next.className="next";next.textContent=c.action||"";
+        driverNow.append(signal,title,detail,next);
+        if(c.startsAt){const timing=document.createElement("p");timing.className="when";timing.textContent="START · "+fmtTime(c.startsAt)+" · "+fmtCountdown(c.startsAt-(s.serverNow||guideNow()||0))+" AWAY";driverNow.append(timing);}
+
+        driverTrace.innerHTML="";const th=document.createElement("h3");th.textContent="YOUR TRACE";driverTrace.append(th);
+        const marks=document.createElement("div");marks.className="driver-marks";
+        marks.append(makeMark((Number(who.sr)||0).toFixed(2),"SAFETY RATING"),makeMark(stats.finishes||0,"OFFICIAL FINISHES"),makeMark(stats.wins||0,"CONTESTED WINS"),
+          makeMark((col.discovered||0)+" / "+(col.total||0),"MACHINE INDEX"),makeMark(col.owned||0,"OWNED MACHINES"),makeMark((col.partsStored||0)+" + "+(col.partsInstalled||0),"PARTS STORED + FITTED"));
+        driverTrace.append(marks);
+        const rack=document.createElement("div");rack.className="badge-rack";
+        for(const badge of (s.badges||[])){const b=document.createElement("div");b.className="earned-badge"+(badge.displayed?" shown":"");b.textContent=badge.label||badge.id;rack.append(b);}
+        if(!(s.badges||[]).length){const e=document.createElement("div");e.className="sub";e.textContent="No badges yet. Your first official finish leaves the first mark.";rack.append(e);}
+        driverTrace.append(rack);
+        for(const tx of (s.transactions||[])){
+          const row=document.createElement("div");row.className="trace-row";
+          const amt=document.createElement("div");amt.className="money"+(Number(tx.amount)<0?" out":"");amt.textContent=(Number(tx.amount)>=0?"+":"−")+cash(Math.abs(Number(tx.amount)||0));
+          const what=document.createElement("div");what.className="what";what.textContent=tx.note||String(tx.kind||"").replaceAll("_"," ");
+          const when=document.createElement("div");when.className="when";when.textContent=tx.at?new Date(tx.at*1000).toLocaleDateString([], {month:"short",day:"numeric"}).toUpperCase():"";
+          row.append(amt,what,when);driverTrace.append(row);
+        }
+
+        driverDoors.innerHTML="";const dh=document.createElement("h3");dh.textContent="DOORS, NOT MANUALS";driverDoors.append(dh);
+        const intro=document.createElement("div");intro.className="sub";intro.textContent="Each room answers a different kind of question. Open the one that matches what you are trying to do.";driverDoors.append(intro);
+        for(const ref of (s.references||[])){
+          const b=document.createElement("button");b.className="door";
+          const title=document.createElement("b");title.textContent=ref.title||ref.id;
+          const desc=document.createElement("span");desc.textContent=ref.text||"";b.append(title,desc);
+          b.addEventListener("click",()=>Open77.emit("panel:navigate",{panel:ref.id}));driverDoors.append(b);
+        }
+        const controls=document.createElement("div");controls.className="wheel-note";
+        controls.textContent="F6 opens the NCM paddock. F10 jumps to Machine Index. Essential information also has a chat twin: /ncm.status, /ncm.guide, /ncm.balance, /ncm.profile.";
+        driverDoors.append(controls);
+      }
+      Open77.on("panel:driver",d=>{if(mode==="driver")guard("driver",()=>renderDriver(d));else driverData=d;});
 
       // ---- race guide
       let guideData = { rows: [], serverNow: 0, loading: true }, guideOffset = null, guideTab = "schedule", selectedEventId = null;
@@ -664,6 +1039,17 @@
         const desc = document.createElement("div"); desc.className = "detail-description"; desc.textContent = r.description || ((r.venue || "Start") + " to " + (r.finish || "finish") + ".");
         const practice = document.createElement("div"); practice.className = "future-slot";
         practice.textContent = r.practice === "open" ? (r.myPracticeBest ? "PRACTICE BEST · " + fmtSec(r.myPracticeBest) : "PRACTICE OPEN · cross the start line") : "PRACTICE · " + String(r.practice || "closed").replaceAll("_", " ");
+        const contract = blockEl(r.myState === "none" ? "WHAT EXPRESSING INTEREST DOES" : "YOUR COMMITMENT", "registered");
+        if (r.myState === "none") {
+          lineEl(contract).textContent = "Marks the venue, opens practice and puts this event in My Races.";
+          lineEl(contract,"muted").textContent = "IT DOES NOT SPEND MONEY OR RESERVE A GRID PLACE. ENTER AT THE VENUE WHEN THE WINDOW OPENS.";
+        } else if (r.myState === "interested") {
+          lineEl(contract).textContent = "ON THE LIST · NOT ENTERED · no fee charged";
+          lineEl(contract,"muted").textContent = "FOLLOW THE NCM VENUE WAYPOINT. USE YOUR CURRENT MAP BINDING, OR /NCM.GPS TO RE-MARK IT. ENTER RACE AT THE LINE.";
+        } else {
+          lineEl(contract).textContent = String(r.myState||"entered").replaceAll("_"," ").toUpperCase()+" · your place is recorded";
+          lineEl(contract,"muted").textContent = "STAY AVAILABLE FOR RACE CONTROL. YOU MAY WITHDRAW BEFORE A LIVE SESSION HOLDS YOU.";
+        }
         const action = document.createElement("button"); action.className = "detail-action";
         const on = r.myState === "interested";
         if (r.invitation) { action.disabled = true; action.append(glyph("private"), document.createTextNode(r.myState !== "none" ? r.myState.toUpperCase() : "BY INVITATION")); }
@@ -671,13 +1057,11 @@
           action.classList.toggle("on", on); action.append(glyph(on ? "withdraw" : "signup"), document.createTextNode(on ? "LEAVE LIST" : "EXPRESS INTEREST"));
           action.addEventListener("click", () => { action.disabled = true; Open77.emit("panel:interest", { eventId: r.eventId, action: on ? "withdraw" : "interest" }); });
         } else { action.disabled = true; action.append(glyph("registered"), document.createTextNode(String(r.myState).toUpperCase())); }
-        const future = document.createElement("div"); future.className = "future-slot";
-        future.textContent = "ROUTE PREVIEW · REMINDERS · EVENT ARCHIVE — reserved in the Guide contract; not online yet.";
         // The information layer, in the order a driver decides in: can I enter, what are the rules, what will
         // it be like. Each returns null when its data is absent, and null entries are dropped rather than
         // rendered as empty boxes.
         const blocks = [carBlock(r), regsBlock(r), economyBlock(r), weatherBlock(r, now)].filter(Boolean);
-        guideDetail.append(kicker, title, series, region, hero, facts, desc, ...blocks, practice, action, future);
+        guideDetail.append(kicker, title, series, region, hero, facts, desc, ...blocks, practice, contract, action);
       }
 
       // PAST RESULTS. Authoritative completed results for this driver, whatever the activity was classified
@@ -741,6 +1125,7 @@
       function renderGuide(d) {
         if (d) { guideData = d; seedGuideClock(d.serverNow); }
         const now = guideNow();
+        guideBalance.innerHTML = guideData.balance == null ? "" : ("€$"+Number(guideData.balance||0).toLocaleString()+"<small>AVAILABLE</small>");
         guideList.innerHTML = "";
         const all = Array.isArray(guideData.rows) ? guideData.rows : [];
         if (guideTab === "past") {
@@ -1384,6 +1769,7 @@
       function heldCount(what) {
         try {
           if (what === "guide") return (guideData.rows || []).length;
+          if (what === "driver") return ((driverData || {}).transactions || []).length;
           if (what === "collection") return (collectionData.slots || []).length;
           // `itemCount` is a number on the wire now. It used to be the length of a list of every
           // purchasable asset, shipped in full so this line could call `.length` on it.
@@ -1423,6 +1809,8 @@
           show("questionnaire"); renderQuestion();
         } else if (d.panel === "inbox") {
           guard("inbox", () => { show("inbox"); renderInbox(d.inbox || lastInboxData || { items: [], unread: 0 }); });
+        } else if (d.panel === "driver") {
+          guard("driver",()=>{show("driver");renderDriver(d.driver||driverData||{loading:true});});
         } else if (d.panel === "guide") {
           guard("guide", () => {
             // the data arrives separately now (KB-63), so draw from whatever we already hold
@@ -1435,6 +1823,8 @@
           });
         } else if (d.panel === "collection") {
           guard("collection", () => { show("collection"); renderCollection(d.collection || collectionData || {}); });
+        } else if (d.panel === "landing") {
+          guard("landing", () => { show("landing"); renderLanding(d.landing || landingData || {}); });
         } else if (d.panel === "help") {
           guard("help", () => { show("help"); renderHelp(null); });
         } else if (d.panel === "wheel") {

@@ -136,6 +136,7 @@
     #inputs .tyre.na .win { opacity: 0.25; }
     #inputs .tyre b { font: 700 9px/1 var(--mono); letter-spacing: 0.12em; color: var(--dim); }
     #inputs .tyre em { font: 700 10px/1 var(--mono); font-style: normal; color: var(--dim); }
+    #inputs .tyre em.state { min-width:58px;text-align:center;color:var(--text);letter-spacing:.05em; }
 
     /* Live race graph (P40). VERTICAL, and deliberately small.
        It used to be a 1240px bar across the bottom of the screen, which sat on top of the speedometer. It now
@@ -180,7 +181,7 @@
       <div class="ped" id="inBrkPed"><div class="bar b"><i id="inBrk"></i></div><b>BRK</b><em id="inBrkPct">--</em></div>
       <div class="ped" id="inThrPed"><div class="bar t"><i id="inThr"></i></div><b>THR</b><em id="inThrPct">--</em></div>
     </div>
-    <div class="tyre na" id="inTyre"><div class="col"><div class="win"></div><div class="ndl" id="inTyreNdl"></div></div><b>TYRE</b><em id="inTyrePct">--</em></div>
+    <div class="tyre na" id="inTyre"><div class="col"><div class="win"></div><div class="ndl" id="inTyreNdl"></div></div><b>TYRE</b><em class="state" id="inTyreState">UNKNOWN</em><em id="inTyrePct">--</em></div>
   </div>
   <div id="instr" class="hidden"><div class="who" id="instrWho"></div><div class="odo" id="instrOdo"></div></div>
   <div id="graph" class="hidden"><span class="flag" id="graphFlag"></span><div class="line"></div><div id="dots"></div><span class="lbl">START</span></div>
@@ -384,7 +385,9 @@
       // a driver reads "where am I" rather than "how many degrees".
       const tyre = document.getElementById("inTyre");
       const tyreNdl = document.getElementById("inTyreNdl");
+      const tyreState = document.getElementById("inTyreState");
       const tyrePct = document.getElementById("inTyrePct");
+      let lastTyreP = null;
       Open77.on("race:tyre", (v) => {
         const p = v && typeof v.p === "number" && isFinite(v.p) ? Math.max(-1, Math.min(1, v.p)) : null;
         haveTyre = p !== null;
@@ -393,13 +396,17 @@
         tyre.classList.toggle("cold", p !== null && p < -0.2);
         tyre.classList.toggle("hot", p !== null && p > 0.2);
         tyre.classList.toggle("good", p !== null && p >= -0.2 && p <= 0.2);
-        if (p === null) { text(tyrePct, "--"); return; }
+        if (p === null) { text(tyreState,"UNKNOWN");text(tyrePct, "--");lastTyreP=null;return; }
         const css = (((p + 1) / 2) * 100).toFixed(1) + "%";
         if (tyreNdl.style.bottom !== css) tyreNdl.style.bottom = css;
+        const delta=lastTyreP===null?0:p-lastTyreP;
+        const arrow=Math.abs(delta)<0.015?"":(delta>0?" ↑":" ↓");
+        text(tyreState,(p < -0.2 ? "COLD" : (p > 0.2 ? "HOT" : "WINDOW"))+arrow);
+        lastTyreP=p;
         // The grip multiplier as a percentage COST, because "you are giving up 6%" is the actionable
         // reading and "0.94" is not.
         const cost = typeof v.m === "number" && isFinite(v.m) ? Math.round((1 - v.m) * 100) : null;
-        text(tyrePct, cost === null ? "--" : (cost === 0 ? "OK" : "-" + cost + "%"));
+        text(tyrePct, cost === null ? "--" : (cost === 0 ? "FULL GRIP" : "-" + cost + "% GRIP"));
       });
 
       // ---------------------------------------------------------------------------------------------

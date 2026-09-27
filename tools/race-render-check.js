@@ -160,11 +160,21 @@ check(tyrePct.textContent === "--", "and renders a dash, never a plausible resti
 fire("race:tyre", { p: 0, m: 1.0 });
 check(!tyreEl.classList.contains("na"), "a known temperature clears not-available");
 check(tyreEl.classList.contains("good"), "dead centre reads as in-window");
-check(tyrePct.textContent === "OK", "and costs nothing");
+// The readout now names the consequence rather than the unit: a driver reads "FULL GRIP" / "-15% GRIP", never
+// "OK" / "0.94". The gauge also carries a state word and a trend arrow, because the visibility pass needs
+// current state AND direction of change, not just a position.
+const tyreState = document.getElementById("inTyreState");
+check(tyrePct.textContent === "FULL GRIP", "and says it costs nothing in grip, not 'OK'");
+check(tyreState.textContent === "WINDOW", "dead centre names the window");
 
 fire("race:tyre", { p: -1, m: 0.85 });
 check(tyreEl.classList.contains("cold"), "fully cold reads cold");
-check(tyrePct.textContent === "-15%", "and shows the cost as a percentage, not a multiplier");
+check(tyrePct.textContent === "-15% GRIP", "and shows the cost as a percentage of grip, not a multiplier");
+check(tyreState.textContent.startsWith("COLD"), "and names the state in words");
+check(tyreState.textContent.includes("↓"), "and a fall from the window shows a falling trend");
+
+fire("race:tyre", { p: -1, m: 0.85 });
+check(tyreState.textContent === "COLD", "an unchanged temperature shows no trend arrow at all");
 
 fire("race:tyre", { p: 1, m: 0.85 });
 check(tyreEl.classList.contains("hot"), "fully hot reads hot");

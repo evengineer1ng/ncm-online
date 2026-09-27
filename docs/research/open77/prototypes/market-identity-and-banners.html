@@ -1,0 +1,422 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NCM Market Identity and Banners</title>
+<!--
+  PROTOTYPE for PRESENTATION_CAPABILITY_AUDIT.md Addendums A, B and C. Not shipped.
+
+  WHAT THIS PROVES
+    1. A market identity is a scoped token override block, not a separate interface. Switch the market in the
+       left list: the SAME markup and the SAME components re-theme. Nothing is duplicated per market.
+    2. The shell chrome, the money figure and the legibility floors do NOT move when identity changes.
+    3. Banner art works at the real measured card geometry: 288x84, grid 1fr/82px, art at opacity .72
+       under text, bottom-left 8px clipped.
+
+  CEF-SAFE: no network, no webfont, no image file. System faces only; every mark is CSS or inline SVG.
+  Market names here are PLACEHOLDERS and are deliberately not the request's examples.
+-->
+<link rel="stylesheet" href="ncm-ui.css">
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; padding: var(--op77-space-6) var(--op77-inset-x) var(--op77-space-8);
+    background: var(--op77-bg); color: var(--op77-text);
+    font: 400 var(--op77-fs-body)/1.55 var(--op77-font-body); }
+  .wrap { max-width: 1180px; margin: 0 auto; }
+  h1 { font: 700 var(--op77-fs-head)/1.1 var(--op77-font-display); margin: 0 0 var(--op77-space-2); }
+  h2 { font: 700 var(--op77-fs-title)/1.2 var(--op77-font-display);
+       margin: var(--op77-space-7) 0 var(--op77-space-3); }
+  .lede { color: var(--op77-text-dim); max-width: 80ch; margin: 0 0 var(--op77-space-3); }
+  .note { color: var(--op77-text-dim); font: 400 var(--op77-fs-meta)/1.55 var(--op77-font-mono);
+    max-width: 94ch; margin: var(--op77-space-3) 0 0; }
+  code { font: 400 var(--op77-fs-meta)/1.4 var(--op77-font-mono); color: var(--op77-accent-ice); }
+
+  /* ===================================================================
+     THEME DESCRIPTORS. This is the entire per-market cost: one block.
+     Every identity may set only these tokens. Anything it does not set
+     falls back to the NCM base, so an unknown theme still renders.
+     =================================================================== */
+  .mk {
+    --mk-accent: var(--op77-accent);
+    --mk-plate: var(--op77-panel);
+    --mk-frame: var(--op77-line-hud);
+    --mk-display: var(--op77-font-display);
+    --mk-texture: none;
+    --mk-cut: var(--op77-notch-clip);
+    --mk-dur: var(--op77-dur);
+    --mk-wash: transparent;
+  }
+  .mk[data-market-theme="forge"] {
+    --mk-accent: #ff8a3c;
+    --mk-plate: rgba(26, 17, 10, 0.95);
+    --mk-frame: rgba(255, 138, 60, 0.38);
+    --mk-display: var(--op77-font-mono);
+    --mk-texture: repeating-linear-gradient(135deg, transparent 0 7px, rgba(255,138,60,.055) 7px 8px);
+    --mk-cut: polygon(0 0, 100% 0, 100% calc(100% - 14px), calc(100% - 14px) 100%, 0 100%);
+    --mk-dur: var(--op77-dur-fast);
+    --mk-wash: radial-gradient(120% 80% at 8% 0%, rgba(255,138,60,.10), transparent 60%);
+  }
+  .mk[data-market-theme="tide"] {
+    --mk-accent: #7ad3b0;
+    --mk-plate: rgba(9, 24, 26, 0.95);
+    --mk-frame: rgba(122, 211, 176, 0.30);
+    --mk-texture: repeating-linear-gradient(0deg, transparent 0 11px, rgba(122,211,176,.05) 11px 12px);
+    --mk-cut: polygon(14px 0, 100% 0, 100% 100%, 0 100%, 0 14px);
+    --mk-dur: var(--op77-dur-slow);
+    --mk-wash: linear-gradient(160deg, rgba(122,211,176,.10), transparent 55%);
+  }
+  .mk[data-market-theme="vault"] {
+    --mk-accent: #c9a4ff;
+    --mk-plate: rgba(17, 13, 28, 0.96);
+    --mk-frame: rgba(201, 164, 255, 0.34);
+    --mk-texture: repeating-linear-gradient(90deg, transparent 0 22px, rgba(201,164,255,.05) 22px 23px);
+    --mk-cut: var(--op77-notch-clip);
+    --mk-wash: linear-gradient(200deg, rgba(201,164,255,.09), transparent 62%);
+  }
+
+  /* ---- the shell. NCM's, always. A theme may not touch anything here. ---- */
+  .shell { display: grid; grid-template-columns: 216px 1fr; border: 1px solid var(--op77-line-hud);
+    background: var(--op77-bg-elev); box-shadow: var(--op77-shadow); overflow: hidden; }
+  .shell-aside { border-right: 1px solid var(--op77-line-strong); background: var(--op77-surface);
+    padding: var(--op77-space-3) 0; }
+  .shell-aside .ncm-eyebrow { padding: 0 var(--op77-space-3) var(--op77-space-2); display: block; }
+  .mkbtn { display: block; width: 100%; text-align: left; cursor: pointer;
+    padding: 9px var(--op77-space-3); border: 0; border-left: 3px solid transparent;
+    background: transparent; color: var(--op77-text-dim);
+    font: 600 var(--op77-fs-meta)/1.3 var(--op77-font-display);
+    transition: background var(--op77-dur-fast) var(--op77-ease), color var(--op77-dur-fast) var(--op77-ease); }
+  .mkbtn small { display: block; font: 400 var(--op77-fs-micro)/1.4 var(--op77-font-mono);
+    letter-spacing: .08em; text-transform: uppercase; color: var(--op77-text-faint); }
+  .mkbtn:hover { background: var(--op77-surface-2); color: var(--op77-text); }
+  .mkbtn[aria-current="true"] { color: var(--op77-text); background: var(--op77-surface-2);
+    border-left-color: var(--mk-accent); }
+  .shell-nav { grid-column: 1 / -1; display: flex; gap: 1px; border-top: 1px solid var(--op77-line-strong);
+    background: var(--op77-surface); }
+  .shell-nav button { flex: 1; padding: 10px 6px; border: 0; background: transparent;
+    color: var(--op77-text-dim); cursor: pointer;
+    font: 700 var(--op77-fs-micro)/1 var(--op77-font-mono);
+    letter-spacing: var(--op77-track-label); text-transform: uppercase; }
+  .shell-nav button.active { color: var(--op77-text); background: var(--op77-surface-2); cursor: default; }
+
+  /* ---- the identity plate. The market's, entirely. ---- */
+  .plate { position: relative; padding: var(--op77-space-4) var(--op77-space-5);
+    background-color: var(--mk-plate); background-image: var(--mk-wash), var(--mk-texture);
+    border-bottom: 1px solid var(--mk-frame); overflow: hidden;
+    animation: plate-in var(--mk-dur) var(--op77-ease) both; }
+  .plate::before { content: ""; position: absolute; inset: 0 auto 0 0; width: var(--op77-rule);
+    background: var(--mk-accent); }
+  .plate .eye { font: 700 var(--op77-fs-micro)/1 var(--op77-font-mono);
+    letter-spacing: var(--op77-track-micro); text-transform: uppercase; color: var(--mk-accent); }
+  .plate h3 { margin: 6px 0 4px; font: 700 var(--op77-fs-head)/1.05 var(--mk-display);
+    letter-spacing: .01em; }
+  .plate p { margin: 0; max-width: 62ch; color: var(--op77-text-dim); font-size: var(--op77-fs-meta); }
+  .mark { position: absolute; top: var(--op77-space-4); right: var(--op77-space-5);
+    width: 46px; height: 46px; display: grid; place-items: center; color: var(--mk-accent);
+    border: 1px solid var(--mk-frame); clip-path: var(--mk-cut); }
+  .mark svg { width: 26px; height: 26px; fill: none; stroke: currentColor; stroke-width: 1.6;
+    stroke-linecap: round; stroke-linejoin: round; }
+
+  /* ---- stock rows: shared components, accent + frame only ---- */
+  .stock { padding: var(--op77-space-3) var(--op77-space-5) var(--op77-space-4); background: var(--op77-bg-elev); }
+  .item { display: grid; grid-template-columns: 4px 1fr auto auto; gap: var(--op77-space-3);
+    align-items: center; padding: 10px 0; border-bottom: 1px solid var(--op77-line); }
+  .item:last-child { border-bottom: 0; }
+  .item i { width: 4px; height: 26px; background: var(--mk-accent); clip-path: var(--mk-cut); }
+  .item .nm { font: 600 var(--op77-fs-body)/1.2 var(--op77-font-display); }
+  .item .nm small { display: block; font: 400 var(--op77-fs-micro)/1.5 var(--op77-font-mono);
+    letter-spacing: .06em; text-transform: uppercase; color: var(--op77-text-faint); }
+  /* THE MONEY FIGURE KEEPS THE NCM TREATMENT UNDER EVERY THEME. Deliberately not --mk-*. */
+  .item .price { font: 700 var(--op77-fs-lead)/1 var(--op77-font-mono); color: var(--op77-text);
+    font-variant-numeric: tabular-nums; }
+  .item .buy { padding: 7px 13px; cursor: pointer; border: 1px solid var(--op77-accent-line);
+    background: var(--op77-accent-soft); color: var(--op77-text);
+    font: 700 var(--op77-fs-label)/1 var(--op77-font-mono);
+    letter-spacing: var(--op77-track-label); text-transform: uppercase; }
+  .fit { font: 700 var(--op77-fs-micro)/1 var(--op77-font-mono); letter-spacing: var(--op77-track-label);
+    padding: 3px 6px; border: 1px solid currentColor; }
+  .fit.yes { color: var(--op77-ok); } .fit.no { color: var(--op77-danger); }
+
+  /* ---- Driver Cards at the REAL measured geometry ---- */
+  .cards { display: flex; flex-wrap: wrap; gap: var(--op77-space-4); }
+  .card { position: relative; width: 288px; height: 84px; display: grid;
+    grid-template-columns: minmax(0, 1fr) 82px;
+    filter: drop-shadow(0 3px 4px rgba(0,0,0,.82)); }
+  .card .bn { position: relative; overflow: hidden; border: 1px solid var(--bn-line, var(--op77-accent-line));
+    border-right: 0; clip-path: polygon(0 0, 100% 0, 100% 100%, 8px 100%, 0 calc(100% - 8px));
+    background: var(--bn-ink, rgba(4,17,27,.98)); }
+  /* The banner ART: a wash UNDER text at .72, exactly as nameplates.css composites it. */
+  .card .art { position: absolute; inset: 0; opacity: .72; background: var(--bn-art, none);
+    background-size: cover; background-position: var(--bn-crop, 50% 50%); }
+  .card .idn { position: relative; z-index: 1; height: 45px; padding: 7px 8px 0 10px; }
+  .card .eye { display: flex; align-items: center; gap: 5px; height: 12px;
+    font: 700 9px/1 var(--op77-font-mono); letter-spacing: .16em; text-transform: uppercase;
+    color: var(--bn-accent, var(--op77-accent)); }
+  .card .nm { display: block; font: 800 18px/22px var(--op77-font-display); color: #f4fbff;
+    text-shadow: 0 1px 1px #000; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .card .bdg { position: relative; z-index: 1; display: flex; align-items: center; gap: 4px;
+    height: 38px; padding: 2px 9px 5px 10px; border-top: 1px solid rgba(255,255,255,.14); }
+  .card .bdg span { width: 26px; height: 26px; display: grid; place-items: center; flex: 0 0 26px;
+    color: #dffaff; background: linear-gradient(145deg, rgba(13,43,57,.96), rgba(5,13,22,.98));
+    border: 1px solid var(--bn-accent, var(--op77-accent));
+    clip-path: polygon(25% 3%, 75% 3%, 98% 25%, 98% 75%, 75% 97%, 25% 97%, 2% 75%, 2% 25%); }
+  .card .bdg svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.7;
+    stroke-linecap: round; stroke-linejoin: round; }
+  .card .fp { position: relative; display: grid; grid-template-rows: 14px 1fr 18px; gap: 2px;
+    padding: 5px; border: 1px solid rgba(169,239,250,.74); background: rgba(1,8,12,.97);
+    color: #dffaff; text-align: center; }
+  .card .fp b { font: 800 9px/1 var(--op77-font-mono); letter-spacing: .06em;
+    color: var(--bn-accent, var(--op77-accent)); }
+  .card .fp em { align-self: center; font: 800 9px/11px var(--op77-font-mono); font-style: normal;
+    letter-spacing: .1em; text-transform: uppercase; color: rgba(223,250,255,.62); }
+  .card .fp u { text-decoration: none; font: 700 9px/1 var(--op77-font-mono);
+    color: rgba(223,250,255,.5); }
+
+  /* placeholder banner arts, all CSS geometry — no asset delivery */
+  .bn-base  { --bn-art: linear-gradient(115deg, #041623, #06303f 55%, #0a1f2e);
+              --bn-accent: #22d8e2; --bn-line: rgba(34,216,226,.5); }
+  .bn-forge { --bn-art: repeating-linear-gradient(118deg, #1b1109 0 14px, #2a1a0d 14px 28px),
+                        radial-gradient(60% 120% at 12% 100%, rgba(255,138,60,.5), transparent 60%);
+              --bn-accent: #ff8a3c; --bn-line: rgba(255,138,60,.55); }
+  .bn-tide  { --bn-art: linear-gradient(160deg, #04201f, #0a3b33 60%, #05231f);
+              --bn-accent: #7ad3b0; --bn-line: rgba(122,211,176,.5); }
+  .bn-vault { --bn-art: linear-gradient(200deg, #140f24, #2a1c46 58%, #100c1c);
+              --bn-accent: #c9a4ff; --bn-line: rgba(201,164,255,.5); }
+
+  /* ---- unlock moment ---- */
+  .unlock { max-width: 460px; padding: var(--op77-space-4) var(--op77-space-5);
+    background: var(--mk-plate); background-image: var(--mk-wash), var(--mk-texture);
+    border: 1px solid var(--mk-frame); border-left: var(--op77-rule) solid var(--mk-accent);
+    clip-path: var(--op77-notch-clip); box-shadow: var(--op77-shadow);
+    animation: rise var(--op77-dur-slow) var(--op77-ease) both; }
+  .unlock .eye { font: 700 var(--op77-fs-micro)/1 var(--op77-font-mono);
+    letter-spacing: var(--op77-track-micro); text-transform: uppercase; color: var(--mk-accent); }
+  .unlock h4 { margin: 7px 0 4px; font: 700 var(--op77-fs-title)/1.2 var(--mk-display); }
+  .unlock p { margin: 0 0 var(--op77-space-3); font-size: var(--op77-fs-meta); color: var(--op77-text-dim); }
+  .unlock p em { color: var(--op77-text); font-style: italic; }
+  .unlock .got { display: flex; align-items: center; gap: var(--op77-space-3);
+    padding-top: var(--op77-space-3); border-top: 1px solid var(--mk-frame); }
+  .unlock .chipart { width: 84px; height: 34px; flex: 0 0 84px; opacity: .85;
+    background: var(--bn-art); background-size: cover;
+    border: 1px solid var(--bn-line); clip-path: polygon(0 0,100% 0,100% 100%,6px 100%,0 calc(100% - 6px)); }
+  .unlock .got b { display: block; font: 700 var(--op77-fs-label)/1.4 var(--op77-font-mono);
+    letter-spacing: var(--op77-track-label); text-transform: uppercase; color: var(--mk-accent); }
+  .unlock .got small { color: var(--op77-text-dim); font-size: var(--op77-fs-meta); }
+
+  .split { display: grid; gap: var(--op77-space-4); grid-template-columns: repeat(auto-fit, minmax(300px,1fr)); }
+  .fixed { border: 1px solid var(--op77-line-hud); background: var(--op77-panel);
+    padding: var(--op77-space-4); clip-path: var(--op77-notch-clip); }
+  table { width: 100%; border-collapse: collapse; font-size: var(--op77-fs-meta); }
+  th, td { text-align: left; padding: 7px var(--op77-space-2); border-bottom: 1px solid var(--op77-line);
+    vertical-align: top; }
+  th { font: 700 var(--op77-fs-micro)/1 var(--op77-font-mono); letter-spacing: var(--op77-track-label);
+       text-transform: uppercase; color: var(--op77-text-dim); }
+  .no { color: var(--op77-danger); } .yes { color: var(--op77-ok); }
+
+  @keyframes plate-in { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+  @keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <p class="ncm-eyebrow">Prototype · addendums A, B and C</p>
+  <h1>Market identity and player banners</h1>
+  <p class="lede">Select a market on the left. The markup and the components never change — only a
+  <code>data-market-theme</code> attribute does. That is the whole mechanism: an identity is a scoped token
+  override block, so a themed market costs one CSS block and <strong>zero</strong> WebUI surfaces, which matters
+  because NCM has one spare surface in its budget of eight. Market names are placeholders.</p>
+
+  <h2>1 · One shell, many identities</h2>
+  <div class="shell mk" id="shell" data-market-theme="base">
+    <aside class="shell-aside">
+      <span class="ncm-eyebrow">Your access</span>
+      <button class="mkbtn" data-theme="base" data-key="base" aria-current="true">Base Market<small>Universal · primary</small></button>
+      <button class="mkbtn" data-theme="forge" data-key="forge">Ninth Street Forge<small>Independent · components</small></button>
+      <button class="mkbtn" data-theme="tide" data-key="tide">Tidewater Salvage<small>Salvage · mixed stock</small></button>
+      <button class="mkbtn" data-theme="vault" data-key="vault">The Long Vault<small>Invitation · collector</small></button>
+    </aside>
+    <div>
+      <div class="plate">
+        <span class="eye" id="pEye">// NCM COMMERCIAL BASELINE</span>
+        <h3 id="pName">Base Market</h3>
+        <p id="pLine">Open to every driver. Serialized machines and components, priced plainly, no relationship required.</p>
+        <span class="mark" id="pMark"></span>
+      </div>
+      <div class="stock" id="pStock"></div>
+    </div>
+    <nav class="shell-nav">
+      <button>Driver File</button><button>Race Guide</button><button class="active">Market</button>
+      <button>Machine Index</button><button>Wheel/Pedals</button><button>Help</button>
+    </nav>
+  </div>
+  <p class="note">Note what did <em>not</em> move: the six-tab nav, the panel frame, the price column and the
+  purchase affordance. A theme may set an accent, a plate fill, a frame motif, a texture, a type <em>role</em>,
+  a motion duration and a copy register. It may not touch the shell, the money figure, or the legibility floors.
+  An unknown theme inherits every base token, so a market with missing art still opens.</p>
+
+  <h2>2 · The boundary, stated</h2>
+  <div class="split">
+    <div class="fixed">
+      <table>
+        <tr><th>Layer</th><th>Themeable</th></tr>
+        <tr><td>Shell nav, frame, back, focus rings</td><td class="no">Never — the player must always know whose software they are in</td></tr>
+        <tr><td>Identity plate, mark, texture, eyebrow, entrance</td><td class="yes">Fully — this is the point</td></tr>
+        <tr><td>Stock rows</td><td class="yes">Accent and frame only</td></tr>
+        <tr><td>Price and commit affordance</td><td class="no">Never — money does not take on a local dialect</td></tr>
+        <tr><td>9px floor, 0.94 opacity, contrast, tabular numerals</td><td class="no">Never — a theme may not opt out of being readable</td></tr>
+      </table>
+    </div>
+    <div class="fixed">
+      <p class="ncm-eyebrow">Resolution order</p>
+      <p style="margin:var(--op77-space-2) 0 0;font-size:var(--op77-fs-meta);color:var(--op77-text-dim)">
+      Explicit <code>themeId</code> → operator/organisation → specialisation → relationship → supply tier →
+      clientele → district as a <em>flavour</em> modifier only → base.</p>
+      <p class="note" style="margin-top:var(--op77-space-3)">Geography is never the primary key, so two markets in
+      one district can differ and one operator can carry its identity across districts. This matches
+      <code>17_MARKET_NETWORK.md</code>, which already rejects name-as-identity and calls
+      <code>display_name</code> "presentation, independently mutable" against an opaque <code>market_id</code>.</p>
+    </div>
+  </div>
+
+  <h2>3 · Banners at the real card geometry</h2>
+  <div class="cards">
+    <div class="card bn-base"><div class="bn"><div class="art"></div>
+      <div class="idn"><div class="eye">NCM DRIVER</div><span class="nm">V. ARASAKA</span></div>
+      <div class="bdg">
+        <span><svg viewBox="0 0 24 24"><path d="M5 3v18M7 5h12l-3 4 3 4H7"/><path d="m9 9 2 2 5-5"/></svg></span>
+        <span><svg viewBox="0 0 24 24"><circle cx="12" cy="13" r="8"/><path d="M9 2h6M12 5v2m0 6 4-3"/></svg></span>
+      </div></div>
+      <aside class="fp"><b>FINGERPRINT</b><em>Unavailable</em><u>Insufficient data</u></aside></div>
+
+    <div class="card bn-forge"><div class="bn"><div class="art"></div>
+      <div class="idn"><div class="eye">NINTH STREET FORGE</div><span class="nm">MOTOKO</span></div>
+      <div class="bdg">
+        <span><svg viewBox="0 0 24 24"><path d="M5 3v18M7 5h12l-3 4 3 4H7"/><path d="m9 9 2 2 5-5"/></svg></span>
+        <span><svg viewBox="0 0 24 24"><path d="m8 20 4-16 4 16M6 20h12M9.5 13h5"/></svg></span>
+        <span><svg viewBox="0 0 24 24"><path d="M5 3v18M7 5h12v10H7"/></svg></span>
+      </div></div>
+      <aside class="fp"><b>FINGERPRINT</b><em>Unavailable</em><u>Insufficient data</u></aside></div>
+
+    <div class="card bn-vault"><div class="bn"><div class="art"></div>
+      <div class="idn"><div class="eye">THE LONG VAULT</div><span class="nm">JACKIE W.</span></div>
+      <div class="bdg">
+        <span><svg viewBox="0 0 24 24"><circle cx="12" cy="13" r="8"/><path d="M9 2h6M12 5v2m0 6 4-3"/></svg></span>
+      </div></div>
+      <aside class="fp"><b>FINGERPRINT</b><em>Unavailable</em><u>Insufficient data</u></aside></div>
+  </div>
+  <p class="note">288×84, grid <code>minmax(0,1fr) 82px</code>, art composited at <strong>opacity .72 under the
+  name</strong>, bottom-left 8px clipped — all measured from the shipped <code>nameplates.css</code>, not invented.
+  The consequence is the format rule: <strong>a banner is a background wash, not a picture.</strong> Author at
+  ~2.45:1, let <code>crop</code> frame it, and expect text on top. The banner is the ground; the badges are the
+  marks on it. Worn banners stay static — this page runs one card per streamed player at 60fps, so animation
+  belongs to the unlock, which happens once.</p>
+
+  <h2>4 · The unlock moment</h2>
+  <div class="mk bn-forge" data-market-theme="forge" style="--bn-art:repeating-linear-gradient(118deg,#1b1109 0 14px,#2a1a0d 14px 28px);--bn-line:rgba(255,138,60,.55)">
+    <div class="unlock">
+      <span class="eye">// A door in Watson opens</span>
+      <h4>Ninth Street Forge</h4>
+      <p><em>Kiroshi-lit, smells of brake dust.</em> Components only, and they know what they have.
+      You know where this one is now.</p>
+      <div class="got">
+        <span class="chipart"></span>
+        <span><b>Banner earned</b><small>Their colours are yours to fly. Driver File keeps it.</small></span>
+      </div>
+    </div>
+  </div>
+  <p class="note">Two halves on two surfaces: the <strong>event</strong> goes through the communication layer
+  (<code>NcmComms.send</code>, priority <code>informative</code>, <code>mode&nbsp;=&nbsp;"once"</code>) with
+  <code>ui_jingle_quest_success</code> via <code>Open77.sfx.play2d</code> — free, quota-less, and a channel NCM
+  currently never uses. The <strong>memory</strong> lands in the Driver File, which is where "where do I find this
+  again?" already belongs. Compare the register: <em>"Supply chain unlocked."</em> is the corporate voice;
+  this is the voice <code>visibility.lua</code> already writes in.</p>
+
+  <h2>5 · What the code delta actually is</h2>
+  <div class="fixed">
+    <table>
+      <tr><th>Already built in <code>driver.presentation</code></th><th>Missing</th></tr>
+      <tr><td>Banner registry with stable ids, a <code>theme</code> field, an <code>entitlement</code> reason,
+        <code>image</code> + <code>crop</code>, entitlement computation, selection validated with typed issues
+        (<code>unknown_banner</code>, <code>banner_not_entitled</code>), persistence in
+        <code>driver_presentation.banner_id</code>, a safe public projection, a client asset catalogue, and a
+        working renderer.</td>
+      <td>One write-once provenance table (<code>banner_grant</code>: banner id, <code>source_kind</code>,
+        <code>source_ref</code>, <code>first_granted_at</code>) and a second input to
+        <code>M.entitlements()</code>. The selection, validation and projection path needs
+        <strong>no change at all</strong>.</td></tr>
+    </table>
+  </div>
+  <p class="note">Which is why this is a small piece of work rather than a new system: banners already exist in
+  embryo and have no earning path. Implement <code>source_kind = "market"</code> only; the other sources
+  (venue, district, championship, manufacturer, team, organisation, event, milestone) are proven possible by the
+  column existing. No banner ever grants money, grip, access or standing — the moment one does, players optimise
+  collection instead of enjoying it, and every future banner becomes a balance argument.</p>
+
+</div>
+<script>
+  // The entire per-market runtime. One attribute, plus authored copy and stock. No per-market code path.
+  const MARKETS = {
+    base:  { eye: "// NCM COMMERCIAL BASELINE", name: "Base Market",
+             line: "Open to every driver. Serialized machines and components, priced plainly, no relationship required.",
+             mark: '<svg viewBox="0 0 24 24"><path d="M4 9h16M6 9V6h12v3M5 9v11h14V9M10 20v-6h4v6"/></svg>',
+             stock: [["Makigai MaiMai","Machine · serialized · one only","€$2,500",true],
+                     ["Thorton Galena","Machine · serialized · one only","€$4,500",true],
+                     ["Archer Hella","Machine · serialized · one only","€$7,500",true]] },
+    forge: { eye: "// INDEPENDENT FABRICATION · NINTH STREET", name: "Ninth Street Forge",
+             line: "Components only. Everything on the bench has been off a car before, and they will tell you which one.",
+             mark: '<svg viewBox="0 0 24 24"><path d="M3 20h18M7 20V9l5-5 5 5v11M10 20v-5h4v5"/><path d="M12 4v5"/></svg>',
+             stock: [["Braced Lower Arms","Component · handling · used","€$1,150",true],
+                     ["Vented Rotor Set","Component · braking · new","€$860",true],
+                     ["Forced-Induction Core","Component · power · needs GT mount","€$4,200",false]] },
+    tide:  { eye: "// SALVAGE YARD · TIDEWATER", name: "Tidewater Salvage",
+             line: "What the storm drains give up. Mixed stock, uneven condition, and the prices reflect both.",
+             mark: '<svg viewBox="0 0 24 24"><path d="M3 15c3-3 6 3 9 0s6 3 9 0M3 19c3-3 6 3 9 0s6 3 9 0M7 11 9 4h6l2 7"/></svg>',
+             stock: [["Villefort Cortes","Machine · salvage · engine tired","€$1,900",true],
+                     ["Assorted Wheel Set","Component · cosmetic","€$300",true],
+                     ["Unidentified Loom","Component · unknown fitment","€$140",false]] },
+    vault: { eye: "// BY INVITATION · THE LONG VAULT", name: "The Long Vault",
+             line: "Collector stock held off the street. One of each, and the provenance is the product.",
+             mark: '<svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="1"/><circle cx="12" cy="12" r="3.5"/><path d="M12 8.5V5M8 20v1m8-1v1"/></svg>',
+             stock: [["Rayfield Caliburn","Machine · collector · sealed","€$92,000",true],
+                     ["Quadra Turbo-R","Machine · collector · documented","€$61,500",true],
+                     ["Period Livery Set","Component · cosmetic · authenticated","€$3,400",true]] }
+  };
+  const shell = document.getElementById("shell");
+  const pEye = document.getElementById("pEye"), pName = document.getElementById("pName");
+  const pLine = document.getElementById("pLine"), pMark = document.getElementById("pMark");
+  const pStock = document.getElementById("pStock");
+
+  function show(key) {
+    const m = MARKETS[key] || MARKETS.base;
+    shell.dataset.marketTheme = key in MARKETS ? key : "base";  // unknown themes fall back, never fail
+    pEye.textContent = m.eye; pName.textContent = m.name; pLine.textContent = m.line;
+    pMark.innerHTML = m.mark;
+    pStock.replaceChildren(...m.stock.map(([nm, meta, price, fits]) => {
+      const row = document.createElement("div"); row.className = "item";
+      row.innerHTML = '<i></i><span class="nm"></span>' +
+        '<span class="fit ' + (fits ? "yes" : "no") + '">' + (fits ? "FITS" : "NO FIT") + '</span>' +
+        '<span class="price"></span>';
+      row.children[1].innerHTML = "<small></small>";
+      row.children[1].insertBefore(document.createTextNode(nm), row.children[1].firstChild);
+      row.children[1].querySelector("small").textContent = meta;
+      row.children[3].textContent = price;
+      const buy = document.createElement("button"); buy.className = "buy"; buy.textContent = "Purchase";
+      row.append(buy);
+      return row;
+    }));
+    // re-run the plate entrance so the identity change is felt, at the market's own duration
+    const plate = shell.querySelector(".plate");
+    plate.style.animation = "none"; void plate.offsetWidth; plate.style.animation = "";
+  }
+  for (const b of document.querySelectorAll(".mkbtn")) {
+    b.addEventListener("click", () => {
+      for (const o of document.querySelectorAll(".mkbtn")) o.removeAttribute("aria-current");
+      b.setAttribute("aria-current", "true");
+      show(b.dataset.key);
+    });
+  }
+  show("base");
+</script>
+</body>
+</html>

@@ -581,7 +581,13 @@ function NcmGuide.interest(pid, ref)
     publishEntryBag(pid, driver.ncmDriverId)   -- soonest live entry, not necessarily the one just clicked
     tell(pid, ("You're on the list: %s · %s at %s, start in %s. Entries at the line from %s before the start."):format(
         e.seriesName, e.routeName, e.venue.name, Entry.countdown(e.startsAt - t), Entry.countdown(e.startsAt - e.entryOpensAt)))
-    toast(pid, { type = "success", title = "ON THE LIST", message = e.routeName .. " · " .. e.venue.name .. " · " .. Entry.countdown(e.startsAt - t), icon = "NCM", durationMs = 7000 })
+    NcmComms.send(pid, {
+        id = "race.interest.registered", category = "objective", priority = "actionable", title = "ROUTE SET · ON THE LIST",
+        firstMessage = e.routeName .. " · Interest is not entry. Ride to " .. e.venue.name .. "; enter at the line when the window opens.",
+        repeatMessage = e.routeName .. " · " .. e.venue.name .. " · starts in " .. Entry.countdown(e.startsAt - t),
+        actionHint = "/ncm.gps re-marks the venue", reference = "driver", surface = "toast",
+        repeatPolicy = { mode = "adaptive" },
+    })
     log("INTEREST player=%d driver=%s event=%s entry=%s", pid, driver.ncmDriverId, e.eventId, en.entryId)
     TriggerClientEvent("ncm:guide.route", pid, { x = e.venue.x, y = e.venue.y, z = e.venue.z, name = e.venue.name, eventId = e.eventId })
     NcmCalendar.publishNow()

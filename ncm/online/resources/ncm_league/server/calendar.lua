@@ -526,7 +526,13 @@ local function enterPlayer(pid, eventId)
             startsAt = math.floor(e.startsAt),
             venue = { x = e.venue.x, y = e.venue.y, z = e.venue.z, name = e.venue.name } }) end)
         tell(pid, ("You're in: %s · %s. Start in %s. Entry -€$%d · balance €$%d."):format(e.seriesName, e.routeName, Entry.countdown(e.startsAt - now()), paid.fee, paid.balance))
-        pcall(Open77.notifications.send, pid, { type = "success", title = "ENTERED · -€$"..paid.fee, message = e.routeName .. " · balance €$"..paid.balance, icon = "NCM", durationMs = 7000 })
+        if NcmComms then
+            NcmComms.acknowledge(pid,"race.interest.registered")
+            NcmComms.send(pid,{id="race.entry:"..e.eventId,category="confirmation",priority="actionable",
+                title="ENTERED · -€$"..paid.fee,
+                message=e.routeName.." · grid place recorded · balance €$"..paid.balance.." · wait for race control",
+                reference="driver",surface="toast",repeatPolicy={mode="once"}})
+        end
         log("ENTERED player=%d driver=%s event=%s entry=%s dist=%.1fm%s", pid, driver.ncmDriverId, e.eventId, en.entryId, en.distanceM or -1, decision.upgraded and " (from interest)" or "")
         -- Navigation intent changes HERE, not at lights-out (owner QA 2026-09-23). The venue GPS has served
         -- its purpose the moment the driver is standing at the venue and entered; from now on the useful

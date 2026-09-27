@@ -1,0 +1,229 @@
+/* =============================================================================
+   NCM UI — proposed token layer (PROTOTYPE, not shipped)
+   =============================================================================
+
+   Prototype for PRESENTATION_CAPABILITY_AUDIT.md findings 1 and 2. It lives in
+   docs/research so nothing in ncm_world changes until the owner decides.
+
+   THREE LAYERS, in this order, and the order is the point:
+
+     1. PLATFORM      --op77-*  copied byte-identical from
+                      tools/open77/server/resources/system/*/web/open77-ui.css
+                      (all 11 copies hash 7481e7a15e043bb301d589212189de35).
+                      Copied, never edited: the mirror check upstream is only
+                      meaningful if our copy still matches theirs.
+     2. NCM ALIASES   the names NCM's pages already use, pointed at platform
+                      values, so panel.html and nameplates.css keep working
+                      while resolving to ONE value instead of two.
+     3. NCM OWN       the handful of roles the platform has no opinion about,
+                      because a marketing site and a freeroam HUD never had to
+                      say "sector 2 is 0.184 up" or "these tyres are cold".
+
+   WHY THIS FILE AND NOT AN @import: each resource's WebUI runs under its own
+   isolated virtual origin and can only load files its own manifest declares.
+   There is no shared origin. `web_files { "web/**" }` in ncm_world/open77.lua
+   already covers a file dropped in web/, so shipping this is a copy plus one
+   <link> per page.
+   ========================================================================== */
+
+:root {
+  color-scheme: dark;
+
+  /* ---- 1. PLATFORM: FIELD ------------------------------------------------ */
+  --op77-void:       #060a12;
+  --op77-bg:         #080e19;
+  --op77-bg-elev:    #0d1624;
+  --op77-surface:    #101b2b;
+  --op77-surface-2:  #132032;
+
+  /* 0.94 is the floor for anything carrying words over live gameplay: the
+     scene behind a HUD panel swings from a blown-out plaza to a black alley. */
+  --op77-panel:        rgba(10, 18, 32, 0.94);
+  --op77-panel-raised: rgba(16, 27, 43, 0.96);
+  --op77-panel-quiet:  rgba(10, 18, 32, 0.78);   /* decoration only */
+  --op77-scrim:        rgba(3, 7, 13, 0.72);
+
+  /* ---- 1. PLATFORM: LINES ----------------------------------------------- */
+  /* Blue-gray hairlines, never cyan. Depth comes from borders, not shadows. */
+  --op77-line:        rgba(174, 211, 224, 0.10);
+  --op77-line-strong: rgba(174, 211, 224, 0.19);
+  --op77-line-hud:    rgba(174, 211, 224, 0.30);  /* survives any backdrop */
+
+  /* ---- 1. PLATFORM: INK ------------------------------------------------- */
+  /* Measured against --op77-surface: 16.2:1 / 6.2:1 / 3.6:1.
+     --op77-text-faint is decoration and disabled ONLY. Never body copy. */
+  --op77-text:       #f2f6f8;
+  --op77-text-dim:   #8d99a8;
+  --op77-text-faint: rgba(141, 153, 168, 0.72);
+  --op77-ink:        #071013;   /* text ON an accent fill — never white */
+
+  /* ---- 1. PLATFORM: SIGNAL ---------------------------------------------- */
+  /* Budget: more than ~3 cyan elements in a viewport means remove some. */
+  --op77-accent:      #22d8e2;
+  --op77-accent-ice:  #70f3f5;
+  --op77-accent-deep: #18c8d4;
+  --op77-accent-soft: rgba(34, 216, 226, 0.12);
+  --op77-accent-line: rgba(34, 216, 226, 0.45);
+  --op77-signal:      #ff5964;   /* live / full / featured / new — never a CTA */
+  --op77-danger:      #ff5c5c;
+  --op77-ok:          #4fe3a9;
+  --op77-warn:        #f5c95c;
+  --op77-glow: 0 0 24px rgba(34, 216, 226, 0.25);  /* live things only */
+
+  /* ---- 1. PLATFORM: TYPE ------------------------------------------------ */
+  /* No font is bundled with any resource and there is no network in-game, so
+     "Rajdhani", "Saira" and "IBM Plex Mono" NEVER resolve. They stay first so
+     that bundling a webfont later takes over with no edit here. What actually
+     renders is the SECOND name, and these are the Windows faces chosen to
+     carry the same voice:
+       display  Bahnschrift Condensed   DIN-derived, closest to Rajdhani
+       body     Bahnschrift             same family, normal width
+       mono     Cascadia Mono           the micro-label and data voice        */
+  --op77-font-display: "Rajdhani", "Bahnschrift Condensed", "Bahnschrift SemiCondensed", "Arial Narrow", "Segoe UI", sans-serif;
+  --op77-font-body:    "Saira", "Bahnschrift", "Segoe UI", system-ui, sans-serif;
+  --op77-font-mono:    "IBM Plex Mono", "Cascadia Mono", "Consolas", ui-monospace, monospace;
+
+  /* HUD scale: read at arm's length over a moving image, not on a document.
+     9px is the FLOOR. NCM currently ships 5px, 6px and 7px text. */
+  --op77-fs-micro:  9px;
+  --op77-fs-label:  10px;
+  --op77-fs-meta:   11px;
+  --op77-fs-body:   14px;
+  --op77-fs-lead:   16px;
+  --op77-fs-title:  18px;
+  --op77-fs-head:   26px;
+  --op77-fs-hero:   40px;   /* countdowns, verdicts */
+
+  --op77-track-micro: 0.18em;
+  --op77-track-label: 0.12em;
+  --op77-track-head:  0.02em;
+
+  /* ---- 1. PLATFORM: SPACE ---------------------------------------------- */
+  --op77-space-1: 4px;  --op77-space-2: 8px;  --op77-space-3: 12px;
+  --op77-space-4: 16px; --op77-space-5: 24px; --op77-space-6: 32px;
+  --op77-space-7: 48px; --op77-space-8: 64px;
+  --op77-inset-x: 32px;   /* every HUD surface uses these, so the surfaces */
+  --op77-inset-y: 28px;   /* line up instead of each picking its own vw    */
+
+  /* ---- 1. PLATFORM: SHAPE --------------------------------------------- */
+  --op77-radius-sm: 2px;
+  --op77-radius-md: 6px;          /* the maximum radius anywhere */
+  --op77-notch: 12px;
+  --op77-notch-clip: polygon(0 0, calc(100% - var(--op77-notch)) 0, 100% var(--op77-notch), 100% 100%, 0 100%);
+  --op77-rule: 3px;               /* accent rule down a panel's leading edge */
+  /* One shadow. A separation device, not a depth ramp: there are no levels. */
+  --op77-shadow: 0 8px 28px rgba(0, 0, 0, 0.55);
+
+  /* ---- 1. PLATFORM: MOTION ------------------------------------------- */
+  /* Functional and fast. No glitch loops, no parallax, no idle animation. */
+  --op77-ease: cubic-bezier(0.2, 0, 0, 1);
+  --op77-dur-fast: 90ms;    /* colour and border changes */
+  --op77-dur:      150ms;   /* enter, leave, hover       */
+  --op77-dur-slow: 220ms;   /* a whole panel sliding in  */
+
+  /* =========================================================================
+     2. NCM ALIASES — the names NCM's pages already use.
+     Keeping both spellings alive is what makes this adoptable in one commit
+     instead of a rewrite of two large pages. panel.html's inline :root block
+     and nameplates.css's --ncm-* block can then be deleted.
+     ====================================================================== */
+  --panel:  var(--op77-panel);
+  --line:   var(--op77-line-hud);
+  --text:   var(--op77-text);
+  --dim:    var(--op77-text-dim);
+  --accent: var(--op77-accent);
+  --ok:     var(--op77-ok);
+  --warn:   var(--op77-warn);
+  --red:    var(--op77-danger);
+  --display: var(--op77-font-display);
+  --mono:    var(--op77-font-mono);
+
+  /* nameplates.css shipped its own cyan (#63efff) and its own ink. Both now
+     resolve to the platform values, which is the whole point of this file.
+     --ncm-magenta has NO platform counterpart: it is the Driver Card's second
+     channel. Kept, but pinned to the platform's coral rather than a third hue. */
+  --ncm-cyan:    var(--op77-accent);
+  --ncm-blue:    var(--op77-accent-deep);
+  --ncm-magenta: var(--op77-signal);
+  --ncm-ink:     var(--op77-panel-raised);
+  --ncm-line:    var(--op77-accent-line);
+
+  /* =========================================================================
+     3. NCM'S OWN ROLES — where the platform has no opinion.
+     ====================================================================== */
+
+  /* Timing. A delta is the one figure NCM shows that is signed, and sign is
+     meaning: ahead/behind is not success/failure, so it must NOT reuse ok/danger
+     at full strength or every slower lap reads as an error. */
+  --ncm-ahead:    #4fe3a9;
+  --ncm-behind:   #ff8a72;
+  --ncm-neutral:  var(--op77-text-dim);
+  --ncm-best:     #c9a4ff;   /* a personal best / route record is its own event */
+  --ncm-sector:   var(--op77-accent-deep);
+
+  /* Session phase. The race kernel's phases, each with one colour, so the
+     banner, the strip and the light tree cannot disagree about what GREEN is. */
+  --ncm-phase-idle:      var(--op77-text-dim);
+  --ncm-phase-forming:   var(--op77-warn);
+  --ncm-phase-countdown: var(--op77-signal);
+  --ncm-phase-green:     var(--op77-ok);
+  --ncm-phase-finished:  var(--op77-accent);
+  --ncm-phase-penalty:   var(--op77-danger);
+
+  /* Machine condition. Reads as a ramp, not as good/bad, because wear is a
+     continuum and the Parts/Wear systems already model it that way. */
+  --ncm-cold:   #6ba8ff;
+  --ncm-ready:  var(--op77-ok);
+  --ncm-hot:    var(--op77-warn);
+  --ncm-spent:  var(--op77-danger);
+
+  /* Tier. Street / GT / Hypercar / NCX already differ economically (document
+     40); giving them one colour each means a card never has to spell it out. */
+  --ncm-tier-street:   #8d99a8;
+  --ncm-tier-gt:       var(--op77-accent);
+  --ncm-tier-hyper:    #c9a4ff;
+  --ncm-tier-ncx:      var(--op77-warn);
+
+  /* Glyph palette, matching web/glyphs.manifest.json's declared palette list. */
+  --glyph-accent: var(--op77-accent);
+
+  /* Layer discipline. §7.1 of the audit: NCM currently collides with
+     open77_notifications at hud z720 and open77_admin at hud z730. These are
+     the WebUI.create zIndex values, kept here so the allocation is written
+     down in one place rather than rediscovered per page. */
+  --ncm-z-cards:  650;   /* above native plates 640, below prompts 660 */
+  --ncm-z-race:   735;   /* was 730 — open77_admin hud */
+  --ncm-z-venue:  740;   /* was 720 — open77_notifications */
+  --ncm-z-panel:  900;   /* layer "menu", so clear of the watermark on hud */
+}
+
+/* The platform's `//` eyebrow device. Where it appears, nothing else glows. */
+.op77-eyebrow,
+.ncm-eyebrow {
+  font: 700 var(--op77-fs-micro) / 1 var(--op77-font-mono);
+  letter-spacing: var(--op77-track-micro);
+  text-transform: uppercase;
+  color: var(--op77-text-dim);
+}
+.op77-eyebrow::before,
+.ncm-eyebrow::before {
+  content: "//";
+  margin-right: 0.7em;
+  color: var(--op77-accent);
+  font-weight: 900;
+  letter-spacing: -0.06em;
+}
+
+/* Animation enhances, it never gates: nothing starts at opacity 0 without a
+   paired end state, and all of it is off when the player asked for less.
+   NCM ships no copy of this block today, so NCM currently honours nothing. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 1ms !important;
+    animation-delay: 0ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+    transition-delay: 0ms !important;
+    scroll-behavior: auto !important;
+  }
+}

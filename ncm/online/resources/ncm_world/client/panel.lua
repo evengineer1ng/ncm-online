@@ -5,11 +5,12 @@
 local Core = NcmCore
 local Q = Core.get("onboarding.questionnaire")
 local Chunks = Core.get("vocabulary.chunks")
+local Landing = Core.get("player.landing")
 
 local function log(fmt, ...) print(("[ncm_world/client/panel] " .. fmt):format(...)) end
 
 local page, pageReady = nil, false
-local open = nil            -- "questionnaire" | "inbox" | "guide" | "market" | "collection" | "help" | nil
+local open = nil            -- "questionnaire" | "inbox" | "driver" | "guide" | "market" | "collection" | "help" | nil
 local inputSeen = false
 local pendingQuestionnaire = false
 local lastInbox = nil
@@ -18,6 +19,7 @@ local lastResults = nil
 local lastCollection = nil
 local lastMarket = nil
 local lastComponents = nil
+local lastVisibility = nil
 local marketWire = nil
 
 -- KB-61. Focus is the dangerous part of this file.
@@ -33,11 +35,25 @@ local marketWire = nil
 local FOCUS_CONFIRM_MS = 2500
 local focusToken = 0
 
+-- Forward declaration: the pad's BACK action must close the panel through the SAME Lua path the keybind uses,
+-- never through the page. See `client/nav_input.lua` and KB-61.
+local hide
+
 local function applyFocus(on)
     if not page then return end
     local ok, focused, reason = pcall(function() return page:setFocus(on, on) end)
     if not ok then log("setFocus failed: %s", tostring(focused))
     elseif focused == false then log("setFocus refused: %s", tostring(reason)) end
+
+    -- Gamepad navigation follows focus exactly, so every panel mode gets it from this one place rather than
+    -- each surface growing its own controller code. Attaching only while focused also means nothing polls the
+    -- pad while the player is simply driving.
+    if type(NcmNavInput) ~= "table" then return end
+    if on then
+        pcall(NcmNavInput.attach, page, { onBack = function() if hide then hide() end end })
+    else
+        pcall(NcmNavInput.detach)
+    end
 end
 
 --- Give input back, whatever state the page is in. Safe to call repeatedly.
@@ -199,6 +215,57 @@ local function showGuide()
     sendBig("panel:guide", lastGuide or { rows = {}, loading = true }, "rows")
 end
 
+-- ---------------------------------------------------------------------------------------------------------
+-- Session Landing Panel.
+--
+-- Appears on every session entry during alpha, not once per install: the progression contract stays true for
+-- the whole of development, so a player who joined in week one still needs to read it in week nine.
+--
+-- The "already seen" watermark is a CLIENT KVP, not a schema column. `Open77.kvp` is isolated by connection
+-- address, resource and key, which is exactly the right scope for a presentation preference -- and it keeps a
+-- landing panel from stacking a migration on top of 036, whose twice-applied dry-run is still owed. The cost
+-- is honest and small: a player on a second machine sees the same releases marked NEW once more.
+local SEEN_KEY = "landing.lastReleaseDate"
+local landingPayload = nil
+
+local function landingSeen()
+    local ok, value = pcall(Open77.kvp.get, SEEN_KEY)
+    if ok and type(value) == "string" and value ~= "" then return { lastReleaseDate = value } end
+    return {}
+end
+
+local function landingAdvance(payload)
+    local nextSeen = Landing.advance(landingSeen(), payload)
+    if nextSeen and nextSeen.lastReleaseDate then
+        pcall(Open77.kvp.set, SEEN_KEY, nextSeen.lastReleaseDate)
+    end
+end
+
+--- Build the payload. Content is authored client-side in `landing_content.lua`, so the panel never waits on
+--- the host to render -- session initialisation must not depend on this panel, and this panel must not depend
+--- on session initialisation either.
+local function landingBuild()
+    local content = type(NcmLandingContent) == "table" and NcmLandingContent or {}
+    local ok, payload = pcall(Landing.payload, content, landingSeen())
+    if not ok then log("landing payload failed: %s", tostring(payload)); return nil end
+    return payload
+end
+
+local function showLanding()
+    if not page or not pageReady then return end
+    landingPayload = landingBuild()
+    if not landingPayload then return end
+    setOpen("landing")
+    page:send("panel:show", { panel = "landing", landing = landingPayload })
+end
+
+local function showDriver()
+    if not page or not pageReady then return end
+    TriggerServerEvent("ncm:visibility.request")
+    setOpen("driver")
+    page:send("panel:show", { panel = "driver", driver = lastVisibility or { loading = true } })
+end
+
 local function showCollection()
     if not page or not pageReady then return end
     TriggerServerEvent("ncm:collection")
@@ -256,7 +323,9 @@ AddEventHandler("ncm:ffb.state", function()
     page:send("panel:wheel", state or { enabled = false, connected = false })
 end)
 
-local function hide()
+-- Assigns the forward-declared local above (not `local function`), so `applyFocus` and the pad's BACK share
+-- this exact close path.
+function hide()
     if page and pageReady then page:send("panel:hide", {}) end
     setOpen(nil)
 end
@@ -285,6 +354,11 @@ AddEventHandler("onClientResourceStart", function(name)
         inputSeen = true
         if type(d) == "table" and d.id and d.action then TriggerServerEvent("ncm:inbox.act", d.id, d.action) end
     end)
+    -- The player has read the landing panel. Only then does the "seen" watermark move, so a panel that was
+    -- opened and never drawn cannot silently mark releases as read.
+    page:on("panel:landing.seen", function()
+        if landingPayload then landingAdvance(landingPayload) end
+    end)
     page:on("panel:read", function(d)
         inputSeen = true
         if type(d) == "table" and d.id then TriggerServerEvent("ncm:inbox.read", d.id) end
@@ -296,7 +370,8 @@ AddEventHandler("onClientResourceStart", function(name)
     end)
     page:on("panel:navigate", function(d)
         if type(d) ~= "table" then return end
-        if d.panel == "guide" then showGuide() elseif d.panel == "market" then showMarket()
+        if d.panel == "driver" then showDriver()
+        elseif d.panel == "guide" then showGuide() elseif d.panel == "market" then showMarket()
         elseif d.panel == "collection" then showCollection()
         elseif d.panel == "wheel" then showWheel()
         elseif d.panel == "help" then showHelp() end
@@ -432,6 +507,12 @@ RegisterNetEvent("ncm:guide.payload", function(value)
     if page and pageReady and open == "guide" then sendBig("panel:guide", value, "rows") end
 end)
 
+RegisterNetEvent("ncm:visibility.payload", function(value)
+    if type(value) ~= "table" then return end
+    lastVisibility = value
+    if page and pageReady and open == "driver" then page:send("panel:driver", value) end
+end)
+
 RegisterNetEvent("ncm:collection.payload", function(value)
     if type(value) ~= "table" then return end
     lastCollection = value
@@ -447,6 +528,8 @@ RegisterNetEvent("ncm:component.inventory",function(value)
 end)
 RegisterNetEvent("ncm:component.state",function(value) if page and pageReady then page:send("panel:component.states",type(value)=="table" and value or {}) end end)
 RegisterNetEvent("ncm:component.install.result",function(value) if page and pageReady then page:send("panel:component.install.result",type(value)=="table" and value or {}) end end)
+RegisterNetEvent("ncm:market.purchase.result",function(value) if page and pageReady then page:send("panel:market.purchase.result",type(value)=="table" and value or {}) end end)
+RegisterNetEvent("ncm:component.purchase.result",function(value) if page and pageReady then page:send("panel:component.purchase.result",type(value)=="table" and value or {}) end end)
 
 -- The Machine Index's CALL VEHICLE button needs to react; a toast behind the open panel is not a reaction.
 RegisterNetEvent("ncm:vehicle.result", function(value)
@@ -564,6 +647,57 @@ local function toggleCollection()
 end
 pcall(function() RegisterKeyMapping("ncm.collectionpage", "NCM: Machine Index", "F10", toggleCollection) end)
 RegisterCommand("ncm.collectionpage", toggleCollection, false)
+
+-- ---------------------------------------------------------------------------------------------------------
+-- Landing panel: automatic on session entry, plus a retrieval path that survives dismissal.
+local function toggleLanding()
+    if open == "landing" then hide() else showLanding() end
+end
+RegisterCommand("ncm.whatsnew", toggleLanding, false)
+RegisterCommand("ncm.landing", toggleLanding, false)
+
+--- The chat twin. Essential information must not become reachable only through one graphical path, so the
+--- contract, today's capabilities and the newest release are all readable without the panel at all.
+RegisterCommand("ncm.alpha", function()
+    local payload = landingBuild()
+    -- `Open77.chat` is SERVER-only. A client resource talks to the chat through `open77_chat`'s own client
+    -- export, which takes a string or a table. Fire and forget: the promise is not awaited, because a chat
+    -- line must never be able to stall a command.
+    local function tell(text)
+        pcall(Open77.exports.call, "open77_chat", "addMessage", "[NCM] " .. text)
+    end
+    if not payload then tell("Alpha status unavailable."); return end
+    tell(payload.contract.headline .. " -- " .. payload.contract.body)
+    local live = {}
+    for _, capability in ipairs(payload.capabilities) do
+        if capability.state ~= "soon" then
+            live[#live + 1] = capability.label .. (capability.state == "partial" and " (partial)" or "")
+        end
+    end
+    tell("You can: " .. table.concat(live, " / "))
+    local newest = payload.currentRelease
+    if newest then
+        tell(("Latest: %s (%s). /ncm.whatsnew for the full changelog."):format(newest.title, newest.date))
+    end
+end, false)
+
+-- Automatic on session entry. Deliberately independent of every other boot step: the world, the player and
+-- the economy initialise normally whether or not this panel is open or dismissed, so a player who leaves it up
+-- for ten minutes cannot wedge anything. The delay only lets the page finish loading.
+local landingShown = false
+local function landingOnEntry()
+    if landingShown then return end
+    landingShown = true
+    CreateThread(function()
+        Wait(6000)
+        -- Never steal a surface the player already opened, and never interrupt a race.
+        if open ~= nil then return end
+        showLanding()
+    end)
+end
+
+AddEventHandler("open77:worldReady", landingOnEntry)
+CreateThread(function() Wait(12000); landingOnEntry() end)   -- covers a resource that starts after worldReady
 
 AddEventHandler("onClientResourceStop", function(name)
     if name == "ncm_world" then hide() end

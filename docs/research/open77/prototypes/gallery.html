@@ -1,0 +1,365 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NCM Presentation Capability Gallery</title>
+<!--
+  PROTOTYPE for PRESENTATION_CAPABILITY_AUDIT.md §14. Not shipped.
+
+  CEF-SAFE BY CONSTRUCTION, because that is the thing being proven:
+    - no network of any kind: no CDN, no webfont, no remote image
+    - system faces only, so what you see is what a client renders
+    - every mark is CSS geometry or inline SVG
+    - all colour, type, space, shape and timing come from ncm-ui.css tokens
+  Open it in a browser. It renders identically with no server.
+-->
+<link rel="stylesheet" href="ncm-ui.css">
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: var(--op77-space-6) var(--op77-inset-x) var(--op77-space-8);
+    background: var(--op77-bg);
+    color: var(--op77-text);
+    font: 400 var(--op77-fs-body)/1.55 var(--op77-font-body);
+  }
+  h1 { font: 700 var(--op77-fs-head)/1.1 var(--op77-font-display);
+       letter-spacing: var(--op77-track-head); margin: 0 0 var(--op77-space-2); }
+  h2 { font: 700 var(--op77-fs-title)/1.2 var(--op77-font-display);
+       letter-spacing: var(--op77-track-head); margin: var(--op77-space-7) 0 var(--op77-space-3); }
+  .lede { color: var(--op77-text-dim); max-width: 78ch; margin: 0 0 var(--op77-space-2); }
+  .note { color: var(--op77-text-dim); font: 400 var(--op77-fs-meta)/1.5 var(--op77-font-mono);
+          max-width: 92ch; margin: var(--op77-space-2) 0 0; }
+  .wrap { max-width: 1180px; margin: 0 auto; }
+  .grid { display: grid; gap: var(--op77-space-3); }
+  .g2 { grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); }
+  .g3 { grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); }
+
+  /* The house panel: 0.94 fill, hairline border, one shadow, notched corner,
+     accent rule down the leading edge. Four platform rules in one component. */
+  .panel {
+    position: relative; padding: var(--op77-space-4) var(--op77-space-4) var(--op77-space-4) var(--op77-space-5);
+    background: var(--op77-panel); border: 1px solid var(--op77-line-hud);
+    clip-path: var(--op77-notch-clip); box-shadow: var(--op77-shadow);
+  }
+  .panel::before { content: ""; position: absolute; inset: 0 auto 0 0;
+    width: var(--op77-rule); background: var(--op77-accent); }
+  .panel--quiet::before { background: var(--op77-line-strong); }
+
+  .swatches { display: grid; grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); gap: 1px; }
+  .sw { padding: var(--op77-space-4) var(--op77-space-2) var(--op77-space-2);
+        font: 700 var(--op77-fs-micro)/1.3 var(--op77-font-mono);
+        letter-spacing: var(--op77-track-label); text-transform: uppercase;
+        border: 1px solid var(--op77-line); }
+  .sw span { display: block; color: var(--op77-text-faint); letter-spacing: 0; text-transform: none; }
+
+  /* --- type scale ------------------------------------------------------- */
+  .type-row { display: flex; align-items: baseline; gap: var(--op77-space-4);
+              padding: var(--op77-space-2) 0; border-bottom: 1px solid var(--op77-line); }
+  .type-row b { flex: 0 0 8ch; font: 700 var(--op77-fs-micro)/1 var(--op77-font-mono);
+                letter-spacing: var(--op77-track-label); color: var(--op77-text-dim); }
+
+  /* --- toast, matching open77_notifications' shape --------------------- */
+  .toast { display: grid; grid-template-columns: 34px 1fr; gap: var(--op77-space-3);
+    align-items: start; padding: var(--op77-space-3); background: var(--op77-panel-raised);
+    border: 1px solid var(--op77-line-hud); border-left: var(--op77-rule) solid var(--accent-c);
+    clip-path: var(--op77-notch-clip); box-shadow: var(--op77-shadow); overflow: hidden;
+    animation: ncm-slide-in var(--op77-dur-slow) var(--op77-ease) both; }
+  .toast .icon { display: grid; place-items: center; width: 34px; height: 34px;
+    color: var(--accent-c); border: 1px solid var(--accent-c); background: var(--op77-accent-soft);
+    font: 700 var(--op77-fs-title)/1 var(--op77-font-mono); }
+  .toast .kind { display: block; font: 700 var(--op77-fs-micro)/1 var(--op77-font-mono);
+    letter-spacing: var(--op77-track-micro); text-transform: uppercase; color: var(--accent-c); }
+  .toast strong { display: block; font: 700 var(--op77-fs-title)/1.2 var(--op77-font-display);
+    margin: 4px 0 2px; }
+  .toast p { margin: 0; font-size: var(--op77-fs-meta); color: var(--op77-text-dim); }
+  .toast .bar { grid-column: 1 / -1; height: 2px; margin-top: var(--op77-space-2);
+    background: var(--op77-line); }
+  .toast .bar i { display: block; height: 100%; background: var(--accent-c);
+    animation: ncm-drain 6s linear infinite; }
+  .t-info    { --accent-c: var(--op77-accent); }
+  .t-success { --accent-c: var(--op77-ok); }
+  .t-warning { --accent-c: var(--op77-warn); }
+  .t-error   { --accent-c: var(--op77-danger); }
+
+  /* --- race banner + countdown ----------------------------------------- */
+  .banner { display: grid; gap: 2px; padding: var(--op77-space-3) var(--op77-space-5);
+    background: var(--op77-panel); border: 1px solid var(--op77-line-hud);
+    border-left: var(--op77-rule) solid var(--phase); clip-path: var(--op77-notch-clip);
+    box-shadow: var(--op77-shadow); text-align: center; }
+  .banner .big { font: 700 var(--op77-fs-hero)/1 var(--op77-font-display);
+    letter-spacing: 0.04em; color: var(--phase); font-variant-numeric: tabular-nums; }
+  .banner .sub { font: 700 var(--op77-fs-micro)/1.4 var(--op77-font-mono);
+    letter-spacing: var(--op77-track-micro); text-transform: uppercase; color: var(--op77-text-dim); }
+  .b-count { --phase: var(--ncm-phase-countdown); }
+  .b-green { --phase: var(--ncm-phase-green); }
+  .b-pen   { --phase: var(--ncm-phase-penalty); }
+  .pulse { animation: ncm-pulse 1s var(--op77-ease) infinite; }
+
+  /* --- light tree ------------------------------------------------------- */
+  .tree { display: flex; gap: var(--op77-space-2); justify-content: center;
+          padding: var(--op77-space-3); }
+  .lamp { width: 26px; height: 26px; border-radius: 50%; border: 1px solid var(--op77-line-hud);
+          background: var(--op77-void); }
+  .lamp.on { background: var(--ncm-phase-countdown); border-color: var(--ncm-phase-countdown);
+              box-shadow: 0 0 14px rgba(255, 89, 100, 0.55); }
+  .lamp.go { background: var(--ncm-phase-green); border-color: var(--ncm-phase-green);
+              box-shadow: 0 0 14px rgba(79, 227, 169, 0.55); }
+
+  /* --- timing tower / classification ---------------------------------- */
+  .tower { border: 1px solid var(--op77-line-hud); background: var(--op77-panel);
+           clip-path: var(--op77-notch-clip); box-shadow: var(--op77-shadow); }
+  .tower header { display: flex; justify-content: space-between; align-items: center;
+    padding: var(--op77-space-2) var(--op77-space-3); border-bottom: 1px solid var(--op77-line-strong); }
+  .row { display: grid; grid-template-columns: 26px 1fr auto auto; gap: var(--op77-space-3);
+    align-items: center; padding: 7px var(--op77-space-3);
+    border-bottom: 1px solid var(--op77-line); font-size: var(--op77-fs-meta);
+    animation: ncm-rise var(--op77-dur) var(--op77-ease) both; }
+  .row:last-child { border-bottom: 0; }
+  .row .pos { font: 700 var(--op77-fs-meta)/1 var(--op77-font-mono); text-align: right;
+    color: var(--op77-text-dim); font-variant-numeric: tabular-nums; }
+  .row .who { font: 600 var(--op77-fs-body)/1.2 var(--op77-font-display);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .row .tyre { font: 700 var(--op77-fs-micro)/1 var(--op77-font-mono);
+    letter-spacing: var(--op77-track-label); padding: 3px 6px; border: 1px solid currentColor; }
+  .row .gap { font: 500 var(--op77-fs-meta)/1 var(--op77-font-mono);
+    font-variant-numeric: tabular-nums; }
+  .row--me { background: var(--op77-accent-soft); }
+  .row--me .pos { color: var(--op77-accent); }
+  .lead { color: var(--op77-text); } .ahead { color: var(--ncm-ahead); }
+  .behind { color: var(--ncm-behind); } .best { color: var(--ncm-best); }
+  .cold { color: var(--ncm-cold); } .ready { color: var(--ncm-ready); }
+  .hot { color: var(--ncm-hot); } .spent { color: var(--ncm-spent); }
+
+  /* --- delta readout --------------------------------------------------- */
+  .delta { display: grid; gap: 2px; text-align: center; padding: var(--op77-space-3);
+    background: var(--op77-panel); border: 1px solid var(--op77-line-hud);
+    clip-path: var(--op77-notch-clip); }
+  .delta b { font: 700 32px/1 var(--op77-font-mono); font-variant-numeric: tabular-nums; }
+
+  /* --- chips ----------------------------------------------------------- */
+  .chips { display: flex; flex-wrap: wrap; gap: var(--op77-space-2); }
+  .chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 9px;
+    font: 700 var(--op77-fs-label)/1 var(--op77-font-mono);
+    letter-spacing: var(--op77-track-label); text-transform: uppercase;
+    border: 1px solid currentColor; background: rgba(0,0,0,0.25); }
+  .chip svg { width: 13px; height: 13px; fill: none; stroke: currentColor;
+    stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+
+  /* --- progress -------------------------------------------------------- */
+  .meter { height: 8px; background: var(--op77-void); border: 1px solid var(--op77-line-strong); }
+  .meter i { display: block; height: 100%; background: var(--fill, var(--op77-accent));
+    animation: ncm-fill 2.4s var(--op77-ease) infinite alternate; }
+
+  /* --- screen-space map ------------------------------------------------ */
+  .screenmap { position: relative; aspect-ratio: 16/9; display: grid;
+    grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr);
+    border: 1px solid var(--op77-line-hud); background: var(--op77-void); }
+  .zone { display: grid; place-content: center; gap: 3px; text-align: center; padding: 6px;
+    border: 1px dashed var(--op77-line); font: 700 var(--op77-fs-micro)/1.35 var(--op77-font-mono);
+    letter-spacing: var(--op77-track-label); text-transform: uppercase; }
+  .zone span { display: block; font-weight: 400; letter-spacing: 0; text-transform: none;
+    color: var(--op77-text-faint); }
+  .free { color: var(--op77-ok); border-color: rgba(79,227,169,0.35); background: rgba(79,227,169,0.06); }
+  .busy { color: var(--op77-warn); border-color: rgba(245,201,92,0.35); background: rgba(245,201,92,0.06); }
+  .keep { color: var(--op77-danger); border-color: rgba(255,92,92,0.30); background: rgba(255,92,92,0.06); }
+
+  /* --- motion strip ---------------------------------------------------- */
+  .motion { display: grid; gap: var(--op77-space-2); }
+  .m-row { display: grid; grid-template-columns: 12ch 1fr; gap: var(--op77-space-3);
+    align-items: center; font: 700 var(--op77-fs-micro)/1 var(--op77-font-mono);
+    letter-spacing: var(--op77-track-label); text-transform: uppercase; color: var(--op77-text-dim); }
+  .m-demo { height: 26px; position: relative; overflow: hidden;
+    border: 1px solid var(--op77-line); background: var(--op77-void); }
+  .m-demo i { position: absolute; inset: 3px auto 3px 3px; width: 46px;
+    background: var(--op77-accent-line); border-left: 2px solid var(--op77-accent); }
+  .m-slide i { animation: ncm-slide 2.2s var(--op77-ease) infinite alternate; }
+  .m-fade  i { animation: ncm-fade 2.2s var(--op77-ease) infinite alternate; }
+  .m-scale i { animation: ncm-scale 2.2s var(--op77-ease) infinite alternate; transform-origin: left center; }
+  .m-pulse i { animation: ncm-pulse 1.4s var(--op77-ease) infinite; }
+
+  table { width: 100%; border-collapse: collapse; font-size: var(--op77-fs-meta); }
+  th, td { text-align: left; padding: 7px var(--op77-space-2); border-bottom: 1px solid var(--op77-line); }
+  th { font: 700 var(--op77-fs-micro)/1 var(--op77-font-mono); letter-spacing: var(--op77-track-label);
+       text-transform: uppercase; color: var(--op77-text-dim); }
+  code { font: 400 var(--op77-fs-meta)/1.4 var(--op77-font-mono); color: var(--op77-accent-ice); }
+
+  @keyframes ncm-slide-in { from { opacity: 0; transform: translateX(-12px); } to { opacity: 1; transform: none; } }
+  @keyframes ncm-rise    { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+  @keyframes ncm-drain   { from { width: 100%; } to { width: 0; } }
+  @keyframes ncm-fill    { from { width: 12%; } to { width: 100%; } }
+  @keyframes ncm-pulse   { 0%,100% { opacity: 1; } 50% { opacity: 0.45; } }
+  @keyframes ncm-slide   { from { transform: translateX(0); } to { transform: translateX(240px); } }
+  @keyframes ncm-fade    { from { opacity: 0.12; } to { opacity: 1; } }
+  @keyframes ncm-scale   { from { transform: scaleX(0.3); } to { transform: scaleX(5); } }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <p class="ncm-eyebrow">Prototype · presentation capability audit</p>
+  <h1>NCM presentation gallery</h1>
+  <p class="lede">Everything below is CSS geometry and inline SVG over the proposed
+  <code>ncm-ui.css</code> token layer. No network, no webfont, no image file — so this is what an
+  in-game CEF surface can actually render. The point is not the styling of any one component; it is
+  that one token contract produces all of them.</p>
+
+  <h2>1 · Field, line, ink, signal</h2>
+  <div class="swatches">
+    <div class="sw" style="background:var(--op77-void)">void<span>#060a12</span></div>
+    <div class="sw" style="background:var(--op77-bg)">bg<span>#080e19</span></div>
+    <div class="sw" style="background:var(--op77-surface)">surface<span>#101b2b</span></div>
+    <div class="sw" style="background:var(--op77-surface-2)">surface-2<span>#132032</span></div>
+    <div class="sw" style="background:var(--op77-accent);color:var(--op77-ink)">accent<span>#22d8e2</span></div>
+    <div class="sw" style="background:var(--op77-signal);color:var(--op77-ink)">signal<span>#ff5964</span></div>
+    <div class="sw" style="background:var(--op77-ok);color:var(--op77-ink)">ok<span>#4fe3a9</span></div>
+    <div class="sw" style="background:var(--op77-warn);color:var(--op77-ink)">warn<span>#f5c95c</span></div>
+  </div>
+  <p class="note">Platform rules carried through: hairlines are blue-gray, never cyan · depth comes
+  from borders, not shadows · one permitted shadow, as separation rather than a depth ramp · 6px is
+  the maximum radius anywhere · more than ~3 cyan elements in a viewport means remove some.</p>
+
+  <h2>2 · Type, as it really renders</h2>
+  <div class="panel panel--quiet">
+    <div class="type-row"><b>hero 40</b><span style="font:700 var(--op77-fs-hero)/1 var(--op77-font-display)">00:07.412</span></div>
+    <div class="type-row"><b>head 26</b><span style="font:700 var(--op77-fs-head)/1.1 var(--op77-font-display)">Japantown Crossway</span></div>
+    <div class="type-row"><b>title 18</b><span style="font:700 var(--op77-fs-title)/1.2 var(--op77-font-display)">Qualifying · Session 2</span></div>
+    <div class="type-row"><b>body 14</b><span>The grid forms at the start line.</span></div>
+    <div class="type-row"><b>meta 11</b><span style="font:400 var(--op77-fs-meta)/1.4 var(--op77-font-mono)">SECTOR 2 · +0.184 · TYRES 71%</span></div>
+    <div class="type-row"><b>micro 9</b><span class="ncm-eyebrow">Classification</span></div>
+  </div>
+  <p class="note">Display resolves to <strong>Bahnschrift Condensed</strong> and mono to
+  <strong>Cascadia Mono</strong> on a Windows client: "Rajdhani" and "IBM Plex Mono" lead each stack
+  but never resolve in-game, because no font is bundled and there is no network. 9px is the floor —
+  NCM currently ships 5px, 6px and 7px text in <code>nameplates.css</code>.</p>
+
+  <h2>3 · Notifications — four types, one shape</h2>
+  <div class="grid g2">
+    <div class="toast t-info"><div class="icon">i</div><div><span class="kind">Information</span>
+      <strong>Street event open</strong><p>Pothole · entry €$50 · closes in 4 minutes.</p></div>
+      <div class="bar"><i></i></div></div>
+    <div class="toast t-success"><div class="icon">✓</div><div><span class="kind">Success</span>
+      <strong>First time trial</strong><p>€$100 paid. Receipt in your statement.</p></div>
+      <div class="bar"><i></i></div></div>
+    <div class="toast t-warning"><div class="icon">!</div><div><span class="kind">Warning</span>
+      <strong>Tyres past peak</strong><p>Grip falling. Two laps of useful pace left.</p></div>
+      <div class="bar"><i></i></div></div>
+    <div class="toast t-error"><div class="icon">×</div><div><span class="kind">Error</span>
+      <strong>Entry denied</strong><p>Machine does not meet the GT ruleset.</p></div>
+      <div class="bar"><i></i></div></div>
+  </div>
+  <p class="note">Shape follows the real contract: 4 types, custom <code>color</code>, a text
+  <code>icon</code> of ≤16 characters (no images), <code>title</code> ≤96, <code>message</code> ≤384,
+  optional timed progress, 7 positions, 32 live and 8 per position. Type is carried by a written
+  <em>kind</em> label as well as colour, so the hierarchy survives colour-blindness.</p>
+
+  <h2>4 · Race state — banner, tree, countdown</h2>
+  <div class="grid g3">
+    <div class="banner b-count"><div class="big pulse">3</div><div class="sub">Countdown · hold position</div></div>
+    <div class="banner b-green"><div class="big">GREEN</div><div class="sub">Lap 1 of 3 · 4 cars</div></div>
+    <div class="banner b-pen"><div class="big">+5.0</div><div class="sub">Penalty · cut corner at T4</div></div>
+  </div>
+  <div class="panel" style="margin-top:var(--op77-space-3)">
+    <p class="ncm-eyebrow">Light tree</p>
+    <div class="tree"><i class="lamp on"></i><i class="lamp on"></i><i class="lamp on"></i><i class="lamp"></i><i class="lamp"></i></div>
+    <div class="tree"><i class="lamp go"></i><i class="lamp go"></i><i class="lamp go"></i><i class="lamp go"></i><i class="lamp go"></i></div>
+  </div>
+  <p class="note">Each phase draws one colour from a single set of phase tokens, so the banner, the
+  strip and the tree cannot disagree about what GREEN is. Sound is the missing half and it is free:
+  <code>sq024_race_countdown_start</code> under the tree, <code>sq024_race_start</code> on green,
+  <code>sq024_race_finish</code> at the line — all via <code>Open77.sfx.play2d</code>, which takes no
+  quota and no handle. NCM plays nothing today.</p>
+
+  <h2>5 · Timing tower and delta</h2>
+  <div class="grid g2">
+    <div class="tower">
+      <header><span class="ncm-eyebrow">Classification</span>
+        <span style="font:700 var(--op77-fs-micro)/1 var(--op77-font-mono);letter-spacing:var(--op77-track-label);color:var(--op77-text-dim)">LAP 2/3</span></header>
+      <div class="row"><span class="pos">1</span><span class="who">MOTOKO</span><span class="tyre ready">RDY</span><span class="gap lead">1:24.115</span></div>
+      <div class="row row--me"><span class="pos">2</span><span class="who">YOU</span><span class="tyre hot">HOT</span><span class="gap behind">+0.184</span></div>
+      <div class="row"><span class="pos">3</span><span class="who">V. ARASAKA</span><span class="tyre ready">RDY</span><span class="gap behind">+2.006</span></div>
+      <div class="row"><span class="pos">4</span><span class="who">GHOST · PB</span><span class="tyre cold">CLD</span><span class="gap best">+0.912</span></div>
+      <div class="row"><span class="pos">5</span><span class="who">JACKIE W.</span><span class="tyre spent">SPT</span><span class="gap behind">+11.44</span></div>
+    </div>
+    <div class="grid" style="align-content:start">
+      <div class="delta"><span class="ncm-eyebrow">Delta to personal best</span><b class="ahead">−0.184</b></div>
+      <div class="delta"><span class="ncm-eyebrow">Sector 2</span><b class="behind">+0.061</b></div>
+      <div class="panel panel--quiet"><p class="ncm-eyebrow">Tyres</p>
+        <div class="meter" style="--fill:var(--ncm-hot)"><i></i></div></div>
+    </div>
+  </div>
+  <p class="note">A delta is the one figure NCM shows whose <em>sign</em> is the meaning, so it gets
+  its own ahead/behind pair rather than reusing ok/danger — otherwise every slower lap reads as an
+  error. A personal best gets a third colour because it is a different kind of event. Tyre state is a
+  four-step ramp (cold / ready / hot / spent), not good-versus-bad, because wear is a continuum and
+  the Wear system already models it that way. Figures are tabular-nums so they stop jittering.</p>
+
+  <h2>6 · Status chips, on NCM's existing glyphs</h2>
+  <div class="chips">
+    <span class="chip" style="color:var(--op77-ok)"><svg viewBox="0 0 24 24"><path d="m8 5 11 7-11 7Z"/></svg>Live</span>
+    <span class="chip" style="color:var(--op77-accent)"><svg viewBox="0 0 24 24"><circle cx="12" cy="13" r="8"/><path d="M9 2h6M12 5v2m0 6 4-3"/></svg>Time trial</span>
+    <span class="chip" style="color:var(--op77-text-dim)"><svg viewBox="0 0 24 24"><path d="M6 18c-3-3-3-9 0-12s9-3 12 0 3 9 0 12-9 3-12 0Z"/></svg>Closed loop</span>
+    <span class="chip" style="color:var(--op77-warn)"><svg viewBox="0 0 24 24"><path d="m12 3 10 18H2Z"/><path d="M12 9v5m0 3v.1"/></svg>Incident</span>
+    <span class="chip" style="color:var(--ncm-tier-gt)"><svg viewBox="0 0 24 24"><path d="M5 3v18M7 4h6v5H7zm6 0h6v5h-6zM7 9h6v5H7zm6 0h6v5h-6z"/></svg>Sanctioned</span>
+    <span class="chip" style="color:var(--ncm-cold)"><svg viewBox="0 0 24 24"><path d="M7 15a4 4 0 0 1 .4-8 5.5 5.5 0 0 1 10.3 1.6A3.5 3.5 0 0 1 17.5 15Z"/><path d="M8 18l-1 3m5-3-1 3m5-3-1 3"/></svg>Wet</span>
+    <span class="chip" style="color:var(--op77-text-dim)"><svg viewBox="0 0 24 24"><path d="M4 10h13M6 14h12M8 18h9M6 6h11"/></svg>Obscured</span>
+    <span class="chip" style="color:var(--op77-signal)"><svg viewBox="0 0 24 24"><path d="M5 3v18M7 5h12l-3 4 3 4H7"/></svg>Penalty</span>
+  </div>
+  <p class="note">These are NCM's own shipped <code>glyphs.js</code> paths, unchanged. The same 24-grid
+  symbols can be exported as <code>icons/*.svg</code> and passed to
+  <code>Open77.blips.create{ icon = { asset, size } }</code>, where the engine draws them as native Ink
+  geometry inside the vanilla map and minimap — keeping vanilla selection, tracking and tooltips. One
+  icon language, two renderers, no client mod.</p>
+
+  <h2>7 · Screen-space map</h2>
+  <div class="screenmap">
+    <div class="zone free">Upper left<span>free — timing tower</span></div>
+    <div class="zone free">Upper centre<span>free — navigation</span></div>
+    <div class="zone busy">Upper right<span>compass, clock</span></div>
+    <div class="zone busy">Middle left<span>toasts land here</span></div>
+    <div class="zone keep">Centre<span>keep clear</span></div>
+    <div class="zone free">Middle right<span>free — no toast position exists</span></div>
+    <div class="zone free">Lower left<span>freed by MP policy</span></div>
+    <div class="zone free">Lower centre<span>free</span></div>
+    <div class="zone free">Lower right<span>freed — timing block</span></div>
+  </div>
+  <p class="note">Green is low-conflict, amber is owned by a vanilla module or the toast service, red
+  should stay clear. Lower-left and lower-right are <em>permanently</em> free: an authenticated
+  OPEN//77 session removes the quick-slot cluster and the crouch silhouette itself, and a claim will
+  not bring them back. Upper-right needs a <code>Open77.hud</code> claim on <code>compass</code> and
+  <code>clock</code> — a permission (<code>ui.vanilla.hud</code>) NCM does not yet declare.</p>
+
+  <h2>8 · Motion, on the platform's own timings</h2>
+  <div class="panel motion">
+    <div class="m-row"><b>slide 220ms</b><div class="m-demo m-slide"><i></i></div></div>
+    <div class="m-row"><b>fade 150ms</b><div class="m-demo m-fade"><i></i></div></div>
+    <div class="m-row"><b>fill 220ms</b><div class="m-demo m-scale"><i></i></div></div>
+    <div class="m-row"><b>pulse · live</b><div class="m-demo m-pulse"><i></i></div></div>
+  </div>
+  <p class="note">Durations and easing are tokens, not numbers: 90ms for colour and border, 150ms for
+  enter and leave, 220ms for a whole panel, on <code>cubic-bezier(0.2,0,0,1)</code>. The platform's
+  stated rule is inherited with them — <em>functional and fast; no glitch loops, no parallax, no idle
+  animation</em> — as is the <code>prefers-reduced-motion</code> block, which NCM honours nowhere
+  today because it ships no copy of the token file. NCM has zero <code>@keyframes</code> at present;
+  the platform proves 38 of them in-engine.</p>
+
+  <h2>9 · What this prototype proves, and what it does not</h2>
+  <div class="panel">
+    <table>
+      <tr><th>Proven here</th><th>Still unproven</th></tr>
+      <tr><td>One token contract renders every component above</td><td>How any of it looks on a real CEF surface over moving gameplay</td></tr>
+      <tr><td>All marks are CSS or inline SVG — no asset delivery needed</td><td>Frame cost with several components animating at once</td></tr>
+      <tr><td>The glyph set already covers race, event, route and weather states</td><td>That Bahnschrift Condensed is what the client actually picks</td></tr>
+      <tr><td>Type stays at or above the 9px HUD floor throughout</td><td>Legibility at speed, which needs a driver, not a reviewer</td></tr>
+      <tr><td>Colour is never the only carrier of meaning</td><td>Ultrawide behaviour: this page is fluid, NCM's pages are fixed 1920×1080</td></tr>
+    </table>
+  </div>
+  <p class="note">The three existing harnesses (<code>tools/{panel,race,nameplate}-render-check.js</code>)
+  stub a DOM in Node and assert that a render did not throw. They prove logic, not appearance — so
+  in-engine visual and cost verification remains the first owed step, and nothing above should be read
+  as a live PASS.</p>
+
+</div>
+</body>
+</html>

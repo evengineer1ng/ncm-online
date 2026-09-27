@@ -80,7 +80,11 @@ function NcmProgression.apply(rec, results, t)
                     ("badge:%s:%s:unique:%s"):format(r.driverId, a.kind, serverId()),
                     { ref=a.kind, note="Badge: "..a.kind:gsub("_"," "), sessionId=ctx.sessionId })
                 if ok and pid then
-                    tell(pid, ("Badge earned: %s · +€$%d · balance €$%d"):format(a.kind:gsub("_"," "), amount, balance or 0))
+                    local label=a.kind:gsub("_"," "):gsub("(%a)([%w']*)",function(x,rest)return x:upper()..rest end)
+                    NcmComms.send(pid,{id="badge.earned:"..a.kind,category="milestone",priority="informative",
+                        title="BADGE EARNED · "..string.upper(label),
+                        message=("+€$%d · balance €$%d · the mark is now in your Driver File"):format(amount,balance or 0),
+                        reference="driver",surface="both",repeatPolicy={mode="once"}})
                 end
             end
         end

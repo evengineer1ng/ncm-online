@@ -580,13 +580,14 @@ AddEventHandler("onPlayerReady", function(playerId)
         if prof.minted then
             CreateThread(function()
                 Wait(6000)   -- let the arrival toast land and be read first
-                pcall(Open77.notifications.send, id, {
-                    type = "info", title = "NCM · ALPHA",
-                    message = "Racing server, being built live. Races: F6  ·  Need this again? /ncm help",
-                    icon = "NCM", durationMs = 14000,
+                TriggerEvent("ncm:comms:send", id, {
+                    id="onboarding.paddock",category="orientation",priority="actionable",
+                    title="NCM · THE CITY UNDER THE CITY",
+                    message="F6 opens the paddock: your Driver File, live races, Market and Machine Index. /ncm help is always there.",
+                    reference="driver",surface="toast",repeatPolicy={mode="once"},durationMs=14000,
                 })
                 tell(id, "Night City Motorsports — a racing layer for OPEN//77. We are in ALPHA: expect rough edges, and things may break or restart while you are here.")
-                tell(id, "Races: press F6  ·  Full command list: /ncm help  ·  Vehicles arrive with the Market — ask a host if you need one tonight.")
+                tell(id, "Paddock: press F6  ·  Driver snapshot: /ncm.status  ·  Full command list: /ncm help  ·  Buy a Machine in Market, then call it from Machine Index.")
             end)
         end
 

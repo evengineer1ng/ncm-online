@@ -602,8 +602,12 @@ RegisterNetEvent("ncm:market.purchase", function(marketId, assetId)
     local pid = tonumber(source) or 0
     CreateThread(function()
         local ok, why = NcmMarket.purchase(pid, tostring(marketId or ""), tostring(assetId or ""))
-        if ok then pcall(Open77.notifications.send, pid, {type="success",title=string.upper(why or "Vehicle") .. " PURCHASED",message="This vehicle is now yours. Open Machine Index (F6 or F10) to call it.",icon="NCM",durationMs=8000})
-        else pcall(Open77.notifications.send, pid, {type="error",title="PURCHASE REFUSED",message=tostring(why),icon="NCM",durationMs=5000}) end
+        TriggerClientEvent("ncm:market.purchase.result",pid,{ok=ok==true,name=ok and why or nil,reason=ok and nil or tostring(why)})
+        if ok then NcmComms.send(pid,{id="market.purchase:"..tostring(assetId),category="transaction",priority="actionable",
+            title=string.upper(why or "Vehicle").." PURCHASED",
+            message="Ownership recorded. Open Machine Index to call this exact Machine.",reference="collection",surface="toast",repeatPolicy={mode="once"},durationMs=8000})
+        else NcmComms.send(pid,{id="market.purchase.refused:"..tostring(assetId),category="warning",priority="actionable",
+            title="PURCHASE REFUSED",message=tostring(why),reference="market",surface="toast",repeatPolicy={mode="cooldown",cooldownSec=2}}) end
     end)
 end)
 

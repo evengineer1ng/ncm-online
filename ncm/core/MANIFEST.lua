@@ -64,5 +64,7 @@ return {
     "driver/feedback.lua",
     "onboarding/questionnaire.lua",
     "qa/rules.lua",
+    "player/communication.lua",
+    "player/landing.lua",
     "player/help.lua",
 }

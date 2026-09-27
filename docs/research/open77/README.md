@@ -41,6 +41,17 @@ Current content-rights register: [NCM server-mod licensing catalog](NCM_SERVER_M
 package-by-package distinction between server-hosted delivery, written-permission candidates and content that
 is off the table today; Cohort 1 and its hard dependencies are the first audited batch.
 
+Current presentation research: [presentation capability audit](PRESENTATION_CAPABILITY_AUDIT.md) — the visual,
+spatial, motion and audio vocabulary actually available to NCM Online: shipped OPEN//77 presentation services, the
+eight-CEF-surface ceiling, native/WebUI hybrid projection, world-space mechanisms (markers, props, world televisions,
+camera surfaces), the base-asset catalogues with their support levels, a screen-space and z-index map with two latent
+collisions, five visual directions, and a token/component proposal. Companion to a separate player-visibility audit,
+which owns *what* to communicate; this one owns *with what*. Prototypes in [prototypes/](prototypes/).
+Addendums A-C (2026-09-27) answer three owner design questions against the same evidence: **market presentation
+identity** as a scoped token override block rather than a per-market interface; **Player Banners**, which already
+exist in embryo in `driver.presentation` and lack only an earning path; and the **communication register** the
+repository already writes in, specified as rules rather than a mood.
+
 Evidence labels: **code verified** means static execution-path inspection, not a gameplay test; **documented** means an official external source; **proposal** means engineering judgment; **unknown** is not proof of absence. External capabilities must be rechecked against a pinned preview before implementation.
 
 ## Discrepancies worth knowing immediately

@@ -316,10 +316,10 @@ function NcmGarage.command(playerId, args, authorized)
     local sub = tostring(args[1] or ""):lower()
     if sub == "garage" then
         tell(id, "Garage: " .. NcmGarage.describe(id))
-        tell(id, "Vehicles are earned or bought — the Market is coming. /ncm return hands back a loaner.")
+        tell(id, "Vehicles are earned or bought in Market. F6 opens it; Machine Index calls a specific owned Machine. /ncm return hands back a loaner.")
         return true
     elseif sub == "car" and not authorized then
-        tell(id, "Cars are not issued on request. Vehicles come from the Market when it opens — ask a host if you need one tonight.")
+        tell(id, "Cars are not issued on request. Buy a Machine in Market, then call the owned asset from Machine Index (F10).")
         log("refused player-invoked car spawn from player=%d (L102)", id)
         return true
     elseif sub == "car" then

@@ -92,6 +92,8 @@ shared_script "shared/core/driver/presentation.lua"
 shared_script "shared/core/driver/feedback.lua"
 shared_script "shared/core/onboarding/questionnaire.lua"
 shared_script "shared/core/qa/rules.lua"
+shared_script "shared/core/player/communication.lua"
+shared_script "shared/core/player/landing.lua"
 shared_script "shared/core/player/help.lua"
 -- ncm-core:end
 
@@ -121,5 +123,9 @@ client_script "client/ghost.lua"
 -- After telemetry.lua: the bridge reuses its `NcmClientOwnVehicle` reader rather than duplicating it.
 client_script "client/carrier_bridge.lua"
 client_script "client/state_probe.lua"
+-- Before panel.lua: it owns the page and calls into both of these.
+-- nav_input is the gamepad driver (a CEF page cannot see a pad); landing_content is authored panel copy.
+client_script "client/nav_input.lua"
+client_script "client/landing_content.lua"
 client_script "client/panel.lua"
 client_script "client/vehicle_access.lua"

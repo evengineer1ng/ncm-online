@@ -409,12 +409,16 @@ check("an accepted submission names the report", /Report received/.test(ht) && /
 // Help listed all three. One definition now feeds every panel; this is the guard that it stays that way.
 console.log("  -- shell nav --");
 const navLabels = (id) => (document.getElementById(id).children || []).map(b => b._text);
-for (const [panel, navId] of [["guide", "guideNav"], ["market", "marketNav"], ["collection", "collectionNav"], ["wheel", "wheelNav"], ["help", "helpNav"]]) {
+// DRIVER FILE joined the shell as the persistent "what is mine / what changed / what next" surface, so it is
+// both a nav entry every panel must offer AND a panel that must itself carry the full nav. Listed here rather
+// than loosening the comparison: the point of this guard is that the set is exact.
+const SHELL_NAV = "DRIVER FILE|RACE GUIDE|MARKET|MACHINE INDEX|WHEEL/PEDALS|HELP";
+for (const [panel, navId] of [["driver", "driverNav"], ["guide", "guideNav"], ["market", "marketNav"], ["collection", "collectionNav"], ["wheel", "wheelNav"], ["help", "helpNav"]]) {
   emitted.length = 0;
   fire("panel:show", { panel: panel });
   if (panel === "help") fire("panel:help", HELP_MIN);
   const labels = navLabels(navId);
-  check(panel + " panel offers every shell surface", labels.join("|") === "RACE GUIDE|MARKET|MACHINE INDEX|WHEEL/PEDALS|HELP",
+  check(panel + " panel offers every shell surface", labels.join("|") === SHELL_NAV,
     panel + " nav = [" + labels.join(", ") + "]");
   const active = (document.getElementById(navId).children || []).filter(b => b.classList.contains("active"));
   check(panel + " panel marks itself as the current tab", active.length === 1 && active[0].disabled === true,
@@ -617,6 +621,102 @@ check("STRENGTH moves one rung at a time",
 
 fire("panel:show",{panel:"help"});
 check("Help explains purchase and specific-asset access",/I bought a car/.test(helpText()) && /specific owned asset/.test(helpText()));
+
+// ---- SESSION LANDING PANEL -------------------------------------------------------------------------
+// The payload shape is exactly what core/player/landing.lua `payload()` returns, so this harness fails if
+// either side drifts. The contract text is asserted by SUBSTANCE, not by wording: a player must be told
+// that progression resets, and must not be told they are being warned about cheating.
+console.log("  -- landing --");
+const LANDING = {
+  schemaVersion: 1,
+  contract: { id: "alpha_progression", eyebrow: "NCM ONLINE // ALPHA", headline: "PROGRESSION IS TEMPORARY",
+    body: "Everything you earn here resets for NCM 1.0.", detail: "Further resets may happen before then.",
+    promise: "What will not reset is what we learn." },
+  capabilities: [
+    { id: "race", label: "Enter races", state: "live", detail: "The Race Guide carries the calendar." },
+    { id: "ghost", label: "Race your own ghost", state: "partial", limit: "Personal best only." },
+    { id: "fuel", label: "Fuel and pit strategy", state: "soon" },
+  ],
+  offeredCount: 2,
+  releases: [
+    { date: "2026-09-27", title: "Economy v1", build: "0.5.0", seq: 0, expanded: true, isNew: true,
+      items: [{ heading: "Money", text: "Events now pay out." }, { text: "Starting balance granted once." }] },
+    { date: "2026-09-26", title: "Lap ghosts", seq: 0, expanded: false, isNew: true,
+      items: [{ heading: "Practice", text: "Your best lap replays beside you." }] },
+    { date: "2026-09-22", title: "Weather and wheels", seq: 0, expanded: false, isNew: false,
+      items: [{ text: "Synchronised sky." }] },
+  ],
+  currentRelease: null, newReleaseCount: 2, firstSession: false, hero: null,
+};
+LANDING.currentRelease = LANDING.releases[0];
+
+emitted.length = 0;
+fire("panel:show", { panel: "landing", landing: LANDING });
+check("landing panel draws", emitted.some(e => e.name === "panel:drawn"),
+  emitted.map(e => e.name).join(",") || "nothing emitted");
+
+const contractText = dump(document.getElementById("landingContract")).join(" | ");
+check("the progression contract is on the panel, not buried",
+  /PROGRESSION IS TEMPORARY/.test(contractText) && /resets for NCM 1\.0/.test(contractText), contractText);
+check("the contract is not framed as an anti-cheat warning",
+  !/cheat/i.test(contractText) && !/\bban\b/i.test(contractText), contractText);
+
+const capsText = dump(document.getElementById("landingCaps")).join(" | ");
+check("live capabilities are offered", /Enter races/.test(capsText), capsText);
+check("a partial capability states its limit rather than promising the whole feature",
+  /Race your own ghost/.test(capsText) && /Personal best only/.test(capsText), capsText);
+const capCells = document.getElementById("landingCaps").children || [];
+check("each capability carries its state as a class",
+  capCells.length === 3 && String(capCells[0].className).includes("live")
+    && String(capCells[1].className).includes("partial") && String(capCells[2].className).includes("soon"),
+  capCells.map(c => c.className).join(" | "));
+
+const hintText = dump(document.getElementById("landingHint")).join(" ");
+check("the hint counts releases since the player was last here, not total releases",
+  /2 releases since/.test(hintText), hintText);
+
+const relRows = document.getElementById("landingScroll").children || [];
+check("every release is listed", relRows.length === 3, relRows.length + " rows");
+check("only the newest release opens, so the panel is not a vertical wall",
+  relRows.length === 3 && String(relRows[0].className).includes("open")
+    && !String(relRows[1].className).includes("open") && !String(relRows[2].className).includes("open"),
+  relRows.map(r => r.className).join(" | "));
+// Every collapsed header must still be reachable without a mouse, or the history is inaccessible -- a named
+// failure condition. `data-nav` is what ncm-nav.js collects.
+const headers = relRows.map(r => (r.children || [])[0]).filter(Boolean);
+check("every changelog header is focusable, so the whole history is reachable without a mouse",
+  headers.length === 3 && headers.every(h => h.attributes && h.attributes["data-nav"] !== undefined),
+  headers.length + " headers");
+check("a collapsed release reports itself collapsed to assistive tech",
+  headers.length === 3 && headers[0].attributes["aria-expanded"] === "true"
+    && headers[1].attributes["aria-expanded"] === "false");
+const relText = dump(document.getElementById("landingScroll")).join(" | ");
+check("a NEW release is marked", /NEW/.test(relText), relText);
+
+// This harness only knows elements JavaScript created, so a markup-declared attribute is asserted against
+// the markup itself. It matters enough to check somewhere: without `data-nav` the nav layer never collects
+// the dismiss control, and a pad player has no way out of the panel.
+check("the dismiss control is declared focusable in the markup",
+  /id="landingDismiss"[^>]*data-nav/.test(html), "markup");
+check("the dismiss control shows the input-appropriate prompt",
+  /id="landingDismiss"[\s\S]{0,200}data-ncm-prompt="back"/.test(html), "markup");
+
+// The watermark must only move once the panel actually drew.
+check("seeing the panel is what advances the 'already seen' watermark",
+  emitted.some(e => e.name === "panel:landing.seen"), emitted.map(e => e.name).join(","));
+
+// A server with no content configured at all must still produce a panel rather than a blank card: the
+// contract is the point of the screen and is never absent.
+emitted.length = 0;
+fire("panel:show", { panel: "landing", landing: { contract: LANDING.contract, capabilities: [], releases: [],
+  offeredCount: 0, newReleaseCount: 0, firstSession: true } });
+check("an unconfigured landing panel still draws and still carries the contract",
+  emitted.some(e => e.name === "panel:drawn")
+    && /PROGRESSION IS TEMPORARY/.test(dump(document.getElementById("landingContract")).join(" ")),
+  emitted.map(e => e.name).join(","));
+check("a first session says what to do rather than 'nothing new'",
+  /Race Guide/.test(dump(document.getElementById("landingHint")).join(" ")),
+  dump(document.getElementById("landingHint")).join(" "));
 
 console.log(failed === 0 ? "panel render: ALL GREEN" : ("panel render: " + failed + " FAILED"));
 process.exit(failed === 0 ? 0 : 1);

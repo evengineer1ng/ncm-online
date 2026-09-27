@@ -339,6 +339,10 @@ end
 RegisterNetEvent("ncm:component.inventory.request",function() local pid=tonumber(source) or 0;CreateThread(function() NcmComponents.pushInventory(pid) end) end)
 RegisterNetEvent("ncm:component.purchase",function(marketId,assetId,idemKey) local pid=tonumber(source) or 0;CreateThread(function()
     local ok,why=NcmComponents.purchase(pid,tostring(marketId or ""),tostring(assetId or ""),tostring(idemKey or ""))
-    pcall(Open77.notifications.send,pid,{type=ok and "success" or "error",title=ok and "PART ACQUIRED" or "PURCHASE REFUSED",message=ok and "The serialized component is now in Parts Inventory." or tostring(why),icon="NCM",durationMs=6000})
+    TriggerClientEvent("ncm:component.purchase.result",pid,{ok=ok==true,reason=ok and nil or tostring(why)})
+    NcmComms.send(pid,{id=(ok and "component.purchase:" or "component.purchase.refused:")..tostring(assetId),
+        category=ok and "transaction" or "warning",priority="actionable",title=ok and "PART ACQUIRED" or "PURCHASE REFUSED",
+        message=ok and "The serialized component is in Parts Inventory. Choose a compatible owned Machine to fit it." or tostring(why),
+        reference=ok and "collection" or "market",surface="toast",repeatPolicy={mode=ok and "once" or "cooldown",cooldownSec=2}})
 end) end)
 AddEventHandler("ncm:component.changed",function(pid) NcmComponents.pushInventory(tonumber(pid) or 0);if NcmMarket then NcmMarket.push(tonumber(pid) or 0) end end)

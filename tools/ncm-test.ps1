@@ -143,6 +143,24 @@ if ($node -and (Test-Path $resRoot)) {
             $rc | Select-String -Pattern '=== race render check:' | Select-Object -Last 1 | ForEach-Object { Write-Host ("{0}" -f $_) }
         }
     }
+
+    # The SHARED NAVIGATION LAYER (web/ncm-nav.js). This is the file that decides whether a player holding a
+    # controller can use NCM at all, and nearly all of it is rectangle geometry and focus state -- wrong in
+    # ways `node --check` cannot see. The harness stubs real getBoundingClientRect values and drives the
+    # layer the way Lua and the keyboard do. It caught one genuine bug on its first run: a bare half-plane
+    # test treated a control 700 px BELOW as "to the right", which is how a player loses their place.
+    $navCheck = Join-Path $here 'nav-render-check.js'
+    if ((Test-Path $navCheck) -and (Test-Path $webRoot)) {
+        $vc = & node $navCheck $webRoot 2>&1
+        if ($LASTEXITCODE -ne 0) {
+            $overall = 1
+            Write-Host '=== nav render check FAILED'
+            $vc | Select-String -Pattern 'FAIL' | Select-Object -First 12 | ForEach-Object { Write-Host ("  {0}" -f $_) }
+        } else {
+            $passes = ($vc | Select-String -Pattern '  PASS ').Count
+            Write-Host ("=== nav render check: {0} assertion(s), 0 bad" -f $passes)
+        }
+    }
 } else {
     Write-Host '=== node not found: inline JavaScript gate skipped'
 }

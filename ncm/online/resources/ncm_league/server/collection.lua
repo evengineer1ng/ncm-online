@@ -225,9 +225,11 @@ local function legacyRecordEncounter(pid, driver, entry, runtimeRecord, liveId, 
         local payload = NcmCollection.payload(pid)
         if payload then
             TriggerClientEvent("ncm:collection.payload", pid, payload)
-            pcall(Open77.notifications.send, pid, { type = "success", title = "NEW VEHICLE DISCOVERED",
-                message = ((entry.manufacturer or "") .. " " .. (entry.displayName or "")) ..
-                    ("  ·  COLLECTION %d / %d"):format(payload.discovered, payload.total), icon = "NCM", durationMs = 6500 })
+            NcmComms.send(pid,{id="machine.discovery:"..entry.vehicleKey,category="discovery",priority="informative",
+                title="MACHINE ENTERS THE INDEX",
+                message=((entry.manufacturer or "").." "..(entry.displayName or ""))..
+                    (" · %d / %d known · F10 opens its identity and evidence"):format(payload.discovered,payload.total),
+                reference="collection",surface="toast",repeatPolicy={mode="once"}})
         end
         log("DISCOVERED driver=%s key=%s record=%s live_vehicle=%s source=%s holding=%s%s",
             driver.ncmDriverId:sub(1, 8), entry.vehicleKey, runtimeRecord, tostring(liveId),
@@ -347,9 +349,11 @@ function NcmCollection.revealIdentity(pid, vehicleKey, opts)
         local payload = NcmCollection.payload(pid)
         if payload then
             TriggerClientEvent("ncm:collection.payload", pid, payload)
-            pcall(Open77.notifications.send, pid, { type = "success", title = "NEW VEHICLE DISCOVERED",
-                message = ((entry.manufacturer or "") .. " " .. (entry.displayName or "")) ..
-                    ("  ·  MACHINE INDEX %d / %d"):format(payload.discovered, payload.total), icon = "NCM", durationMs = 6500 })
+            NcmComms.send(pid,{id="machine.discovery:"..entry.vehicleKey,category="discovery",priority="informative",
+                title="MACHINE ENTERS THE INDEX",
+                message=((entry.manufacturer or "").." "..(entry.displayName or ""))..
+                    (" · %d / %d known · F10 opens its identity and evidence"):format(payload.discovered,payload.total),
+                reference="collection",surface="toast",repeatPolicy={mode="once"}})
         end
         log("DISCOVERED driver=%s key=%s method=%s record=%s live_vehicle=%s source=%s holding=%s%s",
             driver.ncmDriverId:sub(1, 8), entry.vehicleKey, source, tostring(opts.runtimeRecord), tostring(opts.liveId),
