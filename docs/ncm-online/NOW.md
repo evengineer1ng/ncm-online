@@ -3,16 +3,16 @@
 > **STATUS: LEDGER** - living session memory, rewritten at the end of every working session.
 > Authority map: [INDEX.md](INDEX.md) - classified 2026-09-24 (L125).
 
-Last rewritten: **2026-09-26 - Parts economy/UI v1 is deployed and enabled on the private Online development
-surface (`L162`, `L163`), with offline catalogue/R&D and panel coverage green. Live Parts PASSes remain owed.**
+Last rewritten: **2026-09-26 - Parts economy/UI v1 and the `KB-153` bounded Market stream are deployed and
+enabled on the private Online development surface (`L162`, `L163`). The first live panel PASS remains owed.**
 
 > **Claim before writing:** decisions through **L163**; MASTER_TEST through **§BF**; next QA letter **§BG**.
 > BACKLOG next free **IDEA-540**; known issues through **KB-153**. Read ledger tails before allocating.
 
 ## One next action
 
-**Deploy the `KB-153` bounded Market stream to Online, restart once empty, then open Market for the first live
-25-component reassembly PASS.** After the panel draws, continue §BF1-§BF3 database audits and the first purchase.
+**Open Market for the first live 25-component reassembly PASS.** The six-file `KB-153` patch is live after an
+empty-server restart; after the panel draws, continue §BF1-§BF3 database audits and the first purchase.
 
 1. Apply forward migrations 031-032 and boot twice.
 2. Audit that existing vehicle identity/history is untouched.
