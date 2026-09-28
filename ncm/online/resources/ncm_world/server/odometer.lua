@@ -412,7 +412,7 @@ end
 --- Write one asset's accumulated metres. `odometer_m = odometer_m + ?` so a concurrent write cannot lose the
 --- other's contribution, and so the stored value is never computed from a stale read.
 local function flush(assetId, metres, t)
-    if not assetId or (metres or 0) < 1 then return end
+    if not assetId or (metres or 0) < 1 then return true end
     local ok, err = pcall(function()
         local delta, at = math.floor(metres), math.floor(t or now())
         local committed, why = MySQL.transaction.await({
@@ -424,19 +424,44 @@ local function flush(assetId, metres, t)
         })
         if not committed then error(why or "odometer transaction refused") end
     end)
-    if not ok then log("checkpoint failed asset=%s: %s", tostring(assetId):sub(1, 8), tostring(err)) end
+    if not ok then log("checkpoint failed asset=%s: %s", tostring(assetId):sub(1, 8), tostring(err));return false,"odometer_checkpoint_failed" end
     -- Keep the cached durable figure in step, so the reading never jumps backwards at a checkpoint.
-    if ok then stored[assetId] = (stored[assetId] or 0) + math.floor(metres) end
-    return ok
+    stored[assetId] = (stored[assetId] or 0) + math.floor(metres)
+    -- Exposure changed durably; rebuild derived conditions and their handling contributor from SQL.
+    if NcmComponentInstall and NcmComponentInstall.apply then
+        local refreshed,refreshWhy=pcall(NcmComponentInstall.apply,assetId,"exposure checkpoint")
+        if not refreshed then log("wear refresh failed asset=%s: %s",tostring(assetId):sub(1,8),tostring(refreshWhy)) end
+    end
+    return true
+end
+
+--- Settle one Machine's pending interval. Configuration changes call this before moving any component.
+--- A failed write retains the accumulator and fails closed; history is never silently discarded.
+function NcmOdometer.flushAsset(assetId,reason,closeInterval)
+    local acc=pending[assetId]
+    if not acc then return true end
+    if acc.metres<1 then
+        -- Storage is integer metres. At a configuration boundary discard the shared sub-metre remainder
+        -- rather than carrying distance driven on the outgoing part into the incoming one.
+        if closeInterval then pending[assetId]=nil end
+        return true
+    end
+    local whole=math.floor(acc.metres)
+    local ok,why=flush(assetId,whole,now())
+    if not ok then return false,why end
+    acc.metres=acc.metres-whole;acc.since=now()
+    if closeInterval or acc.metres<0.001 then pending[assetId]=nil end
+    log("checkpoint asset=%s %.0fm (%s)",tostring(assetId):sub(1,8),whole,tostring(reason or "explicit"))
+    return true
 end
 
 --- Persist everything outstanding. Called on resource stop and by the checkpoint rule.
 function NcmOdometer.flushAll(reason)
-    local t = now()
     local n = 0
     for assetId, acc in pairs(pending) do
-        if acc.metres >= 1 then flush(assetId, acc.metres, t); n = n + 1 end
-        pending[assetId] = nil
+        local hadWhole=acc.metres>=1
+        local ok=NcmOdometer.flushAsset(assetId,reason,true)
+        if ok and hadWhole then n=n+1 end
     end
     if n > 0 then log("checkpoint %d asset(s) (%s)", n, tostring(reason or "periodic")) end
     return n
@@ -487,8 +512,7 @@ local function step(entry, t)
     if not acc then acc = { metres = 0, since = t }; pending[assetId] = acc end
     acc.metres = acc.metres + seg.metres
     if acc.metres >= CHECKPOINT_M or (t - acc.since) >= CHECKPOINT_S then
-        flush(assetId, acc.metres, t)
-        pending[assetId] = nil
+        NcmOdometer.flushAsset(assetId,"periodic")
     end
     publish(entry.pid, assetId)
 end
@@ -505,9 +529,13 @@ end
 function NcmOdometer.release(assetId)
     if not assetId then return end
     local acc = pending[assetId]
-    if acc then flush(assetId, acc.metres, now()) end
+    if acc then
+        local ok=NcmOdometer.flushAsset(assetId,"release",true)
+        if not ok then last[assetId]=nil;return false,"odometer_checkpoint_failed" end
+    end
     pending[assetId], last[assetId], stored[assetId], card[assetId] = nil, nil, nil, nil
     for vehicleId, reg in pairs(tracked) do if reg.assetId == assetId then tracked[vehicleId] = nil end end
+    return true
 end
 
 CreateThread(function()

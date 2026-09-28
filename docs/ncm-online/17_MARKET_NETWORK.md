@@ -52,9 +52,25 @@ Knowledge, access, stock, eligibility and affordability are separate questions:
 known market → currently accessible market → visible real stock → item-eligible → affordable
 ```
 
-The UI may collapse successful stages, but authority and refusal reasons must not. Unknown markets are absent.
-There is no total market count, completion percentage, locked `???` market roster or canonical market catalogue
-disclosed to the client.
+The UI may collapse successful stages, but authority and refusal reasons must not.
+
+> **AMENDED 2026-09-27 by `L171` (owner ruling).** The paragraph that followed here forbade a disclosed market
+> count and a locked `???` roster. **That prohibition is superseded.** The Market surface may show a fixed roster
+> of undiscovered slots against a working target of **17 markets** (one Base Market plus sixteen unknown), so the
+> interface itself states that a larger network exists. The struck text is preserved immediately below for the
+> record.
+>
+> **The leak rule survives the amendment, because it was engineering and not policy.** The count is now
+> deliberately disclosed; **nothing else about an undiscovered market may be.** No name, operator, district,
+> inventory, specialization or manufacturer may reach the client through slot ids, slot ordering, sort keys,
+> tooltips, payload shape, row counts within a filter, or any inventory call. Slot order must not be inventory
+> order and a slot id must not be derivable from a `marketId`.
+>
+> ~~Unknown markets are absent. There is no total market count, completion percentage, locked `???` market
+> roster or canonical market catalogue disclosed to the client.~~
+
+Unknown markets remain absent *as markets*: a slot discloses that something exists there and nothing else. The
+canonical market catalogue is still never disclosed to the client.
 
 ## IMPLICATIONS FOR STARTER MARKET
 
@@ -120,14 +136,22 @@ statistical buff. Manufacturer identity, supplier identity and component compati
 
 No citywide dealership network, placeholder suppliers, OEM catalogue, parts economy, physical discovery flow,
 map infrastructure, unlock quests, supplier reputation, rarity tiers, loyalty, fast travel, market completion,
-undiscovered-market slots, global omniscient inventory, infinite shops, inventory notifications, brokers or
+~~undiscovered-market slots,~~ global omniscient inventory, infinite shops, inventory notifications, brokers or
 social professions. Preserve the seams; do not fabricate content.
+
+**`L171` (2026-09-27) strikes `undiscovered-market slots` from this list.** They are now authorised, under the
+leak conditions stated in the amendment above. Every other item in the list stands, including *market
+completion* - a roster of unknown slots is not a completion metric, and must not acquire percentages, counters
+or "12 / 17 discovered" framing.
 
 ## Architectural tests
 
 - Base Market is a market, not the market.
 - Players can know different markets.
-- Unknown markets are absent and no total count is exposed.
+- An undiscovered market discloses **only that a slot exists** - never its name, operator, district, inventory,
+  specialization or manufacturer, and never through slot id, ordering, sort key, tooltip or payload shape.
+  *(Amended by `L171`; this test previously read "Unknown markets are absent and no total count is exposed."
+  The total count is now deliberately exposed; everything else about an unknown market is not.)*
 - Market discovery and vehicle discovery are separate facts.
 - A known market reveals only currently exposed real stock.
 - Knowing a vehicle does not reveal where to buy it.

@@ -44,7 +44,35 @@ local Feedback = NcmCore.get("driver.feedback")
 -- sandbox knows its own process id, so this side cannot tell two loopback carriers apart. The carrier
 -- can, and does -- it refuses any peer that is not its own process (`bridge/server.cpp`). This scan is
 -- therefore safe by construction: a wrong port is refused, not silently served.
-local PORT_BASE, PORT_SPAN = 38480, 4     -- must match `kPortSearchSpan` in `bridge/server.cpp`
+-- Rig input/feel and Machine projection are deliberately different products now.  Keeping them on separate
+-- ranges prevents an FFB surface from ever consuming the Carrier's only socket (or vice versa).
+--
+-- ---------------------------------------------------------------------------------------------------
+-- **THE CARRIER SERVES ONE CLIENT AT A TIME, SO A PORT IS A LOCK AND NOT A CHANNEL** (`KB-177`).
+-- ---------------------------------------------------------------------------------------------------
+--
+-- `Server::run` in `bridge/server.cpp` is a serial accept loop: `serveWebSocket` blocks until that one
+-- socket closes, and only then does `accept` return again. Two surfaces cannot share a Carrier. Whichever
+-- one connects first OWNS it, and the other waits forever on a port that looks alive.
+--
+-- That made the skip rule load-bearing, and **the first version pointed it the wrong way**. It protected
+-- FORCE FEEDBACK -- the machine walk refused to use the FFB channel's port -- and top speed only ever
+-- worked by accident: the retired companion held 38480, so the Carrier fell to 38481 and the machine walk
+-- could reach it. The moment the companion stopped being started, the Carrier bound 38480, the machine
+-- channel skipped it by rule, and every car in the world silently went back to its stock gearbox. Seven
+-- live sessions say it exactly: Carrier on 38481 -> 42 gear chains applied; Carrier on 38480 -> zero.
+--
+-- **The Machine channel outranks force feedback and the skip now runs the other way.** Parts, gearing and
+-- the governor are the product; force feedback needs a process NCM does not ship. So:
+--
+--   * the machine walk sweeps `38480-38483` with no skip and no exception;
+--   * the FFB walk starts in the Rig Bridge's own range, and only falls back to the legacy companion
+--     range once the Carrier has been FOUND -- then skipping the port it is on.
+--
+-- The fallback is what keeps the external companion usable until `MASTER_TEST §BU` retires it. Deferring
+-- it until `peerIsCarrier` removes the start-up race: at t=0 both walks would otherwise begin on 38480.
+local RIG_PORT_BASE, CARRIER_PORT_BASE, PORT_SPAN = 38520, 38480, 4
+local FFB_SEARCH_SPAN = PORT_SPAN * 2      -- the rig range, then the legacy companion range
 local portIndex = 0
 
 -- ---------------------------------------------------------------------------------------------------
@@ -109,12 +137,14 @@ local peerIsCarrier, peerVersion = false, nil
 -- it needs a process NCM does not ship. Parts, gearing and the governor are the product.
 local machineEnabled = true
 local machineSurface, machineReady = nil, false
--- **The machine channel must never open a socket to the FFB peer, and starting at index 0 did exactly
--- that.** Both scans begin at 38480, so the machine surface connected to the wheel companion, displaced
--- the FFB surface that was already talking to it, and only then walked on to find the Carrier -- taking
--- force feedback down on the way past. Start one port up, and skip the FFB channel's port whenever the
--- walk would land on it.
-local machineIndex, machineUrl = 1, nil
+-- **The machine walk starts at the Carrier's own base and skips nothing** (`KB-177`). It used to start one
+-- port up and step over the FFB channel's port, to stop it displacing a wheel companion mid-corner. That
+-- protected the optional half of the product at the expense of the whole of it: when the companion was not
+-- running the Carrier bound 38480, the walk refused that port by rule, and no projection, no governor and
+-- no gear headroom reached any car. The skip now lives on the FFB walk, where losing a port costs feel and
+-- not physics. A companion answering here is handled below -- it never names a version, so the grace timer
+-- walks past it.
+local machineIndex, machineUrl = 0, nil
 local machineTicks = 0
 local MACHINE_GRACE_TICKS = 150            -- ~5 s at HZ, long enough for a real handshake plus a health
 
@@ -132,8 +162,40 @@ local function sendMachine(event, payload)
     return true
 end
 
+--- The FFB channel's search order: `0..3` are the Rig Bridge's range, `4..7` the legacy companion's.
+local function ffbPortForIndex(i)
+    i = i % FFB_SEARCH_SPAN
+    if i < PORT_SPAN then return RIG_PORT_BASE + i end
+    return CARRIER_PORT_BASE + (i - PORT_SPAN)
+end
+
 local function urlForIndex(i)
-    return ("http://127.0.0.1:%d/bridge.html"):format(PORT_BASE + (i % PORT_SPAN))
+    return ("http://127.0.0.1:%d/bridge.html"):format(ffbPortForIndex(i))
+end
+
+--- Advance the FFB walk, and never onto the Carrier.
+---
+--- The legacy half of the range is where the Carrier lives too, and taking its socket would strand the
+--- Machine channel on a port that answers and never finishes (see the note beside `RIG_PORT_BASE`). So the
+--- second half is entered only once the Carrier has been located, and its port is stepped over.
+local function nextFfbUrl()
+    for _ = 1, FFB_SEARCH_SPAN do
+        portIndex = (portIndex + 1) % FFB_SEARCH_SPAN
+        local candidate = urlForIndex(portIndex)
+        if portIndex < PORT_SPAN then
+            return candidate                       -- the Rig range is ours alone
+        elseif machineEnabled and not peerIsCarrier then
+            -- The machine walk is still sweeping this range. Stay out of it entirely.
+        elseif candidate ~= machineUrl then
+            return candidate
+        end
+    end
+    portIndex = 0
+    return urlForIndex(0)
+end
+
+local function machineUrlForIndex(i)
+    return ("http://127.0.0.1:%d/bridge.html"):format(CARRIER_PORT_BASE + (i % PORT_SPAN))
 end
 
 local DEFAULT_URL = urlForIndex(0)
@@ -142,7 +204,7 @@ local HZ = 30                       -- the rate the platform's own observers run
 -- for most players something IS listening, and requiring `/ncm.ffb on` before parts or weather could reach
 -- the car would be a trap. A player with no carrier costs a handful of failed connects and a log line.
 local enabled, url = true, DEFAULT_URL
-local attempts, MAX_ATTEMPTS = 0, 6
+local attempts, MAX_ATTEMPTS = 0, FFB_SEARCH_SPAN + 4   -- must outlast a full sweep of both ranges
 -- ---------------------------------------------------------------------------------------------------
 -- How long to let a page prove itself before moving to the next port (`KB-148`).
 -- ---------------------------------------------------------------------------------------------------
@@ -215,7 +277,10 @@ NcmClientFfbCommand = function(kind, payload)
         return true
     end
     if not (surface and surfaceReady) then return false, "not_connected" end
-    if kind == "settings" or kind == "test" then
+    -- `bind` assigns a role (steering/throttle/brake/clutch/ffb) to a device the player picked from the
+    -- WHEEL panel's dropdowns. It travels the same way settings do and, like them, never reaches the
+    -- server: which pedal set is plugged into this PC is nobody else's business.
+    if kind == "settings" or kind == "test" or kind == "bind" then
         surface:send("ncm:ffb." .. kind, type(payload) == "table" and payload or {})
         return true
     end
@@ -470,14 +535,9 @@ local function tearDownMachine(why)
     pushedHandling = nil
 end
 
---- The next port for the machine walk that is NOT the one force feedback is using.
+--- The next Carrier port. Rig Bridge owns a separate range, so no skip or peer collision is possible.
 local function nextMachineUrl()
-    for _ = 1, PORT_SPAN do
-        local candidate = urlForIndex(machineIndex)
-        if candidate ~= url then return candidate end
-        machineIndex = machineIndex + 1
-    end
-    return urlForIndex(machineIndex)
+    return machineUrlForIndex(machineIndex)
 end
 
 local function bringUpMachine()
@@ -537,13 +597,11 @@ local function bringUp()
         -- `KB-147`: try the next port in the range before counting this as a real failure. Only a full
         -- sweep that found nothing is evidence that no carrier is running; one dead port is not, and
         -- treating it as one is what would leave a second client permanently without a bridge.
-        if not pinnedUrl then
-            portIndex = portIndex + 1
-            url = urlForIndex(portIndex)
-        end
+        if not pinnedUrl then url = nextFfbUrl() end
         if attempts >= MAX_ATTEMPTS then
-            log("no carrier found on 127.0.0.1:%d-%d after %d attempt(s) — giving up until /ncm.ffb on",
-                PORT_BASE, PORT_BASE + PORT_SPAN - 1, attempts)
+            log("no rig found on 127.0.0.1:%d-%d or %d-%d after %d attempt(s) — giving up until "
+                .. "/ncm.ffb on", RIG_PORT_BASE, RIG_PORT_BASE + PORT_SPAN - 1,
+                CARRIER_PORT_BASE, CARRIER_PORT_BASE + PORT_SPAN - 1, attempts)
             enabled = false
         end
         announce()
@@ -588,6 +646,13 @@ local function bringUp()
             name = tostring(d.name or "unknown device"),
             class = Feedback.CLASSES[d.class] and d.class or "unknown",
             rung = tonumber(d.rung), rungs = type(d.rungs) == "table" and d.rungs or nil,
+            -- Force is a continuous fraction of the class ceiling now. **These three were the reason the
+            -- FORCE slider snapped back to 0 and force never arrived**: the rebuild dropped them, so the
+            -- panel drew `undefined` as zero, sent zero on the next commit, and the wheel stayed dead.
+            strength = tonumber(d.strength), magnitude = tonumber(d.magnitude),
+            ceiling = tonumber(d.ceiling),
+            classes = type(d.classes) == "table" and d.classes or nil,
+            steerDegrees = tonumber(d.steerDegrees), wheelRange = tonumber(d.wheelRange),
             armed = d.armed and true or false,
             haptics = type(d.haptics) == "table" and d.haptics or nil,
             rig = type(d.rig) == "table" and d.rig or nil,
@@ -614,6 +679,12 @@ local function bringUp()
         announce()
         log("carrier %s | hook=%s | %d flat(s) on %d record(s)",
             carrier.version, tostring(carrier.hook), carrier.applied, carrier.records)
+    end)
+    page:on("ncm:rig.health", function(h)
+        if type(h) ~= "table" then return end
+        log("Rig Bridge %s | provider=%s | hook=%s | devices=%d", tostring(h.version or "?"),
+            tostring(h.provider or "?"), tostring(h.hook and true or false),
+            type(h.devices) == "table" and #h.devices or 0)
     end)
     log("bridge surface created for %s; waiting for a listener", url)
 end
@@ -711,10 +782,7 @@ CreateThread(function()
                     unreadyTicks, unreadyCloses = 0, 0
                     log("%s: %s -- trying the next port", url, why)
                     tearDown("no handshake")
-                    if not pinnedUrl then
-                        portIndex = portIndex + 1
-                        url = urlForIndex(portIndex)
-                    end
+                    if not pinnedUrl then url = nextFfbUrl() end
                 end
             else
                 unreadyTicks, unreadyCloses = 0, 0
@@ -1261,7 +1329,7 @@ RegisterCommand("ncm.carrier", function()
             .. "range. If this never settles, no Carrier is running.", tostring(machineUrl))
     else
         log("MACHINE channel: searching %d-%d for a Carrier (currently %s)",
-            PORT_BASE, PORT_BASE + PORT_SPAN - 1, tostring(machineUrl))
+            CARRIER_PORT_BASE, CARRIER_PORT_BASE + PORT_SPAN - 1, tostring(machineUrl))
     end
 end, false)
 

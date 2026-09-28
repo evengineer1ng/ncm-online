@@ -15,9 +15,71 @@ local function log(fmt, ...)
 end
 
 -- Operator-tunable server identity (L14: framework, not server). Slug; keys per-server rows.
+--
+-- ONE DECLARATION PER RESOURCE. A second `Open77.tunables.declare` in this VM REPLACES this one rather
+-- than adding to it (observed 2026-09-20 in ncm_league, where `components.lua` silently wiped `serverId`
+-- and the calendar began failing reads that had worked for a week). So every ncm_world tunable lives in
+-- this block, including ones that belong to another file -- `server/ambient.lua` reads them through
+-- `NcmIdentity.settings`. Note `apply` accepts only `live`, `next_round` and `next_match`; anything else
+-- is rejected outright and takes the whole resource down with it.
 local settings = Open77.tunables.declare({
     serverId = { value = "ncm-dev", type = "string", apply = "live" },
+
+    -- Ambient population (`server/ambient.lua`, `L177`). Budgets first, then placement, then the race
+    -- corridor. Distances are metres.
+    ambientEnabled = { value = true, type = "boolean", apply = "live" },
+    ambientTickSeconds = { value = 6, type = "integer", min = 2, max = 60, unit = "s", apply = "live" },
+    ambientVehicleBudget = { value = 24, type = "integer", min = 0, max = 200, apply = "live" },
+    ambientPedBudget = { value = 48, type = "integer", min = 0, max = 400, apply = "live" },
+    ambientPerPlayerVehicles = { value = 5, type = "integer", min = 0, max = 40, apply = "live" },
+    ambientPerPlayerPeds = { value = 10, type = "integer", min = 0, max = 80, apply = "live" },
+    ambientSpawnPerTick = { value = 3, type = "integer", min = 0, max = 20, apply = "live" },
+    ambientSpawnMinM = { value = 110, type = "integer", min = 40, max = 500, unit = "m", apply = "live" },
+    ambientSpawnMaxM = { value = 240, type = "integer", min = 60, max = 600, unit = "m", apply = "live" },
+    ambientRetireM = { value = 420, type = "integer", min = 120, max = 2000, unit = "m", apply = "live" },
+    -- The distance past which a despawn is assumed unobserved. Larger than the 180 m default NPC
+    -- streaming radius on purpose: beyond it no client has the entity at all.
+    ambientSightM = { value = 220, type = "integer", min = 100, max = 800, unit = "m", apply = "live" },
+    ambientCorridorRadiusM = { value = 70, type = "integer", min = 20, max = 300, unit = "m", apply = "live" },
+    ambientLeadSeconds = { value = 240, type = "integer", min = 30, max = 1800, unit = "s", apply = "live" },
+    ambientHoldSeconds = { value = 180, type = "integer", min = 0, max = 1800, unit = "s", apply = "live" },
+    -- How long a SCHEDULED row keeps its corridor past its own start before the live session board has to
+    -- justify it. Sessions form at T-60, so this only covers the handover. It is not a guess at race
+    -- length and must not become one -- see `world.ambient.isHeldClear`.
+    ambientGraceSeconds = { value = 120, type = "integer", min = 30, max = 600, unit = "s", apply = "live" },
+    -- Vanilla REDengine density, server-owned and replicated per routing bucket.
+    ambientCrowd = { value = 1.0, type = "number", min = 0, max = 1, apply = "live" },
+    ambientTraffic = { value = 1.0, type = "number", min = 0, max = 1, apply = "live" },
+    ambientPolice = { value = true, type = "boolean", apply = "live" },
+    -- Suppressing vanilla for a race is BUCKET-WIDE -- 2.31 has no radius-scoped population control.
+    -- `ambientVanillaSuppress` permits the switch to be used AT ALL; the shared world bucket is excluded
+    -- from it structurally, because on the shipped race cadence (21 starts per three hours, staggered)
+    -- a corridor is in its window essentially always and a bucket-wide suppression there would empty the
+    -- city permanently. A race in a bucket of its own is the case this is for.
+    ambientVanillaSuppress = { value = true, type = "boolean", apply = "live" },
+    ambientSharedBucket = { value = 0, type = "integer", min = 0, max = 1024, apply = "live" },
+    -- The explicit override: suppress the SHARED bucket too. For a private server where everyone present
+    -- is at the race. Leave this off on anything with a spectator or a second race on it.
+    ambientVanillaSuppressShared = { value = false, type = "boolean", apply = "live" },
+
+    -- City presence: other drivers as pins on your map and minimap (`server/presence.lua`, `L183`). The
+    -- platform's own snapshots are up to two seconds old, so the tick is NOT a responsiveness dial -- see
+    -- the header of `world.presence` before lowering it. The pin cap is a share of a 128-blips-per-resource
+    -- quota that `client/landmarks.lua` is already spending, and the byte budget is measured, never a row
+    -- count (`IDEA-595`).
+    presenceEnabled = { value = true, type = "boolean", apply = "live" },
+    presenceTickSeconds = { value = 5, type = "integer", min = 2, max = 60, unit = "s", apply = "live" },
+    presenceMaxPins = { value = 24, type = "integer", min = 0, max = 96, apply = "live" },
+    presenceBudgetBytes = { value = 3072, type = "integer", min = 256, max = 16384, apply = "live" },
+    presenceMoveEpsilonM = { value = 3, type = "integer", min = 0, max = 200, unit = "m", apply = "live" },
+    presenceNameBytes = { value = 24, type = "integer", min = 4, max = 128, apply = "live" },
+
+    -- Passive health regeneration (`server/vitals.lua`, `KB-180`). Health is a SERVER ledger out of
+    -- `maxHealth` (100 by default), and the platform's regen is 0 until a resource sets it -- freeroam's own
+    -- `regenPerSecond = 0.0` is the same default. 0 here restores that: no regeneration at all.
+    playerRegenPerSecond = { value = 2.0, type = "number", min = 0, max = 50, unit = "hp/s", apply = "live" },
 })
+NcmIdentity.settings = settings
 
 local function serverId()
     local v = tostring(settings.serverId or "ncm-dev")

@@ -2670,3 +2670,1250 @@ offline gate is green. Migration/deployment, exact balances, duplicate/retry/res
 owe live proof in MASTER_TEST §BJ before any row becomes validated.
 
 **Basis.** Owner implementation direction, 2026-09-27; `40_ECONOMY_V1.md`; `IDEA-564`-`IDEA-567`.
+
+
+## L170 — OPEN — three questions the character / PvE reconnaissance cannot answer for itself
+
+Raised 2026-09-27 by [../research/open77/CHARACTER_ARCHAEOLOGY_AND_PVE_SUBSTRATE.md](../research/open77/CHARACTER_ARCHAEOLOGY_AND_PVE_SUBSTRATE.md).
+That pass was read-only and **changed no production behaviour**. It found three decisions that are the owner's,
+not an agent's, and they block real work rather than being philosophical. Nothing was resolved silently.
+
+### G1 — the `???` market roster contradicts a CURRENT authority document
+
+> **RESOLVED 2026-09-27 by `L171`: option A. The roster is approved and supersedes document 17's
+> clause, which is amended in place.** The analysis below is retained as the basis of that ruling.
+
+The owner's addendum asks the Market surface to show a working total of **17 markets**: one Base Market plus
+sixteen `???` silhouettes, so the interface itself says *there is more out there*.
+
+`17_MARKET_NETWORK.md` is **STATUS: CURRENT** and is the named authority for *markets and market discovery*. It
+forbids exactly that, twice and by name:
+
+> *"Unknown markets are absent. There is no total market count, completion percentage, locked `???` market roster
+> or canonical market catalogue disclosed to the client."*
+
+> **DO NOT BUILD YET** — *"...market completion, undiscovered-market slots, global omniscient inventory..."*
+
+and keeps it as an architectural test: *"Unknown markets are absent and no total count is exposed."* The stated
+reason is leakage — hidden-market information escaping through ids, sort order, tooltips, payload shape or
+inventory calls.
+
+**The request splits, and only half of it conflicts.** The addendum's middle **LEAD** state (heard of, cannot yet
+use) is *compatible*: it matches the document's own `access_policy` seam (*"knowledge and access may diverge"*),
+its `player_market_knowledge.source_kind`/`source_ref` columns, and Machine Knowledge's precedent of independent
+accumulating channels rather than a tier ladder. The **sixteen silhouettes** are not compatible: sixteen
+silhouettes *is* a disclosed total count.
+
+Three ways forward, stated neutrally:
+
+- **A. Amend the document.** The `???` grid is a deliberate psychological device and the owner may simply want it.
+  Cost: a decision superseding that clause, plus taking on the leak discipline the clause was protecting.
+- **B. Keep the prohibition and get the same feeling another way.** The Machine Index already produces "there is
+  more than you know" **without a count**, because a catalogue of encountered machines is visibly partial. Markets
+  can do the same: known markets, plus *leads* as named-but-inaccessible rows. Sixteen anonymous slots say
+  "sixteen"; two named leads say "there is a world out there", and are better fiction.
+- **C. Split the difference.** Disclose a bounded, non-numeric shape ("NCM knows of other suppliers in this
+  district"), which is a count of nothing. Needs care not to become a count by another route.
+
+**Recommendation: B, plus one addition** — give a brand-new player **one lead immediately**, from NCM Dispatch, so
+the second market is a name they cannot yet use rather than an empty slot. That is the invitation the addendum
+wants, it satisfies the document, and it is the first authored thread, all in one message row.
+
+**Blocks:** `IDEA-608` (the world graph), the market half of `IDEA-609` (trade provenance as a lead), and any
+authoring of the market network.
+
+### G2 — where may a multi-step race constructor live?
+
+> **RESOLVED 2026-09-27 by `L179`. The answer is "in an integer", and single player had it all along.**
+> The premise below is wrong in one specific place: *"a six-step wizard is a tree"*. Foreman's is not.
+> `race_commands.lua` keeps the entire constructor state in one quest fact (`ncm_foreman_builder_step`) and
+> `MTEJournalHandler.reds` renders each step as a FLAT LIST OF FINAL ACTS filtered by that integer -- choosing
+> "sprint" writes one field and increments a counter, and opens nothing. So the `venue_options` ruling is
+> satisfied rather than scoped away, no CEF surface was spent (the card is drawn on `venue.html`, which is
+> already always attached), and the F6-only alternative below was not needed. Retained unedited as the record
+> of what the question looked like before the source was read.
+
+`competition.venue_options` carries an owner ruling (2026-09-21, amended 2026-09-23):
+
+> *"at most four options, each one a FINAL ACT and never a branch, no sub-menus and no tree. An option that cannot
+> apply right now is ABSENT, not greyed out — a disabled row is a dead end the player has to read and reject,
+> which is the failure KB-32 describes from the other side."*
+
+SP's Foreman constructor is a **six-step wizard** (type → field → launch → pressure → district → confirm), and the
+owner's brief asks for spontaneous race creation at a lighter, more world-adjacent surface. Those two cannot both
+be satisfied: a six-step wizard is a tree, and a tree cannot live at a venue prompt under that ruling.
+
+Either **the constructor is F6-only** — and the world prompt offers `Race Here` as a single final act that accepts
+defaults, which is also exactly what `IDEA-602` proposes — **or the ruling is scoped to venues specifically** and
+some other world surface may branch.
+
+There is a hard budget on the F6 side either way: eight CEF surfaces per resource and `ncm_world` already holds
+seven (`IDEA-570`), so a constructor must be a *mode of `panel.html`*, as the Landing panel was, not a new page.
+
+**Blocks:** the surface design of `IDEA-602` and `IDEA-603`.
+
+### G3 — is a market in *other humans* ever acceptable?
+
+> **RESOLVED 2026-09-27 by `L172`: no. Self-paper only.** The analysis below is retained as the basis
+> of that ruling.
+
+SP's Billie sells winner slips on **any runner**, priced by a softmax book over the field. In single player the
+runners are machines and the economy is private, so that is safe. In a persistent multiplayer economy it is a
+prediction market on a small population of real people, and it is the collusion surface: two players can shape a
+result, repeated head-to-head pairings can print money, and pricing a player's own probability from their own
+record makes **deliberately losing profitable**.
+
+The reconnaissance recommends **self-paper only, indefinitely** — the player raises their own exposure on their own
+finish, opponent strength enters as a *risk-model input* rather than as odds on a person, and no product ever
+quotes a price on another human. That preserves the whole conceptual loop (*"I am confident, so I increase my
+financial exposure"*) and removes the market in people.
+
+This is a product decision with a permanent economic character, not a tuning choice, which is why it is here
+rather than in the backlog.
+
+**Blocks:** `IDEA-610`.
+
+**Basis.** Owner brief plus addendum, 2026-09-27; the reconnaissance document above; `17_MARKET_NETWORK.md`;
+`competition.venue_options`; `betting.lua`. No implementation was authorised and none was performed.
+
+
+## L171 — LOCKED — the undiscovered-market roster is approved and supersedes document 17's prohibition
+
+**Decision (owner, 2026-09-27).** The Market surface **may** present a fixed roster of undiscovered market slots
+against a working target of **17 markets** — one Base Market plus sixteen unknown — so that the interface itself
+tells a new player a larger network exists. This is `L170` G1 **option A**, taken over the recommended option B.
+
+**What this supersedes.** `17_MARKET_NETWORK.md` (STATUS: CURRENT, authority for markets and market discovery)
+forbade exactly this in three places, and all three are amended in place rather than silently overridden:
+
+- the knowledge-model paragraph — *"There is no total market count, completion percentage, locked `???` market
+  roster or canonical market catalogue disclosed to the client"* — struck and replaced, with the original text
+  preserved struck-through;
+- the **DO NOT BUILD YET** list — `undiscovered-market slots` struck from it;
+- the architectural test *"Unknown markets are absent and no total count is exposed"* — rewritten.
+
+`17_MARKET_NETWORK.md` remains the authority for markets. It is amended, not demoted.
+
+**The condition attached to the ruling, and it is not optional.** The reason document 17 wrote the ban was
+**leakage**, and that hazard is entirely unchanged by the decision. The count is now deliberately disclosed;
+**nothing else about an undiscovered market may be.** No name, operator, district, inventory, specialization or
+manufacturer may reach the client through slot ids, slot ordering, sort keys, tooltips, payload shape, row counts
+within a filter, or any inventory call. Slot order must not be inventory order, and a slot id must not be
+derivable from a `marketId`. A slot discloses that something exists there, and that is all.
+
+**What did not change.** *Market completion* stays on the DO NOT BUILD list: a roster of unknown slots is not a
+completion metric and must not acquire percentages, counters or "12 / 17 discovered" framing. The canonical
+market catalogue is still never disclosed. Knowledge, access, stock, eligibility and affordability remain
+separate questions with separate refusal reasons.
+
+**17 is a working scale, not a locked number.** The owner stated it as a useful target; nothing here fixes it,
+and the UI must not hard-code it.
+
+**Still recommended, and unaffected by the ruling:** the **LEAD** state — a market you have heard of but cannot
+yet use — which was compatible with document 17 and is compatible with the roster. It is what `IDEA-609` (trade
+provenance creates leads) resolves into, and it is the difference between a slot that flips straight to usable
+and one that becomes a name first. Giving a new player one lead at session zero is now additive to the roster
+rather than a substitute for it.
+
+**Basis.** Owner ruling, 2026-09-27, answering `L170` G1; the addendum's section 5/7; the analysis in
+[../research/open77/CHARACTER_ARCHAEOLOGY_AND_PVE_SUBSTRATE.md](../research/open77/CHARACTER_ARCHAEOLOGY_AND_PVE_SUBSTRATE.md)
+section VII.3. Affects `IDEA-607`-adjacent market work, `IDEA-608` and `IDEA-609`; unblocks market authoring.
+
+## L172 — LOCKED — NCM never sells a wager on another player
+
+**Decision (owner, 2026-09-27).** Answering `L170` G3: **no.** If BookQueen Billie comes to NCM Online she sells
+**self-paper only**. The player may raise their own financial exposure on their **own** finish, and on their own
+streak legs. NCM will **not** quote odds on another human being.
+
+**What this means mechanically.**
+
+- Light / standard / heavy contracts on the player's own finish: **port**, with stake derived from progression
+  (`maxStake(tier) * ratio`) rather than chosen, as SP did.
+- Streak tickets on the player's own legs: **port**, filtered to settlement-authoritative races.
+- The SP **winner board** — `buildWinnerBoard`, the softmax over `driverThreatScore`, the 8% overround, and the
+  `Back the favorite` / `Back the value` choices — **does not port.** It stays in the archaeology as a record of
+  what single player did.
+- Opponent strength still matters, but enters as a **risk-model input** to the player's own multiplier, exactly
+  as SP used average field threat. A stronger field raises what your own paper pays. It never becomes a price on
+  a person.
+
+**Why.** The conceptual loop worth keeping is *"I am confident in my upcoming performance, so I increase my
+exposure"* — a money sink with a conditional faucet, which is what the economy wants (`IDEA-554`, `IDEA-558`).
+A market in other players is a different product: a prediction market over a small, non-anonymous population,
+where two people can shape a result and repeated pairings can print money.
+
+**What this disposes of, by construction rather than by rule.** Exploit **E7** (collusive odds shaping) cannot
+occur if no product prices another player, and IV.5's "revisit at >= 6 humans" clause is withdrawn. The exploits
+that remain are the self-wager ones and they are still live design work: solo exclusion, manufactured weak
+fields, head-to-head repetition, disconnect abandonment, abort farming, field collapse, and **record shaping** —
+which is the sharpest, because pricing a player's own probability from their own record makes losing on purpose
+profitable. `L172` does not solve those; it removes a different and larger class.
+
+**Basis.** Owner ruling, 2026-09-27, answering `L170` G3; Part IV of the reconnaissance document. Scopes
+`IDEA-610`.
+
+
+## L173 — LOCKED — NCM counts overtakes
+
+**Decision (owner, 2026-09-27).** Add overtakes. The quest graph's reaction library depends on them
+(`41_QUEST_GRAPH_PASS1.md` §7.2 — *"P8. Seven passes. P1."*), and single player had them while Online does not.
+
+**It needs no new telemetry.** `session.race` already persists `r.crossings[gateIndex] = now` for every entrant at
+every gate. Running order at a gate is that gate's crossing times sorted ascending; an overtake between gate *N*
+and *N+1* is a pair whose relative rank inverted across that segment. The derivation is a pure function over data
+the session already holds, so it is `ncm/core` work with no host, schema or network change.
+
+**Rules taken with the decision:**
+
+- A pass counts only where **both** drivers crossed **both** gates of the segment. A driver who retires is not
+  passed by everyone behind them.
+- Passes are counted per segment, so one pair swapping repeatedly counts each time it actually happens.
+- A pass is **contested** when the same pair has a contact incident in that segment's time window, and **clean**
+  otherwise. Contact data is passed in rather than imported, so the module stays pure.
+- Overtakes are **a count, not a Race Tag.** `gained_positions` and `came_through` already exist and answer a
+  different question (net start-to-finish movement, not passes made).
+- Lapping is out of scope for v1 and must not be silently counted as a pass.
+
+**Basis.** Owner ruling, 2026-09-27, answering `IDEA-621`.
+
+## L174 — LOCKED — the Scanner is authorised, superseding two documents that deferred it
+
+**Decision (owner, 2026-09-27).** Build the Scanner.
+
+**What this supersedes.** Two authority documents deferred it explicitly, and both are amended in place:
+
+- `28_MACHINE_KNOWLEDGE.md`: *"Do not promise scanner telemetry before engine capability is validated"* and
+  *"This is not authorisation to build the scanner, component recognition, configuration history or engineering
+  knowledge."*
+- `16_MACHINE_INDEX.md`: build `2.31.13+op77.87` provides *"enough for a bounded Scanner experiment, not enough
+  to promise the final UX."*
+
+The deferral is lifted. The **engineering caution inside it is not**, because it was about capability rather than
+permission: what the Scanner may *claim* is still governed by `competition.machine_knowledge`'s evidence
+vocabulary. A scan may establish `identity_reveal` and `observed_configuration`; it may not invent capability it
+did not measure, and an observation remains a floor rather than a maximum (`28_MACHINE_KNOWLEDGE.md` §7 stands).
+
+**Sequencing this implies.** The Scanner has two halves and they are not equally ready. The *knowledge* half —
+what a scan writes, how it enters the Machine Index, what provenance it carries — is buildable now against
+`machine_knowledge` and migration 033. The *interaction* half — aiming at a machine and scanning it — depends on
+client capability that has never been measured, and `Open77.character.aimedEntity` is the likely input. Build the
+knowledge half first; prove the interaction half with an experiment rather than a promise.
+
+**Unblocks.** `Flashbulb` (`41_QUEST_GRAPH_PASS1.md` §11), whose entire trigger is scanning behaviour, and the
+Scanner/Research channel of Machine Knowledge's five parallel channels.
+
+**Basis.** Owner ruling, 2026-09-27, answering `IDEA-622`.
+
+## L175 — LOCKED — Leads are a first-class object
+
+**Decision (owner, 2026-09-27).** Build Leads.
+
+A **Lead** is knowledge of something the player cannot yet use: a market heard of but not accessible, a part
+whose origin is unknown, a person mentioned but not met, a place named but not found. It is the middle state
+between *unknown* and *accessible* that `17_MARKET_NETWORK.md` anticipated when it separated knowledge from
+access (*"knowledge and access may diverge"*), and that `28_MACHINE_KNOWLEDGE.md` already models for machines as
+independent accumulating channels rather than a tier ladder.
+
+**What this unblocks, and it is most of the graph:**
+
+- `Glass` cannot trigger at all without Leads — his eligibility *is* "multiple unresolved Leads".
+- Trade provenance creating a lead instead of an unlock (`IDEA-609`), which is the coupling that makes the player
+  economy generate PvE rather than bypass it.
+- The `???` market roster's middle state (`L171`), so a slot can become a *name* before it becomes a shop.
+- Dex's context shelf (`41_QUEST_GRAPH_PASS1.md` §2.4), which is a list of unresolved things by another name.
+
+**Rules taken with the decision:**
+
+- A Lead names a **subject** (market, machine, part design, person, place, event) and carries **why the player
+  knows it** — `source_kind` and `source_ref` — because the provenance is what later characters react to.
+- A Lead is **not a quest**. It has no steps and no objective text. It resolves when the thing becomes known or
+  accessible through any route, including routes nobody authored.
+- Leads must not become a checklist. No count, no percentage, no "3 / 8 leads followed".
+- A Lead may expire only if the authored fiction requires it; the default is that knowledge is permanent.
+
+**Basis.** Owner ruling, 2026-09-27, answering `IDEA-608` and the Glass gap in `41_QUEST_GRAPH_PASS1.md`.
+
+## L176 — LOCKED — the voice harness keeps its vocabulary and overlap tests and loses its word ceilings
+
+**Decision (owner, 2026-09-27).** The single-player voice harness's **per-character word and sentence ceilings are
+struck down.** They were built against the WolvenKit phone in single player, which was a highly restrictive
+display surface, and they encode that constraint rather than a design intent. NCM Online's Messages surface has no
+such limit.
+
+**The owner's reason is the important part, and it inverts the usual argument:** enforcing a small envelope on
+every character risks making them *all sound the same*. A 22-word ceiling does not make Dex characterful; it makes
+Dex clipped, and a cast that is uniformly clipped has lost exactly the variety the harness existed to protect.
+
+**What survives, because it serves that same goal better than the ceilings did.** `voice_harness.lua` had four
+mechanisms and only one of them was a UI artifact:
+
+| Mechanism | Status |
+|---|---|
+| per-character word / sentence ceilings | **struck** (`L176`) |
+| `requiredAny` — domain vocabulary a character must use | **kept** |
+| `forbiddenAny` — vocabulary that belongs to another character | **kept** |
+| pairwise token-overlap failure at >= 0.55 across all character pairs | **kept, and it is the load-bearing one** |
+
+The overlap test is the direct mechanical expression of *"no two contacts sound the same"*. Scenario ownership
+(who answers which player question, and who deflects) is kept for the same reason.
+
+**Dex is recharacterised.** The archaeology described Dex's voice as *terseness*; the owner's correction is that
+it is **neutral guidance**. Dex is the contact who routes without colouring, not the contact who is short. That
+distinction matters for authoring: a long Dex message is fine, an *opinionated* one is not. `forbiddenAny` for
+Dex (odds, chassis, podium, favorite, chalk, heater) already encodes this correctly — it forbids other
+characters' domains, not length.
+
+Consequently the violation flagged against `41_QUEST_GRAPH_PASS1.md` §2.2 (Dex's ~75-word opening message) is
+**withdrawn**. It is in voice.
+
+**Basis.** Owner ruling, 2026-09-27, on the harness analysis in
+[../research/open77/CHARACTER_ARCHAEOLOGY_AND_PVE_SUBSTRATE.md](../research/open77/CHARACTER_ARCHAEOLOGY_AND_PVE_SUBSTRATE.md)
+section I.9. Scopes `IDEA-601`: port the validator without the ceilings.
+
+## L177 — PROVISIONAL — ambient population is built in two layers, and only one of them can be cleared by radius
+
+**Decision, 2026-09-27.** NCM Online gets an **ambient population service** (`ncm_world/server/ambient.lua`,
+core `world.ambient`). It exists because an empty city is not a taste problem: a street with nobody on it
+removes the only scale reference a driver has, and it is the first thing every tester has said about the world.
+
+**The reconnaissance record was half right and it was read the wrong way round.** The 2026-09-19 finding that
+*"vanilla traffic is per-client"* is **true** and is confirmed here from the platform's own embedded Lua prelude
+at `2.31.13+op77.102`. What was inferred from it — that traffic is therefore not server-side — is **false**.
+Both of these are true at once:
+
+| | Vanilla population | Our own ambient layer |
+|---|---|---|
+| Density / enable switch | **server-owned and replicated** — `Open77.world.setPopulation(bucket, { crowd, traffic, police })`, needs `world.population`; the client half is read-only | n/a |
+| Granularity | `crowd` is a real multiplier; `traffic` and `police` are **binary** on 2.31, and `getPopulation` says so itself (`trafficGranularity = "binary"`) | per entity |
+| Scope of the switch | **the whole routing bucket**, never a radius | any radius, any shape |
+| Entities | spawned **per client**; nothing on the server can name, move or remove one of them; two players on one corner are not looking at the same cars | canonical, shared, removable by id |
+
+**So the ask — clear traffic out of a race corridor — is the SERVER-OWNED layer's job, and only it can do the
+job by radius.** That is the whole reason the layer exists.
+
+**The vanilla switch is not used in the shared world at all, and the arithmetic is why (`KB-165`).** Amended the
+same day, after the owner asked the obvious question I had not: *there is always a race — don't you see a
+conflict?* There is. The five shipped street series run 20/30/60/180-minute cadences at staggered offsets — **21
+starts in any three-hour window** — and per-slot corridor holds merge into **one continuous interval, 100% of the
+clock**. A bucket-wide switch in a world with a race every twenty minutes is a **permanent** switch, so the first
+version of this decision would have emptied Night City for good: this service's own purpose, inverted, by the
+service itself.
+
+The guard is therefore **structural, not an operator setting** (`world.ambient.maySuppress`): the shared bucket is
+never suppressed for a corridor, because the switch has no radius and the corridor does. A bucket a race has to
+itself still is — there the only players it can reach are the ones racing, which is exactly `IDEA-638`'s case and
+the reason to want it. `ambientVanillaSuppressShared` is the explicit escape hatch for a private server where
+everyone present is at the race, and it is off.
+
+**A corridor is also only held for a race that is really going to happen.** A scheduled slot with no entrants
+holds nothing, and a scheduled row stops holding 120 seconds past its own start — long enough for the T-60 session
+to form and take over — rather than guessing a length for a race that may never have begun. Without this, empty
+slots on a 20-minute cadence would have stripped every published route of ambient life as well.
+
+**Three rules the service holds.**
+
+1. **These are not AI racers.** Nothing the service spawns enters a session, is scored, or appears in a result.
+   The goal is that the courier on the corner is in the *same place* for two players — which is the one thing
+   per-client traffic can never be — not that NCM has a field of bots.
+2. **Nothing is removed that somebody can see.** A corridor despawn needs *two* signals to agree: the host's
+   projection read (`Open77.npcs.owner(id).readyClients`, which is exact — zero means no client is drawing it)
+   **and** a distance rule past every player's streaming radius. An unknown projection state counts as watched.
+   An entity that fails the test is **deferred and reported**, not dropped: a corridor that is not clear yet
+   looks exactly like a corridor that failed, and saying which is the point.
+3. **The corridor is the whole lap, not the grid box.** It is a capsule around the route polyline — start,
+   authored intermediates, finish — so the calendar publication now carries the finish's **coordinates** and the
+   intermediate list, not just a name. Once a session is **live** the corridor is rebuilt from that session's own
+   published **gates**, which are the line race control actually laid out for it; a reversed grid or a shortened
+   route would otherwise be cleared along a road it is not using.
+
+**Provisional, not locked, because nothing here has a live PASS yet.** The offline evidence is the full gate,
+52 core director tests, a 40-assertion host harness against platform doubles, and an `ncm-stub` scenario that
+drives the real `ncm_league` publication into the real `ncm_world` service across two Lua VMs. **None of it caught
+`KB-165`, and that is worth naming:** every test looked at a single race, and the defect only exists when you
+multiply one race by the calendar. What is owed is `wp/MASTER_TEST.md` §BL — and in particular the two things no double can answer: whether `joinTraffic` actually
+puts our cars on the authored lanes on a live client, and what budget the world carries without hurting frame
+time during a race. Scopes `IDEA-635` through `IDEA-639`.
+
+## L178 — EXECUTED IN CODE / LIVE-GATED — component Wear & Tear is active; tyre compounds remain deferred
+
+**Owner ruling, 2026-09-27.** The owner accepts the authoritative odometer as trustworthy and directs the Wear
+& Tear system to be implemented now; Hard / Medium / Soft tyre compounds are explicitly later work. This lifts
+`L120` point 7 as an implementation blocker. It does not convert an offline build into a live PASS (`L69`):
+deployment, migration 038 and the end-to-end checks in `MASTER_TEST` §BM remain owed.
+
+The implemented boundary is deliberately narrower than proposal 42's eventual stress-aware model:
+
+1. **Distance is the first-generation clock.** `component_asset.exposure_m` remains immutable, additive factual
+   distance. No collision, incident, race flag, client-reported aggression or compound-specific thermal history
+   contributes to ordinary wear.
+2. **Wear is pure and component-local.** Core `parts.wear` derives stable per-asset thresholds from asset identity,
+   the versioned family profile, exposure and append-only service relief. Condition and severity are never stored.
+3. **Eight families wear in v1.** Tyres, brakes, suspension, cooling, drivetrain, transmission, power unit and
+   electrical have one named first condition each. Aerodynamics, structure and chassis have no routine mileage
+   consequence until an honest stress model exists.
+4. **Consequences only withhold.** Active conditions contribute downward-only grip, drive and brake multipliers
+   through the existing named `wear` layer and sole `parts.handling` composer. Wear never improves a Machine and
+   never invents a new physics channel.
+5. **Service advances a threshold.** Migration 038 adds append-only `component_service`; the first provider is a
+   deterministic network service with an authored price and fixed workmanship record. It adds bounded `relief_m`,
+   never reduces exposure, never resets identity/history and cannot make a component immortal.
+6. **No health percentage is exposed.** Parts Inventory shows normal / attention / critical, the named condition,
+   service count and a priced hold action. The driving HUD receives targeted system lamps only; critical changes
+   fill/silhouette as well as colour.
+7. **`KB-163` is fixed before consequence.** A fit or installed-part service first settles the Machine's pending
+   odometer interval against the outgoing configuration. A failed checkpoint retains the accumulator and refuses
+   the operation instead of silently moving history.
+8. **Compounds are not smuggled in.** All tyre Designs still use the existing thermal profile. `IDEA-628` and the
+   component-keyed swap semantics in `IDEA-630` remain later work.
+
+**Pacing values are first-pass gameplay tuning, not real-world claims.** They are centralized under wear profile
+version 1 and may move after §BM/live kilometre and economy evidence. Scope: `IDEA-631`-`IDEA-634`, migration 038,
+core `parts.wear`, Parts Inventory service and the race warning strip.
+
+## L179 — EXECUTED IN CODE / LIVE-GATED — players call their own races, and `G2` is answered by single player
+
+> **ITS INTERACTION SHAPE IS SUPERSEDED BY `L181` (same day). The event plumbing below still stands.**
+> What `L181` replaced: the six-step machine, the five-option ceiling, the four-route list, and the
+> discipline question. What survives unchanged: `impromptu` as an event class, `NcmCalendar.adopt` as the
+> non-cadence route, entry at the mark, the announcement, no purse, and both cadence guards. The reading of
+> single player below is still accurate and is still why `G2` is closed — the step machine was a faithful
+> port, and a faithful port of the wrong product. Read `L181` for the shape that shipped.
+
+**Decision (owner, 2026-09-27).** *"Before continuing the PvE, we need the ability for players to set up races
+themselves as outlined by Quickie and Foreman to be implemented."* Built this session.
+
+**`G2` is resolved, and not by a judgement call.** `G2` asked where a multi-step race constructor may live, given
+the owner's `venue_options` ruling — *at most five options, each a FINAL ACT, never a branch, no sub-menus, no
+trees*. That ruling reads like a prohibition on a constructor. It is not, and single player proves it: Foreman's
+builder in `race_commands.lua` is a **six-step machine whose entire state is one integer**
+(`CUSTOM_RACE_BUILDER_STEP`, published as the quest fact `ncm_foreman_builder_step`), and
+`MTEJournalHandler.reds` renders each step as a flat list of final acts filtered by that integer. Choosing
+"sprint" opens no sub-menu; it writes one field and advances the counter. **A step machine is not a tree.** Each
+step is its own short flat list, so the ruling is satisfied rather than bent. The constructor lives in an integer.
+
+**Quickie and Foreman are two different products and both are recovered.** Quinn hands over a race already built
+— one offer, one yes (`createQuickRacePhoneOffer`). Foreman builds one to order. This session implements
+Foreman's half, because Quinn's half is a *pre-filled draft* and therefore a small consequence of it once the
+generator exists.
+
+**Two single-player steps are deliberately dropped, and the module says so in code (`M.OMITTED`).**
+
+| SP step | Fate online | Why |
+|---|---|---|
+| RACE TYPE | kept as **discipline** | street sprint / drag / time attack / drift |
+| FIELD SIZE | **dropped** | SP spawns 3–9 AI rivals. Online fields are human and the field is whoever turns up, so a chosen size is a promise nothing can keep |
+| START TYPE | kept as **launch** | grid / rolling / side-by-side; drag skips it, exactly as SP does |
+| DIFFICULTY | **replaced by class** | street/serious/elite sets AI driver tier and prestige bands. With a human field there is no dial to set; what cars are admitted is the real lever |
+| LOCATION | kept as **route**, with a new meaning | SP picks a district to search in. `P12`/`P17` make position the whole point of an impromptu event, so this is the nearest suitable starts to the creator, closest first |
+| SUMMARY | kept | confirm or scrap, same words |
+
+**`impromptu` was authorised on day one and never built.** `P12` granted it (*"any driver, from wherever they
+stand; lightweight rules"*), `P17` said it posts through the scheduler, and `impromptu` has sat in the
+`EventClass` enum and the `event.class` column ever since with **zero code on either side of it**.
+`NcmCalendar.adopt` is the non-cadence escape hatch `organized` already proves, so no new scheduling concept was
+needed — which is also the answer to the standing objection that the calendar is cadence-derived and cannot
+represent an ad-hoc race. It cannot *materialise* one; it can adopt one.
+
+**Three things a player-called race deliberately is not.**
+
+1. **Not invitational.** It is announced server-wide and entered at the start line like a calendar event (`L35`:
+   you must be on your mark, `venueRadiusM = 60`). Seats and offers are what `organized` is for.
+2. **Not paid.** `economy` is left nil, so settlement finds no purse. Two friends alternating wins would
+   otherwise be a money printer, and the economy is younger than this feature.
+3. **Not free of cadence.** `KB-165` is a standing trap: a per-race permission is a permanent cadence. Hence
+   `impromptuCooldownSec` (900) bounding one driver **and** `impromptuMaxOpen` (2) bounding the board — the
+   second is not redundant, because five drivers each obeying the first would still fill it.
+
+**The draft and the option list are server-side.** The client draws the published bag and sends back an id; the
+server re-derives the step and refuses anything it did not offer, exactly as `ncm:venue.option` already does. A
+stale card therefore cannot create an event.
+
+**Shipped.** `competition.race_builder` (pure, 25 tests), `ncm_league/server/impromptu.lua`,
+`ncm_world/client/race_builder.lua`, the `#build` card in `web/venue.html`, two tunables in
+`NcmCalendar.settings`. No migration: the `impromptu` enum value already existed.
+
+**Basis.** Owner instruction, 2026-09-27. Recovered from `ncm-localized/.../modules/race_commands.lua` lines
+1051–1360 and 3470–3590, and `r6/scripts/MT_Ecosystem/MTEJournalHandler.reds` lines 60–92, 365–395, 697–755.
+Scopes `IDEA-641`–`IDEA-645`. Resolves `G2`, left OPEN by `L170`.
+
+## L180 — EXECUTED IN CODE / LIVE-GATED — NCM's in-world cards live on the right, never the centre of the view
+
+**Decision (owner, 2026-09-27).** Three placements corrected in one ruling, because they are one rule:
+
+1. **The Street Call builder must not be in the F6 panel shell**, must not take the middle of the screen or the
+   whole screen, must be scrollable if its options need more room, and must be **no bigger than the panel used to
+   enter a race at a ring**. It is also **hotkey-opened, not always present**.
+2. **The race-entry panel at a ring** overlaid the middle of the player's view while they were standing on their
+   mark. Moved to the right.
+3. **The live race graph** stood on the left during a race. Moved to the right.
+
+**The rule these share:** while a player is in the world — on their mark, or driving — the centre of the screen is
+the road. NCM may annotate the edges of that view and may not occupy its middle.
+
+**Consequences worth recording, because each one is a constraint the implementation obeyed rather than a
+preference.**
+
+* The builder is drawn on `web/venue.html`, the page that already holds the ring entry panel. That is not
+  convenience: it makes "no bigger than the race-entry panel" **structurally true** rather than a number someone
+  has to maintain, and it costs **zero** of this resource's eight WebUI surfaces — `panel.html` would have spent
+  the last free one.
+* The race graph is **mirrored, not merely shifted**. Its dot labels are `white-space: nowrap` and overflow the
+  152px box on purpose; a graph moved to the right with labels still reading rightward would push driver names
+  off the edge of the screen. Line, dots and labels all flip.
+* `#panel`'s `max-width` drops 980px → 860px so that a full-width panel anchored right still stops short of the
+  screen centre (1920 − 44 − 860 = 1016px) instead of reaching back across it.
+* The builder takes the **E key** while it is up, and `client/calendar.lua` yields both the venue option list and
+  that key via `NcmClientBuildActive` — the same idiom `NcmClientRaceActive` already uses. Two surfaces cannot
+  own one key.
+
+**The hotkey is F5, and this is the weakest part of the change.** `KB-62` records that three of NCM's four
+function keys collide with something, that the collisions keep moving, and that a static audit has a short shelf
+life. F5 was chosen against KB-62's occupied list (F2 wardrobe, F6 POV, F7 camera, F9/F10 PolyZone, F8 already
+ours) and that reasoning may expire the same way the last one did. `/ncm.build` and `/ncm.call` are the durable
+routes.
+
+**Basis.** Owner instruction, 2026-09-27. Scopes `IDEA-646`.
+
+## L181 — EXECUTED IN CODE / LIVE-GATED — a called race is ONE FORM, it starts where you are standing, and it is never asked what kind of race it is
+
+**Decision (owner, 2026-09-27), correcting `L179` the same day it shipped.** `L179` recovered single player's
+Foreman constructor faithfully — a six-step machine, each step a flat list of at most five final acts — and that
+was an accurate port of the wrong product. Four things were wrong and only one of them was the page count.
+
+**1. "Here" is the sane default, and it was not even available.** *"Someone starting a race here and now is not
+'ok lets drive 2 km to race start together'."* The `L179` builder could only start a race at an authored node,
+which made the entire premise of an impromptu race — *race, here, now* — the one thing it could not express. The
+start now defaults to the driver's own position, and that position **becomes a temporary node**.
+
+**2. Do not hide the rest.** Offering four nearest routes, *"of which none are guaranteed near"*, is restrictive
+in both directions at once: it withheld 31 of 35 places AND could not guarantee the four it offered were close.
+The **whole node list** is exposed, for the start, the finish and every checkpoint. Nearest-first ordering is
+kept as a courtesy; nothing is truncated.
+
+**3. Do not ask what kind of race.** *"How do we enforce a drag race?"* — we cannot. There are no staged lanes,
+no launch procedure, no lap counting on an open route and no judging. A discipline picker asked the driver to
+choose something the server would then quietly not honour. Every player-called race is a point-to-point street
+sprint, **derived and never asked** (`race_builder.M.DISCIPLINE`), because that is the only discipline whose
+rules this server can actually enforce.
+
+**4. One form, not six pages.** *"Should be all one form potentially with drop downs not a 6 page click through
+thats hardly quick."* A click-through is fatal for a feature whose whole premise is immediacy.
+
+**And one thing added: checkpoints chain.** *"If someone wants to chain nodes as checkpoints they should be
+allowed."* Up to eight, in order, each becoming a real gate.
+
+### The `venue_options` ceiling does not apply here
+
+`L179` inherited *at most five options, each a final act, never a branch* by analogy and **the analogy was
+wrong**. That ruling governs the prompt a driver gets standing at a venue — an interruption they did not ask
+for, in the middle of the road. This is a form opened deliberately from a hotkey. It may carry a 35-row dropdown
+and a submit button. The owner's correction is what establishes the boundary; the ruling itself is untouched.
+
+### What this cost, and it is a real cost
+
+**The last free WebUI surface.** A form with dropdowns needs the mouse and the keyboard. `venue.html`, where
+`L180` put the card, is `pointer-events: none` and deliberately never takes focus — that is precisely what makes
+it safe to leave attached during a race (`KB-67` is the bug from when it was not). Making it focusable would put
+an input-capturing page permanently on screen. So the form is its own page, `web/build.html`, created only while
+open and destroyed on close. `ncm_world` now holds eight of eight (`IDEA-570`); **nothing else may take one
+without a decision** (`IDEA-647`).
+
+Focus therefore follows `panel.html`'s `KB-61` discipline exactly: the page is shown unfocused, replies
+`build:drawn`, and only then is input captured. A page that never replies loses the player's input back to the
+game after 2500 ms. Nothing about *releasing* focus may depend on the page being healthy — a soft-lock in a
+driving game costs a reconnect.
+
+> **SUPERSEDED, 2026-09-28 (`L193`, `KB-178`). This whole subsection is no longer how the form works, and the
+> cost it accepted has been refunded.** `web/build.html` is **deleted**; the form is a block on `venue.html`,
+> shared through `NcmVenueSurface`, and `ncm_world` is back to **seven of eight**. Two reasons. First, the
+> surface was not merely scarce: at 8 of 8, with three transport pages created and destroyed during a session,
+> `WebUI.create` for the form could be **refused outright depending on timing**. Second and decisive, the form
+> **had never once rendered**, for an unrelated reason in the same area (`KB-178` — the client-to-page hop), and
+> the fix for that removed the need for a focusable page at all.
+>
+> The reasoning above is sound on its own terms and the conclusion still followed from it — *a form with
+> dropdowns does need focus*. What changed is the premise: **the form does not need dropdowns.** Input is read
+> in Lua with `Open77.input.isDown` (arrows, Enter, Backspace, Delete, PageUp/PageDown, and the pad), which are
+> physical reads that need no focus, so the page stays `pointer-events: none` and is never focused.
+>
+> That inverts the paragraph above rather than weakening it: the `KB-61` handshake is not improved here, it is
+> **unnecessary** — there is no focus to hold, so there is nothing to soft-lock. `build:drawn` survives only as
+> a render confirmation. `L181`'s interaction shape — one form, every field visible, submitted once — is
+> untouched; only the surface and the input path changed.
+
+### A route is a list of points, so nothing new was needed to hold one
+
+The host kit has authored routes from arbitrary points since Batch 2: `/ncm.ar start / gate / finish` records a
+point list and `scenario.lua::registerCustom` turns it into nodes plus a root. A Street Call route is the same
+shape with two deliberate differences, which is why `impromptu.lua` has its own registrar rather than reusing
+that one:
+
+| | Authored route (`/ncm.ar`) | Street Call route |
+|---|---|---|
+| Lifetime | permanent reference data | one race |
+| Storage | `custom_route` row | runtime only, in `data.roots` / `data.nodes` |
+| Cleanup | never | swept by `releaseRoute` once the event is closed, cancelled, gone, or an hour past its start |
+
+`data.nodes` gained an `unregister` for this. `data.roots` has had one since the host kit; nodes did not, because
+authored routes never needed it — and without it every called race would leave a start line on the map and a row
+in the builder's own node list for the lifetime of the process.
+
+**Temporary nodes are excluded from the form by construction, not by bookkeeping.** The node list filters on the
+authored `raceLegal` flag, which runtime nodes do not carry — so yesterday's improvised start lines cannot appear
+as today's destinations even between sweeps.
+
+### What the form asks, and what it works out
+
+| Field | Behaviour |
+|---|---|
+| **Start** | `Here` by default, or any of 35 race-legal nodes |
+| **Checkpoints** | 0–8, ordered, any node, chained; each becomes a gate |
+| **Finish** | any node. **No "here"** — the owner's ruling: the end *"doesnt need a here node"* |
+| **Laps** | shown only when start and finish are the same node, because laps are meaningless on a point-to-point |
+| **Open to** | the enabled street classes |
+| **Green flag** | 2 / 5 / 10 / 20 minutes |
+| ~~Type~~ | **not asked** — derived as `street_sprint` (point 3 above) |
+| ~~Field size~~ | **not asked** — the field is whoever turns up (carried over from `L179`) |
+
+**"Here" is an intent, not a coordinate.** The form stores the sentinel and the server resolves it against a
+fresh position at submit time, so a form left open for five minutes starts the race where the driver is when they
+post it — not where they were when they opened it. The client's live-position tick keeps the length preview
+honest while they choose.
+
+**The form previews, the server decides.** Node coordinates ride along in the schema so the page can show a
+running route length as points are chained without a round trip per change. The server recomputes it and refuses
+anything under 250 m regardless of what the client displayed. An unmeasurable preview reads *"length unknown"* —
+never `0 m`, which would look like a refusal nobody made.
+
+### What carries over from `L179` unchanged
+
+The event plumbing, which was right: `impromptu` as an event class, `NcmCalendar.adopt` as the non-cadence route,
+entry at the mark with `venueRadiusM = 60` (`L35`), the server-wide announcement, no purse, and both cadence
+guards (`impromptuCooldownSec` 900 per driver, `impromptuMaxOpen` 2 for the board — `KB-165`). No migration.
+
+**Basis.** Owner instruction, 2026-09-27, superseding `L179`'s interaction shape and nothing else. Scopes
+`IDEA-647`, `IDEA-648`; resolves `IDEA-644`, which asked for exactly the un-capping this ruling orders.
+
+## L182 — LOCKED / EXECUTED IN CODE / RESTART-GATED — wear onset uses very wide overlapping envelopes
+
+**Decision (owner, 2026-09-28), from the first Online observation.** A 157.527 km Galena lit five HUD marks:
+the SRV master plus critical tyre/brake and attention suspension/cooling. The odometer and exposure accounting
+were correct; the pacing was not. Profile v1 put each family in a narrow ±12% band around a fixed distance, so
+every Machine was effectively guaranteed the same maintenance staircase and this Galena's suspension and cooling
+thresholds landed only 10 m apart.
+
+Profile v2 replaces the staircase with broad, overlapping deterministic envelopes: tyres 750–7,500 km, brakes
+1,000–12,000 km, cooling 1,500–25,000 km, suspension 2,000–30,000 km, electrical 2,500–60,000 km, drivetrain
+3,000–45,000 km, transmission 4,000–55,000 km and power unit 6,000–80,000 km. Physical asset identity chooses a
+stable point inside the family envelope. The attention-to-full-effect span is another 100% of that asset's own
+onset distance, and service interval/cap scale from the same threshold. Families deliberately overlap, so neither
+the order nor the relative distance of service is guaranteed across Machines.
+
+At 150 km every mileage-wearing family is necessarily fresh. The observed Galena's first two onsets become
+1,201.718 km (tyres) and 1,732.516 km (brakes); its next is cooling at 3,133.305 km. Existing exposure and service
+history are untouched: condition is a pure projection and simply re-derives under profile version 2.
+
+**Operational state:** full offline gate green. The two vendored `parts.wear` files are staged on Online with
+rollback `/opt/ncm/backups/wear-v2-20260928T004557Z`, but the running resources deliberately remain on v1 until
+the connected client leaves and an announced/empty restart is available.
+
+**Basis.** Owner live observation and ruling, 2026-09-28. Refines `L178` and `IDEA-633`; records `KB-166`.
+
+## L183 — LOCKED / EXECUTED IN CODE / LIVE-GATED — the quest graph's first slice is built, and Messages becomes a conversation
+
+**Decision (owner, 2026-09-28).** Build the quest graph, starting with **Dex, Setup Stu and Rico**, then the
+others. Move Messages off its own hotkey into the **F6 shell, immediately left of HELP**, and rebuild it: pick a
+conversation from a sidebar, have it in the main pane, and make it feel diegetic.
+
+This authorises Appendix A.8 of [41_QUEST_GRAPH_PASS1.md](41_QUEST_GRAPH_PASS1.md) and nothing beyond it. The
+other fifteen contacts in that document remain SPEC.
+
+### What was built
+
+| Layer | What |
+|---|---|
+| `ncm/core/graph/contacts.lua` | All **eighteen** declared contacts, three authored. Discovery grammar, domains (§0.4) and the surviving voice fields. Each unauthored contact records **why** it is blocked, so the appendix is not re-derived next session |
+| `ncm/core/graph/conversation.lua` | The engine: state projection (§0.3), script validation, the `L176` voice audit, the §20 trigger budget, and §0.2's re-entry rules |
+| `ncm/core/graph/opening.lua` | The authored scripts, **copy preserved word for word**, plus the push conditions and their `TUNE` first numbers |
+| migration **039** | `message.from_kind` widened (`IDEA-599` — the one schema blocker), nullable `thread_id` (`IDEA-614`), `player_contact`, `player_behaviour_counter`, `player_graph_budget` |
+| `ncm_league/server/graph.lua` | The adapter: transcript rows, projection at read time, lead writes, the budget, the heartbeat |
+| `panel.html` / `client/panel.lua` | MESSAGES as a shell tab; sidebar of conversations, one transcript, replies as a composer |
+| `tools/test-quest-graph.lua` | 93 host assertions. `test_conversation` + `test_opening` add 70 offline |
+
+### Five rulings inside the build
+
+**1. A conversation is not a quest, and nothing stores one.** `player_contact.node` is where a conversation
+*rests*, not how far it has *got*: no step, no objective, no ordering, no completion column (`L175`, §0.3).
+Choices are **projected from state at read time and never persisted**, and `pick` re-projects server-side, so a
+stale panel cannot force a branch it should no longer be offering.
+
+**2. Hearing a name grants a LEAD, never a contact.** Dex, Stu and Rico all mention people who are not authored
+— Quinn, Foreman, Billie, Needle, Mara, Zero, Dr. Vale. Each mention writes a `lead` row (`player.leads`,
+`L175`) instead of opening a contact who could not answer. This is `IDEA-625`'s first producer: character
+reveals. `Contacts.speakable` refuses to open anything unauthored, so the rule is enforced rather than remembered.
+
+**3. A SOLICITED introduction is never rationed.** §20's budget exists to stop the *world* crowding the player.
+It must not stop the player opening a door they just asked to open: a driver who picks *"Put me through"* and
+then waits out a thirty-minute cooldown has been ignored, not paced. So an introduction caused by a picked choice,
+or named by a message already delivered (§3.1's guaranteed Stu handoff), bypasses the cap and the cooldown. It
+still *counts*, so an unsolicited introduction cannot pile on top of one in progress. **This was a live defect
+until `tools/test-quest-graph.lua` caught it** — see `KB-167`.
+
+**4. A world-initiated beat is pushed exactly once.** Re-entry comes from a player action (§0.2), never from the
+clock, so the host records each pushed node and never pushes it again. The alternative — one bookkeeping flag per
+offer — is the same omission waiting to recur with every beat Pass 2 adds. Also `KB-167`.
+
+**5. The vocabulary rule holds, and its one exception is written down.** `L176` kept `forbiddenAny`, and the
+first thing it caught was a trespass in the owner's own authored copy: §3.3's Stu line says *"instead of waiting
+on the **board**"*, and `board` is on Stu's recovered forbidden list because board *state* belongs to Foreman and
+Dex. Neither silently editing owner copy nor silently deleting a recovered rule is acceptable. The third option
+is a **per-node exemption carrying a mandatory reason** — scoped to one node, greppable, and refused by
+`validate` if the reason is blank. That line points *away* from the board to contrast it with a race the player
+builds; it does not read board state.
+
+### Messages
+
+The surface it replaced was one reverse-ordered pile of notices with no notion of who was talking, which stops
+working the moment characters exist — a Dex thread and a seat offer were the same kind of object. Now: a rail of
+conversations, the player's own lines right and the contact's left, oldest at the top, scrolled to the bottom on
+open, and replies as a composer at the foot of the pane. §2.4's context shelf renders **above** the generic
+categories, as questions about people rather than as objectives.
+
+**The leak discipline is asserted, not promised.** §3.4's hardware-curiosity score lives in its own table away
+from every player-facing payload and is stripped from projected replies; `openCount` never leaves the server. The
+render harness and the host harness both walk the whole payload and fail on anything progress-shaped — a count,
+a fraction, a percentage, a score (`L171`, `L175`). Unread counts stay, because that is a fact about an inbox.
+
+**F9 is released.** `KB-62` records that three of NCM's four function keys collide with something and that the
+collisions keep moving; a surface that can live in the shell should not spend one. Messages had F9, and F7 before
+it, which collided with the camera toggle in owner QA. Nothing claims the key now. Four stale *"press F9"* lines
+in `ncm_world/server/main.lua` were pointing at the questionnaire, which never had that key at all; they now say
+what is true.
+
+**Operational state: DEPLOYED ONLINE 2026-09-28 03:05 UTC.** Offline gate green — 713 core tests, 95
+quest-graph host assertions, 201 panel render assertions, docs authority clean. **Migration 039 applied and
+verified** on the canonical database (`§BQ1`, `§BQ2` PASS): `from_kind` carries all ten values, `thread_id` and
+the three new tables exist, `schema entries 39`, `quest graph ready: 3 authored contact(s), 8 push(es)`, both
+resources `started generation=1` with no script error.
+
+**The deploy immediately paid for itself by exposing `KB-168`,** which the offline gate could not see: a nil SQL
+parameter is a *hole* to OPEN//77's bridge, not NULL, so four of this feature's statements were refused outright
+and nothing persisted across a restart. Two older instances surfaced in the same log — `player_message_exposure`
+had been failing since migration 036, and the `ledger` payout line had been raising an **uncaught** error that
+aborted settlement transactions, so placement money and bounties were never paid. All three are fixed and
+redeployed. The harness that missed mine now models the bridge.
+
+**No player-facing PASS exists yet** (`L69`): every step of `wp/MASTER_TEST.md` **§BQ** from `§BQ3` down is owed,
+and `§BQ32` is the `KB-168` regression check.
+
+**Basis.** Owner instruction, 2026-09-28, authorising Appendix A.8 of `41_QUEST_GRAPH_PASS1.md` and specifying
+the Messages surface. Depends on `L175` (leads) and `L176` (the voice model). Constrained by `L171` (Dex recites
+no market count) and `L172` (Rico never prices a human). Scopes `IDEA-599`, `IDEA-600`, `IDEA-613`, `IDEA-614`,
+`IDEA-625`, `IDEA-649`–`IDEA-654`; records `KB-167`.
+
+---
+
+## L184 — LOCKED / EXECUTED IN CODE / LIVE-GATED — other drivers appear on the map and minimap, the city tier only
+
+**Decision (owner, 2026-09-27).** Build player presence on the player's own map and minimap as the **city tier
+only**: slow positional pins for every driver in the viewer's routing bucket, a player toggle, and the layer
+stood down while the viewer is in a live session.
+
+**The field tier is refused, and the refusal is the decision.** Pins attached to a streamed rival's body
+(`Open77.blips.attachToEntity`) were the other buildable half and the better-looking one — smooth, free of
+update cost, correct at any speed. They also hand a driver a rival's exact position through a building, which
+no mirror gives them. A refusal that exists only as a missing feature gets built by accident later, so it is
+written here instead.
+
+**What the platform actually provides**, checked against the build-pinned API index before anything was
+written (`open77_namespace Open77.blips` / `Open77.players`, `open77_guide blips`, `open77_api
+GetPlayersPositions`):
+
+- `Open77.players.positions()` answers `{ [playerId] = { x, y, z, bucket } }` for every player with a snapshot
+  **younger than two seconds**, with no permission checked in its handler. It is the only source that knows
+  about a driver five kilometres away, which is why this tier is server-driven at all.
+- `Open77.blips` draws to HUD, minimap and world map **together**. There is no per-surface visibility: `range`
+  gates all three and `shortRange` is refused by name. "Everyone on the map, only rivals on the minimap" was
+  never available and must not be promised.
+- `ui.vanilla.map` was already declared for `/ncm.gps`, so **no new permission and no new WebUI surface**.
+  Blips are a quota of 128 per resource, which `client/landmarks.lua` already spends per waypointable node, so
+  pins are moved and never recreated.
+- `CPO_RemotePlayerVariant` (`remote_player`) is the obvious sprite and comes from a **dormant multiplayer
+  HUD** the guide says must be checked visually. The default is therefore `vehicle`, with `/ncm.playersprite`
+  to look at the other one on a live client. `setColor` is unreleased at the index pin (op77.78) while Online
+  runs op77.102, so no colour distinction is depended on.
+
+**Cadence needed a ruling of its own.** The data is already up to 2 s old, so the tick is not a responsiveness
+dial: five seconds by default, tunable. `KB-165` applies directly — a per-tick rule is a permanent rule, and
+1 Hz would be 3600 sends per client per hour to answer a question that does not change in five seconds.
+
+**Operational state:** built and offline-green — 19 new `test_presence` assertions, whole gate green, `luac -p`
+clean over the resources. **Nothing is deployed and no live PASS exists** (`L69`): `wp/MASTER_TEST.md` **§BR**
+is owed. No migration, no schema change, no new dependency.
+
+**Basis.** Owner question and same-day ruling, 2026-09-27. Scopes `IDEA-650`–`IDEA-654`, opens `IDEA-660`,
+records `KB-168`. Constrained by `IDEA-595` (bounded payloads) and `KB-165` (cadence). It reads the same bucket
+convention as `L177` and changes nothing about it.
+
+## L185 - LOCKED OWNER DIRECTION - rig integration becomes a dedicated mod; Carrier is not reopened
+
+**Decision.** The abandoned wheel, pedals, button-rim and force-feedback subgoal will not be resumed inside
+`ncm_carrier`. It becomes a separate **NCM Rig Bridge** RED4ext mod, and implementation waits for the bounded
+device-access proof in `43_RIG_BRIDGE_ASSESSMENT.md`.
+
+This narrows `L146` without undoing the part that worked. Carrier remains the machine-effects mod: server bridge,
+record projection, per-Machine physics binding, handling, gearing and restoration. Rig Bridge owns the local
+hardware product end to end: discovery, mapping, calibration, direct vehicle command, buttons, native force
+output, safety, configuration and diagnostics. Carrier is not modified as a prerequisite and its inert input/FFB
+scaffold is not silently treated as an implementation.
+
+**The server is control plane, never input transport.** Steering, throttle, brake and FFB remain local and
+high-rate. OPEN//77/WebUI may carry health, settings, race context and capabilities. The existing companion/FFB
+hidden surface can be reused while Carrier keeps its existing machine surface; distinct port ranges and protocol
+identities prevent bind order from deciding which peer is which (`KB-147`-`KB-149`, `IDEA-647`).
+
+**The first authorised scope is research/prototype P0 only, not a product build:** while Cyberpunk is running,
+prove that an in-process provider can read the owner's G29, Thrustmaster pedals and ESP32 rim concurrently.
+Start from the source-verified DirectInput and Windows.Gaming.Input precedents; test the Logitech SDK adapter for
+the G29; retain `WM_INPUT` Raw Input as an additional provider if an exact endpoint needs it. None is assumed to
+solve every force-output backend, for which DirectInput exclusivity or a vendor SDK may be needed.
+If neither first provider passes, that P0 iteration stops and records the exact boundary. Per `L186`, that result
+falsifies only those implementations; it does not establish that an out-of-process hardware service is necessary.
+
+**Nothing is built, packaged, deployed or live-passed by this ruling.** The external companion remains the only
+proved rig path until the ordered P0-P5 contract has live evidence. A new required executable package is a later
+promotion decision, not implied here.
+
+**Basis.** Owner direction, 2026-09-27: prefer a new dedicated rig bridge rather than modifying Carrier, after
+understanding what failed. Source trace recorded as `KB-169`; scope `IDEA-661`-`IDEA-664`; assessment document 43.
+
+## L186 - LOCKED EVIDENCE RULE - a failed rig prototype does not refute in-process integration
+
+**Decision.** Negative rig evidence is scoped to the exact implementation tested: API/backend, access mode,
+device set, initialization point, window/thread context and build. If a provider prototype fails,
+the conclusion is that the prototype failed under those conditions. It is not evidence that a fully in-process
+Rig Bridge is impossible, nor that an external process is technically required.
+
+P0 is therefore a provider experiment, not a binary referendum on the architecture. A negative result must retain
+the error and lifecycle evidence, investigate the actual boundary, and select the next smallest discriminating
+experiment. An architecture fallback may be chosen later for measured cost or reliability, but not smuggled in as
+an impossibility claim. The external companion remains the currently proved fallback only.
+
+This corrects one inference in `L185` and document 43; it does not change the locked product boundary. Carrier
+stays closed and the proposed Rig Bridge stays separate.
+
+**Basis.** Owner correction, 2026-09-27. The first assessment repeated the earlier HTTP/HTTPS category error:
+our implementation failure was presented as a failure of the idea. Recorded as `KB-170`; scopes `IDEA-665`.
+
+## L187 - LOCKED - Safety Rating is kept and rebalanced; car contact is the signal, scenery is discounted
+
+**Decision.** The Safety Rating badge is **not removed**. It is rebalanced so that clean racing is worth
+something, a single incident is a cost rather than a catastrophe, and no one session can crater the badge.
+
+Removal was the owner's stated alternative and it was rejected on cost, not on preference: SR is load-bearing in
+four locked decisions. `L54` makes it the **only** dimension that may ever gate entry; `L44` defines NCX
+eligibility as licence + SR floor + invitation; `L38` splits an oversized field by rating/SR; and `P39` hands
+griefing to the SR badge and eligibility floors precisely so that incident scoring can stay zero-fault and
+blame-free. Deleting SR would reopen all four. The defect was never the existence of the badge, it was its
+arithmetic (`KB-171`).
+
+**Four rules now govern SR movement.**
+
+1. **Exposure earns the badge.** A clean session pays `cleanGain` 0.05 plus `perKmGain` 0.03 per kilometre
+   actually raced, capped at `maxGain` 0.30. Distance is the session's built course length with laps included,
+   falling back to the event route; a host that reports no distance still pays the base credit. Turning up is
+   worth little, driving a long race clean is worth a lot.
+2. **SR measures who is safe to race ALONGSIDE.** Car-to-car contact costs `perBand` 0.06 per severity band.
+   Scenery and self-inflicted contact cost `objectFactor` 0.35 of that, and the first band of it per session is
+   free -- it spends the clean credit but moves nothing. Wall damage is car control and belongs on the
+   Fingerprint (`IDEA-069`/`IDEA-070`), not on a rating about racing near people. This settles `IDEA-090`.
+3. **No craters.** One session may cost at most `maxLoss` 0.50, however many incidents it contained. The
+   observed -0.80 and -0.90 races become -0.147 each under the new weighting, recovered by one clean 6 km race.
+4. **Unknown contact is never cheap.** A host that supplies an incident *count* with no records is charged as
+   car contact. A gap in the detector must not read as good behaviour -- which is the shape of `KB-34`.
+
+**What this does not change.** Incident detection, bands, escalation, dedupe and the *corrected time* are
+untouched; `L56` still expresses incidents twice and the seconds added to a result are unaffected. The severity
+index SR reads stays linear in the band (1/2/3) while incident seconds keep the `1x/2x/4x` multiplier -- two
+curves for one event, left as it was rather than changed silently. Nothing gates entry in the first world
+(`L54`). Lifetime `distanceM` is still unwritten in `driver_sr`; the gain needs only the session's distance, so
+no schema migration was taken.
+
+**Alpha SR rows are not migrated.** Under `L75` the numbers already written carry no obligation, and every
+driver's SR simply moves under the new rules from wherever it now sits.
+
+**Basis.** Owner, 2026-09-27: *"safety rating in ncm online is a sham right now, no upside. a race or time trial
+with no incidents gets you maybe a fraction of the gains as one incident. multiple incidents leaves a crater.
+remove it or balance it"* -- the diagnosis was arithmetically exact. `P39` already anticipated tuning thresholds
+in rehearsal (E8), and `IDEA-093` had already judged this a core edit with a fixture rather than a brick.
+Recorded as `KB-171`; residual tuning questions as `IDEA-666`. **Not done until `MASTER_TEST` §BS passes live
+(`L69`).**
+
+## L188 - LOCKED OWNER REQUIREMENT - Rig Bridge is multi-vendor and multi-device by construction
+
+**Decision.** The dedicated NCM Rig Bridge may not be a Logitech-only product with other brands deferred behind
+its core assumptions. Its normalized input model, saved profiles, diagnostics and game injection are hardware
+neutral. A rig may compose steering, pedals, clutch, shifter, handbrake and actions from any number of physical
+devices, and each role/control binds independently to a stable device identity plus an axis/button/switch.
+
+The provider boundary is explicit. Windows.Gaming.Input `RawGameController` and generic DirectInput are the first
+input providers because working MIT Cyberpunk mods prove both in-process patterns. `WM_INPUT` Raw Input remains
+available for an endpoint those providers cannot read. Logitech and any later Thrustmaster/Fanatec/Moza SDKs are
+optional capability adapters, never the definition of a supported input device. Force output is bound separately:
+a wheel can have generic input without an FFB backend, and lacking FFB must not disable its steering.
+
+The first exact-rig proof is the owner's split rig: G29 steering/output, separate Thrustmaster pedals and ESP32
+rim buttons, all sampled concurrently inside the Cyberpunk process. It must preserve stable assignments across
+restart and hotplug. Product-name substrings and enumeration indices seen in the reference mods are useful demos,
+not sufficient identity for NCM.
+
+**Source basis.** Source trace, 2026-09-27: clevergrant's `cp2077-wheel-mod` supplies the working SDK/pump/detour
+pattern; natpoh's `cp2077-wheel-mod-moza` supplies DirectInput enumeration, independent wheel/pedal handles and
+DirectInput FFB; jackhumbert's `custom_game_controller` supplies multiple arbitrary Windows.Gaming.Input devices
+and shipped Fanatec/Thrustmaster mappings. All three repositories are MIT; reused code still requires preserved
+notices and vendor SDK redistribution remains a separate check. Owner requirement: more than Logitech wheels.
+Scopes `IDEA-667`; amends the research basis of document 43 without authorising implementation.
+
+## L189 - LOCKED - a server-to-client payload carrying a list goes over `NcmStream`, never a state bag
+
+**Decision.** `ncm_league/server/stream.lua` is the transport for any payload that carries a list, and the
+player state bag is not an alternative to it. A state bag may hold a small, **bounded, measured** value; the
+moment a payload contains a list whose length is data rather than a constant, it is a stream. The receiving
+half is `ncm_world/client/stream_rx.lua` (`NcmStreamRx`), which is shared rather than per-surface.
+
+**Why now.** `KB-172`: Street Call published its form as an 11,515-byte player bag against a 4,032-byte ceiling
+(`IDEA-509`). It never worked once, on any press, for any player, and it shipped and deployed that way because
+nothing in the offline gate can see a size ceiling and nothing at runtime said a word. This is the **fifth**
+instance of the same bug -- `KB-59`, `KB-86`, `KB-153`, `KB-160` -- and the first that a player met. The
+transport to prevent it already existed, was already written up in its own header as a structural rule rather
+than a per-payload fix, and a new feature simply did not use it. A rule that only applies to the payloads that
+already broke is not a rule.
+
+**What this obliges.**
+- A publisher measures. `NcmStream.send` returns the encoded size, the head size and the packet count, and the
+  caller logs them. An unmeasured payload is an unexploded one.
+- **A head is bounded by construction, or it is not a head.** `NcmStream` cannot split a head. `KB-86` is the
+  instance where twenty rows of history sat in one, and `stream.lua`'s header already warns about it.
+- **Never discard a write's return value.** `KB-172` was silent because the `:set` call sat inside a `pcall`
+  that threw away the result, so a refusal that reports rather than raises read exactly like success. Compare
+  `ncm_world/server/handling.lua:68`, which returns the status.
+- **Say when nothing arrived.** Both sides of `KB-172` logged something reasonable and neither logged the
+  fault. A client that waits for a payload names the two possibilities when it times out.
+
+**What this does not say.** It does not ban the state bag. `ncmEntry`, `ncmVenue`, `ncmHandling` and the
+onboarding flags are small fixed-shape values and stay where they are. It also does not make a stream free: it
+is a net event per packet, so a payload that could simply be *smaller* should be smaller first. Street Call was
+both -- it sent the same 35-node list twice, and `competition.race_builder` now puts it on the wire once and
+rebuilds the page's `start`/`finish` lists on the client (`M.wire` / `M.schemaFromWire`).
+
+> **CORRECTION, 2026-09-28 (`L193`, `KB-178`). The last sentence above described the defect, not the fix.**
+> Rebuilding `start`/`finish` on the client restored the full 11,515 bytes **immediately before the
+> client-to-page hop**, and that hop drops large messages silently (`KB-63`). So this decision fixed the
+> server-to-client half and left the other half broken, and the form still never drew once. **This decision is
+> otherwise sound and stands** -- the stream is the right transport and `KB-172` is genuinely closed. What it
+> got wrong was scope: it counted one hop where there are two. `L193` extends the rule to the second hop and
+> is where the Street Call form's transport now lives. `M.schemaFromWire` remains core's tested inverse of
+> `M.wire`; nothing on the client path calls it any more.
+
+**Consequence accepted.** `client/panel.lua` keeps its own private copy of the receiver for now (`IDEA-668`);
+it is the busiest surface in NCM and carries live PASSes, so converging it is its own change. Until then the
+rule is upheld by two receivers, which is the part of this decision with a shelf life.
+
+**Live proof owed:** `§BN1`-`§BN4`. Nothing here is PASSED until the card opens on a real client.
+
+## L190 - LOCKED - Messages is a messenger: a notice is a thread, and an incoming line arrives
+
+**Decision.** The Messages surface has exactly one place where messages are read: a thread. There is no second
+pane of recent messages, no tray, and no list of notices beside the conversation. Two rules follow, and they are
+rules rather than styling:
+
+- **A notice is mail from a sender.** A seat offer belongs to the team that sent it, in that team's thread, with
+  its subject line intact and its `accept` / `decline` in the composer where every other answer lives. It appears
+  in the rail with an unread badge and it does **not** take the pane the player is reading.
+- **An incoming line arrives.** A line appended to a transcript that is already on screen is revealed on its own,
+  behind a typing indicator, and the composer stays empty until the contact has finished. Opening a thread,
+  switching threads or reopening the panel draws history **at once** -- pacing scrollback would be a claim that
+  old lines are being said now.
+
+Time is part of the surface: a stamp where the clock jumped more than fifteen minutes, a clock on the newest
+bubble and nowhere else, and a `NEW` rule where unread begins. None of these is countable progress (`L171`,
+`L175`); an unread badge counts messages, which is a fact about an inbox.
+
+**Why now.** Two owner complaints, 2026-09-27, about the same panel: the bottom tray was *"terrible and
+intrusive, not how a real messaging app works"*, and the messaging was *"instantaneous right now and i cant
+always tell what the newest message is"*. The first had a defect underneath it (`KB-173`): the tray was fed by a
+query with no thread filter, so it showed the twenty newest rows in `message` regardless of thread -- the open
+conversation duplicated below itself, mixed with everybody else's lines. The second was structural: a reply wrote
+the player's line and spoke the whole next node in the same frame, so a three-line exchange and its replies all
+appeared together and there was nothing to read as a conversation.
+
+**Consequence accepted.** The surface now holds state the server does not know about: which notice thread is
+open, and which lines have already been revealed. That is presentation and it is deliberately not persisted --
+a panel reopen redraws history at once, which is also the honest thing to do after a reconnect. The pacing is
+page-local, so a line is durable the moment the server writes it; nothing about arrival can lose a message.
+
+**What this does not say.** It does not merge the two payloads. `ncm:inbox` and `ncm:graph.threads` stay separate
+on the wire, because a notice has a deadline and an answer and a conversation has neither; the page folds them
+into one rail. It also does not make every notice a conversation the player can talk into -- an offer is
+answered, not discussed.
+
+**Live proof owed:** `§BT`. Nothing here is PASSED until an offer is accepted from a thread on a real client.
+
+## L192 - LOCKED - the Machine channel outranks force feedback for the Carrier's single socket
+
+**Owner report.** *"something broke our top speed ceiling and probably physics application on cars, maimai back
+to stock 103kph"*, with the note that it had been working until the last two or three deploys.
+
+**The constraint.** The Carrier's bridge is a serial accept loop. `serveWebSocket` in `bridge/server.cpp` blocks
+until that one socket closes, so **a Carrier port is a lock, not a channel**, and exactly one of the client's two
+hidden surfaces can ever hold it. Something has to yield. The only question is which.
+
+**The ruling.** The **Machine channel yields to nothing.** Parts, gearing, the governor and every projection are
+the product; force feedback is a peripheral preference that needs a process NCM does not ship. The machine walk
+therefore sweeps `38480-38483` with no skip and no exception, and the FFB walk is the one that steps aside --
+searching the Rig Bridge's own `38520-38523` first and entering the legacy companion range only after the Carrier
+has been located, then skipping the port it is on.
+
+**What this reverses.** The previous rule pointed the same skip the other way, to stop the machine surface
+displacing a wheel companion mid-corner. That protected the optional half of the product at the cost of all of
+it, and it hid the cost for weeks: the companion happened to hold `38480`, so the Carrier fell to `38481` where
+the machine walk could still reach it. **The feature was never robust, only lucky.** `KB-177` has the evidence --
+same plugin build, Carrier on 38481 applies 42 gear chains, Carrier on 38480 applies zero.
+
+**The generalisation, and it is the part worth keeping.** A scan that declines a port emits no fault, because
+declining is its normal behaviour. Two channels contending for one lock must therefore have a **written
+precedence**, and the lower-priority one must be the one that yields -- otherwise the failure is silent,
+indistinguishable from an absent peer, and discovered by a driver rather than by a log line.
+
+**Live gate.** `§BV1`. Offline-green is not a pass.
+
+
+## L191 - EXECUTED IN CODE; LIVE-GATED - Rig Bridge is a full dedicated mod, not a probe and not Carrier
+
+**Owner ruling.** *"nice build it end to end, no probe"*. Build the complete dedicated Rig Bridge product now.
+Do not reopen Carrier's abandoned input scaffold. The bridge is multi-vendor and multi-device by construction;
+Logitech is one compatible device family, not the architecture.
+
+**Executed boundary.** `ncm/rig_bridge/` is a separate RED4ext DLL and package. It owns a 250 Hz DirectInput
+provider, stable instance-GUID bindings, independently assignable steering/throttle/brake/clutch endpoints,
+button-to-game actions, hot-plug re-enumeration, exact local-player mount scoping, direct native vehicle-command
+injection, DirectInput condition/constant FFB, explicit arming, bounded strength and a telemetry watchdog. It
+serves its own loopback/WebUI range (`38520-38523`) and reuses the existing FFB surface. Carrier keeps
+`38480-38483` and the Machine surface; no Carrier source or package changed.
+
+**Why DirectInput first.** The positive source precedent is cross-vendor (`cp2077-wheel-mod-moza`), supports a
+separate wheel and pedals, and exposes both input and FFB without redistributing a vendor SDK. The product does
+not contain a Logitech-only path. Windows.Gaming.Input and Raw Input remain additional providers if a measured
+endpoint cannot expose what it needs through DirectInput; they are not prerequisites invented in advance.
+
+**Done still means live PASS.** The DLL builds warning-free, exports the three RED4ext entry points, depends only
+on Windows system DLLs, packages with config/redscript/notices, and its pure mapping test passes. That is offline
+evidence, not wheel support. `MASTER_TEST §BU` must still prove enumeration of the owner's exact G29 + separate
+Thrustmaster pedals + ESP32 rim, exact-car control, reconnect, panel control, FFB arm/watchdog and coexistence
+with Carrier. The external companion is not retired before those live input and output halves pass.
+
+**Amendment, 2026-09-28 — verification pass. "Bounded strength" is now true in code, and one advertised
+channel is scenery.** Independently rebuilding and re-gating the L191 work confirmed the offline evidence above:
+the Release build is clean, the DLL exports `Query`/`Supports`/`Main`, its imports are Windows system DLLs only
+(`DINPUT8`, `IPHLPAPI`, `KERNEL32`, `USER32`, `WS2_32`, `ole32` — no vendor SDK, no redistributable), the mapping
+test passes, and the package assembles. Two corrections follow, and neither changes the boundary this entry sets.
+
+**First, the force ceiling was a document and a panel convention, not an enforced invariant** (`KB-174`). The
+setter and the config loader clamped to `[0, 1]` and the built-in default was 0.35, above the 0.18 top rung that
+`§BU9` says unknown hardware must never exceed. The ceiling now lives in `config.hpp` as `kFfbRungs` /
+`kFfbStrengthCeiling`, and the setter, the loader, the panel's rung table and the rung the bridge *reports* all
+read it, so the surface can no longer disagree with the device. **The rule this makes explicit: a safety envelope
+stated in an acceptance item must be enforced at the narrowest point in code, not assumed from the values the UI
+happens to offer.** Nothing was armed, so nothing was at risk — that is luck, not design.
+
+**Second, "DirectInput condition/constant FFB" overstates what is driven** (`KB-175`, `IDEA-673`). The condition
+effects (spring, damper) are genuinely fed, from RTTI vehicle speed through the detour. The constant-force effect
+is computed from `feedback.collision`, which nothing ever raises above zero, and `feedback.road` is filled from
+telemetry and read by nothing. Outside a TEST PULSE the constant force is always 0, while the panel still
+advertises road and texture tune values. The claim for this build is therefore **speed-scaled centring and
+damping**, which is what `§BU9` already asks for; road and collision feel are unbuilt, and the owner chooses
+between feeding them and deleting the plumbing.
+
+**The gate was red when this entry was written** (`KB-176`). `tools/ncm-test.ps1` failed on two documentation
+invariants — document 43's `CURRENT` banner named no topic, and `BACKLOG.md`'s next-free-ID line had already
+been consumed. Both are fixed and `ncm-test` is green. A build is not offline-green while the gate that asserts
+it is failing, however narrow the failure; the reported state and the gate's verdict have to be the same fact.
+
+## L193 - LOCKED - a payload crossing the client-to-WebUI bridge is bounded BY CONSTRUCTION, not by batching
+
+**Decision.** `L189` bounded the server-to-client hop. There are **two** hops, and this is the other one. A
+value handed to a WebUI page with `page:send` must be bounded by what it *contains*, not rescued after the fact
+by splitting it: the page receives **what is on screen**, and the catalogue it is chosen from stays in Lua.
+
+Concretely, for the Street Call form: `client/race_builder.lua` holds the node list, the form, the cursor and
+the picker. `web/venue.html` receives at most fourteen form rows or a nine-row picker window, as display
+strings. No message's size depends on how many nodes exist, so there is no size at which the feature can
+silently stop drawing.
+
+**Why now.** `KB-178`. The form had never rendered, on any press, for any player. `L189`'s fix was real but
+half-scoped: the client received the streamed node list correctly and then called `Builder.schemaFromWire`,
+which re-expands it into **both** `start` (HERE + 35 rows) and `finish` (35 rows) — restoring the full 11,515
+bytes — and handed that to the page in one `page:send`. `KB-63` says exactly what happens next: no error, no
+return value, no log line, and the page never receives it. The card then failed its own 2500 ms draw watchdog
+and closed. The schema was reassembled at the last possible moment before the one hop that could not carry it.
+
+**The owner is the reason this was found, and the previous account was wrong twice.** It claimed the form had
+never rendered *because* of payload size and that the earlier six-page version had never worked either. The
+owner said the six-page version rendered. It did — each of its steps sent at most five options, a few hundred
+bytes, comfortably under the threshold. **The page count was never the fault**, and a per-payload size story
+that contradicts an observation is a story, not a diagnosis. `L181`'s one-form shape is kept in full.
+
+**What this obliges.**
+- **Batching is the fallback, not the rule.** `client/panel.lua::sendBig` is correct and stays — it serves
+  screens that genuinely must show a long list. But where a surface can be handed only the visible window, it
+  is, because a split payload still grows and a windowed one cannot.
+- **A page that shows a long list receives a window and a position, never the list.** "17 of 35" is a string.
+- **Geometry stays server- or Lua-side.** The node coordinates existed in the payload only so the page could
+  preview a route length. Lua computes the readout and sends the sentence, so coordinates never cross at all.
+- **Every page gets a guard and a harness.** `venue.html` had neither while carrying three tenants, which is
+  why this was invisible. `tools/venue-render-check.js` is in the gate: 53 assertions, and it asserts the
+  page holds no schema and computes no distances, so the payload cannot grow back.
+
+**What this cost, and what it bought.** The form is no longer driven by dropdowns and a mouse, because
+`venue.html` is `pointer-events: none` and is never focused — which is exactly what makes it safe to leave
+attached during a race (`KB-67`). Input is read in Lua with `Open77.input.isDown` (arrow keys, Enter,
+Backspace, Delete, PageUp/PageDown, and the pad), which are **physical reads that need no focus**. The
+keyboard vocabulary was read out of the deployed `Open77.dll` rather than guessed, per the presentation
+audit's own advice; ESC is deliberately not a close key, because it opens the pause menu.
+
+What that bought is worth more than the dropdowns: **`KB-61` cannot happen here at all.** There is no focus to
+hold, so there is nothing to soft-lock. That is a stronger guarantee than the confirm-then-focus handshake it
+replaces, and the `build:drawn` reply is kept only as a render confirmation.
+
+**And it gave back a WebUI surface.** `kMaximumWebSurfaces` is 8 per resource; `ncm_world` was at **8 of 8**
+with `web/build.html` (`IDEA-570`), while `carrier_bridge.lua` and `race.lua`'s bridge probe create pages
+transiently — so `WebUI.create` for the form could be refused outright depending on timing, a second and
+independent failure mode. The form is now a block on `venue.html`, shared through `NcmVenueSurface`, and
+`web/build.html` is deleted. Back to **7 of 8**. Owner direction, 2026-09-28: *"use venue.html i dont care just
+make it work without adding a second page."*
+
+**Live proof owed:** `§BN1`, `§BN33`-`§BN41`. Offline-green is not rendered; nothing here is PASSED until an owner presses
+F5 on a real client and the card draws.
+
+## L194 - LOCKED / EXECUTED IN CODE / LIVE-GATED - Player Exchange is a first-class F6 system, not a backend slice
+
+**Owner direction.** *"Implement today"* and *"the exchange panel [must be] built in F6 — don't hack around
+this with a narrow vertical slice."* `IDEA-247` therefore ships as one coherent synchronous product: invitation,
+exact offer construction, bilateral consent, settlement, receipts, refusal paths and a first-class **EXCHANGE**
+tab in the existing F6 shell. Commands are recovery twins; they are not the primary product.
+
+**The offer is genuinely heterogeneous.** Either Driver may contribute exact owned Machines and exact stored
+Parts; one side may additionally contribute whole-eddie cash. Both sides must contribute value, money-for-money
+and gifts are refused, and NCM never judges whether the bargain is fair. A selected Machine includes every exact
+component asset fitted to it at confirmation time. That installed set is visible to both Drivers and moves with
+the Machine; a seller who wants to keep a component refits or removes it before offering the Machine.
+
+**Consent binds to facts, not a button press.** Each edit creates a new monotonically increasing revision and
+clears both confirmations. Confirmation covers sorted Machine ids, component ids, their custody and containing
+Machine, cash, parties and revision. Before either confirmation and again before commit, the host rechecks title,
+stored/installed custody, funds, race commitment and whether a Machine is materially present in the world. A
+ called Machine must be stored; a checked-in/racing Machine cannot move. Selecting a stored Machine reserves it
+ against a concurrent CALL until it leaves the offer or the Exchange closes.
+
+**One accepted revision is one transaction.** Migration 040 adds the durable `trade_envelope`, exact asset and
+money legs, provenance links from both transfer histories and a balance-lock row. The transaction serializes all
+NCM debits for both Drivers, inserts the accepted envelope only while every SQL precondition is true, transfers
+title and component custody, appends ordinary transfer histories, writes one paired `player_trade` debit/credit,
+and marks the envelope settled. There is no partial success and no mint. Existing Market, Part-market and entry
+debits now take the same balance lock, closing the concurrent double-spend window rather than making Exchange
+atomic only in isolation. Machine identity, ordinals, distance, wear and service history stay on the same assets.
+
+**Boundary.** This first system is direct and synchronous: both Drivers are online, drafts live in memory, and a
+decline, disconnect, expiry or resource restart releases them without moving anything. The accepted settlement
+is durable and replay-safe. Persistent listings are later because an offline offer requires escrow and expiry
+recovery; that is a second product, not missing UI in this one. Private Exchange reveals acquired Machine identity
+to its new owner but never grants Market access or publishes either Driver's private knowledge.
+
+**Live proof owed:** `MASTER_TEST §BW`. Offline proof covers 747 core tests under Lua 5.4/LuaJIT, a deterministic
+18-assertion host lifecycle/transaction harness, the real F6 panel render harness and syntax over the resource
+tree. No Exchange is DONE until two real clients pass the exact-asset, refusal, retry and restart rows in §BW.
+
+## L195 - EXECUTED IN CODE / LIVE-GATED - the NCM quick menu is a NATIVE radial, drawn by its own required mod
+
+**Owner direction (2026-09-28).** Keep every hotkey, and put F6 (now named **Hub**), F5 (call a race), `/ncm.gps`,
+the map and the other player-facing hotkeys on one radial wheel. Hold **Start** on a controller (Start is free in
+OPEN//77; Back opens the pause menu), or a dedicated non-F key on keyboard; both mappable. Leave slots open for
+features still coming. **Not WebUI** ("dig harder at a real radial"), and **do not appropriate Carrier or Rig
+Bridge; make a new one if needed.** No key audit: the owner picks the keys.
+
+**What was found before building.** `open77_uikit` (the platform's radial) is still absent from op77.102 on both the
+dev box and staging, so it was not an option. `open77_contextmenu` is a hold-ALT entity picker, not a radial. The
+`radial*` strings in `Open77.dll` are a list of vanilla UI states, not a scripting API. The vanilla
+`RadialWheelController` is a full-screen, centred HUD module that exists on foot and in vehicles and already owns
+blur and sounds. OPEN//77 claims the weapon wheel, so that host otherwise sits idle for the whole session.
+`r6/scripts` is a permitted required-mod root (`Open77.Server.Core.dll`), and Rig Bridge already ships redscript
+that way.
+
+**Shape: three owners, one job each.**
+- `ncm_radial` (new resource, client only) **decides everything**: it reads Start/keyboard holds physically
+  (`isDown(keyFor(...))`, the idiom the platform's own hold-to-open context menu uses), aims from either stick,
+  WASD/arrows or an accumulated mouse flick, highlights one of eight FIXED slots, and on release asks `ncm_world`
+  to run it. It is a separate resource only because its hidden loopback transport needs a WebUI surface and
+  `ncm_world` is at 8 of 8 (`IDEA-570`). That surface is transport and is never visible.
+- `ncm_radial.dll` + `ncm_radial.reds` (new required mod `ncm-radial`, `ncm/radial/`) **only draw**: the DLL serves
+  the transport page on 127.0.0.1:38560-38563 (its own range) and exposes two string natives, and the script draws
+  the wheel inside `RadialWheelController`, hiding the vanilla children while NCM's wheel is up and restoring
+  exactly the ones it hid. It shares no code, state, port or package with Carrier or Rig Bridge.
+- `ncm_world` **runs** the action through `quickAction`, over the very function each hotkey calls
+  (`NcmQuickActions`), plus `Open77.map.open()` for Map, so the wheel can never do what the hotkey would not.
+
+**Slots (clockwise from top):** Hub (F6), Race graph (F8), Call a race (F5), *open*, Map (M), *open*, GPS
+(`/ncm.gps`), *open*. Machine Index, Help and Status are deliberately not on the wheel (owner). Defaults: keyboard
+**B**, controller **Start**, both `RegisterKeyMapping`s so both appear in the pause menu's key-bindings tab.
+`/ncm.radial pad <control>` is the fallback if the platform refuses a pad control as a mapping default.
+
+**Safety rules, by construction.** A dropped socket closes the wheel; no frame for 1.5 s closes the wheel; only
+this game's process tree may connect; a focused surface (the F6 hub) closes the wheel and runs nothing; on-foot
+Movement and Attack are blocked while it is up and released on close. Driving is not blocked, on purpose.
+
+**Offline proof:** the DLL builds clean at /W4; the state tests pass (wire format, separator injection, selection
+bounds, drop-close, stale-close, garbage refusal); the redscript compiles against the vanilla bundle AND the
+installed OPEN//77 scripts in a scratch cache (`tools/build-radial.ps1` refuses to package otherwise); `ncm-test`
+is green. **Unverified, owed live:** that the host constructs in an OPEN//77 session, that `DelayCallbackNextFrame`
+ticks it, the ink layout at real resolution, whether `mouseDeltaX/Y` are per-frame or cumulative, what
+`setActionBlocked` accepts, and whether a pad control is accepted as a mapping default.
+**Live proof owed:** `MASTER_TEST §BX`.
+
+## L196 - EXECUTED IN CODE / LIVE-GATED - the Scanner's look is the REAL vanilla render, shipped by its own redscript-only required mod
+
+**Owner direction (2026-09-28).** The green filter and reticle of the vanilla scanner, *"without time dilation
+slowing down"*, for Machine discovery. Offered a WebUI imitation (tier 1) and the real render (tier 2): *"tier 1
+sucks, tier 2 please."* Then: *"do not modify an existing mod, create a new one, disrupting performance of carrier
+or rig bridge is a nonstarter."*
+
+**What was found (evidence: `docs/research/open77/evidence/2026-09-28/scanner-vision-look.md`).** OPEN//77 refuses
+`PlayerVisionModeController` for the whole session, and no claim can release it. It refuses the focus-mode time
+dilation *separately*. Vanilla activation is three independent calls, and only one of them is the green render:
+`VisionModeSystem.EnterMode(player, gameVisionModeType.Focus)`. The platform does not intercept that system. The
+controller deactivates only when its own `m_active` flips, and under OPEN//77 it never activates, so it cannot cancel
+a render we start. `VisionHold` (Tab) and `VisionToggle` (Caps Lock) are in both the on-foot and driving input
+contexts.
+
+**Shape.** A new required mod `ncm-vision` (`ncm/vision/`, `dist/ncm-vision-0.1.0.zip`): **one redscript file and
+no DLL.** A `ScriptableSystem` registers two input listeners on the local player at attach. Hold Tab for green
+while held, tap Caps Lock to toggle. It makes the render call alone. There is no scanning controller, so no scan
+HUD, and no `FocusModeLocomotion`, so no walk-only restriction. It shares no code, state, port or package with the
+Carrier, the Rig Bridge or the radial. It has no per-frame work and never consumes the key.
+
+**Rules kept by construction.** Vanilla symbols only, so an OPEN//77 or NCM rename can never break the compile. A
+redscript compile error disables every script mod a player has, which is why `tools/build-vision.ps1` refuses to
+package unless the file compiles against the vanilla bundle plus every installed script in a scratch cache. A
+release of the hold also clears the toggle, so one press and release recovers from a key-up lost to alt-tab.
+Detach and re-attach return the render to Default before unregistering.
+
+**Not decided here, deliberately.** (a) Whether the filter is refused while a player is entered in a live session.
+Redscript cannot see NCM's race state without either an OPEN//77 symbol (compile risk) or a transport. Record
+§BY's visibility finding first. (b) NCM's own tint: Preem Scanner shows the LUT, vignette and scanlines are inert
+depot content, so a restyle can ship later as an `.archive` without touching this script. (c) The *knowledge*
+half: aiming at a Machine and writing `identity_reveal` stays with `IDEA-624` and the server.
+
+**Offline proof:** the script compiles alone against vanilla and together with OPEN//77, rig bridge and radial
+scripts. The package holds exactly `r6/scripts/ncm_vision/NcmVision.reds` + `README.md`. **Unverified, owed live:**
+that the render appears in an OPEN//77 session, time scale stays 1.0, movement stays free, it works while driving,
+nothing else resets it to Default, and what vanilla highlight noise comes with it.
+**Live proof owed:** `MASTER_TEST §BY`.

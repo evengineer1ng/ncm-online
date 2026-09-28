@@ -14,7 +14,19 @@ auto_start true
 --   this resource only asks what the sky is currently doing. Added 2026-09-26: without it `getState`
 --   returned nil, and a missing permission is indistinguishable from a missing API unless the refusal
 --   reason is read -- which is why `machine.lua` now logs it.
-permissions { "database.access", "network.events", "state.write", "world.vehicles", "ui.vanilla.map", "ui.nameplates", "input.actions", "map.control", "players.teleport", "world.props", "world.npcs", "vehicles.read", "world.query", "world.environment" }
+-- world.population: the SERVER-OWNED vanilla density switch (`Open77.world.setPopulation`), replicated to
+--   every client in a routing bucket. Added 2026-09-27 with `L177` for `server/ambient.lua`. Without it
+--   `setPopulation` refuses and the refusal reason is the only thing that distinguishes a missing
+--   permission from a missing API -- which is why ambient.lua logs it by name.
+--   NOTE what the permission does NOT buy: the vanilla ENTITIES are still spawned per client, so nothing
+--   here can remove one traffic car. Radius-scoped clearing is only possible for the vehicles and NPCs
+--   this resource creates itself, which is the other half of `server/ambient.lua`.
+-- players.stats.apply: `Open77.players.setRegen` for passive health regeneration (`server/vitals.lua`,
+--   KB-180). Health is a server ledger whose regen is 0 until a resource sets it; without this permission
+--   damage never heals.
+-- world.prevention: the console-only `ncm.wanted` probe for IDEA-677 (`Open77.players.setWanted`). Declared
+--   so a live test cannot fail on a missing permission; the card lists none, the client plugin checks this one.
+permissions { "database.access", "network.events", "state.write", "world.vehicles", "ui.vanilla.map", "ui.nameplates", "input.actions", "map.control", "players.teleport", "world.props", "world.npcs", "vehicles.read", "world.query", "world.environment", "world.population", "players.stats.apply", "world.prevention" }
 
 -- Race HUD (M3.2): light tree, banner and race strip as our own WebUI page.
 web_ui_page "web/race.html"
@@ -48,6 +60,8 @@ shared_script "shared/core/world/location.lua"
 shared_script "shared/core/data/nodes.lua"
 shared_script "shared/core/data/roots.lua"
 shared_script "shared/core/course/routes.lua"
+shared_script "shared/core/world/ambient.lua"
+shared_script "shared/core/world/presence.lua"
 shared_script "shared/core/competition/seasons.lua"
 shared_script "shared/core/competition/calendar.lua"
 shared_script "shared/core/competition/entry.lua"
@@ -63,6 +77,8 @@ shared_script "shared/core/competition/format.lua"
 shared_script "shared/core/competition/class.lua"
 shared_script "shared/core/competition/eligibility.lua"
 shared_script "shared/core/competition/race_tags.lua"
+shared_script "shared/core/competition/overtakes.lua"
+shared_script "shared/core/competition/race_builder.lua"
 shared_script "shared/core/session/race.lua"
 shared_script "shared/core/session/quali.lua"
 shared_script "shared/core/session/practice.lua"
@@ -82,17 +98,23 @@ shared_script "shared/core/parts/compat.lua"
 shared_script "shared/core/parts/catalogue.lua"
 shared_script "shared/core/parts/rnd.lua"
 shared_script "shared/core/parts/thermal.lua"
+shared_script "shared/core/parts/wear.lua"
 shared_script "shared/core/parts/handling.lua"
 shared_script "shared/core/economy/markets.lua"
 shared_script "shared/core/economy/production.lua"
 shared_script "shared/core/economy/supply_profiles.lua"
 shared_script "shared/core/economy/settlement.lua"
+shared_script "shared/core/economy/trade.lua"
 shared_script "shared/core/driver/progression.lua"
 shared_script "shared/core/driver/presentation.lua"
 shared_script "shared/core/driver/feedback.lua"
 shared_script "shared/core/onboarding/questionnaire.lua"
 shared_script "shared/core/qa/rules.lua"
 shared_script "shared/core/player/communication.lua"
+shared_script "shared/core/player/leads.lua"
+shared_script "shared/core/graph/contacts.lua"
+shared_script "shared/core/graph/conversation.lua"
+shared_script "shared/core/graph/opening.lua"
 shared_script "shared/core/player/landing.lua"
 shared_script "shared/core/player/help.lua"
 -- ncm-core:end
@@ -109,14 +131,31 @@ server_script "server/observation.lua"
 server_script "server/state_probe.lua"
 server_script "server/pickup.lua"
 server_script "server/venue.lua"
+-- After identity.lua: ambient.lua reads its tunables through NcmIdentity.settings, because a second
+-- Open77.tunables.declare in one resource REPLACES the first rather than adding to it.
+server_script "server/ambient.lua"
+-- Also after identity.lua, and for the same reason: presence reads its tunables from that one block.
+server_script "server/presence.lua"
+-- Also after identity.lua: passive health regen reads `playerRegenPerSecond` from the same block (KB-180).
+server_script "server/vitals.lua"
 server_script "server/main.lua"
 client_script "client/main.lua"
 client_script "client/nameplates.lua"
 -- nav owns every waypoint NCM sets; it loads before the two files that ask for one.
 client_script "client/nav.lua"
 client_script "client/landmarks.lua"
+-- After landmarks.lua: both draw blips against one 128-per-resource quota, and landmarks is the layer
+-- with the fixed cost, so it gets its pins first.
+client_script "client/players_map.lua"
 client_script "client/apparel.lua"
 client_script "client/calendar.lua"
+-- Before race_builder.lua: it registers its `ncm:build` receiver at file scope and cannot do that before
+-- `NcmStreamRx` exists. Shared receiving half of ncm_league/server/stream.lua (`KB-172`).
+client_script "client/stream_rx.lua"
+-- After BOTH stream_rx.lua and calendar.lua. The Street Call form draws on calendar's `web/venue.html` rather
+-- than owning a WebUI surface -- NCM was at 8 of 8 (`IDEA-570`) -- so it needs `NcmVenueSurface` to exist at
+-- file scope to register its `build:drawn` / `build:error` handlers (`L193`).
+client_script "client/race_builder.lua"
 client_script "client/race.lua"
 client_script "client/telemetry.lua"
 client_script "client/ghost.lua"
@@ -129,3 +168,5 @@ client_script "client/nav_input.lua"
 client_script "client/landing_content.lua"
 client_script "client/panel.lua"
 client_script "client/vehicle_access.lua"
+-- Last: publishes the `quickAction` export over the functions the files above put in `NcmQuickActions`.
+client_script "client/quick_actions.lua"

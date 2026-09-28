@@ -62,7 +62,7 @@ the first sale. That requirement is not implemented here.
 
 ## Probe
 
-Build `2.31.13+op77.87` provides enough for a bounded Scanner experiment, not enough to promise the final UX:
+**AMENDED 2026-09-27 by `L174`: the Scanner is authorised and is no longer only an experiment.** The build-capability note below still governs the *interaction* half — aiming and scanning — which has never been measured; the *knowledge* half is buildable now against `competition.machine_knowledge` and migration 033. Original text: Build `2.31.13+op77.87` provides enough for a bounded Scanner experiment, not enough to promise the final UX:
 
 - input plus WebUI/effect/audio surfaces can supply an action and modest feedback;
 - `Open77.inspector.target().engineId` exposes the engine's LOS-tested look-at target;

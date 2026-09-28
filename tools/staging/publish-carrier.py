@@ -43,6 +43,13 @@ import shutil
 import sys
 import zipfile
 
+# **This script publishes ONE package, and which one is a parameter.** It was written when the Carrier was
+# the only NCM plugin, and the id was a module constant used by the drop set, the pruner and the declaration
+# alike. A second plugin (Rig Bridge) made that a hazard rather than a simplification: run unchanged for
+# another zip and it drops `ncm-carrier` from the declaration and re-adds the new file under the Carrier's
+# name, taking Parts and physics off the server in the same breath as it adds force feedback.
+#
+# The defaults below preserve every existing invocation exactly. `--id` / `--display-name` override them.
 PACKAGE_ID = "ncm-carrier"
 DISPLAY_NAME = "NCM Carrier"
 CAPABILITY = "executable"
@@ -216,6 +223,7 @@ def backup_and_write(conf, text):
 # ------------------------------------------------------------------------------------------------- main
 
 def main():
+    global PACKAGE_ID, DISPLAY_NAME
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("server_root", nargs="?",
@@ -232,7 +240,20 @@ def main():
     parser.add_argument("--drop", action="append", default=[], metavar="ID",
                         help="also remove this package id from the declaration; repeatable")
     parser.add_argument("--remove", action="store_true")
+    parser.add_argument("--id", default=PACKAGE_ID, metavar="ID",
+                        help="package id to declare and to replace (default: %s)" % PACKAGE_ID)
+    parser.add_argument("--display-name", default=None, metavar="TEXT",
+                        help="consent-dialog name (default: %s)" % DISPLAY_NAME)
     args = parser.parse_args()
+
+    # Bind the parameterised identity ONCE, before anything reads it. The drop set, the pruner and the
+    # declaration all key off these, so they must agree for the whole run.
+    if args.id != PACKAGE_ID:
+        DISPLAY_NAME = args.display_name or args.id
+        PACKAGE_ID = args.id
+    elif args.display_name:
+        DISPLAY_NAME = args.display_name
+    print("publishing package id: %s (%s)" % (PACKAGE_ID, DISPLAY_NAME))
 
     root = args.server_root
     conf = os.path.join(root, "server.jsonc")

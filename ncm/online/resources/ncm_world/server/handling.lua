@@ -44,9 +44,14 @@ local WIRE_VERSION = 2
 -- Permanent Machine truth (in memory until Parts inventory/persistence exists):
 -- assetId -> { parts = {...}, setup = composed setup }
 local fitted = {}
+-- Derived component state, keyed by Machine. It is rebuilt from exposure + append-only services and is
+-- never itself persisted. `{ contributor, warnings, components }` comes from pure `parts.wear`.
+local wear = {}
 -- Ephemeral delivery truth: playerId -> { assetId, vehicleId, sig }
 local delivered = {}
 local publishTyre   -- forward: defined below, called by publishBound
+local publishWear   -- forward: same delivery/privacy contract as the tyre feed
+local wearSent = {} -- pid -> stable warning signature; declared before publishUnbound captures it
 
 local function validAssetId(assetId)
     return type(assetId) == "string" and #assetId > 0
@@ -81,8 +86,10 @@ local function publishUnbound(playerId, why, force)
     local pid = tonumber(playerId) or 0
     if pid <= 0 then return false, "bad_player" end
     if force and delivered[pid] then delivered[pid].sig = nil end
-    return write(pid, { v = WIRE_VERSION, bound = false, levers = inertLevers() },
+    local ok, refusal = write(pid, { v = WIRE_VERSION, bound = false, levers = inertLevers() },
         "unbound", why or "unbound")
+    if ok and wearSent[pid]~="none" then wearSent[pid]="none";pcall(TriggerClientEvent,"ncm:wear",pid,false) end
+    return ok, refusal
 end
 
 --- The live, per-Machine contributors: everything that is NOT a fitted part.
@@ -97,6 +104,10 @@ end
 --- is exactly the case where an absent contributor would hide a real defect for weeks.
 local function contributorsFor(assetId)
     local out = {}
+
+    -- Component condition is a named downward-only layer. Missing state is inert, never guessed.
+    local lifecycle = wear[assetId]
+    if lifecycle and lifecycle.contributor then out.wear = lifecycle.contributor end
 
     -- Weather and the clock, from the live environment read `KB-151` added. Before that fix this was a
     -- console command and nothing else, so `wetness` was permanently zero in production.
@@ -257,6 +268,7 @@ local function publishBound(playerId, binding, why, force)
     -- (`governed[assetId]`) and must survive a re-bind that did not move a lever.
     applyGovernor(binding.assetId, binding.vehicleId, binding.record, setup)
     publishTyre(pid, binding.assetId)
+    publishWear(pid, binding.assetId)
 
     if not changed then return true end
 
@@ -324,6 +336,21 @@ publishTyre = function(playerId, assetId)
     pcall(TriggerClientEvent, "ncm:tyre", pid, payload or false)
 end
 
+publishWear = function(playerId, assetId)
+    local pid=tonumber(playerId) or 0;if pid<=0 then return end
+    local warnings=((wear[assetId] or {}).warnings) or {}
+    local public={}
+    local keys={}
+    for _,w in ipairs(warnings) do
+        public[#public+1]={system=w.system,status=w.status,label=w.label}
+        keys[#keys+1]=tostring(w.system)..":"..tostring(w.status)
+    end
+    local sig=table.concat(keys,"|")
+    if wearSent[pid]==sig then return end
+    wearSent[pid]=sig
+    pcall(TriggerClientEvent,"ncm:wear",pid,{warnings=public})
+end
+
 --- Reconcile a delivery route from authoritative live-vehicle and driver state.
 function NcmHandling.reconcilePlayer(playerId, why, force)
     local pid = tonumber(playerId) or 0
@@ -365,6 +392,21 @@ function NcmHandling.setParts(assetId, parts, why)
     return true
 end
 
+--- Replace a Machine's derived lifecycle projection. The source facts live in SQL; this cache only avoids
+--- querying eleven assets on every 500 ms authority reconciliation.
+function NcmHandling.setWear(assetId, state, why, publish)
+    if not validAssetId(assetId) then return false,"bad_asset" end
+    wear[assetId]=type(state)=="table" and state or {contributor={source="component_wear"},warnings={},components={}}
+    if publish==false then return true end
+    if NcmVehicleAccess and NcmVehicleAccess.operatorForAsset then
+        local pid,binding=NcmVehicleAccess.operatorForAsset(assetId)
+        if pid and binding then return publishBound(pid,binding,why or "setWear",true) end
+    end
+    return true
+end
+
+function NcmHandling.wear(assetId) return validAssetId(assetId) and wear[assetId] or nil end
+
 function NcmHandling.parts(assetId)
     local entry = validAssetId(assetId) and fitted[assetId] or nil
     return entry and entry.parts or {}
@@ -388,6 +430,7 @@ AddEventHandler("onPlayerDisconnected", function(playerId)
     if pid > 0 then
         delivered[pid] = nil
         tyreSent[pid] = nil
+        wearSent[pid] = nil
         -- The asset-keyed fitted setup deliberately survives this resource session. Disconnect changes the
         -- delivery route, not what is installed in the physical Machine.
         log("player=%d disconnected, delivery forgotten; asset setup retained", pid)

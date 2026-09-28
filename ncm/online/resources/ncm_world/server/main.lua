@@ -600,14 +600,14 @@ AddEventHandler("onPlayerReady", function(playerId)
         -- a car is backwards for a server we want to feel friendly (owner: "regular joins (and mystery ones)
         -- should get normal expected server treatment").
         --
-        -- Nothing is deleted: the questionnaire, its core module, `/ncm.q`, the F9 panel and the `ncmOnboarding`
+        -- Nothing is deleted: the questionnaire, its core module, `/ncm.q`, the panel and the `ncmOnboarding`
         -- bag all still work. Only the automatic prompt on join is off. `ncm.q.ask <playerId>` offers it
         -- deliberately, which is what TW1/TW2 will use; flipping `askOnJoin` back to true restores the old
         -- behaviour in one line.
         local askOnJoin = false   -- TW2 gate (L59/L60); see IDEA-087
         if askOnJoin and NcmIdentity.onboardingPending(prof, Q.VERSION) then
             pcall(function() Open77.state.player(id):set("ncmOnboarding", { pending = true, version = Q.VERSION }) end)
-            tell(id, "Complete your NCM Driver Profile: press F9, or answer here with /ncm.q a|b|c|d.")
+            tell(id, "Complete your NCM Driver Profile: the panel opens by itself, or answer here with /ncm.q a|b|c|d.")
             tell(id, Q.prompt(1))
         else
             -- publish a NON-pending bag either way: the client panel watches this key, and leaving it unset
@@ -632,7 +632,7 @@ RegisterCommand("ncm.q.ask", function(source, args)
     if not prof then log("ncm.q.ask: no NCM driver on player %d", pid); return end
     local Q = Core.get("onboarding.questionnaire")
     pcall(function() Open77.state.player(pid):set("ncmOnboarding", { pending = true, version = Q.VERSION }) end)
-    tell(pid, "Complete your NCM Driver Profile: press F9, or answer here with /ncm.q a|b|c|d.")
+    tell(pid, "Complete your NCM Driver Profile: the panel opens by itself, or answer here with /ncm.q a|b|c|d.")
     tell(pid, Q.prompt(1))
     log("questionnaire offered to player=%d", pid)
 end, false)
@@ -683,7 +683,7 @@ local function showHelp(playerId)
         Open77.state.player(pid):set("ncmHelp", { seq = helpSeq, at = math.floor(Open77.time.unix()) })
     end)
     tell(pid, "NIGHT CITY MOTORSPORTS · HELP is opening. It covers what NCM is, what works today, and how to report a problem.")
-    tell(pid, "Races: F6 · Vehicle Collection: F10 · Messages: F9 · This page again: /ncm help")
+    tell(pid, "Races: F6 · Messages: F6 → MESSAGES · Vehicle Collection: F10 · This page again: /ncm help")
     if not ok then
         log("help: could not set the ncmHelp bag for player=%d", pid)
         tell(pid, "The Help screen could not open. Reconnecting usually fixes it.")
@@ -911,7 +911,7 @@ RegisterNetEvent("ncm:onboarding", function(version, answers)
     local pid = tonumber(source) or 0
     if pid <= 0 then return end
     local Q = Core.get("onboarding.questionnaire")
-    if tonumber(version) ~= Q.VERSION then tell(pid, "That questionnaire is out of date; press F9 again."); return end
+    if tonumber(version) ~= Q.VERSION then tell(pid, "That questionnaire is out of date; reconnect and it will be offered again."); return end
     if type(answers) ~= "table" then return end
     local list = {}
     for i = 1, #Q.QUESTIONS do list[i] = answers[i] end

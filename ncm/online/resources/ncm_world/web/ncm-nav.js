@@ -236,8 +236,18 @@
   // arrives with the action. Switching family must not lose focus — a named failure condition — so the
   // focused element is kept and only the ring's visibility changes.
   // ---------------------------------------------------------------------------------------------------
+  // **The in-game cursor is driven BY the pad**, so a pad action emits a synthetic `mousemove` a frame
+  // later. Switching family on that move flips pad -> mouse -> pad continuously, and since the family
+  // controls the focus ring's visibility and the `.ncm-focused` background, the whole panel strobes --
+  // on every page, not just the one being used. Two guards below: a real pointer has to actually move,
+  // and it has to move outside the shadow of a deliberate pad or keyboard action.
+  const MOUSE_AFTER_ACTION_MS = 600;
+  let lastDeliberateAt = 0;
+  let lastPointer = null;
+
   function setFamily(next) {
     if (next !== "mouse" && next !== "keyboard" && next !== "pad") return;
+    if (next !== "mouse") lastDeliberateAt = Date.now();
     if (family === next) return;
     family = next;
     if (typeof document !== "undefined" && document.body && document.body.dataset) {
@@ -382,7 +392,15 @@
       if (map[key]) { if (perform(map[key], "keyboard")) event.preventDefault(); }
     }, true);
 
-    document.addEventListener("mousemove", () => setFamily("mouse"), true);
+    document.addEventListener("mousemove", (event) => {
+      // A repeated event at the same coordinates is not movement; the game emits those.
+      if (event && typeof event.clientX === "number") {
+        if (lastPointer && lastPointer.x === event.clientX && lastPointer.y === event.clientY) return;
+        lastPointer = { x: event.clientX, y: event.clientY };
+      }
+      if (Date.now() - lastDeliberateAt < MOUSE_AFTER_ACTION_MS) return;
+      setFamily("mouse");
+    }, true);
     // Hover must not fight pad focus: under pad or keyboard, a mouse that has not moved changes nothing.
     document.addEventListener("mouseover", (event) => {
       if (family !== "mouse") return;

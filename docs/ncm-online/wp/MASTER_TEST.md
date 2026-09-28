@@ -2046,3 +2046,553 @@ opponent or AI grid. It also proves the same settlement expands to contested fie
 
 It does not balance the long-run economy, validate million-eddie acquisition time, or prove sinks not yet built.
 Those require telemetry and sustained play after this transactional loop is live.
+
+## §BK - Race Guide bounded transport - **DEPLOYED ONLINE 2026-09-27 19:43 UTC; AWAITING LIVE PASS**
+
+Scope: `KB-160`. The Race Guide's server-to-client hop is now a head plus numbered row packets packed by
+measured bytes, and the panel refuses to render a date it was never given. This section exists because the same
+failure has now happened three times (`KB-59`, `KB-86`, `KB-160`) and twice been declared fixed on the strength
+of a smaller payload rather than a bounded one.
+
+**Offline evidence:** full gate green under Lua 5.4 and LuaJIT -- `test_chunks` covers byte-budget packing, the
+oversized-row report and the unmeasurable-row case; `panel-render-check` is at 154 assertions including three
+that fail if an unseeded clock ever renders a date again; `ncm-stub`'s Guide scenario now reassembles the real
+stream and asserts every packet and the head against the ceiling.
+
+**§BN1 WAS RUN ON 2026-09-28 AND IT FAILED: no card, on any press.** The cause was not the key, the page, the
+focus handshake or the server's decision -- it was the transport, and it had never worked once for anybody
+(`KB-172`). The form was published into a player state bag of **11,515 bytes** against a **4,032**-byte ceiling
+(`IDEA-509`), so the platform discarded every write. What makes this worth reading before re-running the section:
+**both sides logged something reasonable and neither logged the fault.** The server logged `form opened` eleven
+times with no refusal; the client logged `no form arrived within 3000 ms`; `grep ncmBuild` over the whole server
+log returned nothing at all. Fixed by `L189` -- the form now streams over `ncm:build` as a 419-byte head plus one
+5,496-byte packet, and the 35-node list travels **once** instead of twice.
+
+**So §BN1 is the gate for this whole section again, and it is now also a transport test.** On a re-run, the
+client log must show `ncm:build stream begin ... nodes=35`, then `ncm:build stream complete`, then
+`opened with 35 node(s)`; the server must show `form published player=<n> nodes=35 bytes=<n> head=<n> packets=1`.
+If the card does not appear and **chat is silent**, that is a transport fault, not a refusal -- the client now
+says exactly that rather than the old sentence that blamed nobody.
+
+**Read the server line first:** `guide published player=1 rows=<n> bytes=<total> head=<n> packets=<n>`. A
+`HEAD LARGE` or `ROW OVERSIZED` line means the next growth will be the one that hurts.
+
+**Already observed live, so §BK2 is half-answered:** `19:48:30 guide published player=1 rows=17 bytes=22574
+head=385 packets=5`. The total is above 18 KB, the head is negligible, and the stream is running. What remains is
+entirely client-side -- §BK1, §BK3, §BK4, §BK5, §BK6 -- because nothing above proves the packets were received,
+reassembled and drawn.
+
+| # | Do | Expect | Result |
+|---|---|---|---|
+| §BK1 | Deploy, join, open F6 → RACE GUIDE. | The schedule draws with every posted row, and the clock shows today's real date. No 1969, and no "Loading live schedule…" that never resolves. | **NOT RUN** |
+| §BK2 | Read the server log for the push. | One `guide published … bytes=… head=… packets=…` line. Total is above 18 KB and the Guide still arrives; head is well under 6 KB; packets is greater than 1. | **NOT RUN** |
+| §BK3 | Read the client log for the same push. | `guide stream begin id=… packets=<n>` followed by `guide stream complete id=… rows=<n>`, with `rows` equal to the server's count. No `refused at assembly`. | **NOT RUN** |
+| §BK4 | Open the Guide on an event with authored economics and confirm the economy block still reads. | Entry, completion, placement and bounty figures are present — the per-row block that caused `KB-160` is carried, not dropped, now that the hop is bounded. | **NOT RUN** |
+| §BK5 | Stop the host with the Guide open, then reopen the Guide. | The panel says `NO HOST TIME YET` and "No schedule has reached this panel", and the driver card says `COUNTDOWN UNAVAILABLE`. It never shows 1969 and never claims a schedule it does not have. | **NOT RUN** |
+| §BK6 | Restart `ncm_league` while a client stays connected, then reopen the Guide. | A fresh stream arrives and assembles; a partial stream from the previous generation is discarded rather than drawn with rows missing. | **NOT RUN** |
+
+
+## §BL - Ambient population and the race corridor - **NOT DEPLOYED; AWAITING LIVE PASS**
+
+Scope: `L177`, `IDEA-635`. `ncm_world` now spawns its own pedestrians and lane traffic around connected players
+and clears them out of a race corridor before a start, and asserts the vanilla density switch per routing
+bucket beside it. Nothing here has run on a live client.
+
+**Offline evidence:** full gate green under Lua 5.4 and LuaJIT — 52 assertions in `test_ambient` over the pure
+director (capsule geometry, the sight rule, budget order, the hold window), a 40-assertion host harness
+(`tools/test-ambient.lua`) against platform doubles, and an `ncm-stub` scenario that drives the real
+`ncm_league` calendar publication into the real `ncm_world` service across two Lua VMs. The stub scenario was
+mutation-checked: shrinking the corridor radius to 1 m makes it fail.
+
+**What no double can answer, and why this section exists.** Every offline test asserts that the service *asked*
+the platform for something. Three of the asks have never been made on a live client: whether `joinTraffic`
+actually puts our cars on the authored lanes rather than leaving them parked, whether `wander` keeps a
+server-created ped on the pavement, and what a populated city costs in frame time during a race. A green gate
+says the plumbing is right; it says nothing about any of those.
+
+**Read the server lines first.** `ncm.ambient` prints counts against budget, spawn/despawn/refused/ground-miss
+totals, every held corridor with its point count and radius, each bucket's vanilla state, and a live
+`getPopulation(0)` read. `ncm.ambient clear` removes everything the resource owns.
+
+| # | Do | Expect | Result |
+|---|---|---|---|
+| §BL1 | Join and stand still for a minute in a populated district. Run `ncm.ambient`. | Cars and pedestrians appear around you, counts climb toward the per-player caps, and `getPopulation(0)` answers rather than refusing. A refusal naming `world.population` means the permission did not reach the live server. | **NOT RUN** |
+| §BL2 | Watch a spawn happen. | Nothing appears inside about 110 m of you. If anything pops into view at conversational distance, `ambientSpawnMinM` is not holding and the number is the first thing to check. | **NOT RUN** |
+| §BL3 | Watch the ambient cars for a minute. | They **drive**, on roads, in lanes. Parked cars mean `joinTraffic` was refused or the driver never attached — the server log names which. This is the single most likely thing on this page to be wrong. | **NOT RUN** |
+| §BL4 | Watch the pedestrians. | They walk on pavements rather than standing still in the road. A `wander refused` line in the log means they will stand, which is survivable but is not the feature. | **NOT RUN** |
+| §BL5 | Have a second player stand on the same corner and compare. | You are both looking at **the same** pedestrians and cars in the same places. This is the whole point of the server-owned layer; if it fails, only the vanilla half is running. | **NOT RUN** |
+| §BL6 | Post a race, then stand about 300 m to the side of the racing line as T-4 minutes passes. Run `ncm.ambient`. | One corridor is reported held, with more than one point and a 70 m radius. Ambient population along the route is gone by the time the lights come on. | **NOT RUN** |
+| §BL7 | Repeat §BL6 but stand **on** the racing line, looking down it. | Nothing vanishes in front of you. The server logs `n ambient entit(ies) left standing this tick because somebody is close enough to watch them vanish`, and they go once you move away. A car blinking out in view is the failure this rule exists to prevent. | **NOT RUN** |
+| §BL7b | While the race is **running**, run `ncm.ambient`. | The held corridor's id reads `session:<sessionId>`, not the route id — a live session is cleared along its own published gates rather than along whatever the calendar said about the route. | **NOT RUN** |
+| §BL8 | Drive the race. | No ambient car or pedestrian is on the racing line. None of them appears in the session board, the result, or any standings — they are scenery, not entrants. | **NOT RUN** |
+| §BL9 | During the corridor hold, look at the city **away** from the route, and run `ncm.ambient`. | It is **still populated**. The bucket line reads `suppression withheld: shared_bucket` — the vanilla switch has no radius and a race is nearly always in its window, so the shared world is never emptied for one (`KB-165`). Only our own entities are cleared, and only inside the corridor. | **NOT RUN** |
+| §BL9b | Post a race and let its slot pass with **nobody entered**, then run `ncm.ambient`. | **No corridor is held.** An empty slot on a 20-minute cadence must not clear a road — if a corridor appears here, every route is being stripped permanently and `isHeldClear` is not reading the entrant count. | **NOT RUN** |
+| §BL10 | After the race ends and the hold expires, run `ncm.ambient`. | No corridor is held, the bucket reports `open`, vanilla population is back, and ambient population repopulates around the players. | **NOT RUN** |
+| §BL11 | Race with a full field and watch frame time, then run `ncm.ambient` for the counts. | The world holds its budget without hurting the race. Note the numbers that felt right — the shipped defaults (24 cars / 48 peds) are a guess, and this is the test that replaces the guess. | **NOT RUN** |
+| §BL12 | `restart ncm_world` with a populated city. | The log reports `stopped: removed n ambient entit(ies)`, nothing is left standing with no owner, and the world repopulates after the restart. | **NOT RUN** |
+
+## §BM - Component Wear & Tear lifecycle - **DEPLOYED ONLINE; BOOT PASS; DRIVING/SERVICE PASS OWED**
+
+Scope: `L178`, migration **038**, core `parts.wear`, the `KB-163` configuration boundary, component service,
+downward-only handling consequences, Parts Inventory condition presentation and the compact driving warning strip.
+Hard / Medium / Soft tyre compounds and richer stress channels are explicitly outside this section.
+
+**Offline evidence:** 614 core tests pass under Lua 5.4 and LuaJIT, including eight lifecycle assertions;
+57 cross-scope references, 17 QA-observer and 35 vehicle-access checks are clean; `luac -p` is clean over 238
+resource files; panel/race render checks pass at 157 / 55 assertions and cover condition/service presentation plus
+attention/critical warning states. None of that proves the migration against live rows or that a Carrier-applied
+wear contributor feels correct in game.
+
+| # | Do | Expect | Result |
+|---|---|---|---|
+| §BM1 | Deploy and boot twice; inspect `schema_migrations` and `component_service`. | Migration 038 applies once, the second boot is a no-op, the table/index/FKs/check exist, and both resources boot without an unknown `parts.wear` module or missing-table error. | **PASS 2026-09-27/28 Online.** 23:28:03 UTC applied `038 component_wear` once with `pending=[]`; both resources loaded `parts.wear` and started without errors. 00:03:18 UTC logged `no pending migrations`, then `0 applied` with 001–038 and `pending=[]`. `SHOW CREATE TABLE` confirms the primary/unique/asset index, both FKs and JSON-validity check. |
+| §BM2 | Record one installed component's exposure, drive more than one checkpoint, stop, re-CALL and restart. | Machine odometer and each component installed for the whole interval rise by the same accepted whole metres; restart/re-CALL add nothing by themselves. | **NOT RUN** |
+| §BM3 | Drive less than 250 m after a checkpoint, park, then fit a replacement component. Query both assets. | The outgoing component receives the pending metres before displacement; the incoming component receives zero of that interval. Log contains `checkpoint asset=… (before component fit)`. This is the `KB-163` acceptance test. | **NOT RUN** |
+| §BM4 | Force the pre-fit odometer transaction to fail, then attempt the fit. Restore the database and retry. | First attempt refuses with `odometer_checkpoint_failed`, configuration and custody do not change, and the accumulator is retained. Retry commits the same metres once and then fits; no history is lost or doubled. | **NOT RUN** |
+| §BM5 | Inspect fresh and currently low-mileage Parts Inventory entries. | They show `NO ACTIVE CONDITION`, exact factual exposure and service count, with no health percentage, predicted failure distance or hidden threshold. | **NOT RUN** |
+| §BM6 | In a controlled database copy, raise one tyre asset just past its deterministic threshold and reload/restart. | It derives the same `CONTACT PATCH WORN` condition after every reload; Parts Inventory says ATTENTION, and the driving HUD shows SRV + TYR amber/outline marks. No runtime roll occurs. | **NOT RUN** |
+| §BM7 | Measure the same controlled Machine before/after the tyre condition through the Carrier readback/drive. | Grip and braking are reduced, drive is affected only through existing coupling, every multiplier is <= 1, and restoring exposure/service facts restores the exact deterministic result. | **NOT RUN** |
+| §BM8 | Raise the controlled condition through critical severity. | SRV and the affected system switch to the filled red/shape-distinct critical state; unrelated system lamps stay absent and the HUD remains legible at 1080p, 1440p and ultrawide. | **NOT RUN** |
+| §BM9 | Activate conditions in two assets mapped to the same system, then in two different systems. | The HUD shows one worst-severity lamp for the shared system, then one per system plus the single master lamp — never one lamp per component asset. | **NOT RUN** |
+| §BM10 | Service an active stored component from Parts Inventory, retry the same request, then reconnect. | Exactly one negative `component_service` ledger row and one service row exist; exposure is unchanged; `relief_m` advances only the named threshold; the condition clears or reduces; retry/reconnect creates no second charge. | **NOT RUN** |
+| §BM11 | Attempt service without enough funds, on a normal component, and on an installed component while occupied/moving. | Each refusal is named; no ledger/service row is created. Park and vacate the installed Machine and the same valid service becomes available. | **NOT RUN** |
+| §BM12 | Remove, store and refit a worn/serviced component, then transfer it when trading exists. | Exposure, deterministic threshold and service history follow the physical asset. Refit does not reset or reroll it. Transfer remains pending until the trading system exists. | **NOT RUN** |
+| §BM13 | Inspect aero, structure and chassis assets after large mileage. | Exposure rises for provenance, but no ordinary mileage condition, warning or physics consequence appears. | **NOT RUN** |
+| §BM14 | Drive/finish with contact, incidents and penalties while holding distance comparable to a clean run. | Wear differs only by accepted distance. Sporting contact does not damage persistent property and a race flag carries no multiplier. | **NOT RUN** |
+
+### What a PASS establishes, and what it does not
+
+A full PASS establishes deterministic component-local mileage wear, persistent service relief, correct attribution
+across fit boundaries, conservative physical consequences and private owner-facing presentation on Online. It does
+not validate long-run pacing, used-part pricing/trade, engineer workmanship, stress-aware exposure, terminal
+failure, crash damage or tyre compounds. Those remain separate decisions/evidence, not implied features.
+
+## §BN - Street Call: a driver builds and posts their own race - **§BN1 FAILED LIVE TWICE ON 2026-09-28; SECOND CAUSE FOUND AND FIXED; NOT YET REDEPLOYED**
+
+Scope: `L179` (the event), `L180` (placement), `L181` (the form), `L193` (the surface and the transport).
+`competition.race_builder`, `ncm_league/server/impromptu.lua`, `ncm_world/client/race_builder.lua`, the `#build`
+block of `web/venue.html`, `data.nodes.unregister`, `impromptuCooldownSec` / `impromptuMaxOpen`, and three UI
+relocations. **No migration** -- `impromptu` has been in the `event.class` enum since schema 003 with no code on
+either side of it.
+
+**This section was rewritten after `L181`,** and its input rows again after `L193`. The `L179` step machine no
+longer exists; `§BN5`-`§BN12` of that version tested a six-page click-through and are gone rather than adapted.
+
+### Read this before re-running: §BN1 failed twice, for two different reasons, and the first fix hid the second
+
+`KB-172` was real and is fixed: the form was published into a 4,032-byte player state bag at 11,515 bytes, so
+nothing ever arrived. `L189` moved it onto `NcmStream` and that half works.
+
+**But the card still never drew, because there are two hops and `L189` only bounded one** (`KB-178`). The client
+received the streamed node list correctly and then called `Builder.schemaFromWire`, which re-expands it into
+*both* `start` and `finish` -- back to the full 11,515 bytes -- and handed that to the page in a single
+`page:send`. `KB-63`: that bridge drops large messages with **no error, no return value and no log line**. So
+the page never rendered, never replied `build:drawn`, and the draw watchdog closed the card on every press.
+
+**Two things are worth carrying out of this into how the next one of these is read.** The previous write-up
+claimed the earlier six-page version had never worked either, and the owner said it had. **The owner was right**
+-- it rendered because each of its steps sent at most five options, a few hundred bytes, under the threshold.
+The page count was never the fault, and a size theory that contradicts an observation is a theory to discard.
+And `web/build.html` put `ncm_world` at **8 of 8** `kMaximumWebSurfaces` while three transport pages come and
+go, so `WebUI.create` could also be refused on timing alone -- a second, independent cause that was sitting
+underneath the first two.
+
+`L193`'s fix is structural: **the catalogue never crosses the bridge.** Lua holds the node list, the form, the
+cursor and the picker; the page receives at most fourteen form rows or a nine-row picker window, as display
+strings, with the route length computed in Lua. No message's size depends on how many nodes exist.
+
+**The interaction model changed as a consequence, and the rows below reflect it.** `venue.html` is
+`pointer-events: none` and is never focused -- which is what makes it safe to leave attached during a race
+(`KB-67`) -- so there are no dropdowns and no mouse. Arrow keys, Enter, Backspace, Delete and PageUp/PageDown
+are read in Lua as **physical device reads that need no focus**, and the pad works through the same path.
+**`KB-61` is therefore not testable here, because it is not possible here: there is no focus to hold.** ESC is
+deliberately not a close key -- it opens the pause menu. BACKSPACE closes, and F5 still toggles.
+
+**Offline evidence, re-measured 2026-09-28 after `L193`:** full gate **ALL GREEN under both interpreters**;
+`luac -p` clean over 255 resource files; `node --check` over 6 inline blocks; panel 219 / race 55 / **venue 53** /
+nav 33 render assertions; docs authority OK over 79 documents. The `msgTray` failure noted in the previous
+revision of this preamble is resolved. **`venue.html` now has a render harness** (`tools/venue-render-check.js`),
+which closes `IDEA-649` for this page and also puts the option list and the history/practice panel under test
+for the first time -- they had carried no guard and no harness while hosting three tenants, which is a large part
+of why `KB-178` stayed invisible for a build.
+
+**Read the server line first:** `[ncm_league/impromptu] CALLED impromptu:<tag>@<ts> | <route> | <venue> | <n> m |
+<k> gate(s) | improvised start | start in <t> | by <driver>`. No such line means nothing was posted, whatever the
+card said.
+
+| # | Do | Expect | Result |
+|---|---|---|---|
+| **THE FORM** ||||
+| §BN1 | Press **F5** standing in the street, out of a race. | One card on the **RIGHT**, ~520px wide, headed `STREET CALL / Call a race`, with Start already reading **"Here"** and the cursor resting on **Finish** -- the only field with no default. **If F5 does nothing, try `/ncm.build` or `/ncm.call`** -- a dead key is `IDEA-646`, a dead command is a real fault. (`/ncm.call` was named as a durable route in three documents and had never actually been registered until 2026-09-28; `IDEA-670`.) | **FAILED TWICE 2026-09-28 -- 03:23 UTC no card on eleven presses (cause `KB-172`, fixed by `L189`); still no card after that fix (cause `KB-178`, the client-to-page hop, fixed by `L193`). RE-RUN OWED after redeploy.** |
+| §BN2 | Press **DOWN** then **UP**. | The highlight moves between rows and nothing else on screen reacts. **Then check you can still walk and look around with the card open** -- this page never takes focus, so the game keeps its input and `KB-61` is not merely handled but impossible. Client log: `form drawn`. | **NOT RUN** |
+| §BN3 | Look at where the card is. | **Not centred, not full screen, not the F6 shell.** The middle of the view is clear. | **NOT RUN** |
+| §BN4 | Press **BACKSPACE**. Then F5 again, then F5 once more. | Backspace closes the card. F5 toggles it. Two presses do not leave a card behind. **Then press ESC with the card open: the pause menu opens and the card is left alone** -- ESC is deliberately not bound here, because one control doing two jobs is `KB-32`. | **NOT RUN** |
+| §BN5 | Put the cursor on **Start**, press **ENTER**, and page through with PageDown. | A picker opens showing **nine rows at a time** with a `n of 36` counter. **"Here" is first, then every one of the 35 race-legal places**, nearest first, each with its region and distance. If it shows four, the `L179` cap is still in the build. **Nine rows on screen with the count reading 36 is the point of `L193`** -- the other 27 never crossed the bridge. | **NOT RUN** |
+| §BN6 | Open the **Finish** picker the same way. | The same 35 places and **no "Here"** -- a finish where you stand is the start (`L181`). The counter reads `n of 35`. Press **BACKSPACE**: the picker closes and the form is still there, unchanged. | **NOT RUN** |
+| §BN7 | Look for a "type of race" field. | **There is none.** Not greyed, not defaulted-and-shown: absent. We cannot enforce drag, oval or drift, so the driver is never asked (`L181` point 3). | **NOT RUN** |
+| §BN8 | Choose a finish and watch the header. | It reads `Here → <place> · N.NN km` and **POST THE RACE** becomes available. Before a finish is chosen it says *"Choose where it finishes."* and POST is disabled. | **NOT RUN** |
+| §BN9 | Now **walk 200 m** with the form still open. | The distance in the header **changes**. "Here" is an intent resolved at submit, not a coordinate captured at open, and the preview must follow you or it is lying. | **NOT RUN** |
+| §BN10 | Put the cursor on **Checkpoints** and press ENTER three times, picking a different place for each. | Three numbered rows appear, each with its own picker. The header shows `3 checkpoint(s)` and the distance rises to the sum of the legs, not the crow-flies. **Then put the cursor on Checkpoint 2 and press DELETE**: it is removed, the remaining two renumber, and the cursor lands on the add row rather than nowhere. | **NOT RUN** |
+| §BN11 | Reorder your intent: remove the middle checkpoint. | It goes, the remaining two renumber, and the distance recomputes. | **NOT RUN** |
+| §BN12 | Keep adding checkpoints past eight. | The button disables itself and reads `maximum 8 checkpoints`. | **NOT RUN** |
+| §BN13 | Set Finish to the **same place** as Start (pick a node start, not Here). | A **Laps** row appears, and the header reads `<place> loop`. Set it back to a different finish and Laps disappears -- laps are meaningless on a point-to-point. **The cursor must not jump** when the row appears or vanishes: it is remembered by row key, not position, which is `I4`'s lesson from the venue list. | **NOT RUN** |
+| §BN14 | Pick a finish only a few metres from where you stand. | Header goes amber: `... · NN m · too short to be a race`, and POST is disabled. The server enforces 250 m regardless of what any client shows. | **NOT RUN** |
+| **POSTING IT** ||||
+| §BN15 | Fill it in and press **POST THE RACE**. | The card closes. The `CALLED` line appears with `improvised start` when the start was Here. **Every connected player** gets a toast and a chat line naming the caller, the route and the countdown. Your map routes to the start. | **NOT RUN** |
+| §BN16 | Read the `CALLED` line's gate count. | It equals the number of checkpoints you chose. A route with 3 checkpoints must log `3 gate(s)`, not 0 -- that is the difference between a chained route and a straight line between two ends. | **NOT RUN** |
+| §BN17 | Open **F6 → RACE GUIDE**. | The called race is an ordinary row with its countdown ticking. It went through `NcmCalendar.adopt`, so nothing downstream should treat it specially. | **NOT RUN** |
+| §BN18 | Walk to where you were standing when you posted it. | **There is a venue marker there** -- at your improvised start, not at any authored node. This is the whole of `L181` point 1 in one observation. | **NOT RUN** |
+| §BN19 | Stand on the mark as entries open. | The venue card offers **ENTER RACE**. Standing 200 m away must not work: `venueRadiusM` is 60 and `L35` applies to a called race like any other. | **NOT RUN** |
+| §BN20 | Let it go green and race it to the flag, through your checkpoints. | It forms, runs, results and settles on the ordinary path, and the HUD names your chosen checkpoints as gates. **Nothing about class `impromptu` should need a special case** -- any step that differs from a scenario event is the finding. | **NOT RUN** |
+| §BN21 | After settlement, check the money. | **No purse.** `economy` is deliberately nil; a called race pays nothing and a payout here is a defect, not a feature. | **NOT RUN** |
+| §BN22 | Wait a few minutes after the race, then check the server log. | `released route street_call_<tag> (event ...)`. Without that sweep every called race leaks a root and two nodes for the life of the process. | **NOT RUN** |
+| §BN23 | After §BN22, open F5 again and look at the Start and Finish lists. | **Your previous improvised start is not in them**, and the lists are still 35 long. Temporary nodes lack the authored `raceLegal` flag, so they are excluded whether or not the sweep has run yet. | **NOT RUN** |
+| **THE LIMITS, WHICH ARE THE POINT** ||||
+| §BN24 | Immediately after posting, press F5. | Refused in chat: *"You called one recently. Give the street a minute."* No card opens. `impromptuCooldownSec` is 900. | **NOT RUN** |
+| §BN25 | With two called races open, have a third attempted. | Refused: *"There are already enough open races on the board."* Both guards exist because one alone does not bound the board (`KB-165`). | **NOT RUN** |
+| §BN26 | Open a form, leave it open, let somebody else fill the board, then press POST. | Refused **at submit**, and **the reason appears in red inside the card**, not only in chat. A guard that can only fire on the way in is half a guard (`KB-155`); a refusal the driver cannot see while looking at the form is half a message. | **NOT RUN** |
+| §BN27 | Press F5 while in a live race. | Nothing opens (`open ignored: racing`). Then open the form and have a race start around you: it closes itself (`closed (race started)`) rather than sitting over the race HUD. | **NOT RUN** |
+| §BN28 | Open the form standing on a venue mark with the venue list showing. | The venue list yields via `NcmClientBuildActive`, and comes back when the form closes. Two surfaces cannot own one screen corner. | **NOT RUN** |
+| §BN29 | Restart `ncm_league` with a called race pending, then open F6. | The race is **gone** -- its row closed on boot rather than sitting on the board with no scheduler behind it, and its route was never persisted so it could not be restored. Nobody is told, which is `IDEA-645`. | **NOT RUN** |
+| §BN30 | With the form open, `restart ncm_world`. | No card is left behind, and the venue option list works again afterwards. There is no focus to recover -- that is `L193`'s point -- but a card left on screen would keep the option list suppressed, which is the failure this row now looks for. | **NOT RUN** |
+| **THE RELOCATIONS (`L180`) -- look, do not command** ||||
+| §BN31 | Stand on a venue mark with entries open. | The entry panel is on the **right**, not across the middle of your view. | **NOT RUN** |
+| §BN32 | Race, and look at the live race graph. | It is on the **right**, and every driver label reads **leftward, inward**. A name running off the right edge means the mirror is half-applied -- the box moved and the labels did not. | **NOT RUN** |
+| **THE TRANSPORT (`L193`, `KB-178`) -- this is the part that failed twice** ||||
+| §BN33 | Press F5 and read the SERVER log. | `form published player=<n> nodes=35 bytes=<n> head=<n> packets=<n>`. This half was already fixed by `L189`; a missing line means the server refused and said so in chat. | **NOT RUN** |
+| §BN34 | Read the CLIENT log for the same press. | `ncm:build stream begin id=... nodes=35`, then `ncm:build stream complete id=... nodes=35`, then `opened with 35 node(s)`, then **`form drawn`**. | **NOT RUN** |
+| §BN35 | **The row that `KB-178` is about: confirm `form drawn` actually arrives.** | `form drawn` appears within 2500 ms of `opened with 35 node(s)`. **If instead you see `FORM DID NOT DRAW in 2500 ms`, the client-to-page hop is broken again** -- check for a `PAGE ERROR` line first, and if there is none, something has started sending the page a payload whose size grows with the catalogue. That is the whole bug, and it is silent by nature. | **NOT RUN** |
+| §BN36 | Open a picker and watch the client log while paging through 35 nodes. | **No stream, no batching and no chunk lines at all** -- only the small `build:picker` messages, nine rows at a time. Nothing in this feature should ever need a bounded transport to the page again, because nothing sends the page a list. | **NOT RUN** |
+| §BN37 | Count NCM's WebUI surfaces during a session that has used the Carrier bridge, a race and the form. | **Seven, never eight** (`IDEA-570`). No `build WebUI failed` or surface-refusal line anywhere. `web/build.html` is deleted; if anything still references it, that is a stale deploy. | **NOT RUN** |
+| §BN38 | With the Street Call card open, walk into a venue ring. | The venue option list does **not** draw underneath or on top of the card. The two share one page and `client/calendar.lua` stands down on `NcmClientBuildActive`; close the card and the option list returns. | **NOT RUN** |
+| §BN39 | Open the form, then open the F6 panel on top of it. | The arrow keys drive the F6 panel and **not** the Street Call card -- `race_builder.lua` checks `Open77.input.isCaptured()` before reading a key, so a focused surface keeps its own input. Close F6 and the card responds again. | **NOT RUN** |
+| §BN40 | With the card open and Start on **Here**, walk 300 m and watch the header. | The distance updates as you move (refreshed every 700 ms), because a `Here` start is resolved at submit time and a stale length would misreport the route. | **NOT RUN** |
+| §BN41 | Drive the whole form with a **controller** only. | D-pad moves and changes, **A** opens a picker and posts, **B** closes, shoulder buttons page through a long list. No keyboard needed at any point. | **NOT RUN** |
+| §BN33 | During that race, check the graph against the rest of the HUD. | It clears the vanilla minimap (bottom right) and NCM's own strip/board/banner (top centre). | **NOT RUN** |
+
+### What a PASS establishes, and what it does not
+
+A PASS establishes that a driver can call a real race **from where they are standing**, with any start, any
+finish and any chain of checkpoints, in one form; that the improvised start becomes a real venue and is cleaned up
+afterwards; and that the result posts through the scheduler, appears on the Guide, is entered at the line and
+settles on the ordinary path.
+
+It establishes **nothing about disciplines other than a street sprint** -- drag, oval and drift are not offered
+precisely because they cannot be enforced, and `IDEA-648` is where that is revisited. It says nothing about
+**Quinn's half**, the one-question pre-built offer (`IDEA-641`), nor about challenging a **specific** driver,
+which is the two-entrant case (`IDEA-642`, and the live half of `IDEA-063`). The cooldown and cap are a first
+guess at a duty cycle, not a measured one. And a called race **pays nothing**, so it cannot be validated as an
+economic loop (`IDEA-643`).
+
+## §BQ - The quest graph: Dex, Setup Stu, Rico, and Messages as a conversation - **DEPLOYED ONLINE 2026-09-28 03:05 UTC; MIGRATION PASSED; PLAYER-FACING PASS OWED**
+
+Scope: `L183`. Core `graph.contacts` / `graph.conversation` / `graph.opening`, **migration 039**,
+`ncm_league/server/graph.lua`, MESSAGES as a shell tab in `panel.html`, and the release of F9.
+
+**Migration 039 has now run and is verified (`§BQ1`, `§BQ2` PASS).** `message.from_kind` reads
+`enum('team','system','race_control','character','dispatch','driver','market','manufacturer','championship','organizer')`
+on the canonical database, `thread_id` exists, and all three new tables are present. That was the gate on
+everything below: had the ENUM not widened, every character line would fail its INSERT and the surface would be
+empty with no error a player could see.
+
+**Deploying also surfaced `KB-168`, which is why nothing below this line should be trusted from the offline gate
+alone.** Four of this feature's own statements passed a nil where OPEN//77 needs a sentinel, so nothing persisted
+across a restart; the harness had accepted them because the SQL double was more forgiving than the real bridge.
+Fixed and redeployed in the same session, and the harness now models the bridge -- but the *reason* it escaped is
+that no live write had happened yet, and that is still true of every step from `§BQ3` down.
+
+**Offline evidence:** 713 core tests green under Lua 5.4 and LuaJIT (70 of them in `test_conversation` and
+`test_opening`, including the `L176` pairwise-overlap check over the three authored scripts); **93 host assertions
+in `tools/test-quest-graph.lua`**, which found three real defects before any deploy (`KB-167`); `luac -p` clean
+over 250 resource files; panel **201** render assertions, up from 157, of which ~40 are the new surface.
+
+**Read the server lines first.** `[ncm_league/graph] quest graph ready: 3 authored contact(s), 8 push(es)` at
+boot; then `MET dex by <driver> [solicited]`, `LEAD person:<who> via <contact> for <driver>`,
+`curiosity <driver> -> <n> (<category>)`, and `budget refused <contact>.<node> (<intent>): <reason>`. A refusal
+line is **normal** and is how the §20 budget reports itself; silence with no line at all is the fault.
+
+**`ncm.graph.push <playerId> <contact> [node]`** is a console command, and most of this section needs it: the real
+triggers are behavioural and take real play to satisfy.
+
+| # | Do | Expect | Result |
+|---|---|---|---|
+| **THE MIGRATION -- everything below depends on this** ||||
+| §BQ1 | Start `ncm_league` on the live database and read the migration line. | `migration 039 quest_graph applied (5 statement(s))`. Then confirm in SQL that `message.from_kind` accepts `'character'` and `'driver'`. | **PASS 2026-09-28 03:00 UTC** -- migration line seen; ENUM, `thread_id` and all three tables verified in SQL |
+| §BQ2 | Restart `ncm_league` again. | `no pending migrations`. A second run must change nothing. | **PASS 2026-09-28 03:05 UTC** -- `no pending migrations`, `migrations: 0 applied`, `schema entries 39` |
+| **DEX -- the unmissable contact (§2)** ||||
+| §BQ3 | Join with a driver who has never met anybody. Wait ~20 s. | A toast naming NCM DISPATCH, and `MET dex ... [solicited]` on the server. | **NOT RUN** |
+| §BQ4 | Press **F6** and look at the tab strip. | **MESSAGES** sits between WHEEL/PEDALS and **HELP**. Nothing else moved. | **NOT RUN** |
+| §BQ5 | Press **F9**. | **Nothing happens.** The key is released; no panel, no error. | **NOT RUN** |
+| §BQ6 | Open MESSAGES. | Dex is in the rail with an unread badge; his three messages are in the pane, **oldest at the top**, and the pane is scrolled to the newest. | **NOT RUN** |
+| §BQ7 | Read his opening. | Three messages, the draft's own paragraphs, ending *"Want the introduction?"*. **It is not trimmed** -- `L176` struck the word ceiling, and a short Dex here means someone reapplied a withdrawn finding. | **NOT RUN** |
+| §BQ8 | Pick **"Put me through."** | Your reply appears **on the right**, in its own bubble, immediately. | **NOT RUN** |
+| §BQ9 | Watch the rail. | **Rico appears and has actually spoken** -- his *"First one's free"* is there, not just his name. This is `KB-167`(a): a solicited introduction must not wait out the world's cooldown. | **NOT RUN** |
+| §BQ10 | Double-click a reply as fast as you can. | One reply is recorded, not two. Every button disables on the first click. | **NOT RUN** |
+| **THE DOMAIN BOUNDARY (§0.4)** ||||
+| §BQ11 | Ask Dex *"I have a question"* -> *"Does weather affect racing?"* | He answers the general question **and says to ask Stu about your own setup**. He does not explain your car. | **NOT RUN** |
+| §BQ12 | Ask *"Why doesn't this part fit my car?"* and take **Open Setup Stu**. | Stu's thread is selected. Dex did not answer it himself. | **NOT RUN** |
+| §BQ13 | Ask *"What's the deal with markets?"* -> *"Are there other markets?"* | *"Yes. Most don't advertise to everybody..."* -- **and no number anywhere.** `L171` lets the Market UI disclose the roster's shape; Dex must not recite a count. | **NOT RUN** |
+| **SETUP STU -- the guaranteed handoff (§3)** ||||
+| §BQ14 | With Dex answered, wait for the heartbeat (up to 5 min) or force it. | Stu introduces himself. `§3.1` calls this guaranteed, so a Stu who never arrives is a failure even though nothing in the UI says he was coming. | **NOT RUN** |
+| §BQ15 | In a stock car, ask *"Take a look at what I'm driving."* | One of the three authored reactions, matching what you are actually in -- or *"Nothing on my screen yet"* if the host knows nothing. **He must not guess.** | **NOT RUN** |
+| §BQ16 | Reply once, then read his second beat. | The Quinn/Foreman handoff, including *"instead of waiting on the board"*. That word is a **recorded exemption** (`L183`), not a mistake. | **NOT RUN** |
+| §BQ17 | Take **"Send me their line."** | A lead is recorded (`LEAD person:quinn via stu`) and **Quinn does NOT appear in the rail.** Hearing a name is not meeting somebody (`L175`). | **NOT RUN** |
+| §BQ18 | Instead, defer it, then reopen Stu. | *"About those race guys..."* is offered and is **highlighted**. No nag arrived while you were away (§2.2). | **NOT RUN** |
+| **CROSS-CHARACTER TELEMETRY -- the draft's own headline (§0.7, §8.1)** ||||
+| §BQ19 | Ask Stu hardware questions -- *"Where do people find better parts?"*, *"What do you think of this part?"* -- five or more times. | `curiosity <driver> -> n (<category>)` climbs. **Nothing appears in any UI.** §3.4: this is not a meter shown to the player. | **NOT RUN** |
+| §BQ20 | Keep playing for ~20 minutes. | **Rico** says *"You ask a lot of questions about hardware."* Nobody told him; it was Stu's conversation. This is the single most important step in the section. | **NOT RUN** |
+| §BQ21 | Check the timing of §BQ20. | It did **not** arrive in the same breath as the Stu conversation. §8.1's cooldown exists so Rico reads as a man with ears, not a wiretap. | **NOT RUN** |
+| §BQ22 | Walk it to *"Put me in touch"*. | `LEAD person:needle via rico`. Needle does not appear in the rail. | **NOT RUN** |
+| §BQ23 | Now wait through two or three more heartbeats. | **Rico does not say it again.** `KB-167`(c): a world-initiated beat is pushed once. | **NOT RUN** |
+| **THE CONTEXT SHELF (§2.4)** ||||
+| §BQ24 | With at least one lead open, ask Dex *"I have a question."* | *"Who is Needle?"* (or whoever you heard of) sits **above** the generic categories, as a dashed reply. | **NOT RUN** |
+| §BQ25 | Ask it. | Dex says what he honestly knows and no more. He does not open a contact who cannot answer. | **NOT RUN** |
+| §BQ26 | Look hard at every part of the Messages surface. | **No count, fraction, percentage or score anywhere** -- no "2 leads", no "3/8", no curiosity number (`L171`, `L175`). An **unread count is fine**: that is a fact about an inbox. | **NOT RUN** |
+| **THE BUDGET (§20)** ||||
+| §BQ27 | On a fresh driver, watch the first ten minutes. | Contacts arrive **one at a time**. Two introductions in one moment is the failure §20 rule 1 exists to prevent. | **NOT RUN** |
+| §BQ28 | Read the server log through all of the above. | `budget refused ...` lines appear and name a reason. A budget that never reports refusing anything is a budget that is not running. | **NOT RUN** |
+| **NOTICES ARE NOT CONVERSATIONS** ||||
+| §BQ29 | Get a seat offer (`ncm.invite`) while a conversation is open. | It appears in the **tray beneath the pane**, keeping ACCEPT / DECLINE -- not as a chat bubble, and not in the rail. | **NOT RUN** |
+| §BQ30 | Accept it from there. | It works exactly as before, and the notice leaves the tray. | **NOT RUN** |
+| §BQ31 | Read the seat-offer toast. | It says **F6 -> MESSAGES**. No toast anywhere may still say F9. | **NOT RUN** |
+| **DURABILITY AND THE FAILURE MODES** ||||
+| §BQ32 | Mid-conversation, `restart ncm_league`, then reopen MESSAGES. | The transcript is intact and the conversation is resting where you left it. **This is the `KB-168` regression check** -- it is exactly what a nil-parameter hole breaks, and it passed offline while broken. | **NOT RUN** |
+| §BQ33 | Reconnect entirely. | Same. Nobody reintroduces themselves. | **NOT RUN** |
+| §BQ34 | Open MESSAGES, leave it open, and `restart ncm_world`. | **Input returns to the game.** The one failure that costs a reconnect (`KB-61`), and worth causing deliberately once. | **NOT RUN** |
+| §BQ35 | Stop the database, then open MESSAGES. | The panel draws and says what it can. It does not hang and does not show a blank card. | **NOT RUN** |
+| §BQ36 | With MESSAGES open, use the pad: rail, pane, replies. | Focus moves and the transcript scrolls. The shared nav layer owns this and the surface is new to it. | **NOT RUN** |
+| §BQ37 | Run `/ncm.msgs.list`, then `/ncm.say dex`. | The chat twins list conversations and the available replies. Essential information must never be reachable through exactly one graphical path. | **NOT RUN** |
+
+### What a PASS establishes, and what it does not
+
+A PASS establishes that **a character can speak to a player at all** -- which nothing in NCM Online could do
+before migration 039 -- that a conversation persists and rests rather than progressing, that replies are projected
+from live state, that one contact can react to what the player did through another, that hearing a name grants
+knowledge and not access, and that Messages is a conversation surface reached from the shell instead of a notice
+list behind a function key.
+
+It establishes **nothing about the other fifteen contacts**, all of which remain SPEC and most of which are
+blocked on substrate that does not exist -- the Scanner (Flashbulb), physical NPC dialogue (Auntie, Dave),
+wagering (Billie), thread steps (Needle's trust test), a claim store that cannot be mistaken for a result
+(Knuckles). `graph.contacts` carries each reason. It says nothing about the **#1 Fan** (`IDEA-655`), who is next
+and whose only open question is a line of copy. It does not validate the `TUNE` thresholds as *balance* --
+§21 is explicit that they are authoring values, and §BQ19's "five or more" is a first guess at a duty cycle, not a
+measured one (`IDEA-658`). And it proves nothing about **group threads** (`IDEA-656`): every thread tested here has
+exactly two parties, so the renderer has never had to say which of two senders spoke.
+
+---
+
+## §BR - Other drivers on your map and minimap, city tier - **BUILT LOCALLY; NOT DEPLOYED; AWAITING LIVE PASS**
+
+Scope: `L184`, `IDEA-650`-`IDEA-654`. Core `world.presence`, `ncm_world/server/presence.lua`,
+`ncm_world/client/players_map.lua`, six `presence*` tunables in `server/identity.lua`. No migration, no new
+permission, no new WebUI surface.
+
+**Offline evidence:** 19 assertions in `test_presence` over the pure decision (self and other buckets excluded,
+nearest-first ordering, the pin cap and the measured byte budget, name sanitisation, and the
+create/move/retitle/remove plan), whole gate green under Lua 5.4 and LuaJIT, `luac -p` clean.
+
+**What no double can answer, which is why this section exists.** Every offline test asserts that the service
+decided correctly. Nothing offline can say whether a pin is legible among thirty-odd landmark pins, whether
+`CPO_RemotePlayerVariant` renders on the fullscreen map at all, or whether a 5 s pin reads as alive or as
+broken to a driver at speed. **This needs two clients**, and §BR2 decides whether the feature works at all.
+
+| # | Do | Expect | Result |
+|---|---|---|---|
+| §BR1 | Join with one client. Run `ncm.presence` in the server console. | It prints `enabled=true tick=5s`, a payload count that climbs, and one line per connected player with their bucket and position. A `players.positions unavailable` line means the native is missing on this build. | **NOT RUN** |
+| §BR2 | Two clients in the street (not in a session), a kilometre or more apart. Open the full map on each. | Each sees ONE pin, in roughly the other's place, carrying the other's display name when highlighted. This is the whole feature. | **NOT RUN** |
+| §BR3 | Watch the minimap while the other driver moves. | The same pin is on the minimap and it moves in ~5 s steps. Steps are expected, not a defect: the platform's snapshot is up to 2 s old before our tick adds to it. | **NOT RUN** |
+| §BR4 | Run `/ncm.playersprite` on one client and look at both surfaces. | This switches to `remote_player` (`CPO_RemotePlayerVariant`), from a dormant multiplayer HUD. Record honestly whether it renders on the minimap, the fullscreen map, both or neither — that answer is what `IDEA-653` is waiting for. Run it again to return to `vehicle`. | **NOT RUN** |
+| §BR5 | Run `/ncm.players` twice. | The pins vanish, a notification says so, and they come back. Nothing else on the map moves: landmarks and any NCM navigation pin are untouched. | **NOT RUN** |
+| §BR6 | Start a race on one client and watch that client's map during the session. | Every presence pin disappears for the duration and returns afterwards. A rival pin during a session is the thing `L184` refused. | **NOT RUN** |
+| §BR7 | While one client races in its own bucket, look at the map of a client left in the street. | A driver in ANOTHER bucket must never appear. If a pin shows somebody who is not in your world, the bucket filter is not holding. | **NOT RUN** |
+| §BR8 | Have a driver disconnect while you watch their pin. | It disappears within about one tick. A pin that stays is a remove failure and accumulates against the 128-blip quota. | **NOT RUN** |
+| §BR9 | After twenty minutes with the layer on, run `/ncm.presence` on the client. | `pins` equals `rows`, both no greater than 24, and every landmark pin is still there. A climbing pin count against a flat row count means pins are being created rather than moved. | **NOT RUN** |
+| §BR10 | Restart `ncm_world` with the map open. | No stale pins survive into the new generation, and nothing takes the player's input (`KB-61` is the standing hazard for any client surface). | **NOT RUN** |
+
+**If §BR2 fails outright**, read the server line first: no payloads means `positions()` refused; payloads with
+`rows=0` for everybody means the bucket filter or the two-second snapshot age, not the pins.
+
+## §BS - Safety Rating that is worth reading - **BUILT LOCALLY; NOT DEPLOYED; AWAITING LIVE PASS**
+
+Scope: `L187`, `KB-171`, `IDEA-090`. Core `driver.progression` (`M.SR` and the SR block of `apply`), plus one
+line in `ncm_league/server/progression.lua` that supplies `ctx.distanceM`. No migration, no new command, no new
+WebUI surface, no change to incident detection or to corrected time.
+
+**Offline evidence:** `test_quali.sr_is_balanced_in_both_directions` — the distance-scaled gain and its cap, the
+car-versus-scenery weighting reproducing the observed -0.80 race as -0.147, the free scenery band moving SR not
+at all and announcing no delta, the `maxLoss` floor under a 40-incident wreck, the bare-count fallback charging
+as car contact, and the min/max clamps. `progression_licence_sr_rating` and `kb38_once_only_accomplishments_are_granted_once`
+still pass unchanged. Whole gate green under Lua 5.4 and LuaJIT, `luac -p` clean, `ncm-build` vendored.
+
+**What no offline test can answer, which is why this section exists.** Every assertion above proves the
+arithmetic. None of them can say whether the number now *feels* like it means something to a driver: whether a
+clean race reads as a reward, whether a tap reads as a fair cost, or whether the free scenery band reads as
+generous or as broken. That is the whole complaint the rebalance answers, and it is a judgement call made at
+speed, not in a fixture. **§BS3 and §BS6 are the ones that matter.**
+
+**Blocked-on note.** `KB-34` (car-to-car contact filed as scenery) is fixed but **unverified live**. Until
+§BS5 shows `kind=car` with `other` populated, every SR number observed here is a scenery number, and the
+car-contact half of `L187` is untested by anything but the fixture. Do not tune again before §BS5 passes.
+
+| Step | Do | Expect | Result |
+|---|---|---|---|
+| §BS1 | Deploy, boot the server, and read one driver's SR with `/ncm.profile` before racing. | The stored SR is whatever alpha left it at; nothing was migrated and nothing was reset (`L75`). | |
+| §BS2 | Read the server's plan line for the first event and note the route length. | `PLAN … route=N m` is non-zero, so `ctx.distanceM` has a real value to scale the gain by. | |
+| §BS3 | Run one clean solo time trial on a route of roughly 3 km. | `sr +0.14 → …` in chat and the log, not `+0.05`. **The judgement: does finishing clean read as worth doing?** | |
+| §BS4 | Repeat on a route about twice as long, still clean. | A visibly larger gain, capped at `+0.30` once past ~8.3 km. A longer clean race pays more than a short one. | |
+| §BS5 | Two clients, deliberate car-to-car contact, one band-3-ish hit each. | **`kind=car` with `other` populated on BOTH drivers** (`KB-34`), and about `-0.18` each — a real cost, recovered by one or two clean races. | |
+| §BS6 | One client, scrape a wall once lightly and finish. | The incident is recorded (`sr.incidents` rises, the result carries its seconds) and **SR does not move at all** — no gain, no loss, and no `SR -0.00` line in chat. | |
+| §BS7 | Same client, wreck repeatedly against scenery — five or more hits — and finish. | A single modest drop, an order below the old numbers, never worse than `-0.50`. **The judgement: is this still enough of a consequence?** | |
+| §BS8 | Retire or disconnect mid-session after contact. | Unfinished sessions earn no clean credit and are charged as before; nothing about the rebalance changed who is `finished`. | |
+| §BS9 | Race a quali or practice session with contact. | SR does not move for a non-race session (`apply` returns early); only the race settles the badge. | |
+| §BS10 | After a run of clean races, read `/ncm.profile` and the `driver_sr` row. | `sr`, `incidents` and `clean_sessions` agree with the announced deltas, and the `driver_profile.sr` JSON matches the badge. | |
+| §BS11 | Drive a clean race with a driver already at 9.9x, and a dirty one with a driver near 0. | The ceiling holds at 10 and the floor at 0; neither overshoots. | |
+
+**If §BS3 shows `+0.05`**, `ctx.distanceM` is not arriving: `rec.course.lengthM` is nil and the event's
+`distanceM` is nil too, so read the `PLAN` line from §BS2 before touching the coefficients. **If §BS5 shows
+`kind=object`**, stop — that is `KB-34` still live, and no SR reading in this section means what it appears to.
+
+## §BT - Messages reads like a messenger - **DEPLOYED TO ONLINE 2026-09-28 16:41 UTC; AWAITING LIVE PASS**
+
+Scope: `L190`, `KB-173`, `IDEA-671`. `ncm_world/web/panel.html` (the whole Messages block), one query and one
+payload field in `ncm_league/server/organized.lua`, one comment in `ncm_world/client/panel.lua`. No migration, no
+new command, no new WebUI surface, no change to the quest graph or to what the server projects.
+
+**Offline evidence:** `tools/panel-render-check.js`, 219 assertions green -- the tray renders nothing at all; an
+offer appears in the rail under its team's name and does not steal the pane; opening it reads it, shows the
+subject and body, and puts `ACCEPT` / `DECLINE` in the composer; answering reports `panel:act` once and disables
+both; a resolved offer leaves the rail and the pane falls back to the conversation; history draws at once; an
+appended line is **not** on screen until its timer fires, with no reply offered meanwhile; the clock follows the
+newest bubble. The harness grew real queued timers and class selectors to assert those last two. Gate green under
+both interpreters, `ncm-build -Check` clean.
+
+**What no offline test can answer.** Whether the pacing reads as a conversation or as lag, and whether an offer
+that no longer shouts from a tray is still noticed in time to accept it. The toast and the chat line (`/ncm.inbox`,
+`/ncm.accept`) are unchanged and remain the safety net; §BT3 is the one that matters.
+
+| # | Do | Expect | Result |
+|---|---|---|---|
+| §BT1 | Open F6 -> MESSAGES with a Dex conversation already in progress. | The transcript draws instantly, oldest at the top, scrolled to the bottom. A stamp above the first bubble of each gap, a clock on the last bubble only, a `NEW` rule where unread begins. **No second pane under it.** | |
+| §BT2 | Pick a reply. | Your line appears at once on the right. Dex's answer follows on its own, behind a typing indicator, one line at a time; the reply buttons come back only after the last line lands. | |
+| §BT3 | Have a seat offer arrive while MESSAGES is open on a conversation. | The toast fires as before, the offer appears in the rail as a thread under the **team's name** with an unread badge, and the conversation being read is **not** interrupted or replaced. | |
+| §BT4 | Open the offer thread and accept from the composer. | Subject and body are there as a message; `ACCEPT` / `DECLINE` are composer buttons; accepting takes the seat exactly as `/ncm.accept` does, both buttons disable, and the thread leaves the rail once resolved. | |
+| §BT5 | Decline an offer instead. | The same, refused: the seat is released and the thread leaves the rail. | |
+| §BT6 | Run `/ncm.inbox`. | It lists **offers only** -- no conversation lines, no numbering that counts them (`KB-173`). `/ncm.read 1` reads the offer. | |
+| §BT7 | Let an offer expire without answering. | It stops being answerable and leaves the rail; nothing claims it was accepted. | |
+| §BT8 | Close the panel mid-arrival and reopen it. | The full transcript is there at once, including the line that was mid-flight. Nothing is lost and nothing re-animates. | |
+| §BT9 | With no conversations and no offers at all, open MESSAGES. | "No conversations yet" in the rail and "Nobody has written to you yet." in the pane. No empty tray, no error. | |
+| §BT10 | Navigate the whole surface with a pad, then with the keyboard alone. | Rail rows, composer buttons and the tab strip are all reachable; the offer thread is reachable without a mouse (`L142`). | |
+
+**If §BT3 shows the offer taking the pane**, the notice thread is being auto-opened somewhere -- that is the
+behaviour the tray had and the reason it was intrusive. **If §BT2 shows every line at once**, the payload is
+arriving as a fresh thread rather than an append (check that line ids are stable across `ncm:graph` sends).
+
+## §BU - Dedicated multi-vendor NCM Rig Bridge - **DEPLOYED TO ONLINE 2026-09-28 16:41 UTC; AWAITING LIVE PASS**
+
+Scope: `L185`, `L186`, `L188`, `L191`, `IDEA-661`-`IDEA-665`, `IDEA-667`, `IDEA-672`.
+`ncm/rig_bridge/`, `tools/build-rig-bridge.ps1`, and the FFB/Machine port split in
+`ncm_world/client/carrier_bridge.lua`. Carrier source and package are explicitly out of scope and unchanged.
+
+**Offline evidence, re-verified independently 2026-09-28:** clean warning-free Release build from a fresh
+configure; `Main`, `Query`, `Supports` exports present; imports are Windows system DLLs only (`DINPUT8`,
+`IPHLPAPI`, `KERNEL32`, `USER32`, `WS2_32`, `ole32` — no vendor SDK and no redistributable, so the package needs
+nothing installed beside it); `ncm_rig_mapping` passes steering centre/extremes, pedal inversion, calibration and
+deadzone; package `ncm-rig-bridge-0.1.0.zip` (`sha256 9e86c22c…`) contains DLL, safe config, redscript, README
+and notices; `tools/ncm-test.ps1` is green. This is not hardware or in-game evidence.
+
+**Two corrections found by that pass, before any of the rows below were run.** `KB-174`: the three-rung force
+ceiling §BU9 asserts was not enforced in code — it is now, at the setter and the loader, from one shared
+constant. `KB-175` / `IDEA-673`: the constant-force channel is never fed, so **§BU9 tests speed-scaled centring
+and damping only** — do not expect road texture or collision jolts from this build, and do not read their
+absence as a §BU9 failure.
+
+| # | Do | Expect | Result |
+|---|---|---|---|
+| §BU1 | Install the package with FFB left disarmed. Cold-launch the exact Online client. Read the newest `ncm_rig_bridge-<pid>.log`. | Game reaches the menu; one line names every attached DirectInput endpoint with a stable GUID, product name and FFB capability. No Carrier file or log changed. | **NOT RUN** |
+| §BU2 | Confirm the G29, separate Thrustmaster pedals and ESP32 rim are all attached concurrently. Move every axis and press mapped rim buttons. | The WHEEL panel names the bound steering, pedal and rim endpoints; no endpoint is selected only by enumeration order. | **NOT RUN** |
+| §BU3 | Bind steering, throttle, brake and clutch to their logged GUIDs, using separate devices where appropriate; relaunch. | The same roles restore to the same endpoints. Resting pedals read zero; full travel reaches one; centred steering is zero. | **NOT RUN** |
+| §BU4 | Mount one player vehicle with parked/AI/remote vehicles visible. Drive with the rig, then dismount. | Steering/throttle/brake reach only the exact mounted local vehicle. The first injection is logged. Nothing else moves, and injection stops on dismount. | **NOT RUN** |
+| §BU5 | Drive with the ordinary gamepad while the rig remains attached, then use both sources. | Gamepad remains usable. The larger requested magnitude wins per axis; Rig Bridge does not zero or seize vanilla input. | **NOT RUN** |
+| §BU6 | Unplug and reconnect one pedal/rim endpoint while running. | Input for that endpoint withdraws; no stuck key or pedal remains; after the bounded refresh the same GUID rebinds without restarting the game. | **NOT RUN** |
+| §BU7 | Join Development with Carrier and Rig Bridge both loaded. Run `/ncm.carrier`. | FFB/Rig connects in `38520-38523`; Machine/Carrier connects in `38480-38483`; Parts/weather still reach Carrier. No bind-order ambiguity and no ninth WebUI surface. | **NOT RUN** |
+| §BU8 | In WHEEL, keep force disarmed and press TEST PULSE. Then arm at rung 1 and press it again. | Disarmed produces no force. Armed produces one short conservative pulse on the selected FFB endpoint only. | **NOT RUN** |
+| §BU9 | Drive slowly, then at road speed, at rung 1. Adjust centring and stiffness in the panel. | Spring/damper respond smoothly and the panel round-trips their values. Unknown hardware never exceeds the hard three-rung ceiling — now enforced in `config.hpp` rather than assumed from the panel's values (`KB-174`). **Centring and damping only**: the constant-force channel is unfed in 0.1.0, so silence where road texture would be is expected, not a failure (`KB-175`). | **NOT RUN** |
+| §BU10 | While force is active: pause telemetry, dismount, unplug the wheel, disable FFB, and exit the game, one at a time. | Every case releases force; the telemetry watchdog does so within 250 ms. No effect remains latched after process exit. | **NOT RUN** |
+| §BU11 | Start two clients on one PC with both plugins. | Each WebUI descendant binds only to its own game's Rig Bridge and Carrier. Cross-process peers are refused and each client finds the next port. | **NOT RUN** |
+| §BU12 | Remove/disable only Rig Bridge and launch again. | Gamepad and Carrier still work; the WHEEL page reports no rig listener; missing rig support never zeros steering or prevents joining. | **NOT RUN** |
+
+The external companion retires only after §BU2-§BU10 all pass. A DirectInput miss on one endpoint opens a
+provider-specific follow-up for Windows.Gaming.Input or Raw Input; under `L186` it does not invalidate the mod.
+
+## §BV - Health regenerates, and police are allowed to come - **DEPLOYED TO ONLINE 2026-09-28 16:41 UTC; AWAITING LIVE PASS**
+
+Scope: `KB-180` (fixed), `IDEA-677`/`IDEA-678` (probes only). `ncm_world/server/vitals.lua`, the
+`playerRegenPerSecond` tunable and the `players.stats.apply` permission in `ncm_world/open77.lua`.
+
+| # | Do | Expect | Result |
+|---|---|---|---|
+| §BV1 | Join, then read the server console. | `[ncm_world/vitals] player=N health regen 2.00 hp/s (connect)`. **No** `setRegen ... refused` line. A refusal names its reason; `permission` means the manifest change did not deploy. | **NOT RUN** |
+| §BV2 | Take damage (crash hard, or admin `health <you> 40`), then stop and wait 60 s. | Health climbs back to full at roughly 2 hp/s. | **NOT RUN** |
+| §BV3 | Die, respawn, take damage again, wait 60 s. | Regen still works after the respawn, re-asserted within 20 s by the sweep at worst. | **NOT RUN** |
+| §BV4 | (`IDEA-677` probe) Driving on the street, run `ncm.wanted <your player id> 2` in the server console (console-only; `ncm.wanted <id> 0` clears). The console line prints the server policy it set. | NCPD units spawn and pursue. Record whether they do, how long it takes, and whether they have a minimap icon (`IDEA-678`). **This decides whether NCM-driven police is buildable at all.** | **NOT RUN** |
+
+## §BW - Player Exchange: exact heterogeneous barter in F6 - **DEPLOYED TO ONLINE 2026-09-28 16:41 UTC; AWAITING LIVE PASS**
+
+Scope: `IDEA-247`, `L194`, migration 040, `economy.trade`, `ncm_league/server/trade.lua`, the Machine
+materialization registry and the F6 **EXCHANGE** tab. Use two real Drivers with disposable test assets. Record
+all asset ids before starting; visual sameness is not identity proof.
+
+| # | Do | Expect | Result |
+|---|---|---|---|
+| §BW1 | Apply migration 040, restart `ncm_league`, then restart it a second time. Inspect the schema/version log. | Migration 040 applies once and replays cleanly. `trade_envelope`, both leg tables, `economy_balance_lock` and all three `trade_id` columns/indexes exist. Both starts log `player Exchange ready`; neither resource errors. | **NOT RUN** |
+| §BW2 | With both Drivers online and idle, open F6 on A and choose **EXCHANGE**. Invite B from the roster; B opens F6 > EXCHANGE. | A sees a waiting invitation. B sees A by Driver identity with ACCEPT/DECLINE. The tab is part of the shared F6 shell—not a chat-only route or another WebUI page—and neither client loses input before the panel visibly draws. | **NOT RUN** |
+| §BW3 | B declines. Repeat the invitation and accept. | Decline releases both Drivers. Accept opens one shared revision with two clearly separated offer columns, each balance and both confirmation states. `/ncm.exchange`, `/ncm.trade.accept` and `/ncm.trade.cancel` reach the same system as recovery routes. | **NOT RUN** |
+| §BW4 | On A, select one stored Machine that has at least two fitted serialized Parts. On B, inspect A's side before confirming. | The exact Machine asset id/ordinal is visible and its exact fitted component ids/codes are listed underneath. They are not separate checkboxes: the card states they move with the Machine. | **NOT RUN** |
+| §BW5 | On B, select one exact stored Part and enter a cash amount. On A, inspect the final offer. | Machine + installed Parts on one side and stored Part + cash on the other coexist in one offer. Cash may exist on one side only; money-only, gifts, cash on both sides, duplicates, negative/fractional amounts and an empty counter-side are refused without changing the revision. | **NOT RUN** |
+| §BW6 | A confirms, then B edits their cash or Part selection before confirming. | A's confirmation clears immediately, the revision advances, and settlement cannot occur until both Drivers confirm the new exact revision. No old button press carries forward. | **NOT RUN** |
+| §BW7 | Confirm the current revision on A only. While it waits, externally alter one offered fact: fit/remove a selected Part, spend below the offered cash, or change Machine commitment. Then B confirms. | Settlement refuses with a specific reason or advances the revision for reconfirmation. Nothing—money, title, custody or history—moves. Both confirmations never authorize different facts. | **NOT RUN** |
+| §BW8 | Remove A's Machine from the offer, call it into the world, then try to add/confirm it; store it and add it again. Next check that Machine into an event and try to confirm. | Selection reserves an otherwise stored Machine against a concurrent CALL; an already materialized Machine is refused with `store_machine_first`; a committed Machine is refused with `machine_committed`. Storing/withdrawing makes it eligible again. Nobody's live vehicle disappears or changes owner underneath them. | **NOT RUN** |
+| §BW9 | Restore the intended offer and have both Drivers confirm it. Immediately retry confirm and reopen both Exchange panels. | Exactly one settlement occurs. Both panels return idle and both receive one Exchange-complete receipt reference. Retry creates no second ledger row, transfer row or ownership change. | **NOT RUN** |
+| §BW10 | Verify by asset id in Machine Index, Parts Inventory and SQL. | B owns the exact Machine and every fitted Part still points to that Machine; A owns B's exact stored Part in storage. Vehicle identity/ordinals, odometer, Part exposure/wear/service and configuration history are preserved. `acquired_via='trade'`; ordinary vehicle/component transfer history and exact trade legs name from/to custody. | **NOT RUN** |
+| §BW11 | Compare both balances and ledger rows to the written offer. | The payer has one `player_trade` debit and the payee one equal credit, with `trade:<id>:debit/credit`; net NCM money is zero. `trade_money_leg` and the settled envelope agree with them. | **NOT RUN** |
+| §BW12 | Begin another Exchange, make a non-empty offer, then test cancel, expiry, one Driver disconnecting and `restart ncm_league` before confirmation. | Each path releases the other Driver and moves nothing. Memory-only drafts need not survive restart. A fresh invitation works afterward; no stale busy flag remains. | **NOT RUN** |
+| §BW13 | Race two simultaneous spending attempts against the same nearly exhausted balance: Exchange vs a Market/Part purchase or event check-in. | The shared `economy_balance_lock` serializes the debits. At most one affordable transaction succeeds; balance never goes negative and the loser moves no asset. | **NOT RUN** |
+| §BW14 | Trade B a Machine model B had not previously identified, then inspect B's Machine Index and Market knowledge/access. | Ownership reveals that acquired Machine identity to B with ownership provenance. No undiscovered Market becomes known/open and no private knowledge from A is copied. | **NOT RUN** |
+
+Persistent/offline listings are outside §BW. They require escrow and recovery and remain later work; failure to
+offer an offline Driver is expected in this synchronous system, not permission to weaken any row above.
+
+
+## §BX - NCM quick menu: native radial - **DEPLOYED TO ONLINE 2026-09-28 16:41 UTC; AWAITING LIVE PASS**
+
+Scope: `IDEA-680`, `L195`, `dist/ncm-radial-0.1.0.zip` (required mod `ncm-radial`), resource `ncm_radial`,
+`ncm_world/client/quick_actions.lua`. Publish the package with `publish-carrier.py ... --id ncm-radial`, restart,
+rejoin, accept the executable-content consent. Keep a controller connected.
+
+| # | Do | Expect | Result |
+|---|---|---|---|
+| §BX1 | Join. Read `red4ext/plugins/ncm_radial/ncm_radial-<pid>.log`, then run `/ncm.radial`. | Log shows the natives registered, `listening on http://127.0.0.1:38560/radial.html`, `host=RadialWheelController drawn=1` and `resource connected`. `/ncm.radial` reports transport connected, the plugin version and `host=RadialWheelController`. **`host=none` fails this row.** | **NOT RUN** |
+| §BX2 | On foot, hold **B**. Keep holding. | A native wheel appears centred, behind a blur, with no browser surface: Hub top, Race graph top-right, Call a race right, Map bottom, GPS left, three open slots with only a short dash. The character does not walk while it is up, and no vanilla weapon-wheel art is visible. | **NOT RUN** |
+| §BX3 | Still holding, press W, then D, then S+A together, then flick the mouse left. Then release on GPS. | Each input moves the pointer and highlight to the matching slot (top, right, bottom-left, left), with the name and detail in the centre. Releasing closes the wheel and routes like `/ncm.gps`. Nothing else is triggered. | **NOT RUN** |
+| §BX4 | Hold **Start** on the controller, push the right stick up, release. Repeat with the left stick toward Call a race and release. | Start opens the wheel, not a menu. Right stick up highlights Hub and releasing opens the F6 Hub exactly as F6 does. The left stick selects Call a race and releasing opens the Street Call card exactly as F5 does. | **NOT RUN** |
+| §BX5 | Open the wheel, aim at Map, and press left click (keyboard) or A (pad) instead of releasing. Next time, aim at an OPEN slot and release. Next time, release without aiming. | Click/A confirms early and the vanilla map opens (the same `Open77.map.open()` the pause menu uses). An open slot and no aim both close the wheel and run nothing. | **NOT RUN** |
+| §BX6 | While driving, hold B and use the arrows or mouse to choose Race graph. Then press F5/F6/F8/M and type `/ncm.gps`. | The wheel works in a vehicle and the graph toggles. Driving is not blocked (accepted by design). **Every hotkey and command still works exactly as before.** | **NOT RUN** |
+| §BX7 | Open F6, then press B and Start. Close F6. Open the wheel and, while it is up, restart `ncm_radial` from the console. | Neither opens over the focused Hub. After the restart the wheel is gone within 1.5 s, the character can walk, and `/ncm.radial` shows the transport reconnected. No wheel is ever left stranded on screen. | **NOT RUN** |
+| §BX8 | Pause menu, then Key bindings: rebind "NCM: quick menu (hold)" to another key, and check for "NCM: quick menu, controller (hold)". Run `/ncm.radial` and `/ncm.radial input` while moving each stick and the mouse. | The keyboard rebinding takes effect without a reconnect, and the wheel's hint shows the new key. Record whether the controller row exists; if it does not, `/ncm.radial pad padBack` changes the button. Record `last block result` and whether mouseDelta reads per frame (returns to 0) or accumulates. | **NOT RUN** |
+
+## §BY - NCM Vision: the scanner's green render, no scanner, no slow motion - **DEPLOYED TO ONLINE 2026-09-28 16:41 UTC; AWAITING LIVE PASS**
+
+Scope: `IDEA-679`, `L196`, `dist/ncm-vision-0.1.0.zip` (required mod `ncm-vision`, redscript only). Publish with
+`publish-carrier.py ... --id ncm-vision --display-name "NCM Vision"`, restart, rejoin, accept the
+executable-content consent. Other clients nearby help with §BY4.
+
+| # | Do | Expect | Result |
+|---|---|---|---|
+| §BY1 | Join. Confirm `r6/scripts/ncm_vision/NcmVision.reds` was projected and the game reached the world (no redscript compile error dialog). | The world loads normally. Every other script mod still works: F6 opens, the radial (if deployed) opens, OPEN//77 menus behave. **A compile error dialog fails this row and blocks the rest.** | **NOT RUN** |
+| §BY2 | On foot, hold **Tab** for 5 s, then release. | The world takes the vanilla scanner's green render while held and returns exactly to normal on release. No scanner HUD and no scan panel. Record which parts appear: green grade, vignette, scanlines, pixelation. | **NOT RUN** |
+| §BY3 | Hold Tab and sprint, jump and walk for 5 s. Watch an NPC or a moving car. | **No slow motion**: NPCs, traffic and your own movement run at normal speed. Sprint and jump work (no walk-only restriction). | **NOT RUN** |
+| §BY4 | Drive at speed and hold Tab, then tap **Caps Lock** and keep driving for 20 s. Tap Caps Lock again. | Green while driving, from hold and from toggle. Handling, speed and the NCM HUD are unaffected, with no slow motion. The toggle turns off cleanly. Record which vehicles and NPCs get an outline or highlight. | **NOT RUN** |
+| §BY5 | Toggle on with Caps Lock, then enter a vehicle, exit it, open and close F6, open the map, and open the pause menu. | Record whether the render survives each transition or is reset to normal by something else. Nothing leaves the world green after a toggle-off, and one Tab press and release always returns to normal. | **NOT RUN** |
+| §BY6 | Toggle on, then disconnect to the menu and rejoin. Also die or respawn once while on, if convenient. | The world is never green after a rejoin or respawn until a key is pressed. | **NOT RUN** |
+| §BY7 | With chat open, press Tab. With F6 focused, press Tab. | Chat and F6 keep their own Tab behaviour. Record whether the render also toggles underneath (acceptable, but note it). | **NOT RUN** |

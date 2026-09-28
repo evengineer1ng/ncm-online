@@ -21,6 +21,26 @@ function NcmEconomy.balanceOf(driverId)
     return tonumber(MySQL.scalar.await("SELECT COALESCE(SUM(amount),0) FROM ledger WHERE ncm_driver_id=? AND server_id=?",{driverId,sid()})) or 0
 end
 
+-- Serialize every NCM debit for a Driver before its balance predicate runs. The ledger remains the only balance
+-- truth (L84); this row carries no money, it only gives InnoDB one stable row to lock. Without it, two otherwise
+-- atomic purchases/trades can both read the same SUM(amount) and overspend it in concurrent transactions.
+function NcmEconomy.withBalanceLocks(tx,driverIds)
+    local seen,ordered={},{}
+    for _,driverId in ipairs(driverIds or {}) do
+        if type(driverId)=="string" and driverId~="" and not seen[driverId] then seen[driverId]=true;ordered[#ordered+1]=driverId end
+    end
+    table.sort(ordered)
+    local out={}
+    for _,driverId in ipairs(ordered) do
+        out[#out+1]={query="INSERT IGNORE INTO economy_balance_lock (server_id,ncm_driver_id,revision) VALUES (?,?,0)",values={sid(),driverId}}
+    end
+    for _,driverId in ipairs(ordered) do
+        out[#out+1]={query="UPDATE economy_balance_lock SET revision=revision+1 WHERE server_id=? AND ncm_driver_id=?",values={sid(),driverId}}
+    end
+    for _,step in ipairs(tx or {}) do out[#out+1]=step end
+    return out
+end
+
 function NcmEconomy.checkIn(req)
     local fee,why=Settle.entryFee(req.economy); if fee==nil then return nil,why end
     NcmEconomy.ensureStarter(req.driverId)
@@ -42,6 +62,7 @@ function NcmEconomy.checkIn(req)
         SELECT ncm_driver_id,?,'event_entry',-fee,'eddies',event_id,'Scheduled event entry',?,event_id,?
         FROM entry WHERE entry_id=? AND state='checked_in' AND fee=?]],
         values={sid(),"entry:"..req.eventId..":"..req.driverId,req.seriesId,req.entryId,fee}} end
+    tx=NcmEconomy.withBalanceLocks(tx,{req.driverId})
     local ok,err=MySQL.transaction.await(tx); if not ok then return nil,"transaction:"..tostring(err) end
     local row=MySQL.single.await("SELECT state,fee FROM entry WHERE entry_id=?",{req.entryId})
     if not row or row.state~="checked_in" then return nil,"insufficient_funds" end
@@ -107,11 +128,19 @@ function NcmEconomy.settle(rec,results,reason,t)
                 local suffix=line.code
                 if line.meta and line.meta.tagId then suffix="tag:"..line.meta.tagId..":"..tostring(econ.version or 1) end
                 if line.meta and line.meta.bandId then suffix="target:"..line.meta.bandId end
+                -- `NULLIF(?, '')` with an empty-string sentinel, never a bare nil (see `market_knowledge.lua`).
+                -- OPEN//77 measures `#values`, and a trailing nil shortens the array rather than becoming SQL
+                -- NULL: this statement was raising `parameter_count_mismatch: found 11 placeholders but 10
+                -- values` on the live server for every payout line EXCEPT `event_completion`, which is the only
+                -- branch that supplies an opportunity. Because the error was uncaught it aborted the whole
+                -- settlement transaction, so placement money, field bonuses and clean-driving bounties were not
+                -- merely mis-recorded, they were never paid. Found 2026-09-28 in the live log (`KB-168`).
                 tx[#tx+1]={query=[[INSERT IGNORE INTO ledger
                     (ncm_driver_id,server_id,kind,amount,currency,ref,note,idem_key,event_id,session_id,series_id,opportunity_id)
-                    VALUES (?,?,?,?,'eddies',?,?,?,?,?,?,?)]],values={r.driverId,sid(),line.kind,line.amount,rec.routeId,
-                        line.label,"payout:"..rec.s.sessionId..":"..r.driverId..":"..suffix,rec.eventId,rec.s.sessionId,e.seriesId,
-                        line.kind=="event_completion" and opportunity or nil}}
+                    VALUES (?,?,?,?,'eddies',NULLIF(?,''),?,?,NULLIF(?,''),NULLIF(?,''),NULLIF(?,''),NULLIF(?,''))]],
+                    values={r.driverId,sid(),line.kind,line.amount,rec.routeId or "",
+                        line.label,"payout:"..rec.s.sessionId..":"..r.driverId..":"..suffix,rec.eventId or "",rec.s.sessionId or "",e.seriesId or "",
+                        (line.kind=="event_completion" and opportunity) or ""}}
             end
             tx[#tx+1]={query=[[INSERT IGNORE INTO session_settlement
                 (session_id,ncm_driver_id,economy_id,economy_version,time_trial,gross,entry_fee,net,receipt_json,tags_json,settled_at)
@@ -136,10 +165,12 @@ end
 
 function NcmEconomy.reward(driverId,kind,amount,idem,refs)
     amount=math.floor(tonumber(amount) or 0); if amount<=0 or type(idem)~="string" or idem=="" then return nil,"invalid_reward" end
+    -- Five nullable positions, all sentinelled for the same reason as the payout line above (`KB-168`).
     MySQL.insert.await([[INSERT IGNORE INTO ledger
         (ncm_driver_id,server_id,kind,amount,currency,ref,note,idem_key,event_id,session_id,series_id,opportunity_id)
-        VALUES (?,?,?,?,'eddies',?,?,?,?,?,?,?)]],{driverId,sid(),kind,amount,refs and refs.ref or nil,refs and refs.note or kind,idem,
-        refs and refs.eventId or nil,refs and refs.sessionId or nil,refs and refs.seriesId or nil,refs and refs.opportunityId or nil})
+        VALUES (?,?,?,?,'eddies',NULLIF(?,''),?,?,NULLIF(?,''),NULLIF(?,''),NULLIF(?,''),NULLIF(?,''))]],
+        {driverId,sid(),kind,amount,(refs and refs.ref) or "",(refs and refs.note) or kind,idem,
+        (refs and refs.eventId) or "",(refs and refs.sessionId) or "",(refs and refs.seriesId) or "",(refs and refs.opportunityId) or ""})
     return true,NcmEconomy.balanceOf(driverId)
 end
 

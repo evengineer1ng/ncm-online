@@ -67,3 +67,53 @@ Verification: research Markdown links checked locally; captured Lua hashes uncha
 ## 2026-09-19 update — NCM Online orientation
 
 Platform build still 2.31.13+op77.78 and Freeroam still d3f2a7f; docs index grew at the same build. Reconciliation of this research against today's platform, the coupling measurements of the NCM payload, and the living decision record live in [docs/ncm-online/](../../ncm-online/archive/00_ORIENTATION_BRIEF.md). New evidence captures are in [evidence/2026-09-19/](evidence/2026-09-19/README.md). Headline corrections: vehicle adoption exists since .67 (the vehicles guide paragraph saying otherwise is stale); AI is hard-capped at 55 m/s; unverified required mods are inert-only (no CET/redscript/DLL); vanilla traffic is per-client; remote cameras are documented for an unreleased build.
+
+> **Build skew warning, added 2026-09-27 (`KB-162`).** The hosted devkit MCP that `query_open77.ps1` targets is
+> pinned well behind staging - it answered `2.31.13+op77.78` while staging ran `.102` - and it says so in every
+> reply. **An absent card means the index does not know, never that the platform cannot.** A BLOCKED verdict on
+> platform capability needs a positive source: a card that says no, or a guide that states the limit. When the
+> index lags, check the release channel and devblog first. **Grepping the installed `Open77.dll` is worth doing but is NOT an oracle**: binding names are not
+> stored as literals, so a grep MISS proves nothing (`joinTraffic`, `attachDriver`, `driveTo` and `npcs.speak`
+> appear in no server binary yet all are documented and shipping). Prefer listing the resources actually running
+> on the deployed server, and when nothing settles it, **run the call**. This warning exists because a
+> reconnaissance pass declared shared AI traffic BLOCKED three days after OPEN//77 shipped it.
+
+## 2026-09-27 (late) - ambient population is server-side, and the correction is narrower than it looks
+
+> **`KB-164`, decided in `L177`.** Two lines on this page - the 2026-09-19 headline *"vanilla traffic is
+> per-client"* and the 2026-09-27 note that *"corroborates"* it and adds that `traffic` is a binary switch with
+> no density control - are **true about the entities and silent about the control**. Read together with the
+> capability matrix's `BLOCKED` row they were taken to mean traffic is not server-side. It is.
+>
+> The oracle is the shipped server itself: `Open77.Server.Scripting.dll` embeds the documented Lua prelude as
+> strings, so the installed build answers questions the hosted devkit index (pinned behind staging, `KB-162`)
+> cannot. At `2.31.13+op77.102` it says, in its own comments:
+>
+> * `Open77.world.setPopulation(bucket, { crowd, traffic, police })` is **"Server-owned and replicated to every
+>   client in that bucket; the client half is read-only"**, gated on `world.population`. `crowd` is a genuine
+>   multiplier on vanilla pedestrian density; `traffic` and `police` are binary on 2.31 and `getPopulation`
+>   reports `trafficGranularity = "binary"` rather than pretending otherwise.
+> * `Open77.world.clearArea(position, radius, options)` removes what the **calling resource owns** and counts
+>   everything else as `refused`. Its `population = true` option **requires a bucket** and says so by name
+>   (`bucket_required_for_population`), because the suppression that follows is bucket-wide: *"there is no
+>   radius-scoped vanilla-population control on 2.31 and inventing one here would only move the surprise."*
+>
+> **What stays true:** vanilla population entities are spawned per client, carry no canonical id, and cannot be
+> named, moved or removed from the server. Radius-scoped clearing is possible only for entities a resource
+> created itself. That is why NCM builds its own ambient layer rather than trying to curate the vanilla one -
+> see `L177` and `docs/ncm-online/wp/MASTER_TEST.md` §BL.
+>
+> **The method lesson is `KB-162`'s, repeated.** A grep, an index and a prose summary are all sources that can
+> be *incomplete* rather than *negative*, and a capability nobody wrote down is indistinguishable from one that
+> was ruled out. When nothing settles it, read the shipped build or run the call.
+
+## 2026-09-27 follow-up - character / message archaeology and the lightweight PvE substrate
+
+[CHARACTER_ARCHAEOLOGY_AND_PVE_SUBSTRATE.md](CHARACTER_ARCHAEOLOGY_AND_PVE_SUBSTRATE.md) - the NCM **single-player**
+character/message system recovered from its shipped implementation (seven contacts, the WolvenKit journal and
+localization resources, the quest-fact bridge, the state-projected choice sets, the authored prose and the voice
+validator), plus the **Dynamic Contact Event System** that was not in the brief and is the closest thing NCM has to
+an authored PvE substrate; then portability, spontaneous racing, Book Queen Billie, Messages, a world graph, and a
+creative expansion. Read-only; **no production behaviour changed and nothing measured in-engine.** Three owner
+decisions are `L170`. Note it **corroborates this README's 2026-09-19 finding that vanilla traffic is per-client**,
+from the platform's own vehicles guide, and adds that `traffic` is a binary switch with no density control in 2.31.

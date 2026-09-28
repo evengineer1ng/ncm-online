@@ -1,7 +1,7 @@
 -- Runtime access only. The league owns persistent title; this adapter never writes economy/asset tables.
 -- Client physics probes are placement evidence, not ownership authority (L106).
 NcmVehicleAccess = {}
-local pending, locks, active, cooldown = {}, {}, {}, {}
+local pending, locks, active, cooldown, tradeReserved = {}, {}, {}, {}, {}
 -- Runtime vehicle ids are ephemeral, but while an owned Machine is materialised this reverse index is the
 -- authoritative bridge from OPEN//77's live vehicle to NCM's permanent asset identity. Parts must never
 -- infer that identity from a record: two physical Machines (and, with Foundry, two Designs) can share one.
@@ -27,11 +27,33 @@ local function distance(a,b) return math.sqrt((a.x-b.x)^2+(a.y-b.y)^2+(a.z-b.z)^
 --
 -- `state` is "pending" | "ok" | "fail": pressing is not succeeding, so the checking message must not turn the
 -- button green.
-local function feedback(pid, message, ok, state)
+local function feedback(pid, message, ok, state, title)
     state = state or (ok and "ok" or "fail")
-    pcall(Open77.notifications.send, pid, { type=ok and "success" or "error", title="CALL VEHICLE",
+    pcall(Open77.notifications.send, pid, { type=ok and "success" or "error", title=title or "CALL VEHICLE",
         message=message, icon="NCM", durationMs=7000 })
     pcall(TriggerClientEvent, "ncm:vehicle.result", pid, { state=state, message=message })
+end
+
+-- Same channel, different verb: the button the player pressed said STORE, so the toast must not say CALL.
+local function storeFeedback(pid, message, ok, state)
+    return feedback(pid, message, ok, state, "STORE VEHICLE")
+end
+
+--- Which of this player's Machines are standing in the world right now.
+---
+--- The Machine Index lives in `ncm_league`, which cannot see this registry, and a called car cannot be called
+--- again -- so without this the panel offers CALL for a car already parked two districts away and the player
+--- has no way to get it back other than disconnecting. This is the one fact the page needs to show STORE
+--- instead, and it is pushed rather than polled: materialise, store and reclaim are the only three moments it
+--- changes.
+local function sendActive(pid)
+    pid = tonumber(pid) or 0
+    if pid <= 0 then return end
+    local ids = {}
+    for assetId, cur in pairs(active) do
+        if cur.pid == pid then ids[#ids + 1] = assetId end
+    end
+    pcall(TriggerClientEvent, "ncm:vehicle.active", pid, { assets = ids })
 end
 
 -- Why the probe found nowhere. Being told "the ground is uneven" is actionable; "try somewhere else" is not.
@@ -161,6 +183,10 @@ end
 RegisterNetEvent("ncm:vehicle.call", function(assetId)
     local pid = tonumber(source) or 0
     if pid <= 0 or type(assetId) ~= "string" or #assetId ~= 36 then return end
+    if tradeReserved[assetId] then
+        feedback(pid,"This Machine is reserved in an Exchange. Remove it from the offer or cancel the Exchange first.")
+        return
+    end
     if pending[pid] or locks[assetId] or clock() < (cooldown[pid] or 0) then
         feedback(pid, "Please wait for your current vehicle call."); return
     end
@@ -222,6 +248,10 @@ RegisterNetEvent("ncm:vehicle.probed", function(token, pose, why, shape)
             end
             local row, profile = owner(pid,request.assetId) -- fresh authoritative title, never cached UI ownership
             if pending[pid] ~= request then return end
+            if tradeReserved[request.assetId] then
+                feedback(pid,"This Machine entered an Exchange while placement was being checked. Call cancelled.")
+                return
+            end
             if not row or profile.ncmDriverId ~= request.driverId or not supported[row.record] then
                 feedback(pid,"This asset is no longer available to call under your ownership."); return
             end
@@ -306,6 +336,9 @@ RegisterNetEvent("ncm:vehicle.probed", function(token, pose, why, shape)
             TriggerEvent("ncm:vehicle:materialized", request.assetId, vid, pid)
             TriggerEvent("ncm:collection:registerVehicle",vid,row.record,"owned_call",profile.ncmDriverId,"owned",request.assetId)
             print(("[ncm_world/access] materialized asset=%s runtime=%s"):format(request.assetId,tostring(vid)))
+            -- Before the result, not after: the page labels the button from the active set, so settling it
+            -- first means CALL becomes STORE in one step rather than flickering through "CALL" again.
+            sendActive(pid)
             feedback(pid,"Your vehicle has been called nearby. Look around before driving.",true)
         end)
         clear(pid,request)
@@ -315,6 +348,84 @@ RegisterNetEvent("ncm:vehicle.probed", function(token, pose, why, shape)
         end
     end)
 end)
+
+--- STORE: the other half of CALL, and the reason CALL is usable more than once.
+---
+--- Owner, 2026-09-27: a called car cannot be called again while it is in the world, so a car left behind at a
+--- venue is a car you cannot use until you disconnect. Storing has to work from ANYWHERE -- the whole point is
+--- that the player is not standing next to it -- so there is no placement probe, no distance check and no
+--- pose: nothing is being created, only removed.
+---
+--- Ownership is untouched, exactly as in `reclaim`. Title is still re-read from `vehicle_asset` rather than
+--- trusted from the runtime registry, because "this is mine" is a database fact and the panel is a client.
+---
+--- An OCCUPIED car is refused rather than deleted from under whoever is sitting in it -- the same rule
+--- `reclaim` follows, for the same reason.
+RegisterNetEvent("ncm:vehicle.store", function(assetId)
+    local pid = tonumber(source) or 0
+    if pid <= 0 or type(assetId) ~= "string" or #assetId ~= 36 then return end
+    if pending[pid] or locks[assetId] then
+        storeFeedback(pid, "Please wait for your current vehicle call."); return
+    end
+    if not active[assetId] then
+        sendActive(pid)   -- the page was offering STORE for something that is gone; correct it first
+        storeFeedback(pid, "That Machine is not in the world."); return
+    end
+    print(("[ncm_world/access] STORE requested by player=%d asset=%s"):format(pid, tostring(assetId):sub(1,8)))
+    seq = seq + 1
+    local request = { assetId = assetId, token = tostring(seq), started = clock() }
+    locks[assetId] = request -- one store at a time per asset; a yielding title read must not race a call
+    CreateThread(function()
+        local ok, err = pcall(function()
+            local row, profile = owner(pid, assetId)
+            if not row then storeFeedback(pid, "That asset is not available under your ownership."); return end
+            local cur = active[assetId]
+            if not cur then storeFeedback(pid, "That Machine is not in the world."); return end
+            if cur.driverId ~= profile.ncmDriverId then
+                storeFeedback(pid, "That Machine is not yours to store."); return
+            end
+            local okSnap, snap = pcall(Open77.vehicles.get, cur.vehicleId)
+            if okSnap and type(snap) == "table" and snap.occupants and next(snap.occupants) ~= nil then
+                storeFeedback(pid, "Someone is still sitting in it. Step out (or wait) and store it again."); return
+            end
+            -- Its kilometres must be durable before the live vehicle disappears (same order as `reclaim`).
+            if NcmOdometer and NcmOdometer.release then pcall(NcmOdometer.release, assetId) end
+            TriggerEvent("ncm:collection:unregisterVehicle", cur.vehicleId)
+            pcall(Open77.vehicles.remove, cur.vehicleId)
+            forgetActive(assetId, "stored by owner")
+            print(("[ncm_world/access] stored asset=%s (owner request); ownership unchanged")
+                :format(tostring(assetId):sub(1,8)))
+            sendActive(pid)
+            storeFeedback(pid, "Stored. Call it again from Machine Index whenever you need it.", true)
+        end)
+        if locks[assetId] == request then locks[assetId] = nil end
+        if not ok then
+            print("[ncm_world/access] store failed: " .. tostring(err))
+            sendActive(pid)   -- whatever happened, the page must not be left guessing
+            storeFeedback(pid, "Vehicle access is unavailable. Your ownership is unchanged.")
+        end
+    end)
+end)
+
+-- The panel asks when it opens: a car called in an earlier open is still out there.
+RegisterNetEvent("ncm:vehicle.active.request", function() sendActive(tonumber(source) or 0) end)
+
+-- A league-resource restart loses its in-memory custody mirror while this resource may still own live cars.
+-- Replay the exact registry on request so Exchange can never transfer a body it merely forgot was outside.
+AddEventHandler("ncm:trade:requestActiveSnapshot",function()
+    for assetId,cur in pairs(active) do TriggerEvent("ncm:vehicle:materialized",assetId,cur.vehicleId,cur.pid) end
+end)
+
+-- An offered Machine may not race a placement probe into the world between final validation and SQL commit.
+-- The Exchange owns the reservation; this resource only enforces it at both sides of its yielding probe.
+AddEventHandler("ncm:trade:reserveMachine",function(assetId,tradeId)
+    if type(assetId)=="string" and assetId~="" then tradeReserved[assetId]=tostring(tradeId or "trade") end
+end)
+AddEventHandler("ncm:trade:releaseMachine",function(assetId,tradeId)
+    if type(assetId)=="string" and (tradeId==nil or tradeReserved[assetId]==tostring(tradeId)) then tradeReserved[assetId]=nil end
+end)
+AddEventHandler("ncm:trade:reservationsReset",function() tradeReserved={} end)
+CreateThread(function() Wait(0);TriggerEvent("ncm:trade:requestReservationSnapshot") end)
 
 --- Called cars do not outlive their owner's session.
 ---

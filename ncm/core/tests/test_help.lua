@@ -8,7 +8,11 @@ return {
         T.ok(#with > #without, "the Market row appears only when the host says the Market is live")
         for _, c in ipairs(without) do
             T.neq(c.id, "market", "a surface that is not running must not be advertised (section 11)")
+            T.neq(c.id, "exchange", "Exchange is not advertised without its settlement host")
         end
+        local trading,hasTrade=H.controls({trade=true}),false
+        for _,c in ipairs(trading) do if c.id=="exchange" then hasTrade=true;T.match(c.cmd,"ncm.exchange") end end
+        T.ok(hasTrade,"a live Exchange is documented in Help")
         -- every row a player sees must tell them how to reach it
         for _, c in ipairs(with) do
             T.ok(c.key or c.cmd, c.id .. " has no key and no command")

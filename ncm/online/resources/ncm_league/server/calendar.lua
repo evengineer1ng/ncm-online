@@ -36,6 +36,11 @@ local settings = Open77.tunables.declare({
     raceFormAtSec = { value = 60, type = "integer", min = 30, max = 600, unit = "s", apply = "live" },
     raceTickMs = { value = 1000, type = "integer", min = 250, max = 5000, unit = "ms", apply = "live" },
     raceResultHoldSec = { value = 60, type = "integer", min = 5, max = 300, unit = "s", apply = "live" },
+    -- Player-called races (`server/impromptu.lua`, L178). BOTH of these exist because `KB-165` is a standing
+    -- trap: a per-race permission is a permanent cadence. The cooldown bounds one driver, the cap bounds the
+    -- board -- without the second, five drivers each obeying the first would still fill it.
+    impromptuCooldownSec = { value = 900, type = "integer", min = 60, max = 7200, unit = "s", apply = "live" },
+    impromptuMaxOpen = { value = 2, type = "integer", min = 0, max = 10, apply = "live" },
     -- chauffeur pickup for organized events (M7.5a): rides dispatched this long before the start
     pickupLeadSec = { value = 300, type = "integer", min = 90, max = 1800, unit = "s", apply = "live" },
     pickupSpeedMps = { value = 18, type = "number", min = 5, max = 40, unit = "m/s", apply = "live" },
@@ -200,6 +205,9 @@ local function restoreOrganized(t)
                     startsAt = tonumber(r.starts_at), entryOpensAt = tonumber(r.entry_opens_at), entryClosesAt = tonumber(r.entry_closes_at),
                     venue = { x = route.start.x, y = route.start.y, z = route.start.z, heading = route.start.heading, name = route.start.name, nodeId = route.start.id },
                     finish = { x = route.finish.x, y = route.finish.y, z = route.finish.z, name = route.finish.name, nodeId = route.finish.id },
+                    -- The authored intermediate points, carried on the event so the publication can hand the
+                    -- racing line to anyone who needs the whole lap rather than its two ends (`L177`).
+                    via = route.intermediate,
                     distanceM = route.distanceM, venueRadiusM = NcmPackNcx and NcmPackNcx.invitational.venueRadiusM or 40,
                     state = r.state, entries = {}, seatsTotal = tonumber(r.seats_total) or 0,
                     disciplineId = r.discipline_id or "ncx_formula", formatId = r.format_id or "sprint", classId = r.class_id or "ncx_rb15", laps = tonumber(r.laps) or 1,
@@ -253,7 +261,14 @@ publish = function(t, force)
                 startsAt = math.floor(e.startsAt), entryOpensAt = math.floor(e.entryOpensAt), entryClosesAt = math.floor(e.entryClosesAt),
                 state = e.state, entries = n, interested = interested, distanceM = math.floor(e.distanceM),
                 venue = { x = e.venue.x, y = e.venue.y, z = e.venue.z, name = e.venue.name },
-                finish = { name = e.finish.name },
+                -- The finish CARRIES ITS COORDINATES (added with `L177`). It used to publish a name and
+                -- nothing else, which was enough for the HUD line and not enough for anybody who needs
+                -- the racing line itself. `ncm_world` clears ambient population out of a corridor before
+                -- a start, and a corridor drawn from the grid box alone would clear a circle round the
+                -- lights and leave the rest of the lap exactly as busy as it was. `via` is the authored
+                -- intermediate list when the route has one; nil for a point-to-point.
+                finish = { x = e.finish.x, y = e.finish.y, z = e.finish.z, name = e.finish.name },
+                via = e.via,
             }
         end
     end

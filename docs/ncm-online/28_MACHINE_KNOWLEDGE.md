@@ -89,7 +89,7 @@ machine. In a low-population world players will populate much of their evidence 
 **15. The scanner is a deliberate research mechanism.** Passive encounter establishes identity and naturally
 observable evidence; an active scan investigates. Candidate future distinctions: moving vs parked inspection,
 externally identifiable configuration, component-family recognition, deviation from documented factory
-configuration. **Do not promise scanner telemetry before engine capability is validated.**
+configuration. ~~**Do not promise scanner telemetry before engine capability is validated.**~~ **AMENDED 2026-09-27 by `L174`: the Scanner is authorised.** The engineering caution survives the deferral being lifted — a scan may establish `identity_reveal` and `observed_configuration`, and may not invent capability it did not measure. Section 7's floor-not-maximum rule is unaffected.
 
 **16. Engineering knowledge gates interpretation.** A novice sees *"this is a Hella"*; a knowledgeable player
 sees *"this differs from factory configuration"*; an engineer sees *"aftermarket cooling component"*. The
@@ -213,7 +213,7 @@ envelope might legitimately render as a fuzzy wide region that narrows with fami
 
 ## Implementation warning (owner's, preserved)
 
-**This is not authorisation to build the scanner, component recognition, configuration history or engineering
+**AMENDED 2026-09-27 by `L174`: it now is, for the scanner itself.** ~~This is not authorisation to build the scanner~~, component recognition, configuration history or engineering
 knowledge.** The near-term task is to determine what discovery/Market/Machine Index primitives already exist,
 what current schemas record, and **what minimal additive changes preserve the irrecoverable evidence this design
 will eventually need** — specifically that any newly persisted observation can retain world + serialised machine

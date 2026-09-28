@@ -43,6 +43,7 @@ corpus claiming migrations 001-007 while the schema was at 023.
 | Milestone vocabulary (M0-M12) only | [02_ROADMAP.md](02_ROADMAP.md) | L39-L42, L59-L63 |
 | Nodes, routes, ordered chains | [07_NODE_NETWORK.md](07_NODE_NETWORK.md) | - |
 | Economy v1 build contract | [40_ECONOMY_V1.md](40_ECONOMY_V1.md), supported by the ledger/refund audit in [08_ECONOMY.md](08_ECONOMY.md) | L84, L85, L165, L167-L169 |
+| Player Exchange: synchronous heterogeneous barter | [DECISION_RECORD.md](DECISION_RECORD.md#l194---locked--executed-in-code--live-gated---player-exchange-is-a-first-class-f6-system-not-a-backend-slice), [40_ECONOMY_V1.md](40_ECONOMY_V1.md) §12, plus CODE: `ncm/core/economy/trade.lua`, `ncm_league/server/trade.lua`, migration 040 | L123, L194; full F6 system built locally, MASTER_TEST §BW live PASS owed; persistent listings/escrow remain later |
 | Markets and market discovery | [17_MARKET_NETWORK.md](17_MARKET_NETWORK.md) | L106, L117 |
 | Player-scoped machine knowledge | [16_MACHINE_INDEX.md](16_MACHINE_INDEX.md) | - |
 | Discovery and collection | [13_VEHICLE_COLLECTION.md](13_VEHICLE_COLLECTION.md) | - |
@@ -50,11 +51,14 @@ corpus claiming migrations 001-007 while the schema was at 023.
 | Vehicle artwork | [15_GENERATION_1_VEHICLE_ARTWORK_MANIFEST.md](15_GENERATION_1_VEHICLE_ARTWORK_MANIFEST.md) | - |
 | Day-to-day operation of NCM Online | [OPS_STAGING.md](OPS_STAGING.md) | - |
 | Carrier follow-up and in-place Production package upgrade | [CARRIER_NEXT_STEPS_AND_UPGRADE.md](CARRIER_NEXT_STEPS_AND_UPGRADE.md) | L146-L147; KB-132-KB-136 |
+| Rig integration ownership and separation from Carrier | [43_RIG_BRIDGE_ASSESSMENT.md](43_RIG_BRIDGE_ASSESSMENT.md), [DECISION_RECORD.md](DECISION_RECORD.md#l191---executed-in-code-live-gated---rig-bridge-is-a-full-dedicated-mod-not-a-probe-and-not-carrier), plus CODE: `ncm/rig_bridge/` | L185, L186, L188, L191; dedicated multi-vendor product built, Carrier unchanged, `MASTER_TEST §BU` live PASS owed |
 | QA instrumentation mapping | [wp/QA_INSTRUMENTATION.md](wp/QA_INSTRUMENTATION.md) | - |
 | Driver Card and Fingerprint direction | [DECISION_RECORD.md](DECISION_RECORD.md#l130--locked--driver-card-expression-and-fingerprint-authority-stay-separate) | L130 |
 | Foundry scope and invariants | [DECISION_RECORD.md](DECISION_RECORD.md#l153---locked-owner-direction---foundry-is-vehicle-rd-over-existing-geometry) | L153; representation awaits ruling in Proposal 38 |
 | Parts economy and fitting v1 | [DECISION_RECORD.md](DECISION_RECORD.md#l162---executed-in-code--live-gated---parts-becomes-a-conserved-economy-of-physical-assets) | L162-L163; deployed/enabled on private Online surface; MASTER_TEST §BF live evidence pending |
+| Component Wear & Tear lifecycle | [DECISION_RECORD.md](DECISION_RECORD.md#l178--executed-in-code--live-gated--component-wear--tear-is-active-tyre-compounds-remain-deferred) plus CODE: `ncm/core/parts/wear.lua`, migration 038 | L120, L178; distance-only first generation built locally; Hard/Medium/Soft compounds deferred; MASTER_TEST §BM pending |
 | Observation vocabulary and observation provenance | [DECISION_RECORD.md](DECISION_RECORD.md#l164---executed-owner-ruling---the-first-observation-vocabulary-is-accepted-the-estimator-is-not) plus [31_CAPABILITY_AUDIT.md](31_CAPABILITY_AUDIT.md) §9 | L164; §9 accepted as authority, rest of 31 stays PROPOSAL; MASTER_TEST §BH pending |
+| Ambient population and race-corridor clearing | [DECISION_RECORD.md](DECISION_RECORD.md#l177--provisional--ambient-population-is-built-in-two-layers-and-only-one-of-them-can-be-cleared-by-radius) plus CODE: `ncm/core/world/ambient.lua`, `ncm_world/server/ambient.lua` | L177 - PROVISIONAL, no live PASS; §BL owed. Supersedes the `BLOCKED` traffic row in [../research/open77/OPEN77_NCM_MATRIX.md](../research/open77/OPEN77_NCM_MATRIX.md) (`KB-164`) |
 | Estimation, envelopes and confidence | **NOBODY - explicitly unbuilt** | L164 refuses it pending its own reviewed proposal (`IDEA-337`, `IDEA-338`) |
 
 ---
@@ -79,7 +83,7 @@ remains a SPEC artifact; current runtime behavior is the code and current econom
 
 ---
 
-## Current (16)
+## Current (17)
 
 - [01_ARCHITECTURE.md](01_ARCHITECTURE.md) - overall system shape - SEE CONFLICT C-1 in INDEX.md
 - [02_ROADMAP.md](02_ROADMAP.md) - milestone vocabulary (M0-M12) ONLY; current sequencing is 24
@@ -94,11 +98,12 @@ remains a SPEC artifact; current runtime behavior is the code and current econom
 - [17_MARKET_NETWORK.md](17_MARKET_NETWORK.md) - markets, market discovery
 - [24_FOUNDATION_RECONCILIATION.md](24_FOUNDATION_RECONCILIATION.md) - foundational primitives, contradictions, sequencing
 - [40_ECONOMY_V1.md](40_ECONOMY_V1.md) - Economy v1 build contract: paid events, additional faucets, asset sinks and settlement
+- [43_RIG_BRIDGE_ASSESSMENT.md](43_RIG_BRIDGE_ASSESSMENT.md) - dedicated multi-vendor Rig Bridge boundary and live acceptance order; implemented under L191, §BU owed
 - [OPS_STAGING.md](OPS_STAGING.md) - day-to-day operation of NCM Online
 - [CARRIER_NEXT_STEPS_AND_UPGRADE.md](CARRIER_NEXT_STEPS_AND_UPGRADE.md) - bounded Carrier follow-up and exact in-place Production package upgrade
 - [wp/QA_INSTRUMENTATION.md](wp/QA_INSTRUMENTATION.md) - mapping the QA corpus to instrumentation
 
-## Spec - owner intent, not authorised (11)
+## Spec - owner intent, not authorised (12)
 
 - [06_CHROME_ROSTER.md](06_CHROME_ROSTER.md) - vehicle cyberware / quickhack roster
 - [09_APPAREL.md](09_APPAREL.md) - apparel entitlement
@@ -111,8 +116,9 @@ remains a SPEC artifact; current runtime behavior is the code and current econom
 - [28_MACHINE_KNOWLEDGE.md](28_MACHINE_KNOWLEDGE.md) - machine knowledge, discovery, documentation, observation and estimation envelopes
 - [39_GHOST_REPLAY.md](39_GHOST_REPLAY.md) - lap ghost replay: what a ghost is, what it wears, and why poses are not telemetry samples
 - [bricks/assignments/B-089-race-tags.v1.md](bricks/assignments/B-089-race-tags.v1.md) - original Race Tag component specification; admitted by L169, with runtime behavior now governed by code
+- [41_QUEST_GRAPH_PASS1.md](41_QUEST_GRAPH_PASS1.md) - the quest graph: character conversation trees, triggers, re-entry rules and payoffs (authoring Pass 1, preserved unchanged), plus Appendix A reconciling it against shipped telemetry, `L171` and `L172`. **Partly authorised by `L183`:** the Dex / Stu / Rico slice is BUILT and governed by code; the other fifteen contacts remain SPEC. A.5's word ceilings are withdrawn by `L176`
 
-## Proposal - no authority until ruled (15)
+## Proposal - no authority until ruled (17)
 
 - [21_ENGINEERING_PROPOSAL.md](21_ENGINEERING_PROPOSAL.md) - engineering architecture - ACCEPTED; decisions live in L120
 - [22_WEAR_PROPOSAL.md](22_WEAR_PROPOSAL.md) - wear architecture - ACCEPTED; decisions live in L120
@@ -130,6 +136,7 @@ remains a SPEC artifact; current runtime behavior is the code and current econom
 - [37_REPOSITORY_RECONCILIATION_SCHEDULE.md](37_REPOSITORY_RECONCILIATION_SCHEDULE.md) - **the single ordered execution schedule** for both repositories and both servers, including where the RB15 withdrawal safely lands - WRITTEN, NOT EXECUTED (`IDEA-459`)
 - [38_FOUNDRY_VEHICLE_LINEAGE_ARCHITECTURE.md](38_FOUNDRY_VEHICLE_LINEAGE_ARCHITECTURE.md) - repo-aware Foundry review: existing-mesh lineages, deterministic Vehicle R&D, immutable factory BOMs, finite appearance reservoirs and Design-keyed bounded production - **awaiting owner review; no implementation authorised** (`L153`, `IDEA-519`-`IDEA-526`)
 - [38_FOUNDRY_VEHICLE_LINEAGE_ARCHITECTURE.md](38_FOUNDRY_VEHICLE_LINEAGE_ARCHITECTURE.md) - vehicle lineage and procedural Vehicle R&D architecture review - **PROPOSAL, do not implement from it**. The owner invariants are `L153`; `L155` governs the narrower Machine-keyed Parts boundary.
+- [42_PARTS_BEHAVIOR_AND_WEAR_EXPANSION.md](42_PARTS_BEHAVIOR_AND_WEAR_EXPANSION.md) - design-only Parts behaviour, tyre-compound, stress-aware Wear, warning-light and service architecture exploration; **PROPOSAL, no implementation authorised** (`IDEA-627`-`IDEA-634`, `KB-163`)
 - [CARRIER_NEXT_STEPS_AND_UPGRADE.md](CARRIER_NEXT_STEPS_AND_UPGRADE.md) - **the canonical Carrier build/publish/verify/rollback runbook**. Every in-place Carrier replacement follows it; do not hand-copy the DLL and do not accept a warm reconnect as proof.
 
 ## Ledgers - living records (6)

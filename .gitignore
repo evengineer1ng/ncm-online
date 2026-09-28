@@ -80,3 +80,8 @@ desktop.ini
 # Built companion executable (tools/build-ffb-companion.ps1). 15+ MB, reproducible from source,
 # and per-machine -- it is an artefact, not a source file.
 /dist/
+
+# Recovered upstream rig sources cloned for reference during the Rig Bridge build
+# (tools/build-rig-bridge.ps1 does not read them). 149 MB, carries its own nested
+# .git directories, and is reference material rather than payload.
+/.tmp-rig-impl/

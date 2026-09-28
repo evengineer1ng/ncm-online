@@ -10,15 +10,21 @@ local Landing = Core.get("player.landing")
 local function log(fmt, ...) print(("[ncm_world/client/panel] " .. fmt):format(...)) end
 
 local page, pageReady = nil, false
-local open = nil            -- "questionnaire" | "inbox" | "driver" | "guide" | "market" | "collection" | "help" | nil
+local open = nil            -- F6 shell mode, questionnaire/landing, or nil
 local inputSeen = false
 local pendingQuestionnaire = false
 local lastInbox = nil
+local lastThreads = nil      -- the conversation graph (ncm:graph.threads)
+local selectedThread = nil   -- which conversation the player has open; the server defaults it when nil
 local lastGuide = nil
 local lastResults = nil
 local lastCollection = nil
+-- Assets of this player's that are materialised in the world right now (server-pushed; see
+-- `server/vehicle_access.lua`). Held here so the button is right the instant the panel draws.
+local lastCalled = nil
 local lastMarket = nil
 local lastComponents = nil
+local lastTrade = nil
 local lastVisibility = nil
 local marketWire = nil
 
@@ -199,12 +205,25 @@ local function showQuestionnaire()
     end)
 end
 
-local function showInbox()
+--- MESSAGES. A shell tab now, not a hotkey (owner, 2026-09-28): the inbox was the only NCM surface with its own
+--- function key and no seat in the F6 shell, which made it the one surface a player had to be told about. It sits
+--- immediately left of HELP.
+---
+--- Two payloads feed it and they are deliberately separate. `ncm:inbox` is the NOTICE list -- seat offers, which
+--- are addressed to the player, carry a deadline and are answered rather than discussed. `ncm:graph.threads` is
+--- the conversation graph. Asking for both means a player with a pending seat offer and a pending Dex message
+--- sees both, rather than whichever system happened to write last.
+---
+--- They are two payloads and no longer two surfaces: the page folds a notice into the thread list as mail from
+--- its sender (`KB-173`), so this client still sends both and makes no decision about where they are drawn.
+local function showMessages()
     if not page or not pageReady then return end
     TriggerServerEvent("ncm:inbox")
-    setOpen("inbox")   -- BEFORE the send: the page can answer panel:drawn faster than the next line runs
-    page:send("panel:show", { panel = "inbox" })
+    TriggerServerEvent("ncm:graph.threads", selectedThread)
+    setOpen("messages")   -- BEFORE the send: the page can answer panel:drawn faster than the next line runs
+    page:send("panel:show", { panel = "messages" })
     sendBig("panel:inbox", lastInbox or { items = {}, unread = 0 }, "items")
+    if lastThreads then sendBig("panel:graph", lastThreads, "lines") end
 end
 
 local function showGuide()
@@ -270,10 +289,12 @@ local function showCollection()
     if not page or not pageReady then return end
     TriggerServerEvent("ncm:collection")
     TriggerServerEvent("ncm:component.inventory.request")
+    TriggerServerEvent("ncm:vehicle.active.request")
     setOpen("collection")   -- BEFORE the send: the page can answer panel:drawn faster than the next line runs
     page:send("panel:show", { panel = "collection" })
     sendBig("panel:collection", lastCollection or { slots = {}, loading = true }, "slots")
     if lastComponents then sendBig("panel:components",lastComponents,"parts") end
+    if lastCalled then page:send("panel:vehicle.active", lastCalled) end
 end
 
 -- Help. Opened by `/ncm help` (server sets the `ncmHelp` bag) rather than by a key: three of NCM's four
@@ -295,6 +316,16 @@ local function showMarket()
     setOpen("market")
     page:send("panel:show", { panel = "market" })
     sendMarket(lastMarket or { vehicleOfferings = {}, componentOfferings = {}, markets = {}, loading = true })
+end
+
+--- EXCHANGE. A first-class F6 surface: exact Machines, stored Parts and cash from both Drivers. The payload is
+--- streamed because a mature garage is deliberately unbounded; the page receives rows in small batches too.
+local function showTrade()
+    if not page or not pageReady then return end
+    setOpen("trade")
+    page:send("panel:show", { panel = "trade" })
+    sendBig("panel:trade", lastTrade or { state="idle", rows={}, loading=true }, "rows", 2)
+    TriggerServerEvent("ncm:trade.request")
 end
 
 --- The WHEEL tab (`IDEA-399`).
@@ -373,7 +404,9 @@ AddEventHandler("onClientResourceStart", function(name)
         if d.panel == "driver" then showDriver()
         elseif d.panel == "guide" then showGuide() elseif d.panel == "market" then showMarket()
         elseif d.panel == "collection" then showCollection()
+        elseif d.panel == "trade" then showTrade()
         elseif d.panel == "wheel" then showWheel()
+        elseif d.panel == "messages" then showMessages()
         elseif d.panel == "help" then showHelp() end
     end)
     -- The page owns the report id and reuses it on retry, so a resend is the same report (idempotent by key).
@@ -406,6 +439,22 @@ AddEventHandler("onClientResourceStart", function(name)
     page:on("panel:component.install",function(d)
         if type(d)=="table" and d.componentAssetId and d.machineAssetId then TriggerServerEvent("ncm:component.install",tostring(d.componentAssetId),tostring(d.machineAssetId),tostring(d.idempotencyKey or "")) end
     end)
+    page:on("panel:component.service",function(d)
+        if type(d)=="table" and d.componentAssetId and d.conditionId then TriggerServerEvent("ncm:component.service",tostring(d.componentAssetId),tostring(d.conditionId),tostring(d.idempotencyKey or "")) end
+    end)
+    page:on("panel:trade.invite",function(d)
+        if type(d)=="table" and d.playerId then TriggerServerEvent("ncm:trade.invite",tonumber(d.playerId)) end
+    end)
+    page:on("panel:trade.respond",function(d)
+        TriggerServerEvent("ncm:trade.respond",type(d)=="table" and d.accept==true)
+    end)
+    page:on("panel:trade.edit",function(d)
+        if type(d)=="table" then TriggerServerEvent("ncm:trade.edit",d) end
+    end)
+    page:on("panel:trade.confirm",function(d)
+        if type(d)=="table" then TriggerServerEvent("ncm:trade.confirm",tonumber(d.revision)) end
+    end)
+    page:on("panel:trade.cancel",function() TriggerServerEvent("ncm:trade.cancel") end)
     -- Selecting an offering is a player-facing encounter with that model, which the server may treat as a
     -- Machine Index discovery. The client only reports the act; it never decides that anything was learned.
     -- The player opened PAST RESULTS. Ask for it; it is not in the Guide payload by design.
@@ -424,6 +473,34 @@ AddEventHandler("onClientResourceStart", function(name)
             TriggerServerEvent("ncm:vehicle.call", d.assetId)
         end
     end)
+    -- The same button, once the Machine is already out there. Storing needs no placement and no proximity,
+    -- so the client has nothing to contribute beyond the identity.
+    page:on("panel:vehicle.store", function(d)
+        if type(d) == "table" and type(d.assetId) == "string" then
+            TriggerServerEvent("ncm:vehicle.store", d.assetId)
+        end
+    end)
+    -- CONVERSATION. Three actions, and all three are advisory: the SERVER re-projects the choice against fresh
+    -- state and refuses one the page should no longer be offering (§0.3). The page is a view, never the authority.
+    page:on("panel:graph.open", function(d)
+        inputSeen = true
+        if type(d) ~= "table" or type(d.contactId) ~= "string" then return end
+        selectedThread = d.contactId
+        TriggerServerEvent("ncm:graph.open", d.contactId)
+    end)
+    page:on("panel:graph.reply", function(d)
+        inputSeen = true
+        if type(d) ~= "table" or type(d.contactId) ~= "string" or type(d.choiceId) ~= "string" then return end
+        selectedThread = d.contactId
+        TriggerServerEvent("ncm:graph.reply", d.contactId, d.choiceId)
+    end)
+    page:on("panel:graph.shelf", function(d)
+        inputSeen = true
+        if type(d) ~= "table" or type(d.contactId) ~= "string" or type(d.key) ~= "string" then return end
+        selectedThread = d.contactId
+        TriggerServerEvent("ncm:graph.shelf", d.contactId, d.key)
+    end)
+
     page:on("panel:closed", function() setOpen(nil) end)
 
     -- the page drew what we asked for: NOW it is safe to give it the mouse and keyboard (KB-61)
@@ -468,7 +545,7 @@ local function onBag(key, value)
         elseif value.complete and open == "questionnaire" then hide() end
     elseif key == "ncmInbox" and type(value) == "table" then
         lastInbox = value
-        if page and pageReady and open == "inbox" then sendBig("panel:inbox", value, "items") end
+        if page and pageReady and open == "messages" then sendBig("panel:inbox", value, "items") end
     elseif key == "ncmHelp" and type(value) == "table" then
         -- `seq` changes on every request, so asking for Help twice reopens it rather than doing nothing
         if value.seq and value.seq ~= lastHelpSeq then
@@ -500,10 +577,99 @@ RegisterNetEvent("ncm:inbox.payload", function(value)
     onBag("ncmInbox", value)
 end)
 
+-- IDEA-595 / KB-160. Every list payload arrives as a head plus numbered row packets, because the whole-payload
+-- event is the thing that disappears once it grows -- four times now (KB-59, KB-86, KB-153, KB-160), each time
+-- with no error, no return value and no log line. `ncm_league/server/stream.lua` is the sending half.
+--
+-- A partial stream is never handed on: a schedule drawn with rows missing and no way to tell is worse than one
+-- that has not drawn yet. `onComplete(value)` gets the reassembled payload with `loading` cleared.
+local function receiveStream(channel, listKey, onComplete)
+    local wire = nil
+
+    local function finish()
+        if not wire or not Chunks.complete(wire.rx) then return end
+        local rows, why = Chunks.collect(wire.rx)
+        if not rows then
+            log("%s stream %s refused at assembly: %s", channel, tostring(wire.id), tostring(why))
+            wire = nil
+            return
+        end
+        local value = wire.head
+        value[listKey] = rows
+        value.loading = false
+        log("%s stream complete id=%s %s=%d", channel, tostring(wire.id), listKey, #rows)
+        wire = nil
+        onComplete(value)
+    end
+
+    RegisterNetEvent(channel .. ".stream.begin", function(meta)
+        if type(meta) ~= "table" or type(meta.id) ~= "string" then return end
+        local head = type(meta.head) == "table" and meta.head or {}
+        head[listKey] = {}
+        head.loading = true
+        wire = { id = meta.id, head = head, rx = Chunks.receiver(tonumber(meta.parts) or 0) }
+        log("%s stream begin id=%s packets=%d %s=%s", channel, meta.id, wire.rx.expected, listKey, tostring(meta.count))
+        finish()   -- an empty list has no part events at all
+    end)
+
+    RegisterNetEvent(channel .. ".stream.part", function(part)
+        if not wire or type(part) ~= "table" or tostring(part.id or "") ~= wire.id then return end
+        local accepted, why = Chunks.accept(wire.rx, part.index, part.items)
+        if accepted == nil then
+            log("%s stream %s bad part %s: %s", channel, wire.id, tostring(part.index), tostring(why))
+        end
+        finish()
+    end)
+end
+
+receiveStream("ncm:guide", "rows", function(value)
+    lastGuide = value
+    -- A new Guide may follow a finished race, so the cached history is no longer necessarily complete.
+    lastResults = nil
+    if page and pageReady and open == "guide" then sendBig("panel:guide", value, "rows") end
+end)
+
+receiveStream("ncm:guide.results", "results", function(value)
+    lastResults = value
+    if page and pageReady and open == "guide" then sendBig("panel:guideResults", value, "results") end
+end)
+
+receiveStream("ncm:inbox", "items", function(value) onBag("ncmInbox", value) end)
+
+--- The conversation graph. `lines` is the streamed list because a transcript is the only unbounded part;
+--- the sidebar and the projected replies ride in the head (see `server/graph.lua`).
+receiveStream("ncm:graph", "lines", function(value)
+    lastThreads = value
+    if type(value.thread) == "table" and type(value.thread.contactId) == "string" then
+        selectedThread = value.thread.contactId
+    end
+    if page and pageReady and open == "messages" then sendBig("panel:graph", value, "lines") end
+end)
+
+receiveStream("ncm:collection", "slots", function(value)
+    lastCollection = value
+    if page and pageReady and open == "collection" then sendBig("panel:collection", value, "slots") end
+end)
+
+receiveStream("ncm:component.inventory", "parts", function(value)
+    lastComponents = value
+    local ids = {}
+    for _, m in ipairs(type(value.machines) == "table" and value.machines or {}) do ids[#ids + 1] = m.asset_id end
+    TriggerServerEvent("ncm:component.state.request", ids)
+    if page and pageReady and open == "collection" then sendBig("panel:components", value, "parts") end
+end)
+
+receiveStream("ncm:trade", "rows", function(value)
+    lastTrade=value
+    if page and pageReady and open=="trade" then sendBig("panel:trade",value,"rows",2) end
+end)
+
+-- Legacy whole-payload receivers, kept for ONE mixed-version restart window, exactly as the Market hop kept its
+-- own (KB-153). A current server emits none of them.
 RegisterNetEvent("ncm:guide.payload", function(value)
     if type(value) ~= "table" then return end
     lastGuide = value
-    log("guide payload received: %d row(s)", type(value.rows) == "table" and #value.rows or 0)
+    log("guide payload received whole (legacy): %d row(s)", type(value.rows) == "table" and #value.rows or 0)
     if page and pageReady and open == "guide" then sendBig("panel:guide", value, "rows") end
 end)
 
@@ -528,12 +694,22 @@ RegisterNetEvent("ncm:component.inventory",function(value)
 end)
 RegisterNetEvent("ncm:component.state",function(value) if page and pageReady then page:send("panel:component.states",type(value)=="table" and value or {}) end end)
 RegisterNetEvent("ncm:component.install.result",function(value) if page and pageReady then page:send("panel:component.install.result",type(value)=="table" and value or {}) end end)
+RegisterNetEvent("ncm:component.service.result",function(value) if page and pageReady then page:send("panel:component.service.result",type(value)=="table" and value or {}) end end)
 RegisterNetEvent("ncm:market.purchase.result",function(value) if page and pageReady then page:send("panel:market.purchase.result",type(value)=="table" and value or {}) end end)
 RegisterNetEvent("ncm:component.purchase.result",function(value) if page and pageReady then page:send("panel:component.purchase.result",type(value)=="table" and value or {}) end end)
+RegisterNetEvent("ncm:trade.result",function(value) if page and pageReady then page:send("panel:trade.result",type(value)=="table" and value or {}) end end)
+RegisterNetEvent("ncm:trade.open",function() showTrade() end)
 
 -- The Machine Index's CALL VEHICLE button needs to react; a toast behind the open panel is not a reaction.
 RegisterNetEvent("ncm:vehicle.result", function(value)
     if page and pageReady then page:send("panel:vehicle.result", type(value) == "table" and value or {}) end
+end)
+
+-- Which owned Machines are standing in the world. The page turns CALL into STORE from this and nothing else,
+-- so it is held across opens: a car called before the panel was closed is still out there.
+RegisterNetEvent("ncm:vehicle.active", function(value)
+    lastCalled = type(value) == "table" and value or { assets = {} }
+    if page and pageReady then page:send("panel:vehicle.active", lastCalled) end
 end)
 
 RegisterNetEvent("ncm:help.payload", function(value)
@@ -622,10 +798,14 @@ CreateThread(function()
     end
 end)
 
-local function toggleInbox()
-    if open == "inbox" then hide() else showInbox() end
+local function toggleMessages()
+    if open == "messages" then hide() else showMessages() end
 end
-pcall(function() RegisterKeyMapping("ncm.panel", "NCM: messages", "F9", toggleInbox) end)   -- F7 collided with the camera toggle (owner QA)
+-- **NO KEY MAPPING.** Messages had F9 (and F7 before it, which collided with the camera toggle in owner QA).
+-- The key is deliberately released, 2026-09-28: `KB-62` records that three of NCM's four function keys collide
+-- with something and that the collisions keep moving, so a surface that can live in the shell should not spend
+-- one. Messages is now a tab in the F6 shell, immediately left of HELP. The chat twins below still work, and
+-- a player who has bound F9 themselves keeps it -- nothing here claims the key.
 -- Last resort if a panel ever holds input again: this runs entirely in Lua and never touches the page.
 RegisterCommand("ncm.release", function()
     open = nil
@@ -633,14 +813,19 @@ RegisterCommand("ncm.release", function()
     pcall(function() if page and pageReady then page:send("panel:hide", {}) end end)
 end, false)
 
-RegisterCommand("ncm.msgs", toggleInbox, false)
-RegisterCommand("ncm.panel", toggleInbox, false)
+RegisterCommand("ncm.msgs", toggleMessages, false)
+RegisterCommand("ncm.panel", toggleMessages, false)
+RegisterCommand("ncm.messages", toggleMessages, false)
 
 local function toggleGuide()
     if open == "guide" then hide() else showGuide() end
 end
-pcall(function() RegisterKeyMapping("ncm.guidepage", "NCM: race guide", "F6", toggleGuide) end)
+-- F6 opens the whole shell now -- guide, market, exchange, machine index, messages -- so it is the HUB, not
+-- the race guide (owner, 2026-09-28). The mapping id stays `ncm.guidepage` so nobody's rebinding is lost.
+pcall(function() RegisterKeyMapping("ncm.guidepage", "NCM: hub", "F6", toggleGuide) end)
 RegisterCommand("ncm.guidepage", toggleGuide, false)
+NcmQuickActions = NcmQuickActions or {}
+NcmQuickActions.hub = toggleGuide
 
 local function toggleCollection()
     if open == "collection" then hide() else showCollection() end

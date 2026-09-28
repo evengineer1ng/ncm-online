@@ -66,7 +66,10 @@ end
 --- After a race session completes: every classified driver's dimensions move.
 function NcmProgression.apply(rec, results, t)
     local e = rec.plan and rec.plan.e or {}
-    local ctx = { disciplineId = e.disciplineId or rec.disciplineId or "street_sprint", classId = e.classId or "street_open", sessionKind = rec.kind, fieldSize = #results, sessionId = rec.s.sessionId, now = t }
+    -- distanceM feeds the SR gain (exposure earns the badge): the built course length already includes laps,
+    -- and the event's route distance is the fallback for a session that never built one.
+    local ctx = { disciplineId = e.disciplineId or rec.disciplineId or "street_sprint", classId = e.classId or "street_open", sessionKind = rec.kind, fieldSize = #results, sessionId = rec.s.sessionId, now = t,
+                  distanceM = (rec.course and tonumber(rec.course.lengthM)) or tonumber(e.distanceM) }
     for _, r in ipairs(results) do
         local st = NcmProgression.load(r.driverId)
         local before = st.sr.sr

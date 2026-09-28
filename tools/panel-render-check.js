@@ -27,12 +27,12 @@ function makeEl(tag) {
     _text: "", _html: "",
     classList: {
       _s: new Set(),
-      add(...c) { c.forEach(x => this._s.add(x)); },
+      add(...c) { c.forEach(x => { String(x).split(/\s+/).filter(Boolean).forEach(t => this._s.add(t)); }); },
       remove(...c) { c.forEach(x => this._s.delete(x)); },
       contains(c) { return this._s.has(c); },
       toggle(c, on) { if (on === undefined) { this._s.has(c) ? this._s.delete(c) : this._s.add(c); } else if (on) this._s.add(c); else this._s.delete(c); },
     },
-    append(...kids) { for (const k of kids) { if (k == null) throw new TypeError("append(null) — a null child reached the DOM"); this.children.push(k); } },
+    append(...kids) { for (const k of kids) { if (k == null) throw new TypeError("append(null) — a null child reached the DOM"); if (k.nodeType !== 3) k._parent = this; this.children.push(k); } },
     appendChild(k) { this.append(k); return k; },
     setAttribute(k, v) { this.attributes[k] = v; },
     getAttribute(k) { return this.attributes[k]; },
@@ -40,12 +40,37 @@ function makeEl(tag) {
     addEventListener(name, fn) { (this._listeners[name] = this._listeners[name] || []).push(fn); },
     dispatchEvent(ev) { for (const fn of (this._listeners[(ev && ev.type) || ""] || [])) fn(ev); return true; },
     click() { this.dispatchEvent({ type: "click" }); },
-    querySelector() { return makeEl("div"); },
-    querySelectorAll() { return []; },
-    replaceChildren(...k) { this.children = k; },
-    remove() {},
+    querySelector(sel) { return this.querySelectorAll(sel)[0] || makeEl("div"); },
+    // Tag-name and single-CLASS selectors, which is all the page uses ("button", ".bubble", ".typing").
+    // Walks real descendants, because the point of every caller is to reach the OTHER nodes it just rendered.
+    // The class form is not a luxury: Messages finds its newest bubble and its typing indicator that way, and
+    // a stub that answered [] for those would report PASS on code that throws in CEF.
+    querySelectorAll(sel) {
+      const raw = String(sel || "").trim();
+      const cls = raw.startsWith(".") ? raw.slice(1) : null;
+      const want = raw.toUpperCase();
+      const out = [];
+      const walk = (node) => {
+        for (const kid of (node.children || [])) {
+          if (!kid || kid.nodeType === 3) continue;
+          if (cls ? (kid.classList && kid.classList.contains(cls)) : (want === "*" || kid.tagName === want)) out.push(kid);
+          walk(kid);
+        }
+      };
+      walk(this);
+      return out;
+    },
+    replaceChildren(...k) { for (const kid of this.children) if (kid && kid.nodeType !== 3) kid._parent = null; this.children = k; for (const kid of k) if (kid && kid.nodeType !== 3) kid._parent = this; },
+    // A real `remove()` DETACHES. The typing indicator is removed and then asserted gone, so a no-op here
+    // would prove the opposite of what the test claims.
+    remove() { const p = this._parent; if (!p) return; const i = p.children.indexOf(this); if (i >= 0) p.children.splice(i, 1); this._parent = null; },
   };
   Object.defineProperty(el, "textContent", { get() { return this._text; }, set(v) { this._text = String(v == null ? "" : v); } });
+  // Assigning `className` REPLACES the token list, exactly as a browser does.
+  Object.defineProperty(el, "className", {
+    get() { return [...this.classList._s].join(" "); },
+    set(v) { this.classList._s = new Set(String(v == null ? "" : v).split(/\s+/).filter(Boolean)); },
+  });
   Object.defineProperty(el, "innerHTML", { get() { return this._html; }, set(v) { this._html = String(v == null ? "" : v); this.children = []; } });
   return el;
 }
@@ -78,11 +103,27 @@ const Open77 = {
   emit(name, data) { emitted.push({ name, data }); },
   ready() {},
 };
+// Timers are QUEUED, not ignored. Messages paces incoming lines with `setTimeout`, so a stub that dropped the
+// callback would assert that a message never arrives -- the exact bug it is meant to catch. `runTimers()` drains
+// the queue synchronously, including the timers a callback schedules while it runs.
+const timers = [];
+let timerId = 0;
+function runTimers(limit) {
+  let guard = 0;
+  while (timers.length && guard++ < (limit || 60)) {
+    const t = timers.shift();
+    try { t.fn(); } catch (e) { console.log("       timer threw: " + (e && e.message)); failedTimer = true; }
+  }
+  return guard;
+}
+let failedTimer = false;
+
 const sandbox = {
   document, window: {}, Open77, console,
   setInterval: () => 1, clearInterval: () => {},
   Date, Math, JSON, Number, String, Array, Object, Boolean, TypeError, Error,
-  setTimeout: () => 0, clearTimeout: () => {},
+  setTimeout: (fn, ms) => { timers.push({ fn, ms, id: ++timerId }); return timerId; },
+  clearTimeout: (id) => { const i = timers.findIndex(t => t.id === id); if (i >= 0) timers.splice(i, 1); },
   Event: function (type) { this.type = type; },
 };
 sandbox.window = sandbox;
@@ -148,11 +189,44 @@ function dump(el, out) {
 const detailText = () => dump(document.getElementById("guideDetail")).join(" | ");
 const ribbonText = () => dump(document.getElementById("guideWx")).join(" | ");
 const listText = () => dump(document.getElementById("guideList")).join(" | ");
+const clockText = () => dump(document.getElementById("guideClock")).join(" | ");
 
 let failed = 0;
 function check(label, cond, detail) {
   if (cond) { console.log("  PASS " + label); return; }
   failed++; console.log("  FAIL " + label + (detail ? "  -- " + detail : ""));
+}
+
+// ---- KB-86 / KB-160: the 1969 clock. MUST run before anything else, because `guideOffset` is module state:
+// once any payload has seeded it, the never-seeded state cannot be reproduced in this page again.
+//
+// Both outages were reported as "the Race Guide says the date is 1969" -- the panel inventing a fact to fill a
+// hole, since an unseeded clock is `new Date(0)`. That date was the only symptom the owner could see, and it
+// pointed at the calendar rather than at the transport that had actually failed. Assert the rule directly:
+// with no host time, the panel says it has no host time, and the empty list names the transport.
+{
+  emitted.length = 0;
+  fire("panel:show", { panel: "guide" });   // and NO panel:guide -- exactly the state of an outage
+  const ck0 = clockText(), ls0 = listText();
+  check("an unseeded clock NEVER renders a date", !/1969|1970/.test(ck0), ck0);
+  check("it says it has no host time instead", /NO HOST TIME/.test(ck0), ck0);
+  check("and the empty list blames the transport, not the calendar",
+    /reached this panel/.test(ls0) && !/Nothing posted/.test(ls0), ls0.slice(0, 220));
+
+  // rows present but no `serverNow`: a payload arrived and still cannot seed the clock
+  emitted.length = 0;
+  fire("panel:show", { panel: "guide" });
+  fire("panel:guide", CASES[8][1]);
+  check("rows without a serverNow still refuse to invent a date", !/1969|1970/.test(clockText()), clockText());
+  check("a payload that cannot seed the clock draws without throwing",
+    emitted.filter(e => e.name === "panel:error").length === 0);
+
+  // and once it IS seeded, the real date is shown -- the honest case must not be suppressed by the guard
+  emitted.length = 0;
+  fire("panel:show", { panel: "guide" });
+  fire("panel:guide", { rows: [rowBase()], serverNow: 1790000000, weather: READY_WX });
+  const ck1 = clockText();
+  check("a seeded clock does show the real date", /LIVE SCHEDULE/.test(ck1) && !/NO HOST TIME/.test(ck1), ck1);
 }
 
 for (const [label, payload] of CASES) {
@@ -331,6 +405,44 @@ fire("panel:market", { balance: 10000, markets: [{ marketId: "base_market", disp
 marketText = dump(document.getElementById("marketGrid")).join(" | ");
 check("empty stock is honest, not a catalogue", /carries nothing/i.test(marketText) && !/MAIMAI/i.test(marketText), marketText);
 
+// ---- Exchange. Both parties compose one exact revision; Machines visibly carry their fitted Parts.
+console.log("  -- exchange --");
+const tradeText = () => dump(document.getElementById("tradeBody")).join(" | ");
+emitted.length = 0; fire("panel:show", { panel: "trade" });
+fire("panel:trade", { state:"idle",balance:12500,rows:[
+  {kind:"peer",playerId:22,driverId:"driver-b",display:"Mara",busy:false},
+  {kind:"peer",playerId:33,driverId:"driver-c",display:"Vex",busy:true}
+]});
+let xt=tradeText();
+check("Exchange idle state lists online Drivers", /Mara/.test(xt) && /Vex/.test(xt),xt);
+check("a Driver already exchanging cannot be invited", document.getElementById("tradeBody").children.some(c=>/Vex/.test(dump(c).join(" "))&&c.disabled===true),xt);
+const mara=document.getElementById("tradeBody").children.find(c=>/Mara/.test(dump(c).join(" ")));
+if(mara)mara.click();
+check("selecting a Driver emits an Exchange invitation",emitted.some(e=>e.name==="panel:trade.invite"&&e.data.playerId===22),emitted.map(e=>e.name).join(","));
+
+emitted.length=0;fire("panel:show",{panel:"trade"});
+fire("panel:trade",{state:"invited",role:"b",revision:1,expiresAt:1790000600,serverNow:1790000000,balance:12500,other:{display:"Mara"},mine:{money:0,machines:[],components:[],confirmed:false},theirs:{money:0,machines:[],components:[],confirmed:false},rows:[]});
+xt=tradeText();
+check("an invited Driver gets explicit accept and decline controls",/ACCEPT EXCHANGE/.test(xt)&&/DECLINE/.test(xt),xt);
+
+const machineId="10000000-0000-4000-8000-000000000001",partId="20000000-0000-4000-8000-000000000002";
+emitted.length=0;fire("panel:show",{panel:"trade"});
+fire("panel:trade",{state:"active",role:"a",tradeId:"30000000-0000-4000-8000-000000000003",revision:4,expiresAt:1790000600,serverNow:1790000000,balance:12500,other:{display:"Mara"},mine:{money:500,machines:[machineId],components:[],confirmed:false},theirs:{money:0,machines:[],components:[partId],confirmed:true},rows:[
+  {kind:"inventory_machine",assetId:machineId,vehicleKey:"makigai_maimai",selected:true,installed:[{assetId:"p-engine",code:"MK-ENG"},{assetId:"p-tires",code:"MK-TIRE"}]},
+  {kind:"inventory_component",assetId:"p-loose",code:"NCX-BRK",family:"brakes",selected:false},
+  {kind:"their_component",assetId:partId,code:"RAVEN-ECU",family:"electrical"}
+]});
+xt=tradeText();
+const cashInput=document.getElementById("tradeBody").querySelectorAll("input")[0];
+check("active Exchange shows both sides and cash",/YOUR SIDE/.test(xt)&&/Mara SIDE/.test(xt)&&cashInput&&cashInput.value==="500",xt.slice(0,500));
+check("a selected Machine visibly includes its exact fitted Parts",/INCLUDES FITTED PARTS/.test(xt)&&/MK-ENG/.test(xt)&&/p-engine/.test(xt),xt.slice(0,700));
+check("the other Driver's exact serialized Part is visible",/RAVEN-ECU/.test(xt)&&/20000000/.test(xt),xt.slice(0,700));
+check("confirmation names the exact revision",/CONFIRM REVISION 4/.test(xt),xt.slice(-250));
+const loose=document.getElementById("tradeBody").querySelectorAll("button").find(c=>/NCX-BRK/.test(dump(c).join(" ")));
+if(loose)loose.click();
+check("editing an asset submits the complete revision-bound side",emitted.some(e=>e.name==="panel:trade.edit"&&e.data.revision===4&&e.data.components.includes("p-loose")&&e.data.machines.includes(machineId)),JSON.stringify(emitted));
+check("Exchange confirms draw for focus safety",emitted.some(e=>e.name==="panel:drawn"&&e.data.panel==="trade"),emitted.map(e=>e.name).join(","));
+
 // ---- NCM Help. This is the recovery surface: if it does not draw, a player has no way to tell us anything.
 console.log("  -- help --");
 
@@ -412,8 +524,8 @@ const navLabels = (id) => (document.getElementById(id).children || []).map(b => 
 // DRIVER FILE joined the shell as the persistent "what is mine / what changed / what next" surface, so it is
 // both a nav entry every panel must offer AND a panel that must itself carry the full nav. Listed here rather
 // than loosening the comparison: the point of this guard is that the set is exact.
-const SHELL_NAV = "DRIVER FILE|RACE GUIDE|MARKET|MACHINE INDEX|WHEEL/PEDALS|HELP";
-for (const [panel, navId] of [["driver", "driverNav"], ["guide", "guideNav"], ["market", "marketNav"], ["collection", "collectionNav"], ["wheel", "wheelNav"], ["help", "helpNav"]]) {
+const SHELL_NAV = "DRIVER FILE|RACE GUIDE|MARKET|EXCHANGE|MACHINE INDEX|WHEEL/PEDALS|MESSAGES|HELP";
+for (const [panel, navId] of [["driver", "driverNav"], ["guide", "guideNav"], ["market", "marketNav"], ["trade", "tradeNav"], ["collection", "collectionNav"], ["wheel", "wheelNav"], ["messages", "messagesNav"], ["help", "helpNav"]]) {
   emitted.length = 0;
   fire("panel:show", { panel: panel });
   if (panel === "help") fire("panel:help", HELP_MIN);
@@ -423,7 +535,267 @@ for (const [panel, navId] of [["driver", "driverNav"], ["guide", "guideNav"], ["
   const active = (document.getElementById(navId).children || []).filter(b => b.classList.contains("active"));
   check(panel + " panel marks itself as the current tab", active.length === 1 && active[0].disabled === true,
     "active=" + active.length);
+  // Position is a requirement, not a coincidence (owner, 2026-09-28): MESSAGES sits immediately left of HELP.
+  check(panel + " panel puts MESSAGES immediately left of HELP",
+    labels.indexOf("MESSAGES") === labels.indexOf("HELP") - 1,
+    panel + " nav = [" + labels.join(", ") + "]");
 }
+
+// ---- MESSAGES -----------------------------------------------------------------------------------
+// The surface that replaced the F9 inbox. Two payloads feed it and either may be missing while a server is
+// mid-upgrade, so every case here is about staying honest rather than merely not throwing.
+console.log("  -- messages --");
+
+const railText = () => dump(document.getElementById("msgRail")).join(" | ");
+const convoText = () => dump(document.getElementById("msgScroll")).join(" | ");
+const composerText = () => dump(document.getElementById("msgComposer")).join(" | ");
+const railRow = (needle) => document.getElementById("msgRail").children.find(c => dump(c).join(" ").includes(needle));
+const bubbles = () => document.getElementById("msgScroll").querySelectorAll(".bubble");
+const typingShown = () => document.getElementById("msgScroll").querySelectorAll(".typing").length > 0;
+const composerButtons = () => (document.getElementById("msgComposer").children || [])
+  .flatMap(c => c.children || []).filter(b => b.tagName === "BUTTON");
+
+const GRAPH = (over) => Object.assign({
+  at: 1790200000,
+  threads: [
+    { contactId: "dex", name: "Dex", label: "NCM DISPATCH", unread: 1, at: 1790199000,
+      preview: "Want the introduction?", previewMine: false },
+    { contactId: "stu", name: "Setup Stu", label: "SETUP STU", unread: 0, at: 1790198000,
+      preview: "Good to know.", previewMine: true },
+  ],
+  thread: {
+    contactId: "dex", name: "Dex", label: "NCM DISPATCH", domain: "ncm",
+    choices: [{ id: "rico_yes", label: "Put me through." }, { id: "rico_no", label: "Not now." }],
+    shelf: [], resting: false,
+  },
+  lines: [
+    { id: "m1", mine: false, body: "You're through to NCM. I'm Dex, Dispatch.", state: "read", at: 1790198900 },
+    { id: "m2", mine: true, body: "Put me through.", state: "read", at: 1790198950 },
+    { id: "m3", mine: false, body: "Want the introduction?", state: "unread", at: 1790199000 },
+  ],
+}, over || {});
+
+const MESSAGE_CASES = [
+  ["messages: first draw, nothing arrived", null, null],
+  ["messages: conversations only", GRAPH(), null],
+  ["messages: notices only, no graph at all", null, { items: [{ id: "n1", fromKind: "team", fromId: "thorton",
+      subject: "Thorton \u00b7 seat offer", body: "Lights in 4:00.", state: "unread", actions: ["accept", "decline"] }], unread: 1 }],
+  ["messages: both halves", GRAPH(), { items: [{ id: "n1", fromKind: "team", fromId: "thorton",
+      subject: "Thorton \u00b7 seat offer", body: "Lights in 4:00.", state: "unread", actions: ["accept", "decline"] }], unread: 1 }],
+  ["messages: a thread at rest", GRAPH({ thread: { contactId: "dex", name: "Dex", label: "NCM DISPATCH",
+      choices: [], shelf: [], resting: true } }), null],
+  ["messages: no thread selected", GRAPH({ thread: null, lines: [] }), null],
+  ["messages: empty everything (Lua {} arrives as [])", { threads: [], thread: null, lines: [] }, { items: [] }],
+  ["messages: nulls throughout", { threads: [{ contactId: null, name: null, unread: null, at: null, preview: null }],
+      thread: { contactId: null, name: null, label: null, domain: null, choices: null, shelf: null },
+      lines: [{ id: null, mine: null, body: null, state: null }] }, { items: null }],
+  ["messages: junk payload", { threads: "nonsense", thread: 5, lines: null }, { items: "nope" }],
+];
+
+for (const [label, graph, inbox] of MESSAGE_CASES) {
+  emitted.length = 0;
+  fire("panel:show", { panel: "messages" });
+  if (graph) fire("panel:graph", graph);
+  if (inbox) fire("panel:inbox", inbox);
+  const errs = emitted.filter(e => e.name === "panel:error");
+  const drawn = emitted.filter(e => e.name === "panel:drawn");
+  if (errs.length || !drawn.length) {
+    failed++;
+    console.log("  FAIL " + label);
+    for (const e of errs) console.log("       threw: " + e.data.message + "  @" + e.data.where);
+    if (!drawn.length) console.log("       panel:drawn NEVER EMITTED -> KB-61 close");
+  } else {
+    console.log("  PASS " + label + "  (drawn x" + drawn.length + ")");
+  }
+}
+
+// ---- content
+emitted.length = 0;
+fire("panel:show", { panel: "messages" });
+fire("panel:graph", GRAPH());
+let rail = railText(), convo = convoText(), comp = composerText();
+check("the rail lists every conversation by name", /Dex/.test(rail) && /Setup Stu/.test(rail), rail.slice(0, 200));
+check("an unread thread carries its count", /\b1\b/.test(rail), rail.slice(0, 200));
+check("the rail marks the player's own last line", /You: Good to know/.test(rail), rail.slice(0, 200));
+check("the transcript shows both voices", /I'm Dex, Dispatch/.test(convo) && /Put me through/.test(convo), convo.slice(0, 220));
+check("the projected replies are offered", /Put me through/.test(comp) && /Not now/.test(comp), comp.slice(0, 200));
+
+// The player's own lines must be visually distinguishable, which is what makes the pane read as a conversation.
+check("the player's lines are marked as theirs and the contact's are not",
+  bubbles().filter(b => b.classList.contains("mine")).length === 1
+  && bubbles().filter(b => !b.classList.contains("mine")).length === 2,
+  "mine=" + bubbles().filter(b => b.classList.contains("mine")).length);
+check("an unread line is marked fresh", bubbles().filter(b => b.classList.contains("fresh")).length === 1);
+
+// ---- TELLING THE TIME, and telling which line is the newest one (owner, 2026-09-27).
+// The complaint was that the transcript gave no way to know what had just arrived. Two answers, and both are
+// facts about messages rather than progress: a stamp where time jumped, and a clock on the last bubble only.
+check("the transcript stamps when the conversation happened",
+  /\d\d:\d\d/.test(convoText()), convoText().slice(0, 240));
+check("the newest line carries a clock and no earlier line does",
+  document.getElementById("msgScroll").querySelectorAll(".bubble-time").length === 1
+  && (bubbles()[bubbles().length - 1].children || []).some(c => c.classList && c.classList.contains("bubble-time")),
+  "times=" + document.getElementById("msgScroll").querySelectorAll(".bubble-time").length);
+check("and unread lines are fenced off by a NEW rule rather than by a count",
+  document.getElementById("msgScroll").querySelectorAll(".stamp").some(el => el.classList.contains("new")
+    && /^NEW$/.test(el.textContent)),
+  convoText().slice(0, 240));
+
+// Clicking a reply must report it and must not act twice: a conversation is stateful, so the second click
+// would be re-projected against the state the first one just changed.
+emitted.length = 0;
+let replyButtons = composerButtons();
+replyButtons[0].click();
+check("picking a reply reports the choice to the server",
+  emitted.some(e => e.name === "panel:graph.reply" && e.data.contactId === "dex" && e.data.choiceId === "rico_yes"),
+  emitted.map(e => e.name).join(","));
+check("and every reply is then disabled, so a double click cannot reach the server twice",
+  composerButtons().every(b => b.disabled === true));
+
+// Selecting a conversation asks the server for it rather than switching locally: the server owns which
+// projection is current.
+emitted.length = 0;
+fire("panel:show", { panel: "messages" });
+fire("panel:graph", GRAPH());
+const stuRow = document.getElementById("msgRail").children.find(c => dump(c).join(" ").includes("Setup Stu"));
+if (stuRow) stuRow.click();
+check("selecting a conversation asks the server for it",
+  emitted.some(e => e.name === "panel:graph.open" && e.data.contactId === "stu"),
+  emitted.map(e => e.name).join(","));
+
+// A conversation at rest is a normal state (section 0.2), so it says so rather than showing an empty box.
+emitted.length = 0;
+fire("panel:show", { panel: "messages" });
+fire("panel:graph", GRAPH({ thread: { contactId: "dex", name: "Dex", label: "NCM DISPATCH", choices: [], shelf: [], resting: true } }));
+check("a conversation with nothing to say says so", /Nothing to say right now/.test(composerText()), composerText());
+
+// Section 2.4's context shelf: above the generic categories, and rendered as a question rather than a task.
+emitted.length = 0;
+fire("panel:show", { panel: "messages" });
+fire("panel:graph", GRAPH({ thread: { contactId: "dex", name: "Dex", label: "NCM DISPATCH",
+  shelf: [{ key: "person:zero", label: "Who is Zero?", subjectKind: "person" }],
+  choices: [{ id: "races", label: "How do races work?" }], resting: false } }));
+comp = composerText();
+check("a shelf item appears above the generic categories",
+  comp.indexOf("Who is Zero?") < comp.indexOf("How do races work?"), comp.slice(0, 200));
+check("and it reads as a question, never as an objective",
+  !/objective|task|step|\d+\s*\/\s*\d+|complete/i.test(comp), comp.slice(0, 200));
+emitted.length = 0;
+composerButtons()[0].click();
+check("asking a shelf item reports its subject key",
+  emitted.some(e => e.name === "panel:graph.shelf" && e.data.key === "person:zero"),
+  emitted.map(e => e.name).join(","));
+
+// A sticky reply is soft guidance (section 2.3), which must be emphasis and NOT a quest marker.
+emitted.length = 0;
+fire("panel:show", { panel: "messages" });
+fire("panel:graph", GRAPH({ thread: { contactId: "dex", name: "Dex", label: "NCM DISPATCH", shelf: [],
+  choices: [{ id: "rico_shelf", label: "Actually, about Rico...", sticky: true }], resting: false } }));
+check("a sticky reply is marked for emphasis", composerButtons()[0].classList.contains("sticky"));
+check("but carries no quest-marker ornament", !/[!\u2605\u2022]\s*Actually/.test(composerText()), composerText());
+
+// ---- MESSAGE ARRIVAL (KB-173, owner 2026-09-27: "its instantaneous right now").
+// A reply used to be answered in the same frame: the player's line, the contact's two lines and the next set of
+// replies all appeared together, so there was nothing to read as an exchange. Lines appended to a transcript
+// already on screen now arrive one at a time behind a typing indicator, and no reply is offered until the
+// contact has finished. History is still drawn at once -- see the case below, which is the important guard.
+emitted.length = 0;
+fire("panel:show", { panel: "messages" });
+fire("panel:graph", GRAPH());
+const drawnAtOnce = bubbles().length;
+check("opening a thread draws its history at once, never as an animation",
+  drawnAtOnce === 3 && !typingShown(), "bubbles=" + drawnAtOnce + " typing=" + typingShown());
+
+fire("panel:graph", GRAPH({
+  thread: { contactId: "dex", name: "Dex", label: "NCM DISPATCH", domain: "ncm", choices: [{ id: "ok", label: "Understood." }], shelf: [] },
+  lines: GRAPH().lines.concat([
+    { id: "m4", mine: true, body: "Yes.", state: "read", at: 1790199100 },
+    { id: "m5", mine: false, body: "Rico will call you.", state: "unread", at: 1790199120 },
+  ]),
+}));
+check("a line appended to an open thread does not simply appear",
+  bubbles().length === 3, "bubbles=" + bubbles().length);
+check("and no reply is offered while the contact is still talking",
+  composerText() === "", composerText().slice(0, 120));
+runTimers();
+check("once it has arrived, the whole exchange is on screen",
+  bubbles().length === 5 && /Rico will call you/.test(convoText()), "bubbles=" + bubbles().length);
+check("the typing indicator is gone afterwards", !typingShown());
+check("the composer comes back with the replies the arrival earned",
+  /Understood/.test(composerText()), composerText().slice(0, 120));
+check("the clock has moved to the line that just arrived",
+  document.getElementById("msgScroll").querySelectorAll(".bubble-time").length === 1
+  && (bubbles()[4].children || []).some(c => c.classList && c.classList.contains("bubble-time")));
+check("no timer threw while a message was arriving", failedTimer === false);
+
+// ---- NOTICES ARE THREADS, and the tray is gone (KB-173).
+// The tray showed every recent row in the `message` table under whichever conversation was open -- including the
+// lines of that same conversation, and everybody else's. A notice is mail from a sender, so it is that sender's
+// thread, and accept/decline are answers, so they are in the composer.
+emitted.length = 0;
+fire("panel:show", { panel: "messages" });
+fire("panel:graph", GRAPH());
+fire("panel:inbox", { items: [{ id: "n1", fromKind: "team", fromId: "ncx_thorton", fromName: "Thorton Racing",
+  subject: "Thorton \u00b7 seat offer \u00b7 car #7", body: "Lights in 4:00.", state: "unread",
+  actions: ["accept", "decline"], createdAt: 1790199200 }], unread: 1 });
+check("the tray is gone: nothing renders recent messages outside a thread",
+  document.getElementById("msgTray").children.length === 0);
+check("an offer appears in the rail as a thread from the team that sent it",
+  /Thorton Racing/.test(railText()) && /seat offer/.test(railText()), railText().slice(0, 240));
+check("an arriving offer does not take over the pane the player is reading",
+  !/seat offer/.test(convoText()) && /I'm Dex, Dispatch/.test(convoText()), convoText().slice(0, 200));
+
+emitted.length = 0;
+const offerRow = railRow("Thorton Racing");
+if (offerRow) offerRow.click();
+check("opening the offer reads it, like opening any other thread",
+  emitted.some(e => e.name === "panel:read" && e.data.id === "n1"), emitted.map(e => e.name).join(","));
+check("the offer is then the conversation, subject and all",
+  /seat offer/.test(convoText()) && /Lights in 4:00/.test(convoText()), convoText().slice(0, 220));
+check("and accept/decline sit in the composer where every other answer sits",
+  /ACCEPT/.test(composerText()) && /DECLINE/.test(composerText()), composerText().slice(0, 220));
+emitted.length = 0;
+composerButtons()[0].click();
+check("answering an offer reports the action against that message",
+  emitted.some(e => e.name === "panel:act" && e.data.id === "n1" && e.data.action === "accept"),
+  emitted.map(e => e.name).join(","));
+check("and both answers are then disabled, so a seat cannot be taken twice",
+  composerButtons().every(b => b.disabled === true));
+
+// A sender with nothing outstanding has no thread; the pane falls back to the conversation rather than showing
+// a dead offer, and an accepted seat is not silently erased -- it stops being something to answer.
+fire("panel:inbox", { items: [{ id: "n1", fromKind: "team", fromId: "ncx_thorton", fromName: "Thorton Racing",
+  subject: "Thorton \u00b7 seat offer \u00b7 car #7", body: "Lights in 4:00.", state: "accepted", actions: [],
+  createdAt: 1790199200 }], unread: 0 });
+check("a resolved offer leaves the rail", !/Thorton Racing/.test(railText()), railText().slice(0, 200));
+check("and the pane returns to the conversation instead of a dead offer",
+  /I'm Dex, Dispatch/.test(convoText()), convoText().slice(0, 200));
+
+// Without a name from the server the id is all there is, and it is still a thread rather than a blank.
+fire("panel:inbox", { items: [{ id: "n2", fromKind: "system", fromId: null, subject: "Race control",
+  body: "Session opens in 5:00.", state: "unread", actions: [], createdAt: 1790199300 }], unread: 1 });
+check("a notice with no sender name still has somewhere to live",
+  /NCM/.test(railText()) && /Race control/.test(railText()), railText().slice(0, 200));
+
+// THE LEAK DISCIPLINE (L171, L175). This is the assertion that matters most on this surface: leads and the
+// hidden curiosity score are SERVER numbers, and nothing countable about them may be rendered.
+emitted.length = 0;
+fire("panel:show", { panel: "messages" });
+fire("panel:graph", GRAPH({ thread: { contactId: "dex", name: "Dex", label: "NCM DISPATCH",
+  shelf: [{ key: "person:zero", label: "Who is Zero?", subjectKind: "person" },
+          { key: "person:vale", label: "Who is Dr. Vale?", subjectKind: "person" }],
+  choices: [{ id: "races", label: "How do races work?" }], resting: false } }));
+const everything = railText() + " | " + convoText() + " | " + composerText() + " | "
+  + dump(document.getElementById("msgStatus")).join(" ");
+check("no lead count, percentage or progress fraction anywhere in Messages",
+  !/\d+\s*(of|\/)\s*\d+|\d+\s*%|\bleads?\b\s*:?\s*\d|progress|objective|quest/i.test(everything),
+  everything.slice(0, 300));
+check("and no hidden behavioural score is rendered",
+  !/curiosity|score|affinity|\brating\b/i.test(everything), everything.slice(0, 300));
+// Unread COUNTS are fine and deliberately so: that is a fact about an inbox, not a completion metric.
+check("unread is still reported, because that is a fact about an inbox",
+  /unread/i.test(dump(document.getElementById("msgStatus")).join(" ")),
+  dump(document.getElementById("msgStatus")).join(" "));
 
 const assetIds=[1,2,3].map(n=>"10000000-0000-4000-8000-00000000000"+n);
 fire("panel:show",{panel:"market"});
@@ -445,6 +817,23 @@ emitted.length=0; ownedButtons.forEach(b=>b.click());
 check("CALL carries each exact assetId",emitted.filter(e=>e.name==="panel:vehicle.call").map(e=>e.data.assetId).join("|")===assetIds.slice(0,2).join("|"));
 fire("panel:collection",{slots:[{slot:1,discovered:true,owned:false,displayName:"Galena"}]});
 check("discovery alone offers no CALL",!dump(document.getElementById("collectionDetail")).join("|").includes("CALL VEHICLE"));
+
+// A Machine already standing in the world cannot be called again, so the SAME button must store it -- from
+// anywhere, since the player is typically nowhere near the car they walked away from (owner, 2026-09-27).
+fire("panel:collection",{label:"Machine Index",slots:[{slot:1,discovered:true,owned:true,displayName:"MaiMai",assets:assetIds.slice(0,2).map(assetId=>({assetId}))}]});
+fire("panel:vehicle.active",{assets:[assetIds[0]]});
+const verbs=document.getElementById("collectionDetail").children.filter(x=>x.className&&String(x.className).includes("call-btn")).map(x=>x._text);
+check("a called Machine offers STORE and an idle one still offers CALL",
+  verbs.join("|")==="STORE VEHICLE|CALL VEHICLE",verbs.join("|"));
+emitted.length=0;
+document.getElementById("collectionDetail").children.filter(x=>x._text==="STORE VEHICLE").forEach(b=>b.click());
+check("STORE carries the exact assetId of the car that is out there",
+  emitted.filter(e=>e.name==="panel:vehicle.store").map(e=>e.data.assetId).join("|")===assetIds[0]);
+// Storing it puts it back on the CALL side without a fresh catalogue payload.
+fire("panel:vehicle.result",{state:"ok",message:"Stored."});
+fire("panel:vehicle.active",{assets:[]});
+check("a stored Machine can be called again",
+  document.getElementById("collectionDetail").children.filter(x=>x._text==="CALL VEHICLE").length===2);
 
 // ---- THE SIX RESERVED BUYER METRICS (`L162` section 7).
 //
@@ -550,7 +939,9 @@ fire("panel:show",{panel:"collection"});
 fire("panel:components",{partsEnabled:true,parts:[{asset_id:partAsset,design_id:component.designId,
   display_manufacturer:"Makigai",code:component.code,family:"tires",tier:"sport",effect:1.18,
   fidelity:"direct",location_kind:"storage",factory_original:1,global_ordinal:41,maker_ordinal:19,
-  design_ordinal:3,acquired_via:"purchase",exposure_m:0}],machines:[
+  design_ordinal:3,acquired_via:"purchase",exposure_m:80000,service_count:2,
+  wear:{status:"attention",conditions:[{id:"tire_peak_loss",label:"CONTACT PATCH WORN",system:"tyre",status:"attention"}]},
+  service_quote:{condition_id:"tire_peak_loss",cost:420,relief_m:18000}}],balance:10000,machines:[
     {asset_id:assetIds[0],vehicle_key:"makigai_maimai",fitment:{[partAsset]:{compatible:true,reason:"FITS"}}},
     {asset_id:assetIds[1],vehicle_key:"thorton_galena",fitment:{[partAsset]:{compatible:false,reason:"DOES NOT FIT"}}}
   ],states:{[assetIds[0]]:{eligible:true,state:"storage",reason:"In storage"},[assetIds[1]]:{eligible:false,state:"occupied",reason:"Machine is occupied"}}});
@@ -562,6 +953,11 @@ let fitTargets=(document.getElementById("collectionDetail").children||[]).filter
 check("Parts Inventory preserves visible green/red fitment choices",fitTargets.length===2&&fitTargets.some(x=>String(x.className).includes("ok"))&&fitTargets.some(x=>String(x.className).includes("no")),fitTargets.map(x=>x.className).join(" | "));
 fitTargets.find(x=>String(x.className).includes("ok")).click();
 check("eligible stored Machine exposes hold-to-fit",/HOLD TO FIT TO MACHINE/.test(dump(document.getElementById("collectionDetail")).join("|")));
+const wearDetail=dump(document.getElementById("collectionDetail")).join("|");
+check("Parts Inventory exposes named condition and service history without a health percentage",/CONTACT PATCH WORN/.test(wearDetail)&&/2 RECORDED SERVICES/.test(wearDetail)&&!/\d+% HEALTH/.test(wearDetail),wearDetail);
+check("an affordable active condition exposes a priced hold-to-service action",/HOLD TO SERVICE/.test(wearDetail)&&/420/.test(wearDetail),wearDetail);
+fire("panel:component.service.result",{ok:true});
+check("a component service result redraws without throwing",true);
 // ---- WHEEL/PEDALS. **Added after a real defect shipped past this gate on 2026-09-25**: a block reading
 // `dev.seen` was inserted into the `!s.connected` branch, ABOVE where `const dev` is declared, so every
 // player who opened the tab without the companion running hit a temporal-dead-zone ReferenceError. There
@@ -598,26 +994,32 @@ const FULL={enabled:true,connected:true,sent:900,device:{
 drawWheel("wheel panel draws a fully populated companion",FULL);
 
 const wheelText=dump(document.getElementById("wheelBody")).join("|");
-check("STRENGTH is shown as a rung out of the ladder length",/rung 4 \/ 10/.test(wheelText),wheelText.slice(0,400));
-check("the rung's actual magnitude is shown beside it",/0\.08/.test(wheelText),wheelText.slice(0,400));
+// **Force is a continuous percentage now, not a rung.** The ladder came from the companion, where fixed
+// rungs let several testers describe the same setting to each other; the owner has ruled that a single
+// driver on their own wheel wants fine control instead. The CEILING is unchanged and still enforced in
+// the plugin, so what is asserted here is the control, not the safety -- that lives in feel_tests.cpp.
+check("FORCE is shown as a percentage",/FORCE\|\d+%/.test(wheelText),wheelText.slice(0,400));
+check("the wheel type that sets the ceiling is selectable",
+  /WHEEL TYPE/.test(wheelText)&&/Gear drive/.test(wheelText)&&/max \d+%/.test(wheelText),
+  wheelText.slice(0,400));
 check("a channel too weak to feel is marked as such",/too small to feel/.test(wheelText),wheelText.slice(0,400));
 check("a channel with real signal is not marked weak",/0\.4200/.test(wheelText),wheelText.slice(0,400));
 
-// The STRENGTH slider must still refuse to leave the ladder: the ceiling is the wrist protection.
-// Find the STRENGTH row by its own label rather than by position, then its slider. Selecting every range
+// Find the FORCE row by its own label rather than by position, then its slider. Selecting every range
 // input instead would also collect steering range and the five feel knobs, whose maxima are unrelated.
 const strengthRow=(document.getElementById("wheelBody").children||[])
-  .find(r=>(r.children||[]).some(c=>c._text==="STRENGTH"));
+  .find(r=>(r.children||[]).some(c=>c._text==="FORCE"));
 const strengthSlider=strengthRow
   ? (strengthRow.children||[]).flatMap(w=>w.children||[]).find(e=>e.type==="range")
   : null;
-check("STRENGTH is a slider",!!strengthSlider,"no range input in the STRENGTH row");
-check("STRENGTH cannot be dragged past the ceiling rung",
-  !!strengthSlider&&Number(strengthSlider.max)===10&&Number(strengthSlider.min)===1,
+check("FORCE is a slider",!!strengthSlider,"no range input in the FORCE row");
+check("FORCE spans nothing to the class ceiling",
+  !!strengthSlider&&Number(strengthSlider.min)===0&&Number(strengthSlider.max)===100,
   strengthSlider?("min="+strengthSlider.min+" max="+strengthSlider.max):"absent");
-check("STRENGTH moves one rung at a time",
-  !!strengthSlider&&Number(strengthSlider.step)===1,
-  strengthSlider?("step="+strengthSlider.step):"absent");
+// 100% IS the ceiling, so the slider cannot express an unsafe value however it is dragged.
+check("FORCE cannot express a value above the ceiling",
+  !!strengthSlider&&Number(strengthSlider.max)<=100,
+  strengthSlider?("max="+strengthSlider.max):"absent");
 
 fire("panel:show",{panel:"help"});
 check("Help explains purchase and specific-asset access",/I bought a car/.test(helpText()) && /specific owned asset/.test(helpText()));

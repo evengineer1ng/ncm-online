@@ -79,6 +79,34 @@ check("a called machine is painted its own finish",#painted==1 and painted[1].pa
 check("persistent asset accompanies runtime registration",registrations[#registrations][7]==id)
 reply(pose);t=t+4;call();check("replay and repeated CALL reuse existing representation",#created==1)
 t=t+4;call(id2);reply(pose);check("two examples of same model remain distinct",#created==2 and registrations[#registrations][7]==id2)
+
+-- STORE. Owner, 2026-09-27: a car already in the world cannot be called again, so a car walked away from is
+-- unusable for the rest of the session unless it can be put back from ANYWHERE -- no probe, no proximity.
+local function store(asset,pid) source=pid or 1; events["ncm:vehicle.store"](asset or id); drain() end
+local vid2=NcmVehicleAccess.liveAsset(id2).vehicleId
+store(id2,2)
+check("a non-owner cannot store someone else's Machine",registry[vid2]~=nil and lastResult().payload.state=="fail")
+registry[vid2].occupants={[1]=1}
+store(id2)
+check("an occupied Machine is not deleted from under whoever is sitting in it",
+    registry[vid2]~=nil and lastResult().payload.state=="fail")
+registry[vid2].occupants=nil
+-- Far away and moving: exactly the situation STORE exists for, and neither is a reason to refuse.
+me.position.x=500; me.speed=30
+store(id2)
+check("the owner stores it from anywhere, far away and moving",registry[vid2]==nil)
+check("storing reaches the button",lastResult().payload.state=="ok")
+check("the page is told which Machines are still out there",
+    (function() for i=#results,1,-1 do if results[i].name=="ncm:vehicle.active" then
+        local a=results[i].payload.assets
+        return #a==1 and a[1]==id end end end)())
+me.position.x=0; me.speed=0
+store(id2)
+check("storing a Machine that is not in the world changes nothing and says so",lastResult().payload.state=="fail")
+t=t+4;call(id2);reply(pose);check("a stored Machine can be called again",#created==3)
+-- The refusal checks below assert that nothing NEW was ever created, so they count from here rather than from
+-- a hardcoded total that any added case silently invalidates.
+local baseline=#created
 -- Owner QA 2026-09-23: a called car outlived its owner's session and sat on the road forever. Ownership is
 -- untouched by reclaiming it; CALL brings it straight back.
 t=t+4;call();reply(pose)
@@ -89,10 +117,10 @@ local liveAfter=0; for _ in pairs(registry) do liveAfter=liveAfter+1 end
 check("the called car is reclaimed when its owner disconnects",liveAfter<liveBefore)
 
 localEvents.onResourceStop("ncm_world");check("resource stop removes runtime vehicles",next(registry)==nil)
-t=t+4;failDb=true;call();check("database failure fails closed",#created==2);failDb=false
-t=t+4;call();failCreate=true;reply(pose);check("create refusal never mints replacement",#created==2);failCreate=false
-t=t+4;call();localEvents.onPlayerDisconnected(1);reply(pose);check("disconnect invalidates pending request",#created==2)
-t=t+4;call();t=t+11;reply(pose);check("expired probe refused",#created==2)
+t=t+4;failDb=true;call();check("database failure fails closed",#created==baseline);failDb=false
+t=t+4;call();failCreate=true;reply(pose);check("create refusal never mints replacement",#created==baseline);failCreate=false
+t=t+4;call();localEvents.onPlayerDisconnected(1);reply(pose);check("disconnect invalidates pending request",#created==baseline)
+t=t+4;call();t=t+11;reply(pose);check("expired probe refused",#created==baseline)
 
 -- Real client probe: flat support, wall, unsupported ground, ray failure, movement and being seated.
 events={};queue={};timers={}

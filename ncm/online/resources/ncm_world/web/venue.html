@@ -22,8 +22,11 @@
     .ncm-glyph .accent { stroke: var(--glyph-accent, var(--accent)); }
     .ncm-glyph .fill { fill: currentColor; stroke: none; }
 
-    /* The option list: bottom centre, clear of the race strip (top 210px) and the vanilla minimap. */
-    #venue { position: absolute; left: 50%; bottom: 150px; transform: translateX(-50%); min-width: 460px;
+    /* The option list: RIGHT side, clear of the race strip (top 210px) and the vanilla minimap.
+       It sat bottom-CENTRE until 2026-09-27, where it covered the middle of the player's view while they were
+       standing on their mark in the ring -- which is the one moment they most need to see the road (owner, L180).
+       Anchored to the right edge with no `transform`, so the card grows leftward and never crosses the centre. */
+    #venue { position: absolute; right: 44px; bottom: 150px; min-width: 460px; max-width: 560px;
              background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px 20px 14px; }
     #head { border-bottom: 1px solid var(--line); padding-bottom: 10px; margin-bottom: 10px; }
     #series { font-size: 19px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--accent); }
@@ -46,7 +49,10 @@
     kbd { font-family: var(--mono); color: var(--text); border: 1px solid var(--line); border-radius: 4px; padding: 0 5px; }
 
     /* A panel opened by an option (practice / history), above the list. */
-    #panel { position: absolute; left: 50%; bottom: 150px; transform: translateX(-50%); min-width: 720px; max-width: 980px;
+    /* The entry / history / practice panel, right side for the same reason as `#venue` (owner, 2026-09-27).
+       `max-width` comes down from 980px (L180) so that a full-width panel anchored right still stops short of the
+       screen centre (1920 - 44 - 860 = 1016px) instead of reaching back across it. */
+    #panel { position: absolute; right: 44px; bottom: 150px; min-width: 720px; max-width: 860px;
              background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px 22px 14px; }
     #panelTitle { font-size: 19px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--accent); }
     #panelSub { font-size: 24px; font-weight: 600; margin-bottom: 4px; }
@@ -63,6 +69,56 @@
     li.off { opacity: .42; }
     li.off .label { text-decoration: none; }
     li .why { margin-left: auto; padding-left: 10px; font: 600 11px/1.2 var(--mono, monospace); opacity: .85; text-align: right; }
+
+    /* ---- The Street Call form (`L193`) ------------------------------------------------------------
+       A THIRD tenant on this page, not a third page: `kMaximumWebSurfaces` is 8 per resource and NCM had
+       reached 8 of 8 (`IDEA-570`). The option list and this card are never both up — `client/calendar.lua`
+       stands its loop down on `NcmClientBuildActive` and sends `venue:hide` on the way out.
+
+       RIGHT side and 520px, in the same size family as the option list rather than a full-screen menu.
+       Vertically centred instead of `bottom: 150px`, because this card is tall and the driver is standing
+       still while they fill it in — it is the one NCM card that is not competing with the road.
+
+       It inherits `pointer-events: none` from `body` and that is deliberate: this page is NEVER focused, which
+       is what makes it safe to leave attached during a race (`KB-67`). There is nothing to click here. Every
+       field is driven from Lua by `client/race_builder.lua` reading the keyboard and the pad physically, so
+       this block is a PURE RENDERER — it holds no form state and makes no decisions. */
+    #build { position: absolute; right: 44px; top: 50%; transform: translateY(-50%);
+             width: 520px; max-height: 860px; display: flex; flex-direction: column;
+             background: var(--panel); border: 1px solid var(--line); border-radius: 12px; }
+    #bHead { flex: none; padding: 16px 20px 12px; border-bottom: 1px solid var(--line); }
+    #bEyebrow { font: 700 15px/1 var(--mono); letter-spacing: 0.2em; text-transform: uppercase; color: var(--accent); }
+    #bTitle { font-size: 27px; font-weight: 600; line-height: 1.1; margin-top: 4px; }
+    #bReadout { margin-top: 6px; font: 600 15px/1.35 var(--mono); color: var(--dim); }
+    #bReadout.bad { color: var(--warn); }
+
+    #bRows { flex: 1 1 auto; min-height: 0; overflow: hidden; padding: 8px 12px 4px; }
+    .brow { display: flex; align-items: baseline; gap: 12px; padding: 7px 10px;
+            border: 1px solid transparent; border-radius: 8px; }
+    .brow .blabel { flex: none; width: 122px; font: 700 12px/1.5 var(--mono); letter-spacing: 0.16em;
+                    text-transform: uppercase; color: var(--dim); }
+    .brow .bvalue { flex: 1 1 auto; min-width: 0; font-size: 21px; color: var(--text);
+                    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .brow.sel { background: rgba(34, 216, 226, 0.12); border-color: rgba(34, 216, 226, 0.55); }
+    .brow.sel .blabel { color: var(--accent); }
+    .brow.dim { opacity: .45; }
+    .brow.missing .bvalue { color: var(--warn); }
+    /* POST / Scrap carry no label, so the value takes the whole width and reads as the act it is. */
+    .brow.act .bvalue { font-size: 20px; font-weight: 600; letter-spacing: 0.10em; text-transform: uppercase; }
+    .brow.act.sel .bvalue { color: var(--accent); }
+    .brow.off .bvalue { color: var(--dim); }
+
+    /* The picker: a long list windowed to nine rows in Lua, so this never receives the whole catalogue. */
+    #bPicker { flex: none; margin: 4px 12px 0; padding: 8px 10px 6px;
+               border-top: 1px solid var(--line); }
+    #bPickerTitle { font: 700 12px/1.5 var(--mono); letter-spacing: 0.16em; text-transform: uppercase; color: var(--accent); }
+    #bPickerList { margin: 4px 0 0; }
+    #bPickerList li { padding: 5px 9px; font-size: 19px; color: var(--dim); gap: 0; }
+    #bPickerList li.sel { color: var(--text); }
+    #bPickerPos { margin-top: 5px; font: 600 14px/1 var(--mono); color: var(--dim); text-align: right; }
+
+    #bErr { flex: none; margin: 6px 20px 0; font: 600 15px/1.35 var(--mono); color: #ff6b6b; }
+    #bKeys { flex: none; padding: 10px 20px 14px; font: 600 14px/1.4 var(--mono); color: var(--dim); }
   </style>
 </head>
 <body>
@@ -83,6 +139,24 @@
     <div id="panelNote"></div>
     <div id="panelBody"></div>
     <div id="panelKeys">tap <kbd>E</kbd> to close</div>
+  </div>
+
+  <!-- The Street Call form (`L193`). A pure renderer: every row below is drawn from the message Lua sends and
+       nothing here decides anything. See the CSS block for why it lives on this page and not its own. -->
+  <div id="build" class="hidden">
+    <div id="bHead">
+      <div id="bEyebrow">street call</div>
+      <div id="bTitle">Call a race</div>
+      <div id="bReadout"></div>
+    </div>
+    <div id="bRows"></div>
+    <div id="bPicker" class="hidden">
+      <div id="bPickerTitle"></div>
+      <ul id="bPickerList"></ul>
+      <div id="bPickerPos"></div>
+    </div>
+    <div id="bErr" class="hidden"></div>
+    <div id="bKeys"></div>
   </div>
 
   <script src="glyphs.js"></script>
@@ -215,11 +289,103 @@
       show($("panel"), true);
     }
 
+    // ---- The Street Call form (`L193`) ---------------------------------------------------------------
+    //
+    // This block RENDERS and nothing else. The node catalogue, the form, the cursor and the picker all live in
+    // `client/race_builder.lua`, and what arrives here is only ever what is on screen: at most fourteen form
+    // rows or nine picker rows. That is the fix for `KB-63` and it is a structural one — `page:send` drops
+    // large messages silently, so the answer is not a bigger batch but a message whose size cannot grow with
+    // the catalogue. Nothing here may start caching a list, or that guarantee is gone.
+    //
+    // Anything thrown during a render is REPORTED, never swallowed: a throw means no `build:drawn`, and Lua's
+    // watchdog then tears the card down rather than leaving it on top of the venue option list. Silence would
+    // make a broken render indistinguishable from a slow one (`KB-61`, `KB-152`).
+    var bDrawn = false;
+
+    function bGuard(fn, where) {
+      try { fn(); return true; }
+      catch (e) {
+        try { Open77.emit("build:error", { message: String((e && e.message) || e), where: where || "" }); } catch (_) {}
+        return false;
+      }
+    }
+
+    function renderBuildForm(d) {
+      var ok = bGuard(function () {
+        var rows = (d && d.rows) || [];
+        var host = $("bRows");
+        host.innerHTML = "";
+        for (var i = 0; i < rows.length; i++) {
+          var r = rows[i] || {};
+          var div = document.createElement("div");
+          var cls = "brow";
+          if (r.sel) cls += " sel";
+          if (r.dim) cls += " dim";
+          if (r.missing) cls += " missing";
+          if (r.action) cls += " act";
+          if (r.action && !d.canPost && String(r.value || "").indexOf("POST") === 0) cls += " off";
+          div.className = cls;
+          var lab = document.createElement("span");
+          lab.className = "blabel";
+          lab.textContent = r.label || "";
+          var val = document.createElement("span");
+          val.className = "bvalue";
+          val.textContent = r.value === undefined || r.value === null ? "" : String(r.value);
+          div.appendChild(lab); div.appendChild(val);
+          host.appendChild(div);
+        }
+        var ro = $("bReadout");
+        ro.className = d && d.bad ? "bad" : "";
+        text(ro, (d && d.readout) || "");
+        text($("bKeys"), (d && d.hint) || "");
+        if (d && d.error) { text($("bErr"), d.error); show($("bErr"), true); }
+        else { show($("bErr"), false); }
+        show($("build"), true);
+      }, "form");
+      // Confirmed once, on the first render that actually completed. Lua's watchdog is waiting on this.
+      if (ok && !bDrawn) { bDrawn = true; Open77.emit("build:drawn", {}); }
+    }
+
+    function renderBuildPicker(d) {
+      bGuard(function () {
+        if (!d || d.closed || !d.rows || !d.rows.length) { show($("bPicker"), false); return; }
+        text($("bPickerTitle"), d.title || "");
+        var ul = $("bPickerList");
+        ul.innerHTML = "";
+        for (var i = 0; i < d.rows.length; i++) {
+          var r = d.rows[i] || {};
+          var li = document.createElement("li");
+          if (r.sel) li.className = "sel";
+          li.textContent = r.label === undefined || r.label === null ? "" : String(r.label);
+          ul.appendChild(li);
+        }
+        text($("bPickerPos"), d.pos || "");
+        show($("bPicker"), true);
+      }, "picker");
+    }
+
     Open77.on("venue:list", renderVenue);
     Open77.on("venue:hide", function () { show($("venue"), false); });
     Open77.on("venue:history", renderHistory);
     Open77.on("venue:practice", renderPractice);
     Open77.on("venue:closePanel", function () { show($("panel"), false); });
+    // `build:open` only resets the card; the form itself arrives in the `build:form` that follows it.
+    Open77.on("build:open", function () {
+      bDrawn = false;
+      bGuard(function () {
+        $("bRows").innerHTML = "";
+        show($("bPicker"), false);
+        show($("bErr"), false);
+        text($("bReadout"), "");
+      }, "open");
+    });
+    Open77.on("build:form", renderBuildForm);
+    Open77.on("build:picker", renderBuildPicker);
+    Open77.on("build:hide", function () {
+      bDrawn = false;
+      show($("build"), false);
+      show($("bPicker"), false);
+    });
     Open77.ready();
     Open77.emit("venue:ready", {});
   </script>

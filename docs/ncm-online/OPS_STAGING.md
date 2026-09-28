@@ -176,6 +176,25 @@ Post-upgrade health, in one line each: `migrations: N applied` → `ownership le
 `ncm_world started v…` → `class ceilings published` → `scheduler started: 5 series`. If the series line is
 missing, NCM did not start.
 
+## Required mods (state as of 2026-09-28 16:41 UTC)
+
+**Declared on Online:** `ncm-carrier` 0.1.28, `ncm-rig-bridge` 0.1.0, `ncm-radial` 0.1.0 (DLL + redscript, quick
+menu, `L195`) and `ncm-vision` 0.1.0 (redscript only, `L196`); `enabled=true, unsecured=true`; manifest digest
+`258ec4cbe0bfa0b404f4b856389de06c6bf9e5af62d0fda95db83c5235fbe541`. Radial sha256
+`0a07f1ee075c547fe11318da8c7ff67c784d6d88e680908474b8f46f7b35a30b` (244,205 bytes); Vision sha256
+`5406fa60dff914e20f88d254892ff602dd66a6e138fd058d93a5b48252812d50` (2,931 bytes). Both were imported with
+`publish-carrier.py --id <id> --import-blob --enable`, survived the restart in `.open77/mods`, and were downloaded
+back through the public HTTPS endpoint with matching hashes. The consent note names all four packages.
+
+Same deploy: the full resource tree (Exchange `L194`, health regen, the `ncm_radial` resource, F6 renamed Hub)
+and migration 040 (`player_trade`, applied in 8 statements, preconditions checked on the live schema first).
+Pre-change backup: `/opt/ncm/backups/pre-carrier-prod-20260928T163834Z` (`ncm.sql.gz`, `operator-state.tar.gz`
+with the pre-change `server.jsonc`, and `resources-ncm.tar.gz`, the previously deployed resource tree).
+Rollback for either new package: `publish-carrier.py /opt/ncm/server --id ncm-radial --remove` (or `ncm-vision`),
+restart. **Not live-proven:** `MASTER_TEST §BT-§BY` are all still owed.
+
+### Earlier state (2026-09-25)
+
 ## Required mods (state as of 2026-09-25 20:24 UTC)
 
 The canonical Carrier build/publish/verify/rollback procedure is

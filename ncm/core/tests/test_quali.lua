@@ -224,6 +224,75 @@ return {
         T.ok(st2.ratings.street_open ~= nil, "rating moves in a contested field")
     end,
 
+    sr_is_balanced_in_both_directions = function(T)
+        -- IDEA-090 / KB-171. SR had no upside: +0.05 for a clean session against -0.1 per severity band,
+        -- uncapped, with a wall weighted exactly like another driver. The live tell was the first two-human
+        -- race -- -0.80 and -0.90, ENTIRELY from `kind=object` contact with scenery, nobody having touched
+        -- anybody -- against a clean race worth 0.05, so one scrappy race erased sixteen clean ones and the
+        -- 5.0 -> 10.0 climb needed 100 flawless starts (~14 h at 21 starts per 3 h, KB-165).
+        local P = T.Core.get("driver.progression")
+        local function ctx(id, opts)
+            opts = opts or {}
+            return { disciplineId = "street_sprint", classId = "street_open", sessionKind = "race",
+                     fieldSize = opts.fieldSize or 4, sessionId = id, distanceM = opts.distanceM }
+        end
+        local function run(st, id, result, opts) return P.apply(st, result, ctx(id, opts)) end
+        local clean = { state = "finished", position = 2, incidentCount = 0 }
+        local function srOf(st) return st.sr.sr end
+
+        -- 1. A clean session's credit scales with the distance actually raced, and is capped.
+        local base = srOf(run(P.newState(), "s1", clean)) - 5.0
+        T.ok(math.abs(base - 0.05) < 1e-9, "no distance reported still earns the base credit")
+        local short = srOf(run(P.newState(), "s1", clean, { distanceM = 1500 })) - 5.0
+        local long  = srOf(run(P.newState(), "s1", clean, { distanceM = 6000 })) - 5.0
+        T.ok(math.abs(short - 0.095) < 1e-9, "1.5 km clean: 0.05 + 0.03 * 1.5")
+        T.ok(long > short, "a longer clean race is worth more than a short one")
+        local huge = srOf(run(P.newState(), "s1", clean, { distanceM = 100000 })) - 5.0
+        T.ok(math.abs(huge - P.SR.maxGain) < 1e-9, "one session's credit is capped at maxGain")
+
+        -- 2. Scenery is not another driver. Same bands, far cheaper -- SR asks "safe to race ALONGSIDE".
+        local bands = { { band = 3 }, { band = 3 }, { band = 2 } }
+        local function withKind(kind)
+            local out = {}
+            for i, b in ipairs(bands) do out[i] = { band = b.band, kind = kind } end
+            return out
+        end
+        local walls = 5.0 - srOf(run(P.newState(), "s2", { state = "finished", position = 4, incidentCount = 3, incidents = withKind("object") }))
+        local cars  = 5.0 - srOf(run(P.newState(), "s2", { state = "finished", position = 4, incidentCount = 3, incidents = withKind("car") }))
+        T.ok(cars > walls * 2, "car-to-car contact costs far more than the same severity of scenery")
+        T.ok(math.abs(walls - 0.147) < 1e-9, "the observed -0.80 race is now 0.06 * (8 - 1 free) * 0.35")
+        T.ok(walls < long, "and a single clean race of ordinary length more than recovers it")
+
+        -- 3. One light scrape of the scenery costs the clean credit and nothing else.
+        local st, deltas = P.apply(P.newState(), { state = "finished", position = 4, incidentCount = 1,
+            incidents = { { band = 1, kind = "object" } } }, ctx("s3"))
+        T.ok(math.abs(srOf(st) - 5.0) < 1e-9, "the free band does not move SR")
+        T.eq(st.sr.incidents, 1, "but the incident is still recorded")
+        T.eq(st.sr.clean, 0, "and the session is not clean")
+        for _, d in ipairs(deltas) do T.ok(d.kind ~= "sr", "no phantom -0.00 is announced") end
+
+        -- 4. No single session leaves a crater, however bad it was.
+        local wreck = {}
+        for i = 1, 40 do wreck[i] = { band = 3, kind = "car" } end
+        local bad = P.apply(P.newState(), { state = "finished", position = 9, incidentCount = 40, incidents = wreck }, ctx("s4"))
+        T.ok(math.abs(5.0 - srOf(bad) - P.SR.maxLoss) < 1e-9, "one session can cost at most maxLoss")
+
+        -- 5. A host that reports a count but no records is charged as car contact: unknown contact must never
+        -- be cheaper than known contact, or a detector gap would read as good behaviour.
+        local blind = 5.0 - srOf(run(P.newState(), "s5", { state = "finished", position = 4, incidentCount = 2 }))
+        local known = 5.0 - srOf(run(P.newState(), "s5", { state = "finished", position = 4, incidentCount = 2,
+            incidents = { { band = 1, kind = "car" }, { band = 1, kind = "car" } } }))
+        T.ok(math.abs(blind - known) < 1e-9, "a bare count is treated as car contact")
+
+        -- 6. The floor and ceiling still hold.
+        local floor = P.newState(); floor.sr.sr = 0.1
+        floor = P.apply(floor, { state = "finished", position = 9, incidentCount = 3, incidents = withKind("car") }, ctx("s6"))
+        T.eq(floor.sr.sr, P.SR.min, "SR never goes below min")
+        local ceil = P.newState(); ceil.sr.sr = 9.95
+        ceil = P.apply(ceil, clean, ctx("s7", { distanceM = 6000 }))
+        T.eq(ceil.sr.sr, P.SR.max, "SR never goes above max")
+    end,
+
     questionnaire_validate_affinity_prompt = function(T)
         local Q = T.Core.get("onboarding.questionnaire")
         local Teams = T.Core.get("competition.teams")

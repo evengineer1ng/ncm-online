@@ -73,6 +73,9 @@ Core.define("competition.calendar", function(C)
                 venue = { x = route.start.x, y = route.start.y, z = route.start.z, heading = route.start.heading,
                           name = route.start.name, nodeId = route.start.id },
                 finish = { x = route.finish.x, y = route.finish.y, z = route.finish.z, name = route.finish.name, nodeId = route.finish.id },
+                -- The authored intermediate points, carried on the event so the publication can hand the
+                -- racing line to anyone who needs the whole lap rather than its two ends (`L177`).
+                via = route.intermediate,
                 distanceM = route.distanceM,
                 region = route.region,
                 finishRegion = route.finishRegion,

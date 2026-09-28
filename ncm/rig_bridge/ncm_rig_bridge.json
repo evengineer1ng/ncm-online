@@ -1,0 +1,49 @@
+{
+  "_readme": [
+    "NOTHING IS BOUND HERE ON PURPOSE. Bind your rig in NCM's WHEEL panel: each role has a device and an",
+    "axis dropdown, and a live percentage beside it so you can press a pedal and see which axis moves.",
+    "The plugin writes your choices back into this file, so the panel is the source of truth and this is",
+    "its record -- you should not need to edit it by hand.",
+    "",
+    "A wheel is adopted automatically because it reports itself as a DirectInput driving device. Pedals",
+    "are never adopted automatically: a pedal set and a gamepad look identical to enumeration, and a wrong",
+    "guess means a controller lying on a desk holds your throttle open.",
+    "",
+    "`device` is a VID:PID key such as \"044F:B371\". It survives a replug, unlike a DirectInput instance",
+    "GUID, which is reassigned between sessions. Run ncm_rig_devices.exe to list what is attached.",
+    "",
+    "`deviceClass` sets the force ceiling and is a SAFETY setting: gear 0.24, belt 0.20, direct_drive 0.06,",
+    "unknown 0.04. It defaults to unknown, the lowest, because an unidentified wheel is assumed to be the",
+    "most powerful thing it could be. Raise it only to match the wheel you actually own."
+  ],
+
+  "port": 38520,
+  "inputEnabled": true,
+  "steeringGamma": 1.3,
+
+  "axes": {
+    "steering": { "device": "", "axis": "x", "invert": false, "minimum": 0.0, "maximum": 1.0, "deadzone": 0.015 },
+    "throttle": { "device": "", "axis": "x", "invert": false, "minimum": 0.0, "maximum": 1.0, "deadzone": 0.02 },
+    "brake":    { "device": "", "axis": "z", "invert": false, "minimum": 0.0, "maximum": 1.0, "deadzone": 0.02 },
+    "clutch":   { "device": "", "axis": "y", "invert": false, "minimum": 0.0, "maximum": 1.0, "deadzone": 0.02 }
+  },
+
+  "buttons": [],
+
+  "ffb": {
+    "device": "",
+    "enabled": true,
+    "armed": false,
+
+    "deviceClass": "unknown",
+    "strength": 0.02,
+
+    "spring": 0.55,
+    "damper": 0.35,
+    "texture": 0.60,
+    "engine": 0.45,
+    "road": 1.00,
+
+    "watchdogMs": 250
+  }
+}

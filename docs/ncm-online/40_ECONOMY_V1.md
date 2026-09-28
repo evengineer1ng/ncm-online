@@ -4,8 +4,9 @@
 > Authority map: [INDEX.md](INDEX.md).
 
 > **IMPLEMENTATION:** The broad v1 race-money loop, personal-first Research Exchange, existing unique-Badge
-> rewards and selected Race Tag bounties are built locally under `L169`; deployment and MASTER_TEST §BJ remain
-> owed. Fuel, generalized player trade, Research contracts/world-first calls and the tiered Badge reducer are not
+> rewards and selected Race Tag bounties are built locally under `L169`; the synchronous generalized player
+> Exchange is built locally under `L194`. Deployment and live proof at MASTER_TEST §BJ / §BW remain owed. Fuel,
+> persistent trade listings/escrow, Research contracts/world-first calls and the tiered Badge reducer are not
 > claimed by this implementation.
 
 NCM's launch economy must be viable with **one human and no AI drivers**. A scheduled event with one entrant is

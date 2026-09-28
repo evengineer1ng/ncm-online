@@ -37,20 +37,111 @@
     .bar { height: 4px; background: var(--line); border-radius: 2px; margin-top: 8px; overflow: hidden; }
     .bar > div { height: 100%; background: var(--accent); width: 0; transition: width 200ms; }
     .hint { color: var(--dim); font-size: 16px; margin-top: 14px; font-family: var(--mono); }
-    /* inbox */
-    /* a phone thread, not a menu (owner QA): incoming bubbles on the left, sender line above, time + state below */
-    #inbox { width: 760px; }
-    #inboxList { display: flex; flex-direction: column-reverse; gap: 14px; }
-    .msg { position: relative; max-width: 86%; align-self: flex-start; background: rgba(255,255,255,0.06); border: 1px solid var(--line); border-radius: 18px 18px 18px 4px; padding: 12px 16px 10px; margin: 0; }
-    .msg.unread { border-color: var(--warn); box-shadow: 0 0 0 1px rgba(245,201,92,0.25); }
-    .msg .from { font: 700 12px/1 var(--mono); letter-spacing: 0.2em; color: var(--warn); text-transform: uppercase; margin-bottom: 6px; }
-    .msg .subject { font-size: 20px; font-weight: 700; margin: 0 0 4px; }
-    .msg .body { color: var(--text); font-size: 19px; line-height: 1.35; }
-    .msg .state { font: 600 12px/1 var(--mono); color: var(--dim); letter-spacing: 0.16em; margin-top: 8px; text-transform: uppercase; text-align: right; }
-    .msg .actions { display: flex; gap: 10px; margin-top: 12px; }
-    .msg .actions button { padding: 10px 18px; font-size: 20px; }
-    .msg .actions button.accept { border-color: var(--ok); color: var(--ok); }
-    .msg .actions button.decline { border-color: var(--red); color: var(--red); }
+    /* ---- MESSAGES -------------------------------------------------------------------------------
+       A phone, not a menu. Owner, 2026-09-28: pick a conversation on the left, have it in the main pane.
+       The old surface was one reverse-ordered pile of notices with no notion of WHO was talking, which stops
+       working the moment characters exist -- a Dex thread and a seat offer were the same kind of object.
+
+       Owner, 2026-09-27: the notice TRAY under the pane is gone (`KB-173`). It was pinned below whatever
+       conversation was open and it showed the twenty newest rows in the `message` table regardless of thread,
+       so every line of the conversation above it appeared again underneath, mixed in with everybody else's.
+       No messenger has a second pane of loose recent messages, and it read as an interruption rather than as
+       mail. An actionable notice is now a message FROM ITS SENDER, in that sender's own thread, and its
+       accept/decline live in the composer where every other reply lives.
+
+       Diegetic rules this layout follows, and they are rules rather than taste:
+         * The player's own replies sit RIGHT and the contact's sit LEFT, which is how every messenger works
+           and therefore needs no explaining.
+         * A conversation reads DOWNWARD, oldest at the top, and is scrolled to the bottom on open. The notice
+           inbox was `column-reverse`; a transcript read newest-first is not a conversation.
+         * Replies are a composer at the bottom, where a keyboard would be -- not a menu inside a message.
+         * A message ARRIVES. It is not already there: incoming lines land one at a time behind a typing
+           indicator, and the composer stays empty until the contact has finished, because a reply offered
+           before its prompt has been read is how the surface felt instantaneous and unreadable.
+         * Time is on the page. A stamp above the first bubble of a gap, and a clock on the newest bubble, so
+           "which of these did I just receive" is answerable without remembering what was there before.
+         * NOTHING here renders a count of something the player is "progressing" through (`L171`, `L175`): no
+           lead total, no percentage, no step. An unread badge counts messages, which is a fact about an inbox. */
+    #messages { width: 1600px; height: 940px; max-height: 940px; overflow: hidden; padding: 0;
+                display: flex; flex-direction: column; }
+    .msg-head { display: flex; align-items: end; justify-content: space-between; padding: 22px 28px 14px; border-bottom: 1px solid var(--line); }
+    .msg-head h1 { font-size: 44px; margin: 4px 0 0; }
+    .msg-layout { flex: 1; display: grid; grid-template-columns: 420px 1fr; min-height: 0; }
+    /* ---- sidebar: the conversation list */
+    .wheel-range select { background: var(--panel, #12141a); color: inherit; border: 1px solid var(--line);
+      border-radius: 4px; font: inherit; font-size: 12px; padding: 3px 6px;
+      flex: 1 1 130px; min-width: 0; max-width: 100%; text-overflow: ellipsis; }
+    .wheel-invert { background: transparent; color: var(--dim); border: 1px solid var(--line);
+      border-radius: 4px; font: 600 10px/1 var(--mono); letter-spacing: 0.1em; padding: 4px 7px; cursor: pointer; }
+    .wheel-invert.on { color: var(--warn, #e8b339); border-color: currentColor; }
+    .msg-rail { border-right: 1px solid var(--line); overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 8px; }
+    .rail-group { font: 700 11px/1 var(--mono); letter-spacing: 0.22em; color: var(--dim); text-transform: uppercase; padding: 12px 10px 4px; }
+    .thread-row { display: grid; grid-template-columns: 44px 1fr; gap: 12px; align-items: start;
+                  background: rgba(255,255,255,0.03); border: 1px solid transparent; border-radius: 10px;
+                  padding: 12px; cursor: pointer; text-align: left; font-family: var(--display); color: var(--text); }
+    .thread-row:hover, .thread-row:focus { border-color: var(--accent); background: rgba(34,216,226,0.10); outline: none; }
+    .thread-row.active { border-color: var(--accent); background: rgba(34,216,226,0.16); }
+    .thread-row.unread .tr-name { color: var(--warn); }
+    /* The initial disc stands in for a portrait. Deliberately a monogram rather than an icon: NCM has no
+       character art, and a placeholder face is a promise this build cannot keep. */
+    .tr-disc { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center;
+               background: rgba(34,216,226,0.14); border: 1px solid var(--line);
+               font: 700 18px/1 var(--mono); color: var(--accent); }
+    .thread-row.unread .tr-disc { background: rgba(245,201,92,0.16); border-color: var(--warn); color: var(--warn); }
+    .tr-name { font-size: 21px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+    .tr-badge { font: 700 11px/1 var(--mono); background: var(--warn); color: #0b1220; border-radius: 9px; padding: 3px 7px; }
+    .tr-preview { color: var(--dim); font-size: 17px; margin-top: 3px; overflow: hidden;
+                  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+    /* ---- conversation pane */
+    .msg-pane { display: flex; flex-direction: column; min-height: 0; }
+    .pane-head { padding: 16px 28px 12px; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 14px; }
+    .pane-head .tr-disc { width: 40px; height: 40px; font-size: 16px; }
+    .pane-name { font-size: 26px; font-weight: 700; }
+    .pane-domain { font: 600 12px/1 var(--mono); letter-spacing: 0.18em; color: var(--dim); text-transform: uppercase; }
+    #msgScroll { flex: 1; overflow-y: auto; padding: 22px 28px; display: flex; flex-direction: column; gap: 12px; }
+    .bubble { max-width: 68%; padding: 12px 17px; font-size: 20px; line-height: 1.38; border-radius: 16px 16px 16px 5px;
+              background: rgba(255,255,255,0.06); border: 1px solid var(--line); align-self: flex-start; }
+    .bubble.mine { align-self: flex-end; border-radius: 16px 16px 5px 16px;
+                   background: rgba(34,216,226,0.13); border-color: rgba(34,216,226,0.42); }
+    .bubble.fresh { border-color: var(--warn); }
+    .stamp { font: 600 11px/1 var(--mono); letter-spacing: 0.14em; color: var(--dim); text-transform: uppercase;
+             align-self: center; padding: 6px 0 2px; }
+    /* ---- the composer: projected replies (section 0.3) */
+    .composer { border-top: 1px solid var(--line); padding: 14px 28px 18px; display: flex; flex-direction: column; gap: 8px; }
+    .composer-label { font: 700 11px/1 var(--mono); letter-spacing: 0.22em; color: var(--dim); text-transform: uppercase; }
+    .replies { display: flex; flex-wrap: wrap; gap: 8px; }
+    .replies button { font-size: 19px; padding: 11px 16px; border-radius: 18px; }
+    /* Section 2.3's sticky guidance -- "remains highly visible until Rico is known". Deliberate soft emphasis
+       and deliberately NOT a quest marker: no icon, no exclamation, no claim about ordering. */
+    .replies button.sticky { border-color: var(--warn); color: var(--warn); }
+    /* Section 2.4's context shelf: things already known but unresolved, ABOVE the generic categories. */
+    .replies button.shelf { border-style: dashed; }
+    .resting { color: var(--dim); font-size: 18px; font-style: italic; }
+    /* An actionable notice -- a seat offer -- is a bubble in its sender's thread. It keeps its subject line,
+       because "Thorton - seat offer - car #7" is information, and it keeps accept/decline, but those are
+       composer buttons now rather than controls buried inside a message. */
+    .bubble .subject { font-weight: 700; display: block; margin-bottom: 4px; }
+    .bubble.offer { border-color: var(--warn); background: rgba(245,201,92,0.08); }
+    .bubble.settled { opacity: 0.62; }
+    .bubble .settled-mark { font: 700 11px/1 var(--mono); letter-spacing: 0.18em; color: var(--dim);
+                            text-transform: uppercase; display: block; margin-top: 8px; }
+    .replies button.accept { border-color: var(--ok); color: var(--ok); }
+    .replies button.decline { border-color: var(--red); color: var(--red); }
+    /* The clock under the newest bubble. Only the newest one carries it: a time on every bubble is noise, and
+       the question this answers is "which is the one that just came in". */
+    .bubble-time { font: 600 11px/1 var(--mono); letter-spacing: 0.14em; color: var(--dim);
+                   text-transform: uppercase; margin-top: 7px; }
+    /* "NEW" rule: where the messages the player has not seen begin. A divider, not a badge and not a count. */
+    .stamp.new { color: var(--warn); display: flex; align-items: center; gap: 12px; align-self: stretch; }
+    .stamp.new::before, .stamp.new::after { content: ""; flex: 1; height: 1px; background: var(--warn); opacity: 0.5; }
+    /* The typing indicator. It is the whole reason the surface no longer feels instantaneous, so it is a real
+       element with real timing rather than a dressing: while it is on screen, a message is genuinely pending. */
+    .typing { align-self: flex-start; display: flex; gap: 6px; padding: 15px 18px; border-radius: 16px 16px 16px 5px;
+              background: rgba(255,255,255,0.06); border: 1px solid var(--line); }
+    .typing span { width: 9px; height: 9px; border-radius: 50%; background: var(--dim); animation: typing 1.1s infinite; }
+    .typing span:nth-child(2) { animation-delay: 0.16s; }
+    .typing span:nth-child(3) { animation-delay: 0.32s; }
+    @keyframes typing { 0%, 60%, 100% { opacity: 0.28; transform: translateY(0); } 30% { opacity: 1; transform: translateY(-3px); } }
     .empty { color: var(--dim); font-size: 22px; padding: 30px 0; text-align: center; }
     .close { position: absolute; top: 20px; right: 24px; font: 600 14px/1 var(--mono); color: var(--dim); }
     /* Race Guide: a schedule, not a list. */
@@ -201,14 +292,22 @@
     .fit-machine.ok { border-color:var(--ok); }
     .fit-machine.no { border-color:var(--warn); }
     #collection { display:flex; flex-direction:column; }
-    #guide, #market, #collection, #help { box-sizing:border-box; }
+    #guide, #market, #collection, #trade, #help { box-sizing:border-box; }
     .guide-head, .guide-tabs, .collection-head, .market-head, .wheel-head { flex-shrink:0; }
     .guide-balance { font:800 22px/1 var(--mono);color:var(--accent);text-align:right; }
     .guide-balance small { display:block;margin-top:6px;font:700 9px/1 var(--mono);letter-spacing:.14em;color:var(--dim); }
     .wheel-head h2 { margin: 0 0 4px; font: 700 22px/1 var(--mono); letter-spacing: .14em; }
     .wheel-head .sub { font: 700 13px/1.3 var(--mono); letter-spacing: .1em; color: var(--dim); margin-bottom: 16px; }
-    .wheel-row { display: flex; align-items: baseline; gap: 14px; padding: 9px 0; border-bottom: 1px solid var(--line); }
-    .wheel-row .k { min-width: 190px; font: 700 12px/1.2 var(--mono); letter-spacing: .12em; color: var(--dim); }
+    /* **The page was taller than the shell and the last row fell off the bottom.** It is a list of short
+       controls, so it reads far better in two columns on a wide panel than as one long ribbon, and the
+       body scrolls on its own rather than pushing the tab strip out of view. */
+    #wheel { display: flex; flex-direction: column; min-height: 0; }
+    #wheelBody { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(430px, 1fr));
+      column-gap: 28px; align-content: start; padding-right: 6px; }
+    #wheelBody > .wheel-row { break-inside: avoid; }
+    .wheel-row { display: flex; align-items: center; gap: 12px; padding: 7px 0; border-bottom: 1px solid var(--line); min-width: 0; }
+    .wheel-row .k { min-width: 150px; flex: 0 0 auto; font: 700 12px/1.2 var(--mono); letter-spacing: .12em; color: var(--dim); }
     .wheel-row .v { font: 700 15px/1.2 var(--mono); color: var(--text); }
     .wheel-row .v.warn { color: var(--warn); }
     .wheel-row .v.ok { color: var(--ok); }
@@ -226,9 +325,9 @@
     /* Steering range is a SLIDER and force strength is not, deliberately. Range is comfort -- one driver's
        45 degrees is another's 90 -- while strength is the wrist-safety property, and a continuous control
        there would undo the ladder at exactly the step nobody would notice. */
-    .wheel-range { display: flex; align-items: center; gap: 12px; }
-    .wheel-range input[type=range] { width: 260px; accent-color: var(--accent); }
-    .wheel-range .deg { font: 700 15px/1 var(--mono); color: var(--accent); min-width: 74px; }
+    .wheel-range { display: flex; align-items: center; gap: 10px; flex: 1 1 auto; min-width: 0; flex-wrap: wrap; }
+    .wheel-range input[type=range] { width: 100%; max-width: 210px; flex: 1 1 120px; accent-color: var(--accent); }
+    .wheel-range .deg { font: 700 14px/1 var(--mono); color: var(--accent); min-width: 56px; text-align: right; }
     .wheel-note { margin-top: 16px; font: 600 13px/1.6 var(--mono); color: var(--dim); max-width: 760px; }
     .wheel-note b { color: var(--warn); }
     .schedule, .event-detail, .collection-wall, .vehicle-dossier, .help-scroll { min-height:0; }
@@ -316,7 +415,50 @@
     .door { border:1px solid var(--line);padding:11px;margin-top:8px;cursor:pointer;text-align:left;width:100%; }
     .door b { display:block;color:var(--accent);font:800 12px/1 var(--mono);letter-spacing:.13em; }
     .door span { display:block;margin-top:5px;color:var(--text);font:600 13px/1.35 var(--mono); }
-    #driver, #guide, #market, #collection, #help { box-sizing:border-box; }
+    #driver, #guide, #market, #collection, #trade, #help { box-sizing:border-box; }
+
+    /* ===== EXCHANGE ====================================================================== */
+    #trade { width:1820px; height:960px; max-height:960px; overflow:hidden; padding:24px 28px; display:flex; flex-direction:column; }
+    #tradeBody { flex:1; min-height:0; display:flex; flex-direction:column; }
+    #tradeBody.trade-idle { display:grid; }
+    #tradeBody.trade-invite { display:grid; }
+    .trade-head { display:flex; align-items:end; justify-content:space-between; gap:20px; flex:none; }
+    .trade-head h1 { margin:4px 0; font-size:54px; }
+    .trade-status { text-align:right; font:700 14px/1.5 var(--mono); letter-spacing:.08em; color:var(--dim); }
+    .trade-status b { display:block; font:800 24px/1.2 var(--display); color:var(--accent); letter-spacing:.03em; }
+    .trade-feedback { margin:10px 0 0; padding:9px 12px; border:1px solid var(--line); color:var(--dim); font:700 12px/1.35 var(--mono); }
+    .trade-feedback.ok { border-color:var(--ok); color:var(--ok); }
+    .trade-feedback.fail { border-color:var(--red); color:#ffabb1; }
+    .trade-idle { flex:1; min-height:0; overflow:auto; margin-top:18px; display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; align-content:start; }
+    .trade-peer { min-height:120px; padding:16px; text-align:left; border:1px solid var(--line); background:rgba(255,255,255,.025); }
+    .trade-peer:hover:not(:disabled) { border-color:var(--accent); background:rgba(34,216,226,.07); }
+    .trade-peer b { display:block; font:800 22px/1.2 var(--display); color:var(--text); }
+    .trade-peer span { display:block; margin-top:8px; font:700 11px/1.35 var(--mono); color:var(--dim); }
+    .trade-peer:disabled { opacity:.38; }
+    .trade-invite { flex:1; display:grid; place-items:center; }
+    .trade-invite-box { width:620px; padding:34px; text-align:center; border:1px solid var(--line); background:rgba(255,255,255,.02); }
+    .trade-invite-box h2 { margin:8px 0; font-size:38px; }
+    .trade-actions { display:flex; justify-content:center; gap:12px; margin-top:22px; }
+    .trade-actions button { min-width:180px; }
+    .trade-layout { flex:1; min-height:0; display:grid; grid-template-columns:minmax(0,1.2fr) minmax(0,.8fr); gap:18px; margin-top:14px; }
+    .trade-side { min-height:0; display:flex; flex-direction:column; border:1px solid var(--line); background:rgba(2,10,18,.48); padding:14px; }
+    .trade-side-head { display:flex; justify-content:space-between; align-items:center; gap:12px; padding-bottom:10px; border-bottom:1px solid var(--line); }
+    .trade-side-head b { font:800 20px/1 var(--display); letter-spacing:.06em; }
+    .trade-ready { font:800 11px/1 var(--mono); letter-spacing:.1em; color:var(--warn); }
+    .trade-ready.yes { color:var(--ok); }
+    .trade-cash { display:flex; align-items:center; gap:10px; margin:12px 0; }
+    .trade-cash label { font:800 11px/1 var(--mono); color:var(--dim); letter-spacing:.12em; }
+    .trade-cash input { flex:1; min-width:0; padding:9px 11px; color:var(--text); background:#061019; border:1px solid var(--line); font:700 16px/1 var(--mono); }
+    .trade-assets { flex:1; min-height:0; overflow:auto; display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; align-content:start; padding-right:5px; }
+    .trade-asset { padding:11px; text-align:left; border:1px solid var(--line); background:rgba(255,255,255,.02); min-height:92px; }
+    button.trade-asset:hover { border-color:var(--accent); }
+    .trade-asset.selected { border-color:var(--accent); box-shadow:inset 3px 0 var(--accent); background:rgba(34,216,226,.08); }
+    .trade-asset b { display:block; color:var(--text); font:800 16px/1.2 var(--display); }
+    .trade-asset small { display:block; margin-top:4px; color:var(--dim); font:700 10px/1.35 var(--mono); overflow-wrap:anywhere; }
+    .trade-bundle { margin-top:7px; padding-top:6px; border-top:1px solid rgba(255,255,255,.08); color:#9fe8d6; font:600 10px/1.4 var(--mono); }
+    .trade-empty { grid-column:1/-1; padding:30px; text-align:center; color:var(--dim); font:700 12px/1.5 var(--mono); }
+    .trade-foot { flex:none; display:flex; align-items:center; justify-content:space-between; gap:16px; margin-top:12px; }
+    .trade-warning { max-width:760px; color:var(--dim); font:600 11px/1.4 var(--mono); }
     /* ===== SHARED FOCUS AFFORDANCE (ncm-nav.js) ==========================================
        A separate ring element, not an outline, because focus has to be legible over ANY backdrop --
        a dark plate, a bright hero, a moving street. A subtle colour change is not enough, and the ring
@@ -440,12 +582,21 @@
       <div class="guide-layout"><div class="schedule" id="guideList"></div><aside class="event-detail" id="guideDetail"></aside></div>
       <div class="ncm-bottom" id="guideNav"></div>
     </div>
-    <div id="inbox" class="card hidden">
+    <div id="messages" class="card hidden">
       <div class="close">ESC · close</div>
-      <div class="eyebrow">Night City Motorsports · Messages</div>
-      <h1 id="inboxTitle">Messages</h1>
-      <div class="sub" id="inboxSub"></div>
-      <div id="inboxList"></div>
+      <div class="msg-head">
+        <div><div class="eyebrow">Night City Motorsports</div><h1>Messages</h1></div>
+        <div class="pane-domain" id="msgStatus"></div>
+      </div>
+      <div class="msg-layout">
+        <div class="msg-rail" id="msgRail"></div>
+        <div class="msg-pane">
+          <div class="pane-head" id="msgPaneHead"></div>
+          <div id="msgScroll"></div>
+          <div class="composer" id="msgComposer"></div>
+        </div>
+      </div>
+      <div class="ncm-bottom" id="messagesNav"></div>
     </div>
     <div id="collection" class="card hidden">
       <div class="close">ESC · close</div>
@@ -473,6 +624,13 @@
         <section class="market-pane"><div class="market-pane-head"><span>COMPONENTS</span><span>PHYSICAL · SERIALIZED STOCK</span></div><div class="parts-grid" id="marketPartsGrid"></div></section>
       </div><div class="market-detail" id="marketDetail"></div></div>
       <div class="ncm-bottom" id="marketNav"></div>
+    </div>
+    <div id="trade" class="card hidden">
+      <div class="close">ESC Â· close</div>
+      <div class="trade-head"><div><div class="eyebrow">Night City Motorsports Â· Player Exchange</div><h1>Exchange</h1><div class="sub">Machines, serialized Parts and eddies. Both Drivers confirm the same exact revision.</div></div><div class="trade-status" id="tradeStatus"></div></div>
+      <div class="trade-feedback hidden" id="tradeFeedback"></div>
+      <div id="tradeBody"></div>
+      <div class="ncm-bottom" id="tradeNav"></div>
     </div>
     <div id="help" class="card hidden">
       <div class="close">ESC · close</div>
@@ -528,13 +686,16 @@
       "use strict";
       const root = document.getElementById("root");
       const qCard = document.getElementById("questionnaire");
-      const inboxCard = document.getElementById("inbox");
+      const messagesCard = document.getElementById("messages");
       const qText = document.getElementById("qText");
       const qOpts = document.getElementById("qOpts");
       const qProgress = document.getElementById("qProgress");
       const qBar = document.getElementById("qBar");
-      const inboxList = document.getElementById("inboxList");
-      const inboxSub = document.getElementById("inboxSub");
+      const msgRail = document.getElementById("msgRail");
+      const msgScroll = document.getElementById("msgScroll");
+      const msgComposer = document.getElementById("msgComposer");
+      const msgPaneHead = document.getElementById("msgPaneHead");
+      const msgStatus = document.getElementById("msgStatus");
       const driverCard = document.getElementById("driver");
       const driverTitle = document.getElementById("driverTitle");
       const driverBalance = document.getElementById("driverBalance");
@@ -572,7 +733,12 @@
       const fitmentToggle = document.getElementById("fitmentToggle");
       const marketBalance = document.getElementById("marketBalance");
       const marketFeedback = document.getElementById("marketFeedback");
-      let mode = null;          // "questionnaire" | "inbox" | "driver" | "guide" | "market" | "collection" | "wheel" | null
+      const tradeCard = document.getElementById("trade");
+      const tradeBody = document.getElementById("tradeBody");
+      const tradeStatus = document.getElementById("tradeStatus");
+      const tradeFeedback = document.getElementById("tradeFeedback");
+      const tradeNav = document.getElementById("tradeNav");
+      let mode = null;
       let guideTick = null;
       let questions = [], version = 1, index = 0, answers = [];
       let pointerSeen = false;
@@ -594,7 +760,11 @@
       // The NCM shell nav. ONE definition, rendered into whichever panel is open, so a surface can never be
       // present in one panel's tab strip and missing from another's. Add a surface here and it appears
       // everywhere at once; that is the whole point.
-      const SHELL_TABS = [["driver", "DRIVER FILE"], ["guide", "RACE GUIDE"], ["market", "MARKET"], ["collection", "MACHINE INDEX"], ["wheel", "WHEEL/PEDALS"], ["help", "HELP"]];
+      // MESSAGES joined the strip on 2026-09-28 and gave up its function key to do it (see client/panel.lua).
+      // Its position is load-bearing: the owner asked for it immediately left of HELP, which is also where a
+      // surface belongs that a player reaches for when something has been said to them rather than when they
+      // are browsing.
+      const SHELL_TABS = [["driver", "DRIVER FILE"], ["guide", "RACE GUIDE"], ["market", "MARKET"], ["trade", "EXCHANGE"], ["collection", "MACHINE INDEX"], ["wheel", "WHEEL/PEDALS"], ["messages", "MESSAGES"], ["help", "HELP"]];
       function renderNav(container, current) {
         if (!container) return;
         container.innerHTML = "";
@@ -610,14 +780,18 @@
 
       function show(which) {
         mode = which;
+        // A mode change ends any message arrival in flight: the next transcript draw is history, not arrival,
+        // and a timer left running would append to a pane that is no longer the one it was queued against.
+        resetReveal();
         root.classList.toggle("hidden", !which);
         document.body.classList.toggle("closed", !which);
         qCard.classList.toggle("hidden", which !== "questionnaire");
-        inboxCard.classList.toggle("hidden", which !== "inbox");
+        messagesCard.classList.toggle("hidden", which !== "messages");
         driverCard.classList.toggle("hidden", which !== "driver");
         guideCard.classList.toggle("hidden", which !== "guide");
         collectionCard.classList.toggle("hidden", which !== "collection");
         marketCard.classList.toggle("hidden", which !== "market");
+        tradeCard.classList.toggle("hidden", which !== "trade");
         wheelCard.classList.toggle("hidden", which !== "wheel");
         helpCard.classList.toggle("hidden", which !== "help");
         landingCard.classList.toggle("hidden", which !== "landing");
@@ -637,7 +811,8 @@
               // leave immediately instead of tabbing through a changelog to find the way out.
               first: which === "landing" ? "#landingDismiss" : null,
               scroller: document.getElementById(
-                which === "landing" ? "landingScroll" : which === "help" ? "helpScroll" : "") || null,
+                which === "landing" ? "landingScroll" : which === "help" ? "helpScroll"
+                : which === "messages" ? "msgScroll" : "") || null,
               // Back is ALSO resolved in Lua and does not wait for this. See client/nav_input.lua.
               onBack: () => Open77.emit("panel:closed", {}),
             });
@@ -777,7 +952,14 @@
         const detail=document.createElement("p");detail.textContent=c.detail||"";
         const next=document.createElement("div");next.className="next";next.textContent=c.action||"";
         driverNow.append(signal,title,detail,next);
-        if(c.startsAt){const timing=document.createElement("p");timing.className="when";timing.textContent="START · "+fmtTime(c.startsAt)+" · "+fmtCountdown(c.startsAt-(s.serverNow||guideNow()||0))+" AWAY";driverNow.append(timing);}
+        if(c.startsAt){
+          // Same rule as the Guide clock (KB-160): with no reference time, "56 years away" is a fabricated fact.
+          // The start time itself is real and stays; only the distance to it is withheld.
+          const ref=Number(s.serverNow)||(guideClockKnown()?guideNow():0);
+          const timing=document.createElement("p");timing.className="when";
+          timing.textContent="START · "+fmtTime(c.startsAt)+(ref?(" · "+fmtCountdown(c.startsAt-ref)+" AWAY"):" · COUNTDOWN UNAVAILABLE");
+          driverNow.append(timing);
+        }
 
         driverTrace.innerHTML="";const th=document.createElement("h3");th.textContent="YOUR TRACE";driverTrace.append(th);
         const marks=document.createElement("div");marks.className="driver-marks";
@@ -805,7 +987,7 @@
           b.addEventListener("click",()=>Open77.emit("panel:navigate",{panel:ref.id}));driverDoors.append(b);
         }
         const controls=document.createElement("div");controls.className="wheel-note";
-        controls.textContent="F6 opens the NCM paddock. F10 jumps to Machine Index. Essential information also has a chat twin: /ncm.status, /ncm.guide, /ncm.balance, /ncm.profile.";
+        controls.textContent="F6 opens the NCM paddock, including MESSAGES. F10 jumps to Machine Index. Essential information also has a chat twin: /ncm.status, /ncm.guide, /ncm.balance, /ncm.profile.";
         driverDoors.append(controls);
       }
       Open77.on("panel:driver",d=>{if(mode==="driver")guard("driver",()=>renderDriver(d));else driverData=d;});
@@ -828,6 +1010,19 @@
       // the truth and can never step the displayed clock backwards. A large negative jump means the server itself
       // restarted, which is the one case where re-seeding down is correct.
       const guideNow = () => guideOffset === null ? 0 : (Date.now() / 1000) + guideOffset;
+      // KB-86 and KB-160 were both reported as "the Race Guide says 1969", because an unseeded clock means
+      // guideNow() === 0 and new Date(0) is 31 Dec 1969 west of UTC. That is a fabricated fact standing in for a
+      // missing one: the panel has never been told the host's time, and it must SAY that instead of dating
+      // itself to the Apollo programme. The absence is the diagnosis -- it means no payload has arrived.
+      const guideClockKnown = () => guideOffset !== null;
+      function guideClockLine(now, caption) {
+        if (!guideClockKnown()) {
+          return "NO HOST TIME YET<small>" + caption + " · WAITING FOR THE HOST</small>";
+        }
+        const dt = new Date(now * 1000);
+        return dt.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric", year: "numeric" }).toUpperCase()
+          + " · " + fmtTime(now) + "<small>" + caption + "</small>";
+      }
       function seedGuideClock(serverNow) {
         const t = Number(serverNow) || 0;
         if (!t) return;
@@ -1130,9 +1325,7 @@
         const all = Array.isArray(guideData.rows) ? guideData.rows : [];
         if (guideTab === "past") {
           renderWeatherRibbon();
-          const dtp = new Date(now * 1000);
-          guideClock.innerHTML = dtp.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric", year: "numeric" }).toUpperCase()
-            + " · " + fmtTime(now) + "<small>YOUR OFFICIAL RESULTS</small>";
+          guideClock.innerHTML = guideClockLine(now, "YOUR OFFICIAL RESULTS");
           renderPastResults(now);
           renderDetail(all.find(r => r.eventId === selectedEventId), now);
           return;
@@ -1141,8 +1334,19 @@
         if (!selectedEventId || !all.some(r => r.eventId === selectedEventId)) selectedEventId = (rows[0] || all[0] || {}).eventId || null;
         const selected = all.find(r => r.eventId === selectedEventId) || rows[0];
         renderWeatherRibbon();
-        const dt = new Date(now * 1000); guideClock.innerHTML = dt.toLocaleDateString([], { weekday: "short", month: "short", day: "numeric", year: "numeric" }).toUpperCase() + " · " + fmtTime(now) + '<small>LOCAL TIME · LIVE SCHEDULE</small>';
-        if (!rows.length) { const e = document.createElement("div"); e.className = "guide-empty"; e.textContent = guideData.loading ? "Loading live schedule…" : (guideTab === "mine" ? "No races in your file yet. Express interest from the schedule." : "Nothing posted right now."); guideList.append(e); renderDetail(selected, now); return; }
+        guideClock.innerHTML = guideClockLine(now, "LOCAL TIME · LIVE SCHEDULE");
+        if (!rows.length) {
+          const e = document.createElement("div"); e.className = "guide-empty";
+          // Three different facts used to share one sentence, and the one that mattered -- "nothing ever reached
+          // this panel" -- was the one that looked most like the harmless one. An unseeded clock proves it: the
+          // host has never told us the time, so it has never told us the schedule either.
+          e.textContent = !guideClockKnown()
+            ? "No schedule has reached this panel. The host has sent nothing yet — close and reopen the Guide, and tell the host if it stays empty."
+            : (guideData.loading ? "Loading live schedule…"
+              : (guideTab === "mine" ? "No races in your file yet. Express interest from the schedule."
+                : "Nothing posted right now."));
+          guideList.append(e); renderDetail(selected, now); return;
+        }
         const base = Math.floor(now / 1800) * 1800;
         const head = document.createElement("div"); head.className = "time-head";
         const corner = document.createElement("div"); corner.className = "corner"; corner.textContent = "REGION / CHANNEL"; head.append(corner);
@@ -1175,12 +1379,19 @@
 
       // CALL VEHICLE button state. One button at a time: the detail pane only ever shows the selected asset.
       let callBtn = null, callNote = null, callTimer = null;
+      // Assets of this Driver's that are standing in the world right now, pushed by the server. A car already
+      // out there cannot be called again, so for those the same button STORES instead -- otherwise a Machine
+      // left across town is a Machine the player cannot use again this session.
+      let calledAssets = new Set(), assetButtons = [];
+      function isCalled(btn) { return calledAssets.has((btn && btn.dataset && btn.dataset.assetId) || ""); }
+      function restLabel(btn) { return isCalled(btn) ? "STORE VEHICLE" : "CALL VEHICLE"; }
+      function busyLabel(btn) { return isCalled(btn) ? "STORING\u2026" : "CALLING\u2026"; }
       function setCallState(state, message) {
         if (callTimer && state !== "pending") { clearTimeout(callTimer); callTimer = null; }
         if (!callBtn) return;
         callBtn.className = "call-btn " + (state || "");
         callBtn.disabled = (state === "pending");
-        callBtn.textContent = state === "pending" ? "CALLING\u2026" : "CALL VEHICLE";
+        callBtn.textContent = state === "pending" ? busyLabel(callBtn) : restLabel(callBtn);
         if (callNote) {
           callNote.className = "call-note " + (state || "");
           callNote.textContent = message || "";
@@ -1191,12 +1402,19 @@
         // "pending" is the server confirming it is looking; it is NOT success, so the button stays amber.
         setCallState(d.state === "ok" ? "ok" : (d.state === "pending" ? "pending" : "fail"), d.message || "");
       });
+      // The world changed, not the catalogue: relabel in place rather than rebuilding the pane, so the note
+      // the player is reading ("Stored.") survives the flip. A button mid-press is left to its own reply.
+      Open77.on("panel:vehicle.active", (d) => {
+        calledAssets = new Set((d && Array.isArray(d.assets) ? d.assets : []).map(String));
+        for (const btn of assetButtons) if (!btn.disabled) btn.textContent = restLabel(btn);
+      });
 
       // ---- Machine Index: Machines and serialized Parts Inventory share one owned-asset surface.
       let collectionData = { slots: [], discovered: 0, total: 0, owned: 0 }, selectedCollectionSlot = null;
       let componentData = { parts: [], machines: [], states: {}, partsEnabled:false }, collectionMode="machines", selectedPart=null, selectedFitMachine=null;
       function renderCollectionDetail(v) {
         collectionDetail.innerHTML = "";
+        assetButtons = [];   // the buttons in the pane we are about to discard no longer exist
         if (!v || !v.discovered) {
           collectionDetail.innerHTML = '<div class="eyebrow">UNDISCOVERED MACHINE</div><div class="detail-title">???</div><div class="dossier-silhouette">?</div><div class="detail-description">Encounter this machine in the shared world to add it to your Collection.</div>';
           return;
@@ -1208,16 +1426,19 @@
         for (const asset of (Array.isArray(v.assets) ? v.assets : [])) {
           const id=document.createElement("div"); id.className="asset-id"; id.textContent="ASSET " + asset.assetId;
           const serial=document.createElement("div");serial.className="part-status";serial.textContent=asset.globalOrdinal?("NCM #"+asset.globalOrdinal+" · MAKER #"+asset.makerOrdinal+" · MODEL #"+asset.modelOrdinal):"SERIAL NOT RECOVERABLE";
-          const call=document.createElement("button"); call.textContent="CALL VEHICLE"; call.className="call-btn";
+          const call=document.createElement("button"); call.className="call-btn";
+          call.dataset.assetId=asset.assetId; call.textContent=restLabel(call); assetButtons.push(call);
           const note=document.createElement("div"); note.className="call-note";
           // React on the press itself. The server's answer arrives later over `panel:vehicle.result`; until
           // then the button must look busy rather than dead, or the player presses it again.
           call.addEventListener("click",()=>{
             if(call.disabled) return;
+            const storing=isCalled(call);
             callBtn=call; callNote=note;
-            call.disabled=true; call.className="call-btn pending"; call.textContent="CALLING\u2026";
-            note.className="call-note pending"; note.textContent="Checking nearby space\u2026";
-            Open77.emit("panel:vehicle.call",{assetId:asset.assetId});
+            call.disabled=true; call.className="call-btn pending"; call.textContent=busyLabel(call);
+            note.className="call-note pending";
+            note.textContent=storing?"Storing\u2026":"Checking nearby space\u2026";
+            Open77.emit(storing?"panel:vehicle.store":"panel:vehicle.call",{assetId:asset.assetId});
             // The server answers, or times out at 10 s; never leave the button stuck.
             if(callTimer) clearTimeout(callTimer);
             callTimer=setTimeout(()=>{ if(callBtn===call) setCallState("fail","No answer from the server. Try again."); },12000);
@@ -1327,7 +1548,10 @@
         const title=document.createElement("div");title.className="detail-title";title.textContent=p.code||p.design_id;
         const sub=document.createElement("div");sub.className="sub";sub.textContent=(p.subtitle||"")+" · "+String(p.family||"").replaceAll("_"," ").toUpperCase();collectionDetail.append(maker,title,sub);
         for(const pair of [["SERIAL",serialText(p)],["EFFECT",Number(p.effect||1).toFixed(2)+" · "+String(p.fidelity||"modelled").toUpperCase()],["STATUS",String(p.location_kind||"storage").toUpperCase()],["EXPOSURE",Number(p.exposure_m||0).toLocaleString()+" m"]]){const l=document.createElement("div");l.className="dossier-label";l.textContent=pair[0];const v=document.createElement("div");v.className="dossier-value";v.textContent=pair[1];collectionDetail.append(l,v);}
-        if(p.location_kind==="installed"){const n=document.createElement("div");n.className="warning-box";n.textContent="INSTALLED ON MACHINE "+p.machine_asset_id+". Fit another compatible system to displace it.";collectionDetail.append(n);return;}
+        const wear=p.wear||{status:"normal",conditions:[]};const wl=document.createElement("div");wl.className="dossier-label";wl.textContent="CONDITION";const wv=document.createElement("div");wv.className="dossier-value";wv.textContent=wear.status==="normal"?"NO ACTIVE CONDITION":String(wear.status||"attention").toUpperCase()+" · "+((wear.conditions&&wear.conditions[0]&&wear.conditions[0].label)||"SERVICE REQUIRED");collectionDetail.append(wl,wv);
+        const sl=document.createElement("div");sl.className="dossier-label";sl.textContent="SERVICE HISTORY";const sv=document.createElement("div");sv.className="dossier-value";sv.textContent=Number(p.service_count||0).toLocaleString()+" RECORDED SERVICE"+(Number(p.service_count||0)===1?"":"S");collectionDetail.append(sl,sv);
+        if(p.service_quote){const q=p.service_quote;const canPay=Number(componentData.balance||0)>=Number(q.cost||0);const b=document.createElement("button");b.className="detail-action";b.disabled=!canPay;b.textContent=canPay?("HOLD TO SERVICE · €$"+Number(q.cost||0).toLocaleString()):("SERVICE €$"+Number(q.cost||0).toLocaleString()+" · INSUFFICIENT FUNDS");if(canPay)holdAction(b,()=>{b.disabled=true;b.textContent="SERVICING…";Open77.emit("panel:component.service",{componentAssetId:p.asset_id,conditionId:q.condition_id,idempotencyKey:uuid4()});});collectionDetail.append(b);}
+        if(p.location_kind==="installed"){const n=document.createElement("div");n.className="warning-box";n.textContent="INSTALLED ON MACHINE "+p.machine_asset_id+". Service requires it parked and unoccupied; fit another compatible system to displace it.";collectionDetail.append(n);return;}
         const machines=Array.isArray(componentData.machines)?componentData.machines:[];
         for(const m of machines){const fit=m.fitment&&m.fitment[p.asset_id];const st=(componentData.states||{})[m.asset_id]||{eligible:false,state:"checking",reason:"Checking Machine state…"};const row=document.createElement("div");row.className="fit-machine "+(fit&&fit.compatible&&st.eligible?"ok":"no");row.textContent=(fit&&fit.compatible?"✓ ":"⊘ ")+String(m.vehicle_key||"Machine")+" · "+String(m.asset_id).slice(0,8)+" · "+(fit&&fit.compatible?st.reason:(fit&&fit.reason)||"Does not fit");row.addEventListener("click",()=>{selectedFitMachine=m.asset_id;renderPartDetail(p);});if(selectedFitMachine===m.asset_id)row.style.boxShadow="inset 0 0 0 2px var(--accent)";collectionDetail.append(row);}
         const target=machines.find(m=>m.asset_id===selectedFitMachine);const fit=target&&target.fitment&&target.fitment[p.asset_id];const st=target&&(componentData.states||{})[target.asset_id];
@@ -1344,6 +1568,7 @@
       Open77.on("panel:components",d=>{componentData=Object.assign(componentData,d||{});if(mode==="collection"&&collectionMode==="parts")renderPartsInventory();});
       Open77.on("panel:component.states",d=>{componentData.states=d||{};if(mode==="collection"&&collectionMode==="parts")renderPartsInventory();});
       Open77.on("panel:component.install.result",()=>{if(mode==="collection"&&collectionMode==="parts")renderPartsInventory();});
+      Open77.on("panel:component.service.result",()=>{if(mode==="collection"&&collectionMode==="parts")renderPartsInventory();});
 
       // ---- market network (Base Market is the first source, never a global catalogue)
       // ---- Base Market.
@@ -1723,34 +1948,541 @@
         }
       }
 
-      // ---- inbox
-      function renderInbox(data) {
-        const items = (data && data.items) || [];
-        text(inboxSub, items.length ? ((data.unread || 0) + " unread · " + items.length + " total") : "No messages yet.");
-        inboxList.innerHTML = "";
-        if (!items.length) { const e = document.createElement("div"); e.className = "empty"; e.textContent = "Nothing in your file yet."; inboxList.append(e); return; }
-        for (const m of items) {
-          const el = document.createElement("div");
-          el.className = "msg " + (m.state || "");
-          const from = document.createElement("div"); from.className = "from"; from.textContent = (m.fromKind === "team" ? "TEAM · " : "") + (m.fromId || m.fromKind || "NCM"); el.append(from);
-          const subject = document.createElement("div"); subject.className = "subject"; subject.textContent = m.subject || ""; el.append(subject);
-          const body = document.createElement("div"); body.className = "body"; body.textContent = m.body || ""; el.append(body);
-          const state = document.createElement("div"); state.className = "state"; state.textContent = m.state || ""; el.append(state);
-          if ((m.state === "unread" || m.state === "read") && Array.isArray(m.actions) && m.actions.length) {
-            const actions = document.createElement("div"); actions.className = "actions";
-            for (const a of m.actions) {
-              const b = document.createElement("button"); b.className = a; b.textContent = a.toUpperCase();
-              b.addEventListener("click", () => {
-                for (const other of actions.querySelectorAll("button")) other.disabled = true;   // one shot: a double click reached the server twice
-                Open77.emit("panel:act", { id: m.id, action: a });
-              });
-              actions.append(b);
-            }
-            el.append(actions);
-          }
-          el.addEventListener("click", () => { if (m.state === "unread") Open77.emit("panel:read", { id: m.id }); });
-          inboxList.append(el);
+      // ---- MESSAGES ------------------------------------------------------------------------------
+      // Two payloads, deliberately separate, because they are two different kinds of object:
+      //
+      //   `panel:graph` -- CONVERSATIONS. A sidebar of threads, one open transcript, and the replies the
+      //                    server projected from current state (section 0.3). The page never decides what the
+      //                    player may say; it renders what it was handed and reports what was clicked.
+      //   `panel:inbox` -- NOTICES. Seat offers: addressed to the player, actionable, with a deadline.
+      //
+      // They are still two payloads, but they are no longer two SURFACES. The tray that used to hold the
+      // notices below the open conversation is gone (`KB-173`): a notice is folded into the rail as a thread
+      // from whoever sent it, and its accept/decline become composer buttons. A player with an offer from
+      // Thorton has a Thorton conversation, which is what they would expect of a phone.
+      //
+      // Guarding against a missing half matters here: a server mid-upgrade may send one and never the other, and
+      // the surface has to be honest about that rather than blank.
+      let lastGraphData = null;
+
+      // Which NOTICE thread is open, if any. Held here rather than on the server because the server has no
+      // notion of a notice thread -- it has rows addressed to a driver, and the grouping is presentation.
+      let openNotice = null;
+
+      // `x || []` is not a list guard: a string is truthy, has `.length`, and iterates as characters, so a junk
+      // payload rendered one blank row per letter before this existed. Anything that is not an array becomes an
+      // empty list, which is the honest reading of "the server sent something I cannot show".
+      const list = (v) => Array.isArray(v) ? v : [];
+
+      const initials = (name) => String(name || "?").replace(/[^A-Za-z0-9 ]/g, " ").trim()
+        .split(/\s+/).slice(0, 2).map(w => w[0] || "").join("").toUpperCase() || "?";
+
+      function disc(name) {
+        const d = document.createElement("div"); d.className = "tr-disc"; d.textContent = initials(name); return d;
+      }
+
+      // ---- time. A transcript without a clock is the reason a player cannot tell what just arrived.
+      const MONTHS = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
+      const clock = (d) => String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0");
+
+      /** A stamp the player can read: TODAY / YESTERDAY / a date, plus the time. `at` is unix SECONDS from the
+       *  `message` table; anything non-numeric means a row without a usable time and gets no stamp at all,
+       *  which is better than a 1970 heading. */
+      function stampText(at) {
+        const secs = Number(at);
+        if (!isFinite(secs) || secs <= 0) return "";
+        const d = new Date(secs * 1000), now = new Date();
+        const sameDay = (a, b) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+        const yesterday = new Date(now.getTime() - 86400000);
+        if (sameDay(d, now)) return "TODAY " + clock(d);
+        if (sameDay(d, yesterday)) return "YESTERDAY " + clock(d);
+        return MONTHS[d.getMonth()] + " " + d.getDate() + " · " + clock(d);
+      }
+
+      const timeText = (at) => stampText(at).replace(/^TODAY /, "");
+
+      // A stamp is only worth printing when time has actually moved. Fifteen minutes is the gap that separates
+      // "the same exchange" from "they wrote again later", which is the distinction the player is reading for.
+      const STAMP_GAP = 15 * 60;
+
+      function renderRail(data, current) {
+        const threads = list(data && data.threads);
+        const notices = noticeThreads();
+        msgRail.replaceChildren();
+        if (!threads.length && !notices.length) {
+          const e = document.createElement("div"); e.className = "rail-group";
+          e.textContent = "No conversations yet";
+          msgRail.append(e);
+          return;
         }
+
+        /** One rail row. `active` and `unread` are the only states a row has: no progress, no ordering claim. */
+        const row = (opts) => {
+          const el = document.createElement("button");
+          el.className = "thread-row" + (opts.active ? " active" : "") + (opts.unread > 0 ? " unread" : "");
+          el.append(disc(opts.name));
+          const col = document.createElement("div");
+          const name = document.createElement("div"); name.className = "tr-name";
+          const who = document.createElement("span"); who.textContent = opts.name;
+          name.append(who);
+          if (opts.unread > 0) {
+            const badge = document.createElement("span"); badge.className = "tr-badge";
+            badge.textContent = String(opts.unread); name.append(badge);
+          }
+          col.append(name);
+          if (opts.preview) {
+            const pv = document.createElement("div"); pv.className = "tr-preview";
+            pv.textContent = opts.preview;
+            col.append(pv);
+          }
+          el.append(col);
+          el.addEventListener("click", opts.onOpen);
+          msgRail.append(el);
+        };
+
+        // Notices first, and that ordering is the one concession they get for having a deadline: a seat offer
+        // expires, a conversation does not.
+        if (notices.length) {
+          const label = document.createElement("div"); label.className = "rail-group";
+          label.textContent = notices.length === 1 ? "Offer" : "Offers";
+          msgRail.append(label);
+          for (const t of notices) {
+            const newest = t.items[t.items.length - 1] || {};
+            row({
+              name: t.name, unread: t.unread, active: openNotice === t.key,
+              preview: newest.subject || newest.body || "",
+              onOpen: () => openNoticeThread(t.key),
+            });
+          }
+        }
+
+        if (threads.length) {
+          const label = document.createElement("div"); label.className = "rail-group";
+          label.textContent = "Conversations";
+          msgRail.append(label);
+          for (const t of threads) {
+            if (!t || typeof t !== "object") continue;
+            row({
+              name: t.name || t.contactId || "Unknown contact",
+              unread: t.unread || 0,
+              active: !openNotice && t.contactId === current,
+              // "You: " marks the player's own last line, so the rail says who spoke last without a second row.
+              preview: t.preview ? ((t.previewMine ? "You: " : "") + t.preview) : "",
+              onOpen: () => { openNotice = null; Open77.emit("panel:graph.open", { contactId: t.contactId }); },
+            });
+          }
+        }
+      }
+
+      function paneHead(name, domain) {
+        msgPaneHead.replaceChildren();
+        msgPaneHead.append(disc(name));
+        const who = document.createElement("div");
+        const nm = document.createElement("div"); nm.className = "pane-name"; nm.textContent = name;
+        who.append(nm);
+        if (domain) {
+          const dm = document.createElement("div"); dm.className = "pane-domain"; dm.textContent = domain;
+          who.append(dm);
+        }
+        msgPaneHead.append(who);
+      }
+
+      function toBottom() { if (msgScroll.scrollHeight) msgScroll.scrollTop = msgScroll.scrollHeight; }
+
+      /** Append one bubble, with the stamp it needs. `prevAt` is the previous bubble's time; -1 means "this is
+       *  the first bubble in the pane", which always earns a stamp. */
+      function appendBubble(line, prevAt, opts) {
+        opts = opts || {};
+        const at = Number(line.at) || 0;
+        if (opts.newRule) {
+          const rule = document.createElement("div"); rule.className = "stamp new"; rule.textContent = "NEW";
+          msgScroll.append(rule);
+        }
+        const stamp = stampText(at);
+        if (stamp && (prevAt < 0 || !prevAt || at - prevAt > STAMP_GAP)) {
+          const el = document.createElement("div"); el.className = "stamp"; el.textContent = stamp;
+          msgScroll.append(el);
+        }
+        const b = document.createElement("div");
+        b.className = "bubble" + (line.mine ? " mine" : "") + (line.state === "unread" ? " fresh" : "")
+          + (opts.offer ? " offer" : "") + (opts.settled ? " settled" : "");
+        if (line.subject) {
+          const sub = document.createElement("span"); sub.className = "subject"; sub.textContent = line.subject;
+          b.append(sub);
+        }
+        b.append(document.createTextNode(line.body || ""));
+        if (opts.settledMark) {
+          const m = document.createElement("span"); m.className = "settled-mark"; m.textContent = opts.settledMark;
+          b.append(m);
+        }
+        if (b.dataset) b.dataset.at = String(at);
+        msgScroll.append(b);
+        return b;
+      }
+
+      /** The clock sits on the LAST bubble in the pane and nowhere else, so it moves as the conversation grows.
+       *  A time on every bubble is noise; the question being answered is "which one just came in". */
+      function markNewest() {
+        for (const old of msgScroll.querySelectorAll(".bubble-time")) old.remove();
+        const bubbles = msgScroll.querySelectorAll(".bubble");
+        const last = bubbles[bubbles.length - 1];
+        const at = last && last.dataset ? Number(last.dataset.at) : 0;
+        if (!last || !at) return;
+        const t = document.createElement("div"); t.className = "bubble-time"; t.textContent = timeText(at);
+        last.append(t);
+      }
+
+      // ---- ARRIVAL. The reveal queue is what makes a message arrive rather than simply already be there.
+      //
+      // The rule is narrow on purpose: lines are paced ONLY when they were appended to a transcript that is
+      // already on screen. Opening a thread, switching threads or reopening the panel draws its history at
+      // once, because animating scrollback would be a lie about when those lines were said.
+      let reveal = null;     // { sig, contactId, keys, queue, thread, lastAt } for the transcript now drawn
+      let revealTimer = null;
+
+      const lineKey = (line, i) => String((line && line.id) || (i + ":" + ((line && line.at) || 0)));
+
+      function stopReveal() {
+        if (revealTimer) { clearTimeout(revealTimer); revealTimer = null; }
+        const dots = msgScroll.querySelector(".typing");
+        if (dots) dots.remove();
+      }
+
+      /** Called on every mode change: the next transcript draw is history, not arrival. */
+      function resetReveal() { stopReveal(); reveal = null; openNotice = null; }
+
+      // Reading time, roughly. A long line waits longer, everything is clamped, and the player's own line does
+      // not wait at all -- pressing send is instant in every messenger ever built.
+      const revealDelay = (line) => (line && line.mine) ? 0
+        : Math.min(1700, 450 + String((line && line.body) || "").length * 20);
+
+      function showTyping() {
+        stopReveal();
+        const dots = document.createElement("div"); dots.className = "typing";
+        for (let i = 0; i < 3; i++) dots.append(document.createElement("span"));
+        msgScroll.append(dots);
+        toBottom();
+      }
+
+      function pump() {
+        if (!reveal) return;
+        if (!reveal.queue.length) {
+          stopReveal();
+          markNewest();
+          renderComposer(reveal.thread);
+          toBottom();
+          return;
+        }
+        const next = reveal.queue[0];
+        if (!next.mine) showTyping(); else stopReveal();
+        revealTimer = setTimeout(() => {
+          revealTimer = null;
+          if (!reveal || reveal.queue[0] !== next) return;
+          reveal.queue.shift();
+          const dots = msgScroll.querySelector(".typing");
+          if (dots) dots.remove();
+          appendBubble(next, reveal.lastAt);
+          reveal.lastAt = Number(next.at) || 0;
+          markNewest();
+          toBottom();
+          pump();
+        }, revealDelay(next));
+      }
+
+      /** The composer. Shelf items first (section 2.4 puts them ABOVE the generic categories), then the
+       *  projected replies. An empty composer is a conversation at rest, which section 0.2 makes a normal
+       *  state rather than a dead end -- so it says so instead of showing nothing. */
+      function renderComposer(thread) {
+        msgComposer.replaceChildren();
+        if (!thread || typeof thread !== "object") return;
+        const shelf = list(thread.shelf);
+        const choices = list(thread.choices);
+        if (!shelf.length && !choices.length) {
+          const rest = document.createElement("div"); rest.className = "resting";
+          rest.textContent = "Nothing to say right now.";
+          msgComposer.append(rest);
+          return;
+        }
+        const label = document.createElement("div"); label.className = "composer-label";
+        label.textContent = "Reply";
+        msgComposer.append(label);
+        const wrap = document.createElement("div"); wrap.className = "replies";
+        // One shot, for every button in here. A double click used to reach the server twice, and a conversation
+        // is stateful: the second click would be re-projected against the state the first one just changed.
+        const once = (b, send) => b.addEventListener("click", () => {
+          for (const other of wrap.querySelectorAll("button")) other.disabled = true;
+          send();
+        });
+        for (const item of shelf) {
+          const b = document.createElement("button"); b.className = "shelf"; b.textContent = item.label;
+          once(b, () => Open77.emit("panel:graph.shelf", { contactId: thread.contactId, key: item.key }));
+          wrap.append(b);
+        }
+        for (const choice of choices) {
+          const b = document.createElement("button");
+          b.className = choice.sticky ? "sticky" : "";
+          b.textContent = choice.label;
+          once(b, () => Open77.emit("panel:graph.reply", { contactId: thread.contactId, choiceId: choice.id }));
+          wrap.append(b);
+        }
+        msgComposer.append(wrap);
+      }
+
+      function renderConversation(data) {
+        const thread = data && data.thread;
+
+        if (!thread || typeof thread !== "object") {
+          stopReveal(); reveal = null;
+          msgPaneHead.replaceChildren();
+          msgScroll.replaceChildren();
+          msgComposer.replaceChildren();
+          const e = document.createElement("div"); e.className = "empty";
+          e.textContent = list(data && data.threads).length
+            ? "Pick a conversation."
+            : "Nobody has written to you yet.";
+          msgScroll.append(e);
+          return;
+        }
+
+        // The transcript, oldest first. `lines` is top level because it is the streamed list.
+        const lines = list(data && data.lines).filter(l => l && typeof l === "object");
+        const keys = lines.map(lineKey);
+        // The signature covers the PROJECTED REPLIES as well as the lines, and that is not belt-and-braces: the
+        // server re-projects a resting conversation against changed state without adding a line, so a signature
+        // made of line ids alone reported "nothing changed" and left the previous turn's replies on screen.
+        const sig = [thread.contactId, thread.name, thread.domain,
+                     list(thread.choices).map(c => c && c.id).join("~"),
+                     list(thread.shelf).map(i => i && i.key).join("~")].join("|") + "||" + keys.join(",");
+        // Nothing changed: leave the pane alone. Re-rendering mid-arrival would flush the queue to the screen
+        // in one go, which is exactly the behaviour being removed.
+        if (reveal && reveal.sig === sig) { reveal.thread = thread; return; }
+
+        const appended = reveal && reveal.contactId === thread.contactId
+          && keys.length > reveal.keys.length
+          && reveal.keys.every((k, i) => k === keys[i]);
+
+        paneHead(thread.name || thread.contactId || "Unknown contact", thread.domain);
+
+        if (appended) {
+          // ARRIVAL. Keep what is drawn and queue the tail.
+          reveal.queue = reveal.queue.concat(lines.slice(reveal.keys.length));
+          reveal.sig = sig; reveal.keys = keys; reveal.thread = thread;
+          msgComposer.replaceChildren();          // no reply offered until the contact has finished talking
+          pump();
+          return;
+        }
+
+        // HISTORY. Everything at once.
+        stopReveal();
+        msgScroll.replaceChildren();
+        reveal = { sig: sig, contactId: thread.contactId, keys: keys, queue: [], thread: thread, lastAt: -1 };
+        if (!lines.length) {
+          const e = document.createElement("div"); e.className = "empty"; e.textContent = "No messages in this thread.";
+          msgScroll.append(e);
+        }
+        const firstUnread = lines.findIndex(l => l.state === "unread" && !l.mine);
+        for (let i = 0; i < lines.length; i++) {
+          appendBubble(lines[i], reveal.lastAt, { newRule: i === firstUnread });
+          reveal.lastAt = Number(lines[i].at) || 0;
+        }
+        markNewest();
+        renderComposer(thread);
+        // A conversation is read bottom-up in time, so it opens where it left off.
+        toBottom();
+      }
+
+      // ---- NOTICES, as threads. Grouped by sender, because that is what a thread is.
+      //
+      // Only a sender with something OUTSTANDING gets a thread; a resolved notice stays visible inside a thread
+      // that still exists, marked, so accepting a seat does not make the offer vanish as if it never happened.
+      function noticeThreads() {
+        const items = list(lastInboxData && lastInboxData.items).filter(m => m && typeof m === "object");
+        const byKey = new Map();
+        for (const m of items) {
+          const key = String(m.fromId || m.fromKind || "ncm");
+          if (!byKey.has(key)) {
+            byKey.set(key, { key: key, name: String(m.fromName || m.fromId || (m.fromKind === "team" ? "Team" : "NCM")),
+                             domain: m.fromKind === "team" ? "TEAM" : "NCM", unread: 0, items: [], open: false });
+          }
+          const t = byKey.get(key);
+          t.items.push(m);
+          if (m.state === "unread") t.unread += 1;
+          if (m.state === "unread" || m.state === "read") t.open = true;
+        }
+        const out = [];
+        for (const t of byKey.values()) {
+          if (!t.open) continue;                  // nothing outstanding from this sender
+          // Oldest first, like every other transcript on this surface. The list arrives newest-first.
+          t.items.sort((a, b) => (Number(a.createdAt) || 0) - (Number(b.createdAt) || 0));
+          out.push(t);
+        }
+        return out;
+      }
+
+      function openNoticeThread(key) {
+        openNotice = key;
+        // Opening a thread reads it -- the same rule the tray had, no longer one message at a time.
+        for (const t of noticeThreads()) {
+          if (t.key !== key) continue;
+          for (const m of t.items) if (m.state === "unread") Open77.emit("panel:read", { id: m.id });
+        }
+        renderMessages();
+      }
+
+      const SETTLED = { accepted: "Accepted", declined: "Declined", expired: "Expired" };
+
+      function renderNoticeThread(t) {
+        if (!t) return;
+        stopReveal(); reveal = null;
+        paneHead(t.name, t.domain);
+        msgScroll.replaceChildren();
+        msgComposer.replaceChildren();
+        let prevAt = -1;
+        const firstUnread = t.items.findIndex(m => m.state === "unread");
+        for (let i = 0; i < t.items.length; i++) {
+          const m = t.items[i];
+          const settled = SETTLED[m.state];
+          appendBubble({ subject: m.subject, body: m.body, at: m.createdAt, state: m.state }, prevAt,
+                       { newRule: i === firstUnread, offer: !settled, settled: !!settled,
+                         settledMark: settled ? settled.toUpperCase() : null });
+          prevAt = Number(m.createdAt) || 0;
+        }
+        markNewest();
+
+        // The actions of the newest OPEN notice. Accept/decline is an answer, so it lives where answers live.
+        let actionable = null;
+        for (const m of t.items) {
+          if ((m.state === "unread" || m.state === "read") && list(m.actions).length) actionable = m;
+        }
+        if (!actionable) {
+          const rest = document.createElement("div"); rest.className = "resting";
+          rest.textContent = "Nothing to answer right now.";
+          msgComposer.append(rest);
+          toBottom();
+          return;
+        }
+        const label = document.createElement("div"); label.className = "composer-label";
+        label.textContent = "Reply";
+        msgComposer.append(label);
+        const wrap = document.createElement("div"); wrap.className = "replies";
+        for (const a of list(actionable.actions)) {
+          const b = document.createElement("button"); b.className = String(a);
+          b.textContent = String(a).toUpperCase();
+          b.addEventListener("click", () => {
+            for (const other of wrap.querySelectorAll("button")) other.disabled = true;
+            Open77.emit("panel:act", { id: actionable.id, action: a });
+          });
+          wrap.append(b);
+        }
+        msgComposer.append(wrap);
+        toBottom();
+      }
+
+      function renderGraph(data) {
+        if (data) lastGraphData = data;
+        const d = lastGraphData || { threads: [], lines: [] };
+        const notices = noticeThreads();
+        // A notice thread the server has resolved stops existing; the pane falls back to the conversation.
+        if (openNotice && !notices.some(t => t.key === openNotice)) openNotice = null;
+        // An arriving offer does not steal the pane. It appears in the rail with its badge, like a phone.
+        renderRail(d, d.thread && d.thread.contactId);
+        if (openNotice) renderNoticeThread(notices.find(t => t.key === openNotice));
+        else renderConversation(d);
+      }
+
+      function renderMessages() {
+        renderGraph(null);
+        // The status line counts UNREAD MESSAGES, which is a fact about an inbox. It must never become a count
+        // of anything the player is progressing through (`L171`, `L175`).
+        let unread = 0;
+        for (const t of list((lastGraphData || {}).threads)) unread += (t && t.unread) || 0;
+        for (const m of list((lastInboxData || {}).items)) if (m && m.state === "unread") unread += 1;
+        text(msgStatus, unread > 0 ? (unread + " unread") : "");
+      }
+
+      // ---- EXCHANGE ------------------------------------------------------------------------------
+      // The page edits only its own side. The server re-reads ownership, custody, installed bundles and money,
+      // increments the shared revision, and clears both confirmations after every change.
+      let tradeData = { state: "idle", rows: [] };
+      let tradeNotice = null;
+      const tradeRows = (kind) => list(tradeData.rows).filter(r => r && r.kind === kind);
+      const shortId = (v) => String(v || "").slice(0, 8);
+      function tradeLabel(r) {
+        if (!r) return "Asset";
+        if (r.kind && r.kind.includes("machine")) return String(r.vehicleKey || r.record || "Machine").replaceAll("_", " ").toUpperCase();
+        return String(r.code || r.designId || "Component");
+      }
+      function tradeBundle(r) {
+        const parts = list(r && r.installed);
+        if (!parts.length) return "NO INSTALLED COMPONENT RECORDS";
+        return parts.map(p => `${p.code || p.assetId} [${shortId(p.assetId)}]`).join(" · ");
+      }
+      function tradeEmitEdit(change) {
+        const mine = tradeData.mine || { money: 0, machines: [], components: [] };
+        const next = {
+          revision: Number(tradeData.revision || 0),
+          money: Number(change.money == null ? mine.money : change.money) || 0,
+          machines: list(change.machines == null ? mine.machines : change.machines).slice(),
+          components: list(change.components == null ? mine.components : change.components).slice()
+        };
+        Open77.emit("panel:trade.edit", next);
+        tradeNotice = { ok: true, text: "Updating revision…" };
+        renderTrade(null);
+      }
+      function tradeAssetCard(r, editable) {
+        const b = document.createElement(editable ? "button" : "div");
+        b.className = "trade-asset" + (r.selected ? " selected" : "");
+        if(editable && r.transferable===false)b.disabled=true;
+        const title = document.createElement("b"); title.textContent = tradeLabel(r);
+        const serial = document.createElement("small"); serial.textContent = `${r.kind.includes("machine") ? "MACHINE" : "PART"} · ${shortId(r.assetId)} · SERIALIZED`;
+        b.append(title, serial);
+        if(r.refusal){const refused=document.createElement("small");refused.textContent=r.refusal;b.append(refused);}
+        if (r.kind.includes("machine")) { const bundle=document.createElement("div"); bundle.className="trade-bundle"; bundle.textContent="INCLUDES FITTED PARTS · "+tradeBundle(r); b.append(bundle); }
+        if (editable) b.addEventListener("click", () => {
+          const mine=tradeData.mine||{}; const field=r.kind==="inventory_machine"?"machines":"components";
+          const values=list(mine[field]).slice(); const at=values.indexOf(r.assetId);
+          if(at>=0) values.splice(at,1); else values.push(r.assetId);
+          const change={};change[field]=values;tradeEmitEdit(change);
+        });
+        return b;
+      }
+      function tradeFeedbackDraw() {
+        tradeFeedback.classList.toggle("hidden", !tradeNotice);
+        tradeFeedback.classList.toggle("ok", !!(tradeNotice && tradeNotice.ok));
+        tradeFeedback.classList.toggle("fail", !!(tradeNotice && !tradeNotice.ok));
+        tradeFeedback.textContent = tradeNotice ? tradeNotice.text : "";
+      }
+      function renderTrade(data) {
+        if (data) { tradeData=data; tradeNotice=null; }
+        const d=tradeData||{state:"idle",rows:[]};tradeBody.innerHTML="";tradeFeedbackDraw();
+        const remaining=Math.max(0,Number(d.expiresAt||0)-Number(d.serverNow||0));
+        tradeStatus.innerHTML=d.state==="idle"?`€$${Number(d.balance||0).toLocaleString()}<small> AVAILABLE</small>`
+          : `<b>${(d.other&&d.other.display)||"OTHER DRIVER"}</b>REVISION ${Number(d.revision||0)} · ${Math.floor(remaining/60)}:${String(remaining%60).padStart(2,"0")} LEFT`;
+        if(d.loading){tradeBody.className="trade-invite";tradeBody.innerHTML='<div class="trade-invite-box"><h2>LOADING EXCHANGE…</h2></div>';return;}
+        if(d.state==="idle"){
+          tradeBody.className="trade-idle";const peers=tradeRows("peer");
+          if(!peers.length){tradeBody.innerHTML='<div class="trade-empty">NO OTHER DRIVERS ARE ONLINE. THE EXCHANGE OPENS WHEN SOMEBODY ELSE IS HERE.</div>';return;}
+          for(const p of peers){const b=document.createElement("button");b.className="trade-peer";b.disabled=p.busy===true;
+            const n=document.createElement("b");n.textContent=p.display||("Driver "+p.playerId);const s=document.createElement("span");s.textContent=p.busy?"ALREADY IN AN EXCHANGE":`PLAYER ${p.playerId} · OPEN DIRECT EXCHANGE`;
+            b.append(n,s);b.addEventListener("click",()=>{tradeNotice={ok:true,text:"Sending invitation…"};renderTrade(null);Open77.emit("panel:trade.invite",{playerId:p.playerId});});tradeBody.append(b);}return;
+        }
+        if(d.state==="invited"){
+          tradeBody.className="trade-invite";const box=document.createElement("div");box.className="trade-invite-box";
+          const e=document.createElement("div");e.className="eyebrow";e.textContent=d.role==="a"?"INVITATION SENT":"EXCHANGE INVITATION";
+          const h=document.createElement("h2");h.textContent=(d.other&&d.other.display)||"OTHER DRIVER";
+          const p=document.createElement("p");p.textContent=d.role==="a"?"Waiting for the other Driver. No assets are locked until both sides accept and confirm.":"Join to compose both sides of the exact offer. Nothing moves until you confirm the same revision.";
+          const actions=document.createElement("div");actions.className="trade-actions";
+          if(d.role==="b"){const yes=document.createElement("button");yes.textContent="ACCEPT EXCHANGE";yes.addEventListener("click",()=>Open77.emit("panel:trade.respond",{accept:true}));actions.append(yes);const no=document.createElement("button");no.textContent="DECLINE";no.addEventListener("click",()=>Open77.emit("panel:trade.respond",{accept:false}));actions.append(no);}
+          else {const cancel=document.createElement("button");cancel.textContent="CANCEL INVITATION";cancel.addEventListener("click",()=>Open77.emit("panel:trade.cancel",{}));actions.append(cancel);}
+          box.append(e,h,p,actions);tradeBody.append(box);return;
+        }
+        tradeBody.className="";const layout=document.createElement("div");layout.className="trade-layout";
+        const mine=document.createElement("section");mine.className="trade-side";const mh=document.createElement("div");mh.className="trade-side-head";mh.innerHTML=`<b>YOUR SIDE</b><span class="trade-ready ${(d.mine&&d.mine.confirmed)?"yes":""}">${(d.mine&&d.mine.confirmed)?"CONFIRMED":"EDITING"}</span>`;mine.append(mh);
+        const cash=document.createElement("div");cash.className="trade-cash";const lab=document.createElement("label");lab.textContent="EDDIES";const input=document.createElement("input");input.type="number";input.min="0";input.step="1";input.value=String((d.mine&&d.mine.money)||0);input.setAttribute("aria-label","Eddies offered");const set=document.createElement("button");set.textContent="SET";set.addEventListener("click",()=>tradeEmitEdit({money:Math.max(0,Math.floor(Number(input.value)||0))}));cash.append(lab,input,set);mine.append(cash);
+        const own=document.createElement("div");own.className="trade-assets";const ownRows=[...tradeRows("inventory_machine"),...tradeRows("inventory_component")];if(!ownRows.length)own.innerHTML='<div class="trade-empty">NO TRANSFERABLE MACHINES OR STORED PARTS.</div>';for(const r of ownRows)own.append(tradeAssetCard(r,true));mine.append(own);
+        const theirs=document.createElement("section");theirs.className="trade-side";const th=document.createElement("div");th.className="trade-side-head";th.innerHTML=`<b>${(d.other&&d.other.display)||"THEIR"} SIDE</b><span class="trade-ready ${(d.theirs&&d.theirs.confirmed)?"yes":""}">${(d.theirs&&d.theirs.confirmed)?"CONFIRMED":"EDITING"}</span>`;theirs.append(th);
+        const tc=document.createElement("div");tc.className="trade-cash";tc.innerHTML=`<label>EDDIES</label><b>€$${Number((d.theirs&&d.theirs.money)||0).toLocaleString()}</b>`;theirs.append(tc);const theirAssets=document.createElement("div");theirAssets.className="trade-assets";const theirRows=[...tradeRows("their_machine"),...tradeRows("their_component")];if(!theirRows.length)theirAssets.innerHTML='<div class="trade-empty">NOTHING SELECTED YET.</div>';for(const r of theirRows)theirAssets.append(tradeAssetCard(r,false));theirs.append(theirAssets);layout.append(mine,theirs);tradeBody.append(layout);
+        const foot=document.createElement("div");foot.className="trade-foot";const warning=document.createElement("div");warning.className="trade-warning";warning.textContent="Selecting a Machine includes the exact Parts currently fitted to it. Any change creates a new revision and clears both confirmations. Settlement is all-or-nothing.";const actions=document.createElement("div");actions.className="trade-actions";const cancel=document.createElement("button");cancel.textContent="CANCEL";cancel.addEventListener("click",()=>Open77.emit("panel:trade.cancel",{}));const confirm=document.createElement("button");confirm.disabled=!!(d.mine&&d.mine.confirmed);confirm.textContent=confirm.disabled?"CONFIRMED · WAITING":"HOLD TO CONFIRM REVISION "+Number(d.revision||0);if(!confirm.disabled)holdAction(confirm,()=>Open77.emit("panel:trade.confirm",{revision:d.revision}));actions.append(cancel,confirm);foot.append(warning,actions);tradeBody.append(foot);
       }
 
       // ---- bridge
@@ -1774,7 +2506,9 @@
           // `itemCount` is a number on the wire now. It used to be the length of a list of every
           // purchasable asset, shipped in full so this line could call `.length` on it.
           if (what === "market") return Number(marketData.itemCount || 0);
-          if (what === "inbox") return ((lastInboxData || {}).items || []).length;
+          if (what === "trade") return list((tradeData || {}).rows).length;
+          if (what === "messages") return list((lastGraphData || {}).lines).length
+            + list((lastInboxData || {}).items).length;
         } catch (_) {}
         return -1;
       }
@@ -1807,8 +2541,8 @@
         if (d.panel === "questionnaire") {
           questions = d.questions || []; version = d.version || 1; index = 0; answers = [];
           show("questionnaire"); renderQuestion();
-        } else if (d.panel === "inbox") {
-          guard("inbox", () => { show("inbox"); renderInbox(d.inbox || lastInboxData || { items: [], unread: 0 }); });
+        } else if (d.panel === "messages") {
+          guard("messages", () => { show("messages"); renderMessages(); });
         } else if (d.panel === "driver") {
           guard("driver",()=>{show("driver");renderDriver(d.driver||driverData||{loading:true});});
         } else if (d.panel === "guide") {
@@ -1831,6 +2565,8 @@
           guard("wheel", () => { show("wheel"); renderWheel(d.wheel || wheelData || {}); });
         } else if (d.panel === "market") {
           guard("market", () => { show("market"); renderMarket(d.market || marketData || {}); });
+        } else if (d.panel === "trade") {
+          guard("trade", () => { show("trade"); renderTrade(d.trade || tradeData || {state:"idle",rows:[],loading:true}); });
         } else {
           show(null);
         }
@@ -1844,6 +2580,140 @@
       // continuous slider here would undo `IDEA-395` at the last step, which is exactly where it would not
       // be noticed.
       let wheelData = null;
+
+      // -------------------------------------------------------------------------------------------
+      // Rig binding controls. Devices and their live axis values arrive on every status frame.
+      // -------------------------------------------------------------------------------------------
+      const RIG_ROLES = [
+        ["steering", "STEERING"],
+        ["throttle", "THROTTLE"],
+        ["brake", "BRAKE"],
+        ["clutch", "CLUTCH"],
+      ];
+      const RIG_AXES = ["x", "y", "z", "rx", "ry", "rz", "slider0", "slider1"];
+
+      // **A refresh that only carries new axis numbers must not rebuild the page.** Rebuilding destroys
+      // whatever has focus, and the shared focus ring then re-animates to the replacement -- at several
+      // frames a second that reads as the whole panel strobing. So the meters keep live references and
+      // a value-only frame updates text in place; the structure is rebuilt only when it really changed.
+      let rigMeters = [];          // [{ meter, devSel, axSel }]
+      let lastRigShape = null;     // structural signature: devices and bindings, never axis values
+
+      function rigShapeOf(dev) {
+        const devices = (dev.rig && dev.rig.devices) || [];
+        const roles = (dev.rig && dev.rig.roles) || {};
+        return JSON.stringify([
+          devices.map((d) => [d.id, d.name, d.wheel, d.gamepad, d.live]),
+          RIG_ROLES.map(([r]) => {
+            const s = roles[r] || {};
+            return [s.device, s.axis, s.invert, s.bound, s.missing];
+          }),
+        ]);
+      }
+
+      // Returns true if it handled the frame without rebuilding anything.
+      function updateRigMeters(dev) {
+        if (!rigMeters.length) return false;
+        const devices = (dev.rig && dev.rig.devices) || [];
+        for (const m of rigMeters) {
+          const d = devices.find((x) => x.id === m.devSel.value);
+          const v = d && d.axes ? d.axes[m.axSel.value] : null;
+          const next = (v == null) ? "—" : Math.round(v * 100) + "%";
+          if (m.meter.textContent !== next) m.meter.textContent = next;
+        }
+        return true;
+      }
+
+      function renderRigBindings(host, dev) {
+        rigMeters = [];
+        lastRigShape = rigShapeOf(dev);
+        const devices = (dev.rig && dev.rig.devices) || dev.devices || [];
+        const roles = (dev.rig && dev.rig.roles) || dev.roles || {};
+        if (!devices.length) {
+          host.append(wheelRow("DEVICES", "none detected — is the wheel powered on?", "warn"));
+          return;
+        }
+
+        const head = document.createElement("div");
+        head.className = "wheel-row";
+        const hk = document.createElement("div"); hk.className = "k"; hk.textContent = "BINDINGS";
+        const hv = document.createElement("span"); hv.className = "v";
+        hv.textContent = devices.length + " device(s) detected";
+        head.append(hk, hv); host.append(head);
+
+        for (const [role, label] of RIG_ROLES) {
+          const state = roles[role] || {};
+          const row = document.createElement("div"); row.className = "wheel-row";
+          const k = document.createElement("div"); k.className = "k"; k.textContent = label;
+          const wrap = document.createElement("div"); wrap.className = "wheel-range";
+
+          const devSel = document.createElement("select");
+          const none = document.createElement("option");
+          none.value = ""; none.textContent = "— not bound —";
+          devSel.append(none);
+          for (const d of devices) {
+            const o = document.createElement("option");
+            o.value = d.id;
+            o.textContent = d.name + (d.wheel ? "  (wheel)" : (d.gamepad ? "  (gamepad)" : ""));
+            devSel.append(o);
+          }
+          devSel.value = state.device || "";
+
+          const axSel = document.createElement("select");
+          for (const a of RIG_AXES) {
+            const o = document.createElement("option"); o.value = a; o.textContent = a.toUpperCase();
+            axSel.append(o);
+          }
+          axSel.value = state.axis || "x";
+
+          // Live value for the chosen device+axis, so "which one is the brake" is answered by pressing it.
+          const meter = document.createElement("span");
+          meter.className = "deg";
+          const live = () => {
+            const d = devices.find((x) => x.id === devSel.value);
+            const v = d && d.axes ? d.axes[axSel.value] : null;
+            meter.textContent = (v == null) ? "—" : Math.round(v * 100) + "%";
+          };
+          live();
+          rigMeters.push({ meter: meter, devSel: devSel, axSel: axSel });
+
+          const inv = document.createElement("button");
+          inv.type = "button";
+          inv.className = "wheel-invert" + (state.invert ? " on" : "");
+          inv.textContent = state.invert ? "INVERTED" : "NORMAL";
+          inv.title = "Flip if the control reads full when you are not touching it.";
+
+          const commit = () => {
+            wheelDragging = false;
+            wheelCmd("bind", {
+              role: role,
+              device: devSel.value,
+              axis: axSel.value,
+              invert: inv.classList.contains("on"),
+            });
+          };
+          const grab = () => { wheelDragging = true; };
+          devSel.addEventListener("focus", grab);
+          axSel.addEventListener("focus", grab);
+          devSel.addEventListener("change", () => { live(); commit(); });
+          axSel.addEventListener("change", () => { live(); commit(); });
+          inv.addEventListener("click", () => {
+            inv.classList.toggle("on");
+            inv.textContent = inv.classList.contains("on") ? "INVERTED" : "NORMAL";
+            commit();
+          });
+
+          if (state.missing) {
+            const warn = document.createElement("span");
+            warn.className = "v warn";
+            warn.textContent = "bound device not connected";
+            wrap.append(warn);
+          }
+          wrap.append(devSel, axSel, meter, inv);
+          row.append(k, wrap); host.append(row);
+        }
+      }
+
       const wheelCmd = (kind, payload) => Open77.emit("panel:wheel.command", { kind: kind, payload: payload || {} });
 
       // **A periodic refresh must not fight the hand on the slider.** renderWheel rebuilds every control
@@ -1887,13 +2757,13 @@
 
         if (!s.connected) {
           // The first state a new player sees, so it is a layout rather than an error.
-          text(wheelStatus, s.enabled ? "COMPANION NOT DETECTED" : "OFF");
+          text(wheelStatus, s.enabled ? "RIG BRIDGE NOT DETECTED" : "OFF");
           const note = document.createElement("div"); note.className = "wheel-note";
           note.innerHTML = s.enabled
-            ? "Nothing is listening on <b>" + (s.url || "the companion address") + "</b>.<br>"
-              + "Force feedback needs a small companion program running on this PC — the game cannot reach a "
-              + "wheel on its own. Start it, and this page fills in by itself."
-            : "Force feedback is off.<br>Turn it on to look for a wheel companion on this PC.";
+            ? "Nothing is listening on <b>" + (s.url || "the Rig Bridge address") + "</b>.<br>"
+              + "Install and enable the NCM Rig Bridge required mod on this PC. It reads physical rig devices "
+              + "inside the game process; this page fills in when its local bridge is ready."
+            : "Force feedback is off.<br>Turn it on to look for NCM Rig Bridge on this PC.";
           wheelBody.append(note);
         const acts = document.createElement("div"); acts.className = "wheel-actions";
           const toggle = document.createElement("button");
@@ -1905,52 +2775,64 @@
 
         const dev = s.device || {};
         const known = dev.class && dev.class !== "unknown";
-        text(wheelStatus, "COMPANION CONNECTED");
+        text(wheelStatus, "RIG BRIDGE CONNECTED");
         wheelBody.append(wheelRow("DEVICE", dev.name || "unidentified", known ? "ok" : "warn"));
         wheelBody.append(wheelRow("CLASS", (dev.class || "unknown").replace("_", " ").toUpperCase(), known ? "" : "warn"));
         wheelBody.append(wheelRow("FORCE OUTPUT", dev.armed ? "ARMED" : "DISARMED — telemetry only", dev.armed ? "warn" : ""));
         wheelBody.append(wheelRow("FRAMES SENT", String(s.sent || 0)));
 
-        // **A slider whose step is one rung.** The ceiling is the wrist protection -- `clamp()` is the
-        // only way a magnitude leaves the companion and nothing here can exceed it -- so a bounded slider is
-        // exactly as safe as a row of buttons. The rung survives as the UNIT rather than as the widget,
-        // because several testers on different wheels now compare notes and "rung 4" travels between a T128,
-        // a G29 and a G923 in a way "about 60%" does not.
-        const rungs = Array.isArray(dev.rungs) ? dev.rungs : [];
-        if (rungs.length) {
+        // ---- force: a continuous slider, and the class that sets its ceiling --------------------
+        //
+        // This was a fixed ladder, carried over from the companion where reproducible rungs let several
+        // testers describe the same setting. For one driver on their own wheel that is just a coarse
+        // control, so it is a slider. The CEILING still applies: 100% is the class maximum, never past.
+        {
+          const classes = dev.classes || ["gear", "belt", "direct_drive", "unknown"];
+          const crow = document.createElement("div"); crow.className = "wheel-row";
+          const ck = document.createElement("div"); ck.className = "k"; ck.textContent = "WHEEL TYPE";
+          const cwrap = document.createElement("div"); cwrap.className = "wheel-range";
+          const csel = document.createElement("select");
+          for (const c of classes) {
+            const o = document.createElement("option");
+            o.value = c;
+            o.textContent = { gear: "Gear drive (G29, G920, G27)", belt: "Belt drive (T300, T150, TMX)",
+                              direct_drive: "Direct drive", unknown: "Unknown — safest, weakest" }[c] || c;
+            csel.append(o);
+          }
+          csel.value = dev.class || "unknown";
+          const chint = document.createElement("span"); chint.className = "deg";
+          chint.textContent = "max " + Math.round((dev.ceiling || 0.04) * 100) + "%";
+          csel.title = "Sets the force ceiling. Unknown is deliberately the weakest, so an unidentified "
+                     + "wheel is never driven hard. Pick the type you actually own.";
+          csel.addEventListener("focus", () => { wheelDragging = true; });
+          csel.addEventListener("change", () => {
+            wheelDragging = false;
+            wheelCmd("settings", { "class": csel.value });
+          });
+          cwrap.append(csel, chint);
+          crow.append(ck, cwrap); wheelBody.append(crow);
+
           const row = document.createElement("div"); row.className = "wheel-row";
-          const k = document.createElement("div"); k.className = "k"; k.textContent = "STRENGTH";
+          const k = document.createElement("div"); k.className = "k"; k.textContent = "FORCE";
           const wrap = document.createElement("div"); wrap.className = "wheel-range";
           const slider = document.createElement("input");
-          slider.type = "range";
-          slider.min = "1"; slider.max = String(rungs.length); slider.step = "1";
-          const current = Math.max(1, Math.min(rungs.length, tuneValue("rung", dev.rung || 1)));
-          slider.value = String(current);
-          slider.title = "Force output. The top of this slider is this wheel class's safe ceiling.";
-          const deg = document.createElement("span"); deg.className = "deg";
-          // Both numbers, always: the rung is what you quote to another tester, the magnitude is what the
-          // device is actually asked for, and neither alone is enough to compare two rigs.
-          const show = (i) => {
-            const v = rungs[Number(i) - 1];
-            deg.textContent = "rung " + i + " / " + rungs.length
-                            + "   (" + (v != null ? v.toFixed(2) : "?") + ")";
-          };
+          slider.type = "range"; slider.min = "0"; slider.max = "100"; slider.step = "1";
+          slider.value = String(Math.round(tuneValue("strength", dev.strength || 0) * 100));
+          const out = document.createElement("span"); out.className = "deg";
+          const show = (v) => { out.textContent = v + "%"; };
           show(slider.value);
           slider.addEventListener("input", () => show(slider.value));
-          const grab = () => { wheelDragging = true; };
-          slider.addEventListener("pointerdown", grab);
-          slider.addEventListener("keydown", grab);
-          slider.addEventListener("focus", grab);
+          slider.addEventListener("focus", () => { wheelDragging = true; });
           slider.addEventListener("change", () => {
-            const v = Number(slider.value);
-            tunePending["rung"] = { value: v, at: Date.now() };
-            wheelCmd("settings", { rung: v });
+            const v = Number(slider.value) / 100;
+            tunePending["strength"] = { value: v, at: Date.now() };
+            wheelCmd("settings", { strength: v });
           });
           const release = () => { wheelDragging = false; if (wheelDirty) renderWheel(); };
           slider.addEventListener("pointerup", release);
           slider.addEventListener("pointercancel", release);
           slider.addEventListener("blur", release);
-          wrap.append(slider, deg);
+          wrap.append(slider, out);
           row.append(k, wrap); wheelBody.append(row);
         }
 
@@ -1961,6 +2843,17 @@
           if (rig.steering) wheelBody.append(wheelRow("STEERING", rig.steering, "ok"));
           if (rig.pedals) wheelBody.append(wheelRow("PEDALS", rig.pedals, "ok"));
           if (rig.rim) wheelBody.append(wheelRow("RIM", rig.rim, "ok"));
+
+          // ---- binding ------------------------------------------------------------------------
+          //
+          // **A rig is not a list of hardware someone else owns.** The plugin adopts a wheel on its own,
+          // because a wheel announces itself as a driving device, but nothing can tell a pedal set from a
+          // gamepad by enumeration -- so pedals are chosen here rather than guessed, and stored against
+          // the device's VID:PID, which survives a replug and means something on another PC.
+          //
+          // The live bar beside each axis is the point: it is the only way to tell which of three
+          // identical-looking axes is the brake, without reading a manual that does not exist.
+          renderRigBindings(wheelBody, dev);
           if (rig.gamepads && rig.gamepads.length) {
             wheelBody.append(wheelRow("CONTROLLER", rig.gamepads.join(", "), "ok"));
           }
@@ -2113,7 +3006,10 @@
 
       Open77.on("panel:wheel", (d) => { wheelData = d; if (mode === "wheel") guard("wheel", () => renderWheel(d)); });
 
-      Open77.on("panel:inbox", (d) => { lastInboxData = d; if (mode === "inbox") guard("inbox", () => renderInbox(d)); });
+      Open77.on("panel:inbox", (d) => { lastInboxData = d; if (mode === "messages") guard("messages", renderMessages); });
+      Open77.on("panel:graph", (d) => { lastGraphData = d; if (mode === "messages") guard("messages", renderMessages); });
+      Open77.on("panel:trade", (d) => { tradeData=d||{state:"idle",rows:[]}; if(mode==="trade")guard("trade",()=>renderTrade(tradeData)); });
+      Open77.on("panel:trade.result", (d) => { tradeNotice={ok:!!(d&&d.ok),text:(d&&d.ok)?(d.state==="settled"?"EXCHANGE COMPLETE · receipt recorded":d.state==="waiting"?"REVISION CONFIRMED · waiting for the other Driver":"EXCHANGE UPDATED"):String((d&&d.reason)||"Exchange refused")};if(mode==="trade")guard("trade",()=>renderTrade(null)); });
       Open77.on("panel:hide", () => { show(null); });
 
       // KB-63: the Lua side sends a long list in small batches, because `page:send` drops big messages
@@ -2142,7 +3038,9 @@
         else if (p.name === "panel:market.vehicles") { marketData.offerings=value.offerings||[];marketData.vehicleOfferings=marketData.offerings;if(mode==="market")guard("market",()=>renderMarket(null)); }
         else if (p.name === "panel:market.components") { marketData.componentOfferings=value.componentOfferings||[];if(mode==="market")guard("market",()=>renderMarket(null)); }
         else if (p.name === "panel:components") { componentData=Object.assign(componentData,value||{});if(mode==="collection"&&collectionMode==="parts")guard("collection",()=>renderPartsInventory()); }
-        else if (p.name === "panel:inbox") { lastInboxData = value; if (mode === "inbox") guard("inbox", () => renderInbox(value)); }
+        else if (p.name === "panel:inbox") { lastInboxData = value; if (mode === "messages") guard("messages", renderMessages); }
+        else if (p.name === "panel:graph") { lastGraphData = value; if (mode === "messages") guard("messages", renderMessages); }
+        else if (p.name === "panel:trade") { tradeData=value;if(mode==="trade")guard("trade",()=>renderTrade(value)); }
       });
 
       document.addEventListener("keydown", (e) => {

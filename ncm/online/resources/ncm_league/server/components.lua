@@ -3,6 +3,7 @@ NcmComponents={}
 local Cat=NcmCore.get("parts.catalogue")
 local Rnd=NcmCore.get("parts.rnd")
 local Handling=NcmCore.get("parts.handling")
+local Wear=NcmCore.get("parts.wear")
 local Markets=NcmCore.get("economy.markets")
 local Json=NcmCore.get("vocabulary.json")
 local ids=NcmCore.get("vocabulary.ids")
@@ -296,13 +297,28 @@ function NcmComponents.inventory(pid)
       d.display_manufacturer,d.code,d.subtitle,d.family,d.tier,d.effect,d.fidelity,d.positions_json,d.fitment_json
       FROM component_asset a JOIN component_design d ON d.design_id=a.design_id
       WHERE a.server_id=? AND a.ncm_driver_id=? ORDER BY d.family,d.effect,a.design_ordinal,a.asset_id]],{serverId(),d.ncmDriverId}) or {}
-    for _,p in ipairs(parts) do p.effect=tonumber(p.effect);p.positions=dec(p.positions_json) or {};p.supportedVehicles=dec(p.fitment_json) or {};p.positions_json=nil;p.fitment_json=nil end
+    local serviceRows=MySQL.query.await([[SELECT s.component_asset_id,s.condition_id,s.relief_m,s.amount,s.occurred_at
+      FROM component_service s JOIN component_asset a ON a.asset_id=s.component_asset_id
+      WHERE a.server_id=? AND a.ncm_driver_id=? ORDER BY s.occurred_at,s.service_id]],{serverId(),d.ncmDriverId}) or {}
+    local services={} for _,s in ipairs(serviceRows) do local k=tostring(s.component_asset_id);services[k]=services[k] or {};services[k][#services[k]+1]=s end
+    for _,p in ipairs(parts) do
+        p.effect=tonumber(p.effect);p.exposure_m=tonumber(p.exposure_m) or 0;p.positions=dec(p.positions_json) or {};p.supportedVehicles=dec(p.fitment_json) or {};p.positions_json=nil;p.fitment_json=nil
+        local history=services[tostring(p.asset_id)] or {};local state=Wear.evaluate(p,history)
+        p.wear=Wear.publicState(state);p.service_count=#history
+        if state and state.conditions[1] then
+            local quote=Wear.serviceQuote(p,history,state.conditions[1].id)
+            if quote then p.service_quote={condition_id=quote.conditionId,cost=quote.cost,relief_m=quote.reliefM} end
+        end
+    end
     local machines=MySQL.query.await([[SELECT asset_id,vehicle_key,record,production_ordinal,maker_ordinal,model_ordinal,odometer_m
       FROM vehicle_asset WHERE server_id=? AND ncm_driver_id=? ORDER BY acquired_at,asset_id]],{serverId(),d.ncmDriverId}) or {}
     for _,m in ipairs(machines) do m.fitment={};for _,p in ipairs(parts) do m.fitment[p.asset_id]=Cat.resolve({supportedVehicles=p.supportedVehicles},m.vehicle_key) end end
-    return {partsEnabled=enabled(),parts=parts,machines=machines,serverNow=now()}
+    local balance=tonumber(MySQL.scalar.await("SELECT COALESCE(SUM(amount),0) FROM ledger WHERE ncm_driver_id=? AND server_id=?",{d.ncmDriverId,serverId()})) or 0
+    return {partsEnabled=enabled(),parts=parts,machines=machines,balance=balance,serverNow=now()}
 end
-function NcmComponents.pushInventory(pid) local ok,p=pcall(NcmComponents.inventory,pid);if ok and p then TriggerClientEvent("ncm:component.inventory",pid,p) end end
+-- IDEA-595: serialized Parts are per-asset rows that only ever accumulate, so this list grows without bound by
+-- design. Bounded through `NcmStream` rather than waiting for the deploy on which it stops arriving.
+function NcmComponents.pushInventory(pid) local ok,p=pcall(NcmComponents.inventory,pid);if ok and p then NcmStream.send(pid,"ncm:component.inventory",p,"parts") end end
 
 function NcmComponents.purchase(pid,marketId,assetId,idemKey)
     if not enabled() then return nil,"Parts economy is awaiting live QA." end
@@ -316,7 +332,7 @@ function NcmComponents.purchase(pid,marketId,assetId,idemKey)
     if not Markets.accessible(access.accessState) then return nil,"market_inaccessible" end
     local requestKey=tostring(idemKey or "");if requestKey=="" then requestKey=assetId end
     local t=now();local idem="component_purchase:"..serverId()..":"..requestKey
-    local ok=MySQL.transaction.await({
+    local tx={
       {query=[[UPDATE component_market_inventory mi SET state='sold',sold_at=?,sold_to_driver_id=?
         WHERE market_id=? AND asset_id=? AND state='available' AND
         (SELECT COALESCE(SUM(amount),0) FROM ledger WHERE ncm_driver_id=? AND server_id=?)>=mi.price]],values={t,d.ncmDriverId,marketId,assetId,d.ncmDriverId,serverId()}},
@@ -330,7 +346,8 @@ function NcmComponents.purchase(pid,marketId,assetId,idemKey)
         (transfer_id,idem_key,server_id,asset_id,to_driver_id,kind,market_id,amount,occurred_at)
         SELECT ?,?,?,asset_id,?,'primary_purchase',market_id,price,? FROM component_market_inventory
         WHERE market_id=? AND asset_id=? AND state='sold' AND sold_to_driver_id=?]],values={ids.uuid4(hostRng),idem,serverId(),d.ncmDriverId,t,marketId,assetId,d.ncmDriverId}},
-    })
+    }
+    local ok=MySQL.transaction.await(NcmEconomy.withBalanceLocks(tx,{d.ncmDriverId}))
     if not ok then return nil,"transaction_failed" end
     local owner=MySQL.scalar.await("SELECT ncm_driver_id FROM component_asset WHERE asset_id=?",{assetId});if owner~=d.ncmDriverId then return nil,"unavailable_or_unaffordable" end
     NcmComponents.pushInventory(pid);if NcmMarket then NcmMarket.push(pid) end;return true

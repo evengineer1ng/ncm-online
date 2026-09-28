@@ -236,6 +236,9 @@ function NcmScenario.post(spec, t)
         startsAt = startsAt, entryOpensAt = math.floor(t), entryClosesAt = startsAt - setting("raceFormAtSec", 60),
         venue = { x = route.start.x, y = route.start.y, z = route.start.z, heading = route.start.heading, name = route.start.name, nodeId = route.start.id },
         finish = { x = route.finish.x, y = route.finish.y, z = route.finish.z, name = route.finish.name, nodeId = route.finish.id },
+        -- The authored intermediate points, carried on the event so the publication can hand the
+        -- racing line to anyone who needs the whole lap rather than its two ends (`L177`).
+        via = route.intermediate,
         distanceM = route.distanceM, venueRadiusM = 1e9, state = "entry_open", entries = {}, postedAt = t,
         disciplineId = spec.disciplineId, formatId = spec.formatId, classId = spec.classId or "street_open", laps = spec.laps or route.laps or (d.adapter == "laps" and 3 or 1),
         scenarioId = current.id, startType = spec.startType, formationM = spec.formationM, paceKph = spec.paceKph,

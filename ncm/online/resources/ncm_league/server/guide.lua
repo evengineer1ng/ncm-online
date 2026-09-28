@@ -23,6 +23,12 @@ local now = function() return Open77.time.unix() end
 -- well below that gap rather than above it: the old 24 KB threshold sat ABOVE the size that actually broke,
 -- which is why nothing warned.
 local PAYLOAD_WARN_BYTES = 18 * 1024
+
+-- KB-160. The tripwire above is not a fix, and twice now it has not even been a warning that arrived in time:
+-- the Guide broke at ~22.5 KB in KB-86 (twenty rows of history in the head), was rescued by making the payload
+-- smaller, and broke again the moment Economy v1 put a per-row `economy` block on seventeen rows. Making a
+-- payload smaller is a fix with a shelf life, so the hop is BOUNDED instead -- see `server/stream.lua`, which
+-- now does this for every payload that carries a list.
 local hostRng = function() return math.random() end
 
 local function setting(key, default)
@@ -247,49 +253,34 @@ local function pushGuide(pid)
         -- the payload went from ~17.9 KB to ~22.5 KB and stopped arriving altogether, so the panel drew its
         -- empty placeholder -- no races, and a 1969 date because `serverNow` was missing too.
         --
-        -- KB-63 is about `page:send` dropping large messages, and `sendBig` answers it by batching the ROWS.
-        -- But only the named list is batched; everything else rides whole in the head message. Twenty rows of
-        -- per-driver history sat in that head. They are also the wrong thing to broadcast: this payload goes
-        -- to every connected player on every calendar tick, and a driver's own history changes only when they
-        -- finish a race. It is fetched on demand instead -- see `ncm:guide.results` below.
+        -- Both hops are now bounded (KB-160), so size is no longer the reason they stay out -- the reason that
+        -- survives is that they are the wrong thing to broadcast at all: this payload is rebuilt for every
+        -- connected player on every calendar tick, and a driver's own history changes only when they finish a
+        -- race. Fetched on demand instead -- see `ncm:guide.results` below. Note also that the head is still
+        -- the one unsplittable part of the stream, which is exactly where those twenty rows used to sit.
         capabilities = { myRaces = true, pastResults = true, reminders = false, routePreview = false,
                          concurrentLanes = true, carRequirements = true, regs = true,
                          weather = wx.state == "ready" }
     }
-    -- The bag is a durable mirror, but it is not the request/response transport. Deploy 11 proved that a
-    -- successful 16-row bag write can still fail to arrive at the client: /ncm.guide listed the rows while F6
-    -- remained on its cached empty value. Send the same bounded payload directly as well. This also means an
-    -- open Guide receives calendar and entry changes immediately instead of depending on bag observation.
-    -- Measure what we are about to send. Deploy 11 showed a bag write can succeed and still not reach the
-    -- client, and a payload that silently fails to arrive is indistinguishable from a Guide with nothing in it
-    -- -- the panel simply sits on "Loading live schedule..." forever. A number in the log turns that from a
-    -- guess into a fact, and `GUIDE PAYLOAD LARGE` says which way to look before anyone opens a client.
-    local size = -1
-    do
-        local okJ, encoded = pcall(function() return NcmCore.get("vocabulary.json").encode(payload) end)
-        if okJ and type(encoded) == "string" then
-            size = #encoded
-        else
-            -- a payload we cannot even encode locally will certainly not survive the wire
-            log("GUIDE PAYLOAD NOT ENCODABLE player=%d rows=%d: %s", pid, #slim, tostring(encoded))
-        end
-    end
+    -- KB-160: this hop is BOUNDED, it is not merely measured. `NcmStream.send` splits the rows into packets
+    -- packed by measured bytes and leaves a head that carries `serverNow`, weather, balance and capabilities.
+    -- Before this, `sendBig` on the client batched the rows for the WebUI bridge only -- which cannot rescue a
+    -- payload that never reached the client, and this event was sent whole.
+    --
+    -- KB-97: the targeted event is the whole delivery. The `ncmGuide` bag alongside it carried the SAME payload
+    -- to every player in the routing bucket, including `iOwn` and `carRefusal`, so deleting it changed nothing
+    -- the subject sees.
+    local size, headBytes, packets = NcmStream.send(pid, "ncm:guide", payload, "rows")
     if size > PAYLOAD_WARN_BYTES then
-        log("GUIDE PAYLOAD LARGE player=%d rows=%d bytes=%d (warn above %d) -- a payload this size may be " ..
-            "silently dropped before it reaches the panel", pid, #slim, size, PAYLOAD_WARN_BYTES)
+        -- Not a failure any more -- the stream carries it whatever this says. It stays because the total is the
+        -- number that tells us the Guide is growing, and growth is what produced KB-86 and KB-160.
+        log("guide payload large player=%d rows=%d bytes=%d (above %d) -- streamed in packets, not dropped",
+            pid, #slim, size, PAYLOAD_WARN_BYTES)
     end
 
-    -- KB-97: the targeted event is the whole delivery. The `ncmGuide` bag alongside it carried the SAME
-    -- payload to every player in the routing bucket, including `iOwn` (how many eligible machines this driver
-    -- owns) and `carRefusal`. The client already handled this event identically, so the bag was pure
-    -- duplication with a wider audience, and deleting it changes nothing the subject sees.
-    TriggerClientEvent("ncm:guide.payload", pid, payload)
-    local okSet, err = true, nil
-    if not okSet then
-        log("GUIDE PUBLISH FAILED player=%d rows=%d bytes=%d: %s", pid, #slim, size, tostring(err))
-    elseif #slim ~= (lastGuideRows[pid] or -1) then
+    if #slim ~= (lastGuideRows[pid] or -1) then
         lastGuideRows[pid] = #slim
-        log("guide published player=%d rows=%d bytes=%d", pid, #slim, size)
+        log("guide published player=%d rows=%d bytes=%d head=%d packets=%d", pid, #slim, size, headBytes, packets)
     end
     return rows, driver
 end
@@ -659,7 +650,9 @@ RegisterNetEvent("ncm:guide.results", function()
     CreateThread(function()
         local driver = NcmCalendar.resolveDriver(pid)
         local rows = driver and NcmGuide.results(driver.ncmDriverId) or {}
-        TriggerClientEvent("ncm:guide.results.payload", pid, { results = rows, at = math.floor(now()) })
+        -- IDEA-595: this is the very list whose twenty rows in the Guide head caused KB-86. It is bounded here
+        -- for the same reason it was moved out of that payload in the first place.
+        NcmStream.send(pid, "ncm:guide.results", { results = rows, at = math.floor(now()) }, "results")
         log("results sent player=%d rows=%d", pid, #rows)
     end)
 end)

@@ -9,7 +9,22 @@ Core.define("driver.progression", function(C)
 
     M.LICENCE_LEVELS = { "rookie", "licensed", "pro" }
     M.LICENCE_CLEAN = { licensed = 3, pro = 10 }   -- clean completed sessions to reach a level
-    M.SR = { start = 5.0, min = 0, max = 10, cleanGain = 0.05, perBand = 0.1 }
+    -- Safety rating, rebalanced 2026-09-27 (IDEA-090, KB-171). The badge answers ONE question -- "is this
+    -- driver safe to race ALONGSIDE" (L54) -- so car-to-car contact is the signal it exists to carry, scenery
+    -- is car control and belongs on the Fingerprint (IDEA-069/070), and one session moves SR by a bounded
+    -- amount in BOTH directions. The old pair (+0.05 clean, -0.1 per band, uncapped) made a single light tap
+    -- cost two clean races, a wall-scraping race cost sixteen, and the 5.0 -> 10.0 climb take 100 flawless
+    -- starts -- about 14 h at the observed cadence of 21 starts per 3 h (KB-165). There was no upside.
+    M.SR = {
+        start = 5.0, min = 0, max = 10,
+        cleanGain = 0.05,      -- credit for finishing a session clean, plus ...
+        perKmGain = 0.03,      -- ... this per km actually raced: distance driven clean earns the badge
+        maxGain = 0.30,        -- ceiling on one session's credit
+        perBand = 0.06,        -- car-to-car contact: cost per severity band
+        objectFactor = 0.35,   -- scenery/self contact costs this fraction of car contact (IDEA-090)
+        freeObjectBands = 1,   -- one band of scenery contact per session is free: no clean credit, but no loss
+        maxLoss = 0.50,        -- and no single session may cost more than this, so there are no craters
+    }
     M.RATING = { start = 1000, perPlace = 4 }
 
     function M.newState()
@@ -35,8 +50,9 @@ Core.define("driver.progression", function(C)
         return false
     end
 
-    --- Apply one classified result. result = classify() row (state, position, incidentCount, incidents? = {band…});
-    --- ctx = { disciplineId, classId, sessionKind, fieldSize, sessionId }. Returns state, deltas, newAccomplishments.
+    --- Apply one classified result. result = classify() row (state, position, incidentCount, incidents? =
+    --- {{ band, kind }…}); ctx = { disciplineId, classId, sessionKind, fieldSize, sessionId, distanceM? }.
+    --- Returns state, deltas, newAccomplishments.
     function M.apply(state, result, ctx)
         state = state or M.newState()
         ctx = ctx or {}
@@ -60,17 +76,33 @@ Core.define("driver.progression", function(C)
             end
         end
 
-        -- safety rating (the badge)
+        -- safety rating (the badge). `ctx.distanceM` is the distance of the session actually run (course
+        -- length including laps, else the route); absent, a clean session still earns the base credit.
         local sr = state.sr
         if clean then
-            sr.sr = math.min(M.SR.max, sr.sr + M.SR.cleanGain); sr.clean = sr.clean + 1
-            deltas[#deltas + 1] = { kind = "sr", delta = M.SR.cleanGain, sr = sr.sr }
+            local km = math.max(0, tonumber(ctx.distanceM) or 0) / 1000
+            local gain = math.min(M.SR.maxGain, M.SR.cleanGain + M.SR.perKmGain * km)
+            sr.sr = math.min(M.SR.max, sr.sr + gain); sr.clean = sr.clean + 1
+            deltas[#deltas + 1] = { kind = "sr", delta = gain, sr = sr.sr }
         elseif incidents > 0 then
-            local drop = 0
-            for _, inc in ipairs(result.incidents or {}) do drop = drop + M.SR.perBand * (inc.band or 1) end
-            if drop == 0 then drop = M.SR.perBand * incidents end
-            sr.sr = math.max(M.SR.min, sr.sr - drop); sr.incidents = sr.incidents + incidents
-            deltas[#deltas + 1] = { kind = "sr", delta = -drop, sr = sr.sr }
+            -- Split the session's severity by what was hit. `incidents` records carry `kind` ("car"/"object")
+            -- from competition.incidents; a host that reports only a count is treated as car contact, because
+            -- unknown contact must not be cheaper than known contact.
+            local carBands, objBands = 0, 0
+            for _, inc in ipairs(result.incidents or {}) do
+                local band = tonumber(inc.band) or 1
+                if inc.kind == "object" then objBands = objBands + band else carBands = carBands + band end
+            end
+            if carBands + objBands == 0 then carBands = incidents end
+            objBands = math.max(0, objBands - M.SR.freeObjectBands)
+            local drop = math.min(M.SR.maxLoss, M.SR.perBand * (carBands + objBands * M.SR.objectFactor))
+            sr.incidents = sr.incidents + incidents
+            -- A single light scrape of the scenery spends the clean credit and nothing more: SR does not move,
+            -- and the driver is told nothing moved rather than shown a phantom -0.00.
+            if drop > 0 then
+                sr.sr = math.max(M.SR.min, sr.sr - drop)
+                deltas[#deltas + 1] = { kind = "sr", delta = -drop, sr = sr.sr }
+            end
         end
 
         -- rating skeleton per class (seeding only)

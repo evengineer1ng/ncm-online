@@ -1,6 +1,7 @@
 -- World-side fitting authority. Runtime parking state and live handling belong here; economy remains in league.
 NcmComponentInstall={}
 local Cat=NcmCore.get("parts.catalogue")
+local Wear=NcmCore.get("parts.wear")
 local Json=NcmCore.get("vocabulary.json")
 local ids=NcmCore.get("vocabulary.ids")
 local hostRng=function() return math.random() end
@@ -8,6 +9,7 @@ local function now() return math.floor(Open77.time.unix()) end
 local function log(fmt,...) print(("[ncm_world/components] "..fmt):format(...)) end
 local function enabled() local ok,v=pcall(function() return GlobalState.ncmPartsEnabled end);return ok and v==true end
 local function dec(v) if type(v)=="table" then return v end local ok,x=pcall(Json.decode,tostring(v or ""));return ok and x or nil end
+local function enc(v) local ok,x=pcall(Json.encode,v);return ok and x or "{}" end
 local function serverId() local ok,v=pcall(function() return GlobalState.ncmIdentity end);return ok and v and v.serverId or "ncm-dev" end
 
 local function speedOf(v)
@@ -53,11 +55,17 @@ function NcmComponentInstall.currentConfiguration(machineId)
 end
 
 function NcmComponentInstall.apply(machineId,why)
-    local rows=MySQL.query.await([[SELECT DISTINCT a.asset_id,d.family,d.effect FROM machine_configuration_current x
+    local rows=MySQL.query.await([[SELECT DISTINCT a.asset_id,a.exposure_m,d.family,d.effect FROM machine_configuration_current x
       JOIN machine_configuration_item i ON i.configuration_id=x.configuration_id
       JOIN component_asset a ON a.asset_id=i.component_asset_id JOIN component_design d ON d.design_id=a.design_id
       WHERE x.machine_asset_id=? ORDER BY a.asset_id]],{machineId}) or {}
+    local services=MySQL.query.await([[SELECT s.component_asset_id,s.condition_id,s.relief_m FROM component_service s
+      JOIN component_asset a ON a.asset_id=s.component_asset_id
+      WHERE a.machine_asset_id=? AND a.location_kind='installed' ORDER BY s.occurred_at,s.service_id]],{machineId}) or {}
+    local byAsset={} for _,s in ipairs(services) do local k=tostring(s.component_asset_id);byAsset[k]=byAsset[k] or {};byAsset[k][#byAsset[k]+1]=s end
+    local machineWear=Wear.machine(rows,byAsset)
     local parts={} for _,r in ipairs(rows) do parts[#parts+1]={id=r.asset_id,family=r.family,effect=tonumber(r.effect)} end
+    NcmHandling.setWear(machineId,machineWear,why or "persistent component wear",false)
     return NcmHandling.setParts(machineId,parts,why or "persistent component configuration")
 end
 
@@ -78,6 +86,12 @@ function NcmComponentInstall.install(pid,componentId,machineId,idemKey)
     if not machine or machine.ncm_driver_id~=profile.ncmDriverId then return nil,"machine_not_owned" end
     local fit=Cat.resolve({supportedVehicles=dec(part.fitment_json) or {}},machine.vehicle_key);if not fit.compatible then return nil,fit.reason end
     local park=NcmComponentInstall.state(machineId);if not park.eligible then return nil,park.reason end
+    -- KB-163: fitting changes which physical assets receive the Machine's pending interval. Settle the
+    -- outgoing configuration first; a failed checkpoint refuses the fit instead of misattributing history.
+    if NcmOdometer and NcmOdometer.flushAsset then
+        local settled,settleWhy=NcmOdometer.flushAsset(machineId,"before component fit",true)
+        if settled==false then return nil,settleWhy or "exposure_checkpoint_failed" end
+    end
     local old,why=current(machineId);if not old then return nil,why end
     local positions=dec(part.positions_json) or {};local target={} for _,p in ipairs(positions) do target[p]=true end
     local displaced={};local seen={};local newItems={}
@@ -110,11 +124,70 @@ function NcmComponentInstall.install(pid,componentId,machineId,idemKey)
     return applied~=false,applyWhy
 end
 
+local function serviceRows(componentId)
+    return MySQL.query.await([[SELECT condition_id,relief_m FROM component_service
+      WHERE component_asset_id=? ORDER BY occurred_at,service_id]],{componentId}) or {}
+end
+
+function NcmComponentInstall.service(pid,componentId,conditionId,idemKey)
+    if not enabled() then return nil,"Parts economy is awaiting live QA." end
+    local profile=NcmIdentity.get(pid);if not profile then return nil,"no_driver" end
+    local requestKey=tostring(idemKey or "");if requestKey=="" then requestKey=componentId..":"..conditionId end
+    local operationKey="component_service:"..serverId()..":"..requestKey
+    local prior=MySQL.single.await("SELECT component_asset_id,condition_id,relief_m,amount FROM component_service WHERE idem_key=?",{operationKey})
+    if prior then
+        if prior.component_asset_id==componentId and prior.condition_id==conditionId then return true,prior end
+        return nil,"idempotency_conflict"
+    end
+    local part=MySQL.single.await([[SELECT a.asset_id,a.exposure_m,a.location_kind,a.machine_asset_id,a.ncm_driver_id,d.family
+      FROM component_asset a JOIN component_design d ON d.design_id=a.design_id
+      WHERE a.asset_id=? AND a.server_id=?]],{componentId,serverId()})
+    if not part or part.ncm_driver_id~=profile.ncmDriverId then return nil,"component_not_owned" end
+    if part.location_kind=="installed" then
+        local park=NcmComponentInstall.state(part.machine_asset_id);if not park.eligible then return nil,park.reason end
+        if NcmOdometer and NcmOdometer.flushAsset then
+            local settled,settleWhy=NcmOdometer.flushAsset(part.machine_asset_id,"before component service",true)
+            if settled==false then return nil,settleWhy or "exposure_checkpoint_failed" end
+            part.exposure_m=MySQL.scalar.await("SELECT exposure_m FROM component_asset WHERE asset_id=?",{componentId}) or part.exposure_m
+        end
+    elseif part.location_kind~="storage" then return nil,"component_not_serviceable" end
+    local quote,quoteWhy=Wear.serviceQuote(part,serviceRows(componentId),conditionId)
+    if not quote then return nil,quoteWhy end
+    local t=now();local serviceId=ids.uuid4(hostRng);local work=enc(quote.workmanship)
+    local ok,err=MySQL.transaction.await({
+      {query=[[INSERT IGNORE INTO ledger (ncm_driver_id,server_id,kind,amount,currency,ref,note,idem_key,asset_id)
+        SELECT ?,?,'component_service',-?,'eddies',?,'Component condition service',?,?
+        FROM DUAL WHERE (SELECT COALESCE(SUM(amount),0) FROM ledger WHERE ncm_driver_id=? AND server_id=?)>=?]],
+       values={profile.ncmDriverId,serverId(),quote.cost,componentId,operationKey,componentId,profile.ncmDriverId,serverId(),quote.cost}},
+      {query=[[INSERT INTO component_service
+        (service_id,idem_key,server_id,component_asset_id,condition_id,at_exposure_m,by_driver_id,provider_kind,workmanship_json,relief_m,amount,occurred_at)
+        SELECT ?,?,?,?,?,?,?,?,?,?,?,? FROM DUAL
+        WHERE EXISTS(SELECT 1 FROM ledger WHERE idem_key=? AND ncm_driver_id=? AND amount=?) ]],
+       values={serviceId,operationKey,serverId(),componentId,quote.conditionId,math.floor(tonumber(part.exposure_m) or 0),profile.ncmDriverId,
+          quote.providerKind,work,quote.reliefM,quote.cost,t,operationKey,profile.ncmDriverId,-quote.cost}},
+    })
+    if not ok then return nil,"service_transaction:"..tostring(err) end
+    local held=MySQL.single.await("SELECT component_asset_id,condition_id,relief_m,amount FROM component_service WHERE idem_key=?",{operationKey})
+    if not held then return nil,"insufficient_funds" end
+    if part.machine_asset_id then NcmComponentInstall.apply(part.machine_asset_id,"component serviced") end
+    TriggerEvent("ncm:component.changed",pid,part.machine_asset_id)
+    return true,held
+end
+
 RegisterNetEvent("ncm:component.install",function(componentId,machineId,idemKey)
     local pid=tonumber(source) or 0;CreateThread(function()
         local ok,why=NcmComponentInstall.install(pid,tostring(componentId or ""),tostring(machineId or ""),tostring(idemKey or ""))
         pcall(Open77.notifications.send,pid,{type=ok and "success" or "error",title=ok and "PART FITTED" or "FITTING REFUSED",message=ok and "The displaced component is in Parts Inventory." or tostring(why),icon="NCM",durationMs=6500})
         TriggerClientEvent("ncm:component.install.result",pid,{ok=ok and true or false,message=tostring(why or "")})
+    end)
+end)
+
+RegisterNetEvent("ncm:component.service",function(componentId,conditionId,idemKey)
+    local pid=tonumber(source) or 0;CreateThread(function()
+        local ok,result=NcmComponentInstall.service(pid,tostring(componentId or ""),tostring(conditionId or ""),tostring(idemKey or ""))
+        local message=ok and ("Condition serviced. Threshold relief %s m; cost €$%s."):format(tostring(result.relief_m),tostring(result.amount)) or tostring(result)
+        pcall(Open77.notifications.send,pid,{type=ok and "success" or "error",title=ok and "SERVICE COMPLETE" or "SERVICE REFUSED",message=message,icon="NCM",durationMs=6500})
+        TriggerClientEvent("ncm:component.service.result",pid,{ok=ok and true or false,message=message})
     end)
 end)
 

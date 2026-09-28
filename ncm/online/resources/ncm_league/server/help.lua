@@ -55,6 +55,7 @@ local CHANGES = {
 local function liveCapabilities()
     return {
         market = NcmMarket ~= nil and NcmMarket.payload ~= nil,
+        trade = NcmTrade ~= nil and NcmTrade.payload ~= nil,
         collection = NcmCollection ~= nil,
         guide = NcmGuide ~= nil,
         racing = NcmRace ~= nil and NcmRace.forfeit ~= nil,

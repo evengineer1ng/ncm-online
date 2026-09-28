@@ -558,7 +558,7 @@ function NcmMarket.purchase(pid, marketId, assetId)
     local t = now()
     local idem = "purchase:" .. serverId() .. ":" .. assetId
     local transferId = ids.uuid4(hostRng)
-    local ok = MySQL.transaction.await({
+    local tx = {
         { query = [[UPDATE market_inventory mi
             SET mi.state='sold', mi.sold_at=?, mi.sold_to_driver_id=?
             WHERE mi.market_id=? AND mi.asset_id=? AND mi.state='available'
@@ -583,7 +583,8 @@ function NcmMarket.purchase(pid, marketId, assetId)
             SELECT ?, ?, ?, mi.asset_id, NULL, ?, 'primary_purchase', mi.market_id, mi.price, ?
             FROM market_inventory mi WHERE mi.market_id=? AND mi.asset_id=? AND mi.state='sold' AND mi.sold_to_driver_id=?]],
           values = { transferId, idem, serverId(), d.ncmDriverId, t, marketId, assetId, d.ncmDriverId } },
-    })
+    }
+    local ok = MySQL.transaction.await(NcmEconomy.withBalanceLocks(tx,{d.ncmDriverId}))
     if not ok then return nil, "transaction_failed" end
     local owner = MySQL.scalar.await("SELECT ncm_driver_id FROM vehicle_asset WHERE asset_id=?", { assetId })
     if owner ~= d.ncmDriverId then return nil, "unavailable_or_unaffordable" end

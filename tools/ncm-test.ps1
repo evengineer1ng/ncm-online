@@ -144,6 +144,24 @@ if ($node -and (Test-Path $resRoot)) {
         }
     }
 
+    # The VENUE page (web/venue.html). Added 2026-09-28 with `L193`, and for the same reason as the race HUD:
+    # three tenants -- the option list, the history/practice panel and now the Street Call form -- and neither a
+    # guard nor a harness. The form's whole failure mode was invisible: the client rebuilt the 11,515-byte schema
+    # and sent it in one `page:send`, which drops large messages silently (KB-63), so the card never drew and
+    # nothing anywhere said why. These assertions hold the line that the page is a pure renderer and that the
+    # catalogue never crosses the bridge again.
+    $venueCheck = Join-Path $here 'venue-render-check.js'
+    if ((Test-Path $venueCheck) -and (Test-Path $webRoot)) {
+        $vn = & node $venueCheck $webRoot 2>&1
+        if ($LASTEXITCODE -ne 0) {
+            $overall = 1
+            Write-Host '=== venue render check FAILED'
+            $vn | Select-String -Pattern 'FAIL' | Select-Object -First 12 | ForEach-Object { Write-Host ("  {0}" -f $_) }
+        } else {
+            $vn | Select-String -Pattern '=== venue render check:' | Select-Object -Last 1 | ForEach-Object { Write-Host ("{0}" -f $_) }
+        }
+    }
+
     # The SHARED NAVIGATION LAYER (web/ncm-nav.js). This is the file that decides whether a player holding a
     # controller can use NCM at all, and nearly all of it is rectangle geometry and focus state -- wrong in
     # ways `node --check` cannot see. The harness stubs real getBoundingClientRect values and drives the

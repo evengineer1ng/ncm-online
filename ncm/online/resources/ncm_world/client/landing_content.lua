@@ -30,7 +30,7 @@ NcmLandingContent = {
         { id = "index", label = "Build a Machine Index", state = "live", reference = "collection",
           detail = "What you have seen, what you own, and the evidence behind each claim." },
         { id = "wheel", label = "Drive with a wheel", state = "live", reference = "wheel",
-          detail = "Wheel and pedal support with force feedback, through the NCM Carrier." },
+          detail = "Multi-vendor wheel, pedal and custom-rig support with force feedback, through NCM Rig Bridge." },
         { id = "ghost", label = "Race your own ghost", state = "partial",
           limit = "Personal best only, in practice and time trials -- never in a contested race.",
           reference = "guide",
@@ -43,12 +43,24 @@ NcmLandingContent = {
           limit = "Weather is synchronised and affects performance ceilings, not grip.",
           detail = "The session's sky is the same for everyone in it." },
         { id = "fuel", label = "Fuel and pit strategy", state = "soon" },
-        { id = "trade", label = "Trade with other drivers", state = "soon" },
+        { id = "trade", label = "Trade with other drivers", state = "partial",
+          limit = "Direct synchronous Exchange only -- both Drivers must be online. Persistent listings and escrow come later.",
+          reference = "trade",
+          detail = "Compose one exact offer from Machines, stored Parts and eddies; both sides confirm before anything moves." },
     },
 
     -- Newest first is computed, not authored: `landing.payload` sorts by date then `seq`. A redeploy is not a
     -- release. If an entry would read "restarted the server", it does not belong here.
     releases = {
+        {
+            date = "2026-09-28", title = "Player Exchange", build = "0.5.0",
+            items = {
+                { heading = "Exchange", text = "F6 now carries direct Driver-to-Driver trade in the shell." },
+                { heading = "Exact assets", text = "Machines, their fitted Parts, loose serialized Parts and eddies are shown by identity on both sides." },
+                { heading = "Dual consent", text = "Every edit creates a new revision. Both Drivers must confirm that same revision, and the whole exchange settles together or not at all." },
+                { text = "This first form is synchronous: both Drivers stay online. Persistent listings and escrow are later." },
+            },
+        },
         {
             date = "2026-09-27", title = "Economy v1", build = "0.5.0",
             items = {
@@ -79,7 +91,7 @@ NcmLandingContent = {
             date = "2026-09-22", title = "Weather, wheels and the world", build = "0.4.2",
             items = {
                 { heading = "Weather", text = "The session's sky is synchronised for everyone in it, and affects what a machine can do." },
-                { heading = "Wheels", text = "Wheel and pedal support with force feedback, through the NCM Carrier." },
+                { heading = "Rigs", text = "Multi-vendor wheel, pedal and custom-rig support with force feedback, through NCM Rig Bridge." },
                 { heading = "The city", text = "NCM's named locations are on your map, and the race route draws a real GPS line." },
             },
         },

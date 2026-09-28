@@ -159,9 +159,16 @@ function NcmCollection.payload(playerId)
         total = Catalogue.count(), owned = ownedCount, slots = slots }
 end
 
-local function sendPayload(pid)
-    local ok, payload = pcall(NcmCollection.payload, pid)
-    if ok and payload then TriggerClientEvent("ncm:collection.payload", pid, payload) end
+-- IDEA-595. The Machine Index is the largest list NCM sends: one slot per known machine, growing with the
+-- catalogue and with every discovery. It crossed the wire whole, which is the shape that produced KB-59, KB-86,
+-- KB-153 and KB-160 -- a payload that grows until it silently stops arriving. Bounded through `NcmStream`.
+local function sendPayload(pid, payload)
+    if payload == nil then
+        local ok, p = pcall(NcmCollection.payload, pid)
+        if not ok or not p then return end
+        payload = p
+    end
+    NcmStream.send(pid, "ncm:collection", payload, "slots")
 end
 
 -- **The authoritative position, or nothing** (IDEA-329, IDEA-361).
@@ -224,7 +231,7 @@ local function legacyRecordEncounter(pid, driver, entry, runtimeRecord, liveId, 
         found[entry.vehicleKey] = { first_discovered_at = t, last_encounter_at = t, encounter_count = 1, discovery_method = "proximity_dwell" }
         local payload = NcmCollection.payload(pid)
         if payload then
-            TriggerClientEvent("ncm:collection.payload", pid, payload)
+            sendPayload(pid, payload)
             NcmComms.send(pid,{id="machine.discovery:"..entry.vehicleKey,category="discovery",priority="informative",
                 title="MACHINE ENTERS THE INDEX",
                 message=((entry.manufacturer or "").." "..(entry.displayName or ""))..
@@ -348,7 +355,7 @@ function NcmCollection.revealIdentity(pid, vehicleKey, opts)
             encounter_count = encounterCount, discovery_method = source }
         local payload = NcmCollection.payload(pid)
         if payload then
-            TriggerClientEvent("ncm:collection.payload", pid, payload)
+            sendPayload(pid, payload)
             NcmComms.send(pid,{id="machine.discovery:"..entry.vehicleKey,category="discovery",priority="informative",
                 title="MACHINE ENTERS THE INDEX",
                 message=((entry.manufacturer or "").." "..(entry.displayName or ""))..

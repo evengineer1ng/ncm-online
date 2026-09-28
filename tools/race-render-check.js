@@ -114,6 +114,7 @@ function drewCleanly(label) {
 check(typeof events["race:state"] === "function", "race:state has a handler");
 check(typeof events["race:inputs"] === "function", "race:inputs has a handler");
 check(typeof events["race:tyre"] === "function", "race:tyre has a handler (L159)");
+check(typeof events["race:wear"] === "function", "race:wear has a handler (L178)");
 
 // ---------------------------------------------------------------- every state shape race.lua can send
 fire("race:state", {});
@@ -190,6 +191,15 @@ check(tyreEl.classList.contains("na"), "an empty payload is unknown too");
 
 fire("race:tyre", null);
 check(true, "a null tyre payload does not throw");
+
+// ---------------------------------------------------------------- component warning strip (L178)
+const wearLamps=document.getElementById("wearLamps");
+fire("race:wear",{warnings:[{system:"service",status:"critical",label:"SERVICE URGENT"},{system:"brake",status:"attention",label:"BRAKE FADE MARGIN LOW"}]});
+check(!wearLamps.classList.contains("hidden")&&wearLamps.children.length===2,"wear warnings draw a compact system strip");
+check(String(wearLamps.children[0].className).includes("critical")&&wearLamps.children[0].textContent==="SRV","critical severity changes shape/fill as well as colour");
+check(wearLamps.children[1].textContent==="BRK","a component condition maps to its system, not one lamp per asset");
+fire("race:wear",false);
+check(wearLamps.classList.contains("hidden")&&wearLamps.children.length===0,"an unbound/healthy Machine clears the warning strip");
 
 // ---------------------------------------------------------------- the cluster visibility rule
 //

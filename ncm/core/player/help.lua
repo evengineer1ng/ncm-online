@@ -37,10 +37,17 @@ Core.define("player.help", function(C)
           text = "Tonight's races: what is running, where, the weather, the regulations and whether you can enter." },
         { id = "market",     cmd = "/ncm.market", title = "Market", needs = "market",
           text = "Buy a vehicle. What you own is yours and can be entered in races." },
+        { id = "exchange",   key = "F6", cmd = "/ncm.exchange", title = "Exchange", needs = "trade",
+          text = "Trade exact Machines, stored Parts and eddies directly with another online Driver. Both " ..
+                 "Drivers must confirm the same revision before anything moves." },
         { id = "collection", key = "F6 / F10", cmd = "/ncm.collectionpage", title = "Machine Index",
           text = "Discover machines and select a specific owned asset to CALL VEHICLE in a clear nearby space." },
-        { id = "messages",   key = "F9",  cmd = "/ncm.msgs",       title = "Messages",
-          text = "Invitations and notices addressed to you." },
+        -- Messages gave up its function key on 2026-09-28 and became a shell tab, left of HELP. `KB-62` is why:
+        -- three of NCM's four function keys collide with something and the collisions keep moving, so a surface
+        -- that can live in the shell should not spend one.
+        { id = "messages",   key = "F6",  cmd = "/ncm.msgs",       title = "Messages",
+          text = "Your conversations, and any invitation or notice addressed to you. Pick a name on the left " ..
+                 "and talk to them in the main pane." },
         { id = "profile",    cmd = "/ncm.profile", title = "Your driver",
           text = "Licence, safety rating, reputation and what you have achieved." },
         { id = "garage",     cmd = "/ncm garage",  title = "Your garage",

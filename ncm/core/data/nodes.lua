@@ -65,6 +65,19 @@ Core.define("data.nodes", function(C)
         return n
     end
 
+    --- Remove a runtime-registered node. `data.roots` has had this since the host kit; nodes did not, because
+    --- authored routes are permanent and never needed it. A player-called race does (`L181`): its start point is a
+    --- temporary node created from wherever the driver was standing, and without this every Street Call would
+    --- leave two nodes behind for the lifetime of the process -- growing the map markers, the route resolver and
+    --- the builder's own node list a little more every time.
+    function M.unregister(id)
+        local ix = index()
+        if not ix[id] then return false end
+        ix[id] = nil
+        for i, x in ipairs(M.LIST) do if x.id == id then table.remove(M.LIST, i); break end end
+        return true
+    end
+
     function M.count() return #M.LIST end
 
     return M

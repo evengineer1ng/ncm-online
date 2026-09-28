@@ -15,6 +15,35 @@ NcmCore.define("vocabulary.chunks", function()
         return out
     end
 
+    -- Row count is the wrong unit. KB-86 broke the Race Guide at 17 rows, KB-160 re-broke it at the same 17
+    -- rows because each row had grown, and "small enough today" is the reasoning that produced both. Partition
+    -- by MEASURED bytes instead, so a row that grows costs a packet rather than the whole payload.
+    --
+    -- `measure(row)` returns that row's encoded size. A row larger than the budget on its own cannot be split
+    -- here -- it is returned as its own part AND reported in the second return value, so the caller can say so
+    -- in the log instead of putting an oversized packet on a wire that drops it without a word.
+    function M.partitionBytes(list, budget, measure)
+        list = type(list) == "table" and list or {}
+        budget = math.max(1, math.floor(tonumber(budget) or 1))
+        local parts, oversized = {}, {}
+        local part, used = {}, 0
+        for i = 1, #list do
+            -- An unmeasurable row is assumed to fill the budget: pessimism is the safe direction here, and
+            -- callers signal "cannot encode this" with a non-positive size rather than a number we would trust.
+            local measured = tonumber(measure and measure(list[i])) or -1
+            local bytes = measured > 0 and math.floor(measured) or budget
+            if bytes > budget then oversized[#oversized + 1] = { index = i, bytes = bytes } end
+            if #part > 0 and used + bytes > budget then
+                parts[#parts + 1] = part
+                part, used = {}, 0
+            end
+            part[#part + 1] = list[i]
+            used = used + bytes
+        end
+        if #part > 0 then parts[#parts + 1] = part end
+        return parts, oversized
+    end
+
     function M.receiver(expected)
         expected = math.max(0, math.floor(tonumber(expected) or 0))
         return { expected = expected, received = 0, parts = {} }

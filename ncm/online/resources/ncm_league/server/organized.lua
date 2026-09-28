@@ -92,6 +92,13 @@ local function messageResolve(messageId, state)
 end
 
 --- The driver's inbox (unread/read, newest first; expired offers flip to `expired` lazily).
+---
+--- **NOTICES ONLY.** `thread_id IS NULL` is the whole of that rule and it is load-bearing (`KB-173`): the quest
+--- graph writes every conversation line into this same table with a `thread_id` (`server/graph.lua`), so without
+--- the clause this function returned the twenty newest rows of EVERYTHING -- Dex mid-sentence, the player's own
+--- replies, and a seat offer, in one list. The panel then drew that list in a tray pinned under whichever
+--- conversation was open, so the transcript above appeared again below it, interleaved with everybody else.
+--- A conversation is read in its thread; this list is for mail addressed to the driver that is not one.
 local function messageList(driverId)
     if not MySQL.isReady() then return {} end
     local t = math.floor(now())
@@ -103,7 +110,8 @@ local function messageList(driverId)
         -- (the rows stay; the thread stops showing them).
         rows = MySQL.query.await(
             "SELECT message_id, from_kind, from_id, kind, subject, body, actions, state, ref_kind, ref_id, created_at, expires_at FROM message " ..
-            "WHERE server_id = ? AND to_driver_id = ? AND (state IN ('unread','read') OR (state IN ('accepted','declined','expired') AND created_at > ?)) " ..
+            "WHERE server_id = ? AND to_driver_id = ? AND thread_id IS NULL " ..
+            "AND (state IN ('unread','read') OR (state IN ('accepted','declined','expired') AND created_at > ?)) " ..
             "ORDER BY created_at DESC LIMIT 20",
             { NcmCalendar.serverId(), driverId, t - 6 * 3600 }) or {}
     end)
@@ -112,7 +120,12 @@ local function messageList(driverId)
         if r.state == "unread" then unread = unread + 1 end
         local actions = {}
         for a in tostring(r.actions or ""):gmatch('"([%w_]+)"') do actions[#actions + 1] = a end
-        out[i] = { id = r.message_id, n = i, fromKind = r.from_kind, fromId = r.from_id, kind = r.kind, subject = r.subject, body = r.body,
+        -- `fromName` exists because the panel groups these by sender and a thread headed `ncx_thorton` is not a
+        -- sender a player recognises. The id stays on the payload; the name is what gets drawn.
+        local team = r.from_kind == "team" and Teams.byId(r.from_id) or nil
+        out[i] = { id = r.message_id, n = i, fromKind = r.from_kind, fromId = r.from_id,
+                   fromName = team and team.name or nil,
+                   kind = r.kind, subject = r.subject, body = r.body,
                    actions = actions, state = r.state, refId = r.ref_id, createdAt = tonumber(r.created_at), expiresAt = tonumber(r.expires_at) }
     end
     return out, unread
@@ -132,7 +145,8 @@ local function pushInbox(pid, driverId)
     pcall(function()
         -- KB-97: message and seat-offer BODIES. This was the widest gap in the audit -- a `player(id)` bag
         -- reaches every player in the routing bucket, and NCM puts everyone in bucket 0.
-        TriggerClientEvent("ncm:inbox.payload", pid, { items = items, unread = unread, at = math.floor(now()) })
+        -- IDEA-595: message and seat-offer bodies are unbounded in both count and length, so this is bounded too.
+        NcmStream.send(pid, "ncm:inbox", { items = items, unread = unread, at = math.floor(now()) }, "items")
     end)
     return items, unread
 end
@@ -185,6 +199,9 @@ function NcmOrganized.post(routeLabel, minutes, opts)
         startsAt = startsAt, entryOpensAt = math.floor(t), entryClosesAt = startsAt - inv.entryClosesBeforeSec,
         venue = { x = route.start.x, y = route.start.y, z = route.start.z, heading = route.start.heading, name = route.start.name, nodeId = route.start.id },
         finish = { x = route.finish.x, y = route.finish.y, z = route.finish.z, name = route.finish.name, nodeId = route.finish.id },
+        -- The authored intermediate points, carried on the event so the publication can hand the
+        -- racing line to anyone who needs the whole lap rather than its two ends (`L177`).
+        via = route.intermediate,
         distanceM = route.distanceM, venueRadiusM = inv.venueRadiusM,
         state = "entry_open", entries = {},
         seatsTotal = #Teams.NCX * Teams.SEATS_PER_TEAM,
@@ -271,7 +288,8 @@ function NcmOrganized.invite(pid, teamId)
     end)
     -- One voice for all teams until the Messages panel (M7.5).
     tell(pid, body)
-    toast(pid, { type = "warning", title = "NEW MESSAGE · F9", message = ("%s · seat offer — open your messages (F9) or /ncm.accept"):format(team.name), icon = team.short, color = team.colour, durationMs = 15000 })
+    -- F9 was released on 2026-09-28: Messages is a tab in the F6 shell now (`KB-62`).
+    toast(pid, { type = "warning", title = "NEW MESSAGE", message = ("%s · seat offer — F6 → MESSAGES, or /ncm.accept"):format(team.name), icon = team.short, color = team.colour, durationMs = 15000 })
     local Q = Core.get("onboarding.questionnaire")
     local top = affinity and Q.top(affinity) or nil
     log("OFFER driver=%s player=%d team=%s seat=%d event=%s affinity_top=%s", driver.ncmDriverId, pid, seat.teamId, seat.seatIndex, e.eventId, tostring(top or "none"))

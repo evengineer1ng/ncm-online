@@ -17,7 +17,8 @@ local chatLog, toastLog, sqlLog = {}, {}, {}
 local vehicles, nextVid = {}, 100
 local players = {}            -- id -> { name, userId, position, heading, bucket }
 local bags = {}
-local world = { props = {}, npcs = {}, nextId = 500, perf = {} }   -- fake props/NPCs/performance ceilings
+local world = { props = {}, npcs = {}, nextId = 500, perf = {}, population = {} }   -- fake props/NPCs/ceilings/density
+local tunableOverrides = { ambientEnabled = false }   -- scenarios opt in; see Open77.tunables.declare
 GlobalState = {}
 local clientEvents = {}       -- TriggerClientEvent recorder
 
@@ -104,7 +105,15 @@ end
 Open77 = {
     time = { unix = function() return clock end },
     runtime = { luaVersion = function() return _VERSION end },
-    tunables = { declare = function(spec) local t = {}; for k, v in pairs(spec) do t[k] = v.value end; return t end },
+    -- Declared tunables, with a scenario override layer. Ambient population is OFF here by default: it
+    -- spawns cars and pedestrians on a timer, and every scenario that counts what is in the world would
+    -- otherwise be counting the city as well as the grid. A scenario that wants it says so.
+    tunables = { declare = function(spec)
+        local t = {}
+        for k, v in pairs(spec) do t[k] = v.value end
+        for k, v in pairs(tunableOverrides) do if t[k] ~= nil then t[k] = v end end
+        return t
+    end },
     chat = { send = function(pid, text) chatLog[#chatLog + 1] = { pid = pid, text = text }; print(("  chat -> %s: %s"):format(tostring(pid), text)) end },
     notifications = { send = function(pid, n) toastLog[#toastLog + 1] = { pid = pid, n = n } end },
     players = {
@@ -123,11 +132,25 @@ Open77 = {
         all = function() local out = {}; for id, p in pairs(world.props) do out[#out + 1] = { id = id, model = p.model } end; return out end,
     },
     npcs = {
+        -- Flag/enum tables the real prelude exposes; ambient.lua reads them at spawn time.
+        ai = { tasks = 0, frozen = 1, native = 2 },
+        damage = { mortal = 0, immortal = 1, invulnerable = 2 },
+        flags = { alive = 1, ragdoll = 2, despawnWhenUnobserved = 4, persistent = 8 },
         create = function(spec) if spec.template == "Character.bad" or spec.record == "Character.bad" then return nil, "npc_template_invalid" end
             if spec.template and spec.template:find("recordonly") and not spec.record then return nil, "npc_template_invalid" end
             world.nextId = world.nextId + 1; world.npcs[world.nextId] = spec; return world.nextId end,
         remove = function(id) if not world.npcs[id] then return false, "no_such_npc" end; world.npcs[id] = nil; return true end,
-        tasks = { lookAt = function(id, o) if world.npcs[id] then world.npcs[id].lookAt = o end; return true end },
+        get = function(id) local n = world.npcs[id]; if not n then return nil end
+            local p = n.position or n
+            return { id = id, x = p.x, y = p.y, z = p.z, yaw = n.yaw or 0, bucket = n.bucket or 0 } end,
+        -- `readyClients` is how the server learns whether anyone is RENDERING an NPC, which is the exact
+        -- half of the ambient sight rule a distance test cannot supply. Nobody is streaming in the stub.
+        owner = function(id) if not world.npcs[id] then return nil, "not_found" end
+            return { authorityPlayerId = 0, physicsOwner = 0, readyClients = 0, epoch = 1 } end,
+        tasks = {
+            lookAt = function(id, o) if world.npcs[id] then world.npcs[id].lookAt = o end; return true end,
+            wander = function(id, o) if world.npcs[id] then world.npcs[id].wander = o or true end; return true end,
+        },
     },
     routingBuckets = { getPlayer = function(id) return players[id] and players[id].bucket or 0 end },
     state = { player = function(pid) bags[pid] = bags[pid] or {}; local b = bags[pid]; return { set = function(_, k, v) b[k] = v; return true end, get = function(_, k) return b[k] end, clear = function(_, k) b[k] = nil; return true end } end },
@@ -136,6 +159,8 @@ Open77 = {
         remove = function(vid) if not vehicles[vid] then return false, "no_such_vehicle" end; vehicles[vid] = nil; return true end,
         get = function(vid) local v = vehicles[vid]; if not v then return nil end
             return { id = vid, position = v.position, x = v.position.x, y = v.position.y, z = v.position.z, speed = v.ai and v.ai.speedNow or 0, moving = (v.ai and v.ai.speedNow or 0) > 0.1, driverPlayerId = nil, gear = 1, onGround = true, health = 1.0 } end,
+        owner = function(vid) if not vehicles[vid] then return nil, "not_streamed" end
+            return { authorityPlayerId = 0, physicsOwner = 0, aiDriven = vehicles[vid].ai ~= nil, epoch = 1 } end,
         setPerformance = function(vid, profile) if not vehicles[vid] then return false, "vehicle_not_found" end; world.perf[vid] = profile; return true end,
         ai = {
             attachDriver = function(vid) if not vehicles[vid] then return nil, "no_such_vehicle" end; vehicles[vid].ai = { status = "idle", speedNow = 0 }; return true end,
@@ -153,6 +178,21 @@ Open77 = {
     },
     ready = { participate = function() return true end, hold = function() return "h" end, release = function() end },
     map = { open = function() end, close = function() end },
+    resource = { name = function() return "ncm_world" end, state = function() return "started" end },
+    -- The SERVER half of Open77.world. `setPopulation` is the vanilla density switch -- server-owned and
+    -- replicated per routing bucket -- and `groundZ` asks a nearby client for a downward ray. Both are
+    -- what ncm_world/server/ambient.lua needs to do anything at all; without them its tick logged a nil
+    -- index once a second and the stub's output became unreadable.
+    world = {
+        setPopulation = function(bucket, policy) world.population[bucket] = policy; return true end,
+        getPopulation = function(bucket)
+            local p = world.population[bucket] or { crowd = 1.0, traffic = 1.0, police = true }
+            return { bucket = bucket, crowd = p.crowd, traffic = p.traffic, police = p.police,
+                     enabled = true, trafficGranularity = "binary", crowdGranularity = "continuous" }
+        end,
+        -- Flat ground at z = 0: the stub has no geometry, and a number is what the caller must handle.
+        groundZ = function() return 0.0, { playerId = 1, cached = true } end,
+    },
 }
 
 -- MySQL: answers the handful of shapes the resources need; everything else is a no-op that logs the SQL.
@@ -161,6 +201,21 @@ local venuePoints, venueRoutes = {}, {}   -- authored data round-trips through t
 local messages = {}           -- message_id -> row
 local onboarding = {}         -- driverId -> onboarding_json string
 local driverSr = {}           -- driverId -> { sr, incidents, clean }
+-- Economy v1 (L169) made check-in conditional on a ledger balance, and made the check-in write itself a
+-- conditional INSERT/UPDATE guarded by `(SELECT SUM(amount) FROM ledger ...) >= fee`. A double that answers 0 to
+-- every scalar and `true` to every transaction turns that into a permanent `insufficient_funds`, so the offline
+-- stub could not check in to a paid event at all. These two tables are the minimum needed to make the funded and
+-- unfunded cases actually DIFFER -- which is the whole point of having them.
+local ledger = {}             -- driverId -> { total, idem = { [key] = true } }
+local entries = {}            -- entryId -> { state, fee }
+local function ledgerFor(d) ledger[d] = ledger[d] or { total = 0, idem = {} }; return ledger[d] end
+local function ledgerAdd(driverId, amount, idemKey)
+    local l = ledgerFor(driverId)
+    if idemKey and l.idem[idemKey] then return false end   -- INSERT IGNORE on a unique idem_key
+    if idemKey then l.idem[idemKey] = true end
+    l.total = l.total + (tonumber(amount) or 0)
+    return true
+end
 local driverLic = {}          -- driverId -> { [discipline] = { level, clean } }
 local function sql(kind, q, p) sqlLog[#sqlLog + 1] = { kind = kind, q = q, p = p } end
 MySQL = {
@@ -169,6 +224,7 @@ MySQL = {
     scalar = { await = function(q, p) sql("scalar", q, p)
         if q:find("VERSION%(%)") then return "stub" end
         if q:find("schema_migrations") then return 9 end
+        if q:find("SUM%(amount%)") and q:find("FROM ledger") then return ledgerFor(p[1]).total end
         return 0 end },
     single = { await = function(q, p) sql("single", q, p)
         if q:find("FROM ncm_driver_binding") then
@@ -177,6 +233,9 @@ MySQL = {
         end
         if q:find("SELECT onboarding_json FROM driver_profile") then return { onboarding_json = onboarding[p[1]] } end
         if q:find("FROM driver_sr") then local r = driverSr[p[1]]; return r and { sr = r.sr, incidents = r.incidents, clean_sessions = r.clean } or nil end
+        -- `NcmEconomy.checkIn` decides insufficient_funds by reading this row back after the transaction, so a
+        -- double that returns nil here reports every check-in as unfunded no matter what the ledger says.
+        if q:find("FROM entry WHERE entry_id") then local e = entries[p[1]]; return e and { state = e.state, fee = e.fee } or nil end
         return nil end },
     query = { await = function(q, p) sql("query", q, p)
         if q:find("FROM venue_point") then local out = {}; for _, r in pairs(venuePoints) do out[#out + 1] = r end; return out end
@@ -199,15 +258,53 @@ MySQL = {
         if q:find("INTO driver_sr") then driverSr[p[1]] = { sr = p[3], incidents = p[4], clean = p[5] } end
         if q:find("INTO driver_licence") then driverLic[p[1]] = driverLic[p[1]] or {}; driverLic[p[1]][p[3]] = { level = p[4], clean = p[5] } end
         if q:find("INTO venue_route") then venueRoutes[p[3]] = { route_key = p[3], from_kind = p[4], from_key = p[5], to_kind = p[6], to_key = p[7], points_json = p[8], length_m = p[9] } end
+        -- starter_grant and any other direct ledger write: (driver, server, kind, amount, currency, ref, note, idem)
+        if q:find("INTO ledger") then ledgerAdd(p[1], p[3], p[8]) end
+        -- interest, registration and the host-kit shortcut all create entry rows outside the check-in
+        -- transaction, and check-in UPDATEs the row they made.
+        if q:find("INSERT INTO entry") then
+            entries[p[1]] = { state = q:match("'(%a[%a_]*)',%s*%d*,?%s*%w*_?at") or
+                (q:find("'interested'") and "interested") or (q:find("'registered'") and "registered") or
+                (q:find("'checked_in'") and "checked_in") or "interested", fee = tonumber(p[5]) or 0 }
+        end
         return 1 end },
     update = { await = function(q, p) sql("update", q, p)
         if q:find("DELETE FROM venue_point") then venuePoints[p[3] .. "/" .. p[4]] = nil end
         if q:find("UPDATE message SET state = ?, resolved_at", 1, true) then if messages[p[3]] then messages[p[3]].state = p[1] end end
         if q:find("UPDATE message SET state = 'read'") then if messages[p[1]] then messages[p[1]].state = "read" end end
         if q:find("UPDATE driver_profile SET onboarding_json") then onboarding[p[2]] = p[1] end
+        if q:find("UPDATE entry SET state = 'interested'") then local e = entries[p[2]]; if e then e.state = "interested" end end
+        if q:find("UPDATE entry SET state = 'withdrawn'") then local e = entries[p[1]]; if e then e.state = "withdrawn" end end
         return 1 end },
     transaction = { await = function(list) sql("transaction", "tx", list)
-        for _, st in ipairs(list) do if st.query:find("INSERT INTO ncm_driver_binding") then bindings[st.values[2]] = st.values[3] end end
+        for _, st in ipairs(list) do
+            local q, v = st.query, st.values
+            if q:find("INSERT INTO ncm_driver_binding") then bindings[v[2]] = v[3] end
+            -- The funds test lives in the WHERE clause of the write itself, which is deliberate (it is what stops
+            -- balance being read, changing, and then acted on). Model it, rather than letting every write succeed.
+            if q:find("UPDATE entry SET state='checked_in'") then
+                local fee, entryId, driverId, need = tonumber(v[1]) or 0, v[5], v[6], tonumber(v[8]) or 0
+                local e = entries[entryId]
+                if e and (e.state == "interested" or e.state == "withdrawn") and ledgerFor(driverId).total >= need then
+                    e.state, e.fee = "checked_in", fee
+                end
+            elseif q:find("INSERT INTO entry %(entry_id") then
+                local entryId, fee, driverId, need = v[1], tonumber(v[4]) or 0, v[3], tonumber(v[10]) or 0
+                if ledgerFor(driverId).total >= need then entries[entryId] = { state = "checked_in", fee = fee } end
+            elseif q:find("INSERT IGNORE INTO ledger") and q:find("FROM entry WHERE entry_id") then
+                -- `SELECT … -fee … FROM entry WHERE entry_id=? AND state='checked_in' AND fee=?`: the debit only
+                -- happens if the entry write above actually landed, which is the atomicity being tested.
+                local entryId, fee = v[4], tonumber(v[5]) or 0
+                local e = entries[entryId]
+                if e and e.state == "checked_in" and e.fee == fee then
+                    -- the driver is not in this statement's values; find them from the entry we just wrote
+                    for _, st2 in ipairs(list) do
+                        local d = st2.query:find("entry") and (st2.values[6] or st2.values[3]) or nil
+                        if type(d) == "string" and ledger[d] then ledgerAdd(d, -fee, v[2]); break end
+                    end
+                end
+            end
+        end
         return true end },
 }
 
@@ -237,6 +334,46 @@ local function count(pattern, list, field)
     return n
 end
 local function assertf(cond, fmt, ...) if not cond then error(("ASSERT: " .. fmt):format(...), 2) end end
+
+-- The Race Guide is no longer a state bag (KB-97) and no longer one event (KB-160): it arrives as a head plus
+-- numbered row packets. Reassemble the latest stream for `pid` exactly the way client/panel.lua does -- which is
+-- the point. This scenario asserted on `bags[pid].ncmGuide` for three days after KB-97 deleted that bag, so it
+-- failed on line 1 and stopped exercising the Guide at all, which is how a transport regression reached a live
+-- client twice. Asserting through the real transport is what makes the coverage true.
+local GUIDE_PACKET_CEILING = 6 * 1024   -- must match ROW_PACKET_BUDGET_BYTES in server/guide.lua
+local GUIDE_HEAD_CEILING = 6 * 1024
+local function guidePayload(pid)
+    local Chunks, Json = NcmCore.get("vocabulary.chunks"), NcmCore.get("vocabulary.json")
+    local function bytes(v) local ok, e = pcall(Json.encode, v); assertf(ok, "a Guide packet must be encodable"); return #e end
+    local id, head, rx = nil, nil, nil
+    for _, ce in ipairs(clientEvents) do
+        if ce.pid == pid and ce.name == "ncm:guide.stream.begin" then
+            local meta = ce.args[1]
+            id, head, rx = meta.id, meta.head, Chunks.receiver(tonumber(meta.parts) or 0)
+        end
+    end
+    if not id then return nil end
+    -- The head cannot be split, so it is the one part of the stream that can still break it on its own. That is
+    -- precisely where KB-86's twenty rows of history sat.
+    local headBytes = bytes(head)
+    assertf(headBytes <= GUIDE_HEAD_CEILING, "guide head is %d bytes, above the %d ceiling -- it is not split",
+        headBytes, GUIDE_HEAD_CEILING)
+    for _, ce in ipairs(clientEvents) do
+        if ce.pid == pid and ce.name == "ncm:guide.stream.part" and ce.args[1].id == id then
+            local part = ce.args[1]
+            local n = bytes(part)
+            assertf(n <= GUIDE_PACKET_CEILING, "guide packet %s is %d bytes, above the %d ceiling -- a packet " ..
+                "this size is the one that disappears without a word", tostring(part.index), n, GUIDE_PACKET_CEILING)
+            assertf(Chunks.accept(rx, part.index, part.items), "guide packet %s rejected", tostring(part.index))
+        end
+    end
+    assertf(Chunks.complete(rx), "guide stream incomplete: %d of %d packet(s)", rx.received, rx.expected)
+    local rows = assert(Chunks.collect(rx))
+    local out = {}
+    for k, v in pairs(head) do out[k] = v end
+    out.rows = rows
+    return out
+end
 
 -- ------------------------------------------------------------------ scenario: grid cars
 local scenarios = {}
@@ -707,8 +844,11 @@ function scenarios.guide()
     print("== /ncm.guide lists the posted cadence (street tier), numbered")
     chat("ncm.guide", 1)
     assertf(count("Race Guide: ", chatLog, "text") == 1, "guide header told")
-    assertf(bags[1].ncmGuide and #bags[1].ncmGuide.rows >= 3, "guide bag pushed with rows (%s)", tostring(bags[1].ncmGuide and #bags[1].ncmGuide.rows))
-    local row = bags[1].ncmGuide.rows[1]
+    local guide = guidePayload(1)
+    assertf(guide and #guide.rows >= 3, "guide streamed with rows (%s)", tostring(guide and #guide.rows))
+    assertf(tonumber(guide.serverNow) and guide.serverNow > 0,
+        "every Guide head carries serverNow -- without it the panel's clock reads 1969 (KB-86, KB-160)")
+    local row = guide.rows[1]
     assertf(row.tier == "street", "row 1 is the next street event")
     local e = NcmCalendar.events[row.eventId]
     assertf(e and (e.state == "posted" or e.state == "entry_open") and row.practice == "open", "practice open from posting (%s)", tostring(row.practice))
@@ -746,7 +886,8 @@ function scenarios.guide()
     chat("ncm.practice", 1)
     assertf(count("  P1 owner %(you%)", chatLog, "text") == 1, "leaderboard line")
     chat("ncm.guide", 1)
-    assertf(bags[1].ncmGuide.rows[1].myPracticeBest ~= nil and bags[1].ncmGuide.rows[1].myState == "interested", "guide shows my best and state")
+    local mine = guidePayload(1).rows[1]
+    assertf(mine.myPracticeBest ~= nil and mine.myState == "interested", "guide shows my best and state")
 
     print("== a second driver joins, then withdraws")
     chat("ncm.interest", 2, "1")
@@ -758,11 +899,22 @@ function scenarios.guide()
     assertf(count("UPDATE entry SET state = 'withdrawn'", sqlLog, "q") == 1, "withdraw persisted")
 
     print("== interest is not a grid: at the venue the entry upgrades (same id); practice closes when the session forms")
+    -- Check-in refuses a driver with no eligible machine (L83), so the garage has to be seeded for this leg. It is
+    -- seeded through the real `ncm.grant`, not a bypass: a bypass would only ever exercise the bypass.
+    command("ncm.grant", 0, "1", "all"); run(1)
     local entryId = e.entries[driverIdOf(1)].entryId
     while e.state ~= "entry_open" do run(10) end
     moveTo(1, e.venue); players[1].fresh = true; command("ncm.enter", 0, "1")
     assertf(e.entries[driverIdOf(1)].state == "checked_in" and e.entries[driverIdOf(1)].entryId == entryId, "upgraded in place")
-    assertf(count("UPDATE entry SET state = 'checked_in'", sqlLog, "q") == 1, "upgrade persisted as an update, not an insert")
+    -- Economy v1 moved the upgrade inside the check-in TRANSACTION, so it is logged as a transaction whose
+    -- statements carry the SQL -- `sqlLog[].q` is just "tx". Count the statement, not the log line.
+    local upgrades = 0
+    for _, r in ipairs(sqlLog) do
+        if r.kind == "transaction" then
+            for _, st in ipairs(r.p or {}) do if st.query:find("UPDATE entry SET state='checked_in'", 1, true) then upgrades = upgrades + 1 end end
+        end
+    end
+    assertf(upgrades == 1, "upgrade persisted as an update, not an insert (%d)", upgrades)
     assertf(count("INSERT INTO entry", sqlLog, "q") == 2, "no new entry row for the upgrade (owner + tester interest = 2 inserts)")
     while e.startsAt - clock > 58 do run(5) end
     run(2)
@@ -779,7 +931,7 @@ end
 function scenarios.guide2()
     bootstrap()
     commands["ncm.interest"](1, { "1" }); run(1)
-    local row = bags[1].ncmGuide.rows[1]
+    local row = guidePayload(1).rows[1]
     local e = NcmCalendar.events[row.eventId]
     local prec; for _, rec in pairs(NcmRace.sessions) do if rec.practice then prec = rec end end
     assertf(prec == nil, "interest did not create practice")
@@ -925,6 +1077,126 @@ function scenarios.progression()
     command("ncm.profile", 1)
     assertf(count("Licence: ncx_formula rookie %(1 clean%)", chatLog, "text") == 1, "profile readout")
     print("OK progression")
+end
+
+-- 18. ambient: the world is inhabited, and a race clears its own road.
+--
+-- This is the INTEGRATION the unit tests cannot reach: ncm_league publishes a calendar row, ncm_world
+-- reads it out of GlobalState in a different Lua VM, turns the route into a corridor, and takes its own
+-- ambient population out of the way. Both halves of the population story are asserted, because the
+-- interesting failure is doing one and believing you did both.
+function scenarios.ambient()
+    tunableOverrides.ambientEnabled = true
+    tunableOverrides.ambientSpawnPerTick = 4
+    bootstrap()
+
+    -- Record where things are CREATED, which is what the no-pop radius actually promises. Asserting on
+    -- where they are LATER would be wrong and was: an ambient car on joinTraffic drives, and driving past
+    -- the player at 100 m is the behaviour, not a violation.
+    local births = {}
+    local realVehicleCreate, realNpcCreate = Open77.vehicles.create, Open77.npcs.create
+    Open77.vehicles.create = function(spec)
+        local id = realVehicleCreate(spec)
+        if id then births[#births + 1] = { kind = "vehicle", x = spec.position.x, y = spec.position.y } end
+        return id
+    end
+    Open77.npcs.create = function(spec)
+        local id = realNpcCreate(spec)
+        if id then births[#births + 1] = { kind = "ped", x = spec.position.x, y = spec.position.y } end
+        return id
+    end
+
+    moveTo(1, { x = 0, y = 0 })
+    run(30)
+
+    local cars, peds = 0, 0
+    for _, e in pairs(NcmAmbient.owned) do
+        if e.kind == "vehicle" then cars = cars + 1 else peds = peds + 1 end
+    end
+    assertf(cars + peds > 0, "the world was populated around a connected player, got %d", cars + peds)
+    assertf(peds > 0, "there are people on the pavements, not only cars: %d ped(s)", peds)
+    assertf(#births > 0, "births were recorded")
+    for _, b in ipairs(births) do
+        local d = math.sqrt(b.x * b.x + b.y * b.y)
+        assertf(d >= 110, "nothing popped in beside the player: %s born at %.0f m", b.kind, d)
+    end
+    -- Every ambient car is enrolled in the engine's own lane traffic. A parked car is scenery.
+    for _, e in pairs(NcmAmbient.owned) do
+        if e.kind == "vehicle" then
+            assertf(vehicles[e.vehicleId] ~= nil and vehicles[e.vehicleId].ai ~= nil,
+                "ambient car %s has a driver attached", tostring(e.vehicleId))
+        end
+    end
+    assertf(world.population[0] ~= nil, "the vanilla density switch was asserted for the bucket")
+    assertf(world.population[0].crowd == 1.0, "...at the open policy while nothing is due")
+
+    -- Post the race FIRST, then place our ambient population on the road that race actually got. Placing
+    -- it on a route of our own choosing and hoping the calendar picked the same one is how this assertion
+    -- passes for the wrong reason.
+    -- Post the race AND enter it. An empty slot must hold no road at all -- there are 21 scheduled starts
+    -- in any three-hour window on the shipped cadence and most of them have nobody in them, so holding a
+    -- corridor per slot would clear every route permanently. The entrants are what make this race real.
+    command("ncm.event.post", 0, "tip", "3")
+    inviteBoth()
+    run(30)
+    local cal = GlobalState.ncmCalendar
+    assertf(cal and cal.next and cal.next[1], "a race is on the calendar")
+    local row = cal.next[1]
+    assertf((tonumber(row.entries) or 0) > 0, "the race has entrants, got %s", tostring(row.entries))
+    assertf(row.finish and row.finish.x ~= nil,
+        "the publication carries the finish COORDINATES, not just its name -- a corridor needs the whole lap")
+
+    -- Midway down the racing line and 50 m to the SIDE of it. Midway, because that is the part a radius
+    -- drawn round the grid box would miss entirely; to the side, because sitting exactly on the line
+    -- would be cleared by a corridor of any width at all and would prove nothing about this one's.
+    local dx, dy = row.finish.x - row.venue.x, row.finish.y - row.venue.y
+    local len = math.max(1e-6, math.sqrt(dx * dx + dy * dy))
+    local mid = {
+        x = (row.venue.x + row.finish.x) / 2 + (-dy / len) * 50,
+        y = (row.venue.y + row.finish.y) / 2 + (dx / len) * 50,
+    }
+    local onTheLine = {}
+    for key, e in pairs(NcmAmbient.owned) do
+        e.x, e.y = mid.x, mid.y
+        if e.vehicleId then
+            vehicles[e.vehicleId].position = { x = e.x, y = e.y, z = e.z }
+            -- ...and drop the traffic target with it. The stub drives enrolled cars toward whatever
+            -- point joinTraffic last set, so a car teleported onto the racing line would drive straight
+            -- back off it and be reclaimed for distance instead -- which is this assertion passing for
+            -- the wrong reason.
+            if vehicles[e.vehicleId].ai then vehicles[e.vehicleId].ai.target = nil end
+        end
+        if e.npcId and world.npcs[e.npcId] then world.npcs[e.npcId].position = { x = e.x, y = e.y, z = e.z } end
+        onTheLine[#onTheLine + 1] = key
+    end
+    assertf(#onTheLine > 0, "the fixture put something in the corridor's path")
+
+    -- 300 m to the side: past `ambientSightM` (220) so a despawn is unobserved, but well inside
+    -- `ambientRetireM` (420) so the ONLY rule that can remove these is the corridor. Standing further off
+    -- would let the reclaim rule clear them and the assertion would prove nothing.
+    moveTo(1, { x = mid.x, y = mid.y + 300 })
+    run(30)
+
+    local left = 0
+    for _, key in ipairs(onTheLine) do if NcmAmbient.owned[key] then left = left + 1 end end
+    local pp = {}
+    for pid, pl in pairs(players) do
+        pp[#pp+1] = ("p%s@%.0f,%.0f d=%.0f"):format(pid, pl.position.x, pl.position.y,
+            math.sqrt((pl.position.x-mid.x)^2 + (pl.position.y-mid.y)^2))
+    end
+    assertf(left == 0, "the race corridor was cleared of ambient population, %d left standing", left)
+    -- And the city AROUND the corridor is untouched. The vanilla switch is bucket-wide with no radius, so
+    -- throwing it here would empty Night City for everyone -- permanently, given a corridor is in its
+    -- window almost always on this cadence. The corridor is cleared by removing OUR entities from it.
+    assertf(world.population[0].crowd == 1.0 and world.population[0].police == true,
+        "the shared world bucket keeps its vanilla population through a race")
+
+    -- Nothing this file spawns may ever appear in a session.
+    for _, e in pairs(NcmAmbient.owned) do
+        assertf(vehicles[e.vehicleId or -1] == nil or NcmGarage.describe(1):find(tostring(e.vehicleId)) == nil,
+            "ambient cars are never issued to a driver")
+    end
+    print("OK ambient")
 end
 
 local which = arg[1] or "gridcars"

@@ -137,24 +137,34 @@
     #inputs .tyre b { font: 700 9px/1 var(--mono); letter-spacing: 0.12em; color: var(--dim); }
     #inputs .tyre em { font: 700 10px/1 var(--mono); font-style: normal; color: var(--dim); }
     #inputs .tyre em.state { min-width:58px;text-align:center;color:var(--text);letter-spacing:.05em; }
+    #wearLamps { position:absolute;left:0;bottom:calc(100% + 6px);display:flex;gap:5px;align-items:center;pointer-events:none; }
+    #wearLamps.hidden { display:none; }
+    #wearLamps .wear-lamp { min-width:22px;height:20px;padding:0 4px;border:1px solid var(--warn);border-radius:4px;background:rgba(8,10,13,.84);color:var(--warn);font:800 9px/20px var(--mono);letter-spacing:.05em;text-align:center;box-sizing:border-box; }
+    #wearLamps .wear-lamp.critical { border-color:var(--red);background:var(--red);color:#fff; }
 
     /* Live race graph (P40). VERTICAL, and deliberately small.
        It used to be a 1240px bar across the bottom of the screen, which sat on top of the speedometer. It now
-       stands on the left edge, clear of the vanilla driving HUD (bottom-centre speed, bottom-right minimap)
-       and clear of NCM's own strip/board/banner, all of which are top-centre. Finish at the top, start at the
-       bottom, because that is the direction the race is going. */
-    #graph { position: absolute; left: 44px; top: 50%; transform: translateY(-50%); width: 152px; height: 430px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; }
-    #graph .line { position: absolute; left: 34px; top: 46px; bottom: 40px; width: 3px; background: var(--line); border-radius: 2px; }
+       stands on the RIGHT edge (owner, 2026-09-27, L180; it stood on the left until then), clear of the vanilla
+       driving HUD (bottom-centre speed, bottom-right minimap) and clear of NCM's own strip/board/banner, all
+       of which are top-centre. Finish at the top, start at the bottom, because that is the direction the race
+       is going.
+
+       The whole thing is MIRRORED rather than merely shifted: the line and the dots hug the box's right edge
+       and every label reads LEFTWARD, inward across the screen. Labels are `white-space: nowrap` and overflow
+       the 152px box on purpose, so a graph on the right with labels still reading rightward would push driver
+       names off the edge of the screen. */
+    #graph { position: absolute; right: 44px; top: 50%; transform: translateY(-50%); width: 152px; height: 430px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; }
+    #graph .line { position: absolute; right: 34px; top: 46px; bottom: 40px; width: 3px; background: var(--line); border-radius: 2px; }
     #graph .flag { position: absolute; left: 0; right: 0; top: 14px; display: flex; align-items: center; justify-content: center; gap: 5px; font: 700 11px/1 var(--mono); letter-spacing: 0.16em; color: var(--ok); }
     #graph .flag .ncm-glyph { width: 14px; height: 14px; }
     #graph .lbl { position: absolute; left: 0; right: 0; bottom: 14px; text-align: center; font: 700 11px/1 var(--mono); letter-spacing: 0.16em; color: var(--dim); }
-    /* A dot sits on the line at its progress; its label reads outward to the right, so several close
-       together stay legible instead of stacking on top of each other. */
-    #graph .dot { position: absolute; left: 35px; width: 16px; height: 16px; margin-left: -8px; margin-top: -8px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.85); box-shadow: 0 0 8px rgba(0,0,0,0.8); transition: top 300ms linear; }
-    #graph .dot .tag { position: absolute; left: 22px; top: 50%; transform: translateY(-50%); font: 700 12px/1 var(--mono); letter-spacing: 0.06em; color: var(--text); white-space: nowrap; text-shadow: 0 0 6px rgba(0,0,0,0.9); }
-    #graph .dot.me { width: 22px; height: 22px; margin-left: -11px; margin-top: -11px; border-color: var(--warn); box-shadow: 0 0 14px rgba(245,201,92,0.9); z-index: 2; }
+    /* A dot sits on the line at its progress; its label reads inward to the LEFT, so several close together
+       stay legible instead of stacking on top of each other, and none of them leaves the screen. */
+    #graph .dot { position: absolute; right: 35px; width: 16px; height: 16px; margin-right: -8px; margin-top: -8px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.85); box-shadow: 0 0 8px rgba(0,0,0,0.8); transition: top 300ms linear; }
+    #graph .dot .tag { position: absolute; right: 22px; top: 50%; transform: translateY(-50%); text-align: right; font: 700 12px/1 var(--mono); letter-spacing: 0.06em; color: var(--text); white-space: nowrap; text-shadow: 0 0 6px rgba(0,0,0,0.9); }
+    #graph .dot.me { width: 22px; height: 22px; margin-right: -11px; margin-top: -11px; border-color: var(--warn); box-shadow: 0 0 14px rgba(245,201,92,0.9); z-index: 2; }
     #graph .dot.me .tag { color: var(--warn); }
-    #graph .dot .inc { position: absolute; left: 22px; top: 14px; font: 700 10px/1 var(--mono); color: var(--red); white-space: nowrap; }
+    #graph .dot .inc { position: absolute; right: 22px; top: 14px; text-align: right; font: 700 10px/1 var(--mono); color: var(--red); white-space: nowrap; }
   </style>
 </head>
 <body>
@@ -172,6 +182,7 @@
   <div id="ghost" class="hidden"><span class="lbl" id="ghostLabel"></span><span class="who" id="ghostWho"></span><span class="time" id="ghostTime"></span><span class="delta na" id="ghostDelta">--</span><span class="warn hidden" id="ghostWarn"></span></div>
   <div id="board" class="hidden"><div class="title"><span id="boardIcon"></span><span id="boardTitle"></span></div><table><tbody id="rows"></tbody></table></div>
   <div id="inputs" class="hidden">
+    <div id="wearLamps" class="hidden" aria-label="Component condition warnings"></div>
     <div class="wheel" id="inWheel"><svg viewBox="-24 -24 48 48" width="40" height="40" aria-hidden="true"><g id="inWheelG"><circle r="20" fill="none" stroke="currentColor" stroke-width="3.2"/><line x1="-19.5" y1="-3" x2="19.5" y2="-3" stroke="currentColor" stroke-width="2.8"/><line x1="0" y1="-3" x2="0" y2="19.5" stroke="currentColor" stroke-width="2.8"/><circle r="3.2" fill="currentColor"/></g></svg></div>
     <!-- km/h, because every number NCM composes is km/h and the vanilla dial is mph. -->
     <div class="spd"><span class="val na" id="inSpd">--</span><span class="unit">KM/H</span></div>
@@ -204,6 +215,7 @@
       const instr = document.getElementById("instr");
       const instrWho = document.getElementById("instrWho");
       const instrOdo = document.getElementById("instrOdo");
+      const wearLamps = document.getElementById("wearLamps");
       const graph = document.getElementById("graph");
       const graphFlag = document.getElementById("graphFlag");
       const dots = document.getElementById("dots");
@@ -407,6 +419,13 @@
         // reading and "0.94" is not.
         const cost = typeof v.m === "number" && isFinite(v.m) ? Math.round((1 - v.m) * 100) : null;
         text(tyrePct, cost === null ? "--" : (cost === 0 ? "FULL GRIP" : "-" + cost + "% GRIP"));
+      });
+
+      const wearShort={service:"SRV",engine:"ENG",drivetrain:"DRV",brake:"BRK",tyre:"TYR",temperature:"TMP",electrical:"ELC",chassis:"CHS"};
+      Open77.on("race:wear", (v) => {
+        const warnings=v&&Array.isArray(v.warnings)?v.warnings:[];wearLamps.innerHTML="";
+        for(const w of warnings){const lamp=document.createElement("span");lamp.className="wear-lamp "+(w.status==="critical"?"critical":"attention");lamp.textContent=wearShort[w.system]||"!";lamp.title=String(w.label||w.system||"Service required");lamp.setAttribute("aria-label",lamp.title);wearLamps.append(lamp);}
+        wearLamps.classList.toggle("hidden",warnings.length===0);
       });
 
       // ---------------------------------------------------------------------------------------------

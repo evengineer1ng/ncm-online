@@ -28,11 +28,19 @@ end
 local function save(driverId, key, exposure)
     memory[driverId.."|"..key] = exposure
     if not MySQL.isReady() then return end
+    -- `NULLIF(?, 0)` and a 0 sentinel, not nil. OPEN//77's bridge measures `#values`, so a trailing nil is not
+    -- SQL NULL -- it shortens the array and the statement is refused with `parameter_count_mismatch`.
+    --
+    -- **This had been failing on every single write since the table shipped**, and the reason it went unnoticed
+    -- is the shape of the code around it: the failure is caught, logged at INF among thousands of lines, and
+    -- `memory[]` keeps the value for the rest of the process -- so pacing behaved correctly right up until a
+    -- restart, then forgot everything. `once` and `until_ack` silently became `always` across restarts. Found
+    -- 2026-09-28 in the live log while verifying an unrelated deploy; same class as `market_knowledge.lua`.
     local ok, err = pcall(MySQL.insert.await, [[INSERT INTO player_message_exposure
         (ncm_driver_id,server_id,message_key,shown_count,last_shown_at,acknowledged_at)
-        VALUES (?,?,?,?,?,?) ON DUPLICATE KEY UPDATE shown_count=VALUES(shown_count),
+        VALUES (?,?,?,?,NULLIF(?,0),NULLIF(?,0)) ON DUPLICATE KEY UPDATE shown_count=VALUES(shown_count),
         last_shown_at=VALUES(last_shown_at),acknowledged_at=VALUES(acknowledged_at)]],
-        {driverId,sid(),key,exposure.shownCount or 0,exposure.lastShownAt,exposure.acknowledgedAt})
+        {driverId,sid(),key,exposure.shownCount or 0,exposure.lastShownAt or 0,exposure.acknowledgedAt or 0})
     if not ok then log("exposure write failed driver=%s key=%s: %s",driverId:sub(1,8),key,tostring(err)) end
 end
 

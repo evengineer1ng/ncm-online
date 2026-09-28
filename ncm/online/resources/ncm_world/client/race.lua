@@ -290,6 +290,12 @@ RegisterNetEvent("ncm:tyre", function(v)
     pcall(function() page:send("race:tyre", (type(v) == "table") and v or false) end)
 end)
 
+-- Derived component warnings are targeted to the current operator and contain system/severity only.
+RegisterNetEvent("ncm:wear", function(v)
+    if not page then return end
+    pcall(function() page:send("race:wear", (type(v)=="table") and v or false) end)
+end)
+
 local function instrumentState()
     local o = odoState
     if type(o) ~= "table" then return nil end
@@ -980,6 +986,8 @@ local function toggleGraph()
 end
 pcall(function() RegisterKeyMapping("ncm.graph", "NCM: race graph", "F8", toggleGraph) end)
 RegisterCommand("ncm.graph", toggleGraph, false)
+NcmQuickActions = NcmQuickActions or {}
+NcmQuickActions.graph = toggleGraph
 
 AddEventHandler("onClientResourceStop", function(name)
     if name == "ncm_world" then clearAll() end

@@ -124,6 +124,49 @@ end
 local ENGAGE_KEY = "E"
 local HOLD_S = 0.6           -- hold this long to engage; below it, a release is a tap
 local vpage, vpageReady = nil, false
+
+-- ---------------------------------------------------------------------------------------------
+-- `NcmVenueSurface` — this page, lent out (`L193`, 2026-09-28)
+-- ---------------------------------------------------------------------------------------------
+--
+-- `kMaximumWebSurfaces` is **8 per resource** and `ncm_world` had reached 8 of 8 (`IDEA-570`), with three of
+-- them invisible transport pages that come and go — so `WebUI.create` for a ninth was refused depending on
+-- timing. The Street Call form therefore draws on THIS page instead of owning one, and the owner chose that
+-- explicitly (2026-09-28: *"use venue.html i dont care just make it work without adding a second page"*).
+--
+-- Two rules keep the two tenants out of each other's way, and neither is new:
+--   * **The venue option list yields while the card is up.** The input loop below already stands down on
+--     `NcmClientBuildActive`, exactly as it does on `NcmClientRaceActive`, and sends `venue:hide` on the way
+--     out — so only one of the two is ever on screen.
+--   * **Nothing here takes focus.** The page stays `pointer-events: none` and is never focused, which is what
+--     makes it safe to leave attached during a race (`KB-67`). `race_builder.lua` reads its keys in Lua.
+--
+-- `on` is deferred because handlers are registered at file scope, before `onClientResourceStart` has built the
+-- page. A handler registered against a page that does not exist yet would simply be lost, which is the same
+-- class of silent failure as a stream beginning before its receiver.
+NcmVenueSurface = {}
+
+local borrowed = {}      -- name -> fn, registered before the page existed
+
+--- The live page, or nil while it does not exist or has not reported ready. Callers must treat nil as "not now"
+--- rather than as an error: a surface that is not ready is a normal state during resource start.
+function NcmVenueSurface.page()
+    if vpage and vpageReady then return vpage end
+    return nil
+end
+
+function NcmVenueSurface.send(name, value)
+    local p = NcmVenueSurface.page()
+    if not p then return false end
+    local ok, err = pcall(function() p:send(name, value) end)
+    if not ok then log("venue surface send(%s) failed: %s", tostring(name), tostring(err)) end
+    return ok
+end
+
+function NcmVenueSurface.on(name, fn)
+    borrowed[name] = fn
+    if vpage then pcall(function() vpage:on(name, fn) end) end
+end
 local venueBag, historyBag, practiceBag = nil, nil, nil
 -- The server's `at` stamp last acted on, per panel. See `readVenueBags`: a persisted bag must be
 -- adopted silently, never treated as a fresh request.
@@ -190,7 +233,13 @@ AddEventHandler("onClientResourceStart", function(name)
     })
     if not vpage then log("venue WebUI failed: %s", tostring(reason)); return end
     vpage:on("venue:ready", function() vpageReady = true; lastDrawn = nil; log("venue list ready") end)
+    -- Handlers other files asked for before this page existed (`NcmVenueSurface.on`). Bound here rather than
+    -- dropped, because a listener registered against a page that does not exist yet is silently lost.
+    for name, fn in pairs(borrowed) do
+        pcall(function() vpage:on(name, fn) end)
+    end
 end)
+
 
 -- The three bags the server writes for this surface. KB-41: the watcher carries no payload; we always read our own.
 local function readVenueBags()
@@ -248,8 +297,9 @@ CreateThread(function()
     while true do
         local pos = poi.handle and poi.venue and localPosition() or nil
         local near = pos and Routes.planarDistance(pos, poi.venue) <= VENUE_RADIUS_M + 0.5
-        -- while racing, race.lua owns the HUD and the venue list must not sit under it
-        if near and not NcmClientRaceActive then
+        -- while racing, race.lua owns the HUD and the venue list must not sit under it; while the Street Call
+        -- card is up, race_builder.lua owns the same E key and the same corner of the screen (L179)
+        if near and not NcmClientRaceActive and not NcmClientBuildActive then
             readVenueBags()
             local captured = false
             pcall(function() captured = Open77.input.isCaptured() == true end)
@@ -336,7 +386,7 @@ local function refreshHint()
         ensurePoi(nil)
         -- This card is the one instruction that persists. It MUST name the repeatable recovery command;
         -- otherwise a missed first-join toast leaves a visitor stranded for the rest of their session.
-        local text, title = "Races are running tonight · F6 Race Guide · New here? /ncm help", "NCM · RACE GUIDE"
+        local text, title = "Races are running tonight · F6 Hub · New here? /ncm help", "NCM · HUB"
         if text ~= lastHint.text or title ~= lastHint.title then
             lastHint = { text = text, title = title }
             pcall(function()
@@ -478,7 +528,7 @@ end
 -- Verified 2026-09-19 (E17): a routable blip that is created and tracked gets a pin but the engine
 -- does not compute the road path until tracking is cleared and re-set (opening the map does the
 -- same). clearWaypoint -> setWaypoint routes immediately, so that is the whole recipe.
-RegisterCommand("ncm.gps", function()
+local function gpsCommand()
     -- In a session, the HUD's target (grid, start line, next gate) wins over the street cadence. `/ncm.gps` is
     -- a RECOVERY tool, not part of racing: what it does here is re-select the existing target against the
     -- driver's current seat context, which is precisely what opening and closing the map used to do by hand.
@@ -506,7 +556,10 @@ RegisterCommand("ncm.gps", function()
     end
     if not soonest then return end
     CreateThread(function() routeTo(soonest.venue, soonest.eventId, "command") end)
-end, false)
+end
+RegisterCommand("ncm.gps", gpsCommand, false)
+NcmQuickActions = NcmQuickActions or {}
+NcmQuickActions.gps = gpsCommand
 
 -- /ncm.gps.echo — diagnostic (E17): take the waypoint the player set by hand on the map, clear it,
 -- and re-set the SAME coordinates through the scripted API. If the route line comes back, scripted
