@@ -4240,3 +4240,17 @@ penalty, never a boost" rule is superseded for what the car receives.
 
 **Open.** Every constant is a first pass to tune on the wheel (live tests `§HB1`-`§HB5`). Tracked by
 `IDEA-715`-`IDEA-717`.
+
+## L209 - LOCKED OWNER DIRECTION / EXECUTED IN CODE / LIVE-GATED - every weather is a road of its own, combined with time of day
+
+**Owner direction (2026-09-29).** *"lets make all weather conditions have their uniquely tuned logical properties,
+should combine nicely with time of day."* Before this only rain changed the road; every other weather heated the
+track exactly like a sunny day.
+
+**Executed.** `parts.thermal.WEATHER` gives each of the eight states a profile: `sun` (share of daytime solar gain),
+`sky` (share of night radiative loss), `airC` (air offset), `wet` (road wetness target) and optional surface
+`grip`/`drag`. Time of day multiplies through `sun`/`sky`, so sunny is the hottest afternoon and the coldest night,
+heavy cloud keeps both mild, fog is cool with a damp film (wet 0.15), pollution traps heat and leaves grime
+(grip x0.97), sandstorm is hot and gritty (grip x0.95, drag x1.05), rain soaks the road. Track temperature reaches
+the tyre (heating) and the `surface` layer (cold pushes, hot livelier, `L208`). An unknown weather is the previous
+model exactly. First-pass values; live test `§HB6`. Tracked by `IDEA-718`.

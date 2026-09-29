@@ -1008,11 +1008,11 @@ Core.define("parts.handling", function(C)
             brakeScale = 1.0 - (M.WET_DEPTH.brakeScale * w),
             driveScale = 1.0 - (M.WET_DEPTH.driveScale * w),
         }
-        -- Sand on the road: a small push and a little more drag. Fog, pollution and cloud stay neutral.
-        if weatherId == "sandstorm" then
-            out.gripScale = out.gripScale * M.SANDSTORM.gripScale
-            out.dragScale = M.SANDSTORM.dragScale
-        end
+        -- Surface contamination by weather (`L209`): sand pushes and drags, smog grime pushes slightly.
+        -- Damp from fog arrives through `wetness`, not here.
+        local p = Thermal.weatherProfile(weatherId)
+        if p.grip then out.gripScale = out.gripScale * p.grip end
+        if p.drag then out.dragScale = p.drag end
         return out
     end
 
@@ -1020,7 +1020,6 @@ Core.define("parts.handling", function(C)
     --- push on this engine (`E26`), so the wet car refuses to turn and stops long; the loose-on-power half
     --- is `wetPowerGrip`, applied client-side from live throttle.
     M.WET_DEPTH = { gripScale = 0.20, brakeScale = 0.18, driveScale = 0.10 }
-    M.SANDSTORM = { gripScale = 0.95, dragScale = 1.05 }
 
     --- `L208` "push on entry, loose on power": under heavy throttle on a wet road the grip lever is lifted
     --- ABOVE the wet value -- and past 1.0 at full wet -- so the rear steps out. Ramps in from

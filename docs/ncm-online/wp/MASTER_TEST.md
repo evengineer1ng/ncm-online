@@ -2723,6 +2723,7 @@ migration before starting `ncm_world`. Use one owned, issued NCM Machine and not
 | §HB3 | On a fully wet road, turn in gently, then floor it mid-corner (`IDEA-715`). | Entry pushes; heavy throttle steps the rear out. Lifting off brings the push back within a fraction of a second. | **NOT RUN** |
 | §HB4 | Compare a full tank with a near-empty one on the same corner and straight (`/ncm.refuel` to fill) (`IDEA-717`). | Full: slower out of corners, longer braking, a slight push; the tyres heat faster. Near-empty: livelier. | **NOT RUN** |
 | §HB5 | Server console `ncm.machine weather sandstorm`, then `fog` (`IDEA-715`). | Sandstorm: a small push and a slightly lower top speed. Fog: no handling change. | **NOT RUN** |
+| §HB6 | Cycle `ncm.machine weather <id>` through sunny, heavyclouds, fog, pollution and sandstorm at the same time of day, running `/ncm.tyre` after each; repeat once at night (`L209`, `IDEA-718`). | The `track` line differs per weather: sunny hottest by day and coldest by night, heavy cloud mild both ways, fog cool and slightly damp (road wetness ~0.15), sandstorm hot. The tyres warm fastest on a sunny afternoon; a clear night pushes. | **NOT RUN** |
 
 ## §CG - DEVICES and the GAMEPAD layer: rim, Joy-Cons, variants, rumble presets (`IDEA-705`, `L205`, `KB-201`) - **DEPLOYED TO ONLINE 2026-09-29 02:29 UTC; AWAITING LIVE PASS**
 

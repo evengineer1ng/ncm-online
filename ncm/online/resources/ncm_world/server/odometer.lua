@@ -92,12 +92,13 @@ local thermal = {}   -- assetId -> { tempC, at, headingRad }
 --- directly, which is why neither needs a lever of its own: a cold night makes a tyre harder to warm, and
 --- that is the real mechanism rather than a flat penalty for driving after dark.
 local function conditions()
-    local wetness, seconds
+    local wetness, seconds, weather
     if NcmMachine and NcmMachine.state then
         local c = NcmMachine.state()
-        if type(c) == "table" then wetness, seconds = c.wetness, c.secondsOfDay end
+        if type(c) == "table" then wetness, seconds, weather = c.roadWetness or c.wetness, c.secondsOfDay, c.weather end
     end
-    return { wetness = wetness, secondsOfDay = seconds }
+    -- `L209`: the weather's own road profile (sun, sky, air) reaches the tyre through the track.
+    return { wetness = wetness, secondsOfDay = seconds, weather = weather }
 end
 
 --- Cornering load, in m/s^2, from what a ONE HERTZ poll can honestly see.

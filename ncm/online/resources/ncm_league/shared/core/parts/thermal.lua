@@ -89,6 +89,35 @@ Core.define("parts.thermal", function(C)
     M.NIGHT_RADIATION_C = 5.0   -- clear-sky radiative loss below air, dry
     M.TRACK_WET_COOLING_C = 8.0 -- standing water on the surface
 
+    -- ---------------------------------------------------------------------------------------------
+    -- `L209`: every weather is a road of its own (owner, 2026-09-29: "all weather conditions have their
+    -- uniquely tuned logical properties, should combine nicely with time of day").
+    -- ---------------------------------------------------------------------------------------------
+    --
+    --   sun   share of the daytime solar gain that reaches the asphalt (1 = clear sky)
+    --   sky   share of the night-time radiative loss (a clear sky pulls heat off the road; cloud blankets it)
+    --   airC  air temperature offset for this weather
+    --   wet   road wetness this weather drives toward (rain soaks it; fog leaves a damp film)
+    --   grip / drag  surface contamination, applied by `parts.handling.weatherContributor`
+    --
+    -- Time of day multiplies through `sun` and `sky`, so a sunny afternoon is the hottest road and a
+    -- sunny night the coldest, while heavy cloud keeps both mild. First-pass values to tune on the wheel.
+    M.WEATHER = {
+        sunny       = { sun = 1.00, sky = 1.00, airC =  1.0, wet = 0.00 },
+        lightclouds = { sun = 0.80, sky = 0.80, airC =  0.0, wet = 0.00 },
+        cloudy      = { sun = 0.50, sky = 0.50, airC = -1.0, wet = 0.00 },
+        heavyclouds = { sun = 0.25, sky = 0.25, airC = -2.0, wet = 0.00 },
+        rain        = { sun = 0.00, sky = 0.00, airC =  0.0, wet = 1.00 },  -- rain cooling is AIR_WET_COOLING_C
+        fog         = { sun = 0.30, sky = 0.20, airC = -3.0, wet = 0.15 },  -- cool, damp film, little sun
+        pollution   = { sun = 0.60, sky = 0.40, airC =  2.0, wet = 0.00, grip = 0.97 },  -- smog traps heat; grime
+        sandstorm   = { sun = 0.40, sky = 0.30, airC =  4.0, wet = 0.00, grip = 0.95, drag = 1.05 },  -- hot, gritty
+    }
+    -- An unknown or absent weather is the old model exactly: full sun, full sky, no offset, dry.
+    M.WEATHER_NEUTRAL = { sun = 1.00, sky = 1.00, airC = 0.0, wet = 0.00 }
+    function M.weatherProfile(weatherId)
+        return M.WEATHER[tostring(weatherId or "")] or M.WEATHER_NEUTRAL
+    end
+
     -- ---- the road's own grip
     --
     -- **A warm road is grippier than a cold one, and that is independent of the tyre on it.** A tyre
@@ -219,7 +248,7 @@ Core.define("parts.thermal", function(C)
     --- RELATIVE to it, and because a difference between two numbers is only meaningful if both are named.
     function M.airTemperature(conditions)
         conditions = conditions or {}
-        local out = tonumber(conditions.baseC) or M.AMBIENT_DEFAULT
+        local out = (tonumber(conditions.baseC) or M.AMBIENT_DEFAULT) + M.weatherProfile(conditions.weather).airC
         local daily = daylight(conditions)
         if daily then out = out + M.AIR_SWING_C * daily end
         return out - M.AIR_WET_COOLING_C * wetnessOf(conditions)
@@ -240,8 +269,9 @@ Core.define("parts.thermal", function(C)
         local out = M.airTemperature(conditions)
         local daily = daylight(conditions)
         if daily then
-            local solar = M.SOLAR_GAIN_C * math.max(0, daily)
-            local radiated = M.NIGHT_RADIATION_C * math.max(0, -daily)
+            local p = M.weatherProfile(conditions.weather)
+            local solar = M.SOLAR_GAIN_C * p.sun * math.max(0, daily)
+            local radiated = M.NIGHT_RADIATION_C * p.sky * math.max(0, -daily)
             out = out + (solar - radiated) * (1 - w)
         end
         return out - M.TRACK_WET_COOLING_C * w

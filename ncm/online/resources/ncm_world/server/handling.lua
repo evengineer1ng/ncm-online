@@ -139,7 +139,7 @@ local function contributorsFor(assetId)
     -- environment feed then shows no surface layer at all, which is a visible absence in the trace --
     -- where a plausible default would have read as a working feature. That is the `KB-151` lesson.
     if secondsOfDay then
-        local trackC = Thermal.trackTemperature({ wetness = wetness, secondsOfDay = secondsOfDay })
+        local trackC = Thermal.trackTemperature({ wetness = wetness, secondsOfDay = secondsOfDay, weather = weatherId })
         out.surface = Handling.surfaceContributor(trackC)
     end
 
@@ -840,7 +840,8 @@ RegisterNetEvent("ncm:tyre.query", function()
     end
 
     local conditions = (NcmMachine and NcmMachine.state and NcmMachine.state()) or {}
-    local world = { wetness = conditions.wetness, secondsOfDay = conditions.secondsOfDay }
+    local world = { wetness = conditions.roadWetness or conditions.wetness, secondsOfDay = conditions.secondsOfDay,
+                    weather = conditions.weather }
     tell(("tyre %s"):format(Thermal.explain(temperature)))
     -- Both bodies, because reporting one of them explains half of what the driver is feeling.
     tell(("track %s   (air %.1fC)"):format(

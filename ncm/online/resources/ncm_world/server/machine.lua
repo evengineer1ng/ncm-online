@@ -67,8 +67,12 @@ local published = {}        -- record -> signature, so we only rewrite GlobalSta
 
 --- Rain is a family, not a percentage, so the mapping is stated once, here, and it is deliberately coarse.
 --- `world.weather` already classifies every allowed state into dry / wet / obscured / hazardous.
+local RoadThermal = NcmCore.get("parts.thermal")
 local function wetnessOf(weatherId)
     if type(weatherId) ~= "string" then return 0 end
+    -- `L209`: each weather's own road wetness (rain soaks it, fog leaves a damp film).
+    local profile = RoadThermal.WEATHER[weatherId]
+    if profile then return profile.wet or 0 end
     local family = Weather.family(weatherId)
     if family == "wet" then return 1.0 end
     -- Obscured is not wet. Fog reduces what a driver can SEE, and pretending it reduces grip would be the

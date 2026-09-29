@@ -863,4 +863,30 @@ return {
         T.ok(near(F.heatFactor(60000, 60000), 1.0 + F.HEAT_AT_FULL), "full: faster heating")
         T.ok(near(F.tyreWearFactor(30000, 60000), 1.0 + F.TYRE_WEAR_AT_FULL * 0.5), "half: half the extra wear")
     end,
+
+    -- ------------------------------------------------------------------ `L209`: every weather is its own road
+    every_weather_state_has_a_road_profile = function(T)
+        local Th = T.Core.get("parts.thermal")
+        for _, id in ipairs({ "sunny", "lightclouds", "cloudy", "heavyclouds", "rain", "fog", "pollution", "sandstorm" }) do
+            T.ok(Th.WEATHER[id] ~= nil, id .. " must have its own profile, not fall to the default")
+        end
+    end,
+
+    weather_combines_with_time_of_day = function(T)
+        local Th = T.Core.get("parts.thermal")
+        local afternoon, night = 15 * 3600, 3 * 3600
+        local function track(w, s) return Th.trackTemperature({ weather = w, secondsOfDay = s }) end
+        T.ok(track("sunny", afternoon) > track("heavyclouds", afternoon), "sun heats the road; cloud shades it")
+        T.ok(track("heavyclouds", night) > track("sunny", night), "a clear night is colder than a clouded one")
+        T.ok(track("sandstorm", afternoon) > track("fog", afternoon), "a hot dusty day beats a cold fog")
+        T.ok(math.abs(track(nil, afternoon) - Th.trackTemperature({ secondsOfDay = afternoon })) < 1e-9,
+            "no weather is the old model exactly")
+    end,
+
+    contamination_comes_from_the_weather_profile = function(T)
+        local M = T.Core.get("parts.handling")
+        local smog = M.weatherContributor(0, "pollution")
+        T.ok(smog.gripScale < 1.0 and smog.gripScale > 0.95, "smog grime is a slight push")
+        T.ok(M.weatherContributor(0, "sunny").gripScale == 1.0, "a clean dry road is untouched")
+    end,
 }
