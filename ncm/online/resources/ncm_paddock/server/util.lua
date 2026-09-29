@@ -31,13 +31,35 @@ end
 -- The platform caps statements per transaction (weather.lua learned it at 48); chunk everything.
 PaddockUtil.TX_CHUNK = 40
 
+--- A nil inside `values` leaves a hole the host refuses with a bare `invalid_parameters` THROW, which kills the
+--- calling thread and names nothing (KB-204's shape; the offline stub accepts the nil, so the gate cannot see it).
+--- Check every statement first: one value per `?`, none nil. Returns nil when sound, else a message naming the
+--- statement and the first bad position.
+function PaddockUtil.checkStatement(st, index)
+    local q = type(st) == "table" and st.query or nil
+    if type(q) ~= "string" then return ("statement %d has no query"):format(index) end
+    local _, want = q:gsub("%?", "")
+    local v = st.values or {}
+    for k = 1, want do
+        if v[k] == nil then
+            return ("statement %d value %d of %d is nil: %s"):format(index, k, want, (q:gsub("%s+", " ")):sub(1, 90))
+        end
+    end
+    return nil
+end
+
 --- Run a list of { query, values } statements in chunked transactions, yielding between chunks. Returns ok, err.
 function PaddockUtil.transact(statements)
+    for k, st in ipairs(statements) do
+        local bad = PaddockUtil.checkStatement(st, k)
+        if bad then return false, bad end
+    end
     local i = 1
     while i <= #statements do
         local tx = {}
         for k = i, math.min(i + PaddockUtil.TX_CHUNK - 1, #statements) do tx[#tx + 1] = statements[k] end
-        local ok, err = MySQL.transaction.await(tx)
+        local called, ok, err = pcall(MySQL.transaction.await, tx)
+        if not called then return false, tostring(ok) end
         if not ok then return false, err end
         i = i + PaddockUtil.TX_CHUNK
         if i <= #statements then Wait(0) end

@@ -143,20 +143,22 @@ function PaddockRaces.run(race, t)
         splits[e.id] = e.splits
         st[#st + 1] = { query = [[INSERT IGNORE INTO paddock_result (server_id, race_id, person_id, org_id, series_id, season_id,
             cup_id, position, grid, state, finish_ms, gap_ms, points, purse, dnf_reason, at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULLIF(?, ''), ?)]],
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULLIF(?, -1), NULLIF(?, -1), ?, ?, NULLIF(?, ''), ?)]],
             values = { U.sid(), race.raceId, e.id, e.orgId or "", race.seriesId, race.seasonId, race.cupId, e.position,
-                e.grid, e.state, e.finishMs, e.gapMs, e.points, e.purse, e.dnfReason or "", race.opensAt } }
+                e.grid, e.state, e.finishMs or -1, e.gapMs or -1, e.points, e.purse, e.dnfReason or "", race.opensAt } }
     end
     race.closesAt = race.opensAt + math.ceil(lastMs / 1000) + 30
     race.cond, race.baseSec, race.baseSource = cond, base, source
     race.result = r
     race.state = "running"
     local detail = { frozen = race.frozen, splits = splits, events = r.events, segments = r.segments }
-    st[#st + 1] = { query = [[UPDATE paddock_race SET state = 'running', window_closes_at = ?, weather = ?, road_wetness = ?,
-        seconds_of_day = ?, light = ?, base_sec = ?, base_source = ?, sim_version = ?, detail_json = ?
+    st[#st + 1] = { query = [[UPDATE paddock_race SET state = 'running', window_closes_at = ?, weather = NULLIF(?, ''),
+        road_wetness = NULLIF(?, -1), seconds_of_day = NULLIF(?, -1), light = NULLIF(?, ''), base_sec = NULLIF(?, -1),
+        base_source = NULLIF(?, ''), sim_version = NULLIF(?, -1), detail_json = ?
         WHERE server_id = ? AND race_id = ?]],
-        values = { race.closesAt, cond.weather, cond.roadWetness, cond.secondsOfDay, cond.light, base, source,
-            r.simVersion, U.encode(detail) or "{}", U.sid(), race.raceId } }
+        -- Conditions can be missing (no weather plan yet); a DNF has no finish. Sentinels, never nil holes.
+        values = { race.closesAt, cond.weather or "", cond.roadWetness or -1, cond.secondsOfDay or -1, cond.light or "",
+            base or -1, source or "", r.simVersion or -1, U.encode(detail) or "{}", U.sid(), race.raceId } }
     local ok, err = U.transact(st)
     if not ok then log("run %s store FAILED: %s", race.raceId, tostring(err)) end
     PaddockBillie.close(race)

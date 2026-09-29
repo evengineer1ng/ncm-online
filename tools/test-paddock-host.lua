@@ -102,9 +102,10 @@ local function has(q, s) return q:find(s, 1, true) ~= nil end
 
 local function exec(q, v)
     v = v or {}
+    -- Sentinels mirror the SQL: a `NULLIF(?, -1)` / `NULLIF(?, '')` column stores NULL, so the double stores nil.
     if has(q, "INTO paddock_world") then
         DB.world = { server_id = v[1], seed = v[2], genesis_version = v[3], genesis_season = v[4], season_id = v[5],
-            season_ordinal = v[6], paddock_year = v[7], day_index_applied = v[8], cup_id = v[9], counters_json = v[10], created_at = v[11] }
+            season_ordinal = v[6], paddock_year = v[7], day_index_applied = v[8] ~= -1 and v[8] or nil, cup_id = v[9] ~= "" and v[9] or nil, counters_json = v[10], created_at = v[11] }
     elseif has(q, "INTO paddock_series") then
         DB.series[v[2]] = { series_id = v[2], tier = v[3], division = v[4], name = v[5] }
     elseif has(q, "INTO paddock_org") then
@@ -135,7 +136,8 @@ local function exec(q, v)
         end
     elseif has(q, "UPDATE paddock_race SET state = 'running'") then
         local r = DB.race[v[11]]
-        r.state, r.window_closes_at, r.weather, r.road_wetness, r.light, r.detail_json = "running", v[1], v[2], v[3], v[5], v[9]
+        r.state, r.window_closes_at, r.detail_json = "running", v[1], v[9]
+        r.weather, r.road_wetness, r.light = v[2] ~= "" and v[2] or nil, v[3] ~= -1 and v[3] or nil, v[5] ~= "" and v[5] or nil
     elseif has(q, "UPDATE paddock_race SET state = 'priced'") then
         local r = DB.race[v[2]]
         if r and r.state == "scheduled" then r.state = "priced" end
@@ -145,10 +147,10 @@ local function exec(q, v)
         if DB.race[v[3]] then DB.race[v[3]].detail_json = v[1] end
     elseif has(q, "INTO paddock_result") then
         DB.result[#DB.result + 1] = { race_id = v[2], person_id = v[3], org_id = v[4], series_id = v[5], season_id = v[6], cup_id = v[7],
-            position = v[8], grid = v[9], state = v[10], finish_ms = v[11], gap_ms = v[12], points = v[13], purse = v[14], dnf_reason = v[15] }
+            position = v[8], grid = v[9], state = v[10], finish_ms = v[11] ~= -1 and v[11] or nil, gap_ms = v[12] ~= -1 and v[12] or nil, points = v[13], purse = v[14], dnf_reason = v[15] }
     elseif has(q, "INTO paddock_line") then
         DB.line[v[2]] = { line_id = v[2], race_id = v[3], market = v[4], subject_a = v[5], subject_b = v[6] ~= "" and v[6] or nil,
-            prob = v[7], price = v[8], version = 1, refused = v[9], state = v[10] }
+            prob = v[7], price = v[8] ~= -1 and v[8] or nil, version = 1, refused = v[9], state = v[10] }
     elseif has(q, "UPDATE paddock_line SET state = 'closed'") then
         for _, l in pairs(DB.line) do if l.race_id == v[2] and (l.state == "open" or l.state == "suspended") then l.state = "closed" end end
     elseif has(q, "UPDATE paddock_line SET state = 'settled'") then
@@ -160,7 +162,7 @@ local function exec(q, v)
     elseif has(q, "INTO paddock_slip") then
         if DB.idem[v[15]] then
             DB.slip[v[1]] = { slip_id = v[1], idem_key = v[2], ncm_driver_id = v[4], race_id = v[5], line_id = v[6], market = v[7],
-                subject_a = v[8], subject_b = v[9], line_version = v[10], stake = v[11], price = v[12], potential = v[13], placed_at = v[14],
+                subject_a = v[8], subject_b = v[9] ~= "" and v[9] or nil, line_version = v[10], stake = v[11], price = v[12], potential = v[13], placed_at = v[14],
                 state = "open", payout = 0 }
         end
     elseif has(q, "UPDATE paddock_slip SET state") then
@@ -276,6 +278,30 @@ MySQL = {
         return out
     end },
 }
+
+-- Host fidelity: the real runtime refuses a nil inside `values` with a bare `invalid_parameters` throw
+-- (`open77/runtime.lua:351`). This stub used to accept it, so genesis passed here and died on the first real
+-- boot (2026-09-29, `paddock_world.day_index_applied`). Every call now counts `?` against its values first.
+local function refuseHoles(q, v)
+    if type(q) ~= "string" then return end
+    local _, want = q:gsub("%?", "")
+    v = v or {}
+    for k = 1, want do
+        if v[k] == nil then
+            error(("invalid_parameters: value %d of %d is nil in %s"):format(k, want, (q:gsub("%s+", " ")):sub(1, 90)), 2)
+        end
+    end
+end
+for _, ns in pairs(MySQL) do
+    if type(ns) == "table" and type(ns.await) == "function" then
+        local inner = ns.await
+        ns.await = function(q, v)
+            if type(q) == "table" then for _, st in ipairs(q) do refuseHoles(st.query, st.values) end
+            else refuseHoles(q, v) end
+            return inner(q, v)
+        end
+    end
+end
 
 -- ---------------------------------------------------------------- load the resource the way the host does
 local function loadResource(name)

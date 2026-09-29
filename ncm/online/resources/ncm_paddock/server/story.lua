@@ -34,10 +34,11 @@ function PaddockStory.record(events)
             e.day = e.day or Clock.eastern(e.at).dayIndex
             st[#st + 1] = { query = [[INSERT IGNORE INTO paddock_event (server_id, event_id, at, day_index, kind, entities,
                 cause_refs, effect_refs, facts, public_summary, salience, retain, provenance)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)]],
-                values = { sid, e.id, e.at, e.day, e.kind, U.encode(e.entities) or "[]", U.encode(e.causeRefs) or "[]",
-                    U.encode(e.effectRefs) or "[]", U.encode(e.facts) or "{}", e.publicSummary, e.salience,
-                    e.retain and 1 or 0, e.provenance } }
+                VALUES (?, ?, ?, NULLIF(?, -1), ?, ?, ?, ?, ?, NULLIF(?, ''), ?, ?, ?)]],
+                -- Optional fields travel as sentinels: a nil would leave a hole the host refuses (U.checkStatement).
+                values = { sid, e.id, e.at, e.day or -1, e.kind, U.encode(e.entities) or "[]", U.encode(e.causeRefs) or "[]",
+                    U.encode(e.effectRefs) or "[]", U.encode(e.facts) or "{}", e.publicSummary or "", e.salience or 0,
+                    e.retain and 1 or 0, e.provenance or "simulated" } }
             local recent = recentFor(e.kind)
             local story = News.write(e, recent)
             if story then

@@ -55,10 +55,11 @@ function PaddockCalibration.recompute()
         if Cal.qualifies(s, minN, minD) then qualified = qualified + 1 end
         local routeId, tier, bucket = k:match("^(.-)|(%a+)|(.+)$")
         st[#st + 1] = { query = [[INSERT INTO paddock_calibration (server_id, route_id, tier, cond_bucket, n, drivers, median_ms,
-            p25_ms, computed_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE n = VALUES(n),
+            p25_ms, computed_at) VALUES (?, ?, ?, ?, ?, ?, NULLIF(?, -1), NULLIF(?, -1), ?) ON DUPLICATE KEY UPDATE n = VALUES(n),
             drivers = VALUES(drivers), median_ms = VALUES(median_ms), p25_ms = VALUES(p25_ms), computed_at = VALUES(computed_at)]],
-            values = { sid, routeId, tier, bucket, s.n, s.drivers, s.median and math.floor(s.median) or nil,
-                s.p25 and math.floor(s.p25) or nil, t } }
+            -- A bucket without samples has no median yet: -1 travels, NULLIF restores the NULL (a nil is a hole).
+            values = { sid, routeId, tier, bucket, s.n, s.drivers, s.median and math.floor(s.median) or -1,
+                s.p25 and math.floor(s.p25) or -1, t } }
         y()
     end
     if #st > 0 then U.transact(st) end

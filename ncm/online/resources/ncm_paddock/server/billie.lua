@@ -61,9 +61,10 @@ function PaddockBillie.price(race)
     local st = {}
     for _, l in ipairs(lines) do
         st[#st + 1] = { query = [[INSERT IGNORE INTO paddock_line (server_id, line_id, race_id, market, subject_a, subject_b, prob,
-            price, version, refused, state) VALUES (?, ?, ?, ?, ?, NULLIF(?, ''), ?, ?, 1, ?, ?)]],
+            price, version, refused, state) VALUES (?, ?, ?, ?, ?, NULLIF(?, ''), ?, NULLIF(?, -1), 1, ?, ?)]],
+            -- A refused line has no price by design; -1 travels and NULLIF restores the NULL (a nil is a hole).
             values = { U.sid(), lineId(race.raceId, l.market, l.a, l.b), race.raceId, l.market, l.a, l.b or "",
-                math.floor((l.prob or 0) * 1e6) / 1e6, l.price, l.refused and 1 or 0,
+                math.floor((l.prob or 0) * 1e6) / 1e6, l.price or -1, l.refused and 1 or 0,
                 (l.refused or not l.price) and "closed" or "open" } }
     end
     st[#st + 1] = { query = "UPDATE paddock_race SET state = 'priced' WHERE server_id = ? AND race_id = ? AND state = 'scheduled'",
@@ -136,8 +137,9 @@ function PaddockBillie.place(pid, req)
         PaddockWallet.debitStep(d.ncmDriverId, "billie_stake", ctx.slip.stake, stakeIdem, line.race_id, "Paper with Billie"),
         { query = [[INSERT INTO paddock_slip (slip_id, idem_key, server_id, ncm_driver_id, race_id, line_id, market, subject_a,
             subject_b, line_version, stake, price, potential, placed_at)
-            SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? FROM DUAL WHERE EXISTS (SELECT 1 FROM ledger WHERE idem_key = ?)]],
-          values = { slipId, idem, U.sid(), d.ncmDriverId, line.race_id, lid, line.market, line.subject_a, line.subject_b,
+            SELECT ?, ?, ?, ?, ?, ?, ?, ?, NULLIF(?, ''), ?, ?, ?, ?, ? FROM DUAL WHERE EXISTS (SELECT 1 FROM ledger WHERE idem_key = ?)]],
+          -- subject_b is NULL for win and podium slips; '' travels and NULLIF restores it (a nil is a hole).
+          values = { slipId, idem, U.sid(), d.ncmDriverId, line.race_id, lid, line.market, line.subject_a, line.subject_b or "",
               ctx.line.version, ctx.slip.stake, ctx.line.price, potential, t, stakeIdem } },
     }, { d.ncmDriverId })
     local okTx, err = MySQL.transaction.await(tx)

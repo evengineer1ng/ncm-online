@@ -69,12 +69,15 @@ end
 local function metaRow(sid, w)
     return {
         query = [[INSERT INTO paddock_world (server_id, seed, genesis_version, genesis_season, season_id, season_ordinal,
-            paddock_year, day_index_applied, cup_id, counters_json, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            paddock_year, day_index_applied, cup_id, counters_json, created_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, NULLIF(?, -1), NULLIF(?, ''), ?, ?)
             ON DUPLICATE KEY UPDATE season_id = VALUES(season_id), season_ordinal = VALUES(season_ordinal),
                 paddock_year = VALUES(paddock_year), day_index_applied = VALUES(day_index_applied),
                 cup_id = VALUES(cup_id), counters_json = VALUES(counters_json)]],
-        values = { sid, w.seed, w.genesisVersion, w.genesisSeasonId, w.seasonId, w.seasonOrdinal, w.paddockYear,
-            w.dayIndexApplied, w.cupId, U.encode({ nextPerson = w.nextPerson, nextOrg = w.nextOrg,
+        -- A new world has applied no day and entered no Cup: both are NULL, and a nil here would leave a hole the
+        -- host refuses (it did, at the first genesis on dev). Sentinels travel instead and NULLIF restores the NULL.
+        values = { sid, w.seed, w.genesisVersion, w.genesisSeasonId, w.seasonId, w.seasonOrdinal or 0, w.paddockYear,
+            w.dayIndexApplied or -1, w.cupId or "", U.encode({ nextPerson = w.nextPerson, nextOrg = w.nextOrg,
                 nextSponsor = w.nextSponsor, recentTemplates = w.recentTemplates }) or "{}", w.createdAt or U.now() },
     }
 end
