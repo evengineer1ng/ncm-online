@@ -5,7 +5,7 @@
 
 #include <RED4ext/RED4ext.hpp>
 
-// The three natives `redscript/ncm_radial.reds` declares. Strings, not structs: a delimited string is one
+// The four natives `redscript/ncm_radial.reds` declares. Strings, not structs: a delimited string is one
 // native call per tick and cannot drift out of step with a struct layout declared twice.
 namespace ncm::radial::rtti {
 namespace {
@@ -35,6 +35,17 @@ void reportHost(RED4ext::IScriptable*, RED4ext::CStackFrame* stack, bool* out, i
     if (out) *out = true;
 }
 
+// Redscript has nowhere useful to log. This puts its diagnostics in the plugin's own log, bounded.
+void note(RED4ext::IScriptable*, RED4ext::CStackFrame* stack, bool* out, int64_t)
+{
+    RED4ext::CString text;
+    RED4ext::GetParameter(stack, &text);
+    stack->code++;
+    static int count = 0;
+    if (++count <= 200) RADIAL_INFO("reds: %s", clean(text.c_str(), 300).c_str());
+    if (out) *out = true;
+}
+
 void registerTypes() {}
 void postRegister()
 {
@@ -51,6 +62,7 @@ void postRegister()
     add("NcmRadial_Layout", reinterpret_cast<RED4ext::ScriptingFunction_t<void*>>(&layout), "String", {});
     add("NcmRadial_ReportHost", reinterpret_cast<RED4ext::ScriptingFunction_t<void*>>(&reportHost), "Bool",
         {{"String", "host"}, {"Int32", "drawn"}});
+    add("NcmRadial_Log", reinterpret_cast<RED4ext::ScriptingFunction_t<void*>>(&note), "Bool", {{"String", "text"}});
     RADIAL_INFO("redscript natives registered");
 }
 }

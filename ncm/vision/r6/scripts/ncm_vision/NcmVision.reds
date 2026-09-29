@@ -1,36 +1,58 @@
-// NCM Vision -- the scanner's look, without the scanner (`IDEA-679`).
+// NCM Scanner -- the scanner's look and its eye, without the scanner (`L196`, `L197`, `IDEA-679`).
 //
 // Hold Tab (VisionHold) or tap Caps Lock (VisionToggle) and the world takes the vanilla scanner's green
-// render. Nothing else about the scanner comes with it: no scan HUD, no walk-only restriction, no slow
+// render, a reticle appears, and whatever the player looks at is reported to NCM so the Scanner can identify
+// it. Nothing else about the vanilla scanner comes with it: no scan HUD, no walk-only restriction, no slow
 // motion.
 //
-// WHY THIS WORKS UNDER OPEN//77. Vanilla `PlayerVisionModeController.ActivateVisionMode()` makes three
-// independent calls: the scanning controller's Heavy mode (scan-on-look and its HUD), `VisionModeSystem
-// .EnterMode(owner, Focus)` (the render), and the FocusModeLocomotion status effect. OPEN//77 refuses the
-// CONTROLLER in every multiplayer session (`Open77MultiplayerPolicy.reds`, PlayerVisionModeController
-// wraps). It does not touch the system underneath, so this file makes the render call alone.
+// WHY THE GREEN WORKS UNDER OPEN//77 (live PASS 2026-09-28). Vanilla `PlayerVisionModeController` makes three
+// independent calls: the scanning controller's Heavy mode, `VisionModeSystem.EnterMode(owner, Focus)` (the
+// render), and the FocusModeLocomotion status effect. OPEN//77 refuses the CONTROLLER for the whole session. It
+// does not touch the system underneath, so this file makes the render call alone. Scanner time dilation is a
+// player-state-machine state this file never enters, and OPEN//77 refuses it separately besides.
 //
-// WHY THERE IS NO SLOW MOTION. Scanner time dilation is a player-state-machine state
-// (TimeDilationFocusMode), entered from the vision PSM context, not from the render. This file never enters
-// that context, and OPEN//77 refuses the state in multiplayer on its own besides.
+// WHO DECIDES WHAT. This file sees and draws; it decides nothing about knowledge. Each tick while vision is on
+// it reports the look-at object (EntityID hash, record, kind, distance) to `ncm_vision.dll`; resource Lua
+// (`ncm_scanner`) reads that over loopback, asks the server, runs the lock, and sends back what the reticle
+// should say. If the DLL's feed is absent the green and a bare reticle still work -- they are the player's own
+// key -- and nothing is identified.
 //
-// THREE RULES THIS FILE KEEPS, BECAUSE A REDSCRIPT COMPILE ERROR TAKES EVERY SCRIPT MOD DOWN WITH IT:
-//   * vanilla symbols only -- nothing from OPEN//77, NCM or any other mod, so no upstream rename can break
-//     the compile;
-//   * no per-frame work -- two input listeners, and state changes only on a key edge;
+// RULES THIS FILE KEEPS, BECAUSE A REDSCRIPT COMPILE ERROR TAKES EVERY SCRIPT MOD DOWN WITH IT:
+//   * vanilla symbols and this package's own natives only -- nothing from OPEN//77, NCM Lua or any other mod;
+//   * work only while vision is on: two input listeners, and a 20 Hz tick that exists only while the render
+//     does;
 //   * never consume the input -- OPEN//77 WebUI and resource key mappings still receive Tab.
 //
-// It is a separate package from the Carrier and the Rig Bridge on purpose: it shares nothing with them.
+// A separate package from the Carrier, the Rig Bridge and the Radial: it shares nothing with them.
 module NcmVision
+
+// The natives are declared in `NcmScannerNatives.reds`, which has NO module on purpose: a native declared inside
+// a module is looked up as `NcmVision.NcmScanner_*`, the DLL registers `NcmScanner_*`, and RED4ext refuses to
+// start the game (live, 2026-09-28, `KB-182`).
+
+public class NcmVisionTick extends DelayCallback {
+  public let system: wref<NcmVisionSystem>;
+  public let generation: Int32;
+
+  public func Call() -> Void {
+    let system: ref<NcmVisionSystem> = this.system;
+    if IsDefined(system) {
+      system.Tick(this.generation);
+    }
+  }
+}
 
 public class NcmVisionSystem extends ScriptableSystem {
   private let m_player: wref<PlayerPuppet>;
   private let m_listener: ref<NcmVisionListener>;
+  private let m_reticle: wref<NcmScannerReticle>;
   private let m_held: Bool;
   private let m_toggled: Bool;
   // What this file last asked the vision system for. Only ever changed by Refresh(), so a release can never
   // switch off a render some other system turned on.
   private let m_on: Bool;
+  // Bumped on every on/off edge and detach, so a tick scheduled before the edge dies on its next call.
+  private let m_generation: Int32;
 
   private func OnPlayerAttach(request: ref<PlayerAttachRequest>) -> Void {
     let player: ref<PlayerPuppet> = request.owner as PlayerPuppet;
@@ -61,6 +83,17 @@ public class NcmVisionSystem extends ScriptableSystem {
     }
     this.m_listener = null;
     this.m_player = null;
+  }
+
+  public func SetReticle(reticle: ref<NcmScannerReticle>) -> Void {
+    this.m_reticle = reticle;
+    if IsDefined(reticle) {
+      reticle.Show(this.m_on);
+    }
+  }
+
+  public func IsOn() -> Bool {
+    return this.m_on;
   }
 
   public func SetHeld(held: Bool) -> Void {
@@ -98,6 +131,81 @@ public class NcmVisionSystem extends ScriptableSystem {
       vision.EnterMode(player, gameVisionModeType.Default);
     }
     this.m_on = want;
+    this.m_generation += 1;
+    let reticle: ref<NcmScannerReticle> = this.m_reticle;
+    if IsDefined(reticle) {
+      reticle.Show(want);
+    }
+    if want {
+      this.Schedule();
+    } else {
+      NcmScanner_Report(false, 0ul, 0ul, 0, -1.0);
+    }
+  }
+
+  private func Schedule() -> Void {
+    let player: ref<PlayerPuppet> = this.m_player;
+    if !IsDefined(player) {
+      return;
+    }
+    let tick: ref<NcmVisionTick> = new NcmVisionTick();
+    tick.system = this;
+    tick.generation = this.m_generation;
+    GameInstance.GetDelaySystem(player.GetGame()).DelayCallback(tick, 0.05, false);
+  }
+
+  public func Tick(generation: Int32) -> Void {
+    if generation != this.m_generation || !this.m_on {
+      return;
+    }
+    this.Look();
+    let reticle: ref<NcmScannerReticle> = this.m_reticle;
+    if IsDefined(reticle) {
+      reticle.Apply();
+    }
+    this.Schedule();
+  }
+
+  // What is the player looking at? The engine's own look-at target first -- the one the vanilla scanner uses --
+  // then the object nearest the crosshair within a few degrees, because look-at is not guaranteed from a
+  // driver's seat. The player's own car is never a target.
+  private func Look() -> Void {
+    let player: ref<PlayerPuppet> = this.m_player;
+    if !IsDefined(player) {
+      return;
+    }
+    let game: GameInstance = player.GetGame();
+    let targeting: ref<TargetingSystem> = GameInstance.GetTargetingSystem(game);
+    let mounted: wref<VehicleObject>;
+    let angle: EulerAngles;
+    let target: ref<GameObject>;
+    let vehicle: ref<VehicleObject>;
+    let kind: Int32 = 0;
+    let record: Uint64 = 0ul;
+    let entity: Uint64 = 0ul;
+    let distance: Float = -1.0;
+    VehicleComponent.GetVehicle(game, player, mounted);
+    if IsDefined(targeting) {
+      target = targeting.GetLookAtObject(player, false, false);
+      if !IsDefined(target) || target == mounted {
+        target = targeting.GetObjectClosestToCrosshair(player, angle, TSQ_ALL());
+        if IsDefined(target) && (AbsF(angle.Yaw) > 6.0 || AbsF(angle.Pitch) > 6.0) {
+          target = null;
+        }
+      }
+    }
+    if IsDefined(target) && target != mounted && target != player {
+      entity = Cast<Uint64>(EntityID.GetHash(target.GetEntityID()));
+      distance = Vector4.Distance(player.GetWorldPosition(), target.GetWorldPosition());
+      vehicle = target as VehicleObject;
+      if IsDefined(vehicle) {
+        kind = 1;
+        record = TDBID.ToNumber(vehicle.GetRecordID());
+      } else {
+        kind = 2;
+      }
+    }
+    NcmScanner_Report(true, entity, record, kind, distance);
   }
 }
 

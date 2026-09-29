@@ -2,6 +2,8 @@
 #include "config.hpp"
 #include "direct_input.hpp"
 #include "log.hpp"
+#include "pad/pad_service.hpp"
+#include "pad/xinput_hook.hpp"
 #include "rtti.hpp"
 #include "vehicle_hook.hpp"
 
@@ -17,6 +19,7 @@ RED4ext::v1::PluginHandle pluginHandle{};
 const RED4ext::v1::Sdk* pluginSdk = nullptr;
 std::unique_ptr<ncm::rig::DirectInputRig> rig;
 std::unique_ptr<ncm::rig::Bridge> bridge;
+std::unique_ptr<ncm::rig::pad::PadService> pad;
 ncm::rig::Config config;
 
 std::wstring directoryOf(HMODULE value)
@@ -50,6 +53,13 @@ bool runningEnter(RED4ext::CGameApplication*)
         bridge->start();
     });
     stage("vehicle detour", [&] { ncm::rig::vehicle::install(pluginHandle, pluginSdk, config.inputEnabled); });
+    // The gamepad layer: XInput first, so the virtual pad has somewhere to go before it produces anything.
+    stage("XInput hook", [&] { ncm::rig::pad::xinput::install(pluginHandle, pluginSdk); });
+    stage("gamepad layer", [&] {
+        if (!rig) return;
+        pad = std::make_unique<ncm::rig::pad::PadService>(directory, *rig, static_cast<uint16_t>(config.port + 10));
+        pad->start();
+    });
     RIG_INFO("NCM Rig Bridge %s started: provider=DirectInput hook=%s", NCM_RIG_BRIDGE_VERSION,
              ncm::rig::vehicle::installed() ? "installed" : "absent");
     return true;
@@ -57,6 +67,8 @@ bool runningEnter(RED4ext::CGameApplication*)
 
 bool runningExit(RED4ext::CGameApplication*)
 {
+    stage("gamepad teardown", [&] { if (pad) pad->stop(); pad.reset(); });
+    stage("XInput hook teardown", [&] { ncm::rig::pad::xinput::remove(pluginHandle, pluginSdk); });
     stage("vehicle detour teardown", [&] { ncm::rig::vehicle::remove(pluginHandle, pluginSdk); });
     stage("bridge teardown", [&] { if (bridge) bridge->stop(); bridge.reset(); });
     stage("DirectInput teardown", [&] { if (rig) rig->stop(); rig.reset(); });
@@ -69,7 +81,7 @@ RED4EXT_C_EXPORT void RED4EXT_CALL Query(RED4ext::v1::PluginInfo* info)
 {
     info->name = L"NCM Rig Bridge";
     info->author = L"Night City Motorsports";
-    info->version = RED4EXT_V1_SEMVER(0, 1, 0);
+    info->version = RED4EXT_V1_SEMVER(0, 1, 6);
     info->runtime = RED4EXT_V1_RUNTIME_VERSION_LATEST;
     info->sdk = RED4EXT_V1_SDK_VERSION_CURRENT;
 }

@@ -6,12 +6,15 @@
 -- to run the chosen action through its `quickAction` export. Without the required mod nothing is drawn and
 -- `/ncm.radial` says so; every action keeps its hotkey and chat command regardless.
 --
--- input.actions: `Open77.input.isDown` / `axis` / `keyFor` physical reads, and blocking on-foot movement and
---   firing while the wheel is up so a direction key does not also walk the driver off.
+-- input.actions: `Open77.input.isDown` / `axis` / `keyFor` physical reads, and blocking on-foot movement while the
+--   wheel is up.
+-- players.controls: `freezeRotation` / `allowAim` / `allowShoot` / `allowInteraction` / `resetControls`, so the
+--   mouse aims the wheel instead of turning the camera, only while the wheel is up (first live test, 2026-09-28).
+-- local.events: `open77:pauseKey`, so Escape closes the wheel.
 resource "ncm_radial"
-version "0.1.0"
+version "0.1.2"
 auto_start true
 
-permissions { "input.actions" }
+permissions { "input.actions", "players.controls", "local.events" }
 
 client_script "client/radial.lua"

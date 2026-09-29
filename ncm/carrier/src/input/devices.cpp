@@ -10,6 +10,12 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdlib>
+#include <filesystem>
+
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+#include <windows.h>
 
 namespace ncm::ffb {
 
@@ -85,8 +91,41 @@ int Devices::waitForDevices(const char* strategy)
     return 0;
 }
 
+namespace {
+// **One owner for the wheel's force feedback.** SDL's DirectInput haptic backend acquires the wheel
+// EXCLUSIVELY, and DirectInput allows one exclusive owner per device. The Rig Bridge does the same, so with
+// both installed the wheel belonged to whichever acquired last: the Carrier won on vehicle entry and the
+// Rig Bridge's writes failed with DIERR_NOTEXCLUSIVEACQUIRED (0x80040205) -- "FFB worked once and got
+// lost". The Rig Bridge is the wheel product (device binding, torque limits, panel), so when it is
+// installed the Carrier leaves haptics alone. Presence on disk is checked, not only a loaded module,
+// because plugin load order is not ours to rely on.
+bool rigBridgeOwnsForceFeedback()
+{
+    if (GetModuleHandleW(L"ncm_rig_bridge.dll")) return true;
+    HMODULE self = nullptr;
+    if (!GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+                            reinterpret_cast<LPCWSTR>(&rigBridgeOwnsForceFeedback), &self))
+        return false;
+    wchar_t path[MAX_PATH]{};
+    if (GetModuleFileNameW(self, path, MAX_PATH) == 0) return false;
+    // <plugins>/ncm_carrier/ncm_carrier.dll -> <plugins>/ncm_rig_bridge/ncm_rig_bridge.dll
+    const auto plugins = std::filesystem::path(path).parent_path().parent_path();
+    std::error_code ec;
+    return std::filesystem::exists(plugins / L"ncm_rig_bridge" / L"ncm_rig_bridge.dll", ec);
+}
+}  // namespace
+
 bool Devices::open()
 {
+    // **The Rig Bridge owns every rig device now, not just force feedback (`L201`, extended 2026-09-28).**
+    // It runs SDL3 in this same process for Joy-Cons and the rim. Windows lets one process register raw
+    // controller input to ONE window, so two SDL copies in one process fight over it and whichever registered
+    // last starves the other. The Carrier's own device path is diagnostic scaffolding (`KB-169`) with no
+    // consumer, so when the Rig Bridge is installed it does not start SDL at all.
+    if (rigBridgeOwnsForceFeedback()) {
+        NCM_INFO("NCM Rig Bridge is installed and owns rig devices -- the carrier does not start SDL");
+        return true;   // yielding is the intended outcome, not a failure to find hardware
+    }
     // WHAT WENT WRONG ON 2026-09-25, AND WHY THE ANSWER IS A HINT AND NOT A DEVICE QUIRK.
     //
     // The carrier reported `devices none` on a machine with FOUR working controllers -- a Logitech G29
@@ -234,8 +273,13 @@ void Devices::classifyAll()
                  ffb::nameOf(class_), ffb::ceilingFor(class_));
 }
 
+
 bool Devices::openHaptic()
 {
+    if (rigBridgeOwnsForceFeedback()) {
+        NCM_INFO("NCM Rig Bridge is installed and owns force feedback -- the carrier will not open haptics");
+        return false;
+    }
     // **Opening a haptic index is not the test -- creating an effect is** (`IDEA-407`). The owner's wheel
     // enumerates three times and the middle index opens while being able to produce nothing. So probe.
     const int count = SDL_NumHaptics();

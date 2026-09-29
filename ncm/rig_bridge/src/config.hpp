@@ -64,8 +64,13 @@ struct Config {
     // **The class is a safety declaration, not a label.** It picks the ceiling from the measured ladder in
     // `feel.hpp`, and an unrecognised value is `unknown` -- the LOWEST ceiling of the four, because a device
     // we could not identify is assumed to be the most powerful thing it could be.
+    // `Unknown` now also means AUTO: the bound wheel's recognised class is used when there is one.
     feel::DeviceClass deviceClass = feel::DeviceClass::Unknown;
-    float ffbStrength = feel::kFloor;
+    // **Strength is the SLIDER, 0..1 of the ceiling -- never a device magnitude.** The ceiling depends on
+    // which wheel is attached (and, for direct drive, its torque), which is not known when the file is
+    // read. Storing the magnitude clamped it against a guess before the wheel had been seen.
+    float ffbFraction = 0.5f;
+    float ratedNm = 0.0f;   // the driver's own base torque; 0 = use the recognised value
     feel::Tune tune{};
     uint32_t ffbWatchdogMs = 250;
 

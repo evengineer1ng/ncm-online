@@ -19,16 +19,17 @@ int main()
         CHECK(s.apply(R"({"cmd":"layout","title":"NCM","hint":"release to open",
             "slots":[{"label":"H|UB","key":"F6","detail":"Everything"},null,{"label":"Call","state":2}]})", t0));
         const std::string l = s.layout();
-        CHECK(l.rfind("1|NCM|release to open|1|HUB|F6|Everything|0|||", 0) == 0);
-        CHECK(l.find("|2|Call||") != std::string::npos);
+        CHECK(l.rfind("1|NCM|release to open|1|HUB|F6|Everything|0|~|~|~", 0) == 0);
+        CHECK(l.find("|2|Call|~|~") != std::string::npos);
         int fields = 1;
         for (char c : l) fields += c == '|';
         CHECK(fields == 3 + 8 * 4);
+        CHECK(l.find("||") == std::string::npos);        // no empty field can ever reach StrSplit
     }
     {   // A slot with no label is an open slot, whatever state it claims.
         State s;
         CHECK(s.apply(R"({"cmd":"layout","slots":[{"state":1,"label":""}]})", t0));
-        CHECK(s.layout().rfind("1|||0|", 0) == 0);
+        CHECK(s.layout().rfind("1|~|~|0|~|~|~", 0) == 0);
     }
     {   // Frames: selection bounds, pointer normalisation.
         State s;
@@ -50,12 +51,17 @@ int main()
         CHECK(s.frame(t0 + std::chrono::milliseconds(2000)) == "0|-1|-1.0|0");
         CHECK(s.health().find("\"staleClosed\":true") != std::string::npos);
     }
+    {   // A label cannot smuggle in the sentinel.
+        State s;
+        s.apply(R"({"cmd":"layout","slots":[{"label":"~"}]})", t0);
+        CHECK(s.layout().rfind("1|~|~|0|", 0) == 0);    // "~" alone cleans to empty, so the slot is open
+    }
     {   // Garbage changes nothing.
         State s;
         CHECK(!s.apply("not json", t0));
         CHECK(!s.apply(R"({"cmd":"explode"})", t0));
         CHECK(!s.apply(R"({"cmd":"layout","slots":"nope"})", t0));
-        CHECK(s.layout().rfind("0|NCM||", 0) == 0);
+        CHECK(s.layout().rfind("0|NCM|~|", 0) == 0);
     }
 
     if (failures == 0) std::printf("ncm_radial state: all checks passed\n");

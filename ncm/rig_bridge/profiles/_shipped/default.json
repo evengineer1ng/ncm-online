@@ -1,0 +1,1281 @@
+{
+  "profile_version": 1,
+  "name": "Default",
+  "game": "Cyberpunk 2077",
+  "assignments": {
+    "left": "auto",
+    "right": "auto",
+    "primary": "auto",
+    "left_leg": "auto",
+    "right_leg": "auto",
+    "controller": "none"
+  },
+  "calibration": {},
+  "filtering": {
+    "alpha": 0.42
+  },
+  "layers": [
+    {
+      "id": "default",
+      "activation": "always"
+    }
+  ],
+  "mappings": [
+    {
+      "id": "left-joycon-stick",
+      "enabled": true,
+      "layer": "default",
+      "context": "both",
+      "source": {
+        "type": "stick",
+        "controller": "left",
+        "stick": "auto",
+        "rotation": "normal",
+        "deadzone": 0.1
+      },
+      "output": {
+        "control": "left_stick"
+      }
+    },
+    {
+      "id": "right-joycon-stick",
+      "enabled": true,
+      "layer": "default",
+      "context": "both",
+      "source": {
+        "type": "stick",
+        "controller": "right",
+        "stick": "auto",
+        "rotation": "normal",
+        "deadzone": 0.1
+      },
+      "output": {
+        "control": "right_stick"
+      }
+    }
+  ],
+  "gestures": [
+    {
+      "id": "rim-dpad_right-b6",
+      "type": "staged",
+      "enabled": true,
+      "cooldown_ms": 0,
+      "xbox_target": "dpad_right",
+      "variant_name": "Evenracing 1.0.0 button 7",
+      "capture_motion": false,
+      "context": "both",
+      "feedback_effect": "",
+      "feedback_side": "both",
+      "stages": [
+        {
+          "name": "press b6",
+          "conditions": [
+            {
+              "controller": "joystick:Evenracing 1.0.0",
+              "button_pressed": "b6"
+            }
+          ]
+        }
+      ],
+      "hold_until_release": {
+        "controller": "joystick:Evenracing 1.0.0",
+        "button": "b6"
+      },
+      "source": {
+        "imported_from": "joymoco:cyberpunk full rig.json",
+        "rig_button": 6
+      }
+    },
+    {
+      "id": "rim-ls-b9",
+      "type": "staged",
+      "enabled": true,
+      "cooldown_ms": 0,
+      "xbox_target": "ls",
+      "variant_name": "Evenracing 1.0.0 button 10",
+      "capture_motion": false,
+      "context": "both",
+      "feedback_effect": "",
+      "feedback_side": "both",
+      "stages": [
+        {
+          "name": "press b9",
+          "conditions": [
+            {
+              "controller": "joystick:Evenracing 1.0.0",
+              "button_pressed": "b9"
+            }
+          ]
+        }
+      ],
+      "hold_until_release": {
+        "controller": "joystick:Evenracing 1.0.0",
+        "button": "b9"
+      },
+      "source": {
+        "imported_from": "joymoco:cyberpunk full rig.json",
+        "rig_button": 9
+      }
+    },
+    {
+      "id": "rim-rs-b10",
+      "type": "staged",
+      "enabled": true,
+      "cooldown_ms": 0,
+      "xbox_target": "rs",
+      "variant_name": "Evenracing 1.0.0 button 11",
+      "capture_motion": false,
+      "context": "both",
+      "feedback_effect": "",
+      "feedback_side": "both",
+      "stages": [
+        {
+          "name": "press b10",
+          "conditions": [
+            {
+              "controller": "joystick:Evenracing 1.0.0",
+              "button_pressed": "b10"
+            }
+          ]
+        }
+      ],
+      "hold_until_release": {
+        "controller": "joystick:Evenracing 1.0.0",
+        "button": "b10"
+      },
+      "source": {
+        "imported_from": "joymoco:cyberpunk full rig.json",
+        "rig_button": 10
+      }
+    },
+    {
+      "id": "rim-start-b8",
+      "type": "staged",
+      "enabled": true,
+      "cooldown_ms": 0,
+      "xbox_target": "start",
+      "variant_name": "Evenracing 1.0.0 button 9",
+      "capture_motion": false,
+      "context": "both",
+      "feedback_effect": "",
+      "feedback_side": "both",
+      "stages": [
+        {
+          "name": "press b8",
+          "conditions": [
+            {
+              "controller": "joystick:Evenracing 1.0.0",
+              "button_pressed": "b8"
+            }
+          ]
+        }
+      ],
+      "hold_until_release": {
+        "controller": "joystick:Evenracing 1.0.0",
+        "button": "b8"
+      },
+      "source": {
+        "imported_from": "joymoco:cyberpunk full rig.json",
+        "rig_button": 8
+      }
+    },
+    {
+      "id": "rim-dpad_up-b5",
+      "type": "staged",
+      "enabled": true,
+      "cooldown_ms": 0,
+      "xbox_target": "dpad_up",
+      "variant_name": "Evenracing 1.0.0 button 6",
+      "capture_motion": false,
+      "context": "both",
+      "feedback_effect": "",
+      "feedback_side": "both",
+      "stages": [
+        {
+          "name": "press b5",
+          "conditions": [
+            {
+              "controller": "joystick:Evenracing 1.0.0",
+              "button_pressed": "b5"
+            }
+          ]
+        }
+      ],
+      "hold_until_release": {
+        "controller": "joystick:Evenracing 1.0.0",
+        "button": "b5"
+      },
+      "source": {
+        "imported_from": "joymoco:cyberpunk full rig.json",
+        "rig_button": 5
+      }
+    },
+    {
+      "id": "rim-dpad_down-b3",
+      "type": "staged",
+      "enabled": true,
+      "cooldown_ms": 0,
+      "xbox_target": "dpad_down",
+      "variant_name": "Evenracing 1.0.0 button 4",
+      "capture_motion": false,
+      "context": "both",
+      "feedback_effect": "",
+      "feedback_side": "both",
+      "stages": [
+        {
+          "name": "press b3",
+          "conditions": [
+            {
+              "controller": "joystick:Evenracing 1.0.0",
+              "button_pressed": "b3"
+            }
+          ]
+        }
+      ],
+      "hold_until_release": {
+        "controller": "joystick:Evenracing 1.0.0",
+        "button": "b3"
+      },
+      "source": {
+        "imported_from": "joymoco:cyberpunk full rig.json",
+        "rig_button": 3
+      }
+    },
+    {
+      "id": "rim-dpad_left-b4",
+      "type": "staged",
+      "enabled": true,
+      "cooldown_ms": 0,
+      "xbox_target": "dpad_left",
+      "variant_name": "Evenracing 1.0.0 button 5",
+      "capture_motion": false,
+      "context": "both",
+      "feedback_effect": "",
+      "feedback_side": "both",
+      "stages": [
+        {
+          "name": "press b4",
+          "conditions": [
+            {
+              "controller": "joystick:Evenracing 1.0.0",
+              "button_pressed": "b4"
+            }
+          ]
+        }
+      ],
+      "hold_until_release": {
+        "controller": "joystick:Evenracing 1.0.0",
+        "button": "b4"
+      },
+      "source": {
+        "imported_from": "joymoco:cyberpunk full rig.json",
+        "rig_button": 4
+      }
+    },
+    {
+      "id": "rim-b-b2",
+      "type": "staged",
+      "enabled": true,
+      "cooldown_ms": 0,
+      "xbox_target": "b",
+      "variant_name": "Evenracing 1.0.0 button 3",
+      "capture_motion": false,
+      "context": "both",
+      "feedback_effect": "",
+      "feedback_side": "both",
+      "stages": [
+        {
+          "name": "press b2",
+          "conditions": [
+            {
+              "controller": "joystick:Evenracing 1.0.0",
+              "button_pressed": "b2"
+            }
+          ]
+        }
+      ],
+      "hold_until_release": {
+        "controller": "joystick:Evenracing 1.0.0",
+        "button": "b2"
+      },
+      "source": {
+        "imported_from": "joymoco:cyberpunk full rig.json",
+        "rig_button": 2
+      }
+    },
+    {
+      "id": "rim-x-b0",
+      "type": "staged",
+      "enabled": true,
+      "cooldown_ms": 0,
+      "xbox_target": "x",
+      "variant_name": "Evenracing 1.0.0 button 1",
+      "capture_motion": false,
+      "context": "both",
+      "feedback_effect": "",
+      "feedback_side": "both",
+      "stages": [
+        {
+          "name": "press b0",
+          "conditions": [
+            {
+              "controller": "joystick:Evenracing 1.0.0",
+              "button_pressed": "b0"
+            }
+          ]
+        }
+      ],
+      "hold_until_release": {
+        "controller": "joystick:Evenracing 1.0.0",
+        "button": "b0"
+      },
+      "source": {
+        "imported_from": "joymoco:cyberpunk full rig.json",
+        "rig_button": 0
+      }
+    },
+    {
+      "id": "rim-y-b1",
+      "type": "staged",
+      "enabled": true,
+      "cooldown_ms": 0,
+      "xbox_target": "y",
+      "variant_name": "Evenracing 1.0.0 button 2",
+      "capture_motion": false,
+      "context": "both",
+      "feedback_effect": "",
+      "feedback_side": "both",
+      "stages": [
+        {
+          "name": "press b1",
+          "conditions": [
+            {
+              "controller": "joystick:Evenracing 1.0.0",
+              "button_pressed": "b1"
+            }
+          ]
+        }
+      ],
+      "hold_until_release": {
+        "controller": "joystick:Evenracing 1.0.0",
+        "button": "b1"
+      },
+      "source": {
+        "imported_from": "joymoco:cyberpunk full rig.json",
+        "rig_button": 1
+      }
+    },
+    {
+      "id": "rim-back-b7",
+      "type": "staged",
+      "enabled": true,
+      "cooldown_ms": 0,
+      "xbox_target": "back",
+      "variant_name": "Evenracing 1.0.0 button 8",
+      "capture_motion": false,
+      "context": "both",
+      "feedback_effect": "",
+      "feedback_side": "both",
+      "stages": [
+        {
+          "name": "press b7",
+          "conditions": [
+            {
+              "controller": "joystick:Evenracing 1.0.0",
+              "button_pressed": "b7"
+            }
+          ]
+        }
+      ],
+      "hold_until_release": {
+        "controller": "joystick:Evenracing 1.0.0",
+        "button": "b7"
+      },
+      "source": {
+        "imported_from": "joymoco:cyberpunk full rig.json",
+        "rig_button": 7
+      }
+    },
+    {
+      "id": "rim-home-b20",
+      "type": "staged",
+      "enabled": true,
+      "cooldown_ms": 0,
+      "xbox_target": "home",
+      "variant_name": "Evenracing 1.0.0 button 21",
+      "capture_motion": false,
+      "context": "both",
+      "feedback_effect": "",
+      "feedback_side": "both",
+      "stages": [
+        {
+          "name": "press b20",
+          "conditions": [
+            {
+              "controller": "joystick:Evenracing 1.0.0",
+              "button_pressed": "b20"
+            }
+          ]
+        }
+      ],
+      "hold_until_release": {
+        "controller": "joystick:Evenracing 1.0.0",
+        "button": "b20"
+      },
+      "source": {
+        "imported_from": "joymoco:cyberpunk full rig.json",
+        "rig_button": 20
+      }
+    },
+    {
+      "id": "rim-a-b24",
+      "type": "staged",
+      "enabled": true,
+      "cooldown_ms": 0,
+      "xbox_target": "a",
+      "variant_name": "Evenracing 1.0.0 button 25",
+      "capture_motion": false,
+      "context": "both",
+      "feedback_effect": "",
+      "feedback_side": "both",
+      "stages": [
+        {
+          "name": "press b24",
+          "conditions": [
+            {
+              "controller": "joystick:Evenracing 1.0.0",
+              "button_pressed": "b24"
+            }
+          ]
+        }
+      ],
+      "hold_until_release": {
+        "controller": "joystick:Evenracing 1.0.0",
+        "button": "b24"
+      },
+      "source": {
+        "imported_from": "joymoco:cyberpunk full rig.json",
+        "rig_button": 24
+      }
+    },
+    {
+      "id": "rim-x-b27",
+      "type": "staged",
+      "enabled": true,
+      "cooldown_ms": 0,
+      "xbox_target": "x",
+      "variant_name": "Evenracing 1.0.0 button 28",
+      "capture_motion": false,
+      "context": "both",
+      "feedback_effect": "",
+      "feedback_side": "both",
+      "stages": [
+        {
+          "name": "press b27",
+          "conditions": [
+            {
+              "controller": "joystick:Evenracing 1.0.0",
+              "button_pressed": "b27"
+            }
+          ]
+        }
+      ],
+      "hold_until_release": {
+        "controller": "joystick:Evenracing 1.0.0",
+        "button": "b27"
+      },
+      "source": {
+        "imported_from": "joymoco:cyberpunk full rig.json",
+        "rig_button": 27
+      }
+    },
+    {
+      "id": "rim-lb-b11",
+      "type": "staged",
+      "enabled": true,
+      "cooldown_ms": 0,
+      "xbox_target": "lb",
+      "variant_name": "Evenracing 1.0.0 button 12",
+      "capture_motion": false,
+      "context": "both",
+      "feedback_effect": "",
+      "feedback_side": "both",
+      "stages": [
+        {
+          "name": "press b11",
+          "conditions": [
+            {
+              "controller": "joystick:Evenracing 1.0.0",
+              "button_pressed": "b11"
+            }
+          ]
+        }
+      ],
+      "hold_until_release": {
+        "controller": "joystick:Evenracing 1.0.0",
+        "button": "b11"
+      },
+      "source": {
+        "imported_from": "joymoco:cyberpunk full rig.json",
+        "rig_button": 11
+      }
+    },
+    {
+      "id": "rim-rb-b12",
+      "type": "staged",
+      "enabled": true,
+      "cooldown_ms": 0,
+      "xbox_target": "rb",
+      "variant_name": "Evenracing 1.0.0 button 13",
+      "capture_motion": false,
+      "context": "both",
+      "feedback_effect": "",
+      "feedback_side": "both",
+      "stages": [
+        {
+          "name": "press b12",
+          "conditions": [
+            {
+              "controller": "joystick:Evenracing 1.0.0",
+              "button_pressed": "b12"
+            }
+          ]
+        }
+      ],
+      "hold_until_release": {
+        "controller": "joystick:Evenracing 1.0.0",
+        "button": "b12"
+      },
+      "source": {
+        "imported_from": "joymoco:cyberpunk full rig.json",
+        "rig_button": 12
+      }
+    }
+  ],
+  "macros": [],
+  "rumble": {
+    "enabled": true,
+    "scale": 0.7,
+    "game_generated": true,
+    "mapper_feedback": true
+  },
+  "rumble_effects": [
+    {
+      "id": "subtle-tick",
+      "intensity": 0.18,
+      "duration_ms": 25,
+      "pulses": 1,
+      "gap_ms": 0,
+      "side": "both"
+    },
+    {
+      "id": "soft-click",
+      "intensity": 0.28,
+      "duration_ms": 38,
+      "pulses": 1,
+      "gap_ms": 0,
+      "side": "both"
+    },
+    {
+      "id": "confirm-double",
+      "intensity": 0.38,
+      "duration_ms": 38,
+      "pulses": 2,
+      "gap_ms": 42,
+      "side": "both"
+    },
+    {
+      "id": "strong-thump",
+      "intensity": 0.78,
+      "duration_ms": 95,
+      "pulses": 1,
+      "gap_ms": 0,
+      "side": "both"
+    },
+    {
+      "id": "warning-buzz",
+      "intensity": 0.58,
+      "duration_ms": 55,
+      "pulses": 3,
+      "gap_ms": 35,
+      "side": "both"
+    },
+    {
+      "id": "heartbeat",
+      "side": "both",
+      "steps": [
+        {
+          "intensity": 0.48,
+          "duration_ms": 55,
+          "gap_ms": 65
+        },
+        {
+          "intensity": 0.72,
+          "duration_ms": 80
+        }
+      ]
+    },
+    {
+      "id": "success-ramp",
+      "side": "both",
+      "steps": [
+        {
+          "intensity": 0.22,
+          "duration_ms": 28,
+          "gap_ms": 30
+        },
+        {
+          "intensity": 0.42,
+          "duration_ms": 40,
+          "gap_ms": 35
+        },
+        {
+          "intensity": 0.68,
+          "duration_ms": 65
+        }
+      ]
+    },
+    {
+      "id": "ready-pulse",
+      "side": "both",
+      "steps": [
+        {
+          "intensity": 0.32,
+          "duration_ms": 45,
+          "gap_ms": 80
+        },
+        {
+          "intensity": 0.52,
+          "duration_ms": 65
+        }
+      ]
+    },
+    {
+      "id": "whisper-tick",
+      "intensity": 0.08,
+      "duration_ms": 15,
+      "pulses": 1,
+      "gap_ms": 0,
+      "side": "both",
+      "category": "Clicks"
+    },
+    {
+      "id": "feather-touch",
+      "intensity": 0.12,
+      "duration_ms": 30,
+      "pulses": 1,
+      "gap_ms": 0,
+      "side": "both",
+      "category": "Clicks"
+    },
+    {
+      "id": "dry-click",
+      "intensity": 0.4,
+      "duration_ms": 18,
+      "pulses": 1,
+      "gap_ms": 0,
+      "side": "both",
+      "category": "Clicks"
+    },
+    {
+      "id": "crisp-click",
+      "intensity": 0.55,
+      "duration_ms": 25,
+      "pulses": 1,
+      "gap_ms": 0,
+      "side": "both",
+      "category": "Clicks"
+    },
+    {
+      "id": "button-detent",
+      "intensity": 0.32,
+      "duration_ms": 55,
+      "pulses": 1,
+      "gap_ms": 0,
+      "side": "both",
+      "category": "Clicks"
+    },
+    {
+      "id": "soft-double-click",
+      "intensity": 0.2,
+      "duration_ms": 25,
+      "pulses": 2,
+      "gap_ms": 65,
+      "side": "both",
+      "category": "Clicks"
+    },
+    {
+      "id": "tiny-triple",
+      "intensity": 0.16,
+      "duration_ms": 20,
+      "pulses": 3,
+      "gap_ms": 45,
+      "side": "both",
+      "category": "Clicks"
+    },
+    {
+      "id": "menu-step",
+      "intensity": 0.22,
+      "duration_ms": 20,
+      "pulses": 1,
+      "gap_ms": 0,
+      "side": "both",
+      "category": "Clicks"
+    },
+    {
+      "id": "selection-lock",
+      "intensity": 0.48,
+      "duration_ms": 60,
+      "pulses": 1,
+      "gap_ms": 0,
+      "side": "both",
+      "category": "Clicks"
+    },
+    {
+      "id": "deep-thud",
+      "intensity": 0.85,
+      "duration_ms": 150,
+      "pulses": 1,
+      "gap_ms": 0,
+      "side": "both",
+      "category": "Impacts"
+    },
+    {
+      "id": "light-knock",
+      "intensity": 0.42,
+      "duration_ms": 65,
+      "pulses": 1,
+      "gap_ms": 0,
+      "side": "both",
+      "category": "Impacts"
+    },
+    {
+      "id": "impact-decay",
+      "side": "both",
+      "category": "Impacts",
+      "steps": [
+        {
+          "intensity": 0.9,
+          "duration_ms": 30,
+          "gap_ms": 0
+        },
+        {
+          "intensity": 0.6,
+          "duration_ms": 30,
+          "gap_ms": 0
+        },
+        {
+          "intensity": 0.35,
+          "duration_ms": 30,
+          "gap_ms": 0
+        },
+        {
+          "intensity": 0.15,
+          "duration_ms": 30,
+          "gap_ms": 0
+        },
+        {
+          "intensity": 0.05,
+          "duration_ms": 30,
+          "gap_ms": 0
+        }
+      ]
+    },
+    {
+      "id": "soft-landing",
+      "side": "both",
+      "category": "Impacts",
+      "steps": [
+        {
+          "intensity": 0.15,
+          "duration_ms": 35,
+          "gap_ms": 0
+        },
+        {
+          "intensity": 0.4,
+          "duration_ms": 35,
+          "gap_ms": 0
+        },
+        {
+          "intensity": 0.3,
+          "duration_ms": 35,
+          "gap_ms": 0
+        },
+        {
+          "intensity": 0.18,
+          "duration_ms": 35,
+          "gap_ms": 0
+        },
+        {
+          "intensity": 0.06,
+          "duration_ms": 35,
+          "gap_ms": 0
+        }
+      ]
+    },
+    {
+      "id": "alert-double",
+      "intensity": 0.65,
+      "duration_ms": 90,
+      "pulses": 2,
+      "gap_ms": 100,
+      "side": "both",
+      "category": "Alerts"
+    },
+    {
+      "id": "urgent-triple",
+      "intensity": 0.8,
+      "duration_ms": 65,
+      "pulses": 3,
+      "gap_ms": 60,
+      "side": "both",
+      "category": "Alerts"
+    },
+    {
+      "id": "gentle-reminder",
+      "intensity": 0.25,
+      "duration_ms": 100,
+      "pulses": 2,
+      "gap_ms": 180,
+      "side": "both",
+      "category": "Alerts"
+    },
+    {
+      "id": "success-chime",
+      "side": "both",
+      "category": "Feedback",
+      "steps": [
+        {
+          "intensity": 0.2,
+          "duration_ms": 40,
+          "gap_ms": 35
+        },
+        {
+          "intensity": 0.35,
+          "duration_ms": 40,
+          "gap_ms": 35
+        },
+        {
+          "intensity": 0.55,
+          "duration_ms": 40,
+          "gap_ms": 35
+        },
+        {
+          "intensity": 0.75,
+          "duration_ms": 40,
+          "gap_ms": 0
+        }
+      ]
+    },
+    {
+      "id": "error-fall",
+      "side": "both",
+      "category": "Feedback",
+      "steps": [
+        {
+          "intensity": 0.7,
+          "duration_ms": 75,
+          "gap_ms": 55
+        },
+        {
+          "intensity": 0.45,
+          "duration_ms": 75,
+          "gap_ms": 55
+        },
+        {
+          "intensity": 0.2,
+          "duration_ms": 75,
+          "gap_ms": 0
+        }
+      ]
+    },
+    {
+      "id": "level-up",
+      "side": "both",
+      "category": "Feedback",
+      "steps": [
+        {
+          "intensity": 0.15,
+          "duration_ms": 45,
+          "gap_ms": 20
+        },
+        {
+          "intensity": 0.25,
+          "duration_ms": 45,
+          "gap_ms": 20
+        },
+        {
+          "intensity": 0.4,
+          "duration_ms": 45,
+          "gap_ms": 20
+        },
+        {
+          "intensity": 0.6,
+          "duration_ms": 45,
+          "gap_ms": 20
+        },
+        {
+          "intensity": 0.85,
+          "duration_ms": 45,
+          "gap_ms": 0
+        }
+      ]
+    },
+    {
+      "id": "power-up",
+      "side": "both",
+      "category": "Textures",
+      "steps": [
+        {
+          "intensity": 0.08,
+          "duration_ms": 60,
+          "gap_ms": 0
+        },
+        {
+          "intensity": 0.15,
+          "duration_ms": 60,
+          "gap_ms": 0
+        },
+        {
+          "intensity": 0.24,
+          "duration_ms": 60,
+          "gap_ms": 0
+        },
+        {
+          "intensity": 0.35,
+          "duration_ms": 60,
+          "gap_ms": 0
+        },
+        {
+          "intensity": 0.48,
+          "duration_ms": 60,
+          "gap_ms": 0
+        },
+        {
+          "intensity": 0.62,
+          "duration_ms": 60,
+          "gap_ms": 0
+        },
+        {
+          "intensity": 0.78,
+          "duration_ms": 60,
+          "gap_ms": 0
+        },
+        {
+          "intensity": 0.95,
+          "duration_ms": 60,
+          "gap_ms": 0
+        }
+      ]
+    },
+    {
+      "id": "power-down",
+      "side": "both",
+      "category": "Textures",
+      "steps": [
+        {
+          "intensity": 0.85,
+          "duration_ms": 55,
+          "gap_ms": 0
+        },
+        {
+          "intensity": 0.7,
+          "duration_ms": 55,
+          "gap_ms": 0
+        },
+        {
+          "intensity": 0.55,
+          "duration_ms": 55,
+          "gap_ms": 0
+        },
+        {
+          "intensity": 0.4,
+          "duration_ms": 55,
+          "gap_ms": 0
+        },
+        {
+          "intensity": 0.28,
+          "duration_ms": 55,
+          "gap_ms": 0
+        },
+        {
+          "intensity": 0.16,
+          "duration_ms": 55,
+          "gap_ms": 0
+        },
+        {
+          "intensity": 0.08,
+          "duration_ms": 55,
+          "gap_ms": 0
+        }
+      ]
+    },
+    {
+      "id": "soft-swell",
+      "side": "both",
+      "category": "Textures",
+      "steps": [
+        {
+          "intensity": 0.06,
+          "duration_ms": 65,
+          "gap_ms": 0
+        },
+        {
+          "intensity": 0.12,
+          "duration_ms": 65,
+          "gap_ms": 0
+        },
+        {
+          "intensity": 0.22,
+          "duration_ms": 65,
+          "gap_ms": 0
+        },
+        {
+          "intensity": 0.35,
+          "duration_ms": 65,
+          "gap_ms": 0
+        },
+        {
+          "intensity": 0.48,
+          "duration_ms": 65,
+          "gap_ms": 0
+        },
+        {
+          "intensity": 0.35,
+          "duration_ms": 65,
+          "gap_ms": 0
+        },
+        {
+          "intensity": 0.22,
+          "duration_ms": 65,
+          "gap_ms": 0
+        },
+        {
+          "intensity": 0.12,
+          "duration_ms": 65,
+          "gap_ms": 0
+        },
+        {
+          "intensity": 0.06,
+          "duration_ms": 65,
+          "gap_ms": 0
+        }
+      ]
+    },
+    {
+      "id": "breathing",
+      "side": "both",
+      "category": "Textures",
+      "steps": [
+        {
+          "intensity": 0.08,
+          "duration_ms": 140,
+          "gap_ms": 0
+        },
+        {
+          "intensity": 0.14,
+          "duration_ms": 140,
+          "gap_ms": 0
+        },
+        {
+          "intensity": 0.24,
+          "duration_ms": 140,
+          "gap_ms": 0
+        },
+        {
+          "intensity": 0.38,
+          "duration_ms": 140,
+          "gap_ms": 0
+        },
+        {
+          "intensity": 0.5,
+          "duration_ms": 140,
+          "gap_ms": 0
+        },
+        {
+          "intensity": 0.38,
+          "duration_ms": 140,
+          "gap_ms": 0
+        },
+        {
+          "intensity": 0.24,
+          "duration_ms": 140,
+          "gap_ms": 0
+        },
+        {
+          "intensity": 0.14,
+          "duration_ms": 140,
+          "gap_ms": 0
+        },
+        {
+          "intensity": 0.08,
+          "duration_ms": 140,
+          "gap_ms": 0
+        }
+      ]
+    },
+    {
+      "id": "purring",
+      "side": "both",
+      "category": "Textures",
+      "steps": [
+        {
+          "intensity": 0.18,
+          "duration_ms": 65,
+          "gap_ms": 0
+        },
+        {
+          "intensity": 0.25,
+          "duration_ms": 65,
+          "gap_ms": 0
+        },
+        {
+          "intensity": 0.18,
+          "duration_ms": 65,
+          "gap_ms": 0
+        },
+        {
+          "intensity": 0.25,
+          "duration_ms": 65,
+          "gap_ms": 0
+        },
+        {
+          "intensity": 0.18,
+          "duration_ms": 65,
+          "gap_ms": 0
+        },
+        {
+          "intensity": 0.25,
+          "duration_ms": 65,
+          "gap_ms": 0
+        },
+        {
+          "intensity": 0.18,
+          "duration_ms": 65,
+          "gap_ms": 0
+        },
+        {
+          "intensity": 0.25,
+          "duration_ms": 65,
+          "gap_ms": 0
+        }
+      ]
+    },
+    {
+      "id": "fine-texture",
+      "intensity": 0.18,
+      "duration_ms": 15,
+      "pulses": 8,
+      "gap_ms": 20,
+      "side": "both",
+      "category": "Textures"
+    },
+    {
+      "id": "gravel",
+      "intensity": 0.42,
+      "duration_ms": 30,
+      "pulses": 6,
+      "gap_ms": 25,
+      "side": "both",
+      "category": "Textures"
+    },
+    {
+      "id": "rolling-rattle",
+      "side": "both",
+      "category": "Textures",
+      "steps": [
+        {
+          "intensity": 0.2,
+          "duration_ms": 25,
+          "gap_ms": 15
+        },
+        {
+          "intensity": 0.5,
+          "duration_ms": 25,
+          "gap_ms": 15
+        },
+        {
+          "intensity": 0.25,
+          "duration_ms": 25,
+          "gap_ms": 15
+        },
+        {
+          "intensity": 0.6,
+          "duration_ms": 25,
+          "gap_ms": 15
+        },
+        {
+          "intensity": 0.3,
+          "duration_ms": 25,
+          "gap_ms": 15
+        },
+        {
+          "intensity": 0.45,
+          "duration_ms": 25,
+          "gap_ms": 15
+        },
+        {
+          "intensity": 0.15,
+          "duration_ms": 25,
+          "gap_ms": 0
+        }
+      ]
+    },
+    {
+      "id": "heartbeat-soft",
+      "side": "both",
+      "category": "Rhythms",
+      "steps": [
+        {
+          "intensity": 0.28,
+          "duration_ms": 65,
+          "gap_ms": 50
+        },
+        {
+          "intensity": 0.12,
+          "duration_ms": 65,
+          "gap_ms": 50
+        },
+        {
+          "intensity": 0.42,
+          "duration_ms": 65,
+          "gap_ms": 0
+        }
+      ]
+    },
+    {
+      "id": "slow-metronome",
+      "intensity": 0.3,
+      "duration_ms": 40,
+      "pulses": 4,
+      "gap_ms": 360,
+      "side": "both",
+      "category": "Rhythms"
+    },
+    {
+      "id": "fast-metronome",
+      "intensity": 0.3,
+      "duration_ms": 25,
+      "pulses": 6,
+      "gap_ms": 120,
+      "side": "both",
+      "category": "Rhythms"
+    }
+  ],
+  "gyro_steering": {
+    "enabled": false,
+    "controller": "right",
+    "toggle_button": "capture",
+    "hold_ms": 500,
+    "axis": "z",
+    "invert": false,
+    "full_lock_deg": 45.0,
+    "deadzone_deg": 3.0,
+    "response_curve": 1.35,
+    "smoothing": 0.25,
+    "context": "driving"
+  },
+  "xinput": {
+    "user_index": 0
+  }
+}

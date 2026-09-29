@@ -46,9 +46,13 @@ bool Config::save(const std::wstring& directory) const
     for (const auto& b : buttons)
         j["buttons"].push_back({{"device", b.deviceKey}, {"button", b.button},
                                 {"virtualKey", b.virtualKey}, {"vehicleOnly", b.vehicleOnly}});
-    j["ffb"] = {{"device", ffbDeviceKey}, {"enabled", ffbEnabled}, {"armed", ffbArmed},
-                {"deviceClass", feel::nameOf(deviceClass)}, {"strength", ffbStrength},
+    // Arming is deliberately session-only. Persist every tune/control value, but every fresh process must
+    // require the driver to arm the motors again after seeing the selected device.
+    j["ffb"] = {{"device", ffbDeviceKey}, {"enabled", ffbEnabled}, {"armed", false},
+                {"deviceClass", feel::nameOf(deviceClass)}, {"strengthFraction", ffbFraction},
+                {"ratedNm", ratedNm},
                 {"spring", tune.spring}, {"damper", tune.damper}, {"texture", tune.texture},
+                {"collision", tune.collision},
                 {"engine", tune.engine}, {"road", tune.road}, {"watchdogMs", ffbWatchdogMs}};
 
     // Written beside the DLL, next to the log, so a rig's configuration travels with the plugin.
@@ -75,10 +79,10 @@ Config Config::load(const std::wstring& directory)
     applyFile(directory + L"\\ncm_rig_bridge.json", out);
     if (applyFile(directory + L"\\ncm_rig_bridge.user.json", out))
         RIG_INFO("user bindings applied over the shipped defaults");
-    RIG_INFO("config: port=%u input=%s ffb=%s/%s class=%s strength=%.3f ceiling=%.3f buttons=%zu",
+    RIG_INFO("config: port=%u input=%s ffb=%s/%s class=%s strength=%.0f%% ratedNm=%.1f buttons=%zu",
              out.port, out.inputEnabled ? "on" : "off", out.ffbEnabled ? "on" : "off",
-             out.ffbArmed ? "armed" : "disarmed", feel::nameOf(out.deviceClass), out.ffbStrength,
-             feel::ceilingFor(out.deviceClass), out.buttons.size());
+             out.ffbArmed ? "armed" : "disarmed", feel::nameOf(out.deviceClass), out.ffbFraction * 100.0f,
+             out.ratedNm, out.buttons.size());
     return out;
 }
 
@@ -107,20 +111,27 @@ bool applyFile(const std::wstring& path, Config& out)
             out.ffbDeviceGuid = f.value("deviceGuid", out.ffbDeviceGuid);
             out.ffbDeviceName = f.value("deviceName", out.ffbDeviceName);
             out.ffbEnabled = f.value("enabled", out.ffbEnabled);
-            out.ffbArmed = f.value("armed", out.ffbArmed);
+            out.ffbArmed = false;  // explicit arm is session-only, even if an older file says true
             // The class is read FIRST: it decides the ceiling that `strength` is then clamped against, so
             // reading them the other way round would clamp against a stale ladder.
             // Overlay semantics: a key the file omits keeps whatever the previous file set, rather than
             // snapping back to a default. Defaulting to "unknown" here would silently drop the shipped
             // class every time a user file left it out.
             out.deviceClass = feel::classFrom(f.value("deviceClass", std::string(feel::nameOf(out.deviceClass))));
-            out.ffbStrength = std::clamp(f.value("strength", out.ffbStrength),
-                                         0.0f, feel::ceilingFor(out.deviceClass));
+            if (f.contains("strengthFraction")) {
+                out.ffbFraction = std::clamp(f.value("strengthFraction", out.ffbFraction), 0.0f, 1.0f);
+            } else if (f.contains("strength")) {
+                // Files before 0.1.3 stored a magnitude against the class's measured ceiling.
+                const float ceiling = feel::ceilingFor(out.deviceClass);
+                out.ffbFraction = ceiling > 0.0f ? std::clamp(f.value("strength", 0.0f) / ceiling, 0.0f, 1.0f) : 0.5f;
+            }
+            out.ratedNm = std::clamp(f.value("ratedNm", out.ratedNm), 0.0f, 50.0f);
             out.tune.spring = std::clamp(f.value("spring", out.tune.spring), 0.0f, 1.0f);
             out.tune.damper = std::clamp(f.value("damper", out.tune.damper), 0.0f, 1.0f);
             out.tune.texture = std::clamp(f.value("texture", out.tune.texture), 0.0f, 1.0f);
             out.tune.engine = std::clamp(f.value("engine", out.tune.engine), 0.0f, 1.0f);
             out.tune.road = std::clamp(f.value("road", out.tune.road), 0.0f, 1.0f);
+            out.tune.collision = std::clamp(f.value("collision", out.tune.collision), 0.0f, 1.0f);
             out.ffbWatchdogMs = std::clamp(f.value("watchdogMs", out.ffbWatchdogMs), 100u, 1000u);
         }
         if (j.contains("buttons") && j["buttons"].is_array()) {

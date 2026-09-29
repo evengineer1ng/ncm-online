@@ -24,7 +24,7 @@ std::string clean(const std::string& value, size_t limit)
     for (const char c : value) {
         if (out.size() >= limit) break;
         const auto u = static_cast<unsigned char>(c);
-        if (c == '|' || u < 0x20 || u == 0x7f) continue;   // '|' is the redscript field separator
+        if (c == '|' || c == '~' || u < 0x20 || u == 0x7f) continue;   // '|' separates fields, '~' means empty
         out.push_back(c);
     }
     return out;
@@ -95,12 +95,17 @@ std::string State::frame(Clock::time_point now)
     return buffer;
 }
 
+// Every field is non-empty on the wire: an empty one is sent as "~". Redscript's `StrSplit` cannot be trusted to
+// keep empty fields, and when it dropped them the field count came up short and the whole layout was refused --
+// which is exactly how the first live wheel showed eight blank cards (2026-09-28).
+std::string field(const std::string& value) { return value.empty() ? std::string("~") : value; }
+
 std::string State::layout()
 {
     std::lock_guard lock(mutex_);
-    std::string out = std::to_string(revision_) + "|" + title_ + "|" + hint_;
+    std::string out = std::to_string(revision_) + "|" + field(title_) + "|" + field(hint_);
     for (const auto& s : slots_) {
-        out += "|" + std::to_string(s.state) + "|" + s.label + "|" + s.key + "|" + s.detail;
+        out += "|" + std::to_string(s.state) + "|" + field(s.label) + "|" + field(s.key) + "|" + field(s.detail);
     }
     return out;
 }

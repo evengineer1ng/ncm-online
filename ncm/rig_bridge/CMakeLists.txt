@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.21)
-project(ncm_rig_bridge VERSION 0.1.0 LANGUAGES CXX)
+project(ncm_rig_bridge VERSION 0.1.6 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -21,6 +21,12 @@ add_library(ncm_rig_bridge SHARED
     src/config.cpp
     src/state.cpp
     src/direct_input.cpp
+    src/ffb_output.cpp
+    src/net_guard.cpp
+    src/pad/pad_engine.cpp
+    src/pad/sdl_input.cpp
+    src/pad/xinput_hook.cpp
+    src/pad/pad_service.cpp
     src/vehicle_hook.cpp
     src/rtti.cpp
     src/bridge.cpp
@@ -38,7 +44,7 @@ target_compile_definitions(ncm_rig_bridge PRIVATE
 set_target_properties(ncm_rig_bridge PROPERTIES OUTPUT_NAME "ncm_rig_bridge" PREFIX "")
 
 if (MSVC)
-    target_compile_options(ncm_rig_bridge PRIVATE /W4 /EHsc /permissive-)
+    target_compile_options(ncm_rig_bridge PRIVATE /W4 /EHsc /permissive- /utf-8)
 endif()
 
 # A standalone report of what DirectInput can see, for "it does not detect my wheel". Ships beside the
@@ -55,6 +61,14 @@ if (BUILD_TESTING)
     add_executable(ncm_rig_mapping_tests tests/mapping_tests.cpp)
     target_include_directories(ncm_rig_mapping_tests PRIVATE src)
     add_test(NAME ncm_rig_mapping COMMAND ncm_rig_mapping_tests)
+
+    add_executable(ncm_rig_pad_tests tests/pad_tests.cpp src/pad/pad_engine.cpp)
+    target_include_directories(ncm_rig_pad_tests PRIVATE src "${CARRIER_ROOT}/third_party/json")
+    target_compile_definitions(ncm_rig_pad_tests PRIVATE NOMINMAX)
+    if (MSVC)
+        target_compile_options(ncm_rig_pad_tests PRIVATE /W4 /EHsc /permissive- /utf-8)
+    endif()
+    add_test(NAME ncm_rig_pad COMMAND ncm_rig_pad_tests)
 
     add_executable(ncm_rig_feel_tests tests/feel_tests.cpp)
     target_include_directories(ncm_rig_feel_tests PRIVATE src)

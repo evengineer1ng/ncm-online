@@ -1,5 +1,10 @@
 #include "rtti.hpp"
 
+#include "feel.hpp"
+
+#include <algorithm>
+#include <chrono>
+
 #include "log.hpp"
 #include "state.hpp"
 #include "vehicle_hook.hpp"
@@ -29,16 +34,32 @@ void clearVehicle(RED4ext::IScriptable*, RED4ext::CStackFrame* frame, bool* out,
 // **CDPR dispatches OnVehicleBumpEvent to the vehicle that got STRUCK, not the striker**, so the reds side
 // forwards the event whenever EITHER party is the player's mount and computes the kick in the PLAYER's
 // frame. By the time it reaches here the sign is already correct: negative = impact on the driver's left.
+//
+// The script passes RAW numbers -- delta-v and the lateral share of the contact normal -- and the curve is
+// computed here, in `feel::impactIntensity`, where a unit test can hold it.
 void onBump(RED4ext::IScriptable*, RED4ext::CStackFrame* frame, bool* out, int64_t)
 {
     RED4ext::Handle<RED4ext::ISerializable> handle;
-    float kick = 0.0f;
+    float deltaV = 0.0f;
+    float lateral = 0.0f;
     RED4ext::GetParameter(frame, &handle);
-    RED4ext::GetParameter(frame, &kick);
+    RED4ext::GetParameter(frame, &deltaV);
+    RED4ext::GetParameter(frame, &lateral);
     frame->code++;
     // Scoped exactly like the input detour: a jolt from any car but the one under the driver is discarded.
-    if (handle.instance && static_cast<void*>(handle.instance) == state().playerVehicle())
-        state().applyCollision(kick);
+    if (handle.instance && static_cast<void*>(handle.instance) == state().playerVehicle()) {
+        const float thud = feel::impactIntensity(deltaV);
+        const float side = std::clamp(lateral == lateral ? lateral : 0.0f, -1.0f, 1.0f);
+        state().applyCollision(side * thud, thud);
+        // Logged, rate-limited: whether walls and poles fire this event at all is still an open question,
+        // and the answer should come from a log line, not a guess.
+        static auto lastLog = std::chrono::steady_clock::time_point{};
+        const auto now = std::chrono::steady_clock::now();
+        if (now - lastLog > std::chrono::milliseconds(500)) {
+            lastLog = now;
+            RIG_INFO("collision: dv=%.2f m/s lateral=%.2f -> thud=%.2f kick=%.2f", deltaV, side, thud, side * thud);
+        }
+    }
     if (out) *out = true;
 }
 
@@ -70,7 +91,7 @@ void postRegister()
         "Bool", {{"handle:vehicleBaseObject", "vehicle"}});
     add("NcmRig_ClearPlayerVehicle", reinterpret_cast<RED4ext::ScriptingFunction_t<void*>>(&clearVehicle), "Bool", {});
     add("NcmRig_OnVehicleBump", reinterpret_cast<RED4ext::ScriptingFunction_t<void*>>(&onBump), "Bool",
-        {{"handle:vehicleBaseObject", "vehicle"}, {"Float", "kick"}});
+        {{"handle:vehicleBaseObject", "vehicle"}, {"Float", "deltaV"}, {"Float", "lateral"}});
     add("NcmRig_GetStatus", reinterpret_cast<RED4ext::ScriptingFunction_t<void*>>(&getStatus), "String", {});
     RIG_INFO("redscript natives registered");
 }

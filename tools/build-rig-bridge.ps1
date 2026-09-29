@@ -29,6 +29,15 @@ Copy-Item (Join-Path $project "ncm_rig_bridge.json") $pluginDir
 Copy-Item (Join-Path $project "README.md") $pluginDir
 Copy-Item (Join-Path $project "THIRD_PARTY_NOTICES.md") $pluginDir
 Copy-Item (Join-Path $project "redscript\ncm_rig_bridge.reds") $scriptDir
+# The gamepad layer: SDL3 for Joy-Cons and SDL-only devices (loaded at run time from beside the DLL, so a
+# missing copy disables motion input and nothing else), its licence, the profile spec, and the shipped
+# default profile. `_shipped/` is re-projected on update; the player's own profiles beside it are not.
+Copy-Item (Join-Path $project "third_party\SDL3\SDL3.dll") $pluginDir
+Copy-Item (Join-Path $project "third_party\SDL3\LICENSE.txt") (Join-Path $pluginDir "SDL3-LICENSE.txt")
+Copy-Item (Join-Path $project "GAMEPAD_PROFILE.md") $pluginDir
+$shipped = Join-Path $pluginDir "profiles\_shipped"
+New-Item -ItemType Directory -Force $shipped | Out-Null
+Copy-Item (Join-Path $project "profiles\_shipped\default.json") $shipped
 
 $zip = Join-Path $dist "ncm-rig-bridge-$version.zip"
 if (Test-Path $zip) { Remove-Item -Force $zip }

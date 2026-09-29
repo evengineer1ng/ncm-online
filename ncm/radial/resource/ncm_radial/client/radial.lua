@@ -2,15 +2,24 @@
 --
 -- HOLD the quick-menu key (keyboard, default B) or button (controller, default Start), point, RELEASE. Releasing
 -- on a live slot runs it; releasing on nothing, or on an open slot, just closes the wheel. Left click / pad A
--- confirms early. Every action is also a hotkey and a chat command, and those are unchanged: the wheel is a way
--- to REACH them, not a replacement (owner, 2026-09-28: "keep our hotkeys").
+-- confirms early; Escape closes without running anything. Every action is also a hotkey and a chat command, and
+-- those are unchanged: the wheel is a way to REACH them, not a replacement (owner, 2026-09-28).
 --
 -- Who does what:
 --   * THIS FILE decides everything: whether the wheel is open, what is highlighted, what runs. It reads the pad
 --     and keyboard physically (`Open77.input`), exactly like `ncm_world/client/nav_input.lua`.
 --   * `ncm_radial.dll` (+ `ncm_radial.reds`), a required mod, only DRAWS what this file sends it, natively on the
---     HUD -- no WebUI is visible. The hidden page below is transport, not UI.
+--     HUD. The page below is transport ONLY: 16x16, invisible, never shown and never focused.
 --   * `ncm_world` RUNS the action (`quickAction` export), through the same function its hotkey runs.
+--
+-- **The transport page must stay invisible and unfocused (`KB-182`).** 0.1.1 made it a full-screen visible
+-- page so it could hold a cursor for mouse aiming, and it turned the owner's gamepad into keyboard-and-mouse from
+-- the moment the resource started -- on every rejoin, since every start recreated it. No cursor, no focus, ever.
+--
+-- **The mouse** (first live test: "mouse still moves camera"). While the wheel is up, camera rotation is frozen
+-- (`players.freezeRotation`) and the mouse's raw movement (`mouseDeltaX/Y`) aims, the way the vanilla weapon wheel
+-- reads a flick. **Every release happens here in Lua** (`resetControls`), never through the page, and the resource
+-- also releases once at start, so nothing a previous run held can survive a rejoin.
 --
 -- Slots are FIXED positions, clockwise from the top. A slot is greyed or left open, never moved, so a thumb can
 -- learn the wheel; three of the eight are open on purpose, for features that have not shipped yet.
@@ -35,17 +44,18 @@ local PAD_MAPPING, PAD_DEFAULT = "ncm.radial.pad", "padStart"
 local PAD_KVP = "radial.pad"
 
 local STICK_ON = 0.55                -- past this a stick AIMS; below it the last aim is kept (sticky, like vanilla)
-local MOUSE_AIM_PX, MOUSE_CLAMP_PX = 60, 260
+local MOUSE_AIM_PX, MOUSE_CLAMP_PX = 60, 260   -- accumulated mouse travel before it aims, and its ceiling
 local OPEN_TICK_MS, IDLE_TICK_MS = 16, 50
+local KEY_REFRESH_MS = 2000          -- bindings are re-read this often, not every tick
 
 -- ------------------------------------------------------------------------------------------------------------
--- Transport: a hidden loopback surface to the plugin (L129). The plugin owns 38560-38563 -- a range of its own,
--- never the Carrier's or Rig Bridge's.
+-- Transport: a loopback surface to the plugin (L129). The plugin owns 38560-38563 -- a range of its own, never
+-- the Carrier's or Rig Bridge's. 16x16 and invisible, exactly like the Carrier's channel (`KB-182`).
 -- ------------------------------------------------------------------------------------------------------------
 local PORT_BASE, PORT_SPAN = 38560, 4
 local portIndex = 0
 local surface, surfaceReady = nil, false
-local health = nil                   -- last health payload from the plugin
+local health = nil
 local layoutSent = false
 local lastAttemptAt, attempts = 0, 0
 
@@ -73,7 +83,6 @@ local function bringUp()
         zIndex = 1, transparent = true, visible = false,
     })
     if not page then
-        -- Nothing listening on this port. Walk the range; a missing plugin is an ordinary state, said once.
         attempts = attempts + 1
         portIndex = (portIndex + 1) % PORT_SPAN
         if attempts == PORT_SPAN then
@@ -90,8 +99,6 @@ local function bringUp()
     page:on("ncm:radial.closed", function(info)
         local wasReady = surfaceReady
         surfaceReady = false
-        -- A close BEFORE a handshake means the wrong port (or a stranger on it): move on. After one it is an
-        -- ordinary drop and the page reconnects on its own.
         if not wasReady then
             tearDown("closed before connecting: " .. tostring(type(info) == "table" and info.detail or "?"))
             portIndex = (portIndex + 1) % PORT_SPAN
@@ -107,25 +114,30 @@ local function bringUp()
 end
 
 -- ------------------------------------------------------------------------------------------------------------
--- Bindings. Both are ordinary `RegisterKeyMapping`s, so both appear in the pause menu's key-bindings tab and
--- can be rebound there. The handlers only ARM the wheel; the hold itself is read physically below, the same
--- idiom the platform's own hold-to-open context menu uses.
+-- Bindings. Both are ordinary `RegisterKeyMapping`s, so both appear in the pause menu's key-bindings tab. The
+-- handlers only exist so the rows exist; the hold is read physically below, the idiom the platform's own
+-- hold-to-open context menu uses. Resolved keys are CACHED: re-reading them every tick made this the costliest
+-- resource on the client in the first live test.
 -- ------------------------------------------------------------------------------------------------------------
 local padMappingOk = false
+local keys = { keyboard = KEY_DEFAULT, pad = PAD_DEFAULT, at = -KEY_REFRESH_MS }
 
-local function keyboardKey()
+local function refreshKeys(force)
+    local t = now()
+    if not force and t - keys.at < KEY_REFRESH_MS then return end
+    keys.at = t
     local ok, k = pcall(Open77.input.keyFor, KEY_MAPPING)
-    return (ok and type(k) == "string" and k ~= "") and k or KEY_DEFAULT
-end
-
-local function padControl()
+    keys.keyboard = (ok and type(k) == "string" and k ~= "") and k or KEY_DEFAULT
+    local pad = nil
     if padMappingOk then
-        local ok, k = pcall(Open77.input.keyFor, PAD_MAPPING)
-        if ok and type(k) == "string" and k ~= "" then return k end
+        local okP, p = pcall(Open77.input.keyFor, PAD_MAPPING)
+        if okP and type(p) == "string" and p ~= "" then pad = p end
     end
-    local ok, v = pcall(GetResourceKvp, PAD_KVP)
-    if ok and type(v) == "string" and v ~= "" then return v end
-    return PAD_DEFAULT
+    if not pad then
+        local okK, v = pcall(GetResourceKvp, PAD_KVP)
+        if okK and type(v) == "string" and v ~= "" then pad = v end
+    end
+    keys.pad = pad or PAD_DEFAULT
 end
 
 do
@@ -137,9 +149,10 @@ do
         PAD_DEFAULT, function() end)
     padMappingOk = okP and resultP ~= false
     if not padMappingOk then
-        log("controller mapping not accepted (%s); using %s -- change it with /ncm.radial pad <control>",
-            tostring(reasonP or resultP), padControl())
+        log("controller mapping not accepted (%s); change the button with /ncm.radial pad <control>",
+            tostring(reasonP or resultP))
     end
+    refreshKeys(true)
 end
 
 -- ------------------------------------------------------------------------------------------------------------
@@ -149,9 +162,9 @@ local W = {
     open = false, source = nil,      -- "key" | "pad"
     sel = nil,                       -- 1-based slot, sticky
     pointer = nil,                   -- degrees, nil when nothing is aimed at
-    mouse = { x = 0, y = 0 },
-    blocked = nil,                   -- what setActionBlocked said, for /ncm.radial
-    confirmHeld = true,              -- ignore a confirm button already down when the wheel opened
+    mouse = { x = 0, y = 0 },        -- accumulated raw mouse travel since the wheel opened
+    controls = nil,                  -- what the control calls answered, for /ncm.radial
+    confirmHeld = true,              -- a confirm button already down when the wheel opened is ignored
 }
 
 local function isDown(control)
@@ -181,19 +194,32 @@ local function layoutPayload()
     end
     return {
         cmd = "layout", title = "NCM", slots = slots,
-        hint = ("release to open  ·  %s / %s"):format(keyboardKey(), padControl()),
+        hint = ("release to choose  ·  click / A to confirm  ·  Esc to close  ·  %s / %s"):format(keys.keyboard, keys.pad),
     }
 end
 
-local function setBlocked(on)
-    -- Only what a direction key or a click would otherwise do on foot. Driving is deliberately not blocked:
-    -- a wheel that could take the car off a driver mid-corner is worse than one that shares the stick.
-    local results = {}
-    for _, action in ipairs({ "Movement", "Attack" }) do
-        local ok, r, why = pcall(Open77.input.setActionBlocked, action, on)
-        results[#results + 1] = action .. "=" .. (ok and tostring(r) .. (why and ("(" .. tostring(why) .. ")") or "") or ("error:" .. tostring(r)))
+-- Controls while the wheel is up: no camera turn, no firing, no aiming, no interacting. Released by
+-- `resetControls`, the same single call the platform's context menu uses, so nothing is left half-restored.
+local function holdControls(on)
+    local p = Open77.players
+    if not p then W.controls = "players API unavailable"; return end
+    if on then
+        local answers = {}
+        for _, step in ipairs({ { "freezeRotation", true }, { "allowAim", false }, { "allowShoot", false },
+                                { "allowInteraction", false } }) do
+            local fn = p[step[1]]
+            local ok, r = pcall(function() return fn and fn(step[2]) end)
+            answers[#answers + 1] = step[1] .. "=" .. (ok and tostring(r) or ("error:" .. tostring(r)))
+        end
+        -- Opened from the pad nothing holds keyboard focus, so the left stick would also walk the character.
+        -- The platform does not document this call's shape, so its answer is recorded rather than assumed.
+        local okM, m, why = pcall(Open77.input.setActionBlocked, "Movement", true)
+        answers[#answers + 1] = "Movement=" .. (okM and (tostring(m) .. (why and ("(" .. tostring(why) .. ")") or "")) or ("error:" .. tostring(m)))
+        W.controls = table.concat(answers, " ")
+    else
+        pcall(function() if p.resetControls then p.resetControls() end end)
+        pcall(Open77.input.setActionBlocked, "Movement", false)
     end
-    W.blocked = table.concat(results, " ")
 end
 
 local function angleOf(x, y)       -- x right, y up; 0 = up, clockwise
@@ -207,8 +233,7 @@ local function slotOf(angle)
 end
 
 local function aim()
-    -- Controller: whichever stick is pushed further. Right is the vanilla wheel's stick; left is accepted because
-    -- on foot it is where the thumb already is (movement is blocked while the wheel is up).
+    -- Controller: whichever stick is pushed further.
     local rx, ry = axis("padRightStickX"), axis("padRightStickY")
     local lx, ly = axis("padLeftStickX"), axis("padLeftStickY")
     local x, y = rx, ry
@@ -220,7 +245,7 @@ local function aim()
     local dy = ((isDown("W") or isDown("Up")) and 1 or 0) - ((isDown("S") or isDown("Down")) and 1 or 0)
     if dx ~= 0 or dy ~= 0 then return angleOf(dx, dy) end
 
-    -- Mouse: a flick, accumulated and clamped, as the vanilla wheel reads it. Screen Y grows downwards.
+    -- Mouse: a flick, accumulated and clamped. The camera is frozen while the wheel is up. Screen Y grows down.
     local mx, my = axis("mouseDeltaX"), axis("mouseDeltaY")
     if mx ~= 0 or my ~= 0 then
         local m = W.mouse
@@ -241,7 +266,7 @@ local function openWheel(source)
     W.mouse.x, W.mouse.y = 0, 0
     W.confirmHeld = isDown("LeftMouse") or isDown("padA")
     if not layoutSent then layoutSent = send(layoutPayload()) end
-    setBlocked(true)
+    holdControls(true)
     sendFrame()
 end
 
@@ -255,20 +280,27 @@ local function run(slot)
     end)
 end
 
+-- Every release is here, in Lua, and runs whether or not the page is healthy.
 local function closeWheel(commit)
     local chosen = commit and W.sel and SLOTS[W.sel] or nil
     W.open, W.source, W.sel, W.pointer = false, nil, nil, nil
-    setBlocked(false)
+    holdControls(false)
     sendFrame()
     run(chosen)
 end
+
+AddEventHandler("open77:pauseKey", function()
+    if W.open then closeWheel(false) end
+end)
 
 local wasDown = { key = false, pad = false }
 
 CreateThread(function()
     Wait(3000)                                   -- let the plugin and permissions settle
+    -- Release anything a previous run of this resource could have left held (`KB-182`): a rejoin must always
+    -- start from a clean controller.
+    holdControls(false)
     while true do
-        -- Transport upkeep: retry a missing plugin slowly, ping a present one for health.
         local t = now()
         if not surface and t - lastAttemptAt > (attempts < PORT_SPAN and 1500 or 15000) then
             lastAttemptAt = t
@@ -278,20 +310,25 @@ CreateThread(function()
             send({ cmd = "ping" })
             if not layoutSent then layoutSent = send(layoutPayload()) end
         end
+        if not W.open then refreshKeys(false) end
 
-        local captured = false
-        pcall(function() captured = Open77.input.isCaptured() == true end)
-        local keyDown, padDown = isDown(keyboardKey()), isDown(padControl())
+        local keyDown, padDown = isDown(keys.keyboard), isDown(keys.pad)
 
         if not W.open then
-            -- Opens on the press edge only, and never over a focused surface (the F6 hub owns input then).
-            if not captured and keyDown and not wasDown.key then openWheel("key")
-            elseif not captured and padDown and not wasDown.pad then openWheel("pad") end
+            -- Opens on the press edge only, never over another focused surface (the F6 hub owns input then),
+            -- and never when there is no plugin to draw it.
+            if surfaceReady and ((keyDown and not wasDown.key) or (padDown and not wasDown.pad)) then
+                local captured = false
+                pcall(function() captured = Open77.input.isCaptured() == true end)
+                if not captured then openWheel(keyDown and not wasDown.key and "key" or "pad") end
+            end
         else
             local held = (W.source == "key") and keyDown or padDown
             local confirm = isDown("LeftMouse") or isDown("padA")
-            if captured then
-                closeWheel(false)                -- something else took input: stand down, run nothing
+            local captured = false
+            pcall(function() captured = Open77.input.isCaptured() == true end)
+            if captured or not surfaceReady then
+                closeWheel(false)                -- another surface took input, or the plugin went away
             elseif not held then
                 closeWheel(true)
             elseif confirm and not W.confirmHeld and W.sel then
@@ -314,17 +351,24 @@ CreateThread(function()
 end)
 
 -- ------------------------------------------------------------------------------------------------------------
--- /ncm.radial                     status: transport, plugin, host, bindings, last block result
+-- /ncm.radial                     status: transport, plugin, host, bindings, last control answers
 -- /ncm.radial pad <control>       controller button when the mapping cannot be rebound (padStart, padBack, ...)
--- /ncm.radial input               three seconds of raw aim readings, for tuning the mouse and sticks
+-- /ncm.radial input               three seconds of raw aim readings
+-- /ncm.radial close               force the wheel shut and release every control (should never be needed)
 -- ------------------------------------------------------------------------------------------------------------
 RegisterCommand("ncm.radial", function(_, args)
     local sub = args and args[1]
     if sub == "pad" and args[2] then
         pcall(SetResourceKvp, PAD_KVP, tostring(args[2]))
+        refreshKeys(true)
         layoutSent = false
         log("controller button set to %s%s", tostring(args[2]),
             padMappingOk and " (the pause-menu binding, if set, still wins)" or "")
+        return
+    end
+    if sub == "close" then
+        closeWheel(false)
+        log("closed and released")
         return
     end
     if sub == "input" then
@@ -332,7 +376,7 @@ RegisterCommand("ncm.radial", function(_, args)
             for _ = 1, 30 do
                 log("R(%.2f,%.2f) L(%.2f,%.2f) mouseDelta(%.1f,%.1f) key=%s pad=%s",
                     axis("padRightStickX"), axis("padRightStickY"), axis("padLeftStickX"), axis("padLeftStickY"),
-                    axis("mouseDeltaX"), axis("mouseDeltaY"), tostring(isDown(keyboardKey())), tostring(isDown(padControl())))
+                    axis("mouseDeltaX"), axis("mouseDeltaY"), tostring(isDown(keys.keyboard)), tostring(isDown(keys.pad)))
                 Wait(100)
             end
         end)
@@ -345,14 +389,12 @@ RegisterCommand("ncm.radial", function(_, args)
     else
         log("plugin: not heard from -- is the ncm-radial required mod installed?")
     end
-    log("keyboard: %s   controller: %s (%s)", keyboardKey(), padControl(),
-        padMappingOk and "pause-menu binding" or "/ncm.radial pad")
-    log("last block result: %s", tostring(W.blocked or "never opened"))
+    log("keyboard: %s   controller: %s (%s)", keys.keyboard, keys.pad, padMappingOk and "pause-menu binding" or "/ncm.radial pad")
+    log("last control answers: %s", tostring(W.controls or "never opened"))
 end, false)
 
 AddEventHandler("onClientResourceStop", function(name)
     if name ~= GetCurrentResourceName() then return end
-    if W.open then setBlocked(false) end
-    send({ cmd = "frame", open = false, sel = -1, pointer = -1 })
+    if W.open then closeWheel(false) end
     tearDown("resource stop")
 end)

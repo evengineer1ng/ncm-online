@@ -44,14 +44,14 @@ protected cb func OnUnmountingEvent(evt: ref<UnmountingEvent>) -> Bool {
 // with the player's right vector means the impact landed on the driver's left, so the rim jerks right --
 // the chassis rotates about the contact and the front tyres scrub away from it.
 // ---------------------------------------------------------------------------------------------------
-public static native func NcmRig_OnVehicleBump(vehicle: ref<VehicleObject>, kick: Float) -> Bool;
+// Raw numbers only: the strength curve lives in C++ (`feel::impactIntensity`), where it is unit-tested.
+public static native func NcmRig_OnVehicleBump(vehicle: ref<VehicleObject>, deltaV: Float, lateral: Float) -> Bool;
 
 @wrapMethod(VehicleObject)
 protected cb func OnVehicleBumpEvent(evt: ref<VehicleBumpEvent>) -> Bool {
   let result: Bool = wrappedMethod(evt);
 
-  let intensity: Float = ClampF(AbsF(evt.impactVelocityChange) / 20.0, 0.0, 1.0);
-  if intensity <= 0.0 {
+  if AbsF(evt.impactVelocityChange) <= 0.0 {
     return result;
   }
 
@@ -81,8 +81,9 @@ protected cb func OnVehicleBumpEvent(evt: ref<VehicleBumpEvent>) -> Bool {
   let lateral: Float = pr.X * evt.hitNormal.X
                      + pr.Y * evt.hitNormal.Y
                      + pr.Z * evt.hitNormal.Z;
-  let kick: Float = ClampF(-normalSign * lateral * intensity, -1.0, 1.0);
-  NcmRig_OnVehicleBump(playerVeh, kick);
+  // Signed toward the side the impact came from, in the driver's frame. Zero for a head-on hit -- which the
+  // C++ side still delivers as a full THUD; only the sideways kick needs a lateral share.
+  NcmRig_OnVehicleBump(playerVeh, evt.impactVelocityChange, ClampF(-normalSign * lateral, -1.0, 1.0));
 
   return result;
 }

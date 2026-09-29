@@ -8,5 +8,10 @@
 - custom_game_controller by Jack Humbert and contributors — MIT License. Architectural reference for
   arbitrary multi-device controller enumeration and hot-plug behavior.
 
-No vendor SDK is linked or redistributed. Windows DirectInput is supplied by the operating system.
+- SDL 3.4.10 by Sam Lantinga and contributors — zlib License (`SDL3-LICENSE.txt`). Redistributed unmodified
+  as `SDL3.dll` (the official win32-x64 runtime) and loaded at run time for Joy-Con and SDL-only device input.
+- The gamepad layer (`src/pad/`) is a C++ port of JoyMoCo, the owner's own motion-to-XInput mapper; its
+  profile format v1 is kept so profiles move between the two.
+
+No vendor SDK is linked. Windows DirectInput is supplied by the operating system.
 

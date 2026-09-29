@@ -3,6 +3,7 @@
 #include "direct_input.hpp"
 #include "feel.hpp"
 #include "log.hpp"
+#include "net_guard.hpp"
 #include "state.hpp"
 
 #include <nlohmann/json.hpp>
@@ -42,46 +43,6 @@ Open77.on("ncm:ffb.settings",function(p){relay({cmd:"settings",settings:p||{}});
 Open77.on("ncm:ffb.test",function(p){relay({cmd:"test",test:p||{}});});
 Open77.on("ncm:ffb.bind",function(p){relay({cmd:"bind",bind:p||{}});});}connect();})();
 </script></body></html>)HTML";
-
-bool sameProcessTree(uint32_t peer, uint32_t self)
-{
-    if (peer == 0 || peer == self) return true;
-    HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
-    if (snapshot == INVALID_HANDLE_VALUE) return true;
-    std::vector<std::pair<uint32_t, uint32_t>> parents;
-    PROCESSENTRY32W item{}; item.dwSize = sizeof(item);
-    if (Process32FirstW(snapshot, &item)) do {
-        parents.emplace_back(item.th32ProcessID, item.th32ParentProcessID);
-    } while (Process32NextW(snapshot, &item));
-    CloseHandle(snapshot);
-    uint32_t current = peer;
-    for (int depth = 0; depth < 8; ++depth) {
-        uint32_t parent = 0;
-        for (const auto& [pid, ppid] : parents) if (pid == current) { parent = ppid; break; }
-        if (parent == 0) return false;
-        if (parent == self) return true;
-        current = parent;
-    }
-    return false;
-}
-
-uint32_t peerPid(SOCKET client)
-{
-    sockaddr_in peer{}, local{}; int peerSize = sizeof(peer), localSize = sizeof(local);
-    if (getpeername(client, reinterpret_cast<sockaddr*>(&peer), &peerSize) == SOCKET_ERROR ||
-        getsockname(client, reinterpret_cast<sockaddr*>(&local), &localSize) == SOCKET_ERROR) return 0;
-    DWORD size = 0;
-    if (GetExtendedTcpTable(nullptr, &size, FALSE, AF_INET, TCP_TABLE_OWNER_PID_CONNECTIONS, 0) != ERROR_INSUFFICIENT_BUFFER) return 0;
-    std::vector<uint8_t> bytes(size);
-    if (GetExtendedTcpTable(bytes.data(), &size, FALSE, AF_INET, TCP_TABLE_OWNER_PID_CONNECTIONS, 0) != NO_ERROR) return 0;
-    const auto* table = reinterpret_cast<const MIB_TCPTABLE_OWNER_PID*>(bytes.data());
-    for (DWORD i = 0; i < table->dwNumEntries; ++i) {
-        const auto& row = table->table[i];
-        if (row.dwLocalPort == static_cast<DWORD>(peer.sin_port) && row.dwRemotePort == static_cast<DWORD>(local.sin_port) &&
-            row.dwState == MIB_TCP_STATE_ESTAB) return row.dwOwningPid;
-    }
-    return 0;
-}
 
 struct Sha1 {
     uint32_t h[5]{0x67452301u,0xEFCDAB89u,0x98BADCFEu,0x10325476u,0xC3D2E1F0u};
@@ -164,9 +125,9 @@ void Bridge::sendSnapshot()
 
     // The ladder is the device class's, and the reported rung is the INDEX the panel sent -- derived by
     // matching, never by threshold. A threshold is how the panel and the device came to disagree before.
-    const float ceiling = feel::ceilingFor(rig_.deviceClass());
-    const float strength = rig_.ffbStrength();
-    const float fraction = ceiling > 0.0f ? strength / ceiling : 0.0f;
+    const float ceiling = rig_.ffbCeiling();
+    const float fraction = rig_.ffbFraction();
+    const float strength = fraction * ceiling;
 
     json device{{"name", name}, {"class", feel::nameOf(rig_.deviceClass())}, {"armed", rig_.ffbArmed()},
         {"strength", fraction}, {"magnitude", strength}, {"ceiling", ceiling},
@@ -174,7 +135,8 @@ void Bridge::sendSnapshot()
         {"classes", {"gear", "belt", "direct_drive", "unknown"}},
         {"caps", {{"spring", true}, {"damper", true}, {"sine", rig_.hasFfb()}, {"constant", rig_.hasFfb()}}},
         {"tune", {{"spring", rig_.ffbSpring()}, {"damper", rig_.ffbDamper()}, {"engine", rig_.ffbEngine()},
-                  {"road", rig_.ffbRoad()}, {"texture", rig_.ffbTexture()}}},
+                  {"road", rig_.ffbRoad()}, {"texture", rig_.ffbTexture()},
+                  {"collision", rig_.ffbCollision()}}},
         {"rig", {{"steering", steering}, {"pedals", pedals},
                  {"rigLive", state().playerVehicle() != nullptr},
                  // `rig` is passed through whole by the Lua, so anything the panel reads is safest here.
@@ -183,7 +145,12 @@ void Bridge::sendSnapshot()
                  // Inside `rig` on purpose: `carrier_bridge.lua` rebuilds the device payload field by
                  // field and passes `rig` through as a whole table. A sibling of `rig` never arrives.
                  {"devices", info["devices"]},
-                 {"roles", info["roles"]}}}};
+                 {"roles", info["roles"]},
+                 // The gamepad layer's own loopback API. The panel fetches it directly: a whole profile through
+                 // page:send would be silently dropped past its size limit (KB-63).
+                 {"padApi", state().padApiPort() ? "http://127.0.0.1:" + std::to_string(state().padApiPort()) : std::string()},
+                 // What the output is actually doing, in words a tester can screenshot.
+                 {"ffb", info.value("ffbOutput", json::object())}}}};
     json root{{"device", device}, {"rig", {{"version", NCM_RIG_BRIDGE_VERSION}, {"provider", "directinput"},
         {"hook", true}, {"devices", info["devices"]}, {"roles", info["roles"]}}}};
     sendText(static_cast<SOCKET>(client_.load()), root.dump());
@@ -203,10 +170,10 @@ void Bridge::dispatch(const std::string& payload)
         // coarser control, so `strength` is a 0..1 fraction of the class ceiling and the cap survives:
         // 100% is the ceiling, never past it.
         if (s.contains("class")) rig_.setDeviceClass(s["class"].get<std::string>());
-        if (s.contains("strength")) {
-            const float fraction = std::clamp(s["strength"].get<float>(), 0.0f, 1.0f);
-            rig_.setFfbStrength(fraction * feel::ceilingFor(rig_.deviceClass()));
-        }
+        if (s.contains("strength")) rig_.setFfbFraction(s["strength"].get<float>());
+        if (s.contains("ratedNm")) rig_.setRatedTorque(s["ratedNm"].get<float>());
+        // Rides `settings` rather than a new command, so no Lua or relay change is needed to carry it.
+        if (s.value("resetPeaks", false)) rig_.resetFfbPeaks();
         if (s.contains("rung")) {   // older panels
             const auto rungs = feel::ladder(rig_.deviceClass());
             const int index = std::clamp(s["rung"].get<int>(), 1, static_cast<int>(rungs.size()));
@@ -217,6 +184,7 @@ void Bridge::dispatch(const std::string& payload)
         if (s.contains("texture")) rig_.setFfbTexture(s["texture"].get<float>());
         if (s.contains("engine")) rig_.setFfbEngine(s["engine"].get<float>());
         if (s.contains("road")) rig_.setFfbRoad(s["road"].get<float>());
+        if (s.contains("collision")) rig_.setFfbCollision(s["collision"].get<float>());
         if (s.contains("steerDegrees")) rig_.setSteerDegrees(s["steerDegrees"].get<float>());
         // **Settings were never written down.** Only `bind` persisted, so the wheel type and the force
         // level were lost on every restart -- and, worse, any code path that reloaded config put them

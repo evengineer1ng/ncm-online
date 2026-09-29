@@ -30,11 +30,12 @@ struct FeedbackFrame {
 /// arrives 40 ms later would erase a jolt that had not been felt yet. It is latched with its own clock and
 /// decays over `kCollisionDecayMs`, so a hit is felt exactly once and for a bounded time.
 struct Collision {
-    float kick = 0.0f;      // -1..1, signed toward the side the impact came from
+    float kick = 0.0f;      // -1..1, signed toward the side the impact came from (lateral share x intensity)
+    float thud = 0.0f;      // 0..1, how hard the hit was from ANY direction
     std::chrono::steady_clock::time_point at{};
 };
 
-constexpr int kCollisionDecayMs = 220;
+constexpr int kCollisionDecayMs = 250;
 
 class SharedState {
 public:
@@ -45,19 +46,22 @@ public:
 
     /// Latches a jolt. The largest un-decayed kick wins, so a heavy hit is never overwritten by the light
     /// scrape that follows it a frame later.
-    void applyCollision(float kick);
-    /// The remaining jolt at `now`, linearly decayed, or 0 once it has expired.
-    float collisionAt(std::chrono::steady_clock::time_point now) const;
+    void applyCollision(float kick, float thud);
+    /// The remaining kick and thud at `now`, linearly decayed, or zeros once expired.
+    Collision collisionAt(std::chrono::steady_clock::time_point now) const;
 
     void setPlayerVehicle(void* value);
     void* playerVehicle() const;
     void setBridgeConnected(bool value);
     bool bridgeConnected() const;
+    /// Where the gamepad layer's loopback API ended up listening (0 = not yet), so the snapshot can tell the panel.
+    void setPadApiPort(uint16_t port) { padApiPort_.store(port); }
+    uint16_t padApiPort() const { return padApiPort_.load(); }
 
 private:
     /// `collisionMutex_` is already held. Kept separate so `applyCollision` can compare against the live
     /// decayed value without taking the lock twice.
-    float collisionAtLocked_(std::chrono::steady_clock::time_point now) const;
+    Collision collisionAtLocked_(std::chrono::steady_clock::time_point now) const;
 
     mutable std::mutex inputMutex_;
     mutable std::mutex feedbackMutex_;
@@ -67,6 +71,7 @@ private:
     Collision collision_{};
     std::atomic<void*> playerVehicle_{nullptr};
     std::atomic<bool> bridgeConnected_{false};
+    std::atomic<uint16_t> padApiPort_{0};
 };
 
 SharedState& state();

@@ -37,7 +37,7 @@ public:
 
     // "open|selected|pointerDegrees|layoutRevision"
     std::string frame(Clock::time_point now = Clock::now());
-    // "revision|title|hint" then kSlots x "state|label|key|detail"
+    // "revision|title|hint" then kSlots x "state|label|key|detail"; an empty field is sent as "~"
     std::string layout();
 
     void reportHost(const std::string& host, int drawn);
@@ -60,6 +60,6 @@ private:
 
 State& state();
 
-// Exposed for tests: strips the field separator and control characters, and bounds the length.
+// Exposed for tests: strips the field separator, the empty-field sentinel and control characters, and bounds the length.
 std::string clean(const std::string& text, size_t limit);
 }

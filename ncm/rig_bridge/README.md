@@ -37,7 +37,13 @@ Four effects run, matching the four the NCM Wheel Support companion established 
 | `SPRING` | centring stiffness |
 | `DAMPER` | resistance to being whipped around |
 | `CONSTANT` | self-aligning torque, plus collision jolts from `OnVehicleBumpEvent` |
-| `SINE` | road texture: suspension movement, tyre slip and engine hum, at a rev-modulated 12-47 Hz |
+| `SINE` | road texture: suspension movement, tyre slip and engine hum, on a fixed 125 Hz carrier whose magnitude follows the car |
+
+Rig Bridge 0.1.2 keeps that carrier frequency fixed and rate-limits its magnitude writes to 50 Hz. This is a
+driver-compatibility requirement: a DirectInput driver may restart an effect when a playing parameter cannot be
+changed in place. Rewriting a periodic effect at the 250 Hz input cadence can otherwise keep it pinned near phase
+zero and make a non-zero effect feel silent. Constant-force writes use the same driver-managed update path and a
+failed write remains pending rather than being recorded as delivered.
 
 Centring survives on steering and speed alone, so the wheel stays alive if the telemetry feed drops.
 
