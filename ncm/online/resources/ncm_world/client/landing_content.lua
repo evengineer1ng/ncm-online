@@ -48,7 +48,8 @@ NcmLandingContent = {
         { id = "weather", label = "Race the weather", state = "partial",
           limit = "Weather is synchronised and affects performance ceilings, not grip.",
           detail = "The session's sky is the same for everyone in it." },
-        { id = "fuel", label = "Fuel and pit strategy", state = "soon" },
+        { id = "fuel", label = "Fuel and refuelling", state = "live", reference = "market",
+          detail = "Park at a pump and /ncm.refuel; /ncm.fuel routes to the nearest station." },
         { id = "trade", label = "Trade with other drivers", state = "partial",
           limit = "Direct synchronous Exchange only -- both Drivers must be online. Persistent listings and escrow come later.",
           reference = "trade",
@@ -58,6 +59,16 @@ NcmLandingContent = {
     -- Newest first is computed, not authored: `landing.payload` sorts by date then `seq`. A redeploy is not a
     -- release. If an entry would read "restarted the server", it does not belong here.
     releases = {
+        {
+            date = "2026-09-29", title = "Fuel, Autofixer markets and arrivals", build = "0.5.0",
+            items = {
+                { heading = "Fuel", text = "Your Machine now burns fuel as you drive; the level sits under the odometer. Park at a pump in your car and type /ncm.refuel (€$2 a litre). /ncm.fuel sets GPS to the nearest station." },
+                { heading = "Autofixer markets", text = "Autofixer terminals around the city are markets of their own. Stand at one and press E (pad X) to connect; after that, pick it in F6 Market from the list on the left and buy from anywhere." },
+                { heading = "Map", text = "Fuel stations and NCM locations now appear on your map." },
+                { heading = "Arrival", text = "Joining puts you straight back where you left, instead of a stop in the Badlands and a second loading screen." },
+                { heading = "Fixed", text = "/ncm.refuel works. This page is shorter." },
+            },
+        },
         {
             date = "2026-09-28", seq = 2, title = "Scanner, quick menu and fixes", build = "0.5.0",
             items = {

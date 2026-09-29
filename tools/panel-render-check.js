@@ -1116,21 +1116,14 @@ fire("panel:show", { panel: "landing", landing: LANDING });
 check("landing panel draws", emitted.some(e => e.name === "panel:drawn"),
   emitted.map(e => e.name).join(",") || "nothing emitted");
 
-const contractText = dump(document.getElementById("landingContract")).join(" | ");
-check("the progression contract is on the panel, not buried",
-  /PROGRESSION IS TEMPORARY/.test(contractText) && /resets for NCM 1\.0/.test(contractText), contractText);
-check("the contract is not framed as an anti-cheat warning",
-  !/cheat/i.test(contractText) && !/\bban\b/i.test(contractText), contractText);
-
-const capsText = dump(document.getElementById("landingCaps")).join(" | ");
-check("live capabilities are offered", /Enter races/.test(capsText), capsText);
-check("a partial capability states its limit rather than promising the whole feature",
-  /Race your own ghost/.test(capsText) && /Personal best only/.test(capsText), capsText);
-const capCells = document.getElementById("landingCaps").children || [];
-check("each capability carries its state as a class",
-  capCells.length === 3 && String(capCells[0].className).includes("live")
-    && String(capCells[1].className).includes("partial") && String(capCells[2].className).includes("soon"),
-  capCells.map(c => c.className).join(" | "));
+// Owner, 2026-09-29: the progression notice and the capability list are gone; what's new and the
+// changelog are what the panel is for.
+check("the landing panel no longer carries the progression notice",
+  !/id="landingContract"/.test(html), "markup");
+check("the landing panel no longer carries the capability list",
+  !/id="landingCaps"/.test(html) && !/What you can do today/.test(html), "markup");
+const newText = dump(document.getElementById("landingNew")).join(" | ");
+check("what's new shows the newest release's items", /Events now pay out/.test(newText), newText);
 
 const hintText = dump(document.getElementById("landingHint")).join(" ");
 check("the hint counts releases since the player was last here, not total releases",
@@ -1171,9 +1164,9 @@ check("seeing the panel is what advances the 'already seen' watermark",
 emitted.length = 0;
 fire("panel:show", { panel: "landing", landing: { contract: LANDING.contract, capabilities: [], releases: [],
   offeredCount: 0, newReleaseCount: 0, firstSession: true } });
-check("an unconfigured landing panel still draws and still carries the contract",
+check("an unconfigured landing panel still draws rather than a blank card",
   emitted.some(e => e.name === "panel:drawn")
-    && /PROGRESSION IS TEMPORARY/.test(dump(document.getElementById("landingContract")).join(" ")),
+    && /No release notes yet/.test(dump(document.getElementById("landingNew")).join(" ")),
   emitted.map(e => e.name).join(","));
 check("a first session says what to do rather than 'nothing new'",
   /Race Guide/.test(dump(document.getElementById("landingHint")).join(" ")),

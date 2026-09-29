@@ -4187,3 +4187,20 @@ component Design families; a Base Market Design is never listed at an Autofixer.
 2.31 vehicle catalogue (the build-pinned endpoint served the newest indexed build at or below the requested live
 build). This verifies identifiers, not successful Online spawning, handling quality, DLC entitlement behavior or
 terminal Z/mesh alignment. Those remain live-gated. Tracked by `IDEA-709`–`IDEA-712`.
+
+## L207 - LOCKED OWNER DIRECTION / EXECUTED IN CODE / LIVE-GATED - the Session Landing panel is what's new, nothing else
+
+**Owner direction (2026-09-29).** *"our session landing page is quite ugly and dense, needs to be constrained."*
+Asked what it is for: **what's new** (and "status dashboard"; see the open point below). The capability list is
+"rapidly outdated" and goes; **the changelog stays visible**; **the progression-reset notice is scrapped**; nothing
+new is added; it still opens on **every join and is closable**.
+
+**Executed.** `panel.html` draws a centred column at most 760 px wide: eyebrow, "What's new" with the newest
+release's title/date/build, that release's items, the collapsible changelog (newest open), and CONTINUE. The
+contract block, the capability grid and the hero slot are gone from the markup. `core/player/landing.lua` still
+validates and sends `contract` and `capabilities` (unchanged data contract, other readers untouched); the page simply
+no longer draws them. The render check now asserts their absence. A 2026-09-29 release entry was authored so the
+panel's first line is current.
+
+**Open.** "Status dashboard" was chosen alongside what's new while "nothing new" was chosen for additions; whether a
+status strip (balance, Machine, fuel, next race) belongs here is unasked. Tracked by `IDEA-714`.

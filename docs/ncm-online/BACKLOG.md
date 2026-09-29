@@ -17,7 +17,7 @@ a milestone or batch) → `built` (code + offline proof) → `validated` (live P
 **Where things live:** ideas and work → here. Choices made and questions for the owner → `DECISION_RECORD.md`.
 Defects → `KNOWN_BUGS.md`. Live PASS/FAIL → `wp/MASTER_TEST.md`. What to do next → `NOW.md`.
 
-**IDs are permanent.** Next free ID: **IDEA-714**.
+**IDs are permanent.** Next free ID: **IDEA-715**.
 *(This line has now been stale twice — left at IDEA-127 while the ledger ran to IDEA-183, then at IDEA-205 while it
 ran to IDEA-294. It is the only guard against reusing an ID. Check it against the last row before you append.)*
 
@@ -1216,3 +1216,4 @@ content and their published permissions do not permit silent reuse.
 | IDEA-711 | **MARKET·PARTS** | 2026-09-29 | **Every physical Market owns new component Designs and serialized supply; none re-lists Base Market Parts. Specialties may be permanent and should maximize breadth across the network.** | owner | **built locally; balance and live manufacturing proof owed** | Parts catalogue and supply scheduler | Each terminal launches two specialty families with Market-scoped design IDs, fitment and inventory. Manufacturing was generalized from the former `base_market` literal to every authored supply row. |
 | IDEA-712 | **MARKET·PVE** | 2026-09-29 | **Reserve future Market discovery for PvE progression without leaking those Markets into today's registry.** | owner | **reserved** | future PvE rewards and Market access grants | Current physical IDs are coordinate-derived Autofixer IDs only. PvE Markets must arrive with their own authored access source and content rather than placeholder rows visible to players. |
 | IDEA-713 | **MARKET·UI** | 2026-09-29 | **F6 Market shows one Market at a time, chosen from a sources column: Base Market first, then every discovered Autofixer terminal.** Stock is never merged; Machines and Components filter to the selected market and the title names it. | owner, 2026-09-29: *"they shouldnt merge into one list, base market needs to be selectable, market x, market z, etc from a sidebar"* | built and deployed, awaiting live check | §MK1 | Replaced the merged `Market Network · N sources` view. Rows without `marketId` belong to Base Market. Render check pins the behaviour (4 assertions). |
+| IDEA-714 | **UI·LANDING** | 2026-09-29 | **Does the Session Landing panel get a status strip?** The owner named its job as "what's new and status dashboard" but chose "nothing new" for additions. Candidates if yes: balance, current Machine + fuel %, next enterable race, unread messages -- one compact row above What's new. | owner answers, 2026-09-29 (`L207`) | **open question** | L207 | Built without it; ask before adding, because every added line is what made the old panel dense. |

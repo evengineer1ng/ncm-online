@@ -355,8 +355,13 @@ local function standingSomewhere(pid, reason)
     return false, st.known and Readiness.why(st) or "not tracked"
 end
 
+local restoring = {}   -- playerId -> true while the client is being moved to its saved spot (KB-207)
+
 local function saveLocation(pid, driverId, reason)
     if not (driverId and MySQL and MySQL.isReady()) then return end
+    -- The platform's spawn (the template save's Badlands point) is where the body stands until the restore
+    -- lands; storing it would make the NEXT join restore to the Badlands. Disconnect included.
+    if restoring[pid] then return end
     local standing, why = standingSomewhere(pid, reason)
     if not standing then
         -- One line per reason per player: the join window is ~12-120 s of sweeps and this must not become a
@@ -401,8 +406,8 @@ end
 
 --- Put a rejoining driver back where they were, or say why not. A refusal is never silent: a stranded player
 --- looks exactly like a working one, which is the lesson of KB-72 and KB-76.
-local function restoreLocation(pid, driverId)
-    if not (driverId and MySQL and MySQL.isReady()) then return end
+local function decideLocation(pid, driverId)
+    if not (driverId and MySQL and MySQL.isReady()) then return nil end
     local ok, row = pcall(function()
         return MySQL.single.await(
             "SELECT x, y, z, heading, bucket, in_vehicle, saved_at FROM driver_location " ..
@@ -411,7 +416,7 @@ local function restoreLocation(pid, driverId)
     end)
     if not ok or type(row) ~= "table" then
         log("location: nothing stored for driver=%s (default spawn)", tostring(driverId):sub(1, 8))
-        return
+        return nil
     end
     local saved = { x = row.x, y = row.y, z = row.z, heading = row.heading, bucket = row.bucket,
                     inVehicle = tonumber(row.in_vehicle) == 1, savedAt = tonumber(row.saved_at) }
@@ -419,7 +424,7 @@ local function restoreLocation(pid, driverId)
         { connectedAt = connectedAtUnix[pid] })
     if not should then
         log("location: NOT restoring driver=%s (%s) -- default spawn", tostring(driverId):sub(1, 8), tostring(why))
-        return
+        return nil
     end
     local pose = Location.arrivalPose(saved)
     -- L110 owes them their position back, not a second arrival. The platform has already placed them, and
@@ -441,19 +446,82 @@ local function restoreLocation(pid, driverId)
     if current and Location.alreadyThere(current, pose) then
         log("location: driver=%s is already at %.1f,%.1f,%.1f -- no second arrival",
             tostring(driverId):sub(1, 8), pose.x, pose.y, pose.z)
-        return
+        return nil
     end
+    return pose, saved
+end
+
+--- The old server-side arrival: a faded teleport after the platform has already shown its spawn. Kept only as
+--- the fallback for a client that never asked (KB-207) or whose own settle failed.
+local function teleportTo(pid, driverId, pose, saved)
     local okTp, reason = pcall(Open77.players.teleport, pid,
         { x = pose.x, y = pose.y, z = pose.z }, { fade = true, dismount = true })
     if not okTp or reason == false then
         log("location: teleport refused for driver=%s: %s -- default spawn", tostring(driverId):sub(1, 8), tostring(reason))
         return
     end
-    log("location: restored driver=%s to %.1f,%.1f,%.1f (saved %ds ago)", tostring(driverId):sub(1, 8),
-        pose.x, pose.y, pose.z, math.floor(Open77.time.unix()) - (saved.savedAt or 0))
+    log("location: restored driver=%s to %.1f,%.1f,%.1f (saved %ds ago) by SERVER teleport",
+        tostring(driverId):sub(1, 8), pose.x, pose.y, pose.z,
+        math.floor(Open77.time.unix()) - ((saved and saved.savedAt) or 0))
     Wait(1200)
     separate(pid, "location restore")   -- KB-58: nobody arrives inside somebody else
 end
+
+local function restoreLocation(pid, driverId)
+    local pose, saved = decideLocation(pid, driverId)
+    if pose then teleportTo(pid, driverId, pose, saved) end
+end
+
+-- **KB-207: one arrival, not two.** NCM cannot choose the platform's spawn point, so every join first showed the
+-- template save's Badlands spawn (2566.9, 112.6) and then, ~4 km away, a second loading screen for the restore.
+-- Now the client covers its own screen the moment its body exists, ASKS for its destination, moves itself with
+-- `travel.teleportAndSettle` under black and reports back (`client/arrival.lua`). The decision is unchanged
+-- (`decideLocation`); only who moves the body, and when the player is allowed to see, changed.
+local readyAt, decided, pendingPose = {}, {}, {}
+local function answerLocation(pid)
+    if decided[pid] then TriggerClientEvent("ncm:location.restore", pid, false); return end
+    decided[pid] = true
+    -- Same timing as the old restore: after readiness plus the platform's placement window.
+    for _ = 1, 60 do if readyAt[pid] then break end; Wait(500) end
+    if readyAt[pid] then
+        local left = 2.5 - (nowS() - readyAt[pid])
+        if left > 0 then Wait(math.floor(left * 1000)) end
+    end
+    local prof = NcmIdentity.get(pid)
+    local pose, saved = nil, nil
+    if prof and prof.ncmDriverId then pose, saved = decideLocation(pid, prof.ncmDriverId) end
+    if not pose then TriggerClientEvent("ncm:location.restore", pid, false); return end
+    restoring[pid] = true
+    local mine = { pose = pose, saved = saved, driverId = prof.ncmDriverId }
+    pendingPose[pid] = mine
+    TriggerClientEvent("ncm:location.restore", pid, { x = pose.x, y = pose.y, z = pose.z, heading = pose.heading })
+    -- A client that never reports must not leave saving switched off for the session.
+    Wait(45000)
+    if pendingPose[pid] == mine then pendingPose[pid] = nil; restoring[pid] = nil end
+end
+RegisterNetEvent("ncm:location.request", function()
+    local pid = tonumber(source) or 0
+    if pid > 0 then CreateThread(function() answerLocation(pid) end) end
+end)
+RegisterNetEvent("ncm:location.arrived", function(state)
+    local pid = tonumber(source) or 0
+    local p = pendingPose[pid]; pendingPose[pid] = nil
+    restoring[pid] = nil
+    if not p then return end
+    state = tostring(state or "?")
+    CreateThread(function()
+        if state == "settled" or state == "near" then
+            log("location: restored driver=%s to %.1f,%.1f,%.1f under cover (%s)", tostring(p.driverId):sub(1, 8),
+                p.pose.x, p.pose.y, p.pose.z, state)
+            Wait(1200)
+            separate(pid, "location restore")   -- KB-58
+        else
+            log("location: client settle failed for driver=%s (%s) -- falling back to a server teleport",
+                tostring(p.driverId):sub(1, 8), state)
+            teleportTo(pid, p.driverId, p.pose, p.saved)
+        end
+    end)
+end)
 
 --- One sweep for the whole server, same shape as the readiness sweep (L98): driven by a periodic pass over
 --- who is actually connected, never by an event that may not fire.
@@ -548,10 +616,16 @@ AddEventHandler("onPlayerReady", function(playerId)
     limbo:ready(id, nowS())
     separateWhenReady(id, "join")   -- KB-58: the platform's spawn point does not know who is standing on it
     -- L110: put them back where they left, or log why not. After readiness, so there is a puppet to move.
+    readyAt[id] = nowS()
     CreateThread(function()
+        -- KB-207: the client asks for its destination and moves itself under black. This is only the fallback
+        -- for a client that never asked.
+        Wait(30000)
+        if decided[id] or not readyAt[id] then return end
+        decided[id] = true
         local prof = NcmIdentity.get(id)
         if prof and prof.ncmDriverId then
-            Wait(2500)                      -- let the platform finish placing them before we move them
+            log("location: client never asked for its arrival (player=%d) -- server restore fallback", id)
             pcall(restoreLocation, id, prof.ncmDriverId)
         end
     end)
@@ -655,6 +729,7 @@ AddEventHandler("onPlayerDisconnected", function(playerId, reason)
     end
     local gone = tonumber(playerId) or 0
     connectedAtUnix[gone], playedThisSession[gone], saveRefused[gone] = nil, nil, nil
+    readyAt[gone], decided[gone], pendingPose[gone], restoring[gone] = nil, nil, nil, nil
     local departure = limbo:forget(playerId, nowS())
     if departure then
         log("readiness: player=%s name=%s left after %ds without ever being able to play (%s) -- warned %d time(s) (KB-60)",

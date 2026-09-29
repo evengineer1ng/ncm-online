@@ -26,7 +26,7 @@ auto_start true
 --   damage never heals.
 -- world.prevention: the console-only `ncm.wanted` probe for IDEA-677 (`Open77.players.setWanted`). Declared
 --   so a live test cannot fail on a missing permission; the card lists none, the client plugin checks this one.
-permissions { "database.access", "network.events", "state.write", "world.vehicles", "ui.vanilla.map", "ui.nameplates", "input.actions", "map.control", "players.teleport", "world.props", "world.npcs", "vehicles.read", "world.query", "world.environment", "world.population", "players.stats.apply", "world.prevention", "players.hacking.define", "players.hacking.read", "players.hacking.activate", "players.hacking.cancel", "players.cyberware.define", "players.cyberware.read", "players.cyberware.manage", "combat.scope.control", "combat.config" }
+permissions { "database.access", "network.events", "state.write", "world.vehicles", "ui.vanilla.map", "ui.nameplates", "input.actions", "map.control", "players.teleport", "world.props", "world.npcs", "vehicles.read", "world.query", "world.environment", "world.population", "players.stats.apply", "world.prevention", "players.hacking.define", "players.hacking.read", "players.hacking.activate", "players.hacking.cancel", "players.cyberware.define", "players.cyberware.read", "players.cyberware.manage", "combat.scope.control", "combat.config", "player.travel", "screen.effects" }
 
 -- Race HUD (M3.2): light tree, banner and race strip as our own WebUI page.
 web_ui_page "web/race.html"
@@ -151,6 +151,7 @@ client_script "client/main.lua"
 client_script "client/nameplates.lua"
 -- nav owns every waypoint NCM sets; it loads before the two files that ask for one.
 client_script "client/nav.lua"
+client_script "client/arrival.lua"   -- KB-207: cover the platform spawn, settle at the saved spot
 client_script "client/landmarks.lua"
 client_script "client/fuel_stations.lua"
 client_script "client/autofixer_markets.lua"

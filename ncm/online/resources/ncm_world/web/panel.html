@@ -511,43 +511,19 @@
     body:not([data-ncm-input="mouse"]) .ncm-focused { background: rgba(34,216,226,.10); }
 
     /* ===== SESSION LANDING PANEL ========================================================== */
-    #landing { display: flex; flex-direction: column; gap: 14px; }
+    /* Owner, 2026-09-29: "quite ugly and dense, needs to be constrained". What's new and the changelog only;
+       the progression notice and the capability list were removed (the list went stale faster than it was
+       edited). A narrow centred column, not a full-screen wall. */
+    #landing { display: flex; flex-direction: column; gap: 14px; width: min(760px, 100%); max-height: 82vh;
+      margin: 0 auto; box-sizing: border-box; }
     #landing.hidden { display: none; }
-    .landing-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; }
-    .landing-head h1 { margin: 4px 0 2px; }
-    /* No hero art exists yet. Absent, this is a composed type-only header rather than an empty box. */
-    .landing-hero { flex: 0 0 210px; height: 74px; background-size: cover; background-position: 50% 40%;
-      border: 1px solid var(--line); clip-path: polygon(0 0,100% 0,100% 100%,12px 100%,0 calc(100% - 12px)); }
-    .landing-hero:not([style*="url"]) {
-      background-image: repeating-linear-gradient(115deg, rgba(34,216,226,.07) 0 10px, transparent 10px 20px);
-    }
+    .landing-head h1 { margin: 4px 0 2px; font-size: 40px; }
 
-    /* The contract. Given the loudest treatment on the panel on purpose: it is the promise the alpha makes. */
-    .landing-contract { position: relative; padding: 13px 18px 13px 22px; background: rgba(255,89,100,.07);
-      border: 1px solid rgba(255,89,100,.42); }
-    .landing-contract::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 3px; background: var(--red); }
-    .landing-contract b { display: block; font: 800 20px/1.15 var(--display); letter-spacing: .04em; color: #ffb3b8; }
-    .landing-contract p { margin: 5px 0 0; font-size: 13px; color: var(--text); }
-    .landing-contract small { display: block; margin-top: 5px; font-size: 12px; color: var(--dim); }
-    .landing-contract em { display: block; margin-top: 7px; font-size: 12px; font-style: italic; color: #9fe8d6; }
-
-    .landing-grid { display: grid; grid-template-columns: 1.15fr 1fr; gap: 20px; }
-    .landing-col { min-width: 0; }
-    .landing-caps { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 8px; }
-    .cap { padding: 7px 9px; border: 1px solid var(--line); border-left: 2px solid var(--ok);
-      background: rgba(255,255,255,.02); }
-    .cap b { display: block; font: 700 12px/1.25 var(--display); letter-spacing: .02em; }
-    .cap span { display: block; margin-top: 2px; font: 400 10px/1.4 var(--mono); color: var(--dim); }
-    .cap.partial { border-left-color: var(--warn); }
-    .cap.partial span { color: #f0cf85; }
-    .cap.soon { border-left-color: var(--line); opacity: .5; }
-    .cap.soon b::after { content: " · SOON"; font: 700 9px/1 var(--mono); letter-spacing: .12em; color: var(--dim); }
-
-    .landing-new { margin-top: 8px; }
+    .landing-new { margin-top: 6px; }
     .landing-new .row { padding: 6px 0; border-bottom: 1px solid var(--line); }
     .landing-new .row:last-child { border-bottom: 0; }
     .landing-new .row b { font: 700 11px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
-    .landing-new .row p { margin: 3px 0 0; font-size: 12px; color: var(--text); }
+    .landing-new .row p { margin: 3px 0 0; font-size: 13px; color: var(--text); }
 
     .landing-log { flex: 1; min-height: 0; display: flex; flex-direction: column; }
     .landing-scroll { flex: 1; min-height: 120px; overflow-y: auto; overflow-x: hidden;
@@ -583,11 +559,6 @@
       background: rgba(0,0,0,.28); border: 1px solid rgba(0,0,0,.35); }
     .landing-go:hover { background: #4ee6ee; }
 
-    @media (max-width: 1100px) {
-      .landing-grid { grid-template-columns: 1fr; }
-      .landing-caps { grid-template-columns: 1fr; }
-      .landing-hero { display: none; }
-    }
   </style>
 </head>
 <body class="closed">
@@ -679,29 +650,15 @@
          mouse/keyboard/gamepad parity -- the changelog is the hard case, so it is the one worth proving. -->
     <div id="landing" class="card hidden">
       <div class="landing-head">
-        <div>
-          <div class="eyebrow" id="landingEyebrow">NCM ONLINE // ALPHA</div>
-          <h1>Night City Motorsports</h1>
-          <div class="sub" id="landingSub"></div>
-        </div>
-        <div class="landing-hero" id="landingHero" aria-hidden="true"></div>
+        <div class="eyebrow">NCM ONLINE // ALPHA</div>
+        <h1>What's new</h1>
+        <div class="sub" id="landingSub"></div>
       </div>
 
-      <div class="landing-contract" id="landingContract" role="note"></div>
-
-      <div class="landing-grid">
-        <section class="landing-col">
-          <div class="eyebrow">What you can do today</div>
-          <div class="landing-caps" id="landingCaps"></div>
-        </section>
-        <section class="landing-col">
-          <div class="eyebrow">What's new</div>
-          <div class="landing-new" id="landingNew"></div>
-        </section>
-      </div>
+      <section class="landing-new" id="landingNew" aria-label="Latest release"></section>
 
       <section class="landing-log">
-        <div class="eyebrow">Development changelog</div>
+        <div class="eyebrow">Changelog</div>
         <div class="landing-scroll" id="landingScroll" tabindex="-1"></div>
       </section>
 
@@ -856,43 +813,19 @@
       }
 
       // ---- SESSION LANDING PANEL -----------------------------------------------------------------
-      // Renders only what core/player/landing.lua validated. No copy decisions live here: the contract,
-      // the capability list and the changelog are all authored data, so a release never touches markup.
+      // Renders only what core/player/landing.lua validated: the newest release's items and the changelog,
+      // both authored data, so a release never touches markup. The payload still carries `contract` and
+      // `capabilities`; the page no longer draws them (owner, 2026-09-29).
       let landingData = null;
       function renderLanding(d) {
         if (d) landingData = d;
         const s = landingData || {};
         const el = (id) => document.getElementById(id);
 
-        const contract = s.contract || {};
-        el("landingEyebrow").textContent = contract.eyebrow || "NCM ONLINE // ALPHA";
         const current = s.currentRelease;
         el("landingSub").textContent = current
           ? (current.title + " · " + current.date + (current.build ? " · " + current.build : ""))
           : "Development build";
-
-        el("landingHero").style.backgroundImage = s.hero ? 'url("' + s.hero + '")' : "";
-
-        const box = el("landingContract");
-        box.replaceChildren();
-        const strong = document.createElement("b"); strong.textContent = contract.headline || "";
-        const body = document.createElement("p"); body.textContent = contract.body || "";
-        const detail = document.createElement("small"); detail.textContent = contract.detail || "";
-        const promise = document.createElement("em"); promise.textContent = contract.promise || "";
-        box.append(strong, body, detail, promise);
-
-        // Capabilities. A `partial` row states its limit out loud, because a half-feature advertised whole
-        // is how a player discovers the gap by being confused.
-        const caps = el("landingCaps");
-        caps.replaceChildren(...(s.capabilities || []).map((c) => {
-          const cell = document.createElement("div");
-          cell.className = "cap " + (c.state || "live");
-          const name = document.createElement("b"); name.textContent = c.label || "";
-          cell.append(name);
-          const line = c.state === "partial" ? c.limit : c.detail;
-          if (line) { const sub = document.createElement("span"); sub.textContent = line; cell.append(sub); }
-          return cell;
-        }));
 
         // What's new: the newest release's headed items, which is the human summary rather than the log.
         const fresh = el("landingNew");
@@ -940,12 +873,9 @@
           return wrap;
         }));
 
-        const counted = (s.capabilities || []).filter((c) => c.state !== "soon").length;
-        el("landingHint").textContent = s.firstSession
-          ? (counted + " things you can do right now. The Race Guide is where a season starts.")
-          : (s.newReleaseCount > 0
-              ? (s.newReleaseCount + " release" + (s.newReleaseCount === 1 ? "" : "s") + " since you were last here.")
-              : "Nothing new since your last session.");
+        el("landingHint").textContent = s.newReleaseCount > 0
+          ? (s.newReleaseCount + " release" + (s.newReleaseCount === 1 ? "" : "s") + " since you were last here.")
+          : (s.firstSession ? "Welcome. F6 opens the Race Guide." : "Nothing new since your last session.");
 
         // The watermark moves only once the panel has actually drawn, so an open that never rendered
         // cannot silently mark releases as read.
