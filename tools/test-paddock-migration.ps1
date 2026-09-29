@@ -21,6 +21,9 @@ if (-not $env:NCM_DB_ROOT) { throw 'NCM_DB_ROOT was not injected' }
 
 $env:MYSQL_PWD = $env:NCM_DB_ROOT
 function Invoke-Sql([string]$sql, [switch]$NoDatabase) {
+    # PowerShell 5.1 turns a native command's stderr into an ErrorRecord; under 'Stop' that throws before the
+    # exit code (and MariaDB's own message) can be read. Judge by $LASTEXITCODE instead.
+    $ErrorActionPreference = 'Continue'
     $a = @('-h', '127.0.0.1', '-P', '3306', '-u', 'root', '--protocol=tcp', '--batch', '--skip-column-names')
     if (-not $NoDatabase) { $a += $database }
     $a += @('-e', $sql)
