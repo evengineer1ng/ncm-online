@@ -438,6 +438,9 @@ end
 drain(400000, function() return PaddockWorld.ready and PaddockStore.world ~= nil and next(DB.news) ~= nil end)
 queue = {}
 check("genesis ran and the world is ready", PaddockWorld.ready and PaddockStore.world ~= nil)
+-- the scheduler's first tick opens the world's first Cup; boot yields between steps, so the harness may have dropped
+-- the boot thread before that tick ran -- run it here rather than depend on where the drop landed
+if not PaddockStore.world.cupId then run(function() PaddockLife.cupBoundary(clock) end) end
 local W = PaddockStore.world
 check("60 organizations and their people exist", #W.orgOrder == 60 and #W.personOrder > 400)
 local persisted = 0
@@ -594,6 +597,15 @@ for _, oid in ipairs(W.orgOrder) do if W.orgs[oid].garageId and W.orgs[oid].shif
 for _, r in pairs(DB.org) do if r.garage_id and r.garage_shift then persistedGarage = persistedGarage + 1 end end
 check(("every org rents a garage on a shift (%d)"):format(housed), housed == #W.orgOrder)
 check(("and the rental is persisted on the org row (%d)"):format(persistedGarage), persistedGarage == #W.orgOrder)
+do
+    -- a from-scratch rental (the first boot after schema 051) must fit one slice: it died on the quota live
+    local saved = {}
+    for _, oid in ipairs(W.orgOrder) do saved[oid] = { W.orgs[oid].garageId, W.orgs[oid].shift }; W.orgs[oid].garageId, W.orgs[oid].shift = nil, nil end
+    maxSlice = 0
+    run(function() PaddockGarages.ensure() end)
+    check(("housing every org from scratch fits the quota (max slice %d)"):format(maxSlice), maxSlice < 400000)
+    for _, oid in ipairs(W.orgOrder) do check("rental is deterministic for " .. oid, W.orgs[oid].garageId == saved[oid][1]) end
+end
 local deepest = 0
 for _, list in pairs(PaddockGarages.tenants) do if #list > deepest then deepest = #list end end
 check("no garage is stacked past three tenants (" .. deepest .. ")", deepest <= 3)

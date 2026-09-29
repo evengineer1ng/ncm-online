@@ -69,7 +69,9 @@ CreateThread(function()
     if not PaddockWorld.boot() then log("BOOT FAILED: no world") return end
     PaddockCalibration.load()
     PaddockRaces.load()
+    Wait(0)                                  -- each boot step gets its own slice of the instruction quota (KB-211)
     PaddockLive.boot()
+    Wait(0)
     PaddockGarages.start()
     lastCalibration = U.now() - 3500     -- first recompute a minute after boot, not inside it
     log("the Paddock is running (season %s)", PaddockStore.world.seasonId)

@@ -349,6 +349,7 @@ end)
 --- Start the presence loop (main.lua, after boot).
 function PaddockGarages.start()
     PaddockGarages.load()
+    Wait(0)
     PaddockGarages.ensure()
     CreateThread(function()
         local lastEnsure = U.now()

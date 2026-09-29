@@ -101,10 +101,14 @@ Core.define("paddock.garages", function(C)
     function M.assign(seed, orgs, bad, depth)
         bad = bad or {}
         depth = depth or M.DEPTH
-        local pool = {}
-        for _, s in ipairs(Data.SITES) do if not bad[s.id] then pool[#pool + 1] = s end end
+        -- Each site's rank is hashed ONCE, not inside the comparator: a sort calls it ~n log n times, and on the
+        -- host every FNV byte is metered against the instruction quota (KB-211; live 2026-09-29, boot died here).
+        local pool, rank = {}, {}
+        for _, s in ipairs(Data.SITES) do
+            if not bad[s.id] then pool[#pool + 1] = s; rank[s.id] = Hash.fnv1a32(Hash.key(seed, "site", s.id)) end
+        end
         table.sort(pool, function(a, b)
-            local ha, hb = Hash.fnv1a32(Hash.key(seed, "site", a.id)), Hash.fnv1a32(Hash.key(seed, "site", b.id))
+            local ha, hb = rank[a.id], rank[b.id]
             if ha ~= hb then return ha < hb end
             return a.id < b.id
         end)
