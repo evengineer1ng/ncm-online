@@ -638,14 +638,21 @@ return {
         T.eq(#stock.limited, 0, "and no coupling was involved in delivering that")
     end,
 
-    the_thermal_contributor_is_inert_in_the_window_and_never_a_boost = function(T)
+    -- `L208`/`E26`: grip above 1.0 loosens the rear on this engine, so an overheated tyre is authored as a
+    -- LOOSE car with weak brakes, while a cold one still pushes. Braking is never a boost.
+    the_thermal_contributor_pushes_cold_and_goes_loose_hot = function(T)
         local M, Th = H(T), T.Core.get("parts.thermal")
-        local hot = M.thermalContributor(Th.OPTIMUM)
-        T.ok(near(hot.gripScale, 1.0), "in the window there is no charge")
+        local window = M.thermalContributor(Th.OPTIMUM)
+        T.ok(near(window.gripScale, 1.0) and near(window.brakeScale, 1.0), "in the window there is no charge")
+        local cold = M.thermalContributor(Th.OPTIMUM - Th.HALF_WINDOW)
+        T.ok(cold.gripScale < 1.0, "cold pushes")
+        local hot = M.thermalContributor(Th.OPTIMUM + Th.HALF_WINDOW)
+        T.ok(near(hot.gripScale, 1.0 + Th.HOT_LOOSE), "fully hot is loose by exactly HOT_LOOSE")
+        T.ok(near(hot.brakeScale, 1.0 - Th.HOT_BRAKE), "and brakes weaker by exactly HOT_BRAKE")
         for t = -50, 250, 10 do
             local c = M.thermalContributor(t)
-            T.ok(c.gripScale <= 1.0 and c.brakeScale <= 1.0,
-                ("%dC must never be a boost"):format(t))
+            T.ok(c.brakeScale <= 1.0, ("%dC must never add braking"):format(t))
+            T.ok(c.gripScale <= 1.0 + Th.HOT_LOOSE + 1e-9, ("%dC grip stays inside the hot bound"):format(t))
         end
     end,
 
@@ -725,13 +732,15 @@ return {
         T.ok(seen.surface < seen.thermal, "and the road decides what the tyre is working against")
     end,
 
-    the_surface_contributor_withholds_and_never_adds = function(T)
-        local M = T.Core.get("parts.handling")
+    the_surface_contributor_pushes_cold_and_is_livelier_hot = function(T)
+        local M, Th = T.Core.get("parts.handling"), T.Core.get("parts.thermal")
         for temp = -40, 120, 5 do
             local c = M.surfaceContributor(temp)
-            T.ok(c.gripScale <= 1.0 and c.brakeScale <= 1.0,
-                ("a %dC road must not add force"):format(temp))
+            T.ok(c.brakeScale <= 1.0, ("a %dC road must not add braking"):format(temp))
+            T.ok(c.gripScale <= 1.0 + Th.SURFACE_HOT_LOOSE + 1e-9, ("a %dC road stays inside its bound"):format(temp))
         end
+        T.ok(M.surfaceContributor(-10).gripScale < 1.0, "a freezing road pushes")
+        T.ok(M.surfaceContributor(70).gripScale > 1.0, "a hot road is a little looser (L208)")
         T.ok(M.surfaceContributor(nil).gripScale == 1.0, "an unknown road is inert, not a penalty")
         T.ok(M.surfaceContributor(0 / 0).gripScale == 1.0, "and NaN is not a loophole")
     end,
@@ -802,5 +811,56 @@ return {
         T.ok(C.topSpeedKph("Vehicle.v_sportbike1_yaiba_kusanagi_tyger") == nil,
             "bikes are unconfirmed and must stay absent")
         T.ok(C.topSpeedKph("Vehicle.not_a_real_record") == nil, "and an unknown record is absent, not zero")
+    end,
+
+    -- ------------------------------------------------------------------ `L208`: weather, wet power, fuel
+    full_wet_pushes_stops_long_and_loses_traction = function(T)
+        local M = T.Core.get("parts.handling")
+        local wet = M.weatherContributor(1.0, "rain")
+        T.ok(near(wet.gripScale, 0.80) and near(wet.brakeScale, 0.82) and near(wet.driveScale, 0.90),
+            "owner's 'noticeable': grip 0.80, brake 0.82, drive 0.90")
+        local half = M.weatherContributor(0.5, "rain")
+        T.ok(half.gripScale > wet.gripScale and half.gripScale < 1.0, "a drying road sits in between")
+        T.ok(M.isInert(M.compose({ parts = {}, weather = M.weatherContributor(0, "sunny") })), "dry is inert")
+    end,
+
+    sandstorm_pushes_and_drags_fog_does_nothing = function(T)
+        local M = T.Core.get("parts.handling")
+        local sand = M.weatherContributor(0, "sandstorm")
+        T.ok(near(sand.gripScale, 0.95) and near(sand.dragScale, 1.05), "sand: small push, more drag")
+        local fog = M.weatherContributor(0, "fog")
+        T.ok(near(fog.gripScale, 1.0) and fog.dragScale == nil, "fog is grip-neutral")
+    end,
+
+    wet_power_only_loosens_under_heavy_throttle_on_a_wet_road = function(T)
+        local M = T.Core.get("parts.handling")
+        T.eq(M.wetPowerGrip(0, 1.0), 1.0, "dry road: throttle changes nothing")
+        T.eq(M.wetPowerGrip(1.0, 0.5), 1.0, "wet but part throttle: still the wet push")
+        local full = M.wetPowerGrip(1.0, 1.0)
+        T.ok(near(full, 1.0 + M.WET_POWER_LOOSE), "full wet, full throttle: lifted by WET_POWER_LOOSE")
+        T.ok(M.weatherContributor(1.0).gripScale * full > 1.0, "which carries the wet car past 1.0: loose on power")
+        T.eq(M.wetPowerGrip(0 / 0, 1.0), 1.0, "NaN is not a loophole")
+    end,
+
+    fuel_load_weighs_on_the_car_and_empty_is_inert = function(T)
+        local M = T.Core.get("parts.handling")
+        local empty = M.fuelContributor(0)
+        T.ok(near(empty.driveScale, 1.0) and near(empty.gripScale, 1.0), "an empty tank changes nothing")
+        local full = M.fuelContributor(60000, 1500)
+        T.ok(full.driveScale < 0.93 and full.driveScale > 0.90, "full tank on 1,500 kg: ~8% less drive")
+        T.ok(full.brakeScale < 0.93, "and ~8% less braking")
+        T.ok(full.gripScale < 1.0 and full.gripScale > 0.96, "a slight push")
+        T.ok(full.topSpeedScale < 1.0 and full.topSpeedScale > 0.98, "about 1% top speed")
+        local setup = M.compose({ parts = {}, fuel = full })
+        local seen = false
+        for _, row in ipairs(setup.trace) do if row.layer == "fuel" then seen = true end end
+        T.ok(seen, "fuel is a traced layer of its own")
+    end,
+
+    fuel_heats_and_wears_tyres_in_proportion_to_the_tank = function(T)
+        local F = T.Core.get("economy.fuel")
+        T.eq(F.heatFactor(0, 60000), 1.0, "empty: today's heating")
+        T.ok(near(F.heatFactor(60000, 60000), 1.0 + F.HEAT_AT_FULL), "full: faster heating")
+        T.ok(near(F.tyreWearFactor(30000, 60000), 1.0 + F.TYRE_WEAR_AT_FULL * 0.5), "half: half the extra wear")
     end,
 }

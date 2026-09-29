@@ -45,6 +45,7 @@
 local Identity = NcmCore.get("data.vehicle_identity")
 
 local function log(fmt, ...) print(("[ncm_world/odometer] " .. fmt):format(...)) end
+local FuelCore = NcmCore.get("economy.fuel")   -- `L208`: fuel load -> tyre heat and wear
 local function now() return Open77.time.unix() end
 
 local SAMPLE_MS = 1000
@@ -202,6 +203,11 @@ local function thermalStep(entry, prev, cur, t)
     -- model just felt rather than computing a second, subtly different one from the same two samples.
     local lateral = cur and lateralAccel(entry, prev, cur, dt) or 0
     local load = cur and Thermal.load(speed, lateral) or 0
+    -- `L208`: a heavier car works its tyres harder. Empty tank = today's heating exactly.
+    if load > 0 and NcmFuel and NcmFuel.level then
+        local okF, ml, cap = pcall(NcmFuel.level, assetId)
+        if okF and ml then load = load * FuelCore.heatFactor(ml, cap) end
+    end
     observedLateral = cur and lateral or nil
 
     -- ----------------------------------------------------------------- what the model actually sees
@@ -415,13 +421,26 @@ local function flush(assetId, metres, t)
     if not assetId or (metres or 0) < 1 then return true end
     local ok, err = pcall(function()
         local delta, at = math.floor(metres), math.floor(t or now())
-        local committed, why = MySQL.transaction.await({
+        local tx = {
             { query = "UPDATE vehicle_asset SET odometer_m = odometer_m + ?, odometer_at = ? WHERE asset_id = ?",
               values = { delta, at, assetId } },
             { query = [[UPDATE component_asset SET exposure_m = exposure_m + ?
                 WHERE machine_asset_id = ? AND location_kind = 'installed']],
               values = { delta, assetId } },
-        })
+        }
+        -- `L208`: fuel load wears TYRES faster over the long term. The extra is charged to installed tyre
+        -- parts only, on the tank level at checkpoint time.
+        if NcmFuel and NcmFuel.level then
+            local okF, ml, cap = pcall(NcmFuel.level, assetId)
+            local extra = okF and ml and math.floor(delta * (FuelCore.tyreWearFactor(ml, cap) - 1.0)) or 0
+            if extra >= 1 then
+                tx[#tx + 1] = { query = [[UPDATE component_asset ca JOIN component_design d ON d.design_id = ca.design_id
+                    SET ca.exposure_m = ca.exposure_m + ?
+                    WHERE ca.machine_asset_id = ? AND ca.location_kind = 'installed' AND d.family = 'tires']],
+                    values = { extra, assetId } }
+            end
+        end
+        local committed, why = MySQL.transaction.await(tx)
         if not committed then error(why or "odometer transaction refused") end
     end)
     if not ok then log("checkpoint failed asset=%s: %s", tostring(assetId):sub(1, 8), tostring(err));return false,"odometer_checkpoint_failed" end

@@ -150,7 +150,9 @@ Core.define("parts.handling", function(C)
     -- `surface` sits between `weather` and `thermal` because that is the causal order a reader needs: the
     -- sky decides what the road is, the road decides what the tyre can reach, and the tyre decides what
     -- the contact patch delivers. The trace then reads top to bottom as the story of how grip got here.
-    M.LAYERS = { "parts", "wear", "weather", "surface", "thermal", "chrome", "ruleset" }
+    -- `fuel` (`L208`): the mass of what is in the tank, a property of THIS Machine right now, so it sits
+    -- with `wear` before the world layers.
+    M.LAYERS = { "parts", "wear", "fuel", "weather", "surface", "thermal", "chrome", "ruleset" }
 
     --- Contributors other than `parts` supply plain per-lever multipliers. They are quantised before they
     --- reach a lever, and that is load-bearing rather than tidy: `signature()` formats at `%.4f` and
@@ -947,13 +949,16 @@ Core.define("parts.handling", function(C)
     --- Downward-only, so it withholds and never adds -- a cold tyre costs grip, a tyre in the window is
     --- merely not being charged for one.
     function M.thermalContributor(temperatureC)
-        local m = Thermal.gripMultiplier(temperatureC)
-        if type(m) ~= "number" or m ~= m then m = 1.0 end
-        if m > 1.0 then m = 1.0 end
+        -- `L208`/`E26`: cold pushes, overheated goes loose with weak brakes. Grip above 1.0 is a balance
+        -- change on this engine (the rear steps out), not a reward.
+        local l = Thermal.levers(temperatureC)
+        local g, b = tonumber(l.grip) or 1.0, tonumber(l.brake) or 1.0
+        if g ~= g then g = 1.0 end
+        if b ~= b or b > 1.0 then b = 1.0 end
         return {
             source = "tyre_thermal",
-            gripScale = m,
-            brakeScale = m,
+            gripScale = g,
+            brakeScale = b,
         }
     end
 
@@ -973,13 +978,15 @@ Core.define("parts.handling", function(C)
     ---
     --- Downward-only, like every contributor. A warm road is not a bonus; a cold one is a cost.
     function M.surfaceContributor(trackTemperatureC)
-        local m = Thermal.surfaceMultiplier(trackTemperatureC)
-        if type(m) ~= "number" or m ~= m then m = 1.0 end
-        if m > 1.0 then m = 1.0 end
+        -- `L208`: a cold road pushes; a hot road is a little livelier (grip slightly above 1.0).
+        local l = Thermal.surfaceLevers(trackTemperatureC)
+        local g, b = tonumber(l.grip) or 1.0, tonumber(l.brake) or 1.0
+        if g ~= g then g = 1.0 end
+        if b ~= b or b > 1.0 then b = 1.0 end
         return {
             source = "track_surface",
-            gripScale = m,
-            brakeScale = m,
+            gripScale = g,
+            brakeScale = b,
         }
     end
 
@@ -992,19 +999,63 @@ Core.define("parts.handling", function(C)
     ---
     --- Always returns a contributor, even at zero wetness, so the seam is visible in the trace rather than
     --- absent from it.
-    function M.weatherContributor(wetness)
+    function M.weatherContributor(wetness, weatherId)
         local w = tonumber(wetness) or 0
         if w ~= w or w < 0 then w = 0 elseif w > 1 then w = 1 end
-        return {
+        local out = {
             source = "weather",
             gripScale = 1.0 - (M.WET_DEPTH.gripScale * w),
             brakeScale = 1.0 - (M.WET_DEPTH.brakeScale * w),
+            driveScale = 1.0 - (M.WET_DEPTH.driveScale * w),
         }
+        -- Sand on the road: a small push and a little more drag. Fog, pollution and cloud stay neutral.
+        if weatherId == "sandstorm" then
+            out.gripScale = out.gripScale * M.SANDSTORM.gripScale
+            out.dragScale = M.SANDSTORM.dragScale
+        end
+        return out
     end
 
-    --- How much of each lever full wet removes. Carried over from `machine.projection`'s `M.WET`, whose
-    --- header is explicit that these are placeholders awaiting play data.
-    M.WET_DEPTH = { gripScale = 0.18, brakeScale = 0.15 }
+    --- How much of each lever a FULLY wet road removes (`L208`, owner: "noticeable"). Below 1.0 grip is a
+    --- push on this engine (`E26`), so the wet car refuses to turn and stops long; the loose-on-power half
+    --- is `wetPowerGrip`, applied client-side from live throttle.
+    M.WET_DEPTH = { gripScale = 0.20, brakeScale = 0.18, driveScale = 0.10 }
+    M.SANDSTORM = { gripScale = 0.95, dragScale = 1.05 }
+
+    --- `L208` "push on entry, loose on power": under heavy throttle on a wet road the grip lever is lifted
+    --- ABOVE the wet value -- and past 1.0 at full wet -- so the rear steps out. Ramps in from
+    --- `WET_POWER_FROM` throttle to full at 1.0. Returns a multiplier for the already-composed gripScale.
+    M.WET_POWER_LOOSE = 0.33
+    M.WET_POWER_FROM = 0.70
+    function M.wetPowerGrip(wetness, throttle)
+        local w, t = tonumber(wetness) or 0, tonumber(throttle) or 0
+        if w ~= w or w <= 0 or t ~= t then return 1.0 end
+        if w > 1 then w = 1 end
+        local k = (t - M.WET_POWER_FROM) / (1.0 - M.WET_POWER_FROM)
+        if k <= 0 then return 1.0 elseif k > 1 then k = 1 end
+        return 1.0 + M.WET_POWER_LOOSE * w * k
+    end
+
+    --- Fuel load (`L208`, doubled on owner choice). `r` is fuel mass over Machine mass; a full 60 L tank
+    --- on a 1,600 kg car is r ~ 0.028: drive and brake ~x0.925, grip ~x0.97 (a slight push), top speed
+    --- ~x0.99. Server-side car mass is not known yet, so `NOMINAL_MASS_KG` stands in.
+    M.FUEL_KG_PER_L = 0.75
+    M.NOMINAL_MASS_KG = 1600
+    M.FUEL_LOAD = { driveScale = 2.67, brakeScale = 2.67, gripScale = 1.0, topSpeedScale = 0.33 }
+    function M.fuelContributor(fuelMl, massKg)
+        local ml = tonumber(fuelMl)
+        local out = { source = "fuel_load", gripScale = 1.0, driveScale = 1.0, brakeScale = 1.0 }
+        if not ml or ml ~= ml or ml <= 0 then return out end
+        local mass = tonumber(massKg) or M.NOMINAL_MASS_KG
+        if mass ~= mass or mass < 500 then mass = M.NOMINAL_MASS_KG end
+        local r = (ml / 1000 * M.FUEL_KG_PER_L) / mass
+        if r > 0.2 then r = 0.2 end
+        out.gripScale = 1.0 - M.FUEL_LOAD.gripScale * r
+        out.driveScale = 1.0 - M.FUEL_LOAD.driveScale * r
+        out.brakeScale = 1.0 - M.FUEL_LOAD.brakeScale * r
+        out.topSpeedScale = 1.0 - M.FUEL_LOAD.topSpeedScale * r
+        return out
+    end
 
     --- `direction` as a comparable string, rounded so floating-point noise cannot make two identical
     --- directions look different.

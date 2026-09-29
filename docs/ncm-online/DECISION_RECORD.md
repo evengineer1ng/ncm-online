@@ -250,6 +250,7 @@ Numbering follows [OPEN77_EXPERIMENT_PLAN.md](../research/open77/OPEN77_EXPERIME
 | E23 | Orientation media in the client WebUI: bundled VP9/Opus WebM (~15–25 MB, `web_files`) in a modal page with skip/done bridge vs unlisted YouTube embed; download time on a fresh join; audio balance; fallback when neither plays | not run |
 | E24 | Navigation for route plans: does `setWaypoint` re-route without a map open once a route exists (KB-1 at speed is unacceptable); worldui/prop gate visual language (branch rings vs universal cylinder/`race.checkpoint`); does branch-gate placement make the engine's road route follow the intended branch | not run |
 | E25 | (observation, unplanned) Is an `unlisted` server private? Two strangers walked into staging 2026-09-21 23:27–23:41 UTC while it was `Visibility=Unlisted, masterListing=enabled` | **observed 2026-09-21** ([record](archive/experiments/E25_2026-09-21_walk-in.md)): not private in practice; cause unknown (staff view vs. ordinary discovery); reported to devs; KB-36/41/42, IDEA-091/092 |
+| E26 | (owner, live, 2026-09-29) **Which way does `gripScale` move balance?** Owner on Online with `/ncm.setup tires 1.4` then `0.5` (tires family = grip x1.0, brake x0.45, drive x0.15 exponents): *"rear is significantly looser on 1.4, barely rotates at 0.5"*. **Above 1.0 is oversteer, below 1.0 is understeer.** The Carrier scales only the lateral force at the body, never the yaw moment, so the lever changes the car's BALANCE, not just its limit; a design that treats grip loss as "slippery" is wrong on this engine. Earlier the same night the agent had argued the opposite from the code; the owner's drive is the evidence. Governs weather/fuel/thermal mapping (`IDEA-715`-`IDEA-717`). | **ANSWERED** (feel, single driver; a yaw-rate trace would quantify it) |
 | E0-note | A dedicated-server package **2.31.13+op77.82** exists locally (Downloads, 2026-09-18) while the hosted MCP index tops out at .78 ("no index published for .82"). E0 must record the actual server/client build; API cards are a lower bound until the index catches up. | recorded 2026-09-19 |
 
 ## 2026-09-23 — L106: owned-asset access after purchase (LOCKED contract)
@@ -4204,3 +4205,38 @@ panel's first line is current.
 
 **Open.** "Status dashboard" was chosen alongside what's new while "nothing new" was chosen for additions; whether a
 status strip (balance, Machine, fuel, next race) belongs here is unasked. Tracked by `IDEA-714`.
+
+## L208 - LOCKED OWNER DIRECTION / EXECUTED IN CODE / LIVE-GATED - weather, tyre heat and fuel load act on BALANCE, not only on the limit
+
+**Owner direction (2026-09-29).** *"we shouldnt simply use minus grip everywhere, thats understeer. more grip can be
+equally bad and just as relevant, possibly in tire warmth model as well."* Live evidence `E26`: on this engine
+`gripScale` above 1.0 loosens the rear (oversteer) and below 1.0 pushes (understeer). Every condition below is
+therefore authored as a balance choice.
+
+**Weather (graded, drying road).** Road wetness climbs toward the weather's target while it rains (~2 min to full)
+and dries after it stops (~6 min), so the laps after rain stay greasy. At full wet: grip x0.80 and brake x0.82
+(owner: "noticeable"), drive x0.90. **Push on entry, loose on power:** while braking or turning in the wet car
+pushes (grip below 1.0); under heavy throttle it briefly goes loose (grip above 1.0). Sandstorm: grip x0.95, drag
+x1.05. Fog, pollution and cloud stay neutral.
+
+**Tyre temperature.** Cold pushes (x0.85 rising to 1.0; live today). In the window: 1.0. **Overheated goes loose
+with weak brakes:** grip up to ~x1.12, brake down to ~x0.88. Road temperature: cold road ~x0.95, hot road ~x1.03
+and faster tyre heating.
+
+**Fuel load (doubled on owner choice).** Scaled by fuel mass (~0.75 kg/L, 60 L = ~45 kg) over the Machine's mass;
+on a 1,500 kg car a full tank costs ~8% drive and braking, ~3% grip (a slight push) and ~1% top speed. Fuel load
+also heats tyres faster (short term) and adds long-term tyre wear exposure (owner: "faster wear longterm and hotter
+tyres short term").
+
+**Executed (2026-09-29).** `parts.thermal.levers`/`surfaceLevers` (cold pushes, overheated loose with weak
+brakes, hot road livelier); `parts.handling` gains a `fuel` layer (`fuelContributor`, nominal 1,600 kg until
+per-car mass reaches the server), wet drive loss, sandstorm, and `wetPowerGrip` (throttle 0.70 to 1.0 lifts wet
+grip by up to x1.33); `ncm_world/server/machine.lua` moves `roadWetness` toward the weather's target in 0.05 steps;
+`server/handling.lua` composes road wetness, weather id and fuel, and puts `wetPower` on the handling wire;
+`client/carrier_bridge.lua` applies the lift from live throttle and re-sends every 100 ms while the road is wet;
+`server/odometer.lua` scales tyre heating by `economy.fuel.heatFactor` and charges extra tyre-only exposure by
+`tyreWearFactor`. `gripMultiplier` keeps its symmetric <= 1.0 meaning for the gauge; the earlier "the window is a
+penalty, never a boost" rule is superseded for what the car receives.
+
+**Open.** Every constant is a first pass to tune on the wheel (live tests `§HB1`-`§HB5`). Tracked by
+`IDEA-715`-`IDEA-717`.

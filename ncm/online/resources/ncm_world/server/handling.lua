@@ -111,17 +111,26 @@ local function contributorsFor(assetId)
 
     -- Weather and the clock, from the live environment read `KB-151` added. Before that fix this was a
     -- console command and nothing else, so `wetness` was permanently zero in production.
-    local wetness, secondsOfDay = 0, nil
+    local wetness, secondsOfDay, weatherId = 0, nil, nil
     if NcmMachine and NcmMachine.state then
         local c = NcmMachine.state()
         if type(c) == "table" then
-            wetness = tonumber(c.wetness) or 0
+            -- `L208`: the ROAD's wetness, which lags the sky -- soaking while it rains, drying after.
+            wetness = tonumber(c.roadWetness or c.wetness) or 0
             secondsOfDay = tonumber(c.secondsOfDay)
+            weatherId = c.weather
         end
     end
 
-    -- Rain, charged directly: water between the rubber and the road.
-    out.weather = Handling.weatherContributor(wetness)
+    -- Rain, charged directly: water between the rubber and the road. Sandstorm by id (`L208`).
+    out.weather = Handling.weatherContributor(wetness, weatherId)
+
+    -- FUEL LOAD (`L208`): the mass in the tank. Absent until this Machine's fuel state is loaded, which is
+    -- inert rather than guessed.
+    if NcmFuel and NcmFuel.level then
+        local okF, ml = pcall(NcmFuel.level, assetId)
+        if okF and ml then out.fuel = Handling.fuelContributor(ml) end
+    end
 
     -- The ROAD, charged on its temperature alone (`L160`). Deliberately not given `wetness` as an input:
     -- rain is already billed by the layer above, and reaches this one only by cooling the asphalt.
@@ -262,9 +271,14 @@ local function publishBound(playerId, binding, why, force)
     wire.driverPlayerId = binding.driverPlayerId
     wire.configurationRevision = entry and entry.revision or 0
     wire.configurationSignature = Handling.signature(setup)
+    -- `L208` "loose on power": the client lifts grip under heavy throttle from live input, which only it
+    -- has at a useful rate. The server says how wet the road is; nil on a dry road.
+    local okM, mstate = pcall(function() return NcmMachine and NcmMachine.state and NcmMachine.state() end)
+    local road = okM and type(mstate) == "table" and tonumber(mstate.roadWetness) or 0
+    wire.wetPower = (road and road > 0) and road or nil
     local sig = table.concat({ "bound", binding.assetId, tostring(binding.vehicleId),
         tostring(binding.authorityEpoch), tostring(wire.configurationRevision),
-        wire.configurationSignature }, "|")
+        wire.configurationSignature, tostring(wire.wetPower) }, "|")
     if force and delivered[pid] then delivered[pid].sig = nil end
     -- `write()` suppresses an unchanged payload, and this must suppress with it. **It did not, and the
     -- production log took two identical lines per second per driver, for as long as anyone sat in a car.**

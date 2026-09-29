@@ -33,8 +33,15 @@
 -- `LOSSES`, not in a comment.
 --
 -- ---------------------------------------------------------------------------------------------------
--- THE WINDOW IS A PENALTY, NEVER A BOOST
+-- THE WINDOW IS A PENALTY, NEVER A BOOST -- for `gripMultiplier`. See `levers` for what reaches the car.
 -- ---------------------------------------------------------------------------------------------------
+--
+-- **`L208` (owner, 2026-09-29) changes what the CAR receives, not this multiplier.** Live evidence `E26`:
+-- on this engine `gripScale` above 1.0 loosens the rear (oversteer) and below 1.0 pushes (understeer),
+-- because the Carrier scales lateral force and never the yaw moment. So "more grip" is not a reward here;
+-- it is a balance. `levers()` therefore maps COLD to a push (grip and brake down, as before) and
+-- OVERHEATED to a loose rear with weak brakes (grip up, brake down). `gripMultiplier` keeps its symmetric
+-- <= 1.0 meaning for the gauge and the explain line.
 --
 -- `gripMultiplier` returns **1.00 at the optimum and falls to `PENALTY` at both extremes**. It never
 -- exceeds 1.00 for any input, which is asserted rather than assumed.
@@ -97,10 +104,16 @@ Core.define("parts.thermal", function(C)
     M.SURFACE_HOT_SPAN = 28.0   -- 60C is fully hot
     M.SURFACE_COLD_DEPTH = 0.10
     M.SURFACE_HOT_DEPTH = 0.04
+    -- `L208`: a hot road makes the car livelier rather than slower -- grip up to x1.03 (a little looser).
+    M.SURFACE_HOT_LOOSE = 0.03
 
     M.OPTIMUM = 85.0            -- the centre of the window
     M.HALF_WINDOW = 35.0        -- +/- this from OPTIMUM is "fully cold" / "fully hot"
     M.PENALTY = 0.15            -- grip and brake cost at either extreme, so x0.85
+    -- `L208`: an overheated tyre goes LOOSE with weak brakes. Fully hot: grip x1.12 (rear steps out),
+    -- brake x0.88. First-pass values to tune on the wheel.
+    M.HOT_LOOSE = 0.12
+    M.HOT_BRAKE = 0.12
 
     -- Newtonian cooling toward ambient. `tau` is the time constant: about 3 tau to settle, so 45 s gives
     -- roughly two minutes, which is the requested cooldown.
@@ -339,6 +352,30 @@ Core.define("parts.thermal", function(C)
         return 1.0 - M.PENALTY * (x * x)
     end
 
+    --- What the CAR receives from tyre temperature (`L208`, `E26`). Cold: grip and brake down together
+    --- (a push). In the window: nothing. Overheated: grip UP (a loose rear) and brake DOWN.
+    function M.levers(temperatureC)
+        local x = M.position(temperatureC)
+        if not x then return { grip = 1.0, brake = 1.0 } end
+        if x <= 0 then
+            local m = 1.0 - M.PENALTY * (x * x)
+            return { grip = m, brake = m }
+        end
+        return { grip = 1.0 + M.HOT_LOOSE * (x * x), brake = 1.0 - M.HOT_BRAKE * (x * x) }
+    end
+
+    --- What the CAR receives from the road's temperature (`L208`). A cold road pushes (grip and brake
+    --- down, as `surfaceMultiplier`); a hot road is livelier (grip up slightly, brake untouched).
+    function M.surfaceLevers(trackC)
+        local x = M.surfacePosition(trackC)
+        if not x then return { grip = 1.0, brake = 1.0 } end
+        if x < 0 then
+            local m = 1.0 - M.SURFACE_COLD_DEPTH * (x * x)
+            return { grip = m, brake = m }
+        end
+        return { grip = 1.0 + M.SURFACE_HOT_LOOSE * (x * x), brake = 1.0 }
+    end
+
     --- A tyre that has never been driven is at ambient, not at the optimum. Distinct from "unknown", which
     --- the HUD must render as a dash rather than as a plausible resting value (`IDEA-361`).
     function M.initial(conditions)
@@ -355,7 +392,8 @@ Core.define("parts.thermal", function(C)
         elseif x <= 0.2 then band = "IN THE WINDOW"
         elseif x < 0.66 then band = "hot"
         else band = "OVERHEATING" end
-        return ("%.0fC %s (x%.3f grip)"):format(temperatureC, band, M.gripMultiplier(temperatureC))
+        local l = M.levers(temperatureC)
+        return ("%.0fC %s (grip x%.3f, brake x%.3f)"):format(temperatureC, band, l.grip, l.brake)
     end
 
     -- The promise the rest of the system relies on, checked at load rather than trusted.

@@ -46,7 +46,7 @@ NcmLandingContent = {
           reference = "collection",
           detail = "Measured facts about machines accumulate as you drive them." },
         { id = "weather", label = "Race the weather", state = "partial",
-          limit = "Weather is synchronised and affects performance ceilings, not grip.",
+          limit = "Rain soaks the road: less grip and longer braking, loose under heavy throttle; it dries over a few minutes.",
           detail = "The session's sky is the same for everyone in it." },
         { id = "fuel", label = "Fuel and refuelling", state = "live", reference = "market",
           detail = "Park at a pump and /ncm.refuel; /ncm.fuel routes to the nearest station." },

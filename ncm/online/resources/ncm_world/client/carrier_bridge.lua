@@ -1043,6 +1043,9 @@ end
 ---
 --- Any link missing produces an unbind, never a fallback. An unbind is a real message: going silent would
 --- leave the Carrier holding the last setup until its lease expired.
+local WetHandling = NcmCore.get("parts.handling")   -- `L208`: wetPowerGrip
+local wetFast = false
+
 local function resolveHandling(bagOk, setup)
     local function unbound(reason)
         return { v = 2, bound = false }, reason
@@ -1081,6 +1084,23 @@ local function resolveHandling(bagOk, setup)
             .. table.concat(ENTITY_FIELDS, ", ") .. ")")
     end
 
+    -- `L208` "push on entry, loose on power": on a wet road, heavy throttle lifts grip above the wet value
+    -- (past 1.0 at full wet), which on this engine steps the rear out (`E26`). Live throttle exists only
+    -- here, at the lease rate; the server says how wet the road is. Quantised so the lease is not rewritten
+    -- by pedal noise.
+    local levers = setup.levers
+    local wet = tonumber(setup.wetPower)
+    if wet and wet > 0 and type(levers.gripScale) == "number" then
+        local okL, lift = pcall(WetHandling.wetPowerGrip, wet, tonumber(snapshot.throttle))
+        if okL and type(lift) == "number" and lift > 1.0 then
+            lift = math.floor(lift / 0.02 + 0.5) * 0.02
+            local copy = {}
+            for k, v in pairs(levers) do copy[k] = v end
+            copy.gripScale = math.min(1.5, levers.gripScale * lift)
+            levers = copy
+        end
+    end
+
     return {
         v = 2,
         bound = true,
@@ -1088,7 +1108,7 @@ local function resolveHandling(bagOk, setup)
         vehicleId = tostring(setup.vehicleId),
         authorityEpoch = tostring(setup.authorityEpoch or ""),
         engineEntity = entity,
-        levers = setup.levers,
+        levers = levers,
     -- **The tail, not the head.** Truncating to the first 8 characters made both seeded fixtures read as
     -- `10000000`, so the one log a player is most likely to look at could not tell two Machines apart --
     -- during the very test whose whole point is that two Machines differ.
@@ -1129,8 +1149,12 @@ CreateThread(function()
             -- binding and leave the driver's Parts inert with nothing in any log to explain it.
             sendMachine("ncm:machine.handling", payload)
             pushedHandling = seen
+            -- `L208`: on a wet road the lift follows the throttle, so re-send faster than the lease needs.
+            wetFast = type(setup) == "table" and (tonumber(setup.wetPower) or 0) > 0
+        else
+            wetFast = false
         end
-        Wait(500)
+        Wait(wetFast and 100 or 500)
     end
 end)
 

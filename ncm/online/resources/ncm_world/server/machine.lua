@@ -33,8 +33,35 @@ NcmMachine = NcmMachine or {}
 -- are here so that adding them later is a value change rather than a redesign.
 local state = {
     weather = nil,          -- an OPEN//77 weather id, e.g. "rain"
-    wetness = 0,            -- 0..1, derived from the weather family
+    wetness = 0,            -- 0..1, derived from the weather family (the TARGET the road moves toward)
+    roadWetness = 0,        -- 0..1, the road itself: climbs while it rains, dries after (`L208`)
 }
+
+-- `L208`: the road is wet for a while after the rain stops. ~2 min to soak from dry, ~6 min to dry out.
+-- Reported in 0.05 steps so the handling signature moves ~20 times per transition, not every tick.
+local ROAD_SOAK_S, ROAD_DRY_S, ROAD_STEP = 120, 360, 0.05
+local roadRaw, roadAt = 0, nil
+CreateThread(function()
+    while true do
+        Wait(5000)
+        local t = now()
+        local dt = roadAt and (t - roadAt) or 0
+        roadAt = t
+        if dt > 0 then
+            local target = tonumber(state.wetness) or 0
+            if roadRaw < target then roadRaw = math.min(target, roadRaw + dt / ROAD_SOAK_S)
+            elseif roadRaw > target then roadRaw = math.max(target, roadRaw - dt / ROAD_DRY_S) end
+            local q = math.floor(roadRaw / ROAD_STEP + 0.5) * ROAD_STEP
+            if q ~= state.roadWetness then
+                local before = state.roadWetness
+                state.roadWetness = q
+                if math.floor(before * 4 + 0.5) ~= math.floor(q * 4 + 0.5) or q == 0 or q == 1 then
+                    log("road wetness %.2f -> %.2f (weather %s)", before, q, tostring(state.weather))
+                end
+            end
+        end
+    end
+end)
 
 local published = {}        -- record -> signature, so we only rewrite GlobalState when something changed
 
@@ -313,7 +340,8 @@ function NcmMachine.state()
     -- splitting "what the weather is" from "what time it is" would mean two sources that can disagree.
     -- It reaches the car through AMBIENT TEMPERATURE and through nothing else -- a cold night makes tyres
     -- harder to warm, which is the real mechanism, rather than a flat penalty for driving after dark.
-    return { weather = state.weather, wetness = state.wetness, secondsOfDay = state.secondsOfDay }
+    return { weather = state.weather, wetness = state.wetness, roadWetness = state.roadWetness,
+             secondsOfDay = state.secondsOfDay }
 end
 
 -- The ceilings are published by ncm_league at boot and can change with the calendar, so the fleet is not

@@ -24,6 +24,9 @@ local function load(asset)
  if not row then MySQL.insert.await("INSERT IGNORE INTO machine_fuel(asset_id,fuel_ml,capacity_ml,updated_at) VALUES(?,?,?,?)",{asset,s.fuelMl,s.capacityMl,now()}) end
  return s
 end
+-- `L208`: the handling composer and the tyre model read the tank. Only a loaded state answers; an unloaded
+-- Machine is inert rather than assumed full.
+NcmFuel.level=function(asset) local s=state[asset];if s then return s.fuelMl,s.capacityMl end;return nil end
 local function persist(asset,s)
  MySQL.update.await("UPDATE machine_fuel SET fuel_ml=?,capacity_ml=?,updated_at=? WHERE asset_id=?",{s.fuelMl,s.capacityMl,now(),asset})
  s.dirtyMl=0;s.lastWrite=now()

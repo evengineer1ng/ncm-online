@@ -28,6 +28,20 @@ Core.define("economy.fuel", function()
         local cents=math.ceil((need/1000)*math.max(0,tonumber(centsPerLitre) or 0))
         return need,cents
     end
+    -- `L208`: fuel load heats tyres faster (short term) and wears them faster (long term). Scaled by how
+    -- full the tank is, so an empty tank is exactly today's behaviour.
+    M.HEAT_AT_FULL = 0.25
+    M.TYRE_WEAR_AT_FULL = 0.30
+    local function fraction(fuelMl, capacityMl)
+        local f, c = tonumber(fuelMl), tonumber(capacityMl) or M.DEFAULT_CAPACITY_ML
+        if not f or f ~= f or f <= 0 or not c or c <= 0 then return 0 end
+        f = f / c
+        if f > 1 then f = 1 end
+        return f
+    end
+    function M.heatFactor(fuelMl, capacityMl) return 1.0 + M.HEAT_AT_FULL * fraction(fuelMl, capacityMl) end
+    function M.tyreWearFactor(fuelMl, capacityMl) return 1.0 + M.TYRE_WEAR_AT_FULL * fraction(fuelMl, capacityMl) end
+
     function M.nearest(position, stations)
         if type(position)~="table" then return nil end
         local best,bestD
