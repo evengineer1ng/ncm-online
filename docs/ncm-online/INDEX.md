@@ -36,7 +36,7 @@ corpus claiming migrations 001-007 while the schema was at 023.
 |---|---|---|
 | Organisations, team ownership, governance, grid slots | [14_TEAM_ORGANIZATIONS.md](14_TEAM_ORGANIZATIONS.md) | L92, L93; reaffirmed L123 |
 | Foundational primitives, contradictions, build sequencing | [24_FOUNDATION_RECONCILIATION.md](24_FOUNDATION_RECONCILIATION.md) | L123 |
-| NPC motorsport world: organizations, calendar, sim, WIRE, Billie's board, manager mode | [44_THE_PADDOCK.md](44_THE_PADDOCK.md) | L222, L224, L225 |
+| NPC motorsport world: organizations, calendar, sim, WIRE, Billie's board, manager mode, garages, live races | [44_THE_PADDOCK.md](44_THE_PADDOCK.md) | L222, L224, L225, L226, L227 |
 | Environments, promotion discipline (Online vs Development) | [16_ENVIRONMENTS.md](16_ENVIRONMENTS.md) | L112, L121, L223 (Online frozen at Baseline 1) |
 | **Database schema** | CODE: `ncm/online/resources/ncm_league/server/schema/` | - |
 | Lap ghost replay | [39_GHOST_REPLAY.md](39_GHOST_REPLAY.md) | L166 |
@@ -100,7 +100,7 @@ remains a SPEC artifact; current runtime behavior is the code and current econom
 - [17_MARKET_NETWORK.md](17_MARKET_NETWORK.md) - markets, market discovery
 - [24_FOUNDATION_RECONCILIATION.md](24_FOUNDATION_RECONCILIATION.md) - foundational primitives, contradictions, sequencing
 - [40_ECONOMY_V1.md](40_ECONOMY_V1.md) - Economy v1 build contract: paid events, additional faucets, asset sinks and settlement
-- [44_THE_PADDOCK.md](44_THE_PADDOCK.md) - the Paddock, NCM's persistent NPC motorsport world; adopted under L225; nothing built; §CH owed
+- [44_THE_PADDOCK.md](44_THE_PADDOCK.md) - the Paddock, NCM's persistent NPC motorsport world; adopted under L225; phases 1-2 and 4-5 built and running on dev (L226, L227); phase 3 skipped
 - [43_RIG_BRIDGE_ASSESSMENT.md](43_RIG_BRIDGE_ASSESSMENT.md) - dedicated multi-vendor Rig Bridge boundary and live acceptance order; implemented under L191, §BU owed
 - [OPS_STAGING.md](OPS_STAGING.md) - day-to-day operation of NCM Online
 - [CARRIER_NEXT_STEPS_AND_UPGRADE.md](CARRIER_NEXT_STEPS_AND_UPGRADE.md) - bounded Carrier follow-up and exact in-place Production package upgrade
