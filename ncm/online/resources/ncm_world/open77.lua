@@ -146,6 +146,10 @@ shared_script "shared/core/paddock/principal.lua"
 shared_script "shared/core/paddock/manager.lua"
 shared_script "shared/core/paddock/spotlight.lua"
 shared_script "shared/core/competition/affiliation.lua"
+shared_script "shared/core/paddock/garages_data.lua"
+shared_script "shared/core/paddock/garages.lua"
+shared_script "shared/core/paddock/talk.lua"
+shared_script "shared/core/paddock/live.lua"
 -- ncm-core:end
 
 server_script "server/identity.lua"

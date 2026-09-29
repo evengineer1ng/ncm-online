@@ -37,6 +37,29 @@ local ok, settings = pcall(Open77.tunables.declare, {
     pruneDetailDays = { value = 14, type = "integer", min = 1, max = 365, apply = "live" },
     pruneEventDays = { value = 30, type = "integer", min = 1, max = 365, apply = "live" },
     pruneNewsDays = { value = 90, type = "integer", min = 7, max = 3650, apply = "live" },
+    -- Phase 4 (doc 44 §11): Paddock people at their rented garages. Bodies exist only while a player is near a
+    -- garage whose tenant is on shift, and never more than the global cap.
+    garagesEnabled = { value = true, type = "boolean", apply = "live" },
+    garageNearM = { value = 120, type = "integer", min = 30, max = 500, unit = "m", apply = "live" },
+    garageLeaveM = { value = 200, type = "integer", min = 50, max = 800, unit = "m", apply = "live" },
+    garageBodyCap = { value = 18, type = "integer", min = 0, max = 60, apply = "live" },
+    garageTickSeconds = { value = 6, type = "integer", min = 2, max = 60, unit = "s", apply = "live" },
+    talkRadiusM = { value = 6, type = "integer", min = 2, max = 20, unit = "m", apply = "live" },
+    -- Phase 5 (doc 44 §12): declared physical-authoritative races. `liveBackend` = auto (the Pace DLL when the
+    -- declaring player's client has it, else the platform), platform, or pace.
+    liveEnabled = { value = true, type = "boolean", apply = "live" },
+    liveBackend = { value = "auto", type = "string", apply = "live" },
+    liveMaxCars = { value = 16, type = "integer", min = 2, max = 24, apply = "live" },
+    liveDeclareHorizonMin = { value = 90, type = "integer", min = 5, max = 600, unit = "min", apply = "live" },
+    liveDeclareLeadSec = { value = 150, type = "integer", min = 60, max = 1800, unit = "s", apply = "live" },
+    liveStageLeadSec = { value = 75, type = "integer", min = 30, max = 600, unit = "s", apply = "live" },
+    liveStartRadiusM = { value = 300, type = "integer", min = 50, max = 2000, unit = "m", apply = "live" },
+    liveCountdownSec = { value = 5, type = "integer", min = 3, max = 30, unit = "s", apply = "live" },
+    liveSampleMs = { value = 250, type = "integer", min = 100, max = 2000, unit = "ms", apply = "live" },
+    liveStallSec = { value = 30, type = "integer", min = 10, max = 300, unit = "s", apply = "live" },
+    liveTimeoutFactor = { value = 2.5, type = "number", min = 1.2, max = 6, apply = "live" },
+    livePaceMaxMps = { value = 90, type = "number", min = 20, max = 150, unit = "m/s", apply = "live" },
+    liveNpcDrivers = { value = true, type = "boolean", apply = "live" },
 })
 if not ok then print("[ncm_paddock/settings] tunables.declare FAILED: " .. tostring(settings)) settings = nil end
 PaddockSettings.proxy = settings

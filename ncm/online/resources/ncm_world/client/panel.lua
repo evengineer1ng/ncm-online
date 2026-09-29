@@ -490,6 +490,7 @@ AddEventHandler("onClientResourceStart", function(name)
     page:on("panel:paddock.request", function(d) if type(d) == "table" then TriggerServerEvent("ncm:paddock.request", d) end end)
     page:on("panel:paddock.slip", function(d) if type(d) == "table" then TriggerServerEvent("ncm:paddock.slip", d) end end)
     page:on("panel:paddock.manager", function(d) if type(d) == "table" then TriggerServerEvent("ncm:paddock.manager", d) end end)
+    page:on("panel:paddock.live", function(d) if type(d) == "table" then TriggerServerEvent("ncm:paddock.live", d) end end)
     -- Selecting an offering is a player-facing encounter with that model, which the server may treat as a
     -- Machine Index discovery. The client only reports the act; it never decides that anything was learned.
     -- The player opened PAST RESULTS. Ask for it; it is not in the Guide payload by design.

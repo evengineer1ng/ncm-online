@@ -1,10 +1,10 @@
-# Twice-applied dry-run for schemas 043-050 (the Paddock, doc 44 §14.1), plus the constraints that carry rules.
+# Twice-applied dry-run for schemas 043-051 (the Paddock, doc 44 Â§14.1), plus the constraints that carry rules.
 #
 # Replay safety: MariaDB commits DDL implicitly, so a migration that is not idempotent wedges the runner the second
 # time the server starts (see schema 019). Every statement here runs twice.
 #
 # Rules as constraints, asserted rather than trusted:
-#   * the One-Team Rule: a second ACTIVE affiliation for one driver is refused by `ux_one_team` (doc 14 §3)
+#   * the One-Team Rule: a second ACTIVE affiliation for one driver is refused by `ux_one_team` (doc 14 Â§3)
 #   * the NPC circuit admits only the Manager role, and each circuit needs its own org (the CHECK)
 #   * one active Paddock contract per person (`ux_paddock_contract_active`)
 #
@@ -34,7 +34,7 @@ function Invoke-Sql([string]$sql, [switch]$NoDatabase) {
 
 $statements = @()
 foreach ($n in '043_result_conditions', '044_organizations', '045_paddock_world', '046_team_affiliation',
-        '047_paddock_racing', '048_paddock_story', '049_billie', '050_paddock_economy') {
+        '047_paddock_racing', '048_paddock_story', '049_billie', '050_paddock_economy', '051_paddock_live') {
     $text = Get-Content -Raw "ncm\online\resources\ncm_league\server\schema\$n.lua"
     $found = [regex]::Matches($text, '(?s)\[\[(.*?)\]\]') | ForEach-Object { $_.Groups[1].Value }
     if ($found.Count -lt 1) { throw "no statements in $n" }

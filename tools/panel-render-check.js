@@ -1202,6 +1202,13 @@ check("a standings row asks for that driver's profile", emitted.some(e => e.name
 pdShow({ view: "results", series: [], next: [{ raceId: "r9", at: 1790001000, series: "Pacific Apex", route: "The Cut", state: "on the board", eastern: "15:00" }],
   rows: [{ raceId: "r1", at: 1790000000, series: "Night Grid", route: "Hook", state: "resolved", weather: "rain", light: "night", wet: 0.9, provenance: "simulated", winner: "Omar Haddad", winnerOrg: "Metro Racing", commit: "abcd1234" }] });
 check("results show what is next and what happened", pdDrawn() && /NEXT UP/.test(pdText()) && /Omar Haddad/.test(pdText()) && /wet road/.test(pdText()), pdText());
+// phase 5: a race inside its window offers a hold-to-declare live run; one already declared shows its live state
+pdShow({ view: "results", series: [], rows: [], next: [
+  { raceId: "r10", at: 1790002000, series: "Night Grid", route: "Hook", state: "scheduled", eastern: "20:00", canLive: true },
+  { raceId: "r11", at: 1790003000, series: "Night Grid", route: "The Cut", state: "scheduled", eastern: "20:20", live: "staging · Ana" }] });
+check("NEXT UP offers RUN IT LIVE only where it can happen", pdDrawn() && /HOLD: RUN IT LIVE/.test(pdText()) && /LIVE · staging/.test(pdText())
+  && document.getElementById("paddockBody").querySelectorAll("button").filter(b => /RUN IT LIVE/.test(b._text)).length === 1, pdText());
+check("and says what a live run is", /spawns the real grid/.test(pdText()), pdText());
 pdShow({ view: "box", error: "not_resolved", rows: [] });
 check("a running race's box score is explained, never shown", pdDrawn() && /still on track/.test(pdText()), pdText());
 pdShow({ view: "box", raceId: "r1", series: "Night Grid", route: "Hook", at: 1790000000, weather: "rain", light: "night", wet: 0.9, provenance: "simulated", commit: "abcd1234",
@@ -1216,6 +1223,9 @@ check("the directory lists NPC and human sanctioned teams", pdDrawn() && /Apex R
 pdShow({ view: "profile", kind: "person", profile: { id: "p1", name: "Ana Silva", role: "driver", org: "Apex Racing", region: "Brazil", ageBand: "late 20s", tags: ["Clutch"], wins: 3, starts: 20, podiums: 8 },
   rows: [{ t: "result", raceId: "r1", pos: 1, grid: 2, state: "finished", series: "Pacific Apex", route: "The Cut", at: 1790000000 }] });
 check("a driver profile shows record and tags, no numbers behind them", pdDrawn() && /3 wins/.test(pdText()) && /Clutch/.test(pdText()), pdText());
+pdShow({ view: "profile", kind: "org", profile: { id: "o1", name: "Apex Racing", tier: "premier", series: "Pacific Apex", owner: "Sal Rivera", sponsors: [], tags: [],
+  garage: { label: "Watson garage", district: "Watson", hours: "09:00-17:00 ET", here: true, siteId: "g014" } }, rows: [] });
+check("an org profile says where its garage is and whether they're in", pdDrawn() && /Watson garage · 09:00-17:00 ET · in now/.test(pdText()), pdText());
 const BOARD = { view: "board", knows: true, balance: 900, stakedToday: 100, caps: { perSlip: 250, daily: 2000, maxPayout: 10000 }, voice: "I take positions.",
   refusal: "Not that one.", races: [{ raceId: "r9", series: "Pacific Apex", route: "The Cut", opensAt: 1790001000, eastern: "15:00", weather: "sunny" }],
   rows: [{ t: "line", raceId: "r9", lineId: "r9:win:p1", version: 1, market: "win", label: "Ana Silva to win", price: 2.72, open: true },

@@ -103,9 +103,13 @@ function PaddockViews.results(_, args)
     table.sort(list, function(a, b) return a.opensAt < b.opensAt end)
     for i = 1, math.min(6, #list) do
         local race = list[i]
+        -- phase 5: a race can be declared live (run on the street) inside its window; show that, or its live state
+        local live = PaddockLive.statusOf(race.raceId)
+        local canLive = (not live) and PaddockLive.eligible(race, t) or false
         nextRaces[i] = { raceId = race.raceId, at = race.opensAt, series = PaddockWorld.seriesName(race.seriesId),
             route = PaddockWorld.routeName(race.routeId), state = race.state == "running" and "on track" or (race.state == "priced" and "on the board" or "scheduled"),
-            eastern = Clock.hhmm(race.opensAt) }
+            eastern = Clock.hhmm(race.opensAt), canLive = canLive or nil,
+            live = live and (live.state .. (live.verdict and (" · " .. live.verdict) or "") .. (live.declaredBy and (" · " .. live.declaredBy) or "")) or nil }
     end
     return { view = "results", seriesId = filter, series = seriesList(), next = nextRaces, rows = out }
 end
@@ -182,6 +186,7 @@ function PaddockViews.profile(_, args)
         local head = P.orgProfile(o, { seriesName = PaddockWorld.seriesName(o.seriesId), ownerName = PaddockWorld.personName(o.ownerId),
             managerName = o.managerId and PaddockWorld.personName(o.managerId) or (o.humanManagerDriverId and "a human manager" or nil),
             tags = orgTags(o), sponsors = sponsors })
+        head.garage = PaddockGarages.describe(o)         -- phase 4: where to find them, and whether they're in now
         local rows = {}
         for _, p in ipairs(World.members(world, o.id)) do
             if p.state == "active" then

@@ -21,9 +21,9 @@ local function orgRow(sid, o)
         query = [[INSERT INTO paddock_org (server_id, org_id, tier, series_id, name, short, colour, prestige, cash, facility,
             car_json, owner_person_id, manager_person_id, engineer_person_id, strategist_person_id, sponsor_ids,
             human_manager_driver_id, origin, lifecycle, founded_season, seasons_active, red_days, low_cash_days,
-            evidence_json, pending_json, folded_at)
+            evidence_json, pending_json, folded_at, garage_id, garage_shift)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULLIF(?, ''), NULLIF(?, ''), NULLIF(?, ''), NULLIF(?, ''), ?, NULLIF(?, ''),
-                    ?, ?, ?, ?, ?, ?, ?, ?, NULLIF(?, 0))
+                    ?, ?, ?, ?, ?, ?, ?, ?, NULLIF(?, 0), NULLIF(?, ''), NULLIF(?, ''))
             ON DUPLICATE KEY UPDATE tier = VALUES(tier), series_id = VALUES(series_id), name = VALUES(name),
                 short = VALUES(short), prestige = VALUES(prestige), cash = VALUES(cash), facility = VALUES(facility),
                 car_json = VALUES(car_json), owner_person_id = VALUES(owner_person_id),
@@ -32,13 +32,15 @@ local function orgRow(sid, o)
                 human_manager_driver_id = VALUES(human_manager_driver_id), lifecycle = VALUES(lifecycle),
                 seasons_active = VALUES(seasons_active), red_days = VALUES(red_days),
                 low_cash_days = VALUES(low_cash_days), evidence_json = VALUES(evidence_json),
-                pending_json = VALUES(pending_json), folded_at = VALUES(folded_at)]],
+                pending_json = VALUES(pending_json), folded_at = VALUES(folded_at), garage_id = VALUES(garage_id),
+                garage_shift = VALUES(garage_shift)]],
         values = { sid, o.id, o.tier, o.seriesId, o.name, o.short, o.colour, math.floor(o.prestige or 50),
             math.floor(o.cash or 0), math.floor(o.facility or 50), U.encode(o.car) or "{}", o.ownerId or "",
             o.managerId or "", o.engineerId or "", o.strategistId or "", U.encode(o.sponsorIds or {}) or "[]",
             o.humanManagerDriverId or "", o.origin or "genesis", o.lifecycle or "active", o.foundedSeason or "",
             o.seasonsActive or 1, o.redDays or 0, o.lowCashDays or 0, U.encode(o.evidence or {}) or "{}",
-            U.encode(o.pending or {}) or "[]", o.foldedAt or 0 },
+            U.encode(o.pending or {}) or "[]", o.foldedAt or 0, o.garageId or "",
+            NcmCore.get("paddock.garages").encodeShift(o.shift) },
     }
 end
 
@@ -145,6 +147,7 @@ function PaddockStore.load()
             origin = r.origin, lifecycle = r.lifecycle, foundedSeason = r.founded_season,
             seasonsActive = num(r.seasons_active, 1), redDays = num(r.red_days, 0), lowCashDays = num(r.low_cash_days, 0),
             evidence = U.decode(r.evidence_json) or {}, pending = U.decode(r.pending_json) or {}, foldedAt = num(r.folded_at),
+            garageId = r.garage_id, shift = NcmCore.get("paddock.garages").decodeShift(r.garage_shift),
         }
         w.orgs[o.id] = o
         w.orgOrder[#w.orgOrder + 1] = o.id

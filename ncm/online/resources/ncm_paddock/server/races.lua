@@ -7,7 +7,7 @@
 --
 -- The result exists before anyone can see it and is fixed by a seed committed before the window opened, so a
 -- result cannot be chosen after the fact and cannot leak before the close (tested). Provenance is `simulated`
--- (L222): nothing physical ever writes back in phases 1-2.
+-- (L222) unless a declared live run (live.lua, phase 5) is corroborated before the close; then `physical`.
 PaddockRaces = { byId = {} }
 
 local U = PaddockUtil
@@ -350,7 +350,8 @@ end
 function PaddockRaces.tick(t)
     local runNext, resolveNext, priceNext
     for _, race in pairs(PaddockRaces.byId) do
-        if race.state == "running" and race.closesAt and t >= race.closesAt then
+        -- a declared live race holds its close until the street run has a verdict (live.lua); Billie settles after
+        if race.state == "running" and race.closesAt and t >= race.closesAt and not (PaddockLive and PaddockLive.holds(race.raceId)) then
             if not resolveNext or race.closesAt < resolveNext.closesAt then resolveNext = race end
         elseif (race.state == "scheduled" or race.state == "priced") and t >= race.opensAt then
             if not runNext or race.opensAt < runNext.opensAt then runNext = race end

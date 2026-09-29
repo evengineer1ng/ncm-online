@@ -39,10 +39,76 @@ function GetPlayers() return { 1, 2 } end
 function GetCurrentResourceName() return "ncm_paddock" end
 
 local clock = 1790000000
+-- Phases 4-5 doubles: player positions, NPC bodies, vehicles that drive a followRoute at their set speed (so the
+-- server's own timing loop sees them cross gates), and the notifications a player would read.
+local POS, VEH, NPC, NOTES, aiHandlers = {}, {}, {}, {}, {}
+local nextEnt, STALL_FROM = 5000, nil
+GHOSTS = {}
+local function vdist(a, b) local dx, dy = a.x - b.x, a.y - b.y return math.sqrt(dx * dx + dy * dy) end
+local function advance(v)
+    if v.route and v.t then v.dist = v.dist + (v.speed or 0) * (clock - v.t); v.t = clock end
+end
+local function polyAt(pts, d)
+    for i = 2, #pts do
+        local seg = vdist(pts[i - 1], pts[i])
+        if d <= seg and seg > 0 then
+            local f = d / seg
+            return { x = pts[i - 1].x + (pts[i].x - pts[i - 1].x) * f, y = pts[i - 1].y + (pts[i].y - pts[i - 1].y) * f, z = 10 }
+        end
+        d = d - seg
+    end
+    local a, b = pts[#pts - 1], pts[#pts]
+    local seg = vdist(a, b)
+    return { x = b.x + (b.x - a.x) / seg * d, y = b.y + (b.y - a.y) / seg * d, z = 10 }     -- carry on past the end
+end
 Open77 = {
     time = { unix = function() return clock end },
     tunables = { declare = function(spec) local p = {} for k, v in pairs(spec) do p[k] = v.value end return p end },
-    notifications = { send = function() return true end },
+    notifications = { send = function(pid, n) NOTES[#NOTES + 1] = { pid = pid, title = n.title, message = n.message } return true end },
+    players = { positions = function() return POS end },
+    world = { groundZ = function(p, o) return (o.fromZ or 1.5) - 1.5 end },
+    npcs = {
+        ai = { tasks = 1 }, damage = { invulnerable = 2 },
+        create = function(def) nextEnt = nextEnt + 1; NPC[nextEnt] = { position = def.position, record = def.record } return nextEnt end,
+        remove = function(id) NPC[id] = nil return true end,
+        get = function(id) return NPC[id] end,
+        speak = function() return true end,
+        tasks = { lookAt = function() return true end },
+    },
+    vehicles = {
+        create = function(def)
+            nextEnt = nextEnt + 1
+            local count = 0
+            for _ in pairs(VEH) do count = count + 1 end
+            VEH[nextEnt] = { pos = def.position, record = def.record, health = 1, dist = 0, stall = STALL_FROM ~= nil and count >= STALL_FROM }
+            return nextEnt
+        end,
+        remove = function(id) VEH[id] = nil return true end,
+        getPosition = function(id)
+            local v = VEH[id]
+            if not v then return nil end
+            if v.route then advance(v); return polyAt(v.route, v.dist) end
+            return v.pos
+        end,
+        getHealth = function(id) return VEH[id] and VEH[id].health end,
+        requestAuthority = function() return true end,
+        ai = {
+            on = function(ev, fn) aiHandlers[ev] = fn return true end,
+            attachDriver = function(id, o) if not VEH[id] then return nil, "no_vehicle" end VEH[id].driver = o and o.npcId or "none" return { status = "idle" } end,
+            followRoute = function(id, o)
+                local v = VEH[id]
+                if not v or not v.driver then return nil, "no_controller" end
+                if #o.points < 1 or #o.points > 64 then return nil, "invalid_points" end
+                v.route = { v.pos }
+                for _, p in ipairs(o.points) do v.route[#v.route + 1] = p end
+                v.speed, v.t, v.dist = v.stall and 0 or o.speed, clock, 0
+                return { status = "running" }
+            end,
+            setSpeed = function(id, sp) local v = VEH[id] if v then advance(v); v.speed = v.stall and 0 or sp end return {} end,
+            removeDriver = function(id) if VEH[id] then VEH[id].driver = nil end return true end,
+            stop = function() return true end,
+        },
+    },
 }
 
 -- Instruction metering: the most VM instructions any coroutine ran between two yields.
@@ -89,6 +155,7 @@ local DB = {
     world = nil, series = {}, org = {}, person = {}, sponsor = {}, race = {}, result = {}, line = {}, slip = {},
     ledger = {}, idem = {}, affiliation = {}, treasury = {}, tidem = {}, event = {}, news = {}, message = {}, push = {},
     contact = { ["driver-1"] = true, ["driver-2"] = true },
+    live = {}, crossing = {}, meeting = {}, garageCheck = {},
 }
 local function ledgerTotal(d) local s = 0 for _, r in ipairs(DB.ledger) do if r.d == d then s = s + r.amount end end return s end
 local function ledgerAdd(d, kind, amount, idem)
@@ -111,10 +178,12 @@ local function exec(q, v)
     elseif has(q, "INTO paddock_org") then
         local keys = { "server_id", "org_id", "tier", "series_id", "name", "short", "colour", "prestige", "cash", "facility", "car_json",
             "owner_person_id", "manager_person_id", "engineer_person_id", "strategist_person_id", "sponsor_ids", "human_manager_driver_id",
-            "origin", "lifecycle", "founded_season", "seasons_active", "red_days", "low_cash_days", "evidence_json", "pending_json", "folded_at" }
+            "origin", "lifecycle", "founded_season", "seasons_active", "red_days", "low_cash_days", "evidence_json", "pending_json", "folded_at",
+            "garage_id", "garage_shift" }
         local r = {}
         for i, k in ipairs(keys) do r[k] = v[i] end
-        for _, k in ipairs({ "owner_person_id", "manager_person_id", "engineer_person_id", "strategist_person_id", "human_manager_driver_id" }) do
+        for _, k in ipairs({ "owner_person_id", "manager_person_id", "engineer_person_id", "strategist_person_id", "human_manager_driver_id",
+            "garage_id", "garage_shift" }) do
             if r[k] == "" then r[k] = nil end
         end
         DB.org[r.org_id] = r
@@ -145,6 +214,30 @@ local function exec(q, v)
         DB.race[v[3]].state = "resolved"
     elseif has(q, "UPDATE paddock_race SET detail_json") then
         if DB.race[v[3]] then DB.race[v[3]].detail_json = v[1] end
+    elseif has(q, "DELETE FROM paddock_result") then
+        local keep = {}
+        for _, r in ipairs(DB.result) do if r.race_id ~= v[2] then keep[#keep + 1] = r end end
+        DB.result = keep
+    elseif has(q, "UPDATE paddock_race SET provenance = 'physical'") then
+        local r = DB.race[v[5]]
+        if r then r.provenance, r.backend, r.detail_json, r.window_closes_at = "physical", v[1], v[2], v[3] end
+    elseif has(q, "INTO paddock_live_crossing") then
+        DB.crossing[#DB.crossing + 1] = { race_id = v[2], person_id = v[3], gate = v[4], source = has(q, "'pace'") and "pace" or "server", t_ms = v[5] }
+    elseif has(q, "INSERT INTO paddock_live") then
+        if DB.live[v[2]] then error("Duplicate entry for key 'PRIMARY'") end
+        DB.live[v[2]] = { race_id = v[2], declared_by = v[3], state = "declared", cars = v[5] }
+    elseif has(q, "UPDATE paddock_live SET") and has(q, "server restarted") then
+        for _, l in pairs(DB.live) do if l.state ~= "finished" then l.state = "cancelled" end end
+    elseif has(q, "UPDATE paddock_live SET") then
+        local cols = {}
+        for c in q:match("SET (.-) WHERE"):gmatch("([%w_]+) = %?") do cols[#cols + 1] = c end
+        local row = DB.live[v[#v]]
+        if row then for i, c in ipairs(cols) do row[c] = v[i] end end
+    elseif has(q, "INTO paddock_meeting") then
+        local k = v[2] .. "|" .. v[3]
+        if DB.meeting[k] then DB.meeting[k].met_count = DB.meeting[k].met_count + 1 else DB.meeting[k] = { met_count = 1 } end
+    elseif has(q, "INTO paddock_garage_check") then
+        DB.garageCheck[v[2]] = { site_id = v[2], verdict = v[3] }
     elseif has(q, "INTO paddock_result") then
         DB.result[#DB.result + 1] = { race_id = v[2], person_id = v[3], org_id = v[4], series_id = v[5], season_id = v[6], cup_id = v[7],
             position = v[8], grid = v[9], state = v[10], finish_ms = v[11] ~= -1 and v[11] or nil, gap_ms = v[12] ~= -1 and v[12] or nil, points = v[13], purse = v[14], dnf_reason = v[15] }
@@ -208,7 +301,7 @@ MySQL = {
     update = { await = function(q, v) return exec(q, v) end },
     insert = { await = function(q, v) return exec(q, v) end },
     scalar = { await = function(q, v)
-        if has(q, "MAX(version) FROM schema_migrations") then return 50 end
+        if has(q, "MAX(version) FROM schema_migrations") then return 51 end
         if has(q, "FROM ncm_driver_binding") then return 2 end
         if has(q, "SUM(amount),0) FROM ledger") then return ledgerTotal(v[1]) end
         if has(q, "COUNT(*) FROM ledger WHERE idem_key") then return DB.idem[v[1]] and 1 or 0 end
@@ -218,6 +311,7 @@ MySQL = {
         if has(q, "SELECT count FROM paddock_push") then return 0 end
         if has(q, "SELECT display FROM driver_profile") then return "Human " .. tostring(v[1]) end
         if has(q, "SELECT detail_json FROM paddock_race") then return DB.race[v[2]] and DB.race[v[2]].detail_json end
+        if has(q, "FROM paddock_meeting") then local m = DB.meeting[v[2] .. "|" .. v[3]] return m and m.met_count end
         return 0
     end },
     single = { await = function(q, v)
@@ -228,6 +322,7 @@ MySQL = {
         if has(q, "FROM paddock_slip WHERE idem_key") then for _, s in pairs(DB.slip) do if s.idem_key == v[1] then return s end end return nil end
         if has(q, "FROM team_affiliation") then local a = activeAff(v[2]) return a and { circuit = a.circuit, role = a.role } or nil end
         if has(q, "FROM paddock_race WHERE server_id = ? AND race_id") then return DB.race[v[2]] end
+        if has(q, "FROM ghost_lap") then return GHOSTS[v[2]] end
         return nil
     end },
     query = { await = function(q, v)
@@ -236,6 +331,8 @@ MySQL = {
         elseif has(q, "FROM paddock_org") then for _, r in pairs(DB.org) do out[#out + 1] = r end table.sort(out, function(a, b) return a.org_id < b.org_id end)
         elseif has(q, "FROM paddock_person") then for _, r in pairs(DB.person) do out[#out + 1] = r end table.sort(out, function(a, b) return a.person_id < b.person_id end)
         elseif has(q, "FROM paddock_sponsor") then for _, r in pairs(DB.sponsor) do out[#out + 1] = r end table.sort(out, function(a, b) return a.sponsor_id < b.sponsor_id end)
+        elseif has(q, "FROM paddock_garage_check") then
+            for _, r in pairs(DB.garageCheck) do out[#out + 1] = r end
         elseif has(q, "FROM weather_transition") then
             out = { { starts_at_utc = clock - 7200, weather = "sunny" }, { starts_at_utc = clock + 86400 * 3, weather = "rain" } }
         elseif has(q, "FROM paddock_result WHERE server_id = ? AND race_id") then
@@ -320,7 +417,7 @@ realPrint("paddock host harness")
 do
     local offenders = {}
     for _, f in ipairs({ "settings", "util", "store", "players", "stream", "wallet", "story", "world", "calibration", "races",
-        "billie", "life", "manager", "spotlight", "views", "requests", "admin", "main" }) do
+        "billie", "life", "manager", "spotlight", "garages", "live", "views", "requests", "admin", "main" }) do
         local text = assert(io.open(RES .. "ncm_paddock/server/" .. f .. ".lua")):read("a")
         text = text:gsub("%-%-[^\n]*", "")   -- code only: comments may name the resource they mirror
         for g in text:gmatch("(Ncm%u%a+)%.") do
@@ -482,6 +579,250 @@ clock = clock + 1
 fire("ncm:paddock.request", 2, { view = "profile", kind = "org", id = "o002" })
 clock = clock + 1
 check(("every view handler fits the quota (max slice %d)"):format(maxSlice), maxSlice < 400000)
+
+-- ---------------------------------------------------------------- phase 4: garages, bodies, talk
+local G = NcmCore.get("paddock.garages")
+-- boot already housed every org, but the harness dropped the boot thread mid-flush (a yielding flush), so re-mark
+-- them: what is asserted is that an org row CARRIES its garage and shift, not when boot wrote it
+run(function()
+    PaddockGarages.load(); PaddockGarages.ensure()
+    for _, oid in ipairs(W.orgOrder) do PaddockStore.markOrg(oid) end
+    PaddockStore.flush()
+end)
+local housed, persistedGarage = 0, 0
+for _, oid in ipairs(W.orgOrder) do if W.orgs[oid].garageId and W.orgs[oid].shift then housed = housed + 1 end end
+for _, r in pairs(DB.org) do if r.garage_id and r.garage_shift then persistedGarage = persistedGarage + 1 end end
+check(("every org rents a garage on a shift (%d)"):format(housed), housed == #W.orgOrder)
+check(("and the rental is persisted on the org row (%d)"):format(persistedGarage), persistedGarage == #W.orgOrder)
+local deepest = 0
+for _, list in pairs(PaddockGarages.tenants) do if #list > deepest then deepest = #list end end
+check("no garage is stacked past three tenants (" .. deepest .. ")", deepest <= 3)
+do
+    local copy
+    run(function() copy = PaddockStore.load() end)
+    local o1 = W.orgs[W.orgOrder[1]]
+    check("the garage and shift survive a reload", copy.orgs[o1.id].garageId == o1.garageId and copy.orgs[o1.id].shift
+        and copy.orgs[o1.id].shift.from == o1.shift.from)
+end
+
+-- find a sanctioned org on shift at some hour with no race of its own nearby, and stand a player in its garage
+local visitOrg, visitAt
+for _, oid in ipairs(W.orgOrder) do
+    local o = W.orgs[oid]
+    if o.tier ~= "street" and not visitOrg then
+        for h = 0, 47 do
+            local t = clock + h * 3600
+            if G.onShift(o.shift, t) then visitOrg, visitAt = o, t break end
+        end
+    end
+end
+check("an org is on shift somewhere in the next two days", visitOrg ~= nil)
+local savedClock = clock
+clock = visitAt
+local site = G.site(visitOrg.garageId)
+POS = { [1] = { x = site.x + 3, y = site.y, z = site.z, bucket = 0 } }
+replies = {}
+maxSlice = 0
+run(function() PaddockGarages.tick() end)
+local here = {}
+for pid, b in pairs(PaddockGarages.bodies) do if b.siteId == site.id then here[#here + 1] = pid end end
+check(("a player at the garage meets its crew (%d bodies)"):format(#here), #here >= 1 and #here <= G.MAX_BODIES)
+check(("a presence pass fits the quota (max slice %d)"):format(maxSlice), maxSlice < 400000)
+local told = false
+for _, r in ipairs(replies) do if r.name == "ncm:paddock.bodies" and r.pid == -1 and #r.body.rows == #here then told = true end end
+check("every client is told who is standing there", told)
+local visitor = here[1]
+local b1 = PaddockGarages.bodies[visitor]
+POS[1] = { x = NPC[b1.npcId].position.x + 1, y = NPC[b1.npcId].position.y, z = site.z, bucket = 0 }
+NOTES = {}
+fire("ncm:paddock.talk", 1, { personId = visitor })
+check("talking to them gets a line in their voice", #NOTES == 1 and NOTES[1].title:find(W.people[visitor].display, 1, true) ~= nil
+    and not NOTES[1].message:find("{", 1, true))
+check("and the meeting is recorded", DB.meeting["driver-1|" .. visitor] and DB.meeting["driver-1|" .. visitor].met_count == 1)
+local firstLine = NOTES[1].message
+clock = clock + 2
+NOTES = {}
+fire("ncm:paddock.talk", 1, { personId = visitor })
+check("a second talk is a second meeting", DB.meeting["driver-1|" .. visitor].met_count == 2 and #NOTES == 1)
+POS[1] = { x = site.x + 40, y = site.y, z = site.z, bucket = 0 }
+clock = clock + 2
+NOTES = {}
+fire("ncm:paddock.talk", 1, { personId = visitor })
+check("talking from 40 m away is refused by the server", DB.meeting["driver-1|" .. visitor].met_count == 2 and #NOTES == 1 and NOTES[1].message == "Get closer.")
+check("the first meeting was an introduction", firstLine ~= nil)
+POS = { [1] = { x = site.x + 5000, y = site.y, z = site.z, bucket = 0 } }
+run(function() PaddockGarages.tick() end)
+check("when the player leaves, the bodies go", next(PaddockGarages.bodies) == nil and next(NPC) == nil)
+POS = { [1] = { x = site.x, y = site.y, z = site.z, bucket = 0 } }
+local oldGarage = visitOrg.garageId
+run(function() PaddockGarages.check(oldGarage, "bad", "roof pin") end)
+check("a site marked bad leaves the pool and its tenants move", visitOrg.garageId ~= nil and visitOrg.garageId ~= oldGarage
+    and DB.garageCheck[oldGarage].verdict == "bad")
+local prof
+run(function() prof = PaddockViews.profile(1, { kind = "org", id = visitOrg.id }) end)
+check("an org profile says where its garage is, never a coordinate", prof.profile.garage and prof.profile.garage.label
+    and prof.profile.garage.hours and prof.profile.garage.x == nil)
+clock = savedClock
+POS = {}
+for k in pairs(NPC) do NPC[k] = nil end
+PaddockGarages.bodies = PaddockGarages.bodies
+
+-- ---------------------------------------------------------------- phase 5: live races
+local Live = NcmCore.get("paddock.live")
+local liveDay = Clock.eastern(clock).dayIndex + 1
+clock = Clock.utcAt(liveDay, 20 * 3600 - 10 * 60)                    -- 19:50 ET: the street night starts at 20:00
+run(function() PaddockRaces.materialise(clock) end)
+local liveRace = PaddockRaces.byId[Season.raceId("street_a", Clock.utcAt(liveDay, 20 * 3600))]
+check("a street race is ten minutes out", liveRace ~= nil and liveRace.state == "scheduled")
+local liveRoute = PaddockWorld.route(liveRace.routeId)
+-- a human ghost of the route: a gentle dog-leg from start to finish at 10 Hz
+local function ghostFor(route)
+    local s, f = route.start, route.finish
+    local mid = { x = (s.x + f.x) / 2 + 150, y = (s.y + f.y) / 2 - 150 }
+    local raw, t = {}, 0
+    for _, leg in ipairs({ { s, mid }, { mid, f } }) do
+        for i = 0, 299 do
+            local u = i / 300
+            raw[#raw + 1] = { t, leg[1].x + (leg[2].x - leg[1].x) * u, leg[1].y + (leg[2].y - leg[1].y) * u, 10, 0 }
+            t = t + 0.1
+        end
+    end
+    raw[#raw + 1] = { t, f.x, f.y, 10, 0 }
+    GHOSTS[route.routeId] = { poses_json = NcmCore.get("vocabulary.json").encode(raw), format = 1 }
+end
+ghostFor(liveRoute)
+replies = {}
+fire("ncm:paddock.live", 1, { raceId = liveRace.raceId })
+local lr = PaddockLive.byRace[liveRace.raceId]
+check("a player declares the race live", lr ~= nil and lr.state == "declared" and DB.live[liveRace.raceId] ~= nil)
+local gotWaypoint = false
+for _, r in ipairs(replies) do if r.name == "ncm:paddock.live.declared" and r.body.start then gotWaypoint = true end end
+check("and is sent to the start line", gotWaypoint)
+clock = clock + 1
+fire("ncm:paddock.live", 2, { raceId = liveRace.raceId })
+check("a second declaration of the same race is refused", PaddockLive.byRace[liveRace.raceId] == lr)
+local resView
+run(function() resView = PaddockViews.results(1, {}) end)
+local shown = false
+for _, r in ipairs(resView.next) do if r.raceId == liveRace.raceId and r.live and r.live:find("declared") then shown = true end end
+check("NEXT UP shows it is going live", shown)
+
+-- staging: the declarer is at the start, the grid spawns there
+POS = { [1] = { x = liveRoute.start.x + 20, y = liveRoute.start.y, z = 10, bucket = 0 } }
+clock = liveRace.opensAt - 70
+for _ = 1, 4 do run(function() PaddockRaces.tick(clock) end) end
+run(function() PaddockLive.tick(clock) end)
+local nCars = 0
+for _ in pairs(VEH) do nCars = nCars + 1 end
+check(("the grid is spawned at the start (%d cars, %s)"):format(nCars, tostring(lr.backend)), lr.state == "staging" and nCars == #lr.cars and nCars >= 8
+    and lr.backend == "platform")
+check("the road line comes from the human ghost, inside followRoute's limit", lr.path.source == "ghost" and #lr.path.points <= 64)
+check("one timing gate per sim segment", #lr.gates == lr.segments + 1)
+local slot1 = VEH[lr.cars[1].vehicleId].pos
+check("pole sits behind the start line", Live.dist(slot1, liveRoute.start) < 30)
+
+-- lights: the sim runs sealed, then the street run starts and the server times it
+clock = liveRace.opensAt
+for _ = 1, 8 do if liveRace.state == "running" then break end run(function() PaddockRaces.tick(clock) end) end
+check("the sim ran at the window's opening, sealed", liveRace.state == "running" and liveRace.result ~= nil)
+local simWinner = liveRace.result.entrants[1].id
+queue = {}
+run(function() PaddockLive.tick(clock) end)
+check("the live race is running", lr.state == "running" and #queue == 1)
+local steps, heldPastClose = 0, false
+maxSlice = 0
+while lr.state == "running" and steps < 6000 do
+    steps = steps + 1
+    clock = clock + 0.25
+    local q = queue; queue = {}
+    for _, co in ipairs(q) do
+        local ok, err = resumeMetered(co)
+        assert(ok, err)
+        if coroutine.status(co) ~= "dead" then queue[#queue + 1] = co end
+    end
+    if steps % 40 == 0 then
+        run(function() PaddockRaces.tick(math.floor(clock)) end)
+        if liveRace.closesAt and clock > liveRace.closesAt and lr.state == "running" and liveRace.state == "running" then heldPastClose = true end
+    end
+end
+check(("the street run finished (%d samples, %.0f s)"):format(steps, steps * 0.25), lr.state == "finished")
+check(("the timing loop fits the quota (max slice %d)"):format(maxSlice), maxSlice < 400000)
+check("the close waited for the verdict", heldPastClose or (liveRace.closesAt and liveRace.closesAt >= clock - 10))
+check("the verdict is physical: " .. tostring(lr.reason), lr.verdict == "physical" and DB.live[liveRace.raceId].verdict == "physical")
+local rows = {}
+for _, r in ipairs(DB.result) do if r.race_id == liveRace.raceId then rows[#rows + 1] = r end end
+table.sort(rows, function(a, b) return a.position < b.position end)
+check("the physical classification replaced the sim's rows", #rows == #lr.cars and rows[1].position == 1 and rows[1].state == "finished"
+    and DB.race[liveRace.raceId].provenance == "physical")
+check("with physical gaps and points", rows[1].gap_ms == 0 and (rows[2].gap_ms or 0) > 0 and rows[1].points == 25)
+local serverCross = 0
+for _, c in ipairs(DB.crossing) do if c.race_id == liveRace.raceId and c.source == "server" then serverCross = serverCross + 1 end end
+check(("every timed gate is kept (%d crossings)"):format(serverCross), serverCross == #lr.cars * (#lr.gates - 1))
+check("the declarer is told the street result stands", (function()
+    for _, n in ipairs(NOTES) do if n.message:find("Live result stands", 1, true) then return true end end return false end)())
+clock = math.floor(clock) + 10
+for _ = 1, 6 do if liveRace.state == "resolved" then break end run(function() PaddockRaces.tick(clock) end) end
+check("then the race resolves on the physical result", DB.race[liveRace.raceId].state == "resolved")
+run(function() box = PaddockViews.box(1, { raceId = liveRace.raceId }) end)
+check("and its box score says PHYSICAL", box.provenance == "physical" and box.rows[1].driverId == rows[1].person_id)
+realPrint(("    (sim winner %s, street winner %s)"):format(simWinner, rows[1].person_id))
+run(function() Wait(0) end)
+-- the cars linger 20 s, then go
+queue = {}
+for pid in pairs(VEH) do VEH[pid] = nil end
+
+-- a street run where most cars stall: the sim result stands
+local race2 = PaddockRaces.byId[Season.raceId("street_a", Clock.utcAt(liveDay, 20 * 3600 + 40 * 60))]
+clock = race2.opensAt - 600
+run(function() PaddockRaces.materialise(clock) end)
+race2 = PaddockRaces.byId[Season.raceId("street_a", Clock.utcAt(liveDay, 20 * 3600 + 40 * 60))]
+ghostFor(PaddockWorld.route(race2.routeId))
+fire("ncm:paddock.live", 1, { raceId = race2.raceId })
+local lr2 = PaddockLive.byRace[race2.raceId]
+check("a second live race can be declared once the first is done", lr2 ~= nil)
+local r2route = PaddockWorld.route(race2.routeId)
+POS = { [1] = { x = r2route.start.x, y = r2route.start.y, z = 10, bucket = 0 } }
+STALL_FROM = 2
+clock = race2.opensAt - 70
+for _ = 1, 6 do run(function() PaddockRaces.tick(clock) end) end
+run(function() PaddockLive.tick(clock) end)
+clock = race2.opensAt
+for _ = 1, 8 do if race2.state == "running" then break end run(function() PaddockRaces.tick(clock) end) end
+local simRows = 0
+for _, r in ipairs(DB.result) do if r.race_id == race2.raceId then simRows = simRows + 1 end end
+queue = {}
+run(function() PaddockLive.tick(clock) end)
+steps = 0
+while lr2.state == "running" and steps < 6000 do
+    steps = steps + 1
+    clock = clock + 0.25
+    local q = queue; queue = {}
+    for _, co in ipairs(q) do local ok, err = resumeMetered(co); assert(ok, err); if coroutine.status(co) ~= "dead" then queue[#queue + 1] = co end end
+end
+STALL_FROM = nil
+check("stalled cars are retired and the run ends", lr2.state == "finished")
+check("too few finishers: the verdict falls back (" .. tostring(lr2.reason) .. ")", lr2.verdict == "fallback"
+    and tostring(lr2.reason):find("only 2 of", 1, true) ~= nil)
+local after2 = 0
+for _, r in ipairs(DB.result) do if r.race_id == race2.raceId then after2 = after2 + 1 end end
+check("and the sealed sim result stands untouched", after2 == simRows and (DB.race[race2.raceId].provenance or "simulated") == "simulated")
+queue = {}
+for pid in pairs(VEH) do VEH[pid] = nil end
+
+-- a declarer who is not at the start: called off, nothing left in the city
+local race3 = PaddockRaces.byId[Season.raceId("street_b", Clock.utcAt(liveDay, 20 * 3600 + 60 * 60))]
+clock = Clock.utcAt(liveDay, 20 * 3600 + 60 * 60) - 600
+run(function() PaddockRaces.materialise(clock) end)
+race3 = PaddockRaces.byId[Season.raceId("street_b", Clock.utcAt(liveDay, 20 * 3600 + 60 * 60))]
+fire("ncm:paddock.live", 1, { raceId = race3.raceId })
+local lr3 = PaddockLive.byRace[race3.raceId]
+POS = { [1] = { x = 0, y = 0, z = 0, bucket = 0 } }
+clock = race3.opensAt - 70
+run(function() PaddockLive.tick(clock) end)
+check("a declarer far from the start is called off", lr3 and lr3.state == "cancelled" and next(VEH) == nil)
+check("and the race keeps its sim result path", not PaddockLive.holds(race3.raceId))
+POS = {}
+queue = {}
 
 -- ---------------------------------------------------------------- manager mode
 DB.ledger = {}; DB.idem = {}

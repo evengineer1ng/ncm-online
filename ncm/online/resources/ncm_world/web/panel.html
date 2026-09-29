@@ -2617,7 +2617,16 @@
       function pdResults(d) {
         if ((d.next || []).length) {
           paddockBody.append(pdEl("div", "pd-section", "NEXT UP"));
-          paddockBody.append(pdTable([["ET", r => r.eastern], ["SERIES", r => r.series], ["ROUTE", r => r.route], ["", r => r.state]], d.next));
+          // phase 5: a race inside its declaration window can be run live on the street (hold, because it spawns a grid)
+          const liveCell = (r) => {
+            if (r.live) return "LIVE · " + r.live;
+            if (!r.canLive) return "";
+            const b = pdEl("button", "pd-act small", "HOLD: RUN IT LIVE");
+            holdAction(b, () => Open77.emit("panel:paddock.live", { raceId: r.raceId }));
+            return b;
+          };
+          paddockBody.append(pdTable([["ET", r => r.eastern], ["SERIES", r => r.series], ["ROUTE", r => r.route], ["", r => r.state], ["", liveCell]], d.next));
+          if ((d.next || []).some(r => r.canLive)) paddockBody.append(pdEl("div", "pd-dim", "A live race spawns the real grid at the start line and runs it on the street. Be there before the lights; if the street run is clean, its result is the result."));
         }
         paddockBody.append(pdEl("div", "pd-section", "RESULTS"));
         paddockBody.append(pdChips([["", "ALL"]].concat((d.series || []).map(s => [s.id, s.name])), d.seriesId || "", (id) => pdAsk({ view: "results", seriesId: id || null })));
@@ -2662,6 +2671,7 @@
         if (d.kind === "org") {
           add("TIER", p.tier); add("SERIES", p.series); add("OWNER", p.owner); add("MANAGER", p.manager);
           add("SPONSORS", (p.sponsors || []).join(", ")); add("FOUNDED", p.founded);
+          if (p.garage) add("GARAGE", p.garage.label + (p.garage.hours ? " · " + p.garage.hours : "") + (p.garage.here ? " · in now" : ""));
         } else {
           add("ROLE", p.role); add("TEAM", p.org); add("FROM", p.region); add("AGE", p.ageBand);
           add("RECORD", (p.wins || 0) + " wins · " + (p.podiums || 0) + " podiums · " + (p.starts || 0) + " starts");
