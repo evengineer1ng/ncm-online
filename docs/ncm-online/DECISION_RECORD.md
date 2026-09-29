@@ -4339,3 +4339,21 @@ model exactly. First-pass values; live test `§HB6`. Tracked by `IDEA-718`.
 **What Baseline 1 is (verified 2026-09-29).** Platform `2.31.13+op77.102` (client `op77.101`), identical on both servers. All 374 files in Online's `resources/ncm` are byte-identical to the working tree at the Baseline 1 commit (git tag `online-baseline-1`). Required mods are `ncm-carrier` 0.1.30 (`d4431422...`), `ncm-rig-bridge` 0.1.7 (`eea1aba6...`) and `ncm-vision` 0.3.0 (`e44ecafa...`), plus ArchiveXL 1.27.1 and TweakXL 1.11.4 in the mod store. Online's `resources.load` also carries `open-voice`.
 
 **Enforced, not only written.** `tools/deploy-staging.ps1` now refuses to change Online without `-ThawOnline`; `-Logs` still works. Reading Online's logs and state remains fine. A thaw is an owner ruling recorded here, never a session's judgement.
+
+**Dev data (owner, 2026-09-29).** The development database keeps its own data and is never seeded from Online. Its population is the owner's account and `ncmtester2`, and that is a deliberate design constraint: if the sim delivers a good experience for one player plus one test account, it has done something good.
+
+## L224 - OWNER RULINGS / PADDOCK - the Paddock plan's decisions confirmed and amended for a life sim
+
+**Owner rulings (2026-09-29).** These answer the questions raised before the Paddock is built on dev (L223). They confirm and amend the attached Paddock plan, whose proposed L210–L214 are reserved by L215. That plan is still not reconciled into `44_THE_PADDOCK.md`, which does not exist yet.
+
+1. **The parallel circuit stays.** NPC organizations and series never share a grid, standing or result with humans. This will be reconsidered only once there is good NPC racing data *and* human data to compare.
+2. **Full scale**: 4 tiers, about 60 organizations and about 150 drivers.
+3. **A daily rhythm replaces flat cadence.** Series race on the real-time clock (L221/L222): **street racing at night, sanctioned racing during the day.** This replaces the plan's flat "every 20–30 min per series, staggered".
+4. **Billie takes bets on NPC races, confirmed.** This amends L172 as the plan proposed: never on a human, never on a human-managed org's drivers, and managers are barred from their own series.
+5. **Build order agreed.** First a sim-only season (results, standings, WIRE); then display-only sightings in the city; then physical-authoritative races that write back when corroborated (L222).
+6. **Paddock people get physical bodies**, whenever it makes sense in the build. **Garages are shared, rented workplaces, not homes.** Teams rent garages for car work; one garage serves several teams at different times of day, with some natural overlap, and double or triple stacking where garage density requires it. Night City's publicly accessible points of interest (about 1,000, including many garages) and the map are going to be a major part of the sim.
+7. **The owner's own code and data may be reused verbatim**, including the FTB name and sponsor generators. The owner holds the copyright in the Radio-OS and oracle-radio engines and grants NCM that use, which settles the rights question for owner-authored sources. Third-party material in those repositories is not covered.
+8. **Managers and street work.** A manager may not manage a second team (the One-Team Rule). Street activity stays free for everyone, managers included.
+9. **No hardcoded cap on shared impact.** How much one player can change should be learned from the sim's behaviour, not guessed as rules in advance. Design the shared transactions so a limit can be added once evidence shows one is needed.
+
+**Boundary.** Direction for the Paddock build on dev. Implementation, schema numbers and live PASS criteria belong in `44_THE_PADDOCK.md` and MASTER_TEST once written. New ideas are `IDEA-735`–`IDEA-737`.
