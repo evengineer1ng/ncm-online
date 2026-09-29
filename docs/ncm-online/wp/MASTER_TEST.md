@@ -2746,3 +2746,17 @@ DEVICES. Joy-Cons paired to Windows before launch. JoyMoCo closed (it would hold
 | §CG12 | Use the Xbox pad normally with the default profile loaded. | Every pad input works once, not twice. | **NOT RUN** |
 | §CG13 | CALIBRATE with both Joy-Cons resting flat. | Banner counts down, then `Calibrated 2 controller(s)`; gyro readouts sit near 0 at rest afterwards. | **NOT RUN** |
 | §CG14 | Regression: FORCE FEEDBACK section, TEST PULSE armed, drive. | FFB exactly as `§CD`: 7/7 effects, LIVE rows move. | **NOT RUN** |
+
+## §CH - The Paddock, phase 1: the season runs (`L224`, `L225`, [44_THE_PADDOCK.md](../44_THE_PADDOCK.md)) - **NOT BUILT; DEV SERVER ONLY (`L223`)**
+
+Scope: `ncm_paddock` phase 1 on the Windows development server with two humans (owner and `ncmtester2`). Cases are written ahead of the build so "done" is defined first; later phases add rows.
+
+| # | Do | Expect | Result |
+|---|---|---|---|
+| §CH1 | Boot dev with `paddockEnabled` on and an empty Paddock. Run `ncm.paddock.status`. | Genesis logs 24/16/12/8 orgs, about 150 drivers and 40 free agents, no denylisted name, and every `ncm_league` subsystem still boots. | **NOT RUN** |
+| §CH2 | Read `ncm.paddock.status` at an Eastern night hour, then at a day hour. | At night only Street series have races scheduled or running; by day, Regional and Pro; the Premier feature sits at 15:00 ET. | **NOT RUN** |
+| §CH3 | Watch one race window close. | The result appears in RESULTS only after the window closes, with provenance `simulated`; nothing leaked before. | **NOT RUN** |
+| §CH4 | Open F6 > PADDOCK > WIRE, STANDINGS, RESULTS and DIRECTORY. | Every view renders; no hidden number appears anywhere; tags appear only with their evidence. | **NOT RUN** |
+| §CH5 | Race a human sanctioned event, then inspect its `session_result` row. | Migration 043's condition columns are stamped from the real weather, wetness and time of day. | **NOT RUN** |
+| §CH6 | Restart `ncm_paddock` mid-race-window. | No duplicate race and no lost result; the replayed race produces the identical order (event-keyed seed). | **NOT RUN** |
+| §CH7 | Leave the server running overnight. | About 45 races in 24 h; Messages received no more Paddock pushes than the budget; quota errors 0. | **NOT RUN** |

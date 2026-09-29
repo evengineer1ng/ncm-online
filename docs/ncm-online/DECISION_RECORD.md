@@ -4357,3 +4357,17 @@ model exactly. First-pass values; live test `§HB6`. Tracked by `IDEA-718`.
 9. **No hardcoded cap on shared impact.** How much one player can change should be learned from the sim's behaviour, not guessed as rules in advance. Design the shared transactions so a limit can be added once evidence shows one is needed.
 
 **Boundary.** Direction for the Paddock build on dev. Implementation, schema numbers and live PASS criteria belong in `44_THE_PADDOCK.md` and MASTER_TEST once written. New ideas are `IDEA-735`–`IDEA-737`.
+
+## L225 - ADOPTED - `44_THE_PADDOCK.md` is the authority for the NPC motorsport world; L210–L214 released
+
+**Owner request (2026-09-29): "paddock design doc please".** The attached Paddock plan, amended by L222 and L224 and re-verified against Baseline 1, becomes [44_THE_PADDOCK.md](44_THE_PADDOCK.md) (CURRENT; the Pace DLL section is SPEC-level). The decision numbers the plan proposed, L210–L214, were reserved by L215 and never written; they are **released unused**, and their substance lives in L224. Numbering is not reused (L68).
+
+**What the doc adds beyond the rulings, as first numbers and tunables, not locked balance:**
+- A daily schedule of 45 races: Street 20:00–04:00 ET, Regional 12:00–20:00, Pro 10:00–18:00, and a Premier feature at 15:00.
+- Pure-core Eastern-time conversion, so the Paddock does not depend on the in-game clock service.
+- A declared seeded calibration baseline that works at two humans.
+- Salience-ranked WIRE with a small daily push budget.
+- Billie's authoring as a phase-2 dependency.
+- Five build phases, and MASTER_TEST §CH.
+
+**Boundary.** Nothing is built. All work is on the development server (L223), and done means a §CH PASS (L69).
