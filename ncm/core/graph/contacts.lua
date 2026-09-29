@@ -116,11 +116,11 @@ Core.define("graph.contacts", function()
           required = { "course", "field", "procedure", "configuration", "session", "start" },
           forbidden = { "lucky", "obsessed", "chassis", "favorite", "myth" },         -- RECOVERED
           blocked = "as Quinn: the pair is one group thread" },
-        { id = "billie", name = "Book Queen Billie", label = "BOOK QUEEN BILLIE", grammar = "referral", authored = false,
+        { id = "billie", name = "Book Queen Billie", label = "BOOK QUEEN BILLIE", grammar = "referral", authored = true,
           domains = { "wagering" },
           required = { "paper", "position", "money", "book", "risk" },
           forbidden = { "chassis", "route to", "poster", "grid is staged" },          -- RECOVERED
-          blocked = "no wagering exists in Online; `L172` narrows it to self-paper only, permanently -- she may never quote a price on another player" },
+          note = "The Paddock's book (doc 44 §9, L224.4 amends L172): paper on NPC races only, never on a person." },
         { id = "fan", name = "#1 Fan", label = "#1 FAN", grammar = "emergent", authored = false,
           domains = { "personal" },
           required = { "that", "you", "saw", "eyes" },

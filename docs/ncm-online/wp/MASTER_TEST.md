@@ -2747,7 +2747,7 @@ DEVICES. Joy-Cons paired to Windows before launch. JoyMoCo closed (it would hold
 | §CG13 | CALIBRATE with both Joy-Cons resting flat. | Banner counts down, then `Calibrated 2 controller(s)`; gyro readouts sit near 0 at rest afterwards. | **NOT RUN** |
 | §CG14 | Regression: FORCE FEEDBACK section, TEST PULSE armed, drive. | FFB exactly as `§CD`: 7/7 effects, LIVE rows move. | **NOT RUN** |
 
-## §CH - The Paddock, phase 1: the season runs (`L224`, `L225`, [44_THE_PADDOCK.md](../44_THE_PADDOCK.md)) - **NOT BUILT; DEV SERVER ONLY (`L223`)**
+## §CH - The Paddock, phases 1-2: the season runs; Billie and the manager (`L224`-`L226`, [44_THE_PADDOCK.md](../44_THE_PADDOCK.md)) - **BUILT, OFFLINE-GREEN; DEV SERVER ONLY (`L223`); AWAITING LIVE PASS**
 
 Scope: `ncm_paddock` phase 1 on the Windows development server with two humans (owner and `ncmtester2`). Cases are written ahead of the build so "done" is defined first; later phases add rows.
 
@@ -2760,3 +2760,12 @@ Scope: `ncm_paddock` phase 1 on the Windows development server with two humans (
 | §CH5 | Race a human sanctioned event, then inspect its `session_result` row. | Migration 043's condition columns are stamped from the real weather, wetness and time of day. | **NOT RUN** |
 | §CH6 | Restart `ncm_paddock` mid-race-window. | No duplicate race and no lost result; the replayed race produces the identical order (event-keyed seed). | **NOT RUN** |
 | §CH7 | Leave the server running overnight. | About 45 races in 24 h; Messages received no more Paddock pushes than the budget; quota errors 0. | **NOT RUN** |
+| §CH8 | Talk to Rico until he offers a book (4 contested races, or ask him about money); pick *Put me in touch*. | Billie's opening arrives in Messages in her voice; `player_contact` has a `billie` row, state `known`. | **NOT RUN** |
+| §CH9 | F6 > PADDOCK > BILLIE'S BOARD within 15 min of a race. | Win, podium and head-to-head lines with prices; no Cancel button anywhere; a driver of a human-managed team shows her refusal and no price. | **NOT RUN** |
+| §CH10 | Write paper on one line (hold to confirm); write it again from a second click of the same slip. | One slip, one `billie_stake` ledger row; the second is a no-op. Over the per-slip cap is refused with her line. | **NOT RUN** |
+| §CH11 | Wait for that race to close. | The slip settles once: a win pays stake x price (`billie_payout`), a loss pays nothing; one solicited message says which. | **NOT RUN** |
+| §CH12 | MY ORG > found a team as the owner. | Fee leaves the wallet; a Street team with two rookies appears in DIRECTORY marked human-run; `team_affiliation` has one active `npc`/`manager` row. | **NOT RUN** |
+| §CH13 | Try to found a second team. | Refused: one team at a time (the unique index, not just the UI). | **NOT RUN** |
+| §CH14 | Offer a free agent a contract; release a driver; invest in a car area; withdraw 1,500 then 1,000. | Roster moves show under *Waiting for the Cup boundary*; development spends at once; the first withdrawal pays 1,050 after tax, the second is refused by the weekly cap. | **NOT RUN** |
+| §CH15 | `ncmtester2`: race a sanctioned event twice for podiums. | Spotlight rises; past 10 a WIRE mention names them; past 25 an NPC star calls them out (one message, an open arc); the next sanctioned result resolves it. | **NOT RUN** |
+| §CH16 | Cross a Cup boundary (or wait a week). | Cup standings archive and a Cup title story; queued manager moves apply; NPC owners make visible signings or firings; no quota error in the log. | **NOT RUN** |

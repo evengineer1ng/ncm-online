@@ -216,9 +216,9 @@ ok(rows.player_contact.dex ~= nil and rows.player_contact.dex.node == "opening",
 ok(rows.budget.open == 1, "an introduction is counted against the §20 budget")
 
 -- An unauthored contact must be refusable even though the scripts mention several.
-ok(NcmGraph.meet(PID, D, "billie", {}) == false, "an unauthored contact must not be openable")
+ok(NcmGraph.meet(PID, D, "quinn", {}) == false, "an unauthored contact must not be openable")
 ok(NcmGraph.meet(PID, D, "nobody", {}) == false, "an unknown contact must not be openable")
-ok(select(2, NcmGraph.meet(PID, D, "billie", {})) == "not_authored", "and must say why")
+ok(select(2, NcmGraph.meet(PID, D, "quinn", {})) == "not_authored", "and must say why")
 
 -- ==========================================================================================================
 -- 2. §20 rule 1: a second introduction cannot land while the first is unanswered.

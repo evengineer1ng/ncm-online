@@ -31,8 +31,9 @@
 --   * **`L171` / §A.4.** Dex still does not recite a market count. His authored line -- *"Yes. Most don't
 --     advertise to everybody. You'll hear things, find things, meet people"* -- is preserved exactly, because
 --     the appendix judged it exactly right. The Market UI discloses the roster's shape; Dex does not.
---   * **`L172` / §A.4.** Rico may introduce Billie as *"a book"*, and nothing here quotes a price on a human or
---     implies a winner board. Billie is self-paper only, permanently, and she is not authored yet anyway.
+--   * **`L172` as amended by `L224.4` / §A.4.** Rico may introduce Billie as *"a book"*, and nothing he says quotes
+--     a price or implies a winner board. Billie is authored (doc 44 §9): she writes paper on the NPC Paddock and
+--     NEVER on a person -- not another player, not a human-managed team's driver.
 local Core = NcmCore
 
 Core.define("graph.opening", function()
@@ -545,8 +546,8 @@ Core.define("graph.opening", function()
                 choices = { { id = "back", label = "Charming.", to = "top" } },
             },
 
-            -- §5.4 -> Billie. Eligibility is race and money history, which the host evaluates; `L172` means
-            -- nothing here promises a market on other drivers, and Billie is a lead until she is authored.
+            -- §5.4 -> Billie. Eligibility is race and money history, which the host evaluates. Rico makes the
+            -- introduction; Billie's own thread (below) says what she writes paper on, and what she never will.
             billie_open = {
                 intent = "offer",
                 say = { "You ever bet on yourself?" },
@@ -567,7 +568,7 @@ Core.define("graph.opening", function()
                 choices = {
                     { id = "who", label = "Who's running it?", to = "billie_who" },
                     { id = "touch", label = "Put me in touch.", to = "billie_sent",
-                      effect = "lead:person:billie" },
+                      effect = "open:billie" },
                     { id = "no", label = "Not interested.", to = "billie_declined",
                       set = { billieDeferred = true } },
                 },
@@ -579,7 +580,7 @@ Core.define("graph.opening", function()
                 },
                 choices = {
                     { id = "touch", label = "Put me in touch.", to = "billie_sent",
-                      effect = "lead:person:billie" },
+                      effect = "open:billie" },
                     { id = "no", label = "Not interested.", to = "billie_declined",
                       set = { billieDeferred = true } },
                 },
@@ -683,9 +684,64 @@ Core.define("graph.opening", function()
         },
     }
 
+    -- ---- BookQueen Billie (doc 44 §9, L224.4, L226) ------------------------------------------------------
+    -- Introduced by Rico ("I know a book"). Her board is the Paddock's: NPC races only. The voice rule from the
+    -- archaeology (IV.7) holds: positions and paper, never "bets", and no Cancel button anywhere. Her refusal to
+    -- write paper on a person is the lore of the design, stated in her own words rather than as a rule card.
+    M.billie = {
+        contact = "billie",
+        entry = "opening",
+        nodes = {
+            opening = {
+                intent = "introduction",
+                say = {
+                    "Rico said your name. He says a lot of names.",
+                    "I run a book on the Paddock. The teams nobody you know drives for. I take positions; you take paper.",
+                    "Never on people who breathe your air. A human at the wheel is a risk I don't write.",
+                },
+                choices = {
+                    { id = "how", label = "How does it work?", to = "how" },
+                    { id = "why", label = "Why not on people?", to = "why_not" },
+                    { id = "later", label = "Later.", to = "top" },
+                },
+            },
+            how = {
+                say = {
+                    "Every Paddock race goes on the board fifteen minutes out. Win, top three, or one driver over another.",
+                    "You pick a price, you sign the paper, the money moves when the race does. I don't do cancellations.",
+                },
+                choices = { { id = "back", label = "Understood.", to = "top" } },
+            },
+            why_not = {
+                say = {
+                    "Because the minute I put money on a person, two of you get together and the race stops being a race.",
+                    "The Paddock drivers don't know I exist. That makes them the only honest money in Night City.",
+                },
+                choices = { { id = "back", label = "Fair.", to = "top" } },
+            },
+            top = {
+                shelf = true,
+                say = { "Billie. Make it quick, the book is open." },
+                choices = {
+                    { id = "board", label = "What's on the board?", to = "a_board" },
+                    { id = "tips", label = "Any tips?", to = "a_tips" },
+                    { id = "how", label = "How does the paper work again?", to = "how" },
+                },
+            },
+            a_board = {
+                say = { "Look at the board, not at me. Weather moves a price before I do." },
+                choices = { { id = "back", label = "Right.", to = "top" } },
+            },
+            a_tips = {
+                say = { "A tip is a position somebody else already took. Find your own risk." },
+                choices = { { id = "back", label = "Noted.", to = "top" } },
+            },
+        },
+    }
+
     -- ---- registry ------------------------------------------------------------------------------------
 
-    local SCRIPTS = { dex = M.dex, stu = M.stu, rico = M.rico }
+    local SCRIPTS = { dex = M.dex, stu = M.stu, rico = M.rico, billie = M.billie }
 
     function M.script(contactId) return SCRIPTS[tostring(contactId or "")] end
 

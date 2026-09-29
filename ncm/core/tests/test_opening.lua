@@ -33,12 +33,12 @@ cases.no_two_authored_contacts_sound_the_same = function(T)
     for _, id in ipairs(O.contacts()) do bundles[id] = C.lines(O.script(id)) end
     local ok, over, measured = C.distinct(bundles)
     T.ok(ok, "converged: " .. table.concat(over or {}, " | "))
-    T.eq(#measured, 3, "three authored contacts is three pairs")
+    T.eq(#measured, 6, "four authored contacts is six pairs")
 end
 
 cases.every_authored_contact_has_a_script_and_vice_versa = function(T)
     local scripted = O.contacts()
-    T.eq(table.concat(scripted, ","), "dex,rico,stu")
+    T.eq(table.concat(scripted, ","), "billie,dex,rico,stu")
     -- The registry and the scripts must not drift apart: a contact marked authored with no script would be
     -- offered to a player and then say nothing.
     for _, id in ipairs(Contacts.ids(true)) do
@@ -273,6 +273,22 @@ cases.rico_never_prices_a_human = function(T)
     for _, banned in ipairs({ "odds", "favourite", "favorite", "price on", "back the" }) do
         T.falsy(all:find(banned, 1, true), "Rico must never say '" .. banned .. "' (`L172`)")
     end
+end
+
+cases.billie_never_writes_paper_on_a_person = function(T)
+    -- `L224.4` amends `L172`: Billie takes positions on the NPC Paddock and never on a person. Her own copy says
+    -- so, and must never offer the things the archaeology forbade (IV.7: no "Cancel Bet", no winner board).
+    local all = table.concat(C.lines(O.billie), " "):lower()
+    T.ok(all:find("never on people", 1, true), "Billie states her line in her own words")
+    for _, banned in ipairs({ "cancel bet", "bet on", "winner board", "chassis" }) do
+        T.falsy(all:find(banned, 1, true), "Billie must never say '" .. banned .. "'")
+    end
+    local ok, breaches = C.audit(O.billie)
+    T.ok(ok, "Billie's script passes the voice audit: " .. table.concat(breaches or {}, " | "))
+    -- Rico's introduction now OPENS her; it no longer stops at a lead.
+    local opened = false
+    for _, ch in ipairs(O.rico.nodes.billie_book.choices) do if ch.effect == "open:billie" then opened = true end end
+    T.ok(opened, "Rico's 'Put me in touch' opens Billie")
 end
 
 cases.the_billie_offer_needs_a_history_and_respects_a_deferral = function(T)

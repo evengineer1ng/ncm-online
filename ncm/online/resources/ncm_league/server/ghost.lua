@@ -102,6 +102,7 @@ function NcmGhost.store(manifest, wire)
         log("store REFUSED ghost=%s: %s", tostring(manifest.ghostId), tostring(err))
         return nil, "insert_failed"
     end
+    if NcmWeather and NcmWeather.stamp then NcmWeather.stamp("ghost", manifest.ghostId, manifest.runStartedAt) end   -- schema 043
     log("stored ghost=%s driver=%s route=%s %dms poses=%d %d bytes record=%s",
         manifest.ghostId, manifest.driverId, manifest.routeId, manifest.elapsedMs, manifest.poseCount,
         #encoded, tostring(manifest.record))

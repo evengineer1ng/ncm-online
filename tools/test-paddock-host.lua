@@ -1,0 +1,523 @@
+-- The Paddock's server half (`ncm/online/resources/ncm_paddock`, doc 44) run against deterministic doubles.
+--
+-- Core rules are proved by ncm/core/tests/test_paddock_*.lua. What is only provable HERE is the host:
+--   * genesis, persistence and reload round-trip through the store
+--   * a race goes scheduled -> priced -> running -> resolved, and a RUNNING race never shows a result
+--   * Billie's lines refuse a human-managed org's drivers; a slip debits once, pays once, and settles idempotently
+--   * founding a team takes the fee and the One-Team Rule refuses a second team
+--   * withdrawals respect the weekly cap and the tax
+--   * no file in ncm_paddock calls another resource's globals (they are separate VMs; ncm-stub would hide it)
+--   * the wallet's balance-lock statements are the same shape as economy.lua's
+--   * no handler slice runs more VM instructions than the quota headroom allows (KB-211)
+local root = arg[1] or "."
+local RES = root .. "/ncm/online/resources/"
+local passed = 0
+local realPrint = print
+local logs = {}
+local function check(label, value)
+    if not value then
+        realPrint("  FAIL " .. label)
+        for i = math.max(1, #logs - 30), #logs do realPrint("    log| " .. logs[i]) end
+        error(label, 0)
+    end
+    passed = passed + 1
+    realPrint("  PASS " .. label)
+end
+
+-- ---------------------------------------------------------------- host doubles
+local events, queue, replies, commands = {}, {}, {}, {}
+function AddEventHandler(name, fn) events[name] = fn end
+function RegisterNetEvent(name, fn) events[name] = fn end
+function RegisterCommand(name, fn) commands[name] = fn end
+function CreateThread(fn) queue[#queue + 1] = coroutine.create(fn) end
+function Wait(ms) coroutine.yield(ms) end
+function TriggerClientEvent(name, pid, body) replies[#replies + 1] = { name = name, pid = pid, body = body } end
+function print(s) logs[#logs + 1] = tostring(s) end
+function GetPlayerIdentifier(pid) return "user:" .. tostring(pid) end
+function GetPlayerName(pid) return "Player" .. tostring(pid) end
+function GetPlayers() return { 1, 2 } end
+function GetCurrentResourceName() return "ncm_paddock" end
+
+local clock = 1790000000
+Open77 = {
+    time = { unix = function() return clock end },
+    tunables = { declare = function(spec) local p = {} for k, v in pairs(spec) do p[k] = v.value end return p end },
+    notifications = { send = function() return true end },
+}
+
+-- Instruction metering: the most VM instructions any coroutine ran between two yields.
+local maxSlice, slice = 0, 0
+local function hook() slice = slice + 1000 end
+local function resumeMetered(co)
+    slice = 0
+    debug.sethook(co, hook, "", 1000)
+    local ok, err = coroutine.resume(co)
+    if slice > maxSlice then maxSlice = slice end
+    return ok, err
+end
+
+local function drain(limit, untilFn)
+    local guard = 0
+    while #queue > 0 and guard < (limit or 200000) and not (untilFn and untilFn()) do
+        guard = guard + 1
+        local co = table.remove(queue, 1)
+        local ok, err = resumeMetered(co)
+        assert(ok, err)
+        if coroutine.status(co) ~= "dead" then queue[#queue + 1] = co end
+    end
+end
+
+local function run(fn)
+    local co = coroutine.create(fn)
+    local ok, err = resumeMetered(co)
+    assert(ok, err)
+    while coroutine.status(co) ~= "dead" do
+        ok, err = resumeMetered(co)
+        assert(ok, err)
+    end
+end
+
+local function fire(name, pid, ...)
+    source = pid
+    local args = { ... }
+    run(function() events[name]((table.unpack or unpack)(args)) end)
+    drain()
+end
+
+-- ---------------------------------------------------------------- a database double for the Paddock tables
+local DB = {
+    world = nil, series = {}, org = {}, person = {}, sponsor = {}, race = {}, result = {}, line = {}, slip = {},
+    ledger = {}, idem = {}, affiliation = {}, treasury = {}, tidem = {}, event = {}, news = {}, message = {}, push = {},
+    contact = { ["driver-1"] = true, ["driver-2"] = true },
+}
+local function ledgerTotal(d) local s = 0 for _, r in ipairs(DB.ledger) do if r.d == d then s = s + r.amount end end return s end
+local function ledgerAdd(d, kind, amount, idem)
+    if idem and DB.idem[idem] then return false end
+    if idem then DB.idem[idem] = true end
+    DB.ledger[#DB.ledger + 1] = { d = d, kind = kind, amount = amount, idem = idem }
+    return true
+end
+local function activeAff(d) for _, a in ipairs(DB.affiliation) do if a.d == d and not a.to then return a end end end
+local function has(q, s) return q:find(s, 1, true) ~= nil end
+
+local function exec(q, v)
+    v = v or {}
+    if has(q, "INTO paddock_world") then
+        DB.world = { server_id = v[1], seed = v[2], genesis_version = v[3], genesis_season = v[4], season_id = v[5],
+            season_ordinal = v[6], paddock_year = v[7], day_index_applied = v[8], cup_id = v[9], counters_json = v[10], created_at = v[11] }
+    elseif has(q, "INTO paddock_series") then
+        DB.series[v[2]] = { series_id = v[2], tier = v[3], division = v[4], name = v[5] }
+    elseif has(q, "INTO paddock_org") then
+        local keys = { "server_id", "org_id", "tier", "series_id", "name", "short", "colour", "prestige", "cash", "facility", "car_json",
+            "owner_person_id", "manager_person_id", "engineer_person_id", "strategist_person_id", "sponsor_ids", "human_manager_driver_id",
+            "origin", "lifecycle", "founded_season", "seasons_active", "red_days", "low_cash_days", "evidence_json", "pending_json", "folded_at" }
+        local r = {}
+        for i, k in ipairs(keys) do r[k] = v[i] end
+        for _, k in ipairs({ "owner_person_id", "manager_person_id", "engineer_person_id", "strategist_person_id", "human_manager_driver_id" }) do
+            if r[k] == "" then r[k] = nil end
+        end
+        DB.org[r.org_id] = r
+    elseif has(q, "INTO paddock_person") then
+        local keys = { "server_id", "person_id", "role", "org_id", "seat", "first", "last", "display", "region", "gender", "birth_year",
+            "attrs_json", "personality_json", "principal_json", "morale", "state", "wage", "contract_ends", "evidence_json" }
+        local r = {}
+        for i, k in ipairs(keys) do r[k] = v[i] end
+        if r.org_id == "" then r.org_id = nil end
+        if r.seat == "" then r.seat = nil end
+        DB.person[r.person_id] = r
+    elseif has(q, "INTO paddock_sponsor") then
+        DB.sponsor[v[2]] = { sponsor_id = v[2], name = v[3], short = v[4], industry = v[5], tier = v[6], personality_json = v[7],
+            org_id = v[8] ~= "" and v[8] or nil, per_day = v[9] }
+    elseif has(q, "INSERT IGNORE INTO paddock_race") then
+        if not DB.race[v[2]] then
+            DB.race[v[2]] = { race_id = v[2], series_id = v[3], tier = v[4], season_id = v[5], cup_id = v[6], route_id = v[7],
+                window_opens_at = v[8], state = "scheduled", seed = v[9], seed_commit = v[10] }
+        end
+    elseif has(q, "UPDATE paddock_race SET state = 'running'") then
+        local r = DB.race[v[11]]
+        r.state, r.window_closes_at, r.weather, r.road_wetness, r.light, r.detail_json = "running", v[1], v[2], v[3], v[5], v[9]
+    elseif has(q, "UPDATE paddock_race SET state = 'priced'") then
+        local r = DB.race[v[2]]
+        if r and r.state == "scheduled" then r.state = "priced" end
+    elseif has(q, "UPDATE paddock_race SET state = 'resolved'") then
+        DB.race[v[3]].state = "resolved"
+    elseif has(q, "UPDATE paddock_race SET detail_json") then
+        if DB.race[v[3]] then DB.race[v[3]].detail_json = v[1] end
+    elseif has(q, "INTO paddock_result") then
+        DB.result[#DB.result + 1] = { race_id = v[2], person_id = v[3], org_id = v[4], series_id = v[5], season_id = v[6], cup_id = v[7],
+            position = v[8], grid = v[9], state = v[10], finish_ms = v[11], gap_ms = v[12], points = v[13], purse = v[14], dnf_reason = v[15] }
+    elseif has(q, "INTO paddock_line") then
+        DB.line[v[2]] = { line_id = v[2], race_id = v[3], market = v[4], subject_a = v[5], subject_b = v[6] ~= "" and v[6] or nil,
+            prob = v[7], price = v[8], version = 1, refused = v[9], state = v[10] }
+    elseif has(q, "UPDATE paddock_line SET state = 'closed'") then
+        for _, l in pairs(DB.line) do if l.race_id == v[2] and (l.state == "open" or l.state == "suspended") then l.state = "closed" end end
+    elseif has(q, "UPDATE paddock_line SET state = 'settled'") then
+        for _, l in pairs(DB.line) do if l.race_id == v[2] then l.state = "settled" end end
+    elseif has(q, "INSERT IGNORE INTO ledger") and has(q, "WHERE (SELECT COALESCE(SUM(amount),0)") then
+        if ledgerTotal(v[1]) >= v[10] then ledgerAdd(v[1], v[3], v[4], v[7]) end
+    elseif has(q, "INSERT IGNORE INTO ledger") then
+        ledgerAdd(v[1], v[3], v[4], v[7])
+    elseif has(q, "INTO paddock_slip") then
+        if DB.idem[v[15]] then
+            DB.slip[v[1]] = { slip_id = v[1], idem_key = v[2], ncm_driver_id = v[4], race_id = v[5], line_id = v[6], market = v[7],
+                subject_a = v[8], subject_b = v[9], line_version = v[10], stake = v[11], price = v[12], potential = v[13], placed_at = v[14],
+                state = "open", payout = 0 }
+        end
+    elseif has(q, "UPDATE paddock_slip SET state") then
+        local s = DB.slip[v[4]]
+        if s and s.state == "open" then s.state, s.payout = v[1], v[2] end
+    elseif has(q, "INTO team_affiliation") and has(q, "WHERE EXISTS") then
+        if DB.idem[v[6]] then
+            if activeAff(v[3]) then error("Duplicate entry for key 'ux_one_team'") end
+            DB.affiliation[#DB.affiliation + 1] = { d = v[3], org = v[4], circuit = "npc", role = "manager" }
+        end
+    elseif has(q, "INTO team_affiliation") then
+        if activeAff(v[3]) then error("Duplicate entry for key 'ux_one_team'") end
+        DB.affiliation[#DB.affiliation + 1] = { d = v[3], org = v[4], circuit = "npc", role = "manager" }
+    elseif has(q, "UPDATE team_affiliation SET effective_to") then
+        for _, a in ipairs(DB.affiliation) do if a.d == v[4] and not a.to then a.to = v[1] end end
+    elseif has(q, "INTO paddock_treasury") then
+        local idem = has(q, "'withdrawal'") and v[4] or (has(q, "'deposit'") and v[4] or v[5])
+        if not DB.tidem[idem] then
+            DB.tidem[idem] = true
+            local kind = has(q, "'withdrawal'") and "withdrawal" or (has(q, "'deposit'") and "deposit" or v[3])
+            local amount = has(q, "'withdrawal'") and v[3] or (has(q, "'deposit'") and v[3] or v[4])
+            DB.treasury[#DB.treasury + 1] = { org = v[2], kind = kind, amount = amount, at = clock }
+        end
+    elseif has(q, "INTO paddock_event") then
+        DB.event[v[2]] = { event_id = v[2], kind = v[5], facts = v[9] }
+    elseif has(q, "INTO paddock_news") then
+        DB.news[v[2]] = { story_id = v[2], at = v[4], kind = v[5], headline = v[7], body = v[8], prominence = v[9] }
+    elseif has(q, "INTO message") then
+        DB.message[#DB.message + 1] = { to = v[3], subject = v[6] }
+    end
+    return 1
+end
+
+MySQL = {
+    isReady = function() return true end,
+    transaction = { await = function(list)
+        for _, st in ipairs(list) do
+            local ok, err = pcall(exec, st.query, st.values)
+            if not ok then return false, err end
+        end
+        return true
+    end },
+    update = { await = function(q, v) return exec(q, v) end },
+    insert = { await = function(q, v) return exec(q, v) end },
+    scalar = { await = function(q, v)
+        if has(q, "MAX(version) FROM schema_migrations") then return 50 end
+        if has(q, "FROM ncm_driver_binding") then return 2 end
+        if has(q, "SUM(amount),0) FROM ledger") then return ledgerTotal(v[1]) end
+        if has(q, "COUNT(*) FROM ledger WHERE idem_key") then return DB.idem[v[1]] and 1 or 0 end
+        if has(q, "SUM(stake)") then local s = 0 for _, x in pairs(DB.slip) do if x.ncm_driver_id == v[2] then s = s + x.stake end end return s end
+        if has(q, "SELECT price FROM paddock_line") then return DB.line[v[2]] and DB.line[v[2]].price end
+        if has(q, "kind = 'withdrawal'") then local s = 0 for _, t in ipairs(DB.treasury) do if t.org == v[2] and t.kind == "withdrawal" then s = s + t.amount end end return s end
+        if has(q, "SELECT count FROM paddock_push") then return 0 end
+        if has(q, "SELECT display FROM driver_profile") then return "Human " .. tostring(v[1]) end
+        if has(q, "SELECT detail_json FROM paddock_race") then return DB.race[v[2]] and DB.race[v[2]].detail_json end
+        return 0
+    end },
+    single = { await = function(q, v)
+        if has(q, "FROM paddock_world") then return DB.world end
+        if has(q, "FROM ncm_driver_binding") then return { ncm_driver_id = "driver-" .. tostring(v[2]):match("(%d+)$"), display = "Human" } end
+        if has(q, "FROM player_contact") then return DB.contact[v[1]] and { state = "known" } or nil end
+        if has(q, "FROM paddock_line WHERE server_id = ? AND line_id") then return DB.line[v[2]] end
+        if has(q, "FROM paddock_slip WHERE idem_key") then for _, s in pairs(DB.slip) do if s.idem_key == v[1] then return s end end return nil end
+        if has(q, "FROM team_affiliation") then local a = activeAff(v[2]) return a and { circuit = a.circuit, role = a.role } or nil end
+        if has(q, "FROM paddock_race WHERE server_id = ? AND race_id") then return DB.race[v[2]] end
+        return nil
+    end },
+    query = { await = function(q, v)
+        local out = {}
+        if has(q, "FROM paddock_series") then for _, r in pairs(DB.series) do out[#out + 1] = r end
+        elseif has(q, "FROM paddock_org") then for _, r in pairs(DB.org) do out[#out + 1] = r end table.sort(out, function(a, b) return a.org_id < b.org_id end)
+        elseif has(q, "FROM paddock_person") then for _, r in pairs(DB.person) do out[#out + 1] = r end table.sort(out, function(a, b) return a.person_id < b.person_id end)
+        elseif has(q, "FROM paddock_sponsor") then for _, r in pairs(DB.sponsor) do out[#out + 1] = r end table.sort(out, function(a, b) return a.sponsor_id < b.sponsor_id end)
+        elseif has(q, "FROM weather_transition") then
+            out = { { starts_at_utc = clock - 7200, weather = "sunny" }, { starts_at_utc = clock + 86400 * 3, weather = "rain" } }
+        elseif has(q, "FROM paddock_result WHERE server_id = ? AND race_id") then
+            for _, r in ipairs(DB.result) do if r.race_id == v[2] then out[#out + 1] = r end end
+            table.sort(out, function(a, b) return a.position < b.position end)
+        elseif has(q, "FROM paddock_slip WHERE server_id = ? AND race_id") then
+            for _, s in pairs(DB.slip) do if s.race_id == v[2] and s.state == "open" then out[#out + 1] = s end end
+        elseif has(q, "FROM paddock_line WHERE server_id = ? AND race_id") then
+            for _, l in pairs(DB.line) do if l.race_id == v[2] then out[#out + 1] = l end end
+        elseif has(q, "FROM paddock_news") then
+            for _, n in pairs(DB.news) do if n.prominence >= v[2] then out[#out + 1] = n end end
+        elseif has(q, "FROM paddock_race r LEFT JOIN paddock_result") then
+            for _, r in pairs(DB.race) do
+                if r.state == "resolved" then
+                    local winner
+                    for _, x in ipairs(DB.result) do if x.race_id == r.race_id and x.position == 1 then winner = x end end
+                    out[#out + 1] = { race_id = r.race_id, series_id = r.series_id, route_id = r.route_id, window_opens_at = r.window_opens_at,
+                        weather = r.weather, light = r.light, road_wetness = r.road_wetness, provenance = "simulated", seed_commit = r.seed_commit,
+                        winner = winner and winner.person_id, winner_org = winner and winner.org_id }
+                end
+            end
+        elseif has(q, "GROUP BY") and has(q, "FROM paddock_result") then
+            local col = has(q, "org_id AS id") and "org_id" or "person_id"
+            local by, list = {}, {}
+            for _, r in ipairs(DB.result) do
+                if r.season_id == v[2] and r.series_id == v[3] then
+                    local id = r[col]
+                    local s = by[id]
+                    if not s then s = { id = id, points = 0, wins = 0, podiums = 0, starts = 0, dnfs = 0, best = 99 }; by[id] = s; list[#list + 1] = s end
+                    s.points = s.points + r.points; s.starts = s.starts + 1
+                    if r.state == "finished" then
+                        if r.position == 1 then s.wins = s.wins + 1 end
+                        if r.position <= 3 then s.podiums = s.podiums + 1 end
+                    else s.dnfs = s.dnfs + 1 end
+                end
+            end
+            table.sort(list, function(a, b) if a.points ~= b.points then return a.points > b.points end return a.id < b.id end)
+            out = list
+        end
+        return out
+    end },
+}
+
+-- ---------------------------------------------------------------- load the resource the way the host does
+local function loadResource(name)
+    NcmCore = nil
+    local text = assert(io.open(RES .. name .. "/open77.lua")):read("a")
+    for kind, path in text:gmatch('(%w+_script)%s+"([^"]+)"') do
+        if kind ~= "client_script" then assert(loadfile(RES .. name .. "/" .. path))() end
+    end
+end
+math.randomseed(7)
+loadResource("ncm_paddock")
+
+realPrint("paddock host harness")
+
+-- ---------------------------------------------------------------- static checks
+do
+    local offenders = {}
+    for _, f in ipairs({ "settings", "util", "store", "players", "stream", "wallet", "story", "world", "calibration", "races",
+        "billie", "life", "manager", "spotlight", "views", "requests", "admin", "main" }) do
+        local text = assert(io.open(RES .. "ncm_paddock/server/" .. f .. ".lua")):read("a")
+        text = text:gsub("%-%-[^\n]*", "")   -- code only: comments may name the resource they mirror
+        for g in text:gmatch("(Ncm%u%a+)%.") do
+            if g ~= "NcmCore" then offenders[#offenders + 1] = f .. ":" .. g end
+        end
+    end
+    check("no ncm_paddock file calls another resource's globals (" .. table.concat(offenders, ",") .. ")", #offenders == 0)
+    local econ = assert(io.open(RES .. "ncm_league/server/economy.lua")):read("a")
+    check("the wallet's balance-lock INSERT matches economy.lua", has(econ, "INSERT IGNORE INTO economy_balance_lock (server_id,ncm_driver_id,revision) VALUES (?,?,0)"))
+    check("the wallet's balance-lock UPDATE matches economy.lua", has(econ, "UPDATE economy_balance_lock SET revision=revision+1 WHERE server_id=? AND ncm_driver_id=?"))
+    local lockTx = PaddockWallet.withBalanceLocks({}, { "b", "a", "a" })
+    check("locks are deduplicated and sorted like economy.lua", #lockTx == 4 and lockTx[1].values[2] == "a" and lockTx[2].values[2] == "b")
+end
+
+-- ---------------------------------------------------------------- boot: genesis
+-- boot runs inside the resource's forever-loop thread: drive it until the world is ready, then drop it (the
+-- harness calls the scheduler's pieces itself so each step can be asserted)
+drain(400000, function() return PaddockWorld.ready and PaddockStore.world ~= nil and next(DB.news) ~= nil end)
+queue = {}
+check("genesis ran and the world is ready", PaddockWorld.ready and PaddockStore.world ~= nil)
+local W = PaddockStore.world
+check("60 organizations and their people exist", #W.orgOrder == 60 and #W.personOrder > 400)
+local persisted = 0
+for _ in pairs(DB.org) do persisted = persisted + 1 end
+check("every org was persisted", persisted == 60)
+check("genesis wrote a founding story", next(DB.news) ~= nil)
+
+-- reload round-trip: the store reads back what it wrote
+do
+    local copy = PaddockStore.load and nil
+    run(function() PaddockStore.flush(); copy = PaddockStore.load() end)
+    check("reloaded world has the same orgs and names", copy and #copy.orgOrder == 60 and copy.orgs.o001.name == W.orgs.o001.name
+        and copy.people.p00001.display == W.people.p00001.display and copy.seed == W.seed)
+    local did
+    for _, pid in ipairs(W.personOrder) do if W.people[pid].role == "driver" then did = pid break end end
+    check("hidden attributes survive the round trip (" .. did .. ")", copy.people[did].attrs and math.abs(copy.people[did].attrs.pace - W.people[did].attrs.pace) < 0.001)
+end
+
+-- ---------------------------------------------------------------- a race's life
+local Season = NcmCore.get("paddock.season")
+local Clock = NcmCore.get("world.clock")
+-- 14:50 Eastern: the Premier feature at 15:00 is ten minutes out, inside Billie's window
+local day = Clock.eastern(clock).dayIndex
+clock = Clock.utcAt(day, 14 * 3600 + 50 * 60)
+local premierId = Season.raceId("premier", Clock.utcAt(day, 15 * 3600))
+W.orgs.o061 = nil
+-- make one premier org human-managed so Billie must refuse its drivers
+local humanOrg
+for _, oid in ipairs(W.orgOrder) do if W.orgs[oid].seriesId == "premier" then humanOrg = W.orgs[oid]; break end end
+humanOrg.humanManagerDriverId = "driver-9"
+run(function() PaddockRaces.materialise(clock) end)
+check("the Premier feature was materialised", PaddockRaces.byId[premierId] ~= nil and DB.race[premierId] ~= nil)
+local race = PaddockRaces.byId[premierId]
+check("a race is committed to a seed before it opens", #race.commit == 8 and DB.race[premierId].seed_commit == race.commit)
+
+maxSlice = 0
+local t0 = os.clock()
+run(function() PaddockBillie.price(race) end)
+local pricingSec = os.clock() - t0
+check(("pricing one race takes under 1.5 s (%.2f s)"):format(pricingSec), pricingSec < 1.5)
+check(("no pricing slice exceeds 400k VM instructions (max %d)"):format(maxSlice), maxSlice < 400000)
+check("the race is on the board", race.state == "priced" and DB.race[premierId].state == "priced")
+local lines, refused, open = 0, 0, 0
+for _, l in pairs(DB.line) do
+    if l.race_id == premierId then
+        lines = lines + 1
+        local p = W.people[l.subject_a]
+        if p.orgId == humanOrg.id then check("a human-managed driver's line is refused: " .. l.line_id, l.refused == 1 and l.price == nil) end
+        if l.refused == 1 then refused = refused + 1 end
+        if l.state == "open" then open = open + 1 end
+    end
+end
+check("win, podium and head-to-head lines were written", lines > 20 and open > 10 and refused >= 4)
+
+-- a slip on an NPC-run favourite
+DB.ledger = {}; DB.idem = {}
+ledgerAdd("driver-1", "starter", 1000, "seed:1")
+local line
+for _, l in pairs(DB.line) do
+    if l.race_id == premierId and l.market == "win" and l.state == "open" and (not line or l.price < line.price) then line = l end
+end
+fire("ncm:paddock.slip", 1, { lineId = line.line_id, version = 1, stake = 100, idem = "abc" })
+local slipCount = 0
+for _ in pairs(DB.slip) do slipCount = slipCount + 1 end
+check("a slip was written and the stake debited", slipCount == 1 and ledgerTotal("driver-1") == 900)
+fire("ncm:paddock.slip", 1, { lineId = line.line_id, version = 1, stake = 100, idem = "abc" })
+local slipCount2 = 0
+for _ in pairs(DB.slip) do slipCount2 = slipCount2 + 1 end
+check("the same slip twice is one slip and one debit", slipCount2 == 1 and ledgerTotal("driver-1") == 900)
+clock = clock + 1
+fire("ncm:paddock.slip", 1, { lineId = line.line_id, version = 1, stake = 5000, idem = "big" })
+check("over the slip cap is refused", ledgerTotal("driver-1") == 900)
+local refusedLine
+for _, l in pairs(DB.line) do if l.race_id == premierId and l.refused == 1 then refusedLine = l end end
+clock = clock + 1
+fire("ncm:paddock.slip", 1, { lineId = refusedLine.line_id, version = 1, stake = 50, idem = "ref" })
+check("a slip on a refused line is refused", ledgerTotal("driver-1") == 900)
+local lastResult
+for _, r in ipairs(replies) do if r.name == "ncm:paddock.result" then lastResult = r.body end end
+check("Billie answered in her own words", lastResult and not lastResult.ok and lastResult.text == PaddockBillie.REFUSAL)
+
+-- the window opens: the sim runs, but the result is sealed
+clock = race.opensAt
+maxSlice = 0
+-- one run per tick by design (a backlog drains across ticks); other series open at 15:00 too
+for _ = 1, 6 do
+    if race.state == "running" then break end
+    run(function() PaddockRaces.tick(clock) end)
+end
+check("the race is running with results stored", race.state == "running" and #DB.result > 0)
+check(("a race run fits one slice (max %d instructions)"):format(maxSlice), maxSlice < 400000)
+local box
+run(function() box = PaddockViews.box(1, { raceId = premierId }) end)
+check("a RUNNING race never shows its result", box.error == "not_resolved" and #box.rows == 0)
+local res
+run(function() res = PaddockViews.results(1, {}) end)
+local leaked = false
+for _, r in ipairs(res.rows) do if r.raceId == premierId then leaked = true end end
+check("and is not in RESULTS", not leaked)
+local lineClosed = true
+for _, l in pairs(DB.line) do if l.race_id == premierId and l.state == "open" then lineClosed = false end end
+check("the board closed when the window opened", lineClosed)
+
+-- the window closes: public, settled
+clock = race.closesAt + 1
+for _ = 1, 8 do
+    if race.state == "resolved" then break end
+    run(function() PaddockRaces.tick(clock) end)
+end
+check("the race resolved", DB.race[premierId].state == "resolved")
+local slip = next(DB.slip) and DB.slip[next(DB.slip)]
+check("the slip settled", slip.state == "won" or slip.state == "lost")
+local after = ledgerTotal("driver-1")
+check("a winning slip pays stake times price, a losing one pays nothing",
+    (slip.state == "won" and after == 900 + math.floor(100 * slip.price)) or (slip.state == "lost" and after == 900))
+run(function() PaddockBillie.settle(race, {}) end)
+check("settling again pays nothing more", ledgerTotal("driver-1") == after)
+run(function() box = PaddockViews.box(1, { raceId = premierId }) end)
+check("the box score is public now", #box.rows > 0 and box.rows[1].pos == 1)
+local story = false
+for _, e in pairs(DB.event) do if e.event_id == "race_result:" .. premierId then story = true end end
+check("the result is on the tape", story)
+
+-- every view passes the hidden-key guard, inside the quota
+maxSlice = 0
+for _, view in ipairs({ "wire", "standings", "results", "pace", "directory", "board", "myorg" }) do
+    replies = {}
+    logs = {}
+    fire("ncm:paddock.request", 2, { view = view })
+    clock = clock + 1
+    local begun = false
+    for _, r in ipairs(replies) do if r.name == "ncm:paddock.stream.begin" then begun = r.body.head.error == nil end end
+    local refusedLog = false
+    for _, l in ipairs(logs) do if l:find("REFUSED") or l:find("FAILED") then refusedLog = l end end
+    check("view " .. view .. " streams without a hidden key or error" .. (refusedLog and (": " .. refusedLog) or ""), begun and not refusedLog)
+end
+fire("ncm:paddock.request", 2, { view = "profile", kind = "person", id = "p00010" })
+clock = clock + 1
+fire("ncm:paddock.request", 2, { view = "profile", kind = "org", id = "o002" })
+clock = clock + 1
+check(("every view handler fits the quota (max slice %d)"):format(maxSlice), maxSlice < 400000)
+
+-- ---------------------------------------------------------------- manager mode
+DB.ledger = {}; DB.idem = {}
+ledgerAdd("driver-2", "starter", 30000, "seed:2")
+fire("ncm:paddock.manager", 2, { action = "found", args = { name = "Kabuki Night Racing" } })
+local mine = PaddockWorld.orgManagedBy("driver-2")
+check("founding creates a Street team run by the human", mine ~= nil and mine.tier == "street" and mine.origin == "human_founded")
+check("the fee was taken from the wallet", ledgerTotal("driver-2") == 25000)
+check("the treasury holds fee plus grant", mine.cash == 20000)
+check("the One-Team affiliation row exists", activeAff("driver-2") ~= nil)
+clock = clock + 1
+fire("ncm:paddock.manager", 2, { action = "found", args = { name = "Second Team" } })
+check("a second team is refused by the One-Team Rule", #W.orgOrder == 61 and ledgerTotal("driver-2") == 25000)
+clock = clock + 1
+fire("ncm:paddock.manager", 2, { action = "withdraw", args = { eddies = 1500, idem = "w1" } })
+check("a withdrawal pays out after tax", ledgerTotal("driver-2") == 25000 + 1050 and mine.cash == 18500)
+clock = clock + 1
+fire("ncm:paddock.manager", 2, { action = "withdraw", args = { eddies = 1000, idem = "w2" } })
+check("the weekly cap holds", ledgerTotal("driver-2") == 26050)
+clock = clock + 1
+local fa = NcmCore.get("paddock.world").freeAgents(W)[1]
+fire("ncm:paddock.manager", 2, { action = "sign", args = { driverId = fa.id, wage = 200, seasons = 2 } })
+check("a signing is queued for the Cup boundary, not applied", #mine.pending == 1 and fa.orgId == nil)
+clock = clock + 1
+fire("ncm:paddock.manager", 2, { action = "develop", args = { area = "aerodynamics", eddies = 3000 } })
+check("development spends treasury now", mine.cash == 15500)
+
+-- ---------------------------------------------------------------- time passes
+local function passFn(fn)
+    local co = coroutine.create(fn)
+    maxSlice = 0
+    repeat
+        local ok, err = resumeMetered(co)
+        assert(ok, err)
+    until coroutine.status(co) == "dead"
+end
+local cashBefore = W.orgs.o002.cash
+clock = clock + 86400
+passFn(function() PaddockLife.daily(clock) end)
+check(("a daily tick fits the quota (max slice %d)"):format(maxSlice), maxSlice < 400000)
+check("the day's money moved", W.orgs.o002.cash ~= cashBefore)
+check("the daily tick is idempotent for its day", (function() local r; run(function() r = PaddockLife.daily(clock) end) return r == false end)())
+
+local cup = Season.cupOf(clock)
+clock = cup.cupEndUtc + 60
+passFn(function() PaddockLife.cupBoundary(clock) end)
+check(("a Cup boundary fits the quota (max slice %d)"):format(maxSlice), maxSlice < 400000)
+check("the queued signing was decided at the boundary", #mine.pending == 0)
+check("the world moved to the next Cup", W.cupId == Season.cupOf(clock).cupId)
+
+local yearBefore = W.paddockYear
+local seasons = NcmCore.get("competition.seasons")
+clock = seasons.parse(W.seasonId).endUtc + 3600
+passFn(function() PaddockLife.cupBoundary(clock); PaddockLife.rollover(clock) end)
+check(("a season rollover fits the quota (max slice %d)"):format(maxSlice), maxSlice < 400000)
+check("a paddock year passed", W.paddockYear == yearBefore + 1 and W.seasonOrdinal == 1)
+local fas = #NcmCore.get("paddock.world").freeAgents(W)
+check("the free-agent pool is topped up (" .. fas .. ")", fas >= 40)
+local seats = 0
+for _, o in ipairs(NcmCore.get("paddock.world").orgsInSeries(W, "premier")) do
+    for _, d in ipairs(NcmCore.get("paddock.world").drivers(W, o.id)) do if d.seat and d.seat:match("^race") then seats = seats + 1 end end
+end
+check("every Premier race seat is filled after rollover (" .. seats .. ")", seats >= 14)
+
+realPrint(("%d passed, 0 failed"):format(passed))

@@ -496,6 +496,11 @@ local function complete(rec, results, reason, t)
             end
         end)
     end
+    -- Schema 043: the conditions the session was driven in, for Paddock calibration (doc 44 §7).
+    if NcmWeather and NcmWeather.stamp then
+        local sid = s.sessionId
+        CreateThread(function() Wait(2000); NcmWeather.stamp("session", sid, s.greenAt or t) end)
+    end
     if NcmTelemetry and NcmTelemetry.flush then pcall(NcmTelemetry.flush, rec, true) end
     if rec.kind == "race" then
         if NcmRecords and NcmRecords.refresh then pcall(NcmRecords.refresh) end
@@ -1238,9 +1243,10 @@ function NcmRace.reportGate(rec, pid, driver, gateIndex, pos, t, source)
             local incidentMs = math.floor((res.incidentSec or 0) * 1000)
             local runMs = math.floor((res.runSec or 0) * 1000)
             pcall(function()
-                MySQL.insert.await("INSERT INTO practice_run (server_id, event_id, route_id, ncm_driver_id, session_id, run_started_at, run_finished_at, run_ms, incident_ms, incident_count, at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                local runId = MySQL.insert.await("INSERT INTO practice_run (server_id, event_id, route_id, ncm_driver_id, session_id, run_started_at, run_finished_at, run_ms, incident_ms, incident_count, at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                     { serverId(), rec.eventId, rec.routeId or "", driver.ncmDriverId, rec.s.sessionId,
                       res.startedAt, res.finishedAt, runMs, incidentMs, 0, math.floor(t) })
+                if runId and NcmWeather and NcmWeather.stamp then NcmWeather.stamp("practice", runId, res.startedAt or t) end   -- schema 043
             end)
             -- What the SERVER saw, offered to the ghost host. The client may now upload the poses for this
             -- lap and nothing else: every number a stored ghost carries comes from here, not from the client.
@@ -1375,6 +1381,7 @@ function NcmRace.practiceComplete(rec, results, reason, t)
             end
         end
     end)
+    if NcmWeather and NcmWeather.stamp then NcmWeather.stamp("session", rec.s.sessionId, t) end   -- schema 043
     local timed = 0
     for _, r in ipairs(results) do if r.bestSec then timed = timed + 1 end end
     for driverId, pid in pairs(rec.playerOf) do

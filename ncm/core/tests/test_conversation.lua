@@ -37,10 +37,10 @@ cases.every_declared_contact_is_well_formed = function(T)
     end
 end
 
-cases.only_three_contacts_are_authored_and_the_rest_say_why = function(T)
+cases.only_four_contacts_are_authored_and_the_rest_say_why = function(T)
     local authored = Contacts.ids(true)
-    T.eq(#authored, 3)
-    T.eq(table.concat(authored, ","), "dex,stu,rico", "§A.8's first slice, in registry order")
+    T.eq(#authored, 4)
+    T.eq(table.concat(authored, ","), "dex,stu,rico,billie", "§A.8's first slice plus Billie (doc 44 §9), in registry order")
     for _, id in ipairs(Contacts.ids()) do
         local c = Contacts.get(id)
         if not c.authored then
@@ -63,9 +63,10 @@ cases.domains_route_questions_to_the_authored_specialist = function(T)
     T.falsy(Contacts.holds("dex", "machine"), "Dex must not hold the machine domain")
     T.eq(Contacts.specialist("machine"), "stu")
     T.eq(Contacts.specialist("intelligence"), "rico")
+    T.eq(Contacts.specialist("wagering"), "billie", "the Paddock's book (doc 44 §9)")
     -- A domain whose only holders are unauthored has no specialist, so a redirect can never point at somebody
     -- the player cannot reach.
-    T.eq(select(2, Contacts.specialist("wagering")), "no_authored_specialist")
+    T.eq(select(2, Contacts.specialist("creation")), "no_authored_specialist")
     T.eq(select(2, Contacts.specialist("nonsense")), "unknown_domain")
 end
 

@@ -201,6 +201,44 @@ function NcmWeather.readModel()
         modelVersion=Weather.forecastModelVersion,coveredUntilUtc=state.plan.coveredUntilUtc}
 end
 
+--- The racing conditions at `utc` from the persisted plan (`world.conditions`, doc 44 §7), or nil before the plan
+--- exists. Light is the US-Eastern hour (L221), the same clock the Paddock races on.
+function NcmWeather.conditionsAt(utc)
+    if not state.plan or not state.plan.rows or #state.plan.rows == 0 then return nil end
+    return NcmCore.get("world.conditions").at(state.plan.rows, math.floor(utc))
+end
+
+-- Schema 043. Results are stamped AFTER they are written, by a separate UPDATE guarded on `conditions_source IS
+-- NULL`, so a stamp can never delay, fail or alter a result write: the insert paths stay exactly as they were.
+-- Series and class come from the result's own event row, which is where they are authored.
+local STAMP_SQL = {
+    session = [[UPDATE session_result sr JOIN session s ON s.session_id = sr.session_id
+        JOIN event e ON e.event_id = s.event_id
+        SET sr.weather = ?, sr.road_wetness = ?, sr.seconds_of_day = ?, sr.light = ?, sr.series_id = e.series_id,
+            sr.class_id = e.class_id, sr.conditions_source = 'plan'
+        WHERE sr.session_id = ? AND sr.conditions_source IS NULL]],
+    practice = [[UPDATE practice_run pr JOIN event e ON e.event_id = pr.event_id
+        SET pr.weather = ?, pr.road_wetness = ?, pr.seconds_of_day = ?, pr.light = ?, pr.series_id = e.series_id,
+            pr.class_id = e.class_id, pr.conditions_source = 'plan'
+        WHERE pr.id = ? AND pr.conditions_source IS NULL]],
+    ghost = [[UPDATE ghost_lap g LEFT JOIN event e ON e.event_id = g.event_id
+        SET g.weather = ?, g.road_wetness = ?, g.seconds_of_day = ?, g.light = ?, g.series_id = e.series_id,
+            g.conditions_source = 'plan'
+        WHERE g.ghost_id = ? AND g.conditions_source IS NULL]],
+}
+
+--- Stamp the conditions of `atUtc` on a stored result. `kind` is session | practice | ghost; `key` is the
+--- session id, practice_run id or ghost id. Never raises; returns true when a stamp was attempted.
+function NcmWeather.stamp(kind, key, atUtc)
+    local sql = STAMP_SQL[kind]
+    if not sql or key == nil then return false end
+    local c = NcmWeather.conditionsAt(atUtc or now())
+    if not c then return false end
+    local ok, err = pcall(MySQL.update.await, sql, { c.weather, c.roadWetness, c.secondsOfDay, c.light, key })
+    if not ok then log("conditions stamp %s %s failed: %s", kind, tostring(key), tostring(err)) end
+    return ok
+end
+
 function NcmWeather.provenance(startedAtUtc,finishedAtUtc,scope,revisions)
     return Weather.provenance(state.plan and state.plan.rows or {},startedAtUtc,finishedAtUtc,scope or SCOPE,revisions)
 end

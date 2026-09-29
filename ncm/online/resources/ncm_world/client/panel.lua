@@ -328,6 +328,19 @@ local function showTrade()
     TriggerServerEvent("ncm:trade.request")
 end
 
+--- THE PADDOCK (doc 44). The NPC motorsport world lives in its own resource, `ncm_paddock`; this tab is its
+--- window. Every sub-view is one request/stream round trip on channel `ncm:paddock` (the league's own stream
+--- protocol), so the page never holds more than the view it is showing.
+local lastPaddock = nil
+local function showPaddock(req)
+    if not page or not pageReady then return end
+    req = type(req) == "table" and req or { view = (lastPaddock and lastPaddock.view) or "wire" }
+    setOpen("paddock")
+    page:send("panel:show", { panel = "paddock" })
+    sendBig("panel:paddock", lastPaddock or { view = req.view, rows = {}, loading = true }, "rows", 3)
+    TriggerServerEvent("ncm:paddock.request", req)
+end
+
 --- The WHEEL tab (`IDEA-399`).
 ---
 --- **Unlike every other tab, its data does not come from the server.** It comes from the companion process on
@@ -412,6 +425,7 @@ AddEventHandler("onClientResourceStart", function(name)
         elseif d.panel == "guide" then showGuide() elseif d.panel == "market" then showMarket()
         elseif d.panel == "collection" then showCollection()
         elseif d.panel == "trade" then showTrade()
+        elseif d.panel == "paddock" then showPaddock()
         elseif d.panel == "wheel" then showWheel()
         elseif d.panel == "messages" then showMessages()
         elseif d.panel == "help" then showHelp() end
@@ -472,6 +486,10 @@ AddEventHandler("onClientResourceStart", function(name)
         if type(d)=="table" then TriggerServerEvent("ncm:trade.confirm",tonumber(d.revision)) end
     end)
     page:on("panel:trade.cancel",function() TriggerServerEvent("ncm:trade.cancel") end)
+    -- THE PADDOCK: the page asks for a sub-view, writes a slip with Billie, or acts as a manager.
+    page:on("panel:paddock.request", function(d) if type(d) == "table" then TriggerServerEvent("ncm:paddock.request", d) end end)
+    page:on("panel:paddock.slip", function(d) if type(d) == "table" then TriggerServerEvent("ncm:paddock.slip", d) end end)
+    page:on("panel:paddock.manager", function(d) if type(d) == "table" then TriggerServerEvent("ncm:paddock.manager", d) end end)
     -- Selecting an offering is a player-facing encounter with that model, which the server may treat as a
     -- Machine Index discovery. The client only reports the act; it never decides that anything was learned.
     -- The player opened PAST RESULTS. Ask for it; it is not in the Guide payload by design.
@@ -679,6 +697,14 @@ end)
 receiveStream("ncm:trade", "rows", function(value)
     lastTrade=value
     if page and pageReady and open=="trade" then sendBig("panel:trade",value,"rows",2) end
+end)
+
+receiveStream("ncm:paddock", "rows", function(value)
+    lastPaddock = value
+    if page and pageReady and open == "paddock" then sendBig("panel:paddock", value, "rows", 3) end
+end)
+RegisterNetEvent("ncm:paddock.result", function(value)
+    if page and pageReady then page:send("panel:paddock.result", type(value) == "table" and value or {}) end
 end)
 
 -- Legacy whole-payload receivers, kept for ONE mixed-version restart window, exactly as the Market hop kept its
