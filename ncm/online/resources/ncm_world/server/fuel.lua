@@ -1,7 +1,8 @@
 -- Persistent per-Machine fuel, driven only by accepted server odometer distance.
 local Fuel=NcmCore.get("economy.fuel")
 local function log(f,...) print(("[ncm_world/fuel] "..f):format(...)) end
-local function now() return Open77.time.unix() end
+-- Whole seconds: the host clock is fractional and `%d` refuses it (KB-206: every /ncm.refuel died on the idem key).
+local function now() return math.floor(Open77.time.unix()) end
 local state={} -- asset -> {fuelMl,capacityMl,remainderMl,dirtyMl,lastWrite,emptyNotified}
 
 -- One map/recovery target per physical forecourt; every individual pump remains a valid refuelling point.
@@ -110,7 +111,7 @@ local function refuel(pid)
 end
 RegisterCommand("ncm.refuel",function(source)
  local pid=tonumber(source) or 0;if pid<=0 then return end
- CreateThread(function() local ok,msg=refuel(pid);pcall(Open77.chat.send,pid,"[NCM] "..tostring(msg));pcall(Open77.notifications.send,pid,{type=ok and "success" or "error",title=ok and "REFUELLED" or "REFUEL REFUSED",message=tostring(msg),icon="NCM",durationMs=7000}) end)
+ CreateThread(function() local okCall,ok,msg=pcall(refuel,pid);if not okCall then log("refuel error player=%d: %s",pid,tostring(ok));ok,msg=nil,"Refuel failed on the server. Check your balance and tell the host." end;pcall(Open77.chat.send,pid,"[NCM] "..tostring(msg));pcall(Open77.notifications.send,pid,{type=ok and "success" or "error",title=ok and "REFUELLED" or "REFUEL REFUSED",message=tostring(msg),icon="NCM",durationMs=7000}) end)
 end,false)
 RegisterNetEvent("ncm:fuel.request",function() local pid=tonumber(source) or 0;local b=NcmVehicleAccess and NcmVehicleAccess.bindingForAuthority and NcmVehicleAccess.bindingForAuthority(pid);if b then CreateThread(function() send(pid,b.assetId,load(b.assetId)) end) end end)
 AddEventHandler("onPlayerDisconnected",function(pid) for asset,s in pairs(state) do if s.dirtyMl>0 then pcall(persist,asset,s) end end end)
