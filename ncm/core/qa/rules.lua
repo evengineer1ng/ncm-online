@@ -69,8 +69,9 @@ Core.define("qa.rules", function(C)
     end
 
     --- P4 · The driver's guidance follows THEIR event (L107, KB-75).
-    --- Ring, card, waypoint and venue options must all name the event `driverEvent()` returns. This invariant
-    --- was violated in three separate places on 2026-09-23 and nothing noticed.
+    --- Waypoint and persistent card must name the event `driverEvent()` returns. This invariant was violated in
+    --- three separate places on 2026-09-23 and nothing noticed. Since 2026-09-28 the VENUE card is owned by
+    --- place, not by driver: for surface `venue_card` the expected event is the ring the driver stands in.
     function M.guidanceTarget(expectedEventId, shownEventId, surface)
         if expectedEventId == nil then return nil end        -- no live entry: nothing to agree about
         if shownEventId == nil then

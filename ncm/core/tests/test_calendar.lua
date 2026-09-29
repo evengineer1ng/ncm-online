@@ -59,6 +59,32 @@ return {
         T.eq(d.ok, true); T.eq(d.entry.state, "checked_in"); T.eq(d.entry.fee, 0); T.ok(ids.isUuid(d.entry.entryId))
     end,
 
+    one_entry_at_a_time_and_the_ring_is_the_rule = function(T)
+        local Cal = T.Core.get("competition.calendar")
+        local E = T.Core.get("competition.entry")
+        local ids = T.Core.get("vocabulary.ids")
+        local e = Cal.materialize(series(), 1800000000, 3600)[1]
+        local rng = ids.seededRng(2)
+        local now = e.entryOpensAt + 60
+        -- The drawn ring is the rule (owner, 2026-09-28): the old 30 m allowance around a 6 m ring is gone.
+        local justOutside = { x = e.venue.x + E.RING_RADIUS_M + E.RING_TOLERANCE_M + 1, y = e.venue.y, z = e.venue.z }
+        T.eq(E.checkIn({ event = e, now = now, driverId = "d", position = justOutside, rng = rng }).reason, "not_at_venue")
+        local inside = { x = e.venue.x + E.RING_RADIUS_M, y = e.venue.y, z = e.venue.z }
+        T.eq(E.checkIn({ event = e, now = now, driverId = "d", position = inside, rng = rng }).ok, true)
+        -- An entry held elsewhere refuses; a bookmark does not count as one.
+        local other = { eventId = "other", state = "entry_open", entries = { d = { state = "checked_in" } } }
+        local held = E.heldEntry({ other, e }, "d", e.eventId)
+        T.eq(held and held.eventId, "other")
+        T.eq(E.checkIn({ event = e, now = now, driverId = "d", position = inside, heldElsewhere = held, rng = rng }).reason, "entered_elsewhere")
+        other.entries.d.state = "interested"
+        T.eq(E.heldEntry({ other, e }, "d", e.eventId), nil, "interest is a bookmark, not an entry")
+        other.entries.d.state = "registered"
+        T.eq(E.heldEntry({ other, e }, "d", e.eventId).eventId, "other", "a team seat is an entry")
+        T.eq(E.heldEntry({ other, e }, "d", e.eventId, function() return false end), nil,
+            "an entry on an event that is over never holds the driver")
+        T.eq(E.register({ event = e, now = now, driverId = "d", heldElsewhere = other, rng = rng }).reason, "entered_elsewhere")
+    end,
+
     pings_due = function(T)
         local Cal = T.Core.get("competition.calendar")
         local E = T.Core.get("competition.entry")

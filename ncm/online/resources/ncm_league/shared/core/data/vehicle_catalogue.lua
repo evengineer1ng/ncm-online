@@ -4,7 +4,9 @@ local Core = NcmCore
 
 Core.define("data.vehicle_catalogue", function(C)
     local Pool = C.get("data.vehicle_pool")
-    local M = { version = "0.1.0", generation = 1 }
+    -- generation 2 (2026-09-29, KB-204): the Autofixer markets update grew the catalogue 27 -> 45. Bump on every
+    -- membership change; the collection refuses a published generation whose size changed underneath it.
+    local M = { version = "0.1.0", generation = 2 }
 
     local META = {
         Vehicle_v_standard2_thorton_galena       = { "Thorton", "Galena" },
@@ -34,6 +36,24 @@ Core.define("data.vehicle_catalogue", function(C)
         Vehicle_v_sportbike3_brennan_apollo_nomad= { "Brennan", "Apollo Nomad" },
         Vehicle_v_sportbike1_yaiba_kusanagi_tyger= { "Yaiba", "Kusanagi Tyger Claw" },
         Vehicle_v_sportbike1_yaiba_kusanagi_animal={ "Yaiba", "Kusanagi Animals" },
+        Vehicle_v_sport1_herrera_riptide          = { "Herrera", "Riptide" },
+        Vehicle_v_sport1_quadra_sport_r7          = { "Quadra", "Sport R-7" },
+        Vehicle_v_sport1_yaiba_semimaru           = { "Yaiba", "Semimaru" },
+        Vehicle_v_sport2_mizutani_shion_targa     = { "Mizutani", "Shion Targa" },
+        Vehicle_v_sport2_porsche_911turbo         = { "Porsche", "911 Turbo" },
+        Vehicle_v_sport2_porsche_911turbo_cabrio  = { "Porsche", "911 Turbo Cabriolet" },
+        Vehicle_v_sport2_quadra_type66_avenger    = { "Quadra", "Type-66 Avenger" },
+        Vehicle_v_sport2_villefort_deleon_sport   = { "Villefort", "Deleon Vindicator" },
+        Vehicle_v_standard2_archer_bandit         = { "Archer", "Quartz Bandit" },
+        Vehicle_v_standard2_archer_quartz         = { "Archer", "Quartz" },
+        Vehicle_v_standard2_mizutani_hozuki       = { "Mizutani", "Hozuki" },
+        Vehicle_v_standard25_thorton_merrimac     = { "Thorton", "Merrimac" },
+        Vehicle_v_standard3_makigai_tanishi       = { "Makigai", "Tanishi" },
+        Vehicle_v_standard3_militech_hellhound    = { "Militech", "Hellhound" },
+        Vehicle_v_utility4_chevalier_legatus      = { "Chevillon", "Legatus" },
+        Vehicle_v_sportbike1_yaiba_kusanagi       = { "Yaiba", "Kusanagi CT-3X" },
+        Vehicle_v_sportbike1_yaiba_muramasa       = { "Yaiba", "Muramasa" },
+        Vehicle_v_sportbike2_arch                 = { "ARCH", "Nazaré" },
     }
     --- **Stable manufacturer identity.** `META[1]` is a DISPLAY NAME and display names are editable; keying
     --- production history off one would mean that renaming "Chevillon" tomorrow silently started a second,
@@ -49,6 +69,7 @@ Core.define("data.vehicle_catalogue", function(C)
         ["Makigai"] = "makigai", ["Archer"] = "archer", ["Mahir"] = "mahir",
         ["Chevillon"] = "chevillon", ["Red Bull Racing"] = "red_bull_racing",
         ["Brennan"] = "brennan", ["Yaiba"] = "yaiba",
+        ["Porsche"] = "porsche", ["Militech"] = "militech", ["ARCH"] = "arch",
     }
 
     local KEY = {
@@ -66,6 +87,15 @@ Core.define("data.vehicle_catalogue", function(C)
         Vehicle_v_sportbike3_brennan_apollo="brennan_apollo", Vehicle_v_sportbike3_brennan_apollo_sport="brennan_apollo_sport",
         Vehicle_v_sportbike3_brennan_apollo_nomad="brennan_apollo_nomad", Vehicle_v_sportbike1_yaiba_kusanagi_tyger="yaiba_kusanagi_tyger",
         Vehicle_v_sportbike1_yaiba_kusanagi_animal="yaiba_kusanagi_animal",
+        Vehicle_v_sport1_herrera_riptide="herrera_riptide", Vehicle_v_sport1_quadra_sport_r7="quadra_sport_r7",
+        Vehicle_v_sport1_yaiba_semimaru="yaiba_semimaru", Vehicle_v_sport2_mizutani_shion_targa="mizutani_shion_targa",
+        Vehicle_v_sport2_porsche_911turbo="porsche_911_turbo", Vehicle_v_sport2_porsche_911turbo_cabrio="porsche_911_turbo_cabrio",
+        Vehicle_v_sport2_quadra_type66_avenger="quadra_type66_avenger", Vehicle_v_sport2_villefort_deleon_sport="villefort_deleon_sport",
+        Vehicle_v_standard2_archer_bandit="archer_bandit", Vehicle_v_standard2_archer_quartz="archer_quartz",
+        Vehicle_v_standard2_mizutani_hozuki="mizutani_hozuki", Vehicle_v_standard25_thorton_merrimac="thorton_merrimac",
+        Vehicle_v_standard3_makigai_tanishi="makigai_tanishi", Vehicle_v_standard3_militech_hellhound="militech_hellhound",
+        Vehicle_v_utility4_chevalier_legatus="chevillon_legatus", Vehicle_v_sportbike1_yaiba_kusanagi="yaiba_kusanagi",
+        Vehicle_v_sportbike1_yaiba_muramasa="yaiba_muramasa", Vehicle_v_sportbike2_arch="arch_nazare",
     }
 
     local entries, byKey, byRecord = {}, {}, {}
@@ -103,7 +133,7 @@ Core.define("data.vehicle_catalogue", function(C)
                 -- The immutable half of the badge. `manufacturer` is for reading; this is for history.
                 manufacturerKey = MAKER_KEY[m[1]],
                 -- classes[1] is CLASS_ORDER-stable, so a multi-class machine's headline category never flickers
-                category = p.classes[1], categories = p.classes, tags = p.tags,
+                category = p.classes[1], categories = p.classes, tags = p.tags, prestige = p.prestige,
                 source = m[3] or "native", canonicalGeneration = M.generation, runtimeRecords = {},
             }
             entries[#entries + 1], byKey[key] = e, e

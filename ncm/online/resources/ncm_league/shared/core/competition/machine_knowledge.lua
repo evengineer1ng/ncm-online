@@ -14,6 +14,11 @@ Core.define("competition.machine_knowledge", function()
         ownership = true,
         authored_display = true,
         manufacturer_publication = true,
+        -- `L197`: the Scanner is how a Driver deliberately identifies a machine in the world. Proximity no
+        -- longer reveals identity; a scan does. A scan of a server-owned vehicle is `server_measured`, a scan
+        -- of a vanilla per-client car is `client_attested` -- the source is the same act, the basis says how
+        -- far the server could check it.
+        scanner = true,
     }
 
     -- The five `observed_*` characteristics below are `31_CAPABILITY_AUDIT.md` section 9's "safe to define
@@ -203,8 +208,10 @@ Core.define("competition.machine_knowledge", function()
 
     --- Human prestige is deliberately narrower than knowledge acquisition. Only a physical world encounter
     --- may nominate another Driver; markets/listings/publications can reveal identity but never farm credit.
+    --- A scan is a physical encounter made deliberate (`L197`), so it may credit the Driver whose car was
+    --- scanned, exactly as the proximity dwell it replaces did.
     function M.allowsHumanDiscoveryCredit(source)
-        return source == "world_encounter"
+        return source == "world_encounter" or source == "scanner"
     end
 
     return M

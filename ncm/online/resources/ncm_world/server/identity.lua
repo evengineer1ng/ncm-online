@@ -87,6 +87,9 @@ local function serverId()
     return v
 end
 
+--- The world's server id, for other files in this resource that write server-scoped rows (chrome ledger).
+function NcmIdentity.serverId() return serverId() end
+
 -- Host-provided randomness for minting (Lua 5.4 seeds math.random from time+address at VM start).
 local hostRng = function() return math.random() end
 

@@ -158,18 +158,47 @@
     }
   }
 
+  /** What a control IS, independent of the DOM node that currently draws it. A surface that redraws
+   *  replaces every node, so remembering the node alone loses focus on every refresh. `data-nav-key` is
+   *  the explicit form; the fallbacks cover surfaces that have not declared one. */
+  function navKey(el) {
+    if (!el) return null;
+    const ds = el.dataset || {};
+    if (ds.navKey) return "k:" + ds.navKey;
+    if (el.id) return "#" + el.id;
+    if (ds.panelNav) return "tab:" + ds.panelNav;
+    const label = (el.getAttribute && el.getAttribute("aria-label")) || el.title || el.textContent || "";
+    return el.tagName + ":" + String(label).slice(0, 80);
+  }
+
   function setFocus(scope, el, why) {
     if (!scope) return null;
     if (scope.current && scope.current.classList) scope.current.classList.remove("ncm-focused");
     scope.current = el || null;
     if (el) {
+      scope.currentKey = navKey(el);
+      scope.currentIndex = focusables(scope.root).indexOf(el);
       if (el.classList) el.classList.add("ncm-focused");
       // Real DOM focus too, so browser semantics (typing into an input) keep working for keyboard users.
       if (typeof el.focus === "function") { try { el.focus({ preventScroll: true }); } catch (_) { el.focus(); } }
-      if (why !== "pointer") reveal(el);
+      // A restore is the SAME control redrawn in place; scrolling to it would yank the page on every refresh.
+      if (why !== "pointer" && why !== "restore") reveal(el);
     }
     paint(family === "mouse" ? null : el);
     return el;
+  }
+
+  /** **Focus must survive a redraw.** Several surfaces rebuild their controls from each data frame -- the
+   *  WHEEL tab several times a second. The remembered node is then detached: `activate` refused it (Enter
+   *  and CONFIRM did nothing) and `step` restarted from the first control. So a detached or hidden focus is
+   *  re-found by key, then by position, and moved onto the replacement before anything acts on it. */
+  function recover(scope) {
+    if (!scope || !scope.current || usable(scope.current)) return scope && scope.current;
+    const items = focusables(scope.root);
+    if (!items.length) { scope.current = null; paint(null); return null; }
+    let next = scope.currentKey ? items.find((el) => navKey(el) === scope.currentKey) : null;
+    if (!next && scope.currentIndex >= 0) next = items[Math.min(scope.currentIndex, items.length - 1)];
+    return setFocus(scope, next || items[0], "restore");
   }
 
   function scopeItems(scope) {
@@ -179,6 +208,7 @@
   function move(direction) {
     const scope = top();
     if (!scope) return false;
+    recover(scope);
     const items = scopeItems(scope);
     if (!items.length) return false;
     if (!scope.current || items.every((i) => i.el !== scope.current)) {
@@ -212,8 +242,11 @@
 
   function activate() {
     const scope = top();
-    const el = scope && scope.current;
+    const el = recover(scope);
     if (!el || !usable(el)) return false;
+    // A dropdown is CYCLED, not opened. The host renders the page off-screen and a native <select> popup
+    // is not guaranteed to be drawn at all, so "activate opens it" would be a control nobody can use.
+    if (el.tagName === "SELECT") return cycleSelect(el, 1, true);
     // One synthetic click, so a control only ever needs a click handler. Double activation is a named
     // failure condition, so the edge detection that prevents it lives on the Lua side, once.
     if (typeof el.click === "function") el.click();
@@ -221,6 +254,55 @@
       el.dispatchEvent(new Event("click", { bubbles: true }));
     }
     return true;
+  }
+
+  /** Step a <select> by `delta` options and fire `change`, which is all any surface listens for. */
+  function cycleSelect(el, delta, wrap) {
+    const n = (el.options && el.options.length) || 0;
+    if (!n) return false;
+    let i = (typeof el.selectedIndex === "number" ? el.selectedIndex : 0) + delta;
+    if (wrap) i = (i + n) % n;
+    else if (i < 0 || i >= n) return true;           // at the end: handled, nothing to change
+    el.selectedIndex = i;
+    if (typeof el.dispatchEvent === "function" && typeof Event === "function") {
+      el.dispatchEvent(new Event("input", { bubbles: true }));
+      el.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+    return true;
+  }
+
+  /** Step a range slider and fire `input` + `change`, exactly as cycleSelect does for a dropdown.
+   *  **Never leave this to the browser's own arrow-key stepping.** KB-184: the WHEEL tab's FORCE slider was
+   *  focused, Left/Right were handed to it, and no strength ever reached Rig Bridge -- while the dropdown
+   *  beside it, stepped here in code, changed the device class in the same minute. A nav step is a twentieth
+   *  of the span (or the slider's own step if coarser), so 0-100 moves 5 at a time, not 1. */
+  function stepRange(el, delta) {
+    const min = Number(el.min !== undefined && el.min !== "" ? el.min : 0);
+    const max = Number(el.max !== undefined && el.max !== "" ? el.max : 100);
+    const own = Number(el.step) > 0 ? Number(el.step) : 1;
+    const nav = Number(el.dataset && el.dataset.navStep) || Math.max(own, (max - min) / 20);
+    const before = Number(el.value);
+    const raw = Math.min(max, Math.max(min, (isFinite(before) ? before : min) + delta * nav));
+    const next = Math.round((raw - min) / own) * own + min;
+    if (next === before) return true;                 // at the end: handled, nothing to change
+    el.value = String(next);
+    if (typeof el.dispatchEvent === "function" && typeof Event === "function") {
+      el.dispatchEvent(new Event("input", { bubbles: true }));
+      el.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+    return true;
+  }
+
+  /** Controls that own Left/Right themselves: a slider moves, a dropdown steps, a text field moves the caret. */
+  function ownsHorizontal(el) {
+    return !!el && (el.tagName === "SELECT" || el.tagName === "TEXTAREA"
+      || (el.tagName === "INPUT" && !/^(button|submit|reset|checkbox|radio)$/i.test(el.type || "")));
+  }
+
+  /** Controls whose Enter is their own: typing surfaces. Everything else is activated by the layer. */
+  function ownsEnter(el) {
+    return !!el && (el.tagName === "TEXTAREA"
+      || (el.tagName === "INPUT" && !/^(button|submit|reset|checkbox|radio|range|color)$/i.test(el.type || "")));
   }
 
   function back() {
@@ -270,6 +352,7 @@
   function step(delta) {
     const scope = top();
     if (!scope) return false;
+    recover(scope);
     const items = scopeItems(scope);
     if (!items.length) return false;
     let index = items.findIndex((i) => i.el === scope.current);
@@ -381,12 +464,21 @@
       const map = { ArrowUp: "up", ArrowDown: "down", ArrowLeft: "left", ArrowRight: "right",
                     PageUp: "pageUp", PageDown: "pageDown" };
       if (key === "Tab") { perform(event.shiftKey ? "previous" : "next", "keyboard"); event.preventDefault(); return; }
+      const el = recover(top());
       if (key === "Enter" || key === " ") {
-        // Let a text field keep its own Enter. Hijacking standard conventions is explicitly unwanted.
-        const el = NcmNav.focused();
-        const tag = el && el.tagName;
-        if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+        // Let a TEXT field keep its own Enter. This used to exempt every INPUT and SELECT, which on the
+        // WHEEL tab was nearly every control: Enter reached them and did nothing at all.
+        if (ownsEnter(el)) return;
         if (perform("activate", "keyboard")) event.preventDefault();
+        return;
+      }
+      // Left/Right belong to a slider, dropdown or text field while it has focus -- otherwise the keyboard
+      // can reach a slider and never move it. Tab and Up/Down still leave it.
+      if ((key === "ArrowLeft" || key === "ArrowRight") && ownsHorizontal(el)) {
+        if (el.tagName === "SELECT") { cycleSelect(el, key === "ArrowRight" ? 1 : -1, false); event.preventDefault(); }
+        else if (el.tagName === "INPUT" && /^range$/i.test(el.type || "")) {
+          stepRange(el, key === "ArrowRight" ? 1 : -1); event.preventDefault();
+        }
         return;
       }
       if (map[key]) { if (perform(map[key], "keyboard")) event.preventDefault(); }
@@ -414,6 +506,12 @@
     if (typeof window !== "undefined" && window.addEventListener) {
       // Resolution changes invalidate every cached rectangle, which is a named failure condition.
       window.addEventListener("resize", () => NcmNav.refresh());
+    }
+    // A redraw moves focus onto the replacement control straight away, so the ring does not vanish and a
+    // mouse user's DOM focus is not stranded on a detached node until the next keypress.
+    if (typeof MutationObserver === "function" && document.body) {
+      new MutationObserver(() => { const s = top(); if (s && s.current && !usable(s.current)) recover(s); })
+        .observe(document.body, { childList: true, subtree: true });
     }
   }
 

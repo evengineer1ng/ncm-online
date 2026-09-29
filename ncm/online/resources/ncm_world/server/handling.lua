@@ -141,6 +141,13 @@ local function contributorsFor(assetId)
         if temperature then out.thermal = Handling.thermalContributor(temperature) end
     end
 
+    -- CHROME: active vehicle quickhacks on this Machine -- POWER SURGE and OVERCLOCK push drive into
+    -- the headroom the gear chain was widened for. Absent when nothing is active; the lever clamps bound it.
+    if NcmChrome and NcmChrome.contributorFor then
+        local ok, c = pcall(NcmChrome.contributorFor, assetId)
+        if ok and c then out.chrome = c end
+    end
+
     return out
 end
 
@@ -239,7 +246,9 @@ local function publishBound(playerId, binding, why, force)
     -- taper can never disagree about what this Machine's top speed is supposed to be. If `MASTER_TEST` BA
     -- ever proves `setPerformance` works, the two become belt and braces rather than rivals.
     local baseline = binding.record and Catalogue.topSpeedKph(binding.record) or nil
-    setup.governedTopSpeedKph = baseline and Handling.topSpeedKph(setup, baseline, nil) or nil
+    -- Chrome LIMITER / LIMP cap the governor target, most-restrictive-wins, the same argument a class cap uses.
+    local chromeCap = (baseline and NcmChrome and NcmChrome.capKph) and NcmChrome.capKph(binding.assetId, baseline) or nil
+    setup.governedTopSpeedKph = baseline and Handling.topSpeedKph(setup, baseline, chromeCap) or nil
     -- An explicit override wins over the composed figure, and over its absence. Stated plainly so a
     -- governed car is never mistaken for an authored one.
     local override = governOverride[binding.assetId]

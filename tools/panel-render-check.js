@@ -388,6 +388,29 @@ check("but never leaks the profile, its parameters or its reasoning",
 check("no one-per-player wording anywhere in the Market",
   !/one machine per|one per player|already own/i.test(marketText + " " + mktDetail + " " + dump(document.getElementById("market")).join(" ")));
 
+// One Market at a time (owner, 2026-09-29): a sources column, Base Market first; stock is never merged.
+{
+  const two = OFFERINGS();
+  two.markets = [{ marketId: "autofixer_japantown_01", displayName: "Japantown Autofixer" }, { marketId: "base_market", displayName: "Base Market" }];
+  two.offerings.push({ marketId: "autofixer_japantown_01", marketName: "Japantown Autofixer", vehicleKey: "yaiba_semimaru",
+    displayName: "Semimaru", manufacturer: "Yaiba", category: "Sport", price: 90000, available: 1, ceiling: 2, soldOut: false,
+    assetIds: ["30000000-0000-4000-8000-000000000003"] });
+  fire("panel:market", two);
+  const srcEl = document.getElementById("marketSources");
+  const srcText = dump(srcEl).join(" | ");
+  let grid = dump(document.getElementById("marketGrid")).join(" | ");
+  check("market sources list Base Market and the discovered terminal", /Base Market/.test(srcText) && /Japantown Autofixer/.test(srcText), srcText);
+  check("Base Market is selected first and does not show terminal stock", /MaiMai/.test(grid) && !/Semimaru/.test(grid), grid);
+  const jt = (srcEl.children || []).find(c => dump(c).join(" ").includes("Japantown"));
+  if (jt) jt.click();
+  grid = dump(document.getElementById("marketGrid")).join(" | ");
+  check("choosing a terminal shows only its stock", /Semimaru/.test(grid) && !/MaiMai/.test(grid), grid);
+  check("the title names the selected market", /Japantown Autofixer/.test(dump(document.getElementById("marketTitle")).join(" ")));
+  const base = (srcEl.children || []).find(c => dump(c).join(" ").includes("Base Market"));
+  if (base) base.click();
+  fire("panel:market", OFFERINGS());
+}
+
 // Selecting a SOLD OUT offering must still work and must still report the encounter (acceptance K).
 emitted.length = 0;
 const soldOutCard = document.getElementById("marketGrid").children.find(c => dump(c).join(" ").includes("Hella"));
@@ -524,7 +547,7 @@ const navLabels = (id) => (document.getElementById(id).children || []).map(b => 
 // DRIVER FILE joined the shell as the persistent "what is mine / what changed / what next" surface, so it is
 // both a nav entry every panel must offer AND a panel that must itself carry the full nav. Listed here rather
 // than loosening the comparison: the point of this guard is that the set is exact.
-const SHELL_NAV = "DRIVER FILE|RACE GUIDE|MARKET|EXCHANGE|MACHINE INDEX|WHEEL/PEDALS|MESSAGES|HELP";
+const SHELL_NAV = "DRIVER FILE|RACE GUIDE|MARKET|EXCHANGE|MACHINE INDEX|DEVICES|MESSAGES|HELP";
 for (const [panel, navId] of [["driver", "driverNav"], ["guide", "guideNav"], ["market", "marketNav"], ["trade", "tradeNav"], ["collection", "collectionNav"], ["wheel", "wheelNav"], ["messages", "messagesNav"], ["help", "helpNav"]]) {
   emitted.length = 0;
   fire("panel:show", { panel: panel });
@@ -1007,12 +1030,24 @@ check("a channel with real signal is not marked weak",/0\.4200/.test(wheelText),
 
 // Find the FORCE row by its own label rather than by position, then its slider. Selecting every range
 // input instead would also collect steering range and the five feel knobs, whose maxima are unrelated.
-const strengthRow=(document.getElementById("wheelBody").children||[])
+// DEVICES groups rows into collapsible sections (WHEELBASE & PEDALS / FORCE FEEDBACK / GAMEPAD), so a row is
+// no longer a direct child of #wheelBody. Collect the rows out of every section body.
+const wheelRows=()=>(document.getElementById("wheelBody").children||[])
+  .flatMap(sec=>(sec.children||[]).filter(c=>/dev-section-body/.test(c.className||"")).flatMap(b=>b.children||[]));
+const strengthRow=wheelRows()
   .find(r=>(r.children||[]).some(c=>c._text==="FORCE"));
 const strengthSlider=strengthRow
   ? (strengthRow.children||[]).flatMap(w=>w.children||[]).find(e=>e.type==="range")
   : null;
 check("FORCE is a slider",!!strengthSlider,"no range input in the FORCE row");
+// DEVICES: the three sections exist, in order, and GAMEPAD is present even when its API cannot be reached.
+{
+  const heads=(document.getElementById("wheelBody").children||[])
+    .map(sec=>((sec.children||[]).find(c=>/dev-section-head/.test(c.className||""))||{}))
+    .map(h=>(h.children||[]).map(c=>c._text||"").join(""));
+  check("DEVICES has WHEELBASE & PEDALS, FORCE FEEDBACK and GAMEPAD sections, in that order",
+    heads.join("|").replace(/[▸▾]/g,"")==="WHEELBASE & PEDALS|FORCE FEEDBACK|GAMEPAD",heads.join(" | "));
+}
 check("FORCE spans nothing to the class ceiling",
   !!strengthSlider&&Number(strengthSlider.min)===0&&Number(strengthSlider.max)===100,
   strengthSlider?("min="+strengthSlider.min+" max="+strengthSlider.max):"absent");
@@ -1020,6 +1055,30 @@ check("FORCE spans nothing to the class ceiling",
 check("FORCE cannot express a value above the ceiling",
   !!strengthSlider&&Number(strengthSlider.max)<=100,
   strengthSlider?("max="+strengthSlider.max):"absent");
+
+// **A frame that only moves numbers must not rebuild the tab** (owner: "i have to spam click the buttons on
+// that tab"). Rig Bridge streams device frames; each one used to replace every control, so a click's press
+// and release landed on different nodes. The same controls must survive a value-only frame.
+{
+  const findArm=()=>wheelRows().flatMap(r=>r.children||[])
+    .find(e=>/ARM FORCE|DISARM FORCE/.test(e._text||""));
+  drawWheel("wheel panel draws before a value-only frame",FULL);
+  const armBefore=findArm();
+  const next=JSON.parse(JSON.stringify(FULL));
+  next.sent=1234;
+  next.device.seen.slipTotal={max:0.51,frames:1000,live:400};
+  drawWheel("a value-only wheel frame still reports drawn",next);
+  const armAfter=findArm();
+  check("a value-only frame keeps the SAME button nodes, so a click cannot be torn in half",
+    !!armBefore&&armBefore===armAfter,armBefore?"button was replaced":"no arm button found");
+  const liveText=dump(document.getElementById("wheelBody")).join("|");
+  check("a value-only frame still updates the numbers in place",
+    /FRAMES SENT\|1234/.test(liveText)&&/0\.5100/.test(liveText),liveText.slice(0,500));
+  const armed=JSON.parse(JSON.stringify(next)); armed.device.armed=false;
+  drawWheel("a structural wheel frame redraws",armed);
+  check("a real change of state still redraws the controls",
+    findArm()!==armAfter&&/ARM FORCE OUTPUT/.test(dump(document.getElementById("wheelBody")).join("|")));
+}
 
 fire("panel:show",{panel:"help"});
 check("Help explains purchase and specific-asset access",/I bought a car/.test(helpText()) && /specific owned asset/.test(helpText()));

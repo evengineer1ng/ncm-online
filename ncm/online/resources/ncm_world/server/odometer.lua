@@ -511,6 +511,8 @@ local function step(entry, t)
     local acc = pending[assetId]
     if not acc then acc = { metres = 0, since = t }; pending[assetId] = acc end
     acc.metres = acc.metres + seg.metres
+    -- Fuel consumes the exact accepted odometer segment. Rejected jumps, CALL placement and teleports burn none.
+    TriggerEvent("ncm:fuel:distance", entry, seg.metres, t, snap)
     if acc.metres >= CHECKPOINT_M or (t - acc.since) >= CHECKPOINT_S then
         NcmOdometer.flushAsset(assetId,"periodic")
     end

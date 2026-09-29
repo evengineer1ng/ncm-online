@@ -165,7 +165,7 @@
     function text(el, v) { el.textContent = (v === undefined || v === null) ? "" : String(v); }
     function show(el, on) { el.classList.toggle("hidden", !on); }
     function optionGlyph(id) {
-      return ({ enter_race: "enter", practice: "practice", leave_practice: "withdraw", withdraw: "withdraw", leave_list: "withdraw", history: "history" })[id] || "incident";
+      return ({ enter_race: "enter", switch_entry: "enter", confirm_switch: "enter", practice: "practice", leave_practice: "withdraw", withdraw: "withdraw", leave_list: "withdraw", history: "history" })[id] || "incident";
     }
 
     function fmtMs(ms) {

@@ -292,4 +292,13 @@ cases.the_wire_says_whether_a_position_is_known=function(T)
     T.eq(M.wire(facts({position=NONE})).hasPosition,false)
 end
 
+-- Entries close a minute before green, so "in 2 min" from a remote start closed empty twice in one evening.
+cases.two_minutes_needs_the_start_where_you_are=function(T)
+    T.ok(M.normalize(form{minutes=2},facts()))                                  -- HERE: fine
+    T.eq(select(2,M.normalize(form{start=A,minutes=2},facts())),"too_soon_for_start")   -- across town
+    T.ok(M.normalize(form{start=A,minutes=5},facts()))                          -- 5 min: fine anywhere
+    local n=Nodes.byId(A)
+    T.ok(M.normalize(form{start=A,minutes=2},facts{position={x=n.x+20,y=n.y,z=n.z}}))  -- standing at it
+end
+
 return cases

@@ -198,7 +198,7 @@ local function enterEveryone(e, t)
             end)
             e.entries[driver.ncmDriverId] = en
             current.field[pid] = driver.ncmDriverId
-            pcall(function() Open77.state.player(pid):set("ncmEntry", { eventId = e.eventId, state = "checked_in", routeName = e.routeName, startsAt = math.floor(e.startsAt) }) end)
+            if NcmGuide and NcmGuide.refreshEntryBag then NcmGuide.refreshEntryBag(pid) end   -- the one writer of ncmEntry
             n = n + 1
         end
     end
@@ -266,7 +266,7 @@ function NcmScenario.stop(reason, t)
     if e then
         e.state = "closed"
         pcall(function() MySQL.update.await("UPDATE event SET state = 'closed' WHERE event_id = ?", { e.eventId }) end)
-        for pid, _ in pairs(current.field) do pcall(function() Open77.state.player(pid):clear("ncmEntry") end) end
+        for pid, _ in pairs(current.field) do if NcmGuide and NcmGuide.refreshEntryBag then NcmGuide.refreshEntryBag(pid) end end
     end
     NcmCalendar.publishNow()
     slog("STOP event=%s reason=%s sessions=%d", tostring(current.eventId), tostring(reason), n)
@@ -447,7 +447,7 @@ RegisterCommand("ncm.world", function(source, args)
     if current then NcmScenario.stop("world_reset") end
     if NcmOrganized and NcmOrganized.clearOffers then NcmOrganized.clearOffers() end
     TriggerEvent("ncm:worldReset")
-    for _, pid in ipairs(Open77.players.all()) do pcall(function() Open77.state.player(pid):clear("ncmEntry") end); tell(pid, "World reset by the host: sessions ended, cars returned.") end
+    for _, pid in ipairs(Open77.players.all()) do if NcmGuide and NcmGuide.refreshEntryBag then NcmGuide.refreshEntryBag(pid) end; tell(pid, "World reset by the host: sessions ended, cars returned.") end
     log("WORLD RESET sessions=%d", n)
 end, false)
 

@@ -53,8 +53,8 @@ local function toast(pid, def) if pid then pcall(Open77.notifications.send, pid,
 
 --- How close a driver must be to the start to enter one of these. NOT the scenario host's 1e9 (which means
 --- "anywhere", so a QA scenario can enter everyone where they stand): a Street Call is a real event and `L35`
---- applies to it like any other.
-local VENUE_RADIUS_M = 60
+--- applies to it like any other. It was 60 m; it is now the drawn ring, like every race (owner, 2026-09-28).
+local VENUE_RADIUS_M = Core.get("competition.entry").DEFAULT_VENUE_RADIUS_M
 
 local open = {}          -- playerId -> true while a form is open (the form itself lives on the client)
 local lastCalled = {}    -- ncmDriverId -> unix seconds of their last CONFIRMED race
@@ -89,10 +89,28 @@ end
 
 --- Why this driver may not call a race right now, or nil. The builder knows nothing about races, clocks or quotas,
 --- so the host decides this and the builder never guesses.
+---
+--- **Per driver, the limit is ONE CALL ON THE BOARD, not a long timer (KB-187).** The rule was 15 minutes counted
+--- from the moment of calling. A call starts ~5 minutes later and a sprint takes ~4, so a driver who finished their
+--- own race was still locked out for several minutes, and the client said nothing at all. The cadence that `KB-165`
+--- protects is bounded by `impromptuMaxOpen` (server-wide), which is unchanged; per driver, "your call is still on
+--- the board" plus "you are racing" (`busySession`) cover the rest, and the timer is a short floor.
+local function ownCallOpen(driverId, t)
+    for _, eid in ipairs(NcmCalendar.orderedIds()) do
+        local e = NcmCalendar.events[eid]
+        if e and e.class == "impromptu" and e.calledBy == driverId and e.state ~= "closed" and e.state ~= "cancelled"
+            and (e.startsAt or 0) > t then
+            return true
+        end
+    end
+    return false
+end
+
 local function refusalFor(pid, driver, t)
     if not driver then return "no_driver" end
     if NcmRace and NcmRace.busySession and NcmRace.busySession(driver.ncmDriverId) then return "already_racing" end
-    local cooldown = tonumber(setting("impromptuCooldownSec", 900)) or 900
+    if ownCallOpen(driver.ncmDriverId, t) then return "own_call_open" end
+    local cooldown = tonumber(setting("impromptuCooldownSec", 60)) or 60
     local last = lastCalled[driver.ncmDriverId]
     if last and (t - last) < cooldown then return "cooldown" end
     if openImpromptuCount(t) >= (tonumber(setting("impromptuMaxOpen", 2)) or 2) then return "too_many_open" end
@@ -103,6 +121,7 @@ local REFUSAL_TEXT = {
     no_driver = "No NCM driver on this connection yet.",
     already_racing = "Finish the race you are in first.",
     cooldown = "You called one recently. Give the street a minute.",
+    own_call_open = "Your Street Call is still on the board. Race it (or let it start) before calling another.",
     too_many_open = "There are already enough open races on the board.",
     -- form validation, from competition.race_builder
     form_not_table = "That form did not arrive intact.",
@@ -115,6 +134,7 @@ local REFUSAL_TEXT = {
     repeated_point = "Two points in a row are the same place -- that leg has no length.",
     invalid_class = "That class cannot enter a street race.",
     invalid_minutes = "Pick one of the offered start times.",
+    too_soon_for_start = "In 2 min only works when you start where you are -- entries close a minute before green. Pick 5 min or more for that start.",
     too_short = "That route is too short to be a race.",
     route_unresolved = "Could not build a course from those points.",
     too_few_points = "A race needs a start and a finish.",
@@ -230,6 +250,7 @@ local function create(pid, driver, spec, t)
         disciplineId = spec.disciplineId, formatId = spec.formatId, classId = spec.classId, laps = spec.laps,
         -- no `economy`: a Street Call pays nothing (see the header). Settlement finds no purse and that is the
         -- intended behaviour, not an omission waiting to be filled in.
+        unpaid = true,   -- the declaration NcmEconomy.isUnpaid reads: enter free, settle to nothing (KB-186)
         calledBy = driver.ncmDriverId,
         ephemeralRoute = true,
     }
@@ -265,6 +286,28 @@ local function create(pid, driver, spec, t)
         TriggerClientEvent("ncm:guide.route", pid,
             { x = e.venue.x, y = e.venue.y, z = e.venue.z, name = e.venue.name, eventId = e.eventId })
     end)
+    -- **The caller is in their own race.** Nothing put them on it: they had to open F6, find the call, register
+    -- interest for the ring to appear, then hold E -- inside the one minute a 2-minute call leaves before the grid
+    -- forms, while already sat on the line (owner, 2026-09-28: two calls closed empty that way). So enter them
+    -- now, through the normal check-in (car, venue, economy). If that is refused -- not at the line yet, no legal
+    -- car -- they are put on the list instead, so the ring and the route appear at once and they can enter there.
+    local driverId = driver.ncmDriverId
+    CreateThread(function()
+        if NcmCalendar.enter then NcmCalendar.enter(pid, e.eventId) end
+        for _ = 1, 20 do
+            Wait(250)
+            local en = e.entries and e.entries[driverId]
+            if en and en.state ~= "interested" and en.state ~= "withdrawn" then
+                log("caller entered own call player=%d event=%s", pid, e.eventId)
+                return
+            end
+        end
+        local en = e.entries and e.entries[driverId]
+        if not en and NcmGuide and NcmGuide.interest then
+            NcmGuide.interest(pid, e.eventId)
+            log("caller put on the list for own call (entry refused) player=%d event=%s", pid, e.eventId)
+        end
+    end)
     return e
 end
 
@@ -280,7 +323,10 @@ function NcmImpromptu.open(pid)
     local driver = NcmCalendar.resolveDriver(pid)
     local refusal = refusalFor(pid, driver, t)
     if refusal then
-        tell(pid, REFUSAL_TEXT[refusal] or ("Cannot call a race: " .. tostring(refusal)))
+        local text = REFUSAL_TEXT[refusal] or ("Cannot call a race: " .. tostring(refusal))
+        tell(pid, text)
+        -- Chat alone was the only channel, so an F5 that was refused looked exactly like an F5 that did nothing.
+        toast(pid, { type = "warning", title = "STREET CALL", message = text, icon = "NCM", durationMs = 6000 })
         log("open refused player=%d reason=%s", pid, tostring(refusal))
         return false, refusal
     end

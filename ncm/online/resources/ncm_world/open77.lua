@@ -26,12 +26,14 @@ auto_start true
 --   damage never heals.
 -- world.prevention: the console-only `ncm.wanted` probe for IDEA-677 (`Open77.players.setWanted`). Declared
 --   so a live test cannot fail on a missing permission; the card lists none, the client plugin checks this one.
-permissions { "database.access", "network.events", "state.write", "world.vehicles", "ui.vanilla.map", "ui.nameplates", "input.actions", "map.control", "players.teleport", "world.props", "world.npcs", "vehicles.read", "world.query", "world.environment", "world.population", "players.stats.apply", "world.prevention" }
+permissions { "database.access", "network.events", "state.write", "world.vehicles", "ui.vanilla.map", "ui.nameplates", "input.actions", "map.control", "players.teleport", "world.props", "world.npcs", "vehicles.read", "world.query", "world.environment", "world.population", "players.stats.apply", "world.prevention", "players.hacking.define", "players.hacking.read", "players.hacking.activate", "players.hacking.cancel", "players.cyberware.define", "players.cyberware.read", "players.cyberware.manage", "combat.scope.control", "combat.config" }
 
 -- Race HUD (M3.2): light tree, banner and race strip as our own WebUI page.
 web_ui_page "web/race.html"
 web_ui_auto_create false
 web_files { "web/**" }
+-- Native Ink blip assets are not WebUI files: OPEN//77 requires an explicit resource declaration.
+files { "icons/fuel.svg" }
 dependency "open77_notifications"
 dependency "open77_nameplates"
 dependency "open77_worldui"
@@ -58,6 +60,7 @@ shared_script "shared/core/world/weather.lua"
 shared_script "shared/core/world/readiness.lua"
 shared_script "shared/core/world/location.lua"
 shared_script "shared/core/data/nodes.lua"
+shared_script "shared/core/data/fuel_locations.lua"
 shared_script "shared/core/data/roots.lua"
 shared_script "shared/core/course/routes.lua"
 shared_script "shared/core/world/ambient.lua"
@@ -87,6 +90,8 @@ shared_script "shared/core/competition/guide.lua"
 shared_script "shared/core/competition/venue_options.lua"
 shared_script "shared/core/competition/discoveries.lua"
 shared_script "shared/core/competition/machine_knowledge.lua"
+shared_script "shared/core/competition/scanner.lua"
+shared_script "shared/core/competition/chrome.lua"
 shared_script "shared/core/competition/observation.lua"
 shared_script "shared/core/engineering/competency.lua"
 shared_script "shared/core/machine/flats.lua"
@@ -104,6 +109,7 @@ shared_script "shared/core/economy/markets.lua"
 shared_script "shared/core/economy/production.lua"
 shared_script "shared/core/economy/supply_profiles.lua"
 shared_script "shared/core/economy/settlement.lua"
+shared_script "shared/core/economy/fuel.lua"
 shared_script "shared/core/economy/trade.lua"
 shared_script "shared/core/driver/progression.lua"
 shared_script "shared/core/driver/presentation.lua"
@@ -124,8 +130,10 @@ server_script "server/presentation.lua"
 server_script "server/garage.lua"
 server_script "server/vehicle_access.lua"
 server_script "server/odometer.lua"
+server_script "server/fuel.lua"
 server_script "server/machine.lua"
 server_script "server/handling.lua"
+server_script "server/chrome.lua"
 server_script "server/components.lua"
 server_script "server/observation.lua"
 server_script "server/state_probe.lua"
@@ -144,6 +152,8 @@ client_script "client/nameplates.lua"
 -- nav owns every waypoint NCM sets; it loads before the two files that ask for one.
 client_script "client/nav.lua"
 client_script "client/landmarks.lua"
+client_script "client/fuel_stations.lua"
+client_script "client/autofixer_markets.lua"
 -- After landmarks.lua: both draw blips against one 128-per-resource quota, and landmarks is the layer
 -- with the fixed cost, so it gets its pins first.
 client_script "client/players_map.lua"

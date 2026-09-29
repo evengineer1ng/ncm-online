@@ -41,8 +41,18 @@ function NcmEconomy.withBalanceLocks(tx,driverIds)
     return out
 end
 
+--- An event that DECLARES itself unpaid: no fee, no purse. A Street Call is one by design (impromptu.lua's header),
+--- and Economy v1 refused every entry to it with `economy_required` because check-in treated "no economy" as
+--- "broken economy" (KB-186). The declaration is required -- a paid series that merely lost its economy block
+--- must still refuse rather than quietly start racing for free.
+function NcmEconomy.isUnpaid(e)
+    return type(e)=="table" and e.economy==nil and (e.unpaid==true or e.class=="impromptu")
+end
+
 function NcmEconomy.checkIn(req)
-    local fee,why=Settle.entryFee(req.economy); if fee==nil then return nil,why end
+    local fee,why
+    if req.unpaid and req.economy==nil then fee=0 else fee,why=Settle.entryFee(req.economy) end
+    if fee==nil then return nil,why end
     NcmEconomy.ensureStarter(req.driverId)
     local q
     if req.upgraded then
@@ -89,6 +99,7 @@ NcmEconomy.receiptText=receiptText
 
 function NcmEconomy.settle(rec,results,reason,t)
     local e=rec.plan and rec.plan.e or {}; local econ=e.economy
+    if NcmEconomy.isUnpaid(e) then return {} end   -- nothing to pay, and nothing failed (KB-186)
     local valid,why=Settle.validate(econ); if not valid then return nil,"economy:"..tostring(why) end
     local field=#results; local tt=field<=1; local win=windowId(econ,t); local paying=rec.kind=="race"
     local tagInput={session={kind=rec.kind,timeTrial=tt,fieldSize=field,gatesTotal=#(rec.s.gates or {})},results={}}

@@ -89,3 +89,22 @@ function NcmMarketKnowledge.state(driverId, marketId)
     end
     return nil
 end
+
+-- A terminal interaction is an intent, not proof. Re-read the authoritative player snapshot here and accept
+-- only a fresh body within the terminal's small 2D footprint; proximity alone never calls this event.
+RegisterNetEvent("ncm:market.discover", function(marketId)
+    local pid=tonumber(source) or 0
+    CreateThread(function()
+        local market=Markets.byId(tostring(marketId or ""))
+        local d=NcmCalendar.resolveDriver(pid)
+        local okP,p=pcall(Open77.players.get,pid)
+        if not market or market.universallyKnown or not d or not okP or not p or not p.fresh or not p.position then return end
+        local dx,dy=p.position.x-market.x,p.position.y-market.y
+        if dx*dx+dy*dy>36 then return end
+        local learned=NcmMarketKnowledge.learn(d.ncmDriverId,market.marketId,"physical_terminal",market.marketId,"open")
+        if learned then
+            if NcmComms then NcmComms.send(pid,{id="market.discovered:"..market.marketId,kind="progression",title="MARKET DISCOVERED",message=market.displayName.." is now available in F6.",persist=false}) end
+            if NcmMarket then NcmMarket.push(pid) end
+        end
+    end)
+end)

@@ -3,12 +3,205 @@
 > **STATUS: LEDGER** - living session memory, rewritten at the end of every working session.
 > Authority map: [INDEX.md](INDEX.md) - classified 2026-09-24 (L125).
 
+**LATEST 2026-09-29 - 20 PHYSICAL AUTOFIXER MARKETS BUILT, OFFLINE TESTING IN PROGRESS, NOT DEPLOYED (`L206`).**
+All owner-supplied coordinates are distinct interaction-only Markets: no pin, no proximity discovery, and a fresh
+server position check within 6 m after pressing E. Once learned they persist in the F6 Market Network beside Base
+Market. The catalogue adds 18 official-data-verified base/update/Phantom Liberty model families; each terminal has
+1–3 model offerings. Each also has two newly authored specialty Part families with its own Designs and serialized
+supply—no Base Market component is re-listed. F6's remaining Base Market literals were removed from inspect and
+component-purchase actions. **THE ONE NEXT ACTION (Markets): finish the full offline gate, then deploy and verify
+one terminal interaction, persistence across reconnect, all learned F6 sources, one non-Base vehicle purchase and
+one non-Base component production/purchase before broad terminal-by-terminal coordinate QA.**
+
+**LATEST 2026-09-29 (early) - NO MAP PINS AT ALL (`KB-203`): FUEL STATIONS AND LANDMARKS INVISIBLE; `/ncm.fuel` AND A
+`/ncm.blips` PROBE BUILT AND DEPLOYED TO ONLINE 2026-09-29 03:08 UTC.** The deploy carried the Autofixer markets update, whose
+missing `market.kind` aborted `ncm_league`'s boot for about four minutes (`KB-204`, fixed and live; catalogue generation and one SQL 1292 still open). Owner on Online: no fuel blips (or race nodes), nowhere to refuel. The
+client log says all 53 fuel and 35 landmark blips were created; none render, including native `vendor`/`fast_travel`,
+so it is not only the SVG path. The platform mappin filter logs only the routable nav blip as allowed; `§AD7` never passed, so
+non-routable NCM blips have never been proven visible. `/ncm.fuel` routes GPS to the nearest station at any fuel level
+(`IDEA-708`); `/ncm.blips` drops four probe sprites to find one that renders.
+**UPDATE 03:18 UTC:** `§CF9` PASSED (all four probe sprites visible), which proved the cause: the layer pins were built in the
+pre-game world before the character save replaced it. Pins now wait for the settled real world (deployed). Catalogue
+generation bumped to 2; collection ready; proximity stays sighting-only (`L197`).
+**THE ONE NEXT ACTION (map pins): rejoin and run `§CF7` (fuel pins, incl. whether SVG icons render), `§AD7` (landmarks)
+and `§CF8` (`/ncm.fuel`).**
+
+**LATEST 2026-09-28 (night) - PERSISTENT FUEL THIN SLICE BUILT AND OFFLINE-GREEN, NOT DEPLOYED.** `L204` /
+`IDEA-702`: fuel is persistent per Machine and burns only from server-accepted odometer distance. The odometer HUD
+now shows FUEL %. Alpha tuning is 60 L, 350 ml/km and €$2/L; station refuelling settles money and fuel together.
+Empty fuel persists, stops the engine and sends `Stuck? Type /ncm.nofuel for help.` to toast and chat. The recovery
+command routes the nearest station. No verified server-safe jerry-can/equipment method is present yet, so the built
+fallback dismounts the Driver and stores/tows the Machine to that station for an F6 call and `/ncm.refuel`. Two
+authored candidate station blips are visible from the beginning and remain explicitly unverified in-engine.
+Owner correction (`IDEA-704`): two stations were only smoke-test fixtures and are removed. The supplied 5.4a
+archive contains 81 current pump points, grouped into 53 anonymous physical station sites for map/recovery while
+retaining every pump for refuelling proximity. Only factual coordinates were carried; no third-party name, code,
+icon, asset, pricing or interaction logic was copied. All 53 remain live-verification-gated. `KB-200` corrected
+the first blip pass before deployment: OPEN//77 expects a manifest-declared `icons/fuel.svg`,
+not the WebUI path `web/icons/fuel.svg`. Each station now creates as a map-capable native vendor marker first;
+`setIcon` then applies the SVG and logs the exact refusal while leaving that visible fallback intact.
+**THE ONE NEXT ACTION (fuel): deploy schema 042 before `ncm_world`, then run `MASTER_TEST §CF1`-`§CF7`; replace
+the tow fallback when the owner's jerry-can method/asset is supplied and verified.** `IDEA-703` records ZF
+PropForge as the leading candidate asset pipeline: first obtain/test its output and permission, then separately
+prove a hand attachment or native item-record path; a spawnable world prop alone is not yet a carried can.
+
+**LATEST 2026-09-28 (late) - PHYSICAL MOTORING NETWORK DIRECTION RECORDED; RECONNAISSANCE ONLY.** Owner direction
+`L203`: every Autofixer terminal is its own Market, unmarked until explicit interaction; F6 then remembers it
+forever and permits remote purchases. Test drives exist only at that terminal, are timed/geofenced/return-to-origin
+and refuse race entry. Two violations plead for the car; strike three triggers a five-star Hellfire response.
+Returning clears NCM's penalty but not the active chase; death returns the Machine and clears Hellfire; disconnect
+also returns it and clears fugitive state. Keeping the car makes the living Driver a persistent fugitive, and police contact retriggers five stars. Physical garages
+and fuel stations are visible from the beginning as distinct NCM-authored SVG map POIs. Bought Parts move to
+garage-only fitting charged as a percentage of Part value; that is the first Engineering slice, while earned DIY
+remains a large later lane. Linked
+GarageCore/YARRG/CMS/Immersive Fuel and map sites are references only; their assets are permission-restricted and
+no coordinate is accepted without in-engine verification. `IDEA-695`-`IDEA-701` hold the open implementation
+details. **Next action for this thread: author the timer, geofence and fitting percentage as tunable balance values,
+then write the bounded discovery + test-drive + paid-fitting work package.** This does not displace the deployed/live-test queue below.
+
+**LATEST 2026-09-28 (late) - RACE ENTRY REBUILT AROUND PLACE: A RING FOR EVERY RACE, THE CARD FOR THE RING YOU
+STAND IN, ONE ENTRY AT A TIME. BUILT AND OFFLINE-GREEN, NOT DEPLOYED.** Owner: *"we have been fighting bugs for our
+race entries and things are getting lost in translation."* This is a separate workstream from the FFB block below.
+
+- **Root cause (`KB-195`-`KB-199`).** "Which race is this ring/card for?" was answered by time and by driver, never
+  by where the driver stood. There was one ring in the world, visible from only 15 m. A bookmark outranked a
+  paid entry. `enterPlayer` wrote `ncmEntry` behind the Guide's cache, so the card at one ring could act on
+  another race. Team seats could not be withdrawn, and the drawn 6 m ring hid a 30-60 m server allowance.
+- **Owner rulings, `L202`:** every race inside 20 min has its own ring, visible from far away (500 m). The card
+  belongs to the ring you stand in. Interest is a bookmark. One entry at a time, and a seat counts. Switching is two
+  presses. A seat is withdrawable. Street Calls get their own ring. The drawn ring is the entry rule.
+- **Offline:** core 765/765 (5.4 + LuaJIT), full `ncm-test.ps1` green, and the new stub scenario `ringcard`. Stub
+  drift from `IDEA-685` is unchanged. `entrybag` is green again.
+
+**THE ONE NEXT ACTION (race entry): deploy `ncm_league` + `ncm_world` to Online, then run `MASTER_TEST §CE1`-`§CE6`.**
+`§CE1` also answers whether a flat ring is noticeable at a few hundred metres (`IDEA-694`). The FFB action below is
+independent and unchanged.
+
+**LATEST 2026-09-28 (late night) - THE RIG BRIDGE BECOMES THE WHOLE INPUT LAYER: JOYMOCO, PORTED. BUILT AND
+OFFLINE-GREEN, NOT DEPLOYED (`L205`, `IDEA-705`).** Owner: *"full joymoco capabilities ... its rp fuel."*
+
+- **DEVICES** replaces WHEEL/PEDALS: collapsible WHEELBASE & PEDALS, FORCE FEEDBACK, GAMEPAD. GAMEPAD holds
+  recorded **variants** per Xbox output from any device (rim button, Joy-Con button, Joy-Con press-then-swing),
+  each with a rumble preset, side and context (driving / on foot / both); gyro steering; stick rotation;
+  calibration; game rumble to Joy-Cons; local JSON profiles.
+- **How it reaches the game:** a detour on the game's own XInput (it imports XINPUT9_1_0, no
+  Windows.Gaming.Input), so no ViGEm driver. Input: SDL3 in-process (Joy-Cons and the rim, which DirectInput
+  cannot see in-game, `KB-201`) plus DirectInput. Carrier 0.1.30 starts no SDL when the Rig Bridge is present.
+- **Default profile:** the owner's 16 rim bindings from JoyMoCo (the other 11 of the 27 were Xbox-pad
+  passthrough, which would double every pad press). JoyMoCo was only read.
+- **Offline gate:** pad engine tests (holds, variants, context, staged swing, both recorders, gyro steering,
+  XInput merge), feel and mapping tests, clean build, panel harness green with a new DEVICES-sections check.
+- **Staged, not deployed:** `dist/ncm-rig-bridge-0.1.6.zip` (`3dc80f1b…`), `dist/ncm-carrier-0.1.30.zip`
+  (`d4431422…`) and the panel.
+
+**DEPLOYED TO ONLINE 2026-09-29 02:29 UTC** with the fuel work (18 hash-diffed resource files, migration 042 applied,
+`Required mods: 3 declared`, digest `34cfc150…`, backup `backups/pre-devices-fuel-20260929T022746Z`). `ncm_world`
+failed its first start (`KB-202`, fuel data module unregistered), fixed and redeployed 02:32:36 UTC, 0 errors.
+
+**THE ONE NEXT ACTION: rejoin (the launcher installs Rig Bridge 0.1.6 and Carrier 0.1.30), then run `MASTER_TEST
+§CG1`-`§CG14` from the top, and the fuel rows `§CF1`-`§CF7`.**
+`§CG1` answers whether SDL3 sees the rim in-game (`KB-201`); `§CG2` answers whether the panel may fetch
+loopback. Everything else depends on those two.
+
+**LATEST 2026-09-28 (night) - FFB IS BACK ON THE G29 (LIVE); TUNING IS NEXT, AND IT NOW HAS NUMBERS.**
+Owner: *"ffb is back. log the fix. next we tune."*
+
+- **The real cause of "FFB worked once and got lost" was two owners (`KB-188`, `L201`).** The Carrier opened the
+  G29 through SDL haptics, which takes it EXCLUSIVELY, and so did the Rig Bridge. Whoever acquired last owned
+  the wheel; on vehicle entry that was the Carrier, whose own output had mistaken the pedals for the wheel.
+  Carrier 0.1.29 now leaves haptics alone when the Rig Bridge is installed. `KB-187`'s repairs were real but
+  could never be felt while the wheel was taken.
+- **Rig Bridge output rebuilt as its own module (`KB-189`, `KB-190`).** Own device handle and window, effects
+  started once and only updated, X axis, and every DirectInput result shown in the panel's FFB OUTPUT row.
+  Direct drive is limited in newton-metres and any wheel identifies itself with no console (`IDEA-687`).
+- **Deployed to Online 21:44 UTC** (Carrier 0.1.29, Rig Bridge 0.1.4, `Required mods: 3 declared`, digest
+  `9a38fa6d…`). **`§CD1` PASS** (owner). Backups: `server.jsonc.pre-ffb-0.1.4`, `mods/panel.pre-ffb-0.1.4.html`.
+- **Rig Bridge 0.1.5 plus panel, DEPLOYED 22:24 UTC** (digest `78d1b0da…`, backup
+  `backups/resources-pre-ffb015-20260928T222317Z.tar`, `server.jsonc.pre-ffb-0.1.5`): every vibration slider is its own effect with a LIVE
+  now/peak readout and RESET PEAKS (`IDEA-688`); the engine follows revs again, 12-47 Hz, by owner decision
+  (*"125 hz is the old one"*, `KB-191`, `IDEA-689`); TEST PULSE is ARM-gated again (`KB-190`); the live
+  0.1.4 panel's per-frame rebuild is fixed (`KB-193`); and collisions are rebuilt to be felt from every
+  direction, head-on included, with their own COLLISION slider (`KB-194`, `IDEA-690`, `§CD11`).
+- **Same deploy carried a parallel session's race-entry work** (owner: expected): 17 hash-diffed resource files in
+  `ncm_league`/`ncm_scanner`/`ncm_world` (calendar, entry, venue_options, organized, impromptu, street pack,
+  guide, qa rules, client calendar, `venue.html`). No migration. Gate ALL GREEN and `ncm-build -Check` clean first.
+- **Open:** ROAD reads zero in every session because suspension telemetry never arrives (`KB-192`).
+
+**THE ONE NEXT ACTION: rejoin (the launcher installs 0.1.5) and run `MASTER_TEST §CD2`-`§CD11` one channel
+at a time, recording felt / LIVE peak / chosen value.** `§CD6` decides the engine; `§CD8` is expected silent.
+The values from `§CD9` become the shipped defaults. monki's T128 report (`IDEA-421`) is the checklist for a
+second wheel.
+
+**LATEST 2026-09-28 - RIG BRIDGE 0.1.2 RESTORES THE DYNAMIC FFB PATH IN CODE; BUILT AND OFFLINE-GREEN,
+NOT DEPLOYED, LIVE WHEEL PASS OWED.** Owner: *"dont want a probe, want a fix that restores ffb."*
+
+- **`KB-184` is corrected.** Its keyboard slider defect and fix are real, but its main diagnosis was not. In
+  0.1.1 the live setters changed atomics and `persist()` wrote a separate startup `Config`, so `strength 0.020`
+  and `armed false` in `ncm_rig_bridge.user.json` were not evidence of the FORCE used by the running wheel. The
+  owner's report of raising FORCE stands.
+- **`KB-187` / `IDEA-686` / `L199`: behavior fix, not probe.** The SINE stream changed the playing effect's
+  period with revs and could restart it from phase zero at the 250 Hz pump cadence. Both SINE and CONSTANT also
+  cached a requested value before checking whether DirectInput accepted it. 0.1.2 uses a fixed 125 Hz carrier,
+  caps periodic magnitude writes at 50 Hz, lets DirectInput choose its compatibility restart, retries once after
+  reacquisition, and records a value as sent only on success. The watchdog now gates effect start, removing the
+  armed-but-parked 250 Hz start/stop loop.
+- **Settings now mean what they say.** FORCE, class and all tune values update the persisted config. ARM is
+  intentionally session-only: every cold launch still begins disarmed.
+- **Artifact:** `dist/ncm-rig-bridge-0.1.2.zip`, SHA-256 `ee818938…bffc5`; clean MSVC build and both native tests pass. Hardware remains
+  unproven until `MASTER_TEST §CC` records SINE and CONSTANT on the G29.
+
+**THE ONE NEXT ACTION: publish/install Rig Bridge 0.1.2, cold-launch, then run `§CC1`-`§CC5`; `§CC3` (continuous
+road/engine texture) and `§CC4` (aligning torque plus TEST PULSE) decide whether FFB is restored.** The external
+companion remains the fallback until both pass. This does not erase the already-owed Online rows below.
+
+**LATEST 2026-09-28 (evening) - BUG FIX PASS: THE RING, STREET CALL ENTRY, AND WHY "HIGHEST FORCE" DID NOTHING.
+DEPLOYED TO ONLINE 19:18 UTC, WITH THE SESSION LANDING PANEL UPDATED.** Owner: *"venue entry ring doesnt show up unless im there and i re
+express interest ... custom races fail to be entered due to some economy reason ... ffb rumble has disappeared
+again ... i tried highest force so its not that."* All three were traced from the client, Rig Bridge and Online
+server logs of the 14:35 local session, not from docs.
+
+- **`KB-185` ring.** `ncmEntry` was re-derived only on interest or withdraw, so after the race it named had passed
+  (city_cup, 18:40 UTC), it went on naming a race that no longer existed, and nothing was ringed. Not caused by the
+  F5 work. `NcmGuide.refreshEntryBags` now re-derives it every 5 s, and a running weekend holds its ring.
+- **`KB-186` Street Call.** Refused with `economy_required`: a Street Call is unpaid by design, and Economy v1's
+  check-in treated "no economy" as "broken". Now an event that **declares** itself unpaid enters free and settles
+  to nothing. Any other missing economy still refuses (`L198`).
+- **`KB-184` force — CORRECTED by `KB-187`.** Keyboard Left/Right on a slider really did rely on native stepping
+  that never happens in the host, and sliders now step in code and commit on release. But `user.json` was a stale
+  startup-config record, not live proof; the claim that no FORCE reached the bridge and rumble stayed at 2% is
+  withdrawn. Rig Bridge 0.1.2 owns the actual SINE/CONSTANT repair and `§CC` decides it.
+- **Gate:** `ncm-test` ALL GREEN. New stub scenario `entrybag` fails on the previous code for both server bugs.
+  The stub had silently stopped loading since `1f7ec0a` (shimmed); six older scenarios are red on HEAD too
+  (`IDEA-685`).
+
+- **Landing panel** (owner: *"check session landing page, update it and deploy"*): a new release entry, *Scanner,
+  quick menu and fixes*, covers the Scanner, the radial, health regen, keyboard F6 and these three fixes. There
+  are new `partial` capabilities **Call a street race** and **Scan machines**, each with its limit, and the
+  entry-fee line now says scheduled races only. All of it was checked against the core validator.
+- **Deploy:** exactly 7 files differed from Online (hash-diffed), and all were this session's. No players were
+  connected. No migration. The server is healthy, and after the restart all 357 files are identical. No backup
+  was taken; this change touches no data. Required mods still read **3 declared**, digest `917298d8…`, unchanged since
+  17:56 UTC. The "4 declared" in the 16:41 note below is stale.
+
+**The remaining next action for this older batch is `MASTER_TEST §CB1`, `§CB3`-`§CB6`; §CB2 is superseded by the
+0.1.2 force-output run at §CC.** This rides alongside the
+owed §BT-§CA rows below; it does not replace them.
+
 **DEPLOYED 2026-09-28 16:41 UTC to Online (Lightsail):** the whole shared tree, i.e. Exchange (`L194`, migration 040
 applied), health regen, the radial resource and F6 renamed Hub, plus two NEW required mods, `ncm-radial` 0.1.0 and
 `ncm-vision` 0.1.0 (4 declared now, with Carrier and Rig Bridge). Server healthy: scheduler, race control and
 Exchange ready, no errors. Backup `/opt/ncm/backups/pre-carrier-prod-20260928T163834Z`. **Deployed is not done:
 the next action for all of it is the live rows `MASTER_TEST §BT-§BY`, with §BX1 (radial host) and §BY1 (no
 redscript compile error) first, since a script failure would hit every joining player.**
+
+**Also 2026-09-28 - F6 HUB ACCESSIBILITY FIXED, DEPLOYED TO ONLINE 18:15 UTC (`KB-183`, `IDEA-682`).** Owner: *"i have to
+spam click the buttons on [wheel/pedals] ... why can i tab everything but enter does nothing?"* Cause 1: the WHEEL
+tab rebuilt every control on every streamed Rig Bridge frame, so a click's press and release hit different nodes.
+It now redraws only on structural change and writes the values in place. Cause 2: `ncm-nav.js` held focus by DOM
+node, so after any redraw Enter activated a detached node and did nothing. Focus is now keyed and recovered.
+Enter also cycles dropdowns, and Left/Right belong to a focused slider or dropdown. `ncm-test` ALL GREEN, and the
+new assertions fail on the previous commit. Only `ncm_world/web/{ncm-nav.js,panel.html}` differed from the server (hash-diffed), so nothing else
+shipped. Server healthy after restart. **Next action: rejoin and run `MASTER_TEST §CA1-§CA6`.** A pad still cannot move a slider (`IDEA-682`).
 
 **Also 2026-09-28 (parallel session) - NCM QUICK MENU: A NATIVE RADIAL, BUILT AND PACKAGED, LIVE-GATED (`L195`).**
 Hold **Start** (pad) or **B** (keyboard), aim, release: Hub (F6, renamed from "race guide"), Race graph, Call a
@@ -45,14 +238,17 @@ narrow vertical slice."*
 settles once and a retry moves nothing. The same deploy still carries the older owed §BN/§BT/§BV work; do not
 mistake the offline gate for any of those live PASSes.
 
-Alongside it, **2026-09-28 - NCM VISION: THE SCANNER'S REAL GREEN RENDER, NO SCANNER AND NO SLOW MOTION, BUILT
-AND PACKAGED, LIVE-GATED (`L196`, `IDEA-679`).** Hold **Tab**, or tap **Caps Lock**, for the vanilla focus render
-on foot or driving. It is one redscript file in a **new** required mod `ncm-vision` (`ncm/vision/`,
-`dist/ncm-vision-0.1.0.zip`), with no DLL, and it does not touch Carrier, Rig Bridge or the radial. It calls only
-`VisionModeSystem.EnterMode(Focus)`, beneath the controller OPEN//77 refuses. OPEN//77 already refuses the slow
-motion separately. It compiles against vanilla plus every installed script. **Its next action: publish `ncm-vision`
-to the dev server and run `MASTER_TEST §BY1-§BY7`; §BY1 (no compile error) gates the rest.** This does not displace
-the next action above.
+Alongside it, **2026-09-28 - NCM SCANNER: GREEN LIVE-PASSED; RETICLE AND SCAN-GATED DISCOVERY BUILT AND DEPLOYED,
+LIVE-GATED (`L196`, `L197`, `IDEA-679`, `IDEA-681`).** Green on Tab / Caps Lock passed live (`§BY1-§BY2`, owner).
+**Owner decision `L197`:** a new Machine enters the Index only by a Scanner hold of about 1.5 s within 60 m.
+Proximity is now a sighting of a known machine. NCM ambient cars are registered and scan as `server_measured`;
+vanilla per-client cars scan as `client_attested`, rate-limited. `ncm-vision` 0.2.0 (`dist/ncm-vision-0.2.0.zip`)
+adds a DLL transport on 38600+ and a native reticle in the crosshair container. The new `ncm_scanner` resource
+runs the lock, and `collection.lua` does the only write. The Scanner is also where Chrome hacks will attach
+(`IDEA-681`). Offline green: core, DLL tests, and redscript against every installed script. **DEPLOYED TO ONLINE
+2026-09-28 17:34 UTC** as `ncm-vision` 0.2.1 with radial 0.1.1 (digest `46cfc058`; 0.2.0 would not load, `KB-182`; backup
+`pre-carrier-prod-20260928T172655Z`; see `OPS_STAGING.md`). **Its next action: rejoin (the launcher fetches both packages) and run `MASTER_TEST
+§BZ1-§BZ10`, and `§BX` for the radial.** This does not displace the next action above.
 
 Before that, **2026-09-28 (later) - HEALTH NOW REGENERATES; POLICE WERE ALLOWED ALL ALONG, AND WHETHER THEY
 CHASE IS NOW ONE CONSOLE COMMAND AWAY FROM AN ANSWER.** Owner: *"player health doesnt regenerate in ncm online
@@ -223,8 +419,9 @@ next rig action is an in-process read-only P0 that composes the owner's G29, sep
 rim using those source-verified provider patterns and preserves stable device identity. This research does not
 displace the live queue below.
 
-> **Claim before writing:** decisions through **L193**; MASTER_TEST through **§BV**; next QA letter **§BW**.
-> BACKLOG next free **IDEA-679**; known issues through **KB-180**. Read ledger tails before allocating.
+> **Claim before writing:** decisions through **L206**; MASTER_TEST through **§CG**; next QA letter **§CH**.
+> BACKLOG next free **IDEA-713**; known issues through **KB-203**. Read ledger tails before allocating.
+> BACKLOG next free **IDEA-686**; known issues through **KB-186**. Read ledger tails before allocating.
 >
 > The next-free guard matters: overlapping 2026-09-26/27 sessions previously made this block stale several
 > times (`IDEA-380`). The docs gate asserts ID uniqueness and the BACKLOG next-free line.

@@ -307,8 +307,20 @@ local function acceptOffer(pid)
     offer.busy = true
     local e = NcmCalendar.events[offer.eventId]
     if not e then offers[driver.ncmDriverId] = nil; tell(pid, "That event is gone."); return end
-    local decision = Entry.register({ event = e, now = t, driverId = driver.ncmDriverId, existingEntry = e.entries[driver.ncmDriverId], seat = offer.seat, rng = hostRng })
-    if not decision.ok then offer.busy = nil; tell(pid, "Cannot register: " .. tostring(decision.reason)); return end
+    -- One entry at a time, and a seat is an entry (owner, 2026-09-28): accepting while entered elsewhere is refused
+    -- with the race named, never a silent second commitment.
+    local held = NcmGuide and NcmGuide.heldEntry and NcmGuide.heldEntry(driver.ncmDriverId, e.eventId) or nil
+    local decision = Entry.register({ event = e, now = t, driverId = driver.ncmDriverId, existingEntry = e.entries[driver.ncmDriverId],
+        heldElsewhere = held, seat = offer.seat, rng = hostRng })
+    if not decision.ok then
+        offer.busy = nil
+        if decision.reason == "entered_elsewhere" then
+            tell(pid, ("You're entered in %s. Withdraw from it first, then accept the seat."):format(tostring(held.routeName)))
+        else
+            tell(pid, "Cannot register: " .. tostring(decision.reason))
+        end
+        return
+    end
     local en = decision.entry
     local car = Teams.carForSeat(en.teamId, en.seatIndex)
     en.carNumber = car and car.number or nil
@@ -325,16 +337,26 @@ local function acceptOffer(pid)
     offers[driver.ncmDriverId] = nil
     pushInbox(pid, driver.ncmDriverId)
     local team = Teams.byId(en.teamId)
-    pcall(function()
-        Open77.state.player(pid):set("ncmEntry", { eventId = e.eventId, state = "registered", routeName = e.routeName, startsAt = math.floor(e.startsAt),
-            teamId = en.teamId, teamName = team.name, teamShort = team.short, colour = team.colour, seatIndex = en.seatIndex })
-    end)
+    -- Through the one writer, which carries the team fields itself.
+    if NcmGuide and NcmGuide.refreshEntryBag then NcmGuide.refreshEntryBag(pid) end
     local numberText = en.carNumber and ("#" .. en.carNumber) or ("car " .. en.seatIndex)
     tell(pid, ("You're driving for %s (%s). Be on your mark at %s — lights in %s. Your car will be waiting in your grid slot."):format(team.name, numberText, e.venue.name, Entry.countdown(e.startsAt - t)))
     toast(pid, { type = "success", title = ("%s · %s"):format(string.upper(team.name), string.upper(numberText)), message = "Report to the grid at " .. e.venue.name, icon = team.short, color = team.colour, durationMs = 10000 })
     log("ACCEPTED driver=%s player=%d team=%s seat=%d event=%s entry=%s", driver.ncmDriverId, pid, en.teamId, en.seatIndex, e.eventId, en.entryId)
     NcmCalendar.publishNow()
     if NcmRace.pickupStarted(e.eventId) then NcmRace.pickupLate(e, driver.ncmDriverId) end
+end
+
+--- Give an ACCEPTED seat back to its team: the driver withdrew at the venue (owner, 2026-09-28: a seat is an
+--- entry and is withdrawable). The entry row itself is the Guide's to mark withdrawn; this frees the seat.
+function NcmOrganized.releaseSeat(eventId, driverId, teamId, seatIndex)
+    local roster = rosters[eventId]
+    if roster then Teams.releaseSeat(roster, driverId) end
+    pcall(function()
+        MySQL.update.await("UPDATE seat SET ncm_driver_id = NULL, entry_id = NULL, offered_at = NULL, accepted_at = NULL WHERE event_id = ? AND team_id = ? AND seat_index = ?",
+            { eventId, teamId, seatIndex })
+    end)
+    log("SEAT RELEASED driver=%s event=%s team=%s seat=%s", tostring(driverId), tostring(eventId), tostring(teamId), tostring(seatIndex))
 end
 
 local function declineOffer(pid)

@@ -2581,7 +2581,7 @@ rejoin, accept the executable-content consent. Keep a controller connected.
 | §BX7 | Open F6, then press B and Start. Close F6. Open the wheel and, while it is up, restart `ncm_radial` from the console. | Neither opens over the focused Hub. After the restart the wheel is gone within 1.5 s, the character can walk, and `/ncm.radial` shows the transport reconnected. No wheel is ever left stranded on screen. | **NOT RUN** |
 | §BX8 | Pause menu, then Key bindings: rebind "NCM: quick menu (hold)" to another key, and check for "NCM: quick menu, controller (hold)". Run `/ncm.radial` and `/ncm.radial input` while moving each stick and the mouse. | The keyboard rebinding takes effect without a reconnect, and the wheel's hint shows the new key. Record whether the controller row exists; if it does not, `/ncm.radial pad padBack` changes the button. Record `last block result` and whether mouseDelta reads per frame (returns to 0) or accumulates. | **NOT RUN** |
 
-## §BY - NCM Vision: the scanner's green render, no scanner, no slow motion - **DEPLOYED TO ONLINE 2026-09-28 16:41 UTC; AWAITING LIVE PASS**
+## §BY - NCM Vision: the scanner's green render, no scanner, no slow motion - **§BY1-§BY2 PASS LIVE (owner, 2026-09-28); §BY3-§BY7 NOT RUN**
 
 Scope: `IDEA-679`, `L196`, `dist/ncm-vision-0.1.0.zip` (required mod `ncm-vision`, redscript only). Publish with
 `publish-carrier.py ... --id ncm-vision --display-name "NCM Vision"`, restart, rejoin, accept the
@@ -2589,10 +2589,152 @@ executable-content consent. Other clients nearby help with §BY4.
 
 | # | Do | Expect | Result |
 |---|---|---|---|
-| §BY1 | Join. Confirm `r6/scripts/ncm_vision/NcmVision.reds` was projected and the game reached the world (no redscript compile error dialog). | The world loads normally. Every other script mod still works: F6 opens, the radial (if deployed) opens, OPEN//77 menus behave. **A compile error dialog fails this row and blocks the rest.** | **NOT RUN** |
-| §BY2 | On foot, hold **Tab** for 5 s, then release. | The world takes the vanilla scanner's green render while held and returns exactly to normal on release. No scanner HUD and no scan panel. Record which parts appear: green grade, vignette, scanlines, pixelation. | **NOT RUN** |
+| §BY1 | Join. Confirm `r6/scripts/ncm_vision/NcmVision.reds` was projected and the game reached the world (no redscript compile error dialog). | The world loads normally. Every other script mod still works: F6 opens, the radial (if deployed) opens, OPEN//77 menus behave. **A compile error dialog fails this row and blocks the rest.** | **PASS** (owner, Online, 2026-09-28: *"green works"*) |
+| §BY2 | On foot, hold **Tab** for 5 s, then release. | The world takes the vanilla scanner's green render while held and returns exactly to normal on release. No scanner HUD and no scan panel. Record which parts appear: green grade, vignette, scanlines, pixelation. | **PASS** (owner, Online, 2026-09-28: *"green works"*) |
 | §BY3 | Hold Tab and sprint, jump and walk for 5 s. Watch an NPC or a moving car. | **No slow motion**: NPCs, traffic and your own movement run at normal speed. Sprint and jump work (no walk-only restriction). | **NOT RUN** |
 | §BY4 | Drive at speed and hold Tab, then tap **Caps Lock** and keep driving for 20 s. Tap Caps Lock again. | Green while driving, from hold and from toggle. Handling, speed and the NCM HUD are unaffected, with no slow motion. The toggle turns off cleanly. Record which vehicles and NPCs get an outline or highlight. | **NOT RUN** |
 | §BY5 | Toggle on with Caps Lock, then enter a vehicle, exit it, open and close F6, open the map, and open the pause menu. | Record whether the render survives each transition or is reset to normal by something else. Nothing leaves the world green after a toggle-off, and one Tab press and release always returns to normal. | **NOT RUN** |
 | §BY6 | Toggle on, then disconnect to the menu and rejoin. Also die or respawn once while on, if convenient. | The world is never green after a rejoin or respawn until a key is pressed. | **NOT RUN** |
 | §BY7 | With chat open, press Tab. With F6 focused, press Tab. | Chat and F6 keep their own Tab behaviour. Record whether the render also toggles underneath (acceptable, but note it). | **NOT RUN** |
+
+## §BZ - NCM Scanner: native reticle and scan-gated discovery - **DEPLOYED TO ONLINE 2026-09-28 17:34 UTC (`ncm-vision` 0.2.1; 0.2.0 failed to load, `KB-182`); AWAITING LIVE PASS**
+
+Scope: `IDEA-679`, `L197`, `dist/ncm-vision-0.2.0.zip` (required mod `ncm-vision`, now a DLL + two scripts), new
+resource `ncm_scanner`, `ncm_league/server/collection.lua` (scan handlers; proximity is sighting-only),
+`ncm_world/server/ambient.lua` (ambient cars registered). Deploy: publish the package with `publish-carrier.py ...
+--id ncm-vision --display-name "NCM Scanner"`, add `ncm_scanner` to `resources.load`, deploy `ncm_league` and
+`ncm_world`, restart, rejoin, accept the executable-content consent. Have ambient traffic on, and ideally a
+second player with a car.
+
+| # | Do | Expect | Result |
+|---|---|---|---|
+| §BZ1 | Join. Read `red4ext/plugins/ncm_vision/ncm_vision-<pid>.log`, then run `/ncm.scanner`. | Log: `redscript natives registered`, `listening on http://127.0.0.1:38600/vision.html`, `reds: reticle attached to gameuiCrosshairContainerController`, `resource connected`. `/ncm.scanner` says transport connected and names plugin 0.2.0. **No redscript compile error**, and F6, the radial and every other script mod still work. | **NOT RUN** |
+| §BZ2 | On foot, hold **Tab** looking at the sky, then at an NPC. | Green as before, plus a centred corner-bracket reticle. It is dim and bare on the sky and on the NPC, with no text claiming anything. Release: the reticle and the green both go. | **NOT RUN** |
+| §BZ3 | Hold Tab on an **NCM ambient traffic car** you have not discovered. Keep it in the reticle about 1.5 s. | Amber brackets and a `UNIDENTIFIED MACHINE` title. A bar fills with `SCANNING nn%`, then cyan: the machine's name and `ENTERS THE MACHINE INDEX`. The `MACHINE ENTERS THE INDEX` toast appears, and F10 shows it discovered. Server log: `SCAN ... kind=networked basis=server_measured first=true`. | **NOT RUN** |
+| §BZ4 | Scan the same model again, and a machine you already own. | Cyan straight away: its name and `IN YOUR INDEX`. No bar and no new toast. | **NOT RUN** |
+| §BZ5 | Drive slowly beside an undiscovered ambient car for 10 s **without** Tab. | **Nothing is discovered** (the dwell no longer reveals identity). Then drive beside an already-known model: no toast, and `/ncm.collection.probe` still counts it as a candidate. | **NOT RUN** |
+| §BZ6 | Hold Tab on a **vanilla per-client traffic car** (not NCM's) that is a catalogue model. Then scan a second one within 20 s. | First: the scan completes and reveals it. Server log: `basis=client_attested`. Second: `SCANNER COOLING DOWN`. A vanilla car that is not in the catalogue says `NO NCM RECORD` and never fills the bar. | **NOT RUN** |
+| §BZ7 | Start a scan, then look away before the bar fills. Then scan a car more than 60 m away. | Looking away resets the bar to zero. The far car reads `OUT OF RANGE` with its distance, and the bar does not move. | **NOT RUN** |
+| §BZ8 | While **driving**, hold Tab (or toggle Caps Lock) and scan a car ahead. Run `/ncm.scanner` while it is in the reticle. | The reticle works from the driver's seat. Your own car is never the target. Record `/ncm.scanner`'s `entity` against `aimedEntity: engineEntity`: equal, or different but matched by distance. **Either way it must scan.** | **NOT RUN** |
+| §BZ9 | With a second player: scan their car. | It resolves as `networked`. On a first discovery the log names them as source (`source=<id> holding=owned`), and they gain a Discoveries Inspired credit. | **NOT RUN** |
+| §BZ10 | Stop `ncm_scanner` from the console while holding Tab. Start it again. | The reticle keeps its brackets but loses its text within 1.5 s; the green stays. After restart `/ncm.scanner` reconnects, and scanning works again without a rejoin. | **NOT RUN** |
+
+## §CA - F6 Hub: focus survives redraws, Enter works, WHEEL/PEDALS clicks land first time (`KB-183`) - **DEPLOYED TO ONLINE 2026-09-28 18:15 UTC; AWAITING LIVE PASS**
+
+Scope: `ncm_world/web/ncm-nav.js`, `ncm_world/web/panel.html` (WHEEL tab). Offline: `nav render` and `panel render` green, and the new assertions fail against the previous commit. Needs Rig Bridge connected with a wheel or pedals plugged in, so the tab is streaming.
+
+| # | Do | Expect | Result |
+|---|---|---|---|
+| §CA1 | F6, WHEEL/PEDALS. Single-click TEST PULSE, the INVERTED/NORMAL toggle and a shell tab, once each, while the wheel is streaming. | Each responds to **one** click. The live axis percentages and FRAMES SENT keep moving while you do it. | **NOT RUN** |
+| §CA2 | Keyboard only: Tab to TEST PULSE and press Enter. Tab to another shell tab (e.g. HELP) and press Enter. | The pulse fires, then the tab changes. Enter is never a no-op on a focused control. | **NOT RUN** |
+| §CA3 | Tab to a binding's device dropdown. Press Enter, then Right, then Left. | Enter selects the next device and wraps at the end. Right/Left step forward and back. Focus stays on the dropdown, and the binding commits each time. | **NOT RUN** |
+| §CA4 | Tab to FORCE and press Right a few times, then Tab away. | The slider moves and does not lose focus. Tab leaves it, and the value is kept (it does not snap back). | **NOT RUN** |
+| §CA5 | Leave focus on a control with the ring visible for 10 s while the tab streams. | The ring stays on the same control and does not jump to the top or flicker. | **NOT RUN** |
+| §CA6 | On every other F6 tab (Driver File, Race Guide, Market, Exchange, Machine Index, Messages, Help), Tab to any button and press Enter. | It activates. Record any tab where Enter still does nothing. That would be a host key-forwarding problem, not this page. | **NOT RUN** |
+
+## §CB - Wheel FORCE reaches Rig Bridge; the ring follows you; Street Calls can be entered (`KB-184`, `KB-185`, `KB-186`) - **DEPLOYED TO ONLINE 2026-09-28 19:18 UTC; AWAITING LIVE PASS**
+
+Scope: `ncm_world/web/{ncm-nav.js,panel.html}` (client page), `ncm_league/server/{guide,economy,calendar,impromptu}.lua` (server). Offline: `ncm-test` ALL GREEN; the new `nav render` assertions and stub scenario `entrybag` fail on the previous code. **Correction:** the 0.1.1 settings file did not mirror live FORCE/ARM values, so it was never evidence that a panel command arrived. `§CB1`/`§CB3` prove the page control itself; persistence is retested with Rig Bridge 0.1.2 at `§CC2`.
+
+| # | Do | Expect | Result |
+|---|---|---|---|
+| §CB1 | F6 → WHEEL/PEDALS, arm FFB. Tab to FORCE and press Right until it reads 100%. | The number steps 5% per press and remains at 100% through incoming device-state redraws. This row makes no claim about the 0.1.1 settings file. | **NOT RUN** |
+| §CB2 | Superseded by `§CC3` on Rig Bridge 0.1.2. | The old 0.1.1 dynamic-effect stream is not accepted as a rumble test. | **SUPERSEDED by `KB-187` / `§CC`.** |
+| §CB3 | Drag FORCE with the mouse to about 50% and release. | The panel remains at about 50% through incoming device-state redraws. One commit, not one per pixel. | **NOT RUN** |
+| §CB4 | Express interest in the next two street races in the Guide. Let the first start **without entering it**. | Within ~70 s of the first race's start, the ring, card and route move to the second race's venue by themselves, with no second interest. | **NOT RUN** |
+| §CB6 | Rejoin and open the Session Landing Panel. | The newest release reads **Scanner, quick menu and fixes**, above **Player Exchange**. Capabilities list **Call a street race** and **Scan machines**, each with its limit stated. | **NOT RUN** |
+| §CB5 | F5, call a Street Call, drive to its start, and enter from the venue options. | `You're in: Street Call …` with `Entry -€$0`. No `economy_required`. The race runs, and the result posts with no settlement error in the server log. | **NOT RUN** |
+
+## §CC - Rig Bridge 0.1.2 restores streamed force feedback (`KB-187`, `IDEA-686`, `L199`) - **SUPERSEDED BY §CD** (0.1.2 could not be felt while the Carrier held the wheel, `KB-188`)
+
+Scope: `dist/ncm-rig-bridge-0.1.2.zip`, SHA-256 `ee818938cdc0e1aa8152b69f21719f993dd6adbefbf49de2354dc2cb7c9bffc5`; native mapping and feel tests pass. This is a behavior fix, not a logging probe. Spring/damper are regression channels; CONSTANT and SINE decide the result. ARM remains session-only by design.
+
+| # | Do | Expect | Result |
+|---|---|---|---|
+| §CC1 | Publish/install Rig Bridge 0.1.2, cold-launch, join, and inspect its startup line. | RED4ext and the Rig Bridge log both report **0.1.2**. The wheel is named and FFB begins **DISARMED**. | **NOT RUN** |
+| §CC2 | Select gear class, set FORCE to 50%, change ENGINE/ROAD/TEXTURE, quit, and cold-launch again. | Class, FORCE and tune values survive in `ncm_rig_bridge.user.json` and return in the panel; ARM does not survive and must be pressed again. | **NOT RUN** |
+| §CC3 | Arm, set FORCE to 50%, and drive from idle across ordinary asphalt, rough road and kerbs. | A continuous engine/road SINE texture is felt; it changes in magnitude with the car and does not vanish after a telemetry pause or dismount/remount. | **NOT RUN** |
+| §CC4 | At road speed, steer left and right through centre, then press TEST PULSE while stationary. | CONSTANT force pulls toward centre with the correct sign and TEST PULSE gives one bounded jolt. No sustained pull remains afterward. | **NOT RUN** |
+| §CC5 | Repeat §CC3-§CC4 at 100%, then disarm and wait past the watchdog. | Both streamed effects scale upward; DISARM removes all four effects and stale telemetry cannot leave force applied. | **NOT RUN** |
+
+## §CD - One owner for wheel FFB, and a channel-by-channel feel calibration (`KB-188`-`KB-192`, `IDEA-687`-`IDEA-689`, `L201`) - **0.1.4 DEPLOYED 21:44 UTC (§CD1 LIVE PASS); 0.1.5 DEPLOYED 22:24 UTC, §CD2-§CD11 AWAITING LIVE PASS**
+
+Scope: Carrier 0.1.29 (`c5f6d004…`) yields haptics to the Rig Bridge; Rig Bridge 0.1.4 (`b568cbc6…`) with the
+rebuilt output module and FFB OUTPUT / BASE TORQUE panel rows. 0.1.5 (`96837634…`: per-slider effects, LIVE readouts, rev-following engine, COLLISION, ARM-gated TEST PULSE, `KB-193` panel fix) deployed 22:24 UTC.
+
+**Method for §CD3-§CD10 (`IDEA-688`), on Rig Bridge 0.1.5.** FORCE 100%. The channel under test at 100%, every
+other slider at 0, **STIFFNESS included** (a damper resists motion, and vibration is motion, so it mutes what you
+are listening for). Press **RESET PEAKS**, do the manoeuvre, then record three things in Result: **what you felt**,
+the channel's **LIVE peak %**, and **the value you settle on** after lowering it until it feels right. A felt
+problem with a healthy peak is a feel problem; a peak near 0% is a data problem. One channel has no slider:
+self-aligning torque (LIVE · CAR WEIGHT: zero when parked, full by about 72 km/h). COLLISION has its own slider. Test the
+engine parked to keep torque out of it. Each vibration slider is its own effect; only their SUM is capped at FORCE.
+
+| # | Do | Expect | Result |
+|---|---|---|---|
+| §CD1 | Rejoin after the deploy, arm, drive. | Force feedback is felt in the car and stays. The Carrier log says the Rig Bridge owns force feedback. | **PASS** (owner, 2026-09-28: *"ffb is back"*) |
+| §CD2 | Open WHEEL/PEDALS. Disarmed, press TEST PULSE; arm, press it three times in a row. | FFB OUTPUT reads `OK - 7/7 effects on axis X · Logitech G29` (0.1.4 reads 4/4). Each armed press gives a clear ~0.7 s rumble with left-right kicks, every time without re-arming (monki's *"works only once"*, `IDEA-421`). On 0.1.4 the disarmed press also fires; on 0.1.5 it must not. | **NOT RUN** |
+| §CD3 | **CENTRING 100.** Parked: turn the wheel a quarter turn and let go. Then drive slowly and repeat. | A spring. The pull back grows steadily with how far you turn and the wheel returns to centre when released. **Identical parked and moving**: it knows position, not speed. Smooth, no grain or notches (monki's *"sand in the gears"*). Record the value where centring feels natural. | **NOT RUN** |
+| §CD4 | **STIFFNESS 100.** Parked: turn slowly, then flick fast. Let go off-centre. | Viscous, like stirring honey. A slow turn is nearly free and a fast flick is heavy. **No return to centre**: released, the wheel stays where you left it. Constant at any speed. Grain or stepping is a failure. | **NOT RUN** |
+| §CD5 | **Everything at 0 except FORCE.** Parked, then accelerate to ~80 km/h and steer through a gentle bend. | Parked the wheel is limp. As speed rises, a pull toward centre builds with steering angle, full by about 72 km/h, and it is **the car's own weight**, not a spring: it depends on speed. (Set COLLISION to 0 too, or a bump adds its kick.) This is the baseline under every other row. | **NOT RUN** |
+| §CD6 | **ENGINE HUM 100.** Parked: idle, then hold the throttle to rev, release. | A low, slow throb at idle (about 16 Hz, a quarter of full strength) that **rises in pitch and strength** with revs -- about 27 Hz cruising, 48 Hz at the limiter -- and falls back when you release. Felt as the motor, not heard: a steady electric-razor buzz at every rpm means you are on 0.1.4 or the rpm feed is missing (`KB-191`). Record where it stops being annoying. | **NOT RUN** |
+| §CD7 | **SLIP 100.** Launch hard from a stop; brake hard enough to lock; handbrake or throw it sideways in a corner. Then cruise straight and gentle. | **Silence while the tyres grip.** A buzz appears the moment they break loose -- wheelspin, lock-up, sliding -- grows with how much they slide, and stops the moment grip returns. Any buzz in gentle straight cruising is a failure (slip noise). | **NOT RUN** |
+| §CD8 | **ROAD 100.** Drive over kerbs, rough surfaces and a jump, and brake hard over a bump. | Designed: vibration with each bump, kerb and landing, following the suspension. **Expected today: nothing** -- suspension telemetry has read zero in every session (`KB-192`). Any feel here is news; record it. | **NOT RUN** |
+| §CD9 | Combine: set CENTRING, STIFFNESS, ENGINE and SLIP to their recorded values. Drive a lap with a hard corner. | Each channel remains recognisable, and each LIVE row still moves on its own. If one masks another in the hands while both peaks are healthy, note which. These become the shipped defaults. | **NOT RUN** |
+| §CD11 | **COLLISION 100.** RESET PEAKS, then: nudge a parked car side-on at low speed, hit one head-on at ~40 km/h, and scrape a wall and a pole. After each, read LIVE · COLLISION peak and the Rig Bridge log. | Every hit is a short, sharp **thud** (~30 Hz, gone within a quarter second), **head-on included**. A side hit adds a jerk of the rim away from the impact. A scrape is light but present. The log shows `collision: dv=… lateral=…` per hit. **Walls/poles: record whether a log line appears at all** -- none means the game does not raise the event for static geometry (`IDEA-690`). | **NOT RUN** |
+| §CD10 | A direct-drive owner, if one joins: leave BASE TORQUE on Auto, press TEST PULSE, then repeat §CD3 at FORCE 50%. | FFB OUTPUT names the base or "assumed". Force is gentle but clearly present, never violent, and full FORCE is about 3 Nm (`IDEA-687`). | **NOT RUN** |
+
+## §CE - A ring for every race, the card for the ring you stand in, one entry at a time (`KB-195`-`KB-199`, `IDEA-694`, `L202`) - **BUILT, NOT DEPLOYED; AWAITING LIVE PASS**
+
+Scope: `ncm_league` (guide, calendar, organized, scenario, impromptu, street pack) and `ncm_world` (client calendar,
+venue.html) with vendored core. Easiest setup: two races inside twenty minutes at different venues. Use
+`ncm.race.now <route>` twice, or wait for the cadence to overlap.
+
+| # | Do | Expect | Result |
+|---|---|---|---|
+| §CE1 | With two races inside 20 min, drive toward each venue from a few hundred metres away. | Each venue has its own ring, visible from the road well before you arrive (drawn to 500 m). Note the distance at which you first noticed it. | **NOT RUN** |
+| §CE2 | Bookmark the SOONER race (A) in the Guide. Drive to the LATER race's (B) ring and stand in it. | The card names B. ENTER RACE is offered. Pressing LEAVE LIST there does nothing to A's bookmark (the Guide still shows you on A's list). | **NOT RUN** |
+| §CE3 | At B during its entry window, stop about 2 m outside the drawn ring and try ENTER RACE (the card hides, so use `/ncm.enter`). Then roll inside and enter. | Outside is refused: "You need to be at the start". Inside is accepted. The persistent card turns green and names B. | **NOT RUN** |
+| §CE4 | Entered in B, drive to A's ring. Press the first option, then press again within 15 s. | First press: the option reads SWITCH ENTRY, and a toast says you are entered in B and to hold again. The option then reads "Withdraw from B and enter". Second press: you are in A, withdrawn from B, and the card and GPS follow A. | **NOT RUN** |
+| §CE5 | With an NCX seat accepted, stand in that event's ring. Press WITHDRAW. | WITHDRAW is enabled, not greyed "You are not entered". Afterwards you are off the grid and the team's seat is free (server log `SEAT RELEASED`). | **NOT RUN** |
+| §CE6 | A second player calls a Street Call (F5) near a cadence race venue. | You see a ring at the Street Call's start, and the cadence race keeps its own ring. You can enter the Street Call at its ring. | **NOT RUN** |
+
+## §CF - Persistent fuel, physical refuelling and no-fuel recovery (`IDEA-702`, `L204`) - **BUILT, NOT DEPLOYED; AWAITING LIVE PASS**
+
+Scope: schema 042, `ncm_world` fuel service/client/HUD/station blips, and vendored `economy.fuel`. Deploy the
+migration before starting `ncm_world`. Use one owned, issued NCM Machine and note its asset id and balance.
+
+| # | Do | Expect | Result |
+|---|---|---|---|
+| §CF1 | Join, call the Machine and drive briefly. Open the race/odometer HUD. | FUEL appears beside the odometer, initially 100% for an existing Machine. `machine_fuel` has exactly one row for its asset id. | **NOT RUN** |
+| §CF2 | Drive about 1 km normally, then stop long enough for persistence. | Fuel falls by about 0.35 L (roughly 0.6 percentage points of 60 L). Odometer and fuel advance together; no client-reported distance is trusted. | **NOT RUN** |
+| §CF3 | Disconnect/rejoin, then restart the resource/server and call the same Machine. | The prior fuel percentage returns both times; it is not reset by session, dismount or resource restart. | **NOT RUN** |
+| §CF4 | At a marked station, record balance, sit in the Machine and run `/ncm.refuel` twice. | First call fills the tank and charges exactly missing litres × €$2 with one `fuel_purchase` ledger row. Second call says the tank is full and charges nothing. | **NOT RUN** |
+| §CF5 | On a test profile, set/drive fuel to zero. | Fuel reaches 0%, turns red, the engine stops, and both toast and chat say `Stuck? Type /ncm.nofuel for help.` Driving cannot create negative fuel. | **NOT RUN** |
+| §CF6 | While empty and away from a station, run `/ncm.nofuel`. | GPS routes to the nearest authored station. With no verified jerry-can capability, the Driver is dismounted and the Machine is stored/towed there; F6 can call the same owned Machine, then `/ncm.refuel` restores it. | **NOT RUN** |
+| §CF7 | Open the full map and confirm 53 fuel POIs. Sample every district and physically visit a representative spread; then run an authored sweep over all sites. | Every POI is visible without discovery and sits on a real usable pump/forecourt. The client log reports `53/53` and whether each used SVG or native fallback. Refuelling works at all 81 precise pump points. Record or remove every miss; do not accept the registry from source data alone. | **NOT RUN** |
+| §CF8 | (Deployed 2026-09-29 03:08 UTC.) Anywhere, with any fuel level, run `/ncm.fuel` (`IDEA-708`, `KB-203`). | Chat and a toast name the nearest station and its distance; GPS routes there; the Machine is **not** stored and the Driver is **not** moved. Parking at the pumps and `/ncm.refuel` then works as §CF4. | **NOT RUN** |
+| §CF9 | On foot in the open, run `/ncm.blips`, open the full map, then check the minimap. Run it again to clear (`KB-203`). | The client log prints `owned blips: N (M active)` with sprite counts. Record which of the four probe pins (west to east `objective`, `quest`, `vendor`, `fast_travel`) appear on the map and on the minimap. That answer picks the sprite for landmarks (§AD7) and fuel (§CF7), or is the platform report if none appear. | **PASS 2026-09-29 03:11 UTC** (owner: all four dropped visibly beside them; log `owned blips: 88 (88 active)`). Led to the `KB-203` world-gate fix. |
+| §MK1 | Walk to a physical Autofixer terminal (e.g. Little China, Northside, Japantown). Within ~4 m a toast should read `Press E (pad X) to connect to <market>`; press E (`KB-205`, `IDEA-695`). | `MARKET DISCOVERED ... is now available in F6`. F6 Market's sources column lists Base Market first, then this terminal; selecting it shows only its own Machines and Components (never merged), the title names it, and buying works from anywhere afterwards. A terminal with no toast is a coordinate miss: note where the real terminal stands. | **NOT RUN** |
+
+## §CG - DEVICES and the GAMEPAD layer: rim, Joy-Cons, variants, rumble presets (`IDEA-705`, `L205`, `KB-201`) - **DEPLOYED TO ONLINE 2026-09-29 02:29 UTC; AWAITING LIVE PASS**
+
+Scope: Rig Bridge 0.1.6 (`dist/ncm-rig-bridge-0.1.6.zip`, `3dc80f1b…`), Carrier 0.1.30 (`d4431422…`), panel
+DEVICES. Joy-Cons paired to Windows before launch. JoyMoCo closed (it would hold the Joy-Cons itself).
+
+| # | Do | Expect | Result |
+|---|---|---|---|
+| §CG1 | Cold-launch, join, read `ncm_rig_bridge-<pid>.log` and the Carrier log. | Rig Bridge: `XInput hook: ... attached` for at least one module, `SDL3 motion input started`, `SDL3 joystick joystick:Evenracing 1.0.0` (**the `KB-201` question**), `gamepad profile 'default' loaded: 16 variant(s)`, `gamepad API listening`. Carrier: `NCM Rig Bridge is installed and owns rig devices`. | **NOT RUN** |
+| §CG2 | F6 > DEVICES. Collapse and expand each section; close and reopen F6. | Three sections, WHEELBASE & PEDALS, FORCE FEEDBACK, GAMEPAD; collapsed state survives. GAMEPAD shows a status line, not `GAMEPAD LAYER UNREACHABLE`. If it is unreachable, record that line verbatim: it decides whether the panel may fetch loopback. | **NOT RUN** |
+| §CG3 | On foot, press each of the 16 rim buttons in turn. | Each lights its output's dot and does what that Xbox button does in game (map, inventory, D-pad, etc). None doubles or sticks. | **NOT RUN** |
+| §CG4 | Set one rim variant to *While driving*. Press it on foot, then in a car. | Silent on foot, works in the car; leaving the car while holding it releases it. | **NOT RUN** |
+| §CG5 | RECORD B, *Button press*, press a rim button nobody uses. | Banner reads `Added '<name>'`; B now has two variants and both press B. | **NOT RUN** |
+| §CG6 | RECORD B, *Button press*, press Joy-Con Y. Give it rumble `strong-thump`, side Right. | B has a third variant; pressing Joy-Con Y presses B and thumps the right Joy-Con. TEST plays the preset. | **NOT RUN** |
+| §CG7 | RECORD X, *Press + motion*: after the countdown hold SR and swing the right Joy-Con. Repeat the swing three more times as new variants. | Each take is added (or rejected with a reason). In game, SR + that swing taps X; SR without the swing does not; a swing without SR does not. | **NOT RUN** |
+| §CG8 | Drive into something with RUMBLE on and GAME RUMBLE on. | The game's own rumble reaches the Joy-Cons (large motor left, small right). | **NOT RUN** |
+| §CG9 | GYRO STEERING: enable, right Joy-Con, *While driving*. In a car, hold CAPTURE (toggle button) half a second, tilt. | The car steers with the tilt, merged with the wheel (the larger wins); toggling off hands steering back; on foot it does nothing. | **NOT RUN** |
+| §CG10 | On foot, move each Joy-Con's stick; change its rotation if it reads sideways. | Left Joy-Con moves the character, right the camera. If a stick is silent, record which. `stick: auto` is the guess under test. | **NOT RUN** |
+| §CG11 | SAVE AS `onfoot-test`; NEW EMPTY `blank`; load `default`; load `onfoot-test`. | Files appear in `profiles/`; each load restores exactly what was saved; `active.txt` names the last loaded. | **NOT RUN** |
+| §CG12 | Use the Xbox pad normally with the default profile loaded. | Every pad input works once, not twice. | **NOT RUN** |
+| §CG13 | CALIBRATE with both Joy-Cons resting flat. | Banner counts down, then `Calibrated 2 controller(s)`; gyro readouts sit near 0 at rest afterwards. | **NOT RUN** |
+| §CG14 | Regression: FORCE FEEDBACK section, TEST PULSE armed, drive. | FFB exactly as `§CD`: 7/7 effects, LIVE rows move. | **NOT RUN** |

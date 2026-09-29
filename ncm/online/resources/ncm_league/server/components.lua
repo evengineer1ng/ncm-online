@@ -1,6 +1,7 @@
 -- NCM Parts economy: immutable Designs, serialized assets, primary stock, inventory and manufacturer R&D.
 NcmComponents={}
 local Cat=NcmCore.get("parts.catalogue")
+local VehicleCatalogue=NcmCore.get("data.vehicle_catalogue")
 local Rnd=NcmCore.get("parts.rnd")
 local Handling=NcmCore.get("parts.handling")
 local Wear=NcmCore.get("parts.wear")
@@ -41,18 +42,19 @@ local function seedDesign(d,t)
 end
 
 local function ensureSupply(d,t)
-    local s=Cat.SUPPLY[d.tier]; if not s or d.distribution~="base" then return end
+    local s=Cat.SUPPLY[d.tier]; if not s or (d.distribution~="base" and d.distribution~="autofixer") then return end
+    local marketId=d.marketId or Markets.BASE_ID
     MySQL.insert.await([[INSERT IGNORE INTO component_supply_state
       (server_id,market_id,design_id,next_tick_index,next_tick_at,batch,interval_sec,initial_done,updated_at)
-      VALUES (?,'base_market',?,0,?,?,?,0,?)]],{serverId(),d.designId,t,s.batch,s.cadenceSec,t})
+      VALUES (?,?,?,0,?,?,?,0,?)]],{serverId(),marketId,d.designId,t,s.batch,s.cadenceSec,t})
 end
 
 function NcmComponents.seed()
     local t=now()
     pcall(function() GlobalState.ncmPartsEnabled=enabled() end)
     for _,d in ipairs(Cat.designs()) do seedDesign(d,t); ensureSupply(d,t) end
-    for _,vehicleKey in ipairs(Cat.STARTER_VEHICLES) do
-        for _,family in ipairs(Cat.FAMILIES) do seedDesign(Cat.factoryDesign(vehicleKey,family),t) end
+    for _,entry in ipairs(VehicleCatalogue.entries()) do
+        for _,family in ipairs(Cat.FAMILIES) do seedDesign(Cat.factoryDesign(entry.vehicleKey,family),t) end
     end
     local release=math.floor(tonumber(settings.partsReleaseEpoch) or 0); if release<=0 then release=t end
     for makerKey,m in pairs(Rnd.MAKERS) do
@@ -66,8 +68,7 @@ function NcmComponents.seed()
 end
 
 function NcmComponents.factoryStatements(machineAssetId,vehicleKey,ownerId,createdAt,exposureM)
-    local supported=false for _,k in ipairs(Cat.STARTER_VEHICLES) do if k==vehicleKey then supported=true end end
-    if not supported then return nil,"unsupported_machine" end
+    if not VehicleCatalogue.byKey(vehicleKey) then return nil,"unsupported_machine" end
     local t=createdAt or now(); local configId=stableId("factory-config:"..serverId()..":"..machineAssetId); local tx={
       {query=[[INSERT IGNORE INTO machine_configuration
         (configuration_id,machine_asset_id,revision,created_at,created_by_driver_id) VALUES (?,?,1,?,NULLIF(?,''))]],values={configId,machineAssetId,t,ownerId or ""}},
@@ -113,7 +114,7 @@ end
 
 function NcmComponents.ensureFactoryAll()
     local rows=MySQL.query.await([[SELECT asset_id,vehicle_key,ncm_driver_id,odometer_m FROM vehicle_asset
-      WHERE server_id=? AND vehicle_key IN ('makigai_maimai','thorton_galena','archer_hella')]],{serverId()}) or {}
+      WHERE server_id=?]],{serverId()}) or {}
     local n=0 for _,r in ipairs(rows) do local made=NcmComponents.ensureMachine(r.asset_id,r.vehicle_key,r.ncm_driver_id,r.odometer_m); if made then n=n+1 end end
     return n
 end
@@ -158,17 +159,18 @@ local function designFromRow(r)
 end
 
 local function produceLine(d,state,t)
+    local marketId=tostring(state.market_id or d.marketId or Markets.BASE_ID)
     if t<(tonumber(state.next_tick_at) or 0) then return 0 end
     local s=Cat.SUPPLY[d.tier] or {ceiling=3,initialAllocation=1,batch=1,cadenceSec=7200}
     local isInitial=not (state.initial_done==true or tonumber(state.initial_done)==1)
     local qty=isInitial and s.initialAllocation or (tonumber(state.batch) or s.batch)
-    local before=available(d.designId); local want=math.min(qty,math.max(0,s.ceiling-before))
+    local before=available(d.designId,marketId); local want=math.min(qty,math.max(0,s.ceiling-before))
     local index=tonumber(state.next_tick_index) or 0; local nonce=ids.uuid4(hostRng)
     MySQL.insert.await([[INSERT IGNORE INTO component_production_run
       (server_id,market_id,design_id,tick_index,tick_at,claim_nonce,available_before,ceiling,requested,minted)
-      VALUES (?,'base_market',?,?,?,?,?,?,?,0)]],{serverId(),d.designId,index,tonumber(state.next_tick_at) or t,nonce,before,s.ceiling,qty})
+      VALUES (?,?,?,?,?,?,?,?,?,0)]],{serverId(),marketId,d.designId,index,tonumber(state.next_tick_at) or t,nonce,before,s.ceiling,qty})
     local held=MySQL.scalar.await([[SELECT claim_nonce FROM component_production_run
-      WHERE server_id=? AND market_id='base_market' AND design_id=? AND tick_index=?]],{serverId(),d.designId,index})
+      WHERE server_id=? AND market_id=? AND design_id=? AND tick_index=?]],{serverId(),marketId,d.designId,index})
     local minted=0
     if held==nonce and want>0 then
         local ord,why=allocate(d,want)
@@ -183,19 +185,19 @@ local function produceLine(d,state,t)
                     (asset_id,server_id,design_id,run_id,manufacturer_key,location_kind,global_ordinal,maker_ordinal,design_ordinal,created_at)
                     VALUES (?,?,?,?,?,'market',?,?,?,?)]],values={aid,serverId(),d.designId,runId,d.makerKey,o.global,o.maker,o.design,t}},
                   {query=[[INSERT INTO component_market_inventory
-                    (market_id,asset_id,price,state,listed_at) VALUES ('base_market',?,?,'available',?)]],values={aid,d.price,t}},
+                    (market_id,asset_id,price,state,listed_at) VALUES (?,?,?,'available',?)]],values={marketId,aid,d.price,t}},
                   {query=[[INSERT INTO component_asset_transfer
                     (transfer_id,idem_key,server_id,asset_id,kind,market_id,amount,occurred_at)
-                    VALUES (?,?,?,?,'production','base_market',0,?)]],values={ids.uuid4(hostRng),"production:"..serverId()..":"..aid,serverId(),aid,t}},
+                    VALUES (?,?,?,?,'production',?,0,?)]],values={ids.uuid4(hostRng),"production:"..serverId()..":"..aid,serverId(),aid,marketId,t}},
                 })
                 if ok then minted=minted+1 end
             end
             MySQL.update.await([[UPDATE component_production_run SET minted=?,run_id=?
-              WHERE server_id=? AND market_id='base_market' AND design_id=? AND tick_index=?]],{minted,runId,serverId(),d.designId,index})
+              WHERE server_id=? AND market_id=? AND design_id=? AND tick_index=?]],{minted,runId,serverId(),marketId,d.designId,index})
         else log("ordinal allocation failed %s: %s",d.designId,tostring(why)) end
     end
     MySQL.update.await([[UPDATE component_supply_state SET next_tick_index=?,next_tick_at=?,initial_done=1,updated_at=?
-      WHERE server_id=? AND market_id='base_market' AND design_id=?]],{index+1,t+(tonumber(state.interval_sec) or s.cadenceSec),t,serverId(),d.designId})
+      WHERE server_id=? AND market_id=? AND design_id=?]],{index+1,t+(tonumber(state.interval_sec) or s.cadenceSec),t,serverId(),marketId,d.designId})
     return minted
 end
 
@@ -243,9 +245,9 @@ function NcmComponents.produce()
     -- The tunable is live. Republish it on every scheduler pass so ncm_world and
     -- connected panels see an operator's change without a resource restart.
     pcall(function() GlobalState.ncmPartsEnabled=enabled() end)
-    local t=now(); local rows=MySQL.query.await([[SELECT d.*,s.next_tick_index,s.next_tick_at,s.batch,s.interval_sec,s.initial_done
+    local t=now(); local rows=MySQL.query.await([[SELECT d.*,s.market_id,s.next_tick_index,s.next_tick_at,s.batch,s.interval_sec,s.initial_done
       FROM component_supply_state s JOIN component_design d ON d.design_id=s.design_id
-      WHERE s.server_id=? AND s.market_id='base_market']],{serverId()}) or {}
+      WHERE s.server_id=?]],{serverId()}) or {}
     local n=0 for _,r in ipairs(rows) do n=n+produceLine(designFromRow(r),r,t) end
     runRnd(t); return n
 end
@@ -269,7 +271,7 @@ function NcmComponents.marketOfferings(driverId,marketId,vehicleKeys)
     marketId=type(marketId)=="string" and marketId~="" and marketId or Markets.BASE_ID
     local rows=MySQL.query.await([[SELECT d.*,s.next_tick_at,s.batch,s.interval_sec
       FROM component_design d JOIN component_supply_state s ON s.design_id=d.design_id
-      WHERE s.server_id=? AND s.market_id=? AND d.distribution='base' ORDER BY d.family,d.effect]],{serverId(),marketId}) or {}
+      WHERE s.server_id=? AND s.market_id=? AND d.distribution IN ('base','autofixer') ORDER BY d.family,d.effect]],{serverId(),marketId}) or {}
     local ownedKeys={}; for _,r in ipairs(MySQL.query.await("SELECT DISTINCT vehicle_key FROM vehicle_asset WHERE server_id=? AND ncm_driver_id=?",{serverId(),driverId}) or {}) do ownedKeys[#ownedKeys+1]=r.vehicle_key end
     local out={}
     for _,r in ipairs(rows) do local d=designFromRow(r); local s=Cat.SUPPLY[d.tier] or {ceiling=3}

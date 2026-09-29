@@ -30,6 +30,8 @@ another. Establish a basic identity-discovery state, then let channels accumulat
 parallel**: Identity/Discovery · Documented · Observed · Scanner/Research · Ownership. They overlap. A player
 may be heavily documented without ever seeing the machine move, or heavily observed without ever owning one.
 
+> **AMENDED 2026-09-28 by `L197`:** *physical encounter* as a discovery source now means a deliberate **scan**; proximity alone records a sighting of a machine already known and never reveals identity. Market, trade and acquisition reveals are unchanged.
+
 **3. Discovery establishes identity only** — *"what is this thing?"* — turning `???` into `Makigai MaiMai`.
 Many legitimate sources: physical encounter, a player trade listing, a discovered Market, a scan, acquisition.
 **No single universal discovery mechanic.** Different sources may convey different additional knowledge.

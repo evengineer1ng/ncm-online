@@ -57,6 +57,8 @@ Core.define("competition.race_builder", function(C)
     --- Offered in the "green in" dropdown. A race called for *now* cannot be travelled to by anyone else, and one
     --- an hour out is not impromptu -- but 2 minutes is a legitimate "we are both already here" choice.
     M.WHEN_MINUTES = { 2, 5, 10, 20 }
+    M.MIN_REMOTE_MINUTES = 5     -- below this, the start must be where the caller is standing
+    M.NEAR_START_M = 150
 
     --- The shortest race worth posting, in metres. A 40 m sprint between two adjacent points is not a race and
     --- would settle in a way nothing downstream expects.
@@ -286,6 +288,16 @@ Core.define("competition.race_builder", function(C)
         local minutesOk = false
         for _, m in ipairs(M.WHEN_MINUTES) do if m == minutes then minutesOk = true end end
         if not minutesOk then return nil, "invalid_minutes" end
+        -- Entries close when the grid forms, a minute before green, so a 2-minute call leaves ONE minute to reach
+        -- the line and enter. That only works when the start is where the caller already is; from across town the
+        -- call closes empty while they are still driving to it (owner, 2026-09-28: two calls lost this way).
+        if minutes < M.MIN_REMOTE_MINUTES and startId ~= M.START_HERE then
+            local node = Nodes.byId(startId)
+            local p = hasPosition(facts) and facts.position or nil
+            local dx = p and node and (tonumber(p.x) - (tonumber(node.x) or 0)) or nil
+            local dy = p and node and (tonumber(p.y) - (tonumber(node.y) or 0)) or nil
+            if not dx or math.sqrt(dx * dx + dy * dy) > M.NEAR_START_M then return nil, "too_soon_for_start" end
+        end
 
         local laps = posInt(form.laps) or 1
         if laps < 1 then laps = 1 end

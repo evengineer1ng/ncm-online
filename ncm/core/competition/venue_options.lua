@@ -3,15 +3,19 @@
 -- driver's entry, the practice window and whether a session is already live; this module returns a SHORT FLAT LIST
 -- of final actions, most likely intent first.
 --
--- The shape is the design (owner, 2026-09-21): at most four options, each one a FINAL ACT and never a branch, no
--- sub-menus and no tree. An option that cannot apply right now is ABSENT, not greyed out -- a disabled row is a
--- dead end the player has to read and reject, which is the failure KB-32 describes from the other side. The host
--- draws the list and holds a key to engage the highlighted one; nothing here knows about keys, cards or pixels.
+-- The shape is the design (owner, 2026-09-21): a short list, each one a FINAL ACT and never a branch, no sub-menus
+-- and no tree. Every option is always shown; one that cannot apply right now is greyed WITH A REASON (owner,
+-- 2026-09-23 -- see `pack`). The host draws the list and holds a key to engage the highlighted one; nothing here
+-- knows about keys, cards or pixels.
+--
+-- The event is the one whose ring the driver is STANDING IN (owner, 2026-09-28). It used to be "the driver's
+-- soonest race", decided without looking at where they were, so the card on one ring could act on another race.
 local Core = NcmCore
 
 Core.define("competition.venue_options", function(C)
     local M = { version = "0.0.1" }
     local Guide = C.get("competition.guide")
+    local Entry = C.get("competition.entry")
 
     -- Five, because every option is now always present (owner, 2026-09-23). It used to be four, when
     -- inapplicable options were omitted and the list could not exceed the catalogue's applicable subset.
@@ -39,7 +43,10 @@ Core.define("competition.venue_options", function(C)
     --- facts = {
     ---   now         = server seconds (required)
     ---   event       = { eventId, startsAt, entryOpensAt, entryClosesAt, state, invitation, postedAt } (required)
-    ---   entryState  = "interested" | "checked_in" | "withdrawn" | nil   -- this driver's entry, absent = none
+    ---   entryState  = "interested" | "registered" | "checked_in" | ... | nil  -- this driver's row here, absent = none
+    ---   heldElsewhere = { eventId, routeName, releasable } when the driver holds their one entry on ANOTHER
+    ---                 event (competition.entry.heldEntry). Entering here then becomes a switch (owner, 2026-09-28).
+    ---   switchArmed = true when the driver has pressed SWITCH ENTRY here and the host is waiting for the confirm
     ---   sessionLive = true when a session for this event is already forming or running
     ---   busyElsewhere = true when this driver is in an unfinished session of ANOTHER event (KB-37)
     ---   practiceActive = true when this driver is in this event's practice session (L114)
@@ -64,7 +71,9 @@ Core.define("competition.venue_options", function(C)
         local function decline(id, why) reasons[id] = why end
 
         local entry = facts.entryState
-        local entered = entry == "checked_in"
+        -- A team seat (`registered`) is an entry too (owner, 2026-09-28). It used to count as neither entered nor
+        -- listed, so a seated driver's WITHDRAW was greyed as "You are not entered".
+        local entered = Entry.RELEASABLE[tostring(entry or "")] == true
         local listed = entry == "interested"
 
         -- History changes nothing and is always available: it is the one option that is never a dead end.
@@ -98,6 +107,19 @@ Core.define("competition.venue_options", function(C)
             decline("enter_race", "entry_closed")
         else
             on.enter_race = true
+        end
+
+        -- One entry at a time. Entering here while holding an entry elsewhere is a SWITCH, and a switch is two
+        -- presses: the first arms it and says what it will cost, the second does both halves.
+        local held = facts.heldElsewhere
+        if on.enter_race and type(held) == "table" then
+            on.enter_race = nil
+            if held.releasable == false then
+                decline("enter_race", "entered_elsewhere")
+            else
+                on.switch = facts.switchArmed and "confirm_switch" or "switch_entry"
+                on.switchFrom = held.routeName
+            end
         end
 
         -- Practice is user-initiated and unlimited while the window stands (L67/IDEA-002); it is never a
@@ -135,6 +157,10 @@ Core.define("competition.venue_options", function(C)
         not_entered      = "You are not entered",
         practice_closed  = "Practice is closed",
         already_practising = "You are already practising",
+        entered_elsewhere = "You are committed to another race",
+        not_posted       = "Not posted yet",
+        qualifying_forming = "Practice has closed",
+        session_forming  = "The session is forming",
         no_car           = "You have no eligible car",
         over_cap         = "Not shown here",
     }
@@ -161,9 +187,17 @@ Core.define("competition.venue_options", function(C)
                 -- Keep the established five-row payload shape. While practising, the PRACTICE slot becomes
                 -- the explicit exit rather than adding a sixth row that older clients may not render safely.
                 local outId = (id == "practice" and on.leave_practice) and "leave_practice" or id
-                local ok = (outId == "leave_practice") or on[id] == true
+                local label = outId == "leave_practice" and "Leave Practice" or labelOf(id)
+                -- Same trick for the one-entry switch: the ENTER slot becomes the switch, never a sixth row.
+                if id == "enter_race" and on.switch then
+                    outId = on.switch
+                    label = outId == "confirm_switch"
+                        and ("Withdraw from %s and enter"):format(tostring(on.switchFrom or "your race"))
+                        or "Switch Entry"
+                end
+                local ok = (outId == "leave_practice") or (outId ~= id) or on[id] == true
                 options[#options + 1] = {
-                    id = outId, label = outId == "leave_practice" and "Leave Practice" or labelOf(id), enabled = ok,
+                    id = outId, label = label, enabled = ok,
                     why = (not ok) and M.explain(reasons[id]) or nil,
                 }
             else

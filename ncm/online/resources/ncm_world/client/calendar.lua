@@ -20,13 +20,23 @@ end
 
 local cal = nil                 -- last GlobalState.ncmCalendar
 local base = { offset = nil }    -- KB-25: serverNow - monotonic, kept at its RUNNING MAXIMUM (see seedClock)
-local poi = { eventId = nil, handle = nil, venue = nil }
+-- One ring per race inside its window, each at its own venue (owner, 2026-09-28). eventId -> { handle, venue }.
+-- It used to be ONE ring for the whole world, given to "your" soonest race or else the soonest public one, so a
+-- second race starting inside the same twenty minutes had no ring at its venue at all.
+local rings = {}
+local ringFailedAt = {}         -- eventId -> monotonic time of a refused create (retried every 10 s, not every tick)
+local standingIn = nil          -- eventId of the ring the driver is inside, as last told to the server
+local standingToldAt = 0
 local lastHint = { text = nil, title = nil }
 local gps = { eventId = nil, blipId = nil }
 local autoRouted = {}            -- eventId -> true once we set the venue route for it
+local VENUE_RING_LEAD_S = Entry.RING_LEAD_S
 local routeTo                    -- defined below (used by the heartbeat and /ncm.gps)
-local VENUE_RADIUS_M = 6.0        -- the ring; the option list only acts inside it
-local VENUE_SHOW_M = 15.0         -- ring visible from here (tight on purpose; GPS does the approach)
+-- The drawn ring IS the entry rule: the server accepts inside this radius (plus a staleness tolerance) and nowhere
+-- else (owner, 2026-09-28). It is visible from far enough away to spot and head for -- it was 15 m, which meant a
+-- ring could only be found by already standing next to it.
+local VENUE_RADIUS_M = Entry.RING_RADIUS_M
+local VENUE_SHOW_M = Entry.RING_VISIBLE_M
 local PAD_KEY = "padX"            -- vanilla "interact" on a pad; same tap/hold job as E
 local holdFraction = 0            -- 0..1 while the engage key is held, for the list's progress bar
 
@@ -52,6 +62,21 @@ local function seedClock(published)
     end
 end
 
+local function applyCalendar(g, transport)
+    if type(g) ~= "table" or type(g.next) ~= "table" then return false end
+    if not cal or g.signature ~= cal.signature then
+        log("calendar: %d upcoming via %s (%s)", #g.next, tostring(transport), tostring(g.signature))
+    end
+    seedClock(g.serverNow)
+    cal = g
+    return true
+end
+
+-- The production platform currently leaves GlobalState.ncmCalendar absent on clients. The server sends the
+-- same bounded three-row snapshot explicitly every tick; the GlobalState read in the heartbeat stays as a
+-- fallback rather than being trusted as the only transport.
+RegisterNetEvent("ncm:calendar", function(g) applyCalendar(g, "event") end)
+
 local function localPosition()
     local ok, x, y, z = pcall(Open77.character.position)
     if ok and type(x) == "number" then return { x = x, y = y, z = z } end
@@ -69,44 +94,88 @@ local function km(m)
     return string.format("%d m", math.floor(m))
 end
 
-local function removePoi()
-    if poi.handle then
-        pcall(function() call("open77_worldui", "remove", poi.handle) end)
-    end
-    poi = { eventId = nil, handle = nil, venue = nil }
+-- **The heartbeat card must not change every second.** OPEN//77's notification page renders an update as
+-- remove + rebuild + slide-in and moves the card to the bottom of the stack, so a per-second countdown (and a
+-- live distance while driving) re-animated it every second -- "highly disorienting" (owner, 2026-09-28). The
+-- text is coarse on purpose: it changes about once a minute, or once a kilometre. The race HUD owns seconds.
+local function coarseCountdown(seconds)
+    if seconds < 60 then return "starts in under a minute" end
+    return ("starts in %d min"):format(math.ceil(seconds / 60))
 end
 
-local function ensurePoi(next)
-    if not next then removePoi(); return end
-    if poi.eventId == next.eventId and poi.handle then return end
+local function coarseDistance(m, venueName)
+    if m <= 50 then return "at " .. venueName end
+    if m < 1000 then return "under 1 km to " .. venueName end
+    return ("%d km to %s"):format(math.floor(m / 1000 + 0.5), venueName)
+end
+
+local function removeRing(eventId)
+    local r = rings[eventId]
+    if r and r.handle then
+        pcall(function() call("open77_worldui", "remove", r.handle) end)
+    end
+    rings[eventId] = nil
+end
+
+local function removeAllRings()
+    for eventId in pairs(rings) do removeRing(eventId) end
+end
+
+local function createRing(ev)
     -- A refused create is retried every 10 s, not every tick (one log line per attempt).
-    if poi.failedAt and Open77.time.monotonic() - poi.failedAt < 10 then return end
-    removePoi()
-    -- IDEA-095: the marker is now a RING ONLY. It carries no label, key, holdSeconds or event, because a labelled
+    if ringFailedAt[ev.eventId] and Open77.time.monotonic() - ringFailedAt[ev.eventId] < 10 then return end
+    -- IDEA-095: the marker is a RING ONLY. It carries no label, key, holdSeconds or event, because a labelled
     -- worldui marker always makes the platform facade draw its own E card (KB-3, KB-16) -- and that card can offer
     -- exactly one action, which is the whole reason a single key was doing three jobs (KB-32). NCM draws the option
-    -- list itself (web/venue.html) and owns the key. **Unverified live: whether an unlabelled marker still renders
-    -- the ring.** Owner accepted that risk 2026-09-22; if the ring vanishes, put a label back and hide the facade
-    -- card some other way.
+    -- list itself (web/venue.html) and owns the key.
     local result, err = call("open77_worldui", "create", {
-        id = "ncm_venue",
-        position = { x = next.venue.x, y = next.venue.y, z = next.venue.z },
+        id = "ncm_venue_" .. tostring(ev.eventId):gsub("[^%w_]", "_"):sub(1, 40),
+        position = { x = ev.venue.x, y = ev.venue.y, z = ev.venue.z },
         radius = VENUE_RADIUS_M,
         style = "objective",
-        maxDistance = VENUE_SHOW_M,          -- (interactions caps a prompt's show distance at 250 anyway)
+        maxDistance = VENUE_SHOW_M,
         promptDistance = VENUE_RADIUS_M,
         groundOffset = 0.25,
         color = "#00E5FF",
     })
     if result and result.ok then
-        -- Keep the exact event/venue that owns this ring. `cal.next[1]` is merely the
-        -- soonest server-wide event and can differ from the driver's selected event.
-        poi = { eventId = next.eventId, handle = result.handle, venue = next.venue }
-        log("venue marker at %s for %s", next.venue.name, next.eventId)
+        rings[ev.eventId] = { handle = result.handle, venue = ev.venue }
+        ringFailedAt[ev.eventId] = nil
+        log("venue ring at %s for %s", tostring(ev.venue.name), ev.eventId)
     else
-        poi.failedAt = Open77.time.monotonic()
-        log("venue marker failed: %s", tostring(err or (result and result.error)))
+        ringFailedAt[ev.eventId] = Open77.time.monotonic()
+        log("venue ring failed for %s: %s", ev.eventId, tostring(err or (result and result.error)))
     end
+end
+
+--- Make the drawn rings exactly `targets` (array of calendar rows).
+local function syncRings(targets)
+    local want = {}
+    for _, ev in ipairs(targets or {}) do
+        if ev.eventId and type(ev.venue) == "table" then want[ev.eventId] = ev end
+    end
+    for eventId in pairs(rings) do if not want[eventId] then removeRing(eventId) end end
+    for eventId, ev in pairs(want) do if not rings[eventId] then createRing(ev) end end
+end
+
+--- The ring the driver is standing inside, or nil. The nearest wins where two venues overlap.
+local function ringHere(pos)
+    if not pos then return nil end
+    local best, bestD = nil, nil
+    for eventId, r in pairs(rings) do
+        local d = Routes.planarDistance(pos, r.venue)
+        if d <= VENUE_RADIUS_M + 0.5 and (not bestD or d < bestD) then best, bestD = eventId, d end
+    end
+    return best
+end
+
+--- Tell the server which ring we are in: on every change, and again every 10 s while inside one, so a restarted
+--- server re-learns it without the driver having to step out and back in.
+local function tellStanding(eventId)
+    local t = Open77.time.monotonic()
+    if eventId == standingIn and (not eventId or t - standingToldAt < 10) then return end
+    standingIn, standingToldAt = eventId, t
+    pcall(TriggerServerEvent, "ncm:venue.at", eventId)
 end
 
 -- ---------------------------------------------------------------------------------------------
@@ -184,6 +253,10 @@ end
 local function sendVenue()
     if not (vpage and vpageReady) then return end
     local v = venueBag
+    -- The card must belong to the ring we are standing in. A bag for a different ring is a card on its way out
+    -- (the server has not yet answered our new position), and drawing it is exactly the old defect: the list on
+    -- one ring acting on another race.
+    if v and v.eventId ~= standingIn then v = nil end
     if not v or type(v.options) ~= "table" or #v.options == 0 or panelOpen then
         if lastDrawn ~= "hidden" then lastDrawn = "hidden"; vpage:send("venue:hide", {}) end
         return
@@ -206,7 +279,7 @@ end
 
 local function engage()
     local v = venueBag
-    if not v or type(v.options) ~= "table" then return end
+    if not v or type(v.options) ~= "table" or v.eventId ~= standingIn then return end
     local o = v.options[selIndex(v.options)]
     if not o then return end
     -- Disabled options are shown so the player can see what exists (owner, 2026-09-23), but pressing one must
@@ -221,7 +294,7 @@ local function engage()
         return
     end
     log("venue option engaged: %s (%s)", tostring(o.id), tostring(v.eventId))
-    TriggerServerEvent("ncm:venue.option", o.id)
+    TriggerServerEvent("ncm:venue.option", o.id, v.eventId)   -- the ring it was drawn for; the server refuses a stale one
 end
 
 AddEventHandler("onClientResourceStart", function(name)
@@ -295,8 +368,9 @@ RegisterNetEvent("ncm:venue.practice", function(v) practiceBag = v; openVenuePan
 CreateThread(function()
     local heldSince, fired = nil, false
     while true do
-        local pos = poi.handle and poi.venue and localPosition() or nil
-        local near = pos and Routes.planarDistance(pos, poi.venue) <= VENUE_RADIUS_M + 0.5
+        local here = (next(rings) ~= nil and not NcmClientRaceActive) and ringHere(localPosition()) or nil
+        tellStanding(here)
+        local near = here ~= nil
         -- while racing, race.lua owns the HUD and the venue list must not sit under it; while the Street Call
         -- card is up, race_builder.lua owns the same E key and the same corner of the screen (L179)
         if near and not NcmClientRaceActive and not NcmClientBuildActive then
@@ -367,49 +441,48 @@ local function refreshHint()
             lastHint = { text = nil, title = nil }
             pcall(function() call("open77_notifications", "clear") end)   -- do not leave a frozen card behind the race HUD
         end
-        ensurePoi(nil)
+        removeAllRings()
         return
     end
     local entry = myEntry()
     local entryState = entry and tostring(entry.state or "") or nil
     local activeEntry = entry and entry.eventId and entryState ~= "withdrawn" and entryState ~= "cancelled"
-    local next = nil
+    local entryEvent = nil
     if activeEntry and cal and type(cal.next) == "table" then
         for _, candidate in ipairs(cal.next) do
-            if candidate.eventId == entry.eventId then next = candidate; break end
+            if candidate.eventId == entry.eventId then entryEvent = candidate; break end
         end
     end
-    -- The calendar is discovered through F6. Until the driver expresses interest, do not advertise a named
-    -- race, place its venue ring, or take over their waypoint. Once interested/entered, follow THEIR event --
-    -- not cal.next[1], which may be an unrelated championship that happens to start sooner.
-    if not activeEntry then
-        ensurePoi(nil)
-        -- This card is the one instruction that persists. It MUST name the repeatable recovery command;
-        -- otherwise a missed first-join toast leaves a visitor stranded for the rest of their session.
-        local text, title = "Races are running tonight · F6 Hub · New here? /ncm help", "NCM · HUB"
-        if text ~= lastHint.text or title ~= lastHint.title then
-            lastHint = { text = text, title = title }
-            pcall(function()
-                call("open77_notifications", "show", {
-                    id = "ncm_heartbeat", replace = true, type = "info", title = title, message = text,
-                    icon = "NCM", position = "middle_left", durationMs = 0, color = "#22D8E2",
-                })
-            end)
+    -- Venue discovery is world information, not a reward for clicking INTEREST: every race inside its window has
+    -- its own ring at its own venue, Street Calls included (owner, 2026-09-28). An invitational is ringed only
+    -- for the driver who holds a seat in it -- nobody else can do anything there.
+    local targets = {}
+    if cal and type(cal.next) == "table" then
+        local t = serverNow()
+        for _, candidate in ipairs(cal.next) do
+            local mineSeat = activeEntry and entry.eventId == candidate.eventId
+            if (not candidate.invitation or mineSeat) and candidate.startsAt - t <= VENUE_RING_LEAD_S then
+                targets[#targets + 1] = candidate
+            end
         end
-        return
     end
-    if not next then
+    syncRings(targets)
+
+    -- Race toasts are personal: only an event the driver is interested in or has entered may own one.
+    -- The venue ring remains above even when there is no personal notification.
+    if not entryEvent then
         if lastHint.text then
             lastHint = { text = nil, title = nil }
             pcall(function() call("open77_notifications", "clear") end)
         end
-        ensurePoi(nil)
         return
     end
+    local next = entryEvent
     -- A driver with a seat in an organized event is routed by the race HUD, never by the street cadence (a
     -- cadence pin sent the owner to Vista Del Drag mid-weekend, Batch 1 live 2026-09-21).
-    local interested = entryState == "interested"
-    local entered = not interested
+    local ownsTarget = activeEntry and entry.eventId == next.eventId
+    local interested = ownsTarget and entryState == "interested"
+    local entered = ownsTarget and not interested
     if interested and next.state == "entry_open" and not next.invitation and not autoRouted[next.eventId] and not NcmClientRaceActive then
         autoRouted[next.eventId] = true
         local okWp, wp = pcall(Open77.blips.waypoint)
@@ -445,8 +518,8 @@ local function refreshHint()
     if remaining <= 0 then
         text = ("%s · %s · starting · %s"):format(next.seriesName, next.routeName, field)
     else
-        text = ("%s · %s · %s%s · %s"):format(next.seriesName, next.routeName, Entry.countdown(remaining),
-            dist and ("  ·  " .. km(dist) .. " to " .. next.venue.name) or "", field)
+        text = ("%s · %s · %s%s · %s"):format(next.seriesName, next.routeName, coarseCountdown(remaining),
+            dist and ("  ·  " .. coarseDistance(dist, next.venue.name)) or "", field)
     end
     local title
     if next.invitation then
@@ -482,8 +555,9 @@ local function refreshHint()
     -- This used to read `if entered or next.invitation`, from when the marker's only job was to enter the race --
     -- once you were in, it had nothing left to say. IDEA-095 changed what the marker IS: it is now the way to
     -- reach WITHDRAW, PRACTICE and HISTORY, all of which matter most *after* you are entered. Taking it down on
-    -- entry deletes the surface at the moment it becomes useful. Only invitation events hide it now.
-    if next.invitation then ensurePoi(nil) else ensurePoi(next) end
+    -- entry deletes the surface at the moment it becomes useful. An owned invitational seat keeps it too;
+    -- unowned invitationals are filtered from the automatic calendar target above.
+    -- Every ring owns its own venue surface; the personal event above owns only the toast.
 end
 
 CreateThread(function()
@@ -491,13 +565,7 @@ CreateThread(function()
     while true do
         local g = GlobalState and GlobalState.ncmCalendar or nil
         if type(g) == "table" then
-            if not cal or g.signature ~= cal.signature then
-                log("calendar: %d upcoming (%s)", g.next and #g.next or 0, tostring(g.signature))
-            end
-            if not cal or g.serverNow ~= cal.serverNow or g.signature ~= cal.signature then
-                seedClock(g.serverNow)
-                cal = g
-            end
+            applyCalendar(g, "global")
         elseif not cal and (Open77.time.monotonic() % 10) < 1 then
             log("calendar: GlobalState.ncmCalendar not present yet")
         end
@@ -578,7 +646,7 @@ end, false)
 
 AddEventHandler("onClientResourceStop", function(name)
     if name == "ncm_world" then
-        removePoi()
+        removeAllRings()
         clearGps()
         pcall(function() call("open77_notifications", "clear") end)
     end

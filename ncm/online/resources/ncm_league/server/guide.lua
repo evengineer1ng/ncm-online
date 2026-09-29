@@ -294,53 +294,83 @@ NcmGuide.push = pushGuide
 -- twin for a second client that has no WebUI, and for nothing else.
 -- ---------------------------------------------------------------------------------------------
 
---- The soonest published event, which is the one a venue marker is for.
-local function nextEvent()
+--- The soonest published event. `publicOnly` keeps the automatic public ring and its action card on the same
+--- race when an invitational the driver does not belong to happens to start first.
+local function nextEvent(publicOnly)
     for _, eid in ipairs(NcmCalendar.orderedIds()) do
         local e = NcmCalendar.events[eid]
-        if e and e.state ~= "closed" and e.state ~= "cancelled" then return e end
+        if e and e.state ~= "closed" and e.state ~= "cancelled" and (not publicOnly or not e.invitation) then return e end
     end
     return nil
 end
 
-local ENTRY_GRACE_S = 60   -- a race that has just gone green is still "yours" for a moment
+local ENTRY_GRACE_S = 60   -- a bookmarked race that has just gone green is still "yours" for a moment
 
---- The soonest race this driver still has a live entry in, or nil. ONE definition, so the ring, the card,
---- the waypoint and the venue options can never disagree about which race is "yours".
+--- Is this event still happening: not closed, or a session still running for it. An entry on an event that
+--- ended without classifying it must never hold a driver's one entry forever.
+local function liveEvent(x)
+    if x.state ~= "closed" and x.state ~= "cancelled" then return true end
+    return NcmRace and NcmRace.hasSession and NcmRace.hasSession(x.eventId) or false
+end
+
+--- The ONE entry this driver holds, other than on `exceptEventId` (owner, 2026-09-28: one entry at a time, and
+--- a team seat counts). Returns event, entry or nil.
+function NcmGuide.heldEntry(driverId, exceptEventId)
+    return Entry.heldEntry(orderedEvents(), driverId, exceptEventId, liveEvent)
+end
+
+--- "Your race": the entry you hold, or failing that the soonest race you bookmarked. It drives the persistent
+--- card, the GPS and `/ncm.withdraw` with no argument. It does NOT decide rings or venue cards any more -- those
+--- belong to the place they are drawn at (owner, 2026-09-28).
+---
+--- Interest used to rank level with a real entry by start time, so a bookmark on a sooner race took the card,
+--- the waypoint and a bare `/ncm.withdraw` away from the race the driver had actually paid to enter.
 local function driverEvent(driverId)
     if not driverId then return nil end
+    local held, en = NcmGuide.heldEntry(driverId)
+    if held then return held, tostring(en.state) end
     local t = now()
     for _, x in ipairs(orderedEvents()) do          -- ordered by start time: the first match is the soonest
-        local en = x.entries and x.entries[driverId]
-        local st = en and tostring(en.state or "") or nil
-        if st and st ~= "withdrawn" and st ~= "cancelled" and (x.startsAt or 0) > t - ENTRY_GRACE_S then
-            return x, st
+        local mine = x.entries and x.entries[driverId]
+        if mine and mine.state == "interested" and (x.startsAt or 0) > t - ENTRY_GRACE_S then
+            return x, "interested"
         end
     end
     return nil
 end
+NcmGuide.driverEvent = driverEvent
 
---- What this driver can do at that event's venue right now. Pure decision in core; this only gathers facts.
+-- ---------------------------------------------------------------------------------------------
+-- Where the driver is standing. Every race inside its window has its own ring (owner, 2026-09-28), so the
+-- client -- the only side that knows which ring it is inside -- names it, and the server checks the claim
+-- against the position it has. The claim only selects a CARD: every action is still re-validated against the
+-- real rule (entry.checkIn measures the distance itself), so a false claim buys a card and nothing else.
+-- ---------------------------------------------------------------------------------------------
+local venueAt = {}          -- pid -> eventId of the ring the driver says they are standing in
+local switchArmed = {}      -- pid -> { eventId, fromEventId, at } after a first SWITCH ENTRY press
+local SWITCH_ARM_S = 15     -- the confirm must follow the first press, the same window /ncm.forfeit uses
+local CLAIM_SLACK_M = 25    -- server positions lag; only a claim that is plainly elsewhere is refused
+
+local function standingAt(pid, e)
+    local p = Open77.players.get(pid)
+    if not (p and p.fresh and type(p.position) == "table" and e.venue) then return true end   -- cannot tell: trust
+    local Routes = Core.get("course.routes")
+    return Routes.planarDistance(p.position, e.venue) <= Entry.RING_RADIUS_M + CLAIM_SLACK_M
+end
+
+--- What this driver can do at the ring they are standing in. Pure decision in core; this only gathers facts.
 function NcmGuide.venueOptions(pid)
+    local e = venueAt[pid] and NcmCalendar.events[venueAt[pid]] or nil
+    if not e then return nil end
     local driver = NcmCalendar.resolveDriver(pid)
     local busy, busyEvent, busyKind = nil, nil, nil
     if driver and NcmRace and NcmRace.busySession then
         busy, busyEvent, busyKind = NcmRace.busySession(driver.ncmDriverId)
     end
-    -- YOUR race, not the server's soonest. `nextEvent()` ignores the driver entirely, so a player standing on
-    -- the start line of the race they entered was shown the card for an unrelated championship that happened
-    -- to start sooner -- which of course offered nothing but HISTORY, because they were not in it. Third
-    -- occurrence of this class today, after `ncmEntry` and `/ncm.gps` (owner, 2026-09-23).
-    local mine = driver and driverEvent(driver.ncmDriverId) or nil
-    -- L114: practice is independent of interest. Keep the venue card on the practice event so its explicit
-    -- LEAVE PRACTICE action cannot disappear merely because the driver never joined the interest list.
-    local practiceEvent = busyKind == "practice" and NcmCalendar.events[tostring(busyEvent or "")] or nil
-    local e = practiceEvent or mine or nextEvent()
-    if not e then return nil end
-    -- QA P4 / L107: announce whether this card names the driver's own race. A fact, not a decision -- nothing
-    -- below reads it, and `wp/QA_INSTRUMENTATION.md` explains why this particular invariant earns an observer.
+    -- QA P4 / L107: the card must name the ring the driver is standing in. By construction it now does; the
+    -- observer stays so a regression in the claim path shows up as a FAIL rather than as a confused player.
     if driver then
-        pcall(TriggerEvent, "ncm:qa.guidance", mine and mine.eventId or nil, e.eventId, "venue_card", driver.ncmDriverId)
+        pcall(TriggerEvent, "ncm:qa.guidance", venueAt[pid], e.eventId, "venue_card", driver.ncmDriverId)
     end
     local entry = driver and e.entries and e.entries[driver.ncmDriverId] or nil
     local practiceActive = busy ~= nil and busyEvent == e.eventId and busyKind == "practice"
@@ -349,6 +379,16 @@ function NcmGuide.venueOptions(pid)
     -- ask" must never present as "you may not race".
     local carRefusal = driver and NcmCompetition and NcmCompetition.carRefusal
         and NcmCompetition.carRefusal(e, driver.ncmDriverId) or nil
+    local heldElsewhere = nil
+    if driver then
+        local other, oen = NcmGuide.heldEntry(driver.ncmDriverId, e.eventId)
+        if other then
+            local heldBySession = busy ~= nil and busyEvent == other.eventId and busyKind ~= "practice"
+            heldElsewhere = { eventId = other.eventId, routeName = other.routeName,
+                              releasable = Entry.RELEASABLE[tostring(oen.state)] == true and not heldBySession }
+        end
+    end
+    local armed = switchArmed[pid]
     local result = VenueOptions.evaluate({
         now = now(),
         event = e,
@@ -357,9 +397,12 @@ function NcmGuide.venueOptions(pid)
         busyElsewhere = busy ~= nil and not practiceActive,
         practiceActive = practiceActive,
         carRefusal = carRefusal,
+        heldElsewhere = heldElsewhere,
+        switchArmed = armed ~= nil and armed.eventId == e.eventId and heldElsewhere ~= nil
+            and armed.fromEventId == heldElsewhere.eventId and now() - armed.at <= SWITCH_ARM_S,
         formLeadSec = setting("raceFormAtSec", 60),
     })
-    return result, e
+    return result, e, heldElsewhere
 end
 
 local function pushVenue(pid)
@@ -383,15 +426,47 @@ function NcmGuide.pushAll()
     for _, pid in ipairs(Open77.players.all()) do pushGuide(pid); pushVenue(pid) end
 end
 
--- One option engaged. The client sends the id it drew; the server re-derives the list and refuses anything that
--- is not on it, so a stale client cannot act on an option that has since stopped applying.
-RegisterNetEvent("ncm:venue.option", function(optionId)
+--- The ring this player last said they are standing in (tests and the QA observer).
+function NcmGuide.venueAt(pid) return venueAt[pid] end
+
+-- The client names the ring it is standing in (or nil on leaving every ring).
+RegisterNetEvent("ncm:venue.at", function(eventId)
+    local pid = tonumber(source) or 0
+    if pid <= 0 then return end
+    local eid = eventId and tostring(eventId) or nil
+    local e = eid and NcmCalendar.events[eid] or nil
+    if eid and not e then eid = nil end
+    if e and not standingAt(pid, e) then
+        log("venue claim refused player=%d event=%s (not near its venue)", pid, eid)
+        eid = nil
+    end
+    if venueAt[pid] == eid then return end
+    venueAt[pid] = eid
+    if switchArmed[pid] and switchArmed[pid].eventId ~= eid then switchArmed[pid] = nil end
+    pushVenue(pid)
+end)
+
+AddEventHandler("onPlayerDisconnected", function(playerId)
+    local pid = tonumber(playerId) or 0
+    venueAt[pid], switchArmed[pid] = nil, nil
+end)
+
+-- One option engaged. The client sends the id it drew and the ring it drew it for; the server re-derives the
+-- list and refuses anything that is not on it, so a stale client cannot act on an option that has since stopped
+-- applying -- or on a card that belonged to a different ring.
+RegisterNetEvent("ncm:venue.option", function(optionId, eventId)
     local pid = tonumber(source) or 0
     local id = tostring(optionId or "")
-    local result, e = NcmGuide.venueOptions(pid)
+    if eventId ~= nil and tostring(eventId) ~= tostring(venueAt[pid]) then
+        log("venue option refused player=%d option=%s reason=stale_ring (drew %s, standing at %s)",
+            pid, id, tostring(eventId), tostring(venueAt[pid]))
+        pushVenue(pid)
+        return
+    end
+    local result, e, held = NcmGuide.venueOptions(pid)
     if not result or not e then return end
     local allowed = false
-    for _, o in ipairs(result.options) do if o.id == id then allowed = true end end
+    for _, o in ipairs(result.options) do if o.id == id and o.enabled ~= false then allowed = true end end
     if not allowed then
         log("venue option refused player=%d option=%s reason=%s", pid, id, tostring(result.reasons[id] or "unknown_option"))
         toast(pid, { type = "warning", title = "Not available", message = "That option is no longer available here.", icon = "NCM", durationMs = 5000 })
@@ -401,6 +476,15 @@ RegisterNetEvent("ncm:venue.option", function(optionId)
     log("venue option player=%d event=%s option=%s", pid, e.eventId, id)
     if id == "enter_race" then
         NcmCalendar.enter(pid, e.eventId)
+    elseif id == "switch_entry" then
+        -- First press: arm, and say exactly what the second press will cost.
+        switchArmed[pid] = { eventId = e.eventId, fromEventId = held.eventId, at = now() }
+        toast(pid, { type = "warning", title = "SWITCH ENTRY",
+            message = ("You're entered in %s. Hold again to withdraw from it and enter %s."):format(
+                tostring(held.routeName), tostring(e.routeName)), icon = "NCM", durationMs = SWITCH_ARM_S * 1000 })
+    elseif id == "confirm_switch" then
+        switchArmed[pid] = nil
+        NcmCalendar.enter(pid, e.eventId, { switchFrom = held.eventId })
     elseif id == "practice" then
         -- L114: practice is an explicit act. Interest, entry and proximity never join a session.
         local driver = NcmCalendar.resolveDriver(pid)
@@ -523,6 +607,7 @@ local REASONS = {
     invitation_only = "That one is by invitation — a team has to offer you a seat.", already_interested = "You're already on the list for that one.",
     already_entered = "You're already entered.", no_entry = "You're not on that list.", no_driver = "No NCM driver on this session.",
     already_raced = "That one is already in your results.",
+    entered_elsewhere = "You're entered in another race. Switch at this race's ring, or withdraw there first.",
     in_session = "You are out in that session -- /ncm.forfeit to retire from it.",
 }
 
@@ -537,17 +622,60 @@ local REASONS = {
 --- The client derives ring, card and waypoint from this bag, so it must always describe the SOONEST race this
 --- driver still has a live entry in. Recomputed from the entries themselves after any change, never inferred
 --- from the action that caused it.
+---
+--- **And it must be recomputed when TIME moves, not only when the driver acts (KB-185).** It was published on
+--- interest and withdraw alone, so when the race it named ended or closed without them, it went on naming a
+--- race that no longer existed: the client found no such event in the calendar and drew no ring for the next
+--- race they were on the list for -- until they expressed interest again, standing at the venue already.
+--- `NcmGuide.refreshEntryBags` below re-derives it on the Guide's tick.
+local Teams = Core.get("competition.teams")
+local publishedEntry = {}   -- pid -> eventId this file last published ("" = cleared); nil = never, so re-derive
+
 local function publishEntryBag(pid, driverId)
     if not (pid and pid > 0 and driverId) then return end
     local best, bestState = driverEvent(driverId)
     if not best then
         pcall(function() Open77.state.player(pid):clear("ncmEntry") end)
+        publishedEntry[pid] = ""
         return
     end
-    pcall(function() Open77.state.player(pid):set("ncmEntry", {
+    local bag = {
         eventId = best.eventId, state = bestState, routeName = best.routeName,
         startsAt = math.floor(best.startsAt),
-        venue = { x = best.venue.x, y = best.venue.y, z = best.venue.z, name = best.venue.name } }) end)
+        venue = { x = best.venue.x, y = best.venue.y, z = best.venue.z, name = best.venue.name } }
+    -- A team seat (organized.lua) carries its team, and the client's card names it. Re-deriving must not
+    -- strip what the acceptance wrote, or refreshing would demote "you drive for X" to a generic card.
+    local en = best.entries and best.entries[driverId]
+    if en and en.teamId then
+        local okTeam, team = pcall(Teams.byId, en.teamId)
+        bag.teamId, bag.seatIndex = en.teamId, en.seatIndex
+        if okTeam and team then bag.teamName, bag.teamShort, bag.colour = team.name, team.short, team.colour end
+    end
+    pcall(function() Open77.state.player(pid):set("ncmEntry", bag) end)
+    publishedEntry[pid] = best.eventId
+end
+--- The ONLY writer of `ncmEntry`. Check-in, seat acceptance and the scenario host all wrote it themselves, and a
+--- write that bypassed this also bypassed `publishedEntry` -- so the refresh believed its last answer was still
+--- on the wire and never corrected the bag.
+NcmGuide.publishEntryBag = publishEntryBag
+
+--- Re-derive every connected driver's `ncmEntry`, writing only where the answer changed.
+function NcmGuide.refreshEntryBags()
+    for _, pid in ipairs(Open77.players.all()) do
+        local driver = NcmCalendar.resolveDriver(pid)
+        if driver then
+            local best = driverEvent(driver.ncmDriverId)
+            local want = best and best.eventId or ""
+            if publishedEntry[pid] ~= want then publishEntryBag(pid, driver.ncmDriverId) end
+        end
+    end
+end
+
+AddEventHandler("onPlayerDisconnected", function(playerId) publishedEntry[tonumber(playerId) or 0] = nil end)
+--- Re-derive one driver's bag now, whoever changed their entries.
+function NcmGuide.refreshEntryBag(pid)
+    local driver = NcmCalendar.resolveDriver(pid)
+    if driver then publishEntryBag(pid, driver.ncmDriverId) end
 end
 
 function NcmGuide.interest(pid, ref)
@@ -602,8 +730,13 @@ function NcmGuide.withdraw(pid, ref)
     local heldHere = busySid ~= nil and busyEvent == e.eventId and busyKind ~= "practice"
     local decision = Guide.withdraw({ existingEntry = e.entries[driver.ncmDriverId], inSession = heldHere })
     if not decision.ok then tell(pid, REASONS[decision.reason] or tostring(decision.reason)); return nil, decision.reason end
+    local was = e.entries[driver.ncmDriverId]
     pcall(function() MySQL.update.await("UPDATE entry SET state = 'withdrawn' WHERE entry_id = ?", { decision.entryId }) end)
     e.entries[driver.ncmDriverId] = { entryId = decision.entryId, state = "withdrawn" }   -- the row stays; a rejoin reuses it
+    -- A team seat is withdrawable (owner, 2026-09-28), and withdrawing it hands the seat back to the team.
+    if was and was.teamId and NcmOrganized and NcmOrganized.releaseSeat then
+        NcmOrganized.releaseSeat(e.eventId, driver.ncmDriverId, was.teamId, was.seatIndex)
+    end
     publishEntryBag(pid, driver.ncmDriverId)   -- other live entries must survive this withdrawal
     if NcmRace and NcmRace.practiceLeave then NcmRace.practiceLeave(e.eventId, driver.ncmDriverId, now()) end
     -- Leaving a list and withdrawing an entry are different acts (that is why they are different options);
@@ -719,6 +852,9 @@ CreateThread(function()
         Wait(5000)
         local ok, sig = pcall(function() return GlobalState.ncmCalendar and GlobalState.ncmCalendar.signature end)
         if ok and sig ~= last then last = sig; NcmGuide.pushAll() end
+        -- Every tick, not only on a new signature: a race passing its grace window changes which race is
+        -- yours without changing the calendar (KB-185). Writes only where the answer moved.
+        pcall(NcmGuide.refreshEntryBags)
     end
 end)
 

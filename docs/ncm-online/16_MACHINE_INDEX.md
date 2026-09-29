@@ -62,6 +62,8 @@ the first sale. That requirement is not implemented here.
 
 ## Probe
 
+**AMENDED 2026-09-28 by `L197`: a new Machine enters the Index through the Scanner, not proximity.** The interaction half described below is now built (`ncm-vision` 0.2.0 + `ncm_scanner`, live proof owed at `MASTER_TEST §BZ`). The proximity dwell records sightings of machines already known and never reveals identity. NCM ambient traffic is a scan target, and vanilla per-client cars scan as `client_attested`.
+
 **AMENDED 2026-09-27 by `L174`: the Scanner is authorised and is no longer only an experiment.** The build-capability note below still governs the *interaction* half — aiming and scanning — which has never been measured; the *knowledge* half is buildable now against `competition.machine_knowledge` and migration 033. Original text: Build `2.31.13+op77.87` provides enough for a bounded Scanner experiment, not enough to promise the final UX:
 
 - input plus WebUI/effect/audio surfaces can supply an action and modest feedback;

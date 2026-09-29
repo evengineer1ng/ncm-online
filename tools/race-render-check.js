@@ -115,6 +115,7 @@ check(typeof events["race:state"] === "function", "race:state has a handler");
 check(typeof events["race:inputs"] === "function", "race:inputs has a handler");
 check(typeof events["race:tyre"] === "function", "race:tyre has a handler (L159)");
 check(typeof events["race:wear"] === "function", "race:wear has a handler (L178)");
+check(typeof events["race:fuel"] === "function", "race:fuel has a handler (L204)");
 
 // ---------------------------------------------------------------- every state shape race.lua can send
 fire("race:state", {});
@@ -125,6 +126,21 @@ drewCleanly("a null state -- the shape sent when nothing is running");
 
 fire("race:state", { instrument: { odo: "12 345 km", name: "Galena", ord: 2 } });
 drewCleanly("odometer only, which is the freeroam case");
+
+// ---------------------------------------------------------------- persistent fuel instrument (L204)
+const fuelEl = document.getElementById("instrFuel");
+fire("race:fuel", { pct: 82, fuelMl: 49200, capacityMl: 60000 });
+check(fuelEl.children[1].textContent === "82%", "fuel renders the authoritative percentage");
+check(fuelEl.style.color === "", "healthy fuel has no warning colour");
+fire("race:fuel", { pct: 12, fuelMl: 7200, capacityMl: 60000 });
+check(fuelEl.style.color === "", "fuel above reserve remains neutral");
+fire("race:fuel", { pct: 10, fuelMl: 6000, capacityMl: 60000 });
+check(fuelEl.style.color === "var(--warn)", "reserve fuel marks the instrument warning");
+fire("race:fuel", { pct: 0, fuelMl: 0, capacityMl: 60000 });
+check(fuelEl.style.color === "var(--red)" && fuelEl.children[1].textContent === "0%",
+  "an empty tank is explicit and red");
+fire("race:fuel", null);
+check(true, "a null fuel payload does not throw");
 
 fire("race:state", {
   banner: { text: "RACE COMPLETE", kind: "finish", sub: "P3" },

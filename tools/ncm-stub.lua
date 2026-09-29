@@ -311,6 +311,9 @@ MySQL = {
 -- ------------------------------------------------------------------ load resources
 local function loadResource(name)
     NcmCore = nil   -- each resource is its own VM in the host; shared core loads fresh per resource
+    -- The host answers per VM; `impromptu.lua` compares it in `onResourceStart`, and without it the stub died
+    -- at load before any scenario could run.
+    GetCurrentResourceName = function() return name end
     local manifest = assert(io.open(RES .. name .. "/open77.lua")):read("a")
     for kind, path in manifest:gmatch('(%w+_script)%s+"([^"]+)"') do
         if kind ~= "client_script" then
@@ -869,6 +872,8 @@ function scenarios.guide()
     assertf(prec == nil, "interest alone never joins practice")
 
     print("== explicit PRACTICE opens and joins practice")
+    -- The venue card belongs to the ring the driver is standing in (owner, 2026-09-28): name it first.
+    clientNet("ncm:venue.at", 1, e.eventId); run(0)
     clientNet("ncm:venue.option", 1, "practice"); run(1)
     for sid, rec in pairs(NcmRace.sessions) do if rec.practice then psid, prec = sid, rec end end
     assertf(prec and prec.eventId == e.eventId and prec.s.phase == "open", "practice session open for the event")
@@ -891,6 +896,7 @@ function scenarios.guide()
 
     print("== a second driver joins, then withdraws")
     chat("ncm.interest", 2, "1")
+    clientNet("ncm:venue.at", 2, e.eventId); run(0)
     clientNet("ncm:venue.option", 2, "practice"); run(1)
     assertf(prec.s.entrants[driverIdOf(2)] ~= nil, "tester joined the same practice")
     chat("ncm.withdraw", 2)
@@ -938,6 +944,124 @@ function scenarios.guide2()
     while e.startsAt - clock > 55 do run(5) end
     assertf(liveSession() == nil, "no session formed from interest alone")
     print("OK guide2")
+end
+
+-- entrybag (KB-185, KB-186): the ring follows the driver past a race they never entered, and a Street Call can
+-- be entered at all. Owner, 2026-09-28: "the venue entry ring doesnt show up unless im there and i re express
+-- interest ... also custom races fail to be entered due to some economy reason".
+function scenarios.entrybag()
+    bootstrap()
+    run(11)   -- the push rides the calendar tick; the boot-time publish happens before anyone has connected
+    local calendarPushed = false
+    for _, ev in ipairs(clientEvents) do
+        if ev.name == "ncm:calendar" and ev.pid == 1 and type(ev.args[1]) == "table" then
+            calendarPushed = true
+            break
+        end
+    end
+    assertf(calendarPushed, "the public calendar reaches the client over an explicit net event")
+    print("== interest in the two soonest races: the bag names the sooner one")
+    commands["ncm.guide"](1, {}); run(1)
+    local rows = guidePayload(1).rows
+    local first, second = NcmCalendar.events[rows[1].eventId], nil
+    for i = 2, #rows do
+        local x = NcmCalendar.events[rows[i].eventId]
+        if x and x.startsAt > first.startsAt and not x.invitation then second = x; break end
+    end
+    assertf(second, "the cadence posts a later race to be interested in")
+    commands["ncm.interest"](1, { first.eventId }); run(1)
+    commands["ncm.interest"](1, { second.eventId }); run(1)
+    assertf(bags[1].ncmEntry and bags[1].ncmEntry.eventId == first.eventId, "bag = the sooner race (%s)",
+        tostring(bags[1].ncmEntry and bags[1].ncmEntry.eventId))
+
+    print("== the sooner race starts without them: the bag moves on by itself, no second interest")
+    while clock < first.startsAt + 75 do run(5) end
+    assertf(bags[1].ncmEntry and bags[1].ncmEntry.eventId == second.eventId,
+        "bag moved to the next live entry (%s) -- the ring must not wait for the driver to re-express interest",
+        tostring(bags[1].ncmEntry and bags[1].ncmEntry.eventId))
+    assertf(bags[1].ncmEntry.venue and bags[1].ncmEntry.state == "interested", "the moved bag is complete")
+
+    print("== a Street Call enters free and settles to nothing")
+    local call = { eventId = "impromptu:stub@1", class = "impromptu", unpaid = true, seriesId = "impromptu" }
+    assertf(NcmEconomy.isUnpaid(call), "a Street Call declares itself unpaid")
+    local paid, why = NcmEconomy.checkIn({ economy = NcmCompetition.economyFor(call), unpaid = NcmEconomy.isUnpaid(call),
+        entryId = "stub-entry", eventId = call.eventId, seriesId = call.seriesId, driverId = driverIdOf(1),
+        checkedInAt = clock })
+    assertf(why ~= "economy_required", "check-in no longer refuses a Street Call for having no economy")
+    assertf(NcmEconomy.settle({ plan = { e = call }, kind = "race", s = {} }, {}, "finished", clock) ~= nil,
+        "settlement of an unpaid event succeeds with nothing to pay")
+    local broken = { eventId = "paid:stub@1", class = "calendar", seriesId = "no_such_series" }
+    local _, brokenWhy = NcmEconomy.checkIn({ economy = NcmCompetition.economyFor(broken), unpaid = NcmEconomy.isUnpaid(broken),
+        entryId = "stub-entry-2", eventId = broken.eventId, seriesId = broken.seriesId, driverId = driverIdOf(1), checkedInAt = clock })
+    assertf(brokenWhy == "economy_required", "a paid event that lost its economy still refuses (%s)", tostring(brokenWhy))
+    print("OK entrybag")
+end
+
+-- ringcard (2026-09-28): the card belongs to the ring you are standing in; one entry at a time; switching is two
+-- presses. Owner: "we have been fighting bugs for our race entries and things are getting lost in translation."
+-- On the previous code the card at B's ring was A's card (A was bookmarked and sooner), so LEAVE LIST pressed at
+-- B took the driver off A -- and entering B left the Guide believing A was their race.
+function scenarios.ringcard()
+    bootstrap()
+    command("ncm.grant", 0, "1", "all"); run(1)
+    commands["ncm.guide"](1, {}); run(1)
+    local rows = guidePayload(1).rows
+    local A, B = nil, nil
+    for _, r in ipairs(rows) do
+        local x = NcmCalendar.events[r.eventId]
+        if x and not x.invitation then
+            if not A then A = x
+            elseif x.venue.name ~= A.venue.name and x.startsAt > A.startsAt then B = x; break end
+        end
+    end
+    assertf(A and B, "two public races at two different venues")
+    for _, x in ipairs({ A, B }) do x.entryOpensAt = clock - 1; x.state = "entry_open" end
+    local me = driverIdOf(1)
+    local function card() return bags[1].ncmVenue end
+    local function first() return card() and card().options[1] or nil end
+    local function stand(x) moveTo(1, x.venue); players[1].fresh = true; clientNet("ncm:venue.at", 1, x.eventId); run(0) end
+
+    print("== bookmarked A (sooner); standing in B's ring: the card is B's")
+    commands["ncm.interest"](1, { A.eventId }); run(1)
+    stand(B)
+    assertf(card() and card().eventId == B.eventId, "the card at B's ring is B's (was %s)", tostring(card() and card().eventId))
+    assertf(first().id == "enter_race" and first().enabled, "entry is offered at B, bookmark or not")
+
+    print("== LEAVE LIST at B does not touch the bookmark on A")
+    clientNet("ncm:venue.option", 1, "leave_list", B.eventId); run(1)
+    assertf(A.entries[me].state == "interested", "A's bookmark survived a press at B's ring (%s)", tostring(A.entries[me].state))
+
+    print("== enter B: it is the driver's race, whatever they bookmarked")
+    clientNet("ncm:venue.option", 1, "enter_race", B.eventId); run(2)
+    assertf(B.entries[me] and B.entries[me].state == "checked_in", "entered B")
+    assertf(NcmGuide.driverEvent(me) == B, "driverEvent names the entry, not the sooner bookmark")
+    run(6)
+    assertf(bags[1].ncmEntry and bags[1].ncmEntry.eventId == B.eventId and bags[1].ncmEntry.state == "checked_in",
+        "the bag names B and stays there through a refresh (%s)", tostring(bags[1].ncmEntry and bags[1].ncmEntry.eventId))
+
+    print("== a card drawn for another ring is refused")
+    stand(A)
+    clientNet("ncm:venue.option", 1, "withdraw", B.eventId); run(1)
+    assertf(B.entries[me].state == "checked_in", "a stale ring's WITHDRAW did nothing")
+
+    print("== one entry at a time: at A the ENTER slot is a switch, and a switch takes two presses")
+    command("ncm.enter", 0, "1", A.eventId); run(2)
+    assertf(A.entries[me].state == "interested", "a plain entry at A is refused while B is held")
+    assertf(count("SWITCH ENTRY at this ring", chatLog, "text") >= 1, "and the refusal says how to switch")
+    assertf(first().id == "switch_entry" and first().enabled, "A's card offers SWITCH ENTRY (%s)", tostring(first().id))
+    clientNet("ncm:venue.option", 1, "switch_entry", A.eventId); run(1)
+    assertf(B.entries[me].state == "checked_in" and A.entries[me].state == "interested", "the first press changes nothing")
+    assertf(first().id == "confirm_switch" and first().label:find(B.routeName, 1, true), "the confirm names B")
+    clientNet("ncm:venue.option", 1, "confirm_switch", A.eventId); run(2)
+    assertf(A.entries[me].state == "checked_in", "entered A (%s)", tostring(A.entries[me].state))
+    assertf(B.entries[me].state == "withdrawn", "withdrew from B (%s)", tostring(B.entries[me].state))
+    run(6)
+    assertf(bags[1].ncmEntry and bags[1].ncmEntry.eventId == A.eventId, "the bag followed the switch")
+
+    print("== leaving every ring clears the card")
+    moveTo(1, { x = A.venue.x + 400, y = A.venue.y }); clientNet("ncm:venue.at", 1, nil); run(1)
+    assertf(card() == nil, "no ring, no card")
+    print("OK ringcard")
 end
 
 -- 13. hostkit: scenario console, lights now, incident injection, restart/stop, authored routes, world reset

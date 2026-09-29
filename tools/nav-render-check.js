@@ -232,6 +232,80 @@ console.log("  -- activation --");
   check("Enter inside a text field is left to the field", !field.clicked, "clicked=" + field.clicked);
 }
 
+console.log("  -- focus survives a redraw (owner: \"tab everything but enter does nothing\") --");
+{
+  // A surface that rebuilds its controls from each data frame detaches the focused node. Enter used to
+  // reach that dead node and do nothing, and Tab restarted from the first control.
+  const cells = [cell("a", 0, 0, 100, 40), cell("b", 0, 60, 100, 40), cell("c", 0, 120, 100, 40)];
+  const root = container(cells);
+  Nav.clear(); Nav.push({ id: "redraw", root, first: cells[1] });
+  const redraw = () => {
+    for (const old of cells) old.offsetParent = null;             // detached, as innerHTML = "" leaves it
+    const fresh = [cell("a", 0, 0, 100, 40), cell("b", 0, 60, 100, 40), cell("c", 0, 120, 100, 40)];
+    cells.splice(0, cells.length, ...fresh);
+    return fresh;
+  };
+  let fresh = redraw();
+  key("Enter");
+  check("Enter after a redraw activates the SAME control on its replacement node",
+    fresh[1].clicked === 1, "clicked=" + fresh[1].clicked);
+  fresh = redraw();
+  key("Tab");
+  check("Tab after a redraw continues from where focus was, not from the top",
+    Nav.focused() === fresh[2], String(Nav.focused() && Nav.focused().id));
+
+  // A control whose label changes (NORMAL -> INVERTED) and has no id is found by its declared key.
+  const k1 = cell("", 0, 0, 100, 40); k1.id = ""; k1.dataset.navKey = "inv"; k1.textContent = "NORMAL";
+  const other = cell("", 0, 60, 100, 40); other.id = ""; other.textContent = "OTHER";
+  const kc = [other, k1];
+  Nav.clear(); Nav.push({ id: "keyed", root: container(kc), first: k1 });
+  k1.offsetParent = null; other.offsetParent = null;
+  const k2 = cell("", 0, 0, 100, 40); k2.id = ""; k2.dataset.navKey = "inv"; k2.textContent = "INVERTED";
+  const other2 = cell("", 0, 60, 100, 40); other2.id = ""; other2.textContent = "OTHER";
+  kc.splice(0, 2, k2, other2);                                     // order changed as well
+  key("Enter");
+  check("a relabelled control is re-found by data-nav-key, not by position", k2.clicked === 1 && !other2.clicked,
+    "k2=" + k2.clicked + " other=" + other2.clicked);
+}
+
+console.log("  -- dropdowns and sliders are usable without a mouse --");
+{
+  const sel = cell("sel", 0, 0, 200, 40);
+  sel.tagName = "SELECT"; sel.options = [{}, {}, {}]; sel.selectedIndex = 0;
+  let changes = 0; sel.addEventListener("change", () => changes++);
+  const next = cell("next", 300, 0, 100, 40);
+  Nav.clear(); Nav.push({ id: "sel", root: container([sel, next]), first: sel });
+  key("Enter");
+  check("Enter on a dropdown selects the next option and fires change",
+    sel.selectedIndex === 1 && changes === 1, "index=" + sel.selectedIndex + " changes=" + changes);
+  pad("activate");
+  check("pad CONFIRM cycles it too", sel.selectedIndex === 2 && changes === 2, "index=" + sel.selectedIndex);
+  pad("activate");
+  check("activate wraps at the last option", sel.selectedIndex === 0, "index=" + sel.selectedIndex);
+  key("ArrowRight");
+  check("Right on a focused dropdown steps its value instead of stealing focus",
+    Nav.focused() === sel && sel.selectedIndex === 1, "focused=" + (Nav.focused() && Nav.focused().id) + " index=" + sel.selectedIndex);
+
+  const slider = cell("slider", 0, 0, 200, 40); slider.tagName = "INPUT"; slider.type = "range";
+  slider.min = "0"; slider.max = "100"; slider.step = "1"; slider.value = "8";
+  let slides = 0; slider.addEventListener("change", () => slides++);
+  const right = cell("right", 300, 0, 100, 40);
+  Nav.clear(); Nav.push({ id: "slider", root: container([slider, right]), first: slider });
+  key("ArrowRight");
+  check("Right on a focused slider is left to the slider", Nav.focused() === slider,
+    String(Nav.focused() && Nav.focused().id));
+  // KB-184: focus alone was asserted, and the FORCE slider never moved in game. The value must move and
+  // `change` must fire, because `change` is the only thing that reaches Rig Bridge.
+  check("Right on a focused slider MOVES it and fires change", slider.value === "13" && slides === 1,
+    "value=" + slider.value + " changes=" + slides);
+  for (let i = 0; i < 30; i++) key("ArrowRight");
+  check("a slider stops at its max", slider.value === "100", "value=" + slider.value);
+  key("ArrowLeft");
+  check("Left steps it back down", slider.value === "95", "value=" + slider.value);
+  key("Tab");
+  check("Tab still leaves a slider", Nav.focused() === right, String(Nav.focused() && Nav.focused().id));
+}
+
 console.log("  -- back --");
 {
   let backs = 0;

@@ -176,7 +176,32 @@ Post-upgrade health, in one line each: `migrations: N applied` → `ownership le
 `ncm_world started v…` → `class ceilings published` → `scheduler started: 5 series`. If the series line is
 missing, NCM did not start.
 
-## Required mods (state as of 2026-09-28 16:41 UTC)
+## Required mods (state as of 2026-09-28 17:34 UTC)
+
+**`ncm-vision` is 0.2.1** (sha256 `73ce73ae831faccf5847fcb9291719be9341a6a208f6d682b8f86ca7436dda15`), manifest digest `46cfc0588afe325a3cff98a2b4475e967a2296973285bcd53bf38442769c13a9`. Everything else is as in the 17:29 entry below. 0.2.0 stopped the game from starting (`KB-182`) and was live about 5 minutes. 0.2.1 was published with the same tool, and the consent note names it. After the restart every NCM resource started and the blob downloaded over HTTPS with a matching hash.
+
+### 2026-09-28 17:29 UTC
+
+**Declared on Online:** `ncm-carrier` 0.1.28, `ncm-rig-bridge` 0.1.0, **`ncm-radial` 0.1.1** (sha256
+`3114e10329fef9ac34f4ca867c897b35524440b897fe702b4566afeda2238e2e`, 245,870 bytes) and **`ncm-vision` 0.2.0**,
+display name *NCM Scanner* (DLL + two scripts, `L197`; sha256
+`0904d8708c05efd53752667bbbe907f33baef3539bb0e39406c8d46629e19208`, 243,998 bytes). `enabled=true,
+unsecured=true`; manifest digest `531c022a5e6e28a432718551e7ddbd8936a9894796b0bc376ce0bc008b037a3f`. Both new
+blobs were imported with `publish-carrier.py --id <id> --import-blob --enable` and downloaded back through the
+public HTTPS endpoint with matching hashes. The consent note was rewritten to name the new versions.
+
+Same deploy: the full resource tree, including the new `ncm_scanner` resource (loaded by the `ncm/*` wildcard;
+`check-load-list.py` passed with 43 resources), the scan handlers and sighting-only proximity in
+`ncm_league/server/collection.lua`, and ambient-car registration in `ncm_world/server/ambient.lua`. No
+migrations. Boot: every NCM resource `started generation=1`, `collection ready`, `scheduler started: 5 series`,
+no ERR. Pre-change backup: `/opt/ncm/backups/pre-carrier-prod-20260928T172655Z` (`ncm.sql.gz`,
+`operator-state.tar.gz`, `resources-ncm.tar.gz`). Rollback for a package: `publish-carrier.py /opt/ncm/server
+--id ncm-vision --remove` (or re-publish 0.1.0 from `/opt/ncm/mods`), then restart. **Not live-proven:**
+`MASTER_TEST §BX` (radial) and `§BZ` (scanner) are owed.
+
+### Earlier state (2026-09-28 16:41 UTC)
+
+#### Required mods (state as of 2026-09-28 16:41 UTC)
 
 **Declared on Online:** `ncm-carrier` 0.1.28, `ncm-rig-bridge` 0.1.0, `ncm-radial` 0.1.0 (DLL + redscript, quick
 menu, `L195`) and `ncm-vision` 0.1.0 (redscript only, `L196`); `enabled=true, unsecured=true`; manifest digest

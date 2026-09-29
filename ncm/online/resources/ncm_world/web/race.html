@@ -194,7 +194,7 @@
     </div>
     <div class="tyre na" id="inTyre"><div class="col"><div class="win"></div><div class="ndl" id="inTyreNdl"></div></div><b>TYRE</b><em class="state" id="inTyreState">UNKNOWN</em><em id="inTyrePct">--</em></div>
   </div>
-  <div id="instr" class="hidden"><div class="who" id="instrWho"></div><div class="odo" id="instrOdo"></div></div>
+  <div id="instr" class="hidden"><div class="who" id="instrWho"></div><div class="odo" id="instrOdo"></div><div class="odo" id="instrFuel"><small>FUEL</small>--</div></div>
   <div id="graph" class="hidden"><span class="flag" id="graphFlag"></span><div class="line"></div><div id="dots"></div><span class="lbl">START</span></div>
   <script src="glyphs.js"></script>
   <script>
@@ -215,6 +215,7 @@
       const instr = document.getElementById("instr");
       const instrWho = document.getElementById("instrWho");
       const instrOdo = document.getElementById("instrOdo");
+      const instrFuel = document.getElementById("instrFuel");
       const wearLamps = document.getElementById("wearLamps");
       const graph = document.getElementById("graph");
       const graphFlag = document.getElementById("graphFlag");
@@ -426,6 +427,12 @@
         const warnings=v&&Array.isArray(v.warnings)?v.warnings:[];wearLamps.innerHTML="";
         for(const w of warnings){const lamp=document.createElement("span");lamp.className="wear-lamp "+(w.status==="critical"?"critical":"attention");lamp.textContent=wearShort[w.system]||"!";lamp.title=String(w.label||w.system||"Service required");lamp.setAttribute("aria-label",lamp.title);wearLamps.append(lamp);}
         wearLamps.classList.toggle("hidden",warnings.length===0);
+      });
+      Open77.on("race:fuel", (v) => {
+        const pct=v&&typeof v.pct==="number"?Math.max(0,Math.min(100,Math.round(v.pct))):null;
+        instrFuel.innerHTML="";const lab=document.createElement("small");lab.textContent="FUEL";
+        instrFuel.append(lab,document.createTextNode(pct===null?"--":pct+"%"));
+        instrFuel.style.color=pct===0?"var(--red)":(pct!==null&&pct<=10?"var(--warn)":"");
       });
 
       // ---------------------------------------------------------------------------------------------

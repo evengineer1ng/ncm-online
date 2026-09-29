@@ -483,6 +483,16 @@ function NcmVehicleAccess.liveAsset(assetId)
              driverId = cur.driverId, record = cur.record }
 end
 
+--- Emergency recovery after an authoritative dismount (fuel/tow). Ownership is untouched.
+function NcmVehicleAccess.recoveryStore(assetId, reason)
+    local cur=type(assetId)=="string" and active[assetId] or nil;if not cur then return false,"not_materialized" end
+    if NcmOdometer and NcmOdometer.release then local ok,why=NcmOdometer.release(assetId);if ok==false then return false,why end end
+    TriggerEvent("ncm:collection:unregisterVehicle",cur.vehicleId)
+    pcall(Open77.vehicles.remove,cur.vehicleId);forgetActive(assetId,reason or "emergency recovery")
+    if cur.pid then sendActive(cur.pid) end
+    return true
+end
+
 --- Resolve the persistent Machine this player's client is authoritatively simulating.
 ---
 --- Driver and physics owner are not interchangeable: authority may briefly be held by a passenger/steward

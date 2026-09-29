@@ -161,6 +161,39 @@ return {
         T.eq(#V.PRIORITY, #V.CATALOGUE, "every option has a place in the order")
     end,
 
+    a_team_seat_is_an_entry_and_can_be_withdrawn = function(T)
+        local V = T.Core.get("competition.venue_options")
+        -- A seat (`registered`) counted as neither entered nor listed, so WITHDRAW was greyed "You are not
+        -- entered" for the one driver who was (owner, 2026-09-28: a seat is withdrawable at the venue).
+        local r = V.evaluate({ now = 1500, event = ev({ invitation = true }), entryState = "registered" })
+        T.match(on(r), "withdraw", "a seated driver can give the seat back here")
+        T.eq(r.reasons.withdraw, nil)
+    end,
+
+    entering_while_entered_elsewhere_is_a_two_press_switch = function(T)
+        local V = T.Core.get("competition.venue_options")
+        local held = { eventId = "a", routeName = "Tip", releasable = true }
+        local first = V.evaluate({ now = 1500, event = ev(), heldElsewhere = held })
+        T.eq(first.options[1].id, "switch_entry", "the ENTER slot becomes the switch, never a sixth row")
+        T.eq(first.options[1].enabled, true)
+        T.eq(#first.options, V.MAX_OPTIONS)
+        local armed = V.evaluate({ now = 1500, event = ev(), heldElsewhere = held, switchArmed = true })
+        T.eq(armed.options[1].id, "confirm_switch")
+        T.match(armed.options[1].label, "Tip", "the confirm names the race it will withdraw from")
+    end,
+
+    a_switch_never_opens_a_door_entry_would_not = function(T)
+        local V = T.Core.get("competition.venue_options")
+        local held = { eventId = "a", routeName = "Tip", releasable = true }
+        local early = V.evaluate({ now = 500, event = ev(), heldElsewhere = held })
+        T.eq(early.options[1].id, "enter_race", "entries not open: no switch offered")
+        T.eq(early.options[1].enabled, false)
+        local stuck = V.evaluate({ now = 1500, event = ev(), heldElsewhere = { eventId = "a", routeName = "Tip", releasable = false } })
+        T.eq(stuck.options[1].id, "enter_race")
+        T.eq(stuck.reasons.enter_race, "entered_elsewhere", "an entry already racing cannot be switched away from")
+        T.eq(stuck.options[1].why, "You are committed to another race")
+    end,
+
     invalid_input_errors_with_the_module_name = function(T)
         local V = T.Core.get("competition.venue_options")
         T.errors(function() V.evaluate(nil) end, "competition%.venue_options%.evaluate:")

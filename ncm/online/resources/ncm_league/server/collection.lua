@@ -10,6 +10,7 @@ local Observation = NcmCore.get("competition.observation")
 local Json = NcmCore.get("vocabulary.json")
 local ids = NcmCore.get("vocabulary.ids")
 local Seasons = NcmCore.get("competition.seasons")
+local Scanner = NcmCore.get("competition.scanner")
 local registered, dwell, cache = {}, {}, {}
 local running = false
 local RADIUS_M, DWELL_S, POLL_MS = 18.0, 3, 1000
@@ -266,7 +267,8 @@ function NcmCollection.revealIdentity(pid, vehicleKey, opts)
     local found = load(driver.ncmDriverId)
     local first = found ~= nil and found[entry.vehicleKey] == nil
     local t, source = tonumber(opts.observedAt) or now(), tostring(opts.source or "")
-    local physical = source == "world_encounter"
+    -- A scan is a physical encounter made deliberate (`L197`): it counts an encounter exactly as the dwell did.
+    local physical = source == "world_encounter" or source == "scanner"
     -- **How this reached us, which is not the same question as how true it is** (IDEA-362). Every reveal on
     -- this path is decided server-side -- a proximity dwell the server detected from its own snapshots, or a
     -- Market card the server served -- so the basis is `server_measured`. `epistemic` stays orthogonal and
@@ -375,7 +377,14 @@ end
 
 -- Replace the legacy proximity-only adapter with the generalized identity seam above. The old function remains
 -- immediately above as readable migration history until this foundation receives live QA.
+--
+-- **`L197`: proximity is a SIGHTING, never a discovery.** With NCM's ambient traffic on the roads a Driver is
+-- near unknown machines constantly, and a dwell that revealed identity would fill the Machine Index by driving
+-- around. Identity now comes from the Scanner (below), a Market, a trade or ownership. A dwell still records
+-- the encounter -- when and where -- for a machine this Driver already knows, and stays silent otherwise.
 local function recordEncounter(pid, driver, entry, runtimeRecord, liveId, reg)
+    local found = load(driver.ncmDriverId)
+    if not found or not found[entry.vehicleKey] then return false end
     return NcmCollection.revealIdentity(pid, entry.vehicleKey, {
         source = "world_encounter", runtimeRecord = runtimeRecord, liveId = liveId,
         assetId = reg and reg.assetId or nil, sourceDriverId = reg and reg.sourceDriverId or nil,
@@ -553,9 +562,156 @@ function NcmCollection.start()
     return true
 end
 
+-- ---------------------------------------------------------------------------------------------------------------
+-- THE SCANNER'S SERVER HALF (`L197`, `IDEA-679`). The only path by which a Machine in the world enters the Index.
+-- ---------------------------------------------------------------------------------------------------------------
+--
+-- The client holds the reticle and decides when a lock completes; it proves nothing. Every fact that can be
+-- re-derived here is: a networked target's record, bucket and distance come from the server's own snapshots
+-- and never from the report. A vanilla per-client car cannot be seen from here at all, so its record must be a
+-- real catalogue machine, its claimed distance must be in range, and it is rate-limited and recorded as
+-- `client_attested` (owner ruling, 2026-09-28) -- distinguishable from a measured scan for as long as it exists.
+--
+-- **Fog of war holds on the wire.** A query about an unknown machine answers "unknown" and nothing else; the
+-- name travels only in the reply to a scan the server admitted, or for a machine the Driver already knows.
+
+local attested = {}      -- ncmDriverId -> { ms, ... } client-attested reveals, pruned to the last hour
+local recordIndex = nil  -- record key -> record, built on first use
+local queryBudget = {}   -- pid -> { at = ms window start, n = count }
+local QUERIES_PER_S = 20
+local queryLog = {}      -- pid -> lines logged this session; the first few answers are logged for diagnosis
+local QUERY_LOG_MAX = 25
+
+local function nowMs() return math.floor((tonumber(Open77.time.unix()) or 0) * 1000) end
+
+local function label(entry)
+    return ((entry.manufacturer or "") .. " " .. (entry.displayName or "")):gsub("^%s+", "")
+end
+
+local function knows(driverId, vehicleKey)
+    local found = load(driverId)
+    if found and found[vehicleKey] then return true end
+    return ownedKeys(driverId)[vehicleKey] == true
+end
+
+--- What a target IS, re-derived server-side. Returns entry, facts or nil, reason.
+local function resolveTarget(pid, req)
+    if type(req) ~= "table" then return nil, "bad_request" end
+    if req.kind == "networked" then
+        local liveId = tonumber(req.vehicleId)
+        if not liveId then return nil, "no_vehicle_id" end
+        local v = snapshot(liveId)
+        if not v then return nil, "no_snapshot" end
+        local entry = Catalogue.resolveRecord(v.record)
+        local p = Open77.players.get(tonumber(pid) or 0)
+        local sameBucket = p ~= nil and v.bucket ~= nil and tonumber(v.bucket) == tonumber(p.bucket or 0)
+        local me = observedPosition(pid)
+        return entry, { kind = "networked", recordKnown = entry ~= nil, sameBucket = sameBucket,
+            serverDistance = me and distance(me, v.pos) or nil, record = v.record, liveId = liveId,
+            reg = registered[liveId], pos = me }
+    elseif req.kind == "vanilla" then
+        -- The client reports a record KEY (CRC32 + length of the TweakDBID, as redscript read it), never a
+        -- name: the server maps it back to a record it knows, so the catalogue stays off the wire (`L193`).
+        recordIndex = recordIndex or Scanner.recordIndex(Catalogue.allRecords())
+        local key = type(req.recordKey) == "string" and #req.recordKey <= 20 and req.recordKey or nil
+        local record = key and recordIndex[key] or nil
+        if not record then return nil, key and "no_ncm_record" or "no_record" end
+        local entry = Catalogue.resolveRecord(record)
+        return entry, { kind = "vanilla", recordKnown = entry ~= nil, claimedDistance = tonumber(req.distance),
+            record = record }
+    end
+    return nil, "unknown_kind:" .. tostring(req.kind)
+end
+
+local function reply(pid, token, body)
+    body.token = token
+    TriggerClientEvent("ncm:scanner.result", pid, body)
+end
+
+--- The reticle's question on every new lock: is this an NCM machine, and do I already know it?
+--- **Every query is answered** (live, 2026-09-28): the client asks once per machine and waits, so a query that is
+--- dropped leaves the reticle on "READING..." for as long as vision stays on. Over budget is an answer too.
+RegisterNetEvent("ncm:scanner.query", function(req)
+    local pid = tonumber(source) or 0
+    local token = type(req) == "table" and tostring(req.token or "") or ""
+    local t = nowMs()
+    local b = queryBudget[pid]
+    if not b or t - b.at >= 1000 then b = { at = t, n = 0 }; queryBudget[pid] = b end
+    b.n = b.n + 1
+    if b.n > QUERIES_PER_S then return reply(pid, token, { phase = "query", busy = true }) end
+    local body
+    local driver = NcmCalendar.resolveDriver(pid)
+    if not driver then
+        body = { phase = "query", indexable = false, reason = "no_driver" }
+    else
+        local entry, facts = resolveTarget(pid, req)
+        if not entry then
+            body = { phase = "query", indexable = false, reason = type(facts) == "string" and facts or "no_ncm_record" }
+        else
+            local known = knows(driver.ncmDriverId, entry.vehicleKey)
+            body = { phase = "query", indexable = true, known = known, label = known and label(entry) or nil }
+        end
+    end
+    local n = (queryLog[pid] or 0) + 1
+    queryLog[pid] = n
+    if n <= QUERY_LOG_MAX then
+        log("scan query player=%d kind=%s vehicle=%s key=%s -> indexable=%s known=%s reason=%s", pid,
+            tostring(type(req) == "table" and req.kind), tostring(type(req) == "table" and req.vehicleId),
+            tostring(type(req) == "table" and req.recordKey), tostring(body.indexable), tostring(body.known),
+            tostring(body.reason))
+    end
+    reply(pid, token, body)
+end)
+
+--- A completed lock. The only write.
+RegisterNetEvent("ncm:scanner.scan", function(req)
+    local pid = tonumber(source) or 0
+    local token = type(req) == "table" and tostring(req.token or "") or ""
+    CreateThread(function()
+        local driver = NcmCalendar.resolveDriver(pid)
+        if not driver then return reply(pid, token, { phase = "scan", ok = false, reason = "no_driver" }) end
+        local entry, facts = resolveTarget(pid, req)
+        if not entry then
+            return reply(pid, token, { phase = "scan", ok = false,
+                reason = type(facts) == "string" and facts or "no_ncm_record" })
+        end
+        local t = nowMs()
+        local mine = attested[driver.ncmDriverId] or {}
+        local kept = {}
+        for _, at in ipairs(mine) do if t - at < 3600000 then kept[#kept + 1] = at end end
+        attested[driver.ncmDriverId] = kept
+        facts.recentAttested, facts.now = kept, t
+        local basis, why = Scanner.admit(facts)
+        if not basis then
+            log("scan refused driver=%s kind=%s record=%s: %s", driver.ncmDriverId:sub(1, 8), facts.kind,
+                tostring(facts.record), why)
+            return reply(pid, token, { phase = "scan", ok = false, reason = why })
+        end
+        local wasKnown = knows(driver.ncmDriverId, entry.vehicleKey)
+        local reg = facts.reg
+        local first, err = NcmCollection.revealIdentity(pid, entry.vehicleKey, {
+            source = "scanner", epistemic = "observed", basis = basis,
+            runtimeRecord = facts.record, liveId = facts.liveId, pos = facts.pos,
+            assetId = reg and reg.assetId or nil,
+            sourceDriverId = reg and reg.sourceDriverId or nil,
+            sourceHolding = reg and reg.sourceHolding or nil,
+        })
+        if first == nil then
+            return reply(pid, token, { phase = "scan", ok = false, reason = err or "write_failed" })
+        end
+        if basis == "client_attested" and first then kept[#kept + 1] = t end
+        log("SCAN driver=%s key=%s kind=%s basis=%s first=%s", driver.ncmDriverId:sub(1, 8), entry.vehicleKey,
+            facts.kind, basis, tostring(first == true))
+        reply(pid, token, { phase = "scan", ok = true, first = first == true and not wasKnown,
+            label = label(entry), basis = basis })
+    end)
+end)
+
 AddEventHandler("onPlayerDisconnected", function(pid)
     local id = tonumber(pid) or 0
     dwell[id] = nil
+    queryBudget[id] = nil
+    queryLog[id] = nil
     -- the discovery cache is keyed by driver, not player, and nothing else evicts it: without this it grows
     -- for the life of the process
     local ok, driver = pcall(NcmCalendar.resolveDriver, id)

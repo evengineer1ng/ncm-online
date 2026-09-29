@@ -6,6 +6,7 @@ local captured = {}
 
 NcmCalendar = { serverId = function() return "test-world" end }
 Open77 = { time = { unix = function() return 123456 end } }
+RegisterNetEvent = function() end
 MySQL = {
     insert = { await = function(query, values)
         captured.query, captured.values = query, values

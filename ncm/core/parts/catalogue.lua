@@ -4,6 +4,8 @@ local Core = NcmCore
 Core.define("parts.catalogue", function(C)
     local M = { version = "1.0.0" }
     local ontology = C.get("parts.ontology")
+    local Vehicles = C.get("data.vehicle_catalogue")
+    local Markets = C.get("economy.markets")
 
     M.STARTER_VEHICLES = { "makigai_maimai", "thorton_galena", "archer_hella" }
     M.INTERFACES = {
@@ -66,13 +68,33 @@ Core.define("parts.catalogue", function(C)
         if r.premium then add(family,"premium",r.premium,all) end
     end
 
+    -- A terminal's component channel is genuinely its own: new immutable Designs, new serialized supply,
+    -- and fitment aimed at that terminal's models. Base Market designs are never re-listed elsewhere.
+    for marketIndex,market in ipairs(Markets.MARKETS) do
+        if not market.universallyKnown then
+            for familyIndex,family in ipairs(market.partFamilies or {}) do
+                local tier=((marketIndex+familyIndex)%4==0) and "premium" or "sport"
+                local effect=M.EFFECT[tier]; local designId=("%s:%s:%s"):format(market.marketId,family,tier)
+                local maker=(market.specialty or "Autofixer")
+                local d={designId=designId,lineageId=("%s:%s"):format(market.marketId,family),revision=1,
+                    manufacturer=maker,makerKey=market.marketId,family=family,tier=tier,effect=effect,
+                    code=("AFX-%02d-%s-%03d"):format(marketIndex-1,abbreviations[family],math.floor(effect*100+.5)),
+                    subtitle=(market.specialty or "Autofixer").." System",
+                    price=(tier=="premium" and (content[family].premium or math.floor(content[family].sport*1.65))) or content[family].sport,
+                    positions=copy(M.INTERFACES[family]),supportedVehicles=copy(market.vehicles),
+                    distribution="autofixer",marketId=market.marketId,origin="autofixer",fidelity=M.FIDELITY[family] or "modelled"}
+                designs[#designs+1],byId[designId]=d,d
+            end
+        end
+    end
+
     local function has(list, value) for _,v in ipairs(list or {}) do if v==value then return true end end return false end
     function M.designs() return designs end
     function M.byId(id) return byId[id] end
     function M.resolve(designOrId, vehicleKey)
         local d=type(designOrId)=="table" and designOrId or byId[designOrId]
         if not d then return { outcome="malformed", compatible=false, reason="unknown component design" } end
-        if not has(M.STARTER_VEHICLES,vehicleKey) then
+        if not Vehicles.byKey(vehicleKey) then
             return { outcome="unknown_vehicle", compatible=false, reason="no v1 Machine interface profile" }
         end
         if has(d.supportedVehicles,vehicleKey) then return { outcome="fits",compatible=true,reason="all required interfaces match" } end
@@ -88,7 +110,7 @@ Core.define("parts.catalogue", function(C)
         return fits>=2, fits>=2 and nil or "fewer_than_two_supported_starter_architectures"
     end
     function M.factoryDesign(vehicleKey,family)
-        if not has(M.STARTER_VEHICLES,vehicleKey) or not M.INTERFACES[family] then return nil end
+        if not Vehicles.byKey(vehicleKey) or not M.INTERFACES[family] then return nil end
         return { designId=("factory:%s:%s"):format(vehicleKey,family), lineageId=("factory:%s:%s"):format(vehicleKey,family),
             revision=1, manufacturer="Factory", makerKey="factory", family=family, tier="factory", effect=1.0,
             code=("OEM-%s-%s"):format(vehicleKey,abbreviations[family]), subtitle="Factory Original",

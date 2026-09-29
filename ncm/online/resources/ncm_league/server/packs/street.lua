@@ -73,7 +73,6 @@ NcmPackStreet = {
                 { rootId = "root_central_highway_1110_342__to__pothole_1354_476" },             -- Hook
             },
             entryWindow = { opensMinutes = 15, closesMinutes = 1 },
-            venueRadiusM = 30,
         },
         {
             -- One-make. The whole point is that the car is not a variable.
@@ -93,7 +92,6 @@ NcmPackStreet = {
                 { rootId = "root_hanford_overpass_1281_1107__to__stadium_1326_1656" },          -- Troll Pass
             },
             entryWindow = { opensMinutes = 15, closesMinutes = 1 },
-            venueRadiusM = 30,
         },
         {
             -- Serious high-performance road/GT. The brief names Mizutani/Quadra/Herrera families; the pool has
@@ -117,7 +115,6 @@ NcmPackStreet = {
                 { rootId = "root_hill_abode_505_1229__to__downtown_2362_117" },                 -- Snake in the Grass
             },
             entryWindow = { opensMinutes = 15, closesMinutes = 1 },
-            venueRadiusM = 30,
         },
         {
             -- Exotic machinery. `classes = { "Sport" }` rather than a bare `prestigeMin = 5`, because the RB15
@@ -137,7 +134,6 @@ NcmPackStreet = {
                 { rootId = "root_north_tunnel_1450_2467__to__japantown_crossway_373_0" },       -- Sewer
             },
             entryWindow = { opensMinutes = 15, closesMinutes = 1 },
-            venueRadiusM = 30,
         },
         {
             -- Open drag, on the two roots whose own data says `recommendedMode = "drag"` (IDEA-104).
@@ -158,7 +154,6 @@ NcmPackStreet = {
                 { rootId = "root_deep_dive_2350_2446__to__trench_2899_2711" },                  -- Hold Your Breath
             },
             entryWindow = { opensMinutes = 15, closesMinutes = 1 },
-            venueRadiusM = 30,
         },
     },
 }

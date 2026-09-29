@@ -280,6 +280,7 @@ end
 -- ---------------------------------------------------------------------------------------------
 
 local function remove(e, reason)
+    if e.vehicleId then pcall(TriggerEvent, "ncm:collection:unregisterVehicle", e.vehicleId) end
     if e.vehicleId then pcall(Open77.vehicles.ai.removeDriver, e.vehicleId) end
     if e.npcId then pcall(Open77.npcs.remove, e.npcId) end
     if e.vehicleId then pcall(Open77.vehicles.remove, e.vehicleId) end
@@ -373,6 +374,9 @@ local function makeVehicle(site)
             if not joined then log("ambient car %d: joinTraffic refused: %s", vid, tostring(joinWhy)) end
         end
     end
+    -- `L197`: an ambient car is a real machine and a Scanner candidate. Registering it makes the collection
+    -- watch it (sightings of known machines) and lets a scan of it resolve. No source Driver: nobody showed it.
+    pcall(TriggerEvent, "ncm:collection:registerVehicle", vid, record, "ambient")
     nextKey = nextKey + 1
     local key = "v" .. nextKey
     owned[key] = { key = key, kind = "vehicle", vehicleId = vid, npcId = driver, bucket = site.bucket or 0,
@@ -401,6 +405,7 @@ function NcmAmbient.tick()
                 watched = watchedBy(e),
             }
         else
+            if e.vehicleId then pcall(TriggerEvent, "ncm:collection:unregisterVehicle", e.vehicleId) end
             owned[key] = nil
         end
     end

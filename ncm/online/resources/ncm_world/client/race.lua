@@ -29,6 +29,7 @@ local function call(resource, name, ...)
 end
 
 NcmClientRaceActive = false      -- read by calendar.lua to yield the heartbeat card
+NcmClientRacePhase = "none"      -- the live phase; "complete" is the result hold, when a driver is free again (KB-187)
 
 local view = nil                 -- last view picked from GlobalState.ncmSessions / ncmPractice
 local lastView = nil             -- what mattered from the previous tick (green flag edge)
@@ -172,6 +173,7 @@ local function clearAll(instr)
     -- The cluster survives the race HUD letting go: it is information about the machine, not about a session.
     hud({ instrument = instr })
     NcmClientRaceActive = false
+    NcmClientRacePhase = "none"
     -- Nothing of this race may outlive it. A stale race target is how a finished session keeps steering the
     -- next one; `gridGpsFor` is keyed by session so it self-invalidates, but the waypoint itself did not.
     if gpsTarget then gpsTarget = nil; NcmNav.clear() end
@@ -294,6 +296,14 @@ end)
 RegisterNetEvent("ncm:wear", function(v)
     if not page then return end
     pcall(function() page:send("race:wear", (type(v)=="table") and v or false) end)
+end)
+
+RegisterNetEvent("ncm:fuel", function(v)
+    if not page then return end
+    pcall(function() page:send("race:fuel", (type(v)=="table") and v or false) end)
+end)
+RegisterNetEvent("ncm:fuel.route", function(v, why)
+    if type(v)=="table" and NcmNav then NcmNav.to(v, type(why)=="string" and why or "Fuel recovery") end
 end)
 
 local function instrumentState()
@@ -550,6 +560,7 @@ local function present()
     local instr = instrumentState()
     if not view or view.phase == "none" or not me then clearAll(instr); return end
     NcmClientRaceActive = true
+    NcmClientRacePhase = tostring(view.phase)
     local pos = localPosition()
     local n = #view.entrants
     local phase = view.phase

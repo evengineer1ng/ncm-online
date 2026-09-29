@@ -53,6 +53,7 @@ local Core = NcmCore
 
 Core.define("economy.production", function(C)
     local Catalogue = C.get("data.vehicle_catalogue")
+    local Markets = C.get("economy.markets")
     local M = { version = "0.1.0" }
 
     --- Manufacturer defaults. A badge has a temperament, but it does not force every model wearing it to
@@ -86,6 +87,18 @@ Core.define("economy.production", function(C)
           ceiling = 4, initialAllocation = 2, batch = 2, cadenceSec = 120 * 60,
           envelope = { batchMin = 1, batchMax = 2, intervalMin = 60 * 60, intervalMax = 72 * 3600 } },
     }
+
+    -- Every discovered physical terminal owns its own shelves. Values are conservative launch balancing;
+    -- identity and placement are authored, while quantities can be tuned after live population evidence.
+    local priceByPrestige={ [1]=6000,[2]=12000,[3]=28000,[4]=52000,[5]=90000 }
+    for _,market in ipairs(Markets.MARKETS) do
+        for _,vehicleKey in ipairs(market.vehicles or {}) do
+            local entry=Catalogue.byKey(vehicleKey); local prestige=(entry and entry.prestige) or 3
+            M.LINES[#M.LINES+1]={marketId=market.marketId,vehicleKey=vehicleKey,price=priceByPrestige[prestige],
+                ceiling=math.max(1,6-prestige),initialAllocation=1,batch=1,cadenceSec=(2+prestige)*3600,
+                envelope={batchMin=1,batchMax=math.max(1,3-math.floor(prestige/2)),intervalMin=3600,intervalMax=(12+prestige*12)*3600}}
+        end
+    end
 
     --- Which supply profile governs this line: the model's own, else its manufacturer's, else the default.
     function M.profileFor(line, entry)

@@ -3917,3 +3917,273 @@ scripts. The package holds exactly `r6/scripts/ncm_vision/NcmVision.reds` + `REA
 that the render appears in an OPEN//77 session, time scale stays 1.0, movement stays free, it works while driving,
 nothing else resets it to Default, and what vanilla highlight noise comes with it.
 **Live proof owed:** `MASTER_TEST §BY`.
+
+## L197 - LOCKED / EXECUTED IN CODE / LIVE-GATED - a new Machine enters the Index through the SCANNER, not through proximity
+
+**Owner decision (2026-09-28).** *"since we added ai traffic ... we are going to be in proximity of discoverable
+cars constantly and machine index will fill rather quickly ... my decision is to gate discovery of new cars to
+machine index behind using the scanner, not simply proximity. we need the reticle for discovery purposes. also,
+the scanner is where chrome hacks will be available to use against other drivers."* Rulings on the four open
+points, same day: the reticle and transport grow the existing `ncm-vision` package; **vanilla per-client traffic
+is discoverable as `client_attested`**; proximity becomes **sighting-only**; a scan is **a ~1.5 s hold within ~60 m**.
+
+**What the code established first.** NCM's ambient traffic (`L177`) is not vanilla traffic. It is server-owned
+network vehicles (`Open77.vehicles.create` + an NPC driver on `joinTraffic`). It had never triggered discovery only
+because nothing registered it with the collection. Those cars are therefore server-verifiable scan targets.
+Vanilla per-client cars cannot be seen by the server at all, and `aimedEntity()` does not give their record.
+Redscript can (`VehicleObject.GetRecordID()`).
+
+**Shape: three owners, one job each (the `L195` pattern).**
+- **`ncm-vision` 0.2.0** (required mod, `ncm/vision/`) **sees and draws.** The green render (`L196`), unchanged. A
+  20 Hz look-at report that runs only while vision is on: the engine's look-at target, falling back to the object
+  nearest the crosshair within 6°, never the player's own car. It carries the EntityID hash, the record **key**,
+  the kind and the distance. A native reticle is drawn in the vanilla crosshair container, which is full-screen,
+  present on foot and in vehicles, and not managed by OPEN//77. `ncm_vision.dll` is a loopback transport on
+  **38600-38603**, its own range. It answers every Lua message with the latest report, so the socket has a single
+  writer. It shares no code, state, port or package with the Carrier, the Rig Bridge or the Radial.
+- **`ncm_scanner`** (new client resource, separate because `ncm_world` is at 8 of 8 surfaces) **decides the lock.**
+  It uses `competition.scanner.step`, the same function the core tests cover. It names a target as `networked`
+  (by `vehicleId`, when `aimedEntity` agrees with redscript by entity or within 3 m) or as `vanilla` (by record
+  key). It asks the server, and it tells the reticle what to say.
+- **`ncm_league/server/collection.lua`** **decides knowledge.** `ncm:scanner.query` answers only "indexable?" and
+  "known?", and a name only for a machine already known, so fog of war holds on the wire. `ncm:scanner.scan` is
+  the only write, through `revealIdentity(source = "scanner")`. A networked target's record, bucket and distance
+  are re-derived from the server's own snapshots; the report is not trusted. A vanilla target's record key is
+  mapped back to a catalogue record **server-side** (`competition.scanner.recordIndex`, CRC32 + length, the
+  TweakDBID identity layout), so the catalogue never crosses the wire (`L193`) and a client cannot name a record
+  the server did not derive. Vanilla reveals are `client_attested`, at most one per 20 s and 30 per hour.
+
+**Consequences, all in code.** `scanner` is a knowledge source, and it may credit a human, as the dwell did.
+Proximity (`recordEncounter`) now records an encounter only for a machine the Driver already knows. Ambient cars
+register with the collection as `context = "ambient"`, with no source Driver, and unregister when removed or
+lost. Market, trade and ownership reveals are unchanged (`28_MACHINE_KNOWLEDGE.md` §3: many sources, no universal
+mechanic). What changed is that physical encounter now means a deliberate scan.
+
+**Chrome hacks (`IDEA-076`/`IDEA-077`, now `IDEA-681`).** The Scanner is the targeting surface they will use. The
+target model is already the one `Open77.hacking` needs, a network vehicle by id with server revalidation. The
+reticle's state vocabulary and the transport are where a hack list will attach. Nothing hack-specific is built.
+
+**Offline proof:** 8 new core tests (lock, range, retarget, admission for both kinds, rate limits, record keys
+against the CRC32 check value) pass under Lua 5.4 and LuaJIT. The DLL builds clean at /W4 and its state tests
+pass (wire format, clamping, stale and disconnect clearing, key masking). The scripts compile against vanilla
+**plus every installed script**; that check caught a real `Uint32`/`Uint64` error a standalone compile missed.
+`ncm-test` is green. **Unverified, owed live:** the look-at target from a driver's seat; whether
+`aimedEntity.engineEntity` equals the EntityID hash; the reticle's layout at real resolution; whether the
+crosshair container stays visible in every vehicle camera.
+**Live proof owed:** `MASTER_TEST §BZ`.
+
+## L198 - LOCKED / EXECUTED IN CODE / LIVE-GATED - an unpaid event DECLARES itself; a missing economy anywhere else is a refusal
+
+**Why this needed saying (`KB-186`).** Two earlier decisions were each right, and together they refused every
+Street Call. `impromptu.lua` made a player-called race unpaid on purpose by leaving `economy` nil, so there would be
+no money printer between two friends (`KB-165`'s cadence logic). Economy v1 then made every check-in validate the
+event's economy and refuse when there was none, so a paid series that lost its block could not start racing free.
+
+**Ruling.** "No economy" has exactly two meanings, and the event must say which one applies:
+- **Declared unpaid** (`unpaid = true`, or class `impromptu`): check-in at fee 0, no ledger line, and settlement
+  returns nothing to pay. `NcmEconomy.isUnpaid(e)` is the one test, and both check-in and settlement read it.
+- **Anything else** with no economy is misconfigured, and still refuses with `economy_required`. A missing block
+  must never quietly become a free race.
+
+A future unpaid format (e.g. a meet-up or exhibition) sets `unpaid = true`. It does not delete its economy and hope.
+Covered by stub scenario `entrybag`, which asserts both halves. Live: `MASTER_TEST §CB5`.
+
+## L199 - LOCKED OWNER DIRECTION / EXECUTED IN CODE / LIVE-GATED - restore FFB in the product; do not ship a logging probe first
+
+**Owner direction (2026-09-28).** *"dont want a probe, want a fix that restores ffb."* The accepted response is
+Rig Bridge 0.1.2, not a diagnostics-only DLL. This does not waive live proof: it changes what earns the next drive.
+The build must correct known invalid output behavior before asking the owner to spend a session collecting it.
+
+**Correction to the prior record.** `KB-184`'s main inference is withdrawn. In 0.1.1 the panel setters changed live
+atomics, while `persist()` serialized a separate startup `Config`; `strength 0.020` / `armed false` in the file did
+not establish the force used by the running device. The keyboard slider bug was real and remains fixed, but it is
+not the explanation for absent rumble. The owner raised FORCE and still had SPRING/DAMPER without SINE/CONSTANT.
+
+**0.1.2 behavior.** SINE has one fixed 125 Hz carrier; car state changes magnitude, not a playing effect's period.
+Magnitude writes are capped at 50 Hz, so a driver that must restart still emits complete cycles. Both dynamic
+effects let DirectInput preserve playback or perform its required compatibility restart, retry once after
+reacquisition, and update their sent-value cache only after success. The watchdog is checked before effects start,
+removing the armed-but-parked 250 Hz start/stop loop. FORCE, device class and tuning update the persisted config.
+ARM deliberately remains session-only: every fresh process starts disarmed.
+
+**Evidence boundary.** The DLL builds warning-free; native mapping and feel tests pass; package 0.1.2 exists. No
+hardware claim is made until `MASTER_TEST §CC` passes on the G29. The external companion remains the fallback until
+SINE and CONSTANT both pass. Tracked by `KB-187` / `IDEA-686`.
+
+## L200 - LOCKED OWNER DIRECTION / EXECUTED IN CODE / LIVE-GATED - Chrome hacks adapt OPEN//77's hacking framework, and affect vehicles only
+
+**Owner direction (2026-09-28).** Implement Chrome now, the whole roster, allowed everywhere, with players and AI
+traffic as targets, usable only while scanning (`L197`), Online first, and a full build rather than a probe.
+Chrome affects vehicles only. The framework NCM adapts is `Open77.hacking`, as recorded in
+`docs/research/open77/CAPABILITY_PALETTE.md` §1-§3 and `IDEA-067`.
+
+**Shape.** One deck definition (`ncm.chrome`) whose grades are the roster, every grade `cosmetic`, `nonlethal`
+and `damage = 0`, plus Self-ICE and purge implants, all equipped on join. A driven car goes through
+`Open77.hacking.start`, with the platform's range, warning, line-of-sight, ICE and purge, and the native bars are
+driven by `present()`. A car nobody human is driving goes through an NCM-timed upload with a lock heartbeat.
+On `impact` NCM applies the vehicle consequence:
+- LIMITER, LIMP, POWER SURGE and OVERCLOCK go through the `chrome` handling layer and the Carrier governor. Caps
+  are fractions of the authored baseline; SURGE and OVERCLOCK raise drive and top speed into the gear headroom.
+- ENGINE CUT, TIRE SABOTAGE, BLACKOUT, LIMP health and TOTAL FAILURE use `Open77.vehicles` natives.
+
+A per-bucket PvP scope admits hacks, and a damage arbiter keeps weapon PvP off. Every outcome is written to
+`chrome_event` (migration 041), so the skull and fingerprint history (`IDEA-078`) is a query over those rows.
+Code: `ncm/core/competition/chrome.lua`, `ncm_world/server/chrome.lua`, `ncm_scanner/client/scanner.lua`.
+Offline: core and host harness green under both interpreters. **Live proof owed.**
+
+## L201 - LOCKED (ownership) / PROVISIONAL (DD numbers) / EXECUTED IN CODE / LIVE-PASSED ON THE G29 - the Rig Bridge alone owns wheel force feedback
+
+**Ownership, LOCKED.** Exclusive DirectInput force feedback has exactly one owner per device, and the Carrier and
+Rig Bridge were both taking it (`KB-188`). Under `L188` the Rig Bridge is the rig/FFB product and the Carrier is
+the machine-effects mod, so **when the Rig Bridge is installed the Carrier never opens haptics** (Carrier 0.1.29).
+The Carrier still reads devices. Anything else that takes the wheel (SimHub, a vendor tool, another mod) is
+named in the Rig Bridge panel rather than failing silently.
+
+**Output architecture, LOCKED.** Force output is a self-contained module with its own device instance, its own
+message-only window and a lifetime independent of input rescans. Effects are created and started once, then only
+updated; silence is magnitude zero. Every DirectInput result is visible in the panel's FFB OUTPUT row, because
+testers report from the panel, not from a console (`KB-189`).
+
+**Direct-drive limits, PROVISIONAL.** Gear and belt keep their measured fractions. Direct drive is a newton-metre
+budget (3 Nm at full FORCE) over rated torque, and an unknown DD base is assumed 32 Nm (`IDEA-687`). Unmeasured:
+revisit on the first report from a DD owner.
+
+**Evidence.** Deployed to Online 2026-09-28 21:44 UTC (Carrier 0.1.29, Rig Bridge 0.1.4). Owner, same evening:
+*"ffb is back"* (`MASTER_TEST §CD1`). ARM gates TEST PULSE again in 0.1.5 (`KB-190`), built and not deployed. The
+engine frequency conflict is settled by the owner in favour of `IDEA-422` (rpm-linked): `L199`'s fixed carrier now
+holds for SLIP and ROAD only, and the engine has its own effect (`KB-191`, `IDEA-689`, 0.1.5).
+
+## L202 - LOCKED (owner rulings) / EXECUTED IN CODE / NOT DEPLOYED - a race ring belongs to its place; interest is a bookmark; one entry at a time
+
+**Why.** Race-entry fixes kept landing one at a time (`KB-27`, `KB-75`, `KB-77`, `KB-82`, `KB-185`), and each patched
+one of several independent answers to "which race is this ring/card for?". Every one of those answers was based on
+time or on who the driver was, and never on where they stood. The owner answered targeted questions on 2026-09-28,
+and those answers replace the model rather than patch it again (`KB-195`-`KB-199`).
+
+**Rulings, LOCKED (owner, 2026-09-28).**
+1. **Rings.** Every race inside its window has its own ring at its own venue. The window stays at 20 minutes. Rings
+   are visible from far enough away to spot one and head over (`IDEA-694`).
+2. **The card belongs to the ring you stand in**, never to "your soonest race".
+3. **Interest is a bookmark**: GPS, reminders and a place in the Guide. It is never required to enter, and it never
+   takes a ring or card.
+4. **One entry at a time**, and a team seat counts. Entering B while entered in A is a **two-press switch**. The
+   first press says what it will cost, and the second withdraws from A and enters B. A's fee follows the ordinary
+   withdrawal rule, which is forfeit.
+5. **A team seat is withdrawable at the venue**, and withdrawing gives the seat back.
+6. **Street Calls are public races with their own ring** and never take another race's ring.
+7. **Entry reach is the drawn ring**, and the server uses the same number.
+
+**Executed.** Core: `competition.entry` (`RING_*`, `HELD`/`RELEASABLE`, `heldEntry`, `entered_elsewhere` on
+`checkIn`/`register`) and `competition.venue_options` (seat = entry, `switch_entry`/`confirm_switch` in the ENTER slot).
+Host: `NcmGuide.driverEvent` (entry first, then bookmark), `ncm:venue.at` and location-owned `venueOptions`,
+`ncm:venue.option` carries its ring, the switch in `enterPlayer` (B is written and paid before A is released, so a
+refused B never costs A), a single `ncmEntry` writer, and `NcmOrganized.releaseSeat`. Client: one ring per race,
+visible to 500 m. Publication: every race inside the lead.
+
+**Evidence.** Offline only. Core 765/765 under Lua 5.4 and LuaJIT. The full `ncm-test.ps1` gate is green. New stub
+scenario `ringcard`. `guide`, `guide2`, `entrybag`, `weekend`, `gridcars`, `hostkit`, `rolling` and `progression` pass.
+The six scenarios recorded red in `IDEA-685` fail at the same points, before or outside this code. **Live proof owed:
+`MASTER_TEST §CE`.**
+
+**Open around it.** `IDEA-691` (ring colour, platform), `IDEA-692` (re-seating), `IDEA-693` (practice elsewhere).
+
+## L203 - LOCKED OWNER DIRECTION / DESIGN DETAILS OPEN - the motoring network begins in physical places and persists in the Hub
+
+The owner set the product boundary on 2026-09-28. **Every Autofixer terminal is one distinct Market.** It is
+unmarked and unknown until the Driver deliberately interacts with it; proximity is explicitly insufficient.
+After that interaction the Market is permanently known, sits beside Base Market and the Driver's other discovered
+Markets in F6, and may be browsed and purchased from there.
+
+**Test drives exist only at the physical terminal and never in F6.** A test-drive Machine is timed, geofenced,
+must return to the same terminal and may not enter a race. Time expiry, leaving the geofence and attempting race
+entry are the three violation sources for one shared strike sequence: the first two violations are soft, pleading
+messages (*"pleeeeeease return the car?"*, then *"you're making me feel bad"*); strike three is **Hellfire**, a
+five-star police chase. **Returning the Machine after Hellfire clears NCM's test-drive penalty and fugitive state,
+but it does not clear the active wanted level:** the Driver broke the rules and must escape the five-star chase
+normally. A living Driver who keeps the Machine remains a fugitive even after escaping; police seeing them
+retriggers Hellfire. **Death automatically returns the test-drive Machine and clears Hellfire and the fugitive
+state. Disconnect also returns the Machine and clears the fugitive state.** Exact duration, radius and police
+detection remain open. This preserves the Market
+Network's distinction between learning/access and stock, and keeps test drives as temporary access rather than
+ownership or a free vehicle faucet.
+
+NCM will also examine physical garage and fuel-station locations for an NCM-owned motoring-place registry. **Every
+garage and fuel station is visible on the map from the beginning**, with distinct authored SVG blips; unlike an
+Autofixer Market, neither infrastructure type requires discovery. **Bought Parts may be held and
+inspected remotely, but fitting moves to a physical garage and costs a percentage of the fitted Part's value.**
+The percentage is authored economy balance; the debit and configuration change must be one transaction. That is
+the entire first garage /
+Engineering slice. Engineering is intentionally a much larger future lane, including an earned do-it-yourself
+path, but that future is not smuggled into the first work package. The linked GarageCore, YARRG, CMS location
+packs, Immersive Odometer/Fuel and public maps are reconnaissance sources, not permission to redistribute their
+files, assets or coordinates without verification. Open implementation details are tracked by `IDEA-695`-
+`IDEA-701`.
+
+## L204 - PROVISIONAL / EXECUTED LOCALLY - fuel is persistent Machine state and distance is its authority
+
+The first fuel slice is built locally and offline-green, not deployed. Fuel belongs to the persistent Machine,
+not the current session or Driver. It is consumed only from the server odometer's accepted distance segments;
+teleports and rejected jumps therefore consume nothing. The alpha profile is deliberately tunable: **60 L capacity,
+350 ml/km (35 L/100 km), and €$2/L**. The HUD extends the odometer cluster with the authoritative percentage.
+
+At zero fuel the server persists zero, stops the engine, and sends both toast and chat: **`Stuck? Type
+/ncm.nofuel for help.`** `/ncm.refuel` is accepted only while seated in the active NCM Machine within 18 m of an
+authored fuel station; it buys a full fill, and balance ledger plus fuel state settle under the economy lock before
+the engine restarts. `/ncm.nofuel` chooses and routes the nearest station. The intended recovery presentation is a
+jerry can in hand, but no server-safe handheld-equipment method or redistributable asset is yet verified. The built
+fallback dismounts the Driver, stores/tows the Machine to that station, then asks them to call it from F6 and refuel.
+
+Fuel stations are visible from the beginning with an NCM-authored SVG. Owner-supplied Immersive Odometer and Fuel
+System 5.4a data provides 81 factual in-game pump coordinates. NCM copies no third-party names, code, icons, assets,
+prices or interaction logic: it groups pumps within 50 m into **53 anonymous physical sites**, uses all 81 pump
+points for refuelling proximity, and uses one representative pump per site for its map/recovery target. Every site
+remains unaccepted truth until `MASTER_TEST §CF7` passes in-engine. This is an executed experiment pending live proof.
+
+## L205 - LOCKED OWNER DIRECTION / EXECUTED IN CODE / LIVE-GATED - the Rig Bridge's gamepad layer is JoyMoCo, ported
+
+**Owner direction (2026-09-28).** *"make wheel/pedals tab be called devices ... gamepad tab should allow me to
+record pure button presses from my esp32 wheel ... also allow variants for that same button ... from other
+devices ... controllers with gyro axes should be allowed to be mapped for driving x. We also need rumble presets
+we can assign per button just like joymoco."* Answers to the four questions: (1) port the engine to C++ inside the
+Rig Bridge -- Cyberpunk and this server now, possibly shared later as a mod; import the owner's rim buttons as the
+default profile; JoyMoCo is read-only and untouched; other Cyberpunk control schemes are wanted; (2) each variant
+carries a context dropdown: driving, on foot, or both; (3) build the full stack first and test backwards; (4) save
+and load a local JSON, nothing more for now.
+
+**Design that follows, LOCKED.** JoyMoCo's profile format v1 is the spec, with three additions documented in
+`ncm/rig_bridge/GAMEPAD_PROFILE.md` (device-keyed sources, `context`, the XInput slot). The virtual pad reaches
+the game by a detour on `XInputGetState`/`XInputSetState` in the game's own XInput modules, not ViGEm: the binary
+imports XINPUT9_1_0 and names xinput1_4/1_3, and imports no Windows.Gaming.Input (measured from the import table).
+Buttons OR with the physical pad, sticks and triggers take the larger deflection, JoyMoCo's rule. The Xbox pad is
+never a source, because it already reaches the game. The panel talks to a separate loopback API guarded to the
+game's process tree, because a whole profile through `page:send` would be dropped silently (`KB-63`).
+
+**Ownership, extending `L201`.** The Rig Bridge owns every rig device, not only force feedback. It runs SDL3
+in-process for Joy-Cons and SDL-only devices (the rim, `KB-201`), and Windows gives one process one raw-input
+target, so Carrier 0.1.30 starts no SDL at all when the Rig Bridge is installed.
+
+**PROVISIONAL.** The shipped Joy-Con stick mappings use `"stick": "auto"` because how SDL reports a solo
+Joy-Con's stick varies. Recording windows are JoyMoCo's: 3 s countdown and 4 s capture for motion, first press
+within 8 s for a button. Revisit on test.
+
+**Evidence boundary.** Built and offline-green: the pure engine and the XInput merge under `tests/pad_tests.cpp`,
+the full build warning-free, the panel harness green including the new section assertion. Nothing has run in
+the game. `MASTER_TEST §CG` is the contract. Tracked by `IDEA-705`; gaps `IDEA-706`; sharing deferred `IDEA-707`.
+
+## L206 - LOCKED OWNER DIRECTION / EXECUTED IN CODE / LIVE-GATED - physical Autofixers are specialized Market sources
+
+**Owner direction (2026-09-29).** The supplied 20 coordinates are 20 distinct Markets. Permanent specialties are
+allowed. A Market's 1–3 cars means 1–3 distinct models, while serialized examples may replenish. Every physical
+Market must receive newly authored Parts supply rather than reusing Base Market stock; breadth and uniqueness are
+the goal. Leave future Market identities unallocated for PvE discovery.
+
+**Locked behavior.** The Market begins unknown and unmarked. Only an explicit terminal interaction may record
+`physical_terminal` discovery; the league host then rechecks a fresh authoritative player position within 6 m.
+Once learned, the Market persists in F6 beside Base Market and the Driver's other learned Markets, and buying from
+F6 is allowed. Proximity never discovers it. The 20 launch terminals each carry 1–3 models and two Market-scoped
+component Design families; a Base Market Design is never listed at an Autofixer.
+
+**Catalogue evidence boundary.** The 18 added model families have `_player` records in the official OPEN//77 game
+2.31 vehicle catalogue (the build-pinned endpoint served the newest indexed build at or below the requested live
+build). This verifies identifiers, not successful Online spawning, handling quality, DLC entitlement behavior or
+terminal Z/mesh alignment. Those remain live-gated. Tracked by `IDEA-709`–`IDEA-712`.

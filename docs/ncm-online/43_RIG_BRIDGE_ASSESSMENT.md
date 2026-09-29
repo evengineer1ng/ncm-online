@@ -379,7 +379,7 @@ The proof order above is the ordered live acceptance contract, not an implementa
 output disarmed to identify the exact endpoints, then proceed through control and output. A failure at one stage
 narrows the failing edge without deleting the rest of the product.
 
-## 10. Implemented product (0.1.0)
+## 10. Implemented product (0.1.x lineage; current source 0.1.2)
 
 `ncm/rig_bridge/` now contains:
 
@@ -398,6 +398,13 @@ Machine surface, so bind order cannot choose the product.
 
 The build is not called complete in the project sense. Hardware and in-game claims remain NOT RUN until
 `MASTER_TEST §BU` records them. The external companion remains the fallback until both native input and FFB pass.
+
+**0.1.2 correction (`KB-187`, `L199`).** The original dynamic-effect stream changed a playing sine's period and
+could restart it at the 250 Hz pump cadence; it also cached attempted writes before checking whether DirectInput
+accepted them. The current stream fixes the sine at 125 Hz, limits magnitude writes to 50 Hz, lets DirectInput
+perform only the compatibility restart its driver requires, retries once after reacquisition, and advances its
+sent-value cache only on success. FORCE/class/tune settings now update the persisted `Config`; ARM remains
+session-only, so every process still starts disarmed. Hardware proof is `MASTER_TEST §CC`, not the successful build.
 
 ## 11. Evidence
 

@@ -293,7 +293,7 @@ end
 -- ------------------------------------------------------------------------------------------------
 
 local function open(wire)
-    if NcmClientRaceActive then log("open ignored: racing"); return end
+    if NcmClientRaceActive and NcmClientRacePhase ~= "complete" then log("open ignored: racing"); return end
     if NcmClientBuildActive then return end
     if type(wire) ~= "table" then return end
     if not surfaceReady() then
@@ -362,7 +362,15 @@ end)
 --- means a refused request never flashes an empty card.
 local function request()
     if NcmClientBuildActive then hide("toggle"); return end
-    if NcmClientRaceActive then log("request ignored: racing"); return end
+    -- KB-187: the result hold is not a race. The HUD keeps showing the finished session for a minute, and F5 was
+    -- refused -- silently -- for all of it. The server's own gate (`busySession`) already ignores a complete one.
+    if NcmClientRaceActive and NcmClientRacePhase ~= "complete" then
+        log("request ignored: racing")
+        pcall(Open77.exports.call, "open77_notifications", "show", { id = "ncm_build_refused", replace = true,
+            type = "warning", title = "STREET CALL", message = "Finish the race you are in first.", icon = "NCM",
+            durationMs = 5000 })
+        return
+    end
     TriggerServerEvent("ncm:build.open")
     -- This watcher exists ONLY so that a form which never arrives says so: `KB-172` was invisible for a day
     -- because the refusing side and the waiting side each logged something reasonable and neither logged the

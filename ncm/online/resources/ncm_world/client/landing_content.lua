@@ -22,13 +22,19 @@ NcmLandingContent = {
         { id = "money", label = "Earn prize money", state = "live", reference = "guide",
           detail = "Scheduled events pay on completion and placement. Every payment leaves an itemised receipt." },
         { id = "race", label = "Enter races", state = "live", reference = "guide",
-          detail = "The Race Guide carries the live calendar. Looking costs nothing; entry is a separate, paid step." },
+          detail = "The Race Guide carries the live calendar. Looking costs nothing; entering a scheduled race is a separate, paid step." },
+        { id = "streetcall", label = "Call a street race", state = "partial",
+          limit = "Unpaid: no entry fee and no prize money. One call per driver every 15 minutes, two open at once.",
+          detail = "Press F5 to set a start, a finish and a start time. Anyone can enter at the line." },
         { id = "timetrial", label = "Run time trials", state = "live", reference = "guide",
           detail = "A field of one against the clock. Free practice and qualifying mint nothing." },
         { id = "parts", label = "Buy and fit parts", state = "live", reference = "market",
           detail = "Serialized components with real fitment rules. A part that does not fit says so before you buy." },
         { id = "index", label = "Build a Machine Index", state = "live", reference = "collection",
-          detail = "What you have seen, what you own, and the evidence behind each claim." },
+          detail = "What you have scanned, what you own, and the evidence behind each claim." },
+        { id = "scanner", label = "Scan machines", state = "partial", reference = "collection",
+          limit = "The reticle and scan-to-discover are new and still being proven live.",
+          detail = "Tab or Caps Lock brings up the Scanner. Hold it on a car within 60 m to add a machine you have not met to your Index." },
         { id = "wheel", label = "Drive with a wheel", state = "live", reference = "wheel",
           detail = "Multi-vendor wheel, pedal and custom-rig support with force feedback, through NCM Rig Bridge." },
         { id = "ghost", label = "Race your own ghost", state = "partial",
@@ -53,7 +59,17 @@ NcmLandingContent = {
     -- release. If an entry would read "restarted the server", it does not belong here.
     releases = {
         {
-            date = "2026-09-28", title = "Player Exchange", build = "0.5.0",
+            date = "2026-09-28", seq = 2, title = "Scanner, quick menu and fixes", build = "0.5.0",
+            items = {
+                { heading = "Scanner", text = "Tab or Caps Lock brings up the Scanner. Hold it on a car within 60 m to add a machine you have not met to your Machine Index. Driving past a car no longer adds it." },
+                { heading = "Quick menu", text = "Hold Start on a pad, or B on the keyboard, aim and release: Hub, Race graph, Call a race, Map and GPS." },
+                { heading = "Health", text = "Your health now regenerates, a full bar in about a minute." },
+                { heading = "Keyboard", text = "F6 works without a mouse: Enter activates the focused control, and Left/Right move sliders and dropdowns." },
+                { heading = "Fixed", text = "Street Calls (F5) can be entered again, and are free. Your venue ring now moves to your next race on its own. The WHEEL tab's FORCE slider now really changes your wheel's strength." },
+            },
+        },
+        {
+            date = "2026-09-28", seq = 1, title = "Player Exchange", build = "0.5.0",
             items = {
                 { heading = "Exchange", text = "F6 now carries direct Driver-to-Driver trade in the shell." },
                 { heading = "Exact assets", text = "Machines, their fitted Parts, loose serialized Parts and eddies are shown by identity on both sides." },

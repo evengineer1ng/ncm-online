@@ -39,7 +39,7 @@ local settings = Open77.tunables.declare({
     -- Player-called races (`server/impromptu.lua`, L178). BOTH of these exist because `KB-165` is a standing
     -- trap: a per-race permission is a permanent cadence. The cooldown bounds one driver, the cap bounds the
     -- board -- without the second, five drivers each obeying the first would still fill it.
-    impromptuCooldownSec = { value = 900, type = "integer", min = 60, max = 7200, unit = "s", apply = "live" },
+    impromptuCooldownSec = { value = 60, type = "integer", min = 60, max = 7200, unit = "s", apply = "live" },   -- a floor; one call on the board per driver is the real limit (KB-187)
     impromptuMaxOpen = { value = 2, type = "integer", min = 0, max = 10, apply = "live" },
     -- chauffeur pickup for organized events (M7.5a): rides dispatched this long before the start
     pickupLeadSec = { value = 300, type = "integer", min = 90, max = 1800, unit = "s", apply = "live" },
@@ -115,6 +115,14 @@ NcmCalendar.events = events
 -- ---------------------------------------------------------------------------------------------
 -- Driver lookup (ncm_world owns minting; the binding table is the shared truth).
 -- ---------------------------------------------------------------------------------------------
+-- Ties broken by id: two races at the same minute used to swap places on every sort, which changed the
+-- published signature every tick and resent every player's whole Guide every 10 s.
+local function byStart(a, b)
+    local x, y = events[a].startsAt, events[b].startsAt
+    if x ~= y then return x < y end
+    return a < b
+end
+
 local function resolveDriver(playerId)
     local id = tonumber(playerId) or 0
     if driverOf[id] then return driverOf[id] end
@@ -177,7 +185,7 @@ function NcmCalendar.adopt(e)
     if events[e.eventId] then return nil, "duplicate_event" end
     events[e.eventId] = e
     order[#order + 1] = e.eventId
-    table.sort(order, function(a, b) return events[a].startsAt < events[b].startsAt end)
+    table.sort(order, byStart)
     local ok, err = pcall(persistEvent, e)
     if not ok then log("adopt: persist failed: %s", tostring(err)) end
     publish(now(), true)
@@ -249,7 +257,10 @@ publish = function(t, force)
     local list = {}
     for _, eid in ipairs(order) do
         local e = events[eid]
-        if e.state ~= "closed" and e.state ~= "cancelled" and #list < (settings.publishCount or 3) then
+        -- The soonest `publishCount`, and ALSO every race inside the ring lead: each one gets its own ring at its
+        -- own venue (owner, 2026-09-28), and a client can only draw a ring for a race it has been told about.
+        local inRingLead = (e.startsAt or 0) - t <= Entry.RING_LEAD_S and #list < Entry.RING_MAX
+        if e.state ~= "closed" and e.state ~= "cancelled" and (#list < (settings.publishCount or 3) or inRingLead) then
             local n, interested = countEntries(e)
             local seatsTaken = 0
             if e.class == "organized" and NcmOrganized and NcmOrganized.rosters[e.eventId] then
@@ -276,7 +287,15 @@ publish = function(t, force)
     for _, x in ipairs(list) do sig[#sig + 1] = x.eventId .. ":" .. x.state .. ":" .. x.entries end
     local signature = table.concat(sig, ",")
     -- serverNow lets clients run the countdown between publications; republish at least every tick.
-    GlobalState.ncmCalendar = { next = list, serverNow = math.floor(t), signature = signature }
+    local snapshot = { next = list, serverNow = math.floor(t), signature = signature }
+    GlobalState.ncmCalendar = snapshot
+    -- Production clients do not currently receive this GlobalState key (the live client logged it absent for
+    -- its entire session while the server kept publishing it). Send the same small read model explicitly on
+    -- every calendar tick. A late join therefore needs no request/replay path, and GlobalState remains a
+    -- harmless fallback for hosts where replication does work.
+    for _, pid in ipairs(Open77.players.all()) do
+        TriggerClientEvent("ncm:calendar", pid, snapshot)
+    end
     -- Republished alongside the calendar: the tunables are `apply = "live"`, so an operator flipping
     -- `environment` in Warden takes effect without a restart, and ncm_world sees it on the next tick.
     publishIdentity()
@@ -377,7 +396,7 @@ local function tick()
         if e.startsAt > t - 3600 then kept[#kept + 1] = eid else events[eid] = nil end
     end
     order = kept
-    table.sort(order, function(a, b) return events[a].startsAt < events[b].startsAt end)
+    table.sort(order, byStart)
     sendPings(t)
     publish(t)
 end
@@ -419,7 +438,7 @@ function NcmCalendar.start(series)
                     if st.state == "closed" or st.state == "cancelled" then e.state = st.state end
                 end
             end
-            table.sort(order, function(a, b) return events[a].startsAt < events[b].startsAt end)
+            table.sort(order, byStart)
             for _, r in ipairs(entries) do
                 local e = events[r.event_id]
                 if e then e.entries[r.ncm_driver_id] = { entryId = r.entry_id, state = r.state, fee = tonumber(r.fee) or 0, checkedInAt = tonumber(r.checked_in_at), registeredAt = tonumber(r.registered_at), interestedAt = tonumber(r.interested_at), teamId = r.team_id, seatIndex = tonumber(r.seat_index) } end
@@ -445,7 +464,10 @@ local function tell(playerId, text)
     pcall(Open77.chat.send, playerId, "[NCM] " .. text)
 end
 
-local function enterPlayer(pid, eventId)
+--- opts.switchFrom = the eventId of the entry the driver confirmed giving up for this one (venue CONFIRM SWITCH).
+--- One entry at a time (owner, 2026-09-28): without it, an entry held elsewhere refuses this one.
+local function enterPlayer(pid, eventId, opts)
+    opts = opts or {}
     CreateThread(function()
         local e = events[tostring(eventId or "")]
         if not e then tell(pid, "That race is not on the calendar."); return end
@@ -491,10 +513,15 @@ local function enterPlayer(pid, eventId)
         local enteredAsset = NcmCompetition and NcmCompetition.enterMachine
             and NcmCompetition.enterMachine(e, driver.ncmDriverId, seated) or nil
         local p = Open77.players.get(pid)
+        -- The switch is honoured only for the exact entry the driver confirmed giving up. Anything else held
+        -- elsewhere still refuses, so a stale confirm cannot release a race they never saw named.
+        local held = NcmGuide and NcmGuide.heldEntry and NcmGuide.heldEntry(driver.ncmDriverId, e.eventId) or nil
+        local switchFrom = held and opts.switchFrom and held.eventId == opts.switchFrom and held or nil
         local decision = Entry.checkIn({
             event = e, now = now(), driverId = driver.ncmDriverId,
             position = p and p.fresh and p.position or nil,
             existingEntry = e.entries[driver.ncmDriverId],
+            heldElsewhere = (held and not switchFrom) and held or nil,
             radiusM = e.venueRadiusM, rng = hostRng,
             fee = (NcmCompetition.economyFor(e) or {}).entryFee or 0,
         })
@@ -507,6 +534,8 @@ local function enterPlayer(pid, eventId)
                 window_closed = "Entries are closed for this one.",
                 not_at_venue = ("You need to be at the start (%d m away)."):format(math.floor(decision.distanceM or 0)),
                 position_unknown = "Position not fresh yet, try again.",
+                entered_elsewhere = ("You're entered in %s. Use SWITCH ENTRY at this ring to move to this race."):format(
+                    tostring(held and held.routeName or "another race")),
             })[why] or ("Cannot enter: " .. tostring(why))
             tell(pid, text)
             log("enter refused player=%d event=%s reason=%s", pid, e.eventId, tostring(why))
@@ -518,7 +547,7 @@ local function enterPlayer(pid, eventId)
         en.assetId = enteredAsset
         if enteredAsset and not en.carNumber then en.carNumber = assignNumber(e.eventId, driver.ncmDriverId) end
         local okCall, paid, payWhy = pcall(NcmEconomy.checkIn, {
-            economy=NcmCompetition.economyFor(e), upgraded=decision.upgraded, entryId=en.entryId,
+            economy=NcmCompetition.economyFor(e), unpaid=NcmEconomy.isUnpaid(e), upgraded=decision.upgraded, entryId=en.entryId,
             eventId=e.eventId, seriesId=e.seriesId, driverId=driver.ncmDriverId, checkedInAt=en.checkedInAt,
             assetId=en.assetId, carNumber=en.carNumber,
         })
@@ -532,14 +561,22 @@ local function enterPlayer(pid, eventId)
             NcmRace.practiceLeave(e.eventId, driver.ncmDriverId, now(), "entered_race")
         end
         e.entries[driver.ncmDriverId] = en
-        -- **The venue belongs in this bag.** It was written without one, and `/ncm.gps` reads
-        -- `entry.venue` to decide whether it knows your race: with it absent the command skipped the driver's
-        -- OWN entry and routed to whatever race on the server started soonest. Same shape as
-        -- `NcmGuide.publishEntryBag`, which is the definition this must not drift from.
-        pcall(function() Open77.state.player(pid):set("ncmEntry", {
-            eventId = e.eventId, state = "checked_in", routeName = e.routeName,
-            startsAt = math.floor(e.startsAt),
-            venue = { x = e.venue.x, y = e.venue.y, z = e.venue.z, name = e.venue.name } }) end)
+        -- The other half of a confirmed switch, done only now that this entry is written and paid: a refused
+        -- entry must never have cost the driver the race they already held. Withdrawal forfeits that race's fee
+        -- under the ordinary rule; the confirm text said so.
+        if switchFrom and NcmGuide and NcmGuide.withdraw then
+            local okW, whyW = NcmGuide.withdraw(pid, switchFrom.eventId)
+            if not okW then
+                log("SWITCH INCOMPLETE player=%d kept=%s entered=%s reason=%s", pid, switchFrom.eventId, e.eventId, tostring(whyW))
+                tell(pid, ("You're in %s, but %s could not be released (%s). Withdraw from it at its ring."):format(
+                    e.routeName, tostring(switchFrom.routeName), tostring(whyW)))
+            else
+                log("SWITCH player=%d from=%s to=%s", pid, switchFrom.eventId, e.eventId)
+            end
+        end
+        -- Through the one writer (KB-75/L107). This used to set the bag itself, which also skipped the Guide's
+        -- record of what it had published, so the refresh never corrected it again.
+        if NcmGuide and NcmGuide.refreshEntryBag then NcmGuide.refreshEntryBag(pid) end
         tell(pid, ("You're in: %s · %s. Start in %s. Entry -€$%d · balance €$%d."):format(e.seriesName, e.routeName, Entry.countdown(e.startsAt - now()), paid.fee, paid.balance))
         if NcmComms then
             NcmComms.acknowledge(pid,"race.interest.registered")
@@ -568,7 +605,7 @@ end
 NcmCalendar.enter = enterPlayer
 
 RegisterNetEvent("ncm:enter", function(eventId)
-    enterPlayer(tonumber(source) or 0, eventId)
+    enterPlayer(tonumber(source) or 0, eventId)   -- never a switch: that is only ever the venue's two-press confirm
 end)
 
 -- Server console (KB-4: a second local instance has no chat and no key input at the prompt):
@@ -609,7 +646,7 @@ RegisterCommand("ncm.race.now", function(source, args)
                 MySQL.update.await("UPDATE event SET starts_at = ?, entry_opens_at = ?, entry_closes_at = ?, state = ? WHERE event_id = ?",
                     { math.floor(e.startsAt), math.floor(e.entryOpensAt), math.floor(e.entryClosesAt), e.state, e.eventId })
             end)
-            table.sort(order, function(a, b) return events[a].startsAt < events[b].startsAt end)
+            table.sort(order, byStart)
             publish(t, true)
             for _, pid in ipairs(Open77.players.all()) do
                 pcall(Open77.notifications.send, pid, { type = "warning", title = "RACE PULLED FORWARD", message = e.routeName .. " starts in 3:00 — enter at " .. e.venue.name .. " within 2:00", icon = "NCM", durationMs = 9000 })

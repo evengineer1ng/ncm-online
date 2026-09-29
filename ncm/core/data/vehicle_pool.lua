@@ -25,6 +25,14 @@ Core.define("data.vehicle_pool", function(C)
         { id = "Vehicle.v_sport1_quadra_turbo",             prestige = 4, tags = { "sport", "race"             } },
         { id = "Vehicle.v_sport1_rayfield_caliburn",        prestige = 5, tags = { "halo", "race", "sport"     } },
         { id = "Vehicle.v_sport1_rayfield_aerondight",      prestige = 5, tags = { "halo", "iconic", "sport"   } },
+        { id = "Vehicle.v_sport1_herrera_riptide",          prestige = 4, tags = { "sport", "update"          } },
+        { id = "Vehicle.v_sport1_quadra_sport_r7",          prestige = 4, tags = { "sport", "phantom_liberty" } },
+        { id = "Vehicle.v_sport1_yaiba_semimaru",           prestige = 5, tags = { "halo", "update"           } },
+        { id = "Vehicle.v_sport2_mizutani_shion_targa",     prestige = 4, tags = { "sport", "update"          } },
+        { id = "Vehicle.v_sport2_porsche_911turbo",         prestige = 5, tags = { "iconic", "sport"          } },
+        { id = "Vehicle.v_sport2_porsche_911turbo_cabrio",  prestige = 5, tags = { "iconic", "phantom_liberty"} },
+        { id = "Vehicle.v_sport2_quadra_type66_avenger",    prestige = 4, tags = { "muscle", "sport"          } },
+        { id = "Vehicle.v_sport2_villefort_deleon_sport",   prestige = 4, tags = { "muscle", "update"         } },
     },
     Tech = {
         { id = "Vehicle.v_standard2_makigai_maimai",        prestige = 1, tags = { "budget", "tech"            } },
@@ -33,6 +41,13 @@ Core.define("data.vehicle_pool", function(C)
         { id = "Vehicle.v_standard2_villefort_cortes",      prestige = 2, tags = { "street", "tech"            } },
         { id = "Vehicle.v_standard3_chevalier_emperor",     prestige = 3, tags = { "executive", "tech"         } },
         { id = "Vehicle.v_standard2_chevalier_thrax",       prestige = 4, tags = { "executive", "tech", "race" } },
+        { id = "Vehicle.v_standard2_archer_bandit",          prestige = 2, tags = { "street", "update"           } },
+        { id = "Vehicle.v_standard2_archer_quartz",          prestige = 2, tags = { "street", "tech"             } },
+        { id = "Vehicle.v_standard2_mizutani_hozuki",        prestige = 2, tags = { "street", "update"           } },
+        { id = "Vehicle.v_standard25_thorton_merrimac",      prestige = 3, tags = { "utility", "phantom_liberty" } },
+        { id = "Vehicle.v_standard3_makigai_tanishi",        prestige = 2, tags = { "utility", "phantom_liberty" } },
+        { id = "Vehicle.v_standard3_militech_hellhound",     prestige = 5, tags = { "armored", "phantom_liberty" } },
+        { id = "Vehicle.v_utility4_chevalier_legatus",       prestige = 4, tags = { "utility", "update"           } },
     },
     Nomad = {
         { id = "Vehicle.v_standard25_thorton_colby_pickup", prestige = 1, tags = { "budget", "offroad"         } },
@@ -53,6 +68,9 @@ Core.define("data.vehicle_pool", function(C)
         { id = "Vehicle.v_sportbike3_brennan_apollo_nomad",         prestige = 4, tags = { "bike", "motorcycle", "nomad", "apollo"    } },
         { id = "Vehicle.v_sportbike1_yaiba_kusanagi_tyger",         prestige = 4, tags = { "bike", "motorcycle", "race", "kusanagi"  } },
         { id = "Vehicle.v_sportbike1_yaiba_kusanagi_animal",        prestige = 4, tags = { "bike", "motorcycle", "race", "yaiba"     } },
+        { id = "Vehicle.v_sportbike1_yaiba_kusanagi",               prestige = 4, tags = { "bike", "motorcycle", "sport"              } },
+        { id = "Vehicle.v_sportbike1_yaiba_muramasa",               prestige = 5, tags = { "bike", "motorcycle", "update"             } },
+        { id = "Vehicle.v_sportbike2_arch",                          prestige = 3, tags = { "bike", "motorcycle", "street"             } },
     },
     }
 

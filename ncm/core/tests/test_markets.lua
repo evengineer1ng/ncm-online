@@ -13,6 +13,22 @@ return {
         T.eq(known[1].marketId, "base_market")
         T.eq(known.total, nil)
     end,
+    ["twenty physical autofixers are distinct interaction-only markets"] = function(T)
+        local M=T.Core.get("economy.markets");local coords,ids,models={}, {},0
+        T.eq(#M.MARKETS,21,"base plus twenty physical markets")
+        for _,m in ipairs(M.MARKETS) do if not m.universallyKnown then
+            ids[m.marketId]=(ids[m.marketId] or 0)+1;coords[m.x..":"..m.y]=(coords[m.x..":"..m.y] or 0)+1
+            T.eq(#m.vehicles>=1 and #m.vehicles<=3,true,m.marketId.." model count")
+            T.eq(#m.partFamilies,2,m.marketId.." unique supply specialties")
+            models=models+#m.vehicles
+        end end
+        for id,n in pairs(ids) do T.eq(n,1,id) end
+        for xy,n in pairs(coords) do T.eq(n,1,xy) end
+        T.eq(models>=40,true,"catalogue breadth")
+        local fact=M.discovery({driverId="d1",serverId="ncm-dev",marketId="autofixer_badlands_01",
+            firstKnownAt=1000,sourceKind="physical_terminal",sourceRef="autofixer_badlands_01",accessState="open"})
+        T.eq(fact.marketId,"autofixer_badlands_01")
+    end,
     ["visible eligible and affordable are independent gates"] = function(T)
         local M = T.Core.get("economy.markets")
         local base = { marketKnown=true, marketAccessible=true, visible=true, available=true,
