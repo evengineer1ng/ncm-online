@@ -354,6 +354,13 @@ AddEventHandler("ncm:ffb.state", function()
     page:send("panel:wheel", state or { enabled = false, connected = false })
 end)
 
+--- The GAMEPAD section's replies (`KB-210`), from `carrier_bridge.lua`. Forwarded as they came: the parts are
+--- already strings under the WebUI's message limit, so there is nothing to encode here.
+NcmClientPadDeliver = function(kind, d)
+    if not (page and pageReady) or type(d) ~= "table" then return end
+    page:send(kind == "fail" and "panel:pad.fail" or "panel:pad.part", d)
+end
+
 -- Assigns the forward-declared local above (not `local function`), so `applyFocus` and the pad's BACK share
 -- this exact close path.
 function hide()
@@ -426,6 +433,16 @@ AddEventHandler("onClientResourceStart", function(name)
             local state = (type(NcmClientFfbState) == "function") and NcmClientFfbState() or nil
             page:send("panel:wheel", state or { enabled = false, connected = false })
         end
+    end)
+
+    page:on("panel:pad.req", function(d)
+        if type(d) ~= "table" then return end
+        local ok, why = false, "Rig Bridge not loaded"
+        if type(NcmClientPadRequest) == "function" then
+            local fine, r1, r2 = pcall(NcmClientPadRequest, d)
+            if fine then ok, why = r1, r2 else why = tostring(r1) end
+        end
+        if not ok then page:send("panel:pad.fail", { id = tostring(d.id or ""), error = tostring(why or "refused") }) end
     end)
 
     page:on("panel:market.purchase", function(d)

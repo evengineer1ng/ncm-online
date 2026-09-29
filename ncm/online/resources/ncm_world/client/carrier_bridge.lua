@@ -287,6 +287,23 @@ NcmClientFfbCommand = function(kind, payload)
     return false, "unknown_command"
 end
 
+--- The GAMEPAD section's only way to the Rig Bridge's gamepad API (`KB-210`).
+---
+--- The F6 panel is a bundled page with no network at all (MASTER_TEST §AJ1), so its first version, which
+--- fetched `http://127.0.0.1:38530` directly, could only ever say "unreachable". This surface's page is
+--- loopback HTTP, so IT fetches, and the reply comes back as `ncm:pad.part` strings the panel reassembles.
+--- The body is a JSON string end to end: nothing here encodes or decodes, so no script budget is spent
+--- (KB-63) and an empty array cannot turn into an object on the way through.
+NcmClientPadRequest = function(req)
+    if type(req) ~= "table" or not req.id then return false, "bad_request" end
+    if not (surface and surfaceReady) then return false, "Rig Bridge not connected" end
+    surface:send("ncm:pad.req", {
+        id = tostring(req.id), path = tostring(req.path or "/pad/state"), body = tostring(req.body or ""),
+        base = device and device.rig and type(device.rig.padApi) == "string" and device.rig.padApi or nil,
+    })
+    return true
+end
+
 --- The last projection set we pushed, by record, so an unchanged world costs nothing. Keyed by the same
 --- signature the server publishes with; a record that disappears is sent a restore rather than forgotten.
 local projected = {}
@@ -679,6 +696,13 @@ local function bringUp()
         announce()
         log("carrier %s | hook=%s | %d flat(s) on %d record(s)",
             carrier.version, tostring(carrier.hook), carrier.applied, carrier.records)
+    end)
+    -- Gamepad API replies, passed through untouched to whatever panel asked (`NcmClientPadRequest`).
+    page:on("ncm:pad.part", function(d)
+        if type(NcmClientPadDeliver) == "function" then pcall(NcmClientPadDeliver, "part", d) end
+    end)
+    page:on("ncm:pad.fail", function(d)
+        if type(NcmClientPadDeliver) == "function" then pcall(NcmClientPadDeliver, "fail", d) end
     end)
     page:on("ncm:rig.health", function(h)
         if type(h) ~= "table" then return end

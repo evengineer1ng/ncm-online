@@ -23,6 +23,7 @@
 #include <atomic>
 #include <functional>
 #include <mutex>
+#include <set>
 #include <string>
 #include <thread>
 #include <vector>
@@ -41,6 +42,12 @@ public:
 
     /// JoyMoco `assignments`: hand -> "auto" | "none" | a controller serial/MAC.
     void setAssignments(const nlohmann::json& assignments);
+
+    /// Devices DirectInput already reads, as "VID:PID" (KB-209). SDL must never open these: SDL 3.4's
+    /// Logitech wheel driver talks to the wheel, and a G29 opened by SDL lost its force feedback on ARM and
+    /// needed a replug. They still reach the gamepad layer as `di:<VID:PID>`. Seed it before `start()`; later
+    /// calls (a hot-plugged wheel) re-apply the ignore list and release anything SDL had open.
+    void setOwnedElsewhere(std::set<std::string> vidPids);
 
     Samples snapshot() const;
     /// What SDL can see, for the panel: key, name, kind, assigned hand, motion, battery.
@@ -66,6 +73,8 @@ private:
     nlohmann::json devices_ = nlohmann::json::array();
     nlohmann::json assignments_ = nlohmann::json::object();
     bool assignmentsChanged_ = false;
+    std::set<std::string> ownedElsewhere_;
+    bool ownedChanged_ = false;
     struct Rumble { std::string hand; float low, high; uint32_t ms; };
     std::vector<Rumble> rumbles_;
     std::string status_ = "not started";

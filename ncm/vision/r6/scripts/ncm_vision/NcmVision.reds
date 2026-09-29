@@ -139,7 +139,7 @@ public class NcmVisionSystem extends ScriptableSystem {
     if want {
       this.Schedule();
     } else {
-      NcmScanner_Report(false, 0ul, 0ul, 0, -1.0);
+      NcmScanner_Report(false, 0ul, 0ul, 0, -1.0, 0.0, 0.0, 0.0);
     }
   }
 
@@ -184,6 +184,7 @@ public class NcmVisionSystem extends ScriptableSystem {
     let record: Uint64 = 0ul;
     let entity: Uint64 = 0ul;
     let distance: Float = -1.0;
+    let at: Vector4;
     VehicleComponent.GetVehicle(game, player, mounted);
     if IsDefined(targeting) {
       target = targeting.GetLookAtObject(player, false, false);
@@ -196,7 +197,8 @@ public class NcmVisionSystem extends ScriptableSystem {
     }
     if IsDefined(target) && target != mounted && target != player {
       entity = Cast<Uint64>(EntityID.GetHash(target.GetEntityID()));
-      distance = Vector4.Distance(player.GetWorldPosition(), target.GetWorldPosition());
+      at = target.GetWorldPosition();
+      distance = Vector4.Distance(player.GetWorldPosition(), at);
       vehicle = target as VehicleObject;
       if IsDefined(vehicle) {
         kind = 1;
@@ -205,7 +207,7 @@ public class NcmVisionSystem extends ScriptableSystem {
         kind = 2;
       }
     }
-    NcmScanner_Report(true, entity, record, kind, distance);
+    NcmScanner_Report(true, entity, record, kind, distance, at.X, at.Y, at.Z);
   }
 }
 

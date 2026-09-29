@@ -7,6 +7,12 @@
 // It draws what Lua says, read through `NcmScanner_Reticle()` as "revision|state|progress|title|detail" (`~`
 // is an empty field, so `StrSplit` can never collapse one). With no feed it is a bare reticle: corner brackets
 // and nothing claimed. Coordinates are the HUD's 3840x2160 space.
+//
+// 0.3.0 adds the vanilla scanner's two side panels, read through `NcmScanner_Panel()`:
+//   * left, QUICKHACKS -- every chrome hack at once, the selected one highlighted, each row saying whether it
+//     can be used on this target (vanilla's quickhack column, without RAM);
+//   * right, the DATA panel -- the machine's name and class once this Driver knows it, who is driving it, and
+//     what the Scanner knows about it.
 module NcmVision
 
 public static func NcmScannerField(value: String) -> String {
@@ -29,6 +35,10 @@ public static func NcmScannerRefused() -> HDRColor {
   return new HDRColor(0.95, 0.35, 0.3, 1.0);
 }
 
+public static func NcmScannerShade() -> HDRColor {
+  return new HDRColor(0.02, 0.06, 0.07, 1.0);
+}
+
 public class NcmScannerReticle extends IScriptable {
   private let root: ref<inkCanvas>;
   private let frame: ref<inkCanvas>;
@@ -40,6 +50,18 @@ public class NcmScannerReticle extends IScriptable {
   private let detail: ref<inkText>;
   private let revision: String;
   private let refused: Int32;
+  // The side panels (0.3.0).
+  private let listRoot: ref<inkCanvas>;
+  private let rowBack: array<ref<inkRectangle>>;
+  private let rowMark: array<ref<inkRectangle>>;
+  private let rowLabel: array<ref<inkText>>;
+  private let rowRight: array<ref<inkText>>;
+  private let infoRoot: ref<inkCanvas>;
+  private let infoTitle: ref<inkText>;
+  private let infoSub: ref<inkText>;
+  private let infoKey: array<ref<inkText>>;
+  private let infoValue: array<ref<inkText>>;
+  private let panelRefused: Int32;
 
   public func Build(parent: ref<inkCompoundWidget>) -> Void {
     let stage: ref<inkCanvas>;
@@ -76,6 +98,82 @@ public class NcmScannerReticle extends IScriptable {
     this.title = this.Text(stage, n"title", 52, 0.0, 480.0, 900.0, 70.0);
     this.detail = this.Text(stage, n"detail", 34, 0.0, 552.0, 900.0, 50.0);
     this.Paint(0, 0.0, "", "");
+    this.BuildPanels();
+  }
+
+  // A 2800x700 canvas placed exactly like the stage, so the bracket centre is (1400, 300) here too.
+  private func BuildPanels() -> Void {
+    let wide: ref<inkCanvas> = this.root.AddChild(n"inkCanvasWidget") as inkCanvas;
+    let header: ref<inkText>;
+    let back: ref<inkRectangle>;
+    let rule: ref<inkRectangle>;
+    let x: Float;
+    let y: Float;
+    let i: Int32 = 0;
+    wide.SetName(n"panels");
+    wide.SetAnchor(inkEAnchor.Centered);
+    wide.SetAnchorPoint(new Vector2(0.5, 0.5));
+    wide.SetMargin(0.0, 200.0, 0.0, 0.0);
+    wide.SetSize(2800.0, 700.0);
+
+    // QUICKHACKS, left of the brackets.
+    x = 520.0;
+    this.listRoot = wide.AddChild(n"inkCanvasWidget") as inkCanvas;
+    this.listRoot.SetName(n"quickhacks");
+    this.listRoot.SetMargin(x, 0.0, 0.0, 0.0);
+    this.listRoot.SetSize(640.0, 800.0);
+    header = this.TextAt(this.listRoot, n"header", 30, 0.0, 110.0, 640.0, 50.0, textHorizontalAlignment.Left);
+    header.SetText("QUICKHACKS");
+    header.SetTintColor(NcmScannerAccent());
+    rule = this.Rect(this.listRoot, n"headerRule", 0.0, 160.0, 640.0, 3.0);
+    rule.SetTintColor(NcmScannerAccent());
+    rule.SetOpacity(0.6);
+    while i < 12 {
+      y = 172.0 + Cast<Float>(i) * 50.0;
+      back = this.Rect(this.listRoot, n"rowBack", 0.0, y, 640.0, 44.0);
+      back.SetTintColor(NcmScannerShade());
+      back.SetOpacity(0.6);
+      ArrayPush(this.rowBack, back);
+      ArrayPush(this.rowMark, this.Rect(this.listRoot, n"rowMark", 0.0, y, 8.0, 44.0));
+      ArrayPush(this.rowLabel, this.TextAt(this.listRoot, n"rowLabel", 32, 26.0, y, 400.0, 44.0, textHorizontalAlignment.Left));
+      ArrayPush(this.rowRight, this.TextAt(this.listRoot, n"rowRight", 26, 400.0, y, 222.0, 44.0, textHorizontalAlignment.Right));
+      i += 1;
+    }
+    this.listRoot.SetVisible(false);
+
+    // DATA, right of the brackets.
+    x = 1660.0;
+    this.infoRoot = wide.AddChild(n"inkCanvasWidget") as inkCanvas;
+    this.infoRoot.SetName(n"data");
+    this.infoRoot.SetMargin(x, 0.0, 0.0, 0.0);
+    this.infoRoot.SetSize(660.0, 800.0);
+    header = this.TextAt(this.infoRoot, n"header", 30, 0.0, 110.0, 660.0, 50.0, textHorizontalAlignment.Left);
+    header.SetText("SCAN DATA");
+    header.SetTintColor(NcmScannerAccent());
+    rule = this.Rect(this.infoRoot, n"headerRule", 0.0, 160.0, 660.0, 3.0);
+    rule.SetTintColor(NcmScannerAccent());
+    rule.SetOpacity(0.6);
+    back = this.Rect(this.infoRoot, n"back", 0.0, 172.0, 660.0, 400.0);
+    back.SetTintColor(NcmScannerShade());
+    back.SetOpacity(0.6);
+    this.infoTitle = this.TextAt(this.infoRoot, n"title", 44, 24.0, 182.0, 620.0, 60.0, textHorizontalAlignment.Left);
+    this.infoSub = this.TextAt(this.infoRoot, n"sub", 26, 24.0, 240.0, 620.0, 40.0, textHorizontalAlignment.Left);
+    this.infoSub.SetTintColor(NcmScannerAccent());
+    i = 0;
+    while i < 6 {
+      y = 300.0 + Cast<Float>(i) * 44.0;
+      ArrayPush(this.infoKey, this.TextAt(this.infoRoot, n"key", 24, 24.0, y, 220.0, 40.0, textHorizontalAlignment.Left));
+      ArrayPush(this.infoValue, this.TextAt(this.infoRoot, n"value", 28, 250.0, y, 390.0, 40.0, textHorizontalAlignment.Left));
+      this.infoKey[i].SetOpacity(0.6);
+      i += 1;
+    }
+    this.infoRoot.SetVisible(false);
+  }
+
+  private func TextAt(parent: ref<inkCompoundWidget>, name: CName, size: Int32, x: Float, y: Float, w: Float, h: Float, align: textHorizontalAlignment) -> ref<inkText> {
+    let label: ref<inkText> = this.Text(parent, name, size, x, y, w, h);
+    label.SetHorizontalAlignment(align);
+    return label;
   }
 
   private func Rect(parent: ref<inkCompoundWidget>, name: CName, x: Float, y: Float, w: Float, h: Float) -> ref<inkRectangle> {
@@ -145,6 +243,108 @@ public class NcmScannerReticle extends IScriptable {
     }
     this.revision = parts[0];
     this.Paint(StringToInt(parts[1]), StringToFloat(parts[2]), NcmScannerField(parts[3]), NcmScannerField(parts[4]));
+    this.ApplyPanels();
+  }
+
+  // "revision|selected|rows|infoTitle|infoSub|info"; rows "state`label`right" joined by '^', info "key`value".
+  private func ApplyPanels() -> Void {
+    let parts: array<String>;
+    let rows: array<String>;
+    let cells: array<String>;
+    let selected: Int32;
+    let state: Int32;
+    let color: HDRColor;
+    let dim: Float;
+    let i: Int32 = 0;
+    if !IsDefined(this.listRoot) || !IsDefined(this.infoRoot) {
+      return;
+    }
+    parts = StrSplit(NcmScanner_Panel(), "|");
+    if ArraySize(parts) != 6 {
+      this.panelRefused += 1;
+      if this.panelRefused <= 3 {
+        NcmScanner_Log("panel frame refused: " + ToString(ArraySize(parts)) + " fields, expected 6");
+      }
+      return;
+    }
+    selected = StringToInt(parts[1]);
+    if Equals(parts[2], "~") {
+      ArrayClear(rows);
+    } else {
+      rows = StrSplit(parts[2], "^");
+    }
+    this.listRoot.SetVisible(ArraySize(rows) > 0);
+    while i < ArraySize(this.rowBack) {
+      if i < ArraySize(rows) {
+        cells = StrSplit(rows[i], "`");
+        state = ArraySize(cells) > 0 ? StringToInt(cells[0]) : 0;
+        color = NcmScannerInk();
+        dim = 1.0;
+        if state == 1 || state == 4 {
+          dim = 0.4;
+        } else {
+          if state == 2 || state == 3 {
+            color = NcmScannerAmber();
+          } else {
+            if state == 5 {
+              color = NcmScannerRefused();
+            }
+          }
+        }
+        if i == selected {
+          this.rowBack[i].SetTintColor(NcmScannerAccent());
+          this.rowBack[i].SetOpacity(0.3);
+          this.rowMark[i].SetVisible(true);
+          this.rowMark[i].SetTintColor(state == 0 ? NcmScannerAccent() : color);
+          if state == 0 {
+            color = NcmScannerAccent();
+          }
+        } else {
+          this.rowBack[i].SetTintColor(NcmScannerShade());
+          this.rowBack[i].SetOpacity(0.6);
+          this.rowMark[i].SetVisible(state == 3 || state == 5);
+          this.rowMark[i].SetTintColor(color);
+        }
+        this.rowLabel[i].SetText(ArraySize(cells) > 1 ? cells[1] : "");
+        this.rowLabel[i].SetTintColor(color);
+        this.rowLabel[i].SetOpacity(dim);
+        this.rowRight[i].SetText(ArraySize(cells) > 2 ? cells[2] : "");
+        this.rowRight[i].SetTintColor(color);
+        this.rowRight[i].SetOpacity(dim * 0.85);
+        this.rowBack[i].SetVisible(true);
+        this.rowLabel[i].SetVisible(true);
+        this.rowRight[i].SetVisible(true);
+      } else {
+        this.rowBack[i].SetVisible(false);
+        this.rowMark[i].SetVisible(false);
+        this.rowLabel[i].SetVisible(false);
+        this.rowRight[i].SetVisible(false);
+      }
+      i += 1;
+    }
+
+    this.infoRoot.SetVisible(!Equals(parts[3], "~"));
+    this.infoTitle.SetText(NcmScannerField(parts[3]));
+    this.infoSub.SetText(NcmScannerField(parts[4]));
+    if Equals(parts[5], "~") {
+      ArrayClear(rows);
+    } else {
+      rows = StrSplit(parts[5], "^");
+    }
+    i = 0;
+    while i < ArraySize(this.infoKey) {
+      if i < ArraySize(rows) {
+        cells = StrSplit(rows[i], "`");
+        this.infoKey[i].SetText(ArraySize(cells) > 0 ? cells[0] : "");
+        this.infoValue[i].SetText(ArraySize(cells) > 1 ? cells[1] : "");
+        this.infoKey[i].SetVisible(true);
+        this.infoValue[i].SetVisible(true);
+      } else {
+        this.infoKey[i].SetVisible(false);
+        this.infoValue[i].SetVisible(false);
+      }
+      i += 1;
+    }
   }
 
   // States (the DLL's `Reticle` enum): 0 bare, 1 searching, 2 unknown, 3 known, 4 scanning, 5 identified,

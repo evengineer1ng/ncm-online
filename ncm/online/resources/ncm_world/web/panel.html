@@ -3211,15 +3211,35 @@
                          ["left_leg", "Left leg"], ["right_leg", "Right leg"], ["controller", "Xbox pad"]];
       const padLabel = (t) => PAD_LABELS[t] || t;
 
-      function padBase() {
-        const rig = wheelData && wheelData.device && wheelData.device.rig;
-        return (rig && rig.padApi) || "http://127.0.0.1:38530";
-      }
+      // KB-210. This page has no network at all (MASTER_TEST §AJ1), so the gamepad API is reached through the Rig
+      // Bridge's own surface: the request goes out through Lua, and the reply comes back as string parts of at
+      // most 3,000 characters (the WebUI drops large messages, KB-63), reassembled and parsed here.
+      let padSeq = 0;
+      const padPending = new Map();
       function padFetch(path, body) {
-        if (typeof fetch !== "function") return Promise.reject(new Error("this page has no fetch"));
-        const opts = body ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) } : {};
-        return fetch(padBase() + path, opts).then((r) => { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); });
+        return new Promise((resolve, reject) => {
+          const id = "pad" + (++padSeq);
+          const timer = setTimeout(() => { padPending.delete(id); reject(new Error("no answer from the Rig Bridge")); }, 3000);
+          padPending.set(id, { resolve, reject, timer, parts: [], got: 0 });
+          Open77.emit("panel:pad.req", { id: id, path: path, body: body ? JSON.stringify(body) : "" });
+        });
       }
+      Open77.on("panel:pad.part", (d) => {
+        const p = d && padPending.get(d.id);
+        if (!p || !(d.i >= 1 && d.i <= d.n)) return;
+        if (p.parts[d.i - 1] === undefined) { p.parts[d.i - 1] = String(d.s || ""); p.got++; }
+        if (p.got < d.n) return;
+        clearTimeout(p.timer);
+        padPending.delete(d.id);
+        try { p.resolve(JSON.parse(p.parts.join(""))); } catch (e) { p.reject(new Error("unreadable reply: " + e.message)); }
+      });
+      Open77.on("panel:pad.fail", (d) => {
+        const p = d && padPending.get(d.id);
+        if (!p) return;
+        clearTimeout(p.timer);
+        padPending.delete(d.id);
+        p.reject(new Error(String(d.error || "refused")));
+      });
       function padPoll() {
         if (padInFlight || mode !== "wheel" || devCollapsed.pad) return;
         padInFlight = true;
@@ -3285,8 +3305,8 @@
 
         if (!s) {
           const b = document.createElement("div"); b.className = "pad-banner warn";
-          b.textContent = "GAMEPAD LAYER UNREACHABLE at " + padBase() + " — " + (padError || "no answer yet")
-            + ". It runs inside the NCM Rig Bridge; if the bridge is connected above and this persists, report this line.";
+          b.textContent = "GAMEPAD LAYER UNREACHABLE — " + (padError || "no answer yet")
+            + ". It runs inside the NCM Rig Bridge (0.1.7 or later); if the bridge is connected above and this persists, report this line.";
           padRoot.append(b);
           return;
         }

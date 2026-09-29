@@ -31,17 +31,49 @@ Core.define("competition.scanner", function()
     -- so the catalogue never crosses the wire (`L193`) and a client cannot name a record the server did not
     -- derive for itself.
     --
-    -- Portable on purpose: this runs under Lua 5.4 and LuaJIT, so no bitwise operators -- XOR is arithmetic.
+    -- Portable on purpose: this runs under Lua 5.4 and LuaJIT, so no bitwise operators in the source. Where
+    -- the interpreter has a native XOR (Lua 5.4's `~`, reached through `load` so LuaJIT still parses this
+    -- file) it is used; otherwise XOR is a nibble table, eight lookups a word.
+    --
+    -- **Cost matters here** (live, 2026-09-29): the first version XORed bit by bit, ~640 VM instructions per
+    -- character, and building the index over the catalogue inside a query handler blew OPEN//77's instruction
+    -- quota. The handler died without replying, the index was never built, and every vanilla car read
+    -- "READING..." for as long as vision stayed on.
     -- -------------------------------------------------------------------------------------------------------
-    local function bxor(a, b)
-        local r, bit = 0, 1
-        for _ = 1, 32 do
-            local x, y = a % 2, b % 2
-            if x ~= y then r = r + bit end
-            a, b, bit = (a - x) / 2, (b - y) / 2, bit * 2
+    local XOR4 = {}
+    for a = 0, 15 do
+        for b = 0, 15 do
+            local r, bit, x, y = 0, 1, a, b
+            for _ = 1, 4 do
+                if x % 2 ~= y % 2 then r = r + bit end
+                x, y, bit = math.floor(x / 2), math.floor(y / 2), bit * 2
+            end
+            XOR4[a * 16 + b] = r
+        end
+    end
+
+    local function bxorTable(a, b)
+        local r, m = 0, 1
+        for _ = 1, 8 do
+            local x, y = a % 16, b % 16
+            r = r + XOR4[x * 16 + y] * m
+            a, b, m = (a - x) / 16, (b - y) / 16, m * 16
         end
         return r
     end
+
+    local bxor = bxorTable
+    do
+        local compile = load or loadstring
+        local ok, fn = pcall(function()
+            local chunk = compile and compile("return function(a, b) return math.tointeger(a) ~ math.tointeger(b) end")
+            return chunk and chunk()
+        end)
+        if ok and type(fn) == "function" and pcall(fn, 1, 3) and fn(0xEDB88320, 0xFFFFFFFF) == 0x12477CDF then
+            bxor = fn
+        end
+    end
+    M._bxorTable = bxorTable   -- exposed for tests: both paths must agree
 
     local CRC_TABLE = nil
     local function crcTable()
@@ -79,6 +111,18 @@ Core.define("competition.scanner", function()
             if k then index[k] = r end
         end
         return index
+    end
+
+    --- The same index, a slice at a time: add records[from .. from+count-1] to `index` and return the next
+    --- `from`, or nil when done. The server yields between slices so no single call nears the quota.
+    function M.recordIndexStep(records, index, from, count)
+        local last = math.min(#records, from + count - 1)
+        for i = from, last do
+            local k = M.recordKey(records[i])
+            if k then index[k] = records[i] end
+        end
+        if last >= #records then return nil end
+        return last + 1
     end
 
     local function num(v) return tonumber(v) end

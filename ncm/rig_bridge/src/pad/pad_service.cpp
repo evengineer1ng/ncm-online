@@ -14,6 +14,7 @@
 #include <chrono>
 #include <filesystem>
 #include <fstream>
+#include <set>
 #include <sstream>
 
 namespace ncm::rig::pad {
@@ -154,6 +155,17 @@ void PadService::applyProfileLocked()
 }
 
 // ============================================================================ lifecycle
+namespace {
+/// "VID:PID" for every device DirectInput reads, from its `di:VID:PID[#n]` sample keys.
+std::set<std::string> directInputKeys(const Samples& samples)
+{
+    std::set<std::string> out;
+    for (const auto& [key, sample] : samples)
+        if (key.rfind("di:", 0) == 0 && key.size() >= 12) out.insert(key.substr(3, 9));
+    return out;
+}
+}  // namespace
+
 void PadService::start()
 {
     if (running_.exchange(true)) return;
@@ -187,6 +199,8 @@ void PadService::start()
             rumbleWake_.notify_one();
         }
     });
+    // Before SDL starts, so it never opens the wheel even once (KB-209).
+    { Samples seed; rig_.rawSamples(seed); sdl_.setOwnedElsewhere(directInputKeys(seed)); }
     sdl_.start();
     tick_ = std::thread([this] { tickLoop(); });
     rumble_ = std::thread([this] { rumbleLoop(); });
@@ -211,7 +225,12 @@ void PadService::tickLoop()
 {
     while (running_.load()) {
         Samples samples = sdl_.snapshot();
-        rig_.rawSamples(samples);
+        {
+            Samples di;
+            rig_.rawSamples(di);
+            sdl_.setOwnedElsewhere(directInputKeys(di));   // a hot-plugged wheel is handed back too
+            samples.merge(di);
+        }
         const bool driving = ncm::rig::state().playerVehicle() != nullptr;
         const int64_t now = steadyNs();
         std::vector<Feedback> feedback;

@@ -17,6 +17,12 @@ void reticle(RED4ext::IScriptable*, RED4ext::CStackFrame* stack, RED4ext::CStrin
     if (out) *out = RED4ext::CString(state().reticle().c_str());
 }
 
+void panel(RED4ext::IScriptable*, RED4ext::CStackFrame* stack, RED4ext::CString* out, int64_t)
+{
+    stack->code++;
+    if (out) *out = RED4ext::CString(state().panel().c_str());
+}
+
 void report(RED4ext::IScriptable*, RED4ext::CStackFrame* stack, bool* out, int64_t)
 {
     bool active = false;
@@ -24,13 +30,17 @@ void report(RED4ext::IScriptable*, RED4ext::CStackFrame* stack, bool* out, int64
     uint64_t record = 0;
     int32_t kind = 0;
     float distance = -1.0f;
+    float x = 0.0f, y = 0.0f, z = 0.0f;
     RED4ext::GetParameter(stack, &active);
     RED4ext::GetParameter(stack, &entity);
     RED4ext::GetParameter(stack, &record);
     RED4ext::GetParameter(stack, &kind);
     RED4ext::GetParameter(stack, &distance);
+    RED4ext::GetParameter(stack, &x);
+    RED4ext::GetParameter(stack, &y);
+    RED4ext::GetParameter(stack, &z);
     stack->code++;
-    state().report(active, entity, record, kind, distance);
+    state().report(active, entity, record, kind, distance, x, y, z);
     if (out) *out = true;
 }
 
@@ -57,8 +67,10 @@ void postRegister()
         system->RegisterFunction(fn);
     };
     add("NcmScanner_Reticle", reinterpret_cast<RED4ext::ScriptingFunction_t<void*>>(&reticle), "String", {});
+    add("NcmScanner_Panel", reinterpret_cast<RED4ext::ScriptingFunction_t<void*>>(&panel), "String", {});
     add("NcmScanner_Report", reinterpret_cast<RED4ext::ScriptingFunction_t<void*>>(&report), "Bool",
-        {{"Bool", "active"}, {"Uint64", "entity"}, {"Uint64", "record"}, {"Int32", "kind"}, {"Float", "distance"}});
+        {{"Bool", "active"}, {"Uint64", "entity"}, {"Uint64", "record"}, {"Int32", "kind"}, {"Float", "distance"},
+         {"Float", "x"}, {"Float", "y"}, {"Float", "z"}});
     add("NcmScanner_Log", reinterpret_cast<RED4ext::ScriptingFunction_t<void*>>(&note), "Bool", {{"String", "text"}});
     VISION_INFO("redscript natives registered");
 }

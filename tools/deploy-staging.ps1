@@ -25,7 +25,10 @@ param(
     # nothing about the current workflow changes. Once the Windows development server is running, the default
     # flips to 'dev' and reaching the official world becomes a deliberate act -- see
     # docs/ncm-online/16_ENVIRONMENTS.md. Named now so the habit and the banner exist before the split.
-    [ValidateSet('online','dev')][string]$Target = 'online'
+    [ValidateSet('online','dev')][string]$Target = 'online',
+    # L223: Online is frozen at Baseline 1 until the sim expansion is ready on dev. Reading logs still works;
+    # changing Online takes this switch, typed on purpose, after the owner has thawed the freeze.
+    [switch]$ThawOnline
 )
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path -Parent $PSScriptRoot
@@ -52,6 +55,13 @@ function Remote([string]$cmd) { $b64 = [Convert]::ToBase64String([Text.Encoding]
 $tarExe = Join-Path $env:SystemRoot 'System32\tar.exe'   # bsdtar: understands Windows drive letters
 
 if ($Logs) { Remote 'tail -n 60 /opt/ncm/logs/server.log'; exit 0 }
+
+if (-not $ThawOnline) {
+    Write-Host '  NCM ONLINE IS FROZEN AT BASELINE 1 (DECISION_RECORD L223, git tag online-baseline-1).' -ForegroundColor Red
+    Write-Host '  All work happens on the development server. Nothing was changed on Online.'
+    Write-Host '  Only when the owner has thawed the freeze: re-run with -ThawOnline.'
+    exit 1
+}
 
 Write-Host "== ncm-build (vendor core into resources)"
 & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $repo 'tools\ncm-build.ps1') | Select-Object -Last 1

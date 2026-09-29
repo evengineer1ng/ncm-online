@@ -2727,13 +2727,13 @@ migration before starting `ncm_world`. Use one owned, issued NCM Machine and not
 
 ## §CG - DEVICES and the GAMEPAD layer: rim, Joy-Cons, variants, rumble presets (`IDEA-705`, `L205`, `KB-201`) - **DEPLOYED TO ONLINE 2026-09-29 02:29 UTC; AWAITING LIVE PASS**
 
-Scope: Rig Bridge 0.1.6 (`dist/ncm-rig-bridge-0.1.6.zip`, `3dc80f1b…`), Carrier 0.1.30 (`d4431422…`), panel
+Scope: Rig Bridge 0.1.7 since 2026-09-29 15:18 UTC (`dist/ncm-rig-bridge-0.1.7.zip`, `eea1aba6…`; 0.1.6 was `3dc80f1b…`), Carrier 0.1.30 (`d4431422…`), panel
 DEVICES. Joy-Cons paired to Windows before launch. JoyMoCo closed (it would hold the Joy-Cons itself).
 
 | # | Do | Expect | Result |
 |---|---|---|---|
-| §CG1 | Cold-launch, join, read `ncm_rig_bridge-<pid>.log` and the Carrier log. | Rig Bridge: `XInput hook: ... attached` for at least one module, `SDL3 motion input started`, `SDL3 joystick joystick:Evenracing 1.0.0` (**the `KB-201` question**), `gamepad profile 'default' loaded: 16 variant(s)`, `gamepad API listening`. Carrier: `NCM Rig Bridge is installed and owns rig devices`. | **NOT RUN** |
-| §CG2 | F6 > DEVICES. Collapse and expand each section; close and reopen F6. | Three sections, WHEELBASE & PEDALS, FORCE FEEDBACK, GAMEPAD; collapsed state survives. GAMEPAD shows a status line, not `GAMEPAD LAYER UNREACHABLE`. If it is unreachable, record that line verbatim: it decides whether the panel may fetch loopback. | **NOT RUN** |
+| §CG1 | Cold-launch, join, read `ncm_rig_bridge-<pid>.log` and the Carrier log. | Rig Bridge: `XInput hook: ... attached` for at least one module, `SDL3 motion input started`, `SDL3 joystick joystick:Evenracing 1.0.0` (**the `KB-201` question**), `gamepad profile 'default' loaded: 16 variant(s)`, `gamepad API listening`. Carrier: `NCM Rig Bridge is installed and owns rig devices`. **0.1.7 (`KB-209`): NO `SDL3 joystick` line for the G29 or the pedals.** Then ARM FFB and feel it; no replug. | **0.1.6 FAIL 2026-09-29 11:01:** SDL3 opened the G29 and pedals, and ARM killed FFB until a replug (`KB-209`). No Evenracing line (rim not seen or not connected). 0.1.7 NOT RUN. |
+| §CG2 | F6 > DEVICES. Collapse and expand each section; close and reopen F6. | Three sections, WHEELBASE & PEDALS, FORCE FEEDBACK, GAMEPAD; collapsed state survives. GAMEPAD shows a status line, not `GAMEPAD LAYER UNREACHABLE`. If it is unreachable, record that line verbatim. | **0.1.6 FAIL 2026-09-29:** `GAMEPAD LAYER UNREACHABLE`; a bundled page cannot fetch (`§AJ1`, `KB-210`). Relay via the bridge surface in 0.1.7; NOT RUN. |
 | §CG3 | On foot, press each of the 16 rim buttons in turn. | Each lights its output's dot and does what that Xbox button does in game (map, inventory, D-pad, etc). None doubles or sticks. | **NOT RUN** |
 | §CG4 | Set one rim variant to *While driving*. Press it on foot, then in a car. | Silent on foot, works in the car; leaving the car while holding it releases it. | **NOT RUN** |
 | §CG5 | RECORD B, *Button press*, press a rim button nobody uses. | Banner reads `Added '<name>'`; B now has two variants and both press B. | **NOT RUN** |

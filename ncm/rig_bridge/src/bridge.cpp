@@ -26,6 +26,10 @@ using json = nlohmann::json;
 constexpr uint16_t kPortSpan = 4;
 constexpr const char* kWebSocketGuid = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
 
+// The surface NCM loads from this port. It is also the ONLY way the F6 panel reaches the gamepad API (KB-210):
+// the panel is a bundled page with no network at all (MASTER_TEST §AJ1), while this page is plain-HTTP loopback.
+// `ncm:pad.req` comes in from Lua, the page fetches the API, and the reply goes back as `ncm:pad.part` strings
+// of at most 3,000 characters, because the WebUI bridge silently drops large messages (KB-63).
 const char* kPage = R"HTML(<!doctype html><html><head><meta charset="utf-8"><title>NCM Rig Bridge</title></head>
 <body style="margin:0;background:transparent"><script>(function(){
 var ws=null,ready=false;
@@ -41,7 +45,14 @@ if(window.Open77&&Open77.on){Open77.on("ncm:ffb.frame",relay);
 Open77.on("ncm:ffb.idle",function(p){relay({v:(p&&p.v)||1,idle:true});});
 Open77.on("ncm:ffb.settings",function(p){relay({cmd:"settings",settings:p||{}});});
 Open77.on("ncm:ffb.test",function(p){relay({cmd:"test",test:p||{}});});
-Open77.on("ncm:ffb.bind",function(p){relay({cmd:"bind",bind:p||{}});});}connect();})();
+Open77.on("ncm:ffb.bind",function(p){relay({cmd:"bind",bind:p||{}});});
+Open77.on("ncm:pad.req",padReq);}connect();
+function padReq(p){if(!p||!p.id)return;var path=p.path==="/pad/cmd"?"/pad/cmd":"/pad/state";
+var base=p.base||("http://127.0.0.1:"+((+location.port||38520)+10));
+var o=path==="/pad/cmd"?{method:"POST",headers:{"Content-Type":"text/plain"},body:String(p.body||"{}")}:{};
+fetch(base+path,o).then(function(r){if(!r.ok)throw new Error("HTTP "+r.status);return r.text();}).then(function(s){
+var n=Math.max(1,Math.ceil(s.length/3000));for(var i=0;i<n;i++)Open77.emit("ncm:pad.part",{id:p.id,i:i+1,n:n,s:s.substr(i*3000,3000)});
+}).catch(function(e){Open77.emit("ncm:pad.fail",{id:p.id,error:String((e&&e.message)||e)});});}})();
 </script></body></html>)HTML";
 
 struct Sha1 {

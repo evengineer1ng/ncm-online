@@ -1,4 +1,17 @@
 return {
+    ["the fast XOR and the table XOR agree, and a sliced index equals the whole one"] = function(T)
+        local S = T.Core.get("competition.scanner")
+        T.eq(S._bxorTable(0xEDB88320, 0xFFFFFFFF), 0x12477CDF)
+        T.eq(S._bxorTable(0, 0), 0); T.eq(S._bxorTable(0xFFFFFFFF, 0xFFFFFFFF), 0)
+        local records = {}
+        for i = 1, 23 do records[i] = "Vehicle.v_test_record_" .. i end
+        local whole, sliced, from = S.recordIndex(records), {}, 1
+        while from do from = S.recordIndexStep(records, sliced, from, 5) end
+        local n = 0
+        for k, v in pairs(whole) do T.eq(sliced[k], v, k); n = n + 1 end
+        T.eq(n, 23)
+    end,
+
     ["record keys match the TweakDBID identity layout the DLL reports"] = function(T)
         local S = T.Core.get("competition.scanner")
         T.eq(S.crc32("123456789"), 0xCBF43926, "CRC32-B check value")

@@ -6,5 +6,6 @@
 // (`KB-182`, 2026-09-28). `scc` compiles either form happily, so `tools/build-vision.ps1` checks for it.
 
 public static native func NcmScanner_Reticle() -> String
-public static native func NcmScanner_Report(active: Bool, entity: Uint64, record: Uint64, kind: Int32, distance: Float) -> Bool
+public static native func NcmScanner_Panel() -> String
+public static native func NcmScanner_Report(active: Bool, entity: Uint64, record: Uint64, kind: Int32, distance: Float, x: Float, y: Float, z: Float) -> Bool
 public static native func NcmScanner_Log(text: String) -> Bool

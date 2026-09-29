@@ -36,7 +36,7 @@ corpus claiming migrations 001-007 while the schema was at 023.
 |---|---|---|
 | Organisations, team ownership, governance, grid slots | [14_TEAM_ORGANIZATIONS.md](14_TEAM_ORGANIZATIONS.md) | L92, L93; reaffirmed L123 |
 | Foundational primitives, contradictions, build sequencing | [24_FOUNDATION_RECONCILIATION.md](24_FOUNDATION_RECONCILIATION.md) | L123 |
-| Environments, promotion discipline (Online vs Development) | [16_ENVIRONMENTS.md](16_ENVIRONMENTS.md) | L112, L121 |
+| Environments, promotion discipline (Online vs Development) | [16_ENVIRONMENTS.md](16_ENVIRONMENTS.md) | L112, L121, L223 (Online frozen at Baseline 1) |
 | **Database schema** | CODE: `ncm/online/resources/ncm_league/server/schema/` | - |
 | Lap ghost replay | [39_GHOST_REPLAY.md](39_GHOST_REPLAY.md) | L166 |
 | Overall system shape | [01_ARCHITECTURE.md](01_ARCHITECTURE.md) | L28-L33 - see conflict C-1 |
@@ -60,6 +60,7 @@ corpus claiming migrations 001-007 while the schema was at 023.
 | Observation vocabulary and observation provenance | [DECISION_RECORD.md](DECISION_RECORD.md#l164---executed-owner-ruling---the-first-observation-vocabulary-is-accepted-the-estimator-is-not) plus [31_CAPABILITY_AUDIT.md](31_CAPABILITY_AUDIT.md) §9 | L164; §9 accepted as authority, rest of 31 stays PROPOSAL; MASTER_TEST §BH pending |
 | Ambient population and race-corridor clearing | [DECISION_RECORD.md](DECISION_RECORD.md#l177--provisional--ambient-population-is-built-in-two-layers-and-only-one-of-them-can-be-cleared-by-radius) plus CODE: `ncm/core/world/ambient.lua`, `ncm_world/server/ambient.lua` | L177 - PROVISIONAL, no live PASS; §BL owed. Supersedes the `BLOCKED` traffic row in [../research/open77/OPEN77_NCM_MATRIX.md](../research/open77/OPEN77_NCM_MATRIX.md) (`KB-164`) |
 | Estimation, envelopes and confidence | **NOBODY - explicitly unbuilt** | L164 refuses it pending its own reviewed proposal (`IDEA-337`, `IDEA-338`) |
+| Long-term PvE experience and personal/shared boundary | `DECISION_RECORD.md` L218-L223; [PvE simulation-stack vision](../research/open77/NCM_PVE_WORLD_VISION_AND_SIM_REVIEW.md) is PROPOSAL for architecture | Owner direction: individual adventures over shared Paddock/city sim; simulation-led stack performed by Night City through OPEN//77 and NCM's own native mods (L220); named physical NPC text dialogue with four primary intents and deeper choices. No Paddock runtime or physical dialogue system built. |
 
 ---
 
@@ -118,7 +119,7 @@ remains a SPEC artifact; current runtime behavior is the code and current econom
 - [bricks/assignments/B-089-race-tags.v1.md](bricks/assignments/B-089-race-tags.v1.md) - original Race Tag component specification; admitted by L169, with runtime behavior now governed by code
 - [41_QUEST_GRAPH_PASS1.md](41_QUEST_GRAPH_PASS1.md) - the quest graph: character conversation trees, triggers, re-entry rules and payoffs (authoring Pass 1, preserved unchanged), plus Appendix A reconciling it against shipped telemetry, `L171` and `L172`. **Partly authorised by `L183`:** the Dex / Stu / Rico slice is BUILT and governed by code; the other fifteen contacts remain SPEC. A.5's word ceilings are withdrawn by `L176`
 
-## Proposal - no authority until ruled (17)
+## Proposal - no authority until ruled (18)
 
 - [21_ENGINEERING_PROPOSAL.md](21_ENGINEERING_PROPOSAL.md) - engineering architecture - ACCEPTED; decisions live in L120
 - [22_WEAR_PROPOSAL.md](22_WEAR_PROPOSAL.md) - wear architecture - ACCEPTED; decisions live in L120
@@ -137,6 +138,7 @@ remains a SPEC artifact; current runtime behavior is the code and current econom
 - [38_FOUNDRY_VEHICLE_LINEAGE_ARCHITECTURE.md](38_FOUNDRY_VEHICLE_LINEAGE_ARCHITECTURE.md) - repo-aware Foundry review: existing-mesh lineages, deterministic Vehicle R&D, immutable factory BOMs, finite appearance reservoirs and Design-keyed bounded production - **awaiting owner review; no implementation authorised** (`L153`, `IDEA-519`-`IDEA-526`)
 - [38_FOUNDRY_VEHICLE_LINEAGE_ARCHITECTURE.md](38_FOUNDRY_VEHICLE_LINEAGE_ARCHITECTURE.md) - vehicle lineage and procedural Vehicle R&D architecture review - **PROPOSAL, do not implement from it**. The owner invariants are `L153`; `L155` governs the narrower Machine-keyed Parts boundary.
 - [42_PARTS_BEHAVIOR_AND_WEAR_EXPANSION.md](42_PARTS_BEHAVIOR_AND_WEAR_EXPANSION.md) - design-only Parts behaviour, tyre-compound, stress-aware Wear, warning-light and service architecture exploration; **PROPOSAL, no implementation authorised** (`IDEA-627`-`IDEA-634`, `KB-163`)
+- [NCM_PVE_WORLD_VISION_AND_SIM_REVIEW.md](../research/open77/NCM_PVE_WORLD_VISION_AND_SIM_REVIEW.md) - long-term PvE vision: five-layer simulation stack over Night City, three capability tiers incl. NCM native mods, and the five-engine review; owner direction is L218-L223, architecture and source-port map remain proposals (`IDEA-722`-`IDEA-734`)
 - [CARRIER_NEXT_STEPS_AND_UPGRADE.md](CARRIER_NEXT_STEPS_AND_UPGRADE.md) - **the canonical Carrier build/publish/verify/rollback runbook**. Every in-place Carrier replacement follows it; do not hand-copy the DLL and do not accept a warm reconnect as proof.
 
 ## Ledgers - living records (6)

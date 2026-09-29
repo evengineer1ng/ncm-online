@@ -117,3 +117,7 @@ an authored PvE substrate; then portability, spontaneous racing, Book Queen Bill
 creative expansion. Read-only; **no production behaviour changed and nothing measured in-engine.** Three owner
 decisions are `L170`. Note it **corroborates this README's 2026-09-19 finding that vanilla traffic is per-client**,
 from the platform's own vehicles guide, and adds that `traffic` is a binary switch with no density control in 2.31.
+
+PvE social research (2026-09-29): [Oracle Kingdom assessment](ORACLE_KINGDOM_PVE_ASSESSMENT.md) - headless smoke results, a per-player NPC social seam around the shared Paddock, port candidates, limits and next gates.
+
+Long-term PvE vision (2026-09-29, restructured under L220): [NCM PvE world: a simulation stack over Night City](NCM_PVE_WORLD_VISION_AND_SIM_REVIEW.md) - owner answers in L218-L220; the sims decide and Night City performs, reached through OPEN//77 and NCM's own redscript/RED4ext mods; individual adventures over a shared Paddock/city simulation; driver and manager agency; named physical NPC text dialogue; source-level strengths, limits and port map for Oracle Kingdom, ForkUniverse, Neikos and FTB2; architecture and next-coder handoff remain PROPOSAL.

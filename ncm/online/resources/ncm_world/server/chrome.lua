@@ -424,7 +424,12 @@ end)
 -- Requests from the Scanner
 -- ---------------------------------------------------------------------------------------------------------
 
+local refusalsLogged = {}   -- pid -> count; the first few per session are logged, so a silent refusal is visible
+
 local function refuse(pid, token, hack, why)
+    local n = (refusalsLogged[pid] or 0) + 1
+    refusalsLogged[pid] = n
+    if n <= 30 then log("start %s player=%d refused: %s", tostring(hack), pid, tostring(why)) end
     tell(pid, { token = token, result = "refused", reason = why, hack = hack })
 end
 
@@ -508,6 +513,7 @@ RegisterNetEvent("ncm:chrome.start", function(req)
         end
         cooldowns[pid] = cooldowns[pid] or {}
         cooldowns[pid][hackId] = t + (h.cooldownMs or 0)
+        log("start %s player=%d -> vehicle=%s driver=%d (platform)", hackId, pid, tostring(target), driver)
         tell(pid, { token = token, result = "uploading", hack = hackId, route = "platform" })
         return
     end
@@ -521,6 +527,7 @@ RegisterNetEvent("ncm:chrome.start", function(req)
                         heartbeat = t, token = token, actionId = 900000000 + (t % 100000000), defender = defender }
     cooldowns[pid] = cooldowns[pid] or {}
     cooldowns[pid][hackId] = t + (h.cooldownMs or 0)
+    log("start %s player=%d -> vehicle=%s defender=%s (ncm)", hackId, pid, tostring(target), tostring(defender))
     tell(pid, { token = token, result = "uploading", hack = hackId, route = "ncm" })
 end)
 
@@ -635,6 +642,7 @@ AddEventHandler("onPlayerDisconnected", function(playerId)
     local pid = tonumber(playerId) or 0
     ncmUploads[pid], channels[pid], cooldowns[pid], deck[pid] = nil, nil, nil, nil
     installQueue[pid], installing[pid], scoped[pid] = nil, nil, nil
+    refusalsLogged[pid] = nil
 end)
 
 CreateThread(function()

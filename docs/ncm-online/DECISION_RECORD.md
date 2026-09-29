@@ -4254,3 +4254,88 @@ heavy cloud keeps both mild, fog is cool with a damp film (wet 0.15), pollution 
 (grip x0.97), sandstorm is hot and gritty (grip x0.95, drag x1.05), rain soaks the road. Track temperature reaches
 the tyre (heating) and the `surface` layer (cold pushes, hot livelier, `L208`). An unknown weather is the previous
 model exactly. First-pass values; live test `§HB6`. Tracked by `IDEA-718`.
+
+## L215 - OWNER DIRECTION / DESIGN OPEN - Oracle Kingdom informs the per-player PvE social layer
+
+**Owner direction (2026-09-29).** Explore bringing the Radio-OS Oracle Kingdom socio-political simulation into NCM Online's expanded PvE, specifically for social interaction with NPCs per player. It may influence racing indirectly; it does not replace the Paddock's motorsport simulation. The attached Paddock plan contains proposed L210-L214 numbers, reserved here to avoid collision until that plan is reconciled into the living record.
+
+**Boundary.** This is a research and design direction, not authorisation to port the Python plugin or deploy a new runtime. The event contract, social variables, shared versus private facts, persistence, pacing, authoring and test thresholds remain open. The static and headless assessment is [ORACLE_KINGDOM_PVE_ASSESSMENT.md](../research/open77/ORACLE_KINGDOM_PVE_ASSESSMENT.md); IDEA-719 tracks the work. Existing L176 voice rules, L183's authored-contact boundary, the Messages trigger budget and L69's live PASS rule continue to govern.
+
+## L216 - LOCKED OWNER DIRECTION / PROTOTYPE BUILT - develop Oracle Kingdom in racing language before an NCM port
+
+**Owner direction (2026-09-29).** Copy Oracle Kingdom into this repository and develop it here before porting anything to NCM Online. Recast its vocabulary as racing and allow substantially wider outcomes while preserving causal explanation.
+
+**Executed in an isolated prototype.** `prototypes/oracle_racing/` contains an unchanged reference copy of the Oracle Kingdom and court source, headless tools and UI source, plus a new pure racing-social model. It takes stable racing/social event facts and produces private per-player NPC relationships, district standing, salient memories and cause-linked offers. Accept/decline and a later result can form a traceable event -> offer -> choice -> outcome path. It reuses Oracle's seeded RNG and indexed causal ledger. The 100-seed fixture sweep spans -56.7 to +98.2 average NPC respect after 32 events, with 36/600 individual values at the +/-99 cap. Replay, idempotency, provenance, shared-cast/private-history divergence, causal conservation and offer-choice-outcome tests pass. Those metrics show variance, not yet good pacing or writing.
+
+**Boundary.** This is a standalone prototype, not an NCM resource, live system, or approval of particular contact scripts. Public Paddock events, results and provenance remain authoritative in their own domain. A later port must use the build-pinned NCM event contract and pass live MASTER_TEST cases. The current copy's realm, faith and decree systems remain reference code; the active racing model does not mislabel those equations as motorsport.
+
+## L217 - OWNER REQUEST / RESEARCH RECORDED - assess ForkUniverse and Neikos as additional references
+
+**Owner request (2026-09-29).** Also examine `D:/dev/Radio-OS/forkuniverse` and `D:/dev/Radio-OS/plugins/neikos.py` for lessons and port candidates. Static review only; no code copied from either source, no tests run, and no NCM runtime changed.
+
+**Finding.** ForkUniverse contributes patterns for stable tick/event-namespaced randomness, replayable catch-up, strict event schemas and separating factual events from presentation deltas. Neikos contributes action-driven progression, a normalized macro-ledger, player trajectory and restrained cross-run memory echoes. For the racing prototype, combine replay/provenance discipline with compact choice-derived trajectory and a small scene-pressure summary. Keep public Paddock facts separate from private NPC interpretations; any shared district mutation requires a later ruling. Details and limits are in [the comparative assessment](../research/open77/ORACLE_KINGDOM_PVE_ASSESSMENT.md#2026-09-29-forkuniverse-and-neikos-comparison), tracked by IDEA-721.
+
+## L218 - OWNER DIRECTION / PVE VISION - shared Night City career and social world
+
+**Owner answers (2026-09-29).** A solo player's first 10–20 hours should **blend a racing career with city ties**. Their repeatable PvE play should mix **driving jobs, turf challenges and racing**. Recurring NPCs should appear through **Messages and place-based encounters**. Consequential conversations use **authored choices with reactive dialogue**. The world is **one shared evolving world**; the most visible changes are **people, access and opportunities**, with longer-term shifts in **access and alliances**. The first arc should **mix the existing contact web with new NPCs**. Use recognizable Night City **places**, while inventing most groups.
+
+**Meaning.** Public events and shared access changes need server authority and source history; personal relationships can differ by player. These answers supersede L217's open question about whether shared district state is wanted. The precise magnitude, duration and conflict policy for shared changes are still open. The owner requested a deep four-simulator review and defined vision for the next coder; the [PvE world vision and sim review](../research/open77/NCM_PVE_WORLD_VISION_AND_SIM_REVIEW.md) records source strengths, limits, a proposed architecture and a concrete handoff. Its architecture is PROPOSAL, not a production implementation ruling. The Paddock attachment remains a plan in this checkout; no `44_THE_PADDOCK.md` or Paddock runtime exists here at review time.
+
+## L219 - OWNER CORRECTION / LONG-TERM PVE VISION - personal adventures over shared simulation and physical dialogue
+
+**Owner correction (2026-09-29).** L218's “one shared evolving world” must not be read as one shared questline. Each player has **their own PvE adventure**, while an underlying shared simulation runs for everyone; the NPC Paddock is the starting model for that substrate. The owner explicitly rejected framing this as an “ideal first version”: this is **long-term vision**. The player may choose a driver path, an NPC-team management path, or both as the design allows; no one role is assumed as the sole PvE route.
+
+**Physical meetings.** The intended interaction is a named, physical NPC and a Fallout 4-like **text dialogue** between player and NPC, with **four primary intents leading to deeper choices**. Authored choices and reactive replies can often depend on evidence and relationship history, with the reason grounded in fiction. No voice acting or mocap is planned. Messages and physical conversations should read the same character/story state. The [vision review](../research/open77/NCM_PVE_WORLD_VISION_AND_SIM_REVIEW.md#physical-dialogue-long-term-interaction-contract) gives an illustrative shared-event/two-player example; it is still a proposal for implementation, not a built interface or a platform capability claim.
+
+## L220 - OWNER DIRECTION / PVE ARCHITECTURE - simulation-led, performed by Night City through every capability tier
+
+**Owner direction (2026-09-29).** The PvE layer leans **simulation-based**, built from the owner's multiple earlier Python sim engines (FTB1 through the Paddock plan, Oracle Kingdom/Court, ForkUniverse, Neikos, FTB2). It leverages what CDPR gave us: a rich Night City and the engine beneath it for NPCs, traffic, crowds, police, weather and native UI. **Owner correction, same session:** do not treat OPEN//77 as the extent of NCM's capability; NCM already ships its own redscript and RED4ext required mods (Carrier, Rig Bridge, ncm-vision/Scanner, Radial) and single-player NCM drove the native phone, journal, quest nav and mappins.
+
+**Meaning.** The sims decide and Night City performs: sim state is server authority, engine bodies and UI are projections that never write back, and only server-corroborated observations flow upward. Persistent identity lives in the sim, not the entity. Each engine owns one job and they meet only through the fact tape. Capability is reached through three tiers (OPEN//77 server API; NCM's own native mods; vanilla systems those mods drive). The tiers differ in authority, not reach: client natives act locally, so shared state stays server-decided and corroborated. New natives ship as new packages under `requiredMods`, never inside Carrier or Rig Bridge. The [restructured vision](../research/open77/NCM_PVE_WORLD_VISION_AND_SIM_REVIEW.md) records the five-layer stack, the capability inventory and two first probes (native dialogue choices fed by the server; Online Messages in the native phone). Architecture remains PROPOSAL; no runtime changed; `IDEA-726`-`IDEA-728`.
+
+## L221 - OWNER RULINGS / PVE - native dialogue yes, native phone deferred, real-time clock, per-system control, reuse by reimplementation
+
+**Owner rulings (2026-09-29), answering the L220 vision's open questions.**
+
+1. **Native dialogue: yes.** IDEA-727 is approved as the first PvE probe: a new isolated required mod drives CDPR's own choice UI from server-supplied choices, with a WebUI fallback.
+2. **Native phone: deferred.** Building the single-player phone through WolvenKit was brutal and repeatedly lagged the whole game. The final SP phone works, except that Foreman, the richest thread, lags every time (`KB-212`). It would be a good feature but needs a deeper audit first. Online Messages is adequate for now. IDEA-728 is deferred.
+3. **Sim control over vanilla systems is decided per enumerated system**, not by one blanket rule. The vision's [per-system table](../research/open77/NCM_PVE_WORLD_VISION_AND_SIM_REVIEW.md#per-system-control-decided-one-system-at-a-time) lists fourteen systems with proposed defaults. Only rows 1 (clock) and 14 (native dialogue) are ruled; the rest await the owner.
+4. **The in-game clock follows real time in US Eastern** on a 24-hour day (11:00 PM ET = 11:00 PM in game), because day versus night matters to NPC schedules and to roleplay. The platform clock (`open77_weather`: `setTime`, `setTimeRate` 0–120, default 8× from noon on every restart) makes this rate 1.0 plus an Eastern anchor. Daylight saving, per-bucket event time, and players who always see the same hour are open (IDEA-729).
+5. **Reuse proven code by principle, tested first, and make it work in Cyberpunk, not Python.** Tens of thousands of lines of the owner's engines are available. Mechanisms are reimplemented as pure `ncm/core` Lua, with the Python originals as test oracles where they can be run. No Python process runs beside the game.
+
+**Boundary.** Research and direction only; no runtime changed. The clock service and the dialogue probe each need MASTER_TEST cases and a live PASS (L69).
+
+## L222 - OWNER RULINGS / PVE - a Night City life sim: every vanilla system ruled, physical facts may write back
+
+**Owner rulings (2026-09-29), answering the L221 questions.**
+
+- **The model is a life sim.** Abstract *inZOI* or *The Sims 4*, set in Night City and flavoured by motorsport, but not so rigid that it is only racing. The owner's Python engines are the seed of a proper life-sim engine; CDPR and OPEN//77 supplied the hard part, Night City and a hostable multiplayer REDengine server. **There is no "first arc"**: the world is an ongoing snow globe players reside in.
+- **Clock.** `America/New_York` with daylight saving. A player who always plays at the same hour always sees the same part of the day, and that is accepted as the cost of doing business. Events never pin their own time: a midnight race at noon makes no sense.
+- **Per-system rulings** (the full table and wording are in the [vision](../research/open77/NCM_PVE_WORLD_VISION_AND_SIM_REVIEW.md#per-system-control-decided-one-system-at-a-time)):
+  - Weather: ACCEPT, with expansion. World state, not a story knob; everything reacts to it.
+  - NCPD: CHANGE. Legitimate NCPD interactions for players **and simulated actors** when their actions warrant it; never a wanted level manufactured for drama.
+  - Ambient crowds and traffic: ACCEPT.
+  - Vanilla traffic: CHANGE. Normally untouched, but an authoritative activity may control it where technically necessary, with explicit scope and restoration.
+  - Named NPC bodies: ACCEPT AND EXPAND, including physical experience.
+  - AI vehicles: CHANGE substantially. They may represent persistent actors and activities.
+  - Map pins: ACCEPT, and the absence of a pin keeps discovery meaningful.
+  - Markets: ACCEPT, deepen later. Named causes only; simulated NPCs buy parts and move the modelled R&D and supply chain.
+  - Handling: ACCEPT the boundary. Narrative has zero direct handling authority; only physical and mechanical systems change it.
+  - Hacks and cyberware: CHANGE. They are genuine sim verbs where target, capability and consequence are authoritative; no scripted effects masquerading as hacks.
+  - Slow motion: ACCEPT. No sim authority.
+  - Screens, radio and billboards: ACCEPT AND EXPAND. Sourced projection surfaces.
+- **Write-back amended.** The Paddock plan's blanket "physical outcomes never write back" becomes provenance-gated. An activity running in explicit physical-authoritative mode whose outcome NCM corroborates writes `physical` facts back; everything else is a projection and cannot manufacture truth. Provenance is `physical`, `simulated` or `reported`, and one never pretends to be another.
+- **People.** The 18 quest-graph contacts become physical people too. Canon gangs and groups may be used. NPCs may address the player by driver name, an earned handle, or both. Solo incident frequency is not locked; test and iterate.
+- **Work order.** The Paddock lands first, then the social sim. The Python originals may be run as test oracles freely. Dialogue is a mix of owner-authored and drafted lines, informed by Night City's own dialogue.
+
+**Boundary.** Direction, not implementation. The vision stays PROPOSAL architecture; each system's first use still needs MASTER_TEST cases and a live PASS (L69). New ideas are `IDEA-730`-`IDEA-734`.
+
+## L223 - LOCKED OWNER DIRECTION / OPS - NCM Online is frozen at Baseline 1; all work moves to the development server
+
+**Owner direction (2026-09-29).** NCM Online is sound as it stands: someone can join with a wheel and play just by joining the server, a Thrustmaster tester has been contacted and two more testers are planned. Iterating on Online risks hiccups for them. **The current Online deployment is Baseline 1, frozen exactly as it is. Nothing is pushed to Online until the big expansion is ready on dev.** All PvE and sim work happens on the development server exclusively.
+
+**Why this ruling.** Iterating on both servers once produced a split that had to be reconciled. From then on only Online was pushed, so dev fell days behind. Dev now catches up to Baseline 1 and becomes the only workshop.
+
+**What Baseline 1 is (verified 2026-09-29).** Platform `2.31.13+op77.102` (client `op77.101`), identical on both servers. All 374 files in Online's `resources/ncm` are byte-identical to the working tree at the Baseline 1 commit (git tag `online-baseline-1`). Required mods are `ncm-carrier` 0.1.30 (`d4431422...`), `ncm-rig-bridge` 0.1.7 (`eea1aba6...`) and `ncm-vision` 0.3.0 (`e44ecafa...`), plus ArchiveXL 1.27.1 and TweakXL 1.11.4 in the mod store. Online's `resources.load` also carries `open-voice`.
+
+**Enforced, not only written.** `tools/deploy-staging.ps1` now refuses to change Online without `-ThawOnline`; `-Logs` still works. Reading Online's logs and state remains fine. A thaw is an owner ruling recorded here, never a session's judgement.

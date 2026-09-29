@@ -71,6 +71,32 @@ int main()
         CHECK(s.targetJson().find("\"entity\":\"\"") != std::string::npos);
         CHECK(s.targetJson().find("\"active\":false") != std::string::npos);
     }
+    {   // The panel wire: six fields, rows and info joined with their own separators that text cannot forge.
+        State s;
+        CHECK(s.apply(R"({"cmd":"frame","state":3,"title":"x","selected":1,
+            "hacks":[{"s":0,"l":"LIMITER","r":"2.0s"},{"s":4,"l":"ENGINE^CUT","r":"COOL`ING"}],
+            "infoTitle":"Thorton Galena","infoSub":"STREET",
+            "info":[{"k":"OPERATOR","v":"NCM TRAFFIC"},{"k":"RANGE","v":"12|m"}]})", t0));
+        s.reticle(t0);
+        const auto p = s.panel();
+        CHECK(fields(p) == 6);
+        CHECK(p == "1|1|0`LIMITER`2.0s^4`ENGINECUT`COOLING|Thorton Galena|STREET|OPERATOR`NCM TRAFFIC^RANGE`12m");
+    }
+    {   // No list is selected -1; a stale feed clears the panels with the reticle.
+        State s;
+        s.apply(R"({"cmd":"frame","state":1,"selected":7,"hacks":[{"s":9,"l":"A"}]})", t0);
+        CHECK(s.panel() == "1|-1|0`A`|~|~|~");
+        s.reticle(t0 + std::chrono::milliseconds(ncm::vision::kStaleMs + 1));
+        CHECK(s.panel().find("|-1|~|~|~|~") != std::string::npos);
+    }
+    {   // The looked-at point travels with the report; moving it half a metre is a new report.
+        State s;
+        s.report(true, 9, 0, 1, 10.0f, 100.0f, -200.0f, 30.0f);
+        const auto a = s.targetJson();
+        CHECK(a.find("\"pos\":{\"x\":100.0,\"y\":-200.0,\"z\":30.0}") != std::string::npos);
+        s.report(true, 9, 0, 1, 10.0f, 101.0f, -200.0f, 30.0f);
+        CHECK(s.targetJson() != a);
+    }
     {   // Garbage is refused and changes nothing.
         State s;
         CHECK(!s.apply("not json", t0));

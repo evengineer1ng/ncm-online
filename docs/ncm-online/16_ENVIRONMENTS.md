@@ -3,6 +3,8 @@
 > **STATUS: CURRENT** - authority for: *environments, promotion discipline* - affirmed 2026-09-24 (L112, L121)
 > Authority map: [INDEX.md](INDEX.md) - classified 2026-09-24 (L125)
 
+**2026-09-29 - NCM ONLINE IS FROZEN AT BASELINE 1 (`L223`).** Online stays exactly as deployed (git tag `online-baseline-1`) until the sim expansion is ready. **All work happens on NCM Development.** `deploy-staging.ps1` refuses to change Online without `-ThawOnline`, and only an owner ruling thaws it.
+
 **Status:** architecture agreed (L112). **NCM Development is standing as of 2026-09-24 (L121).**
 NCM Online is **unchanged**: still `serverId = ncm-dev`, unrenamed, and `deploy-staging.ps1` still defaults to
 `-Target online`. Cutover steps 1-2 are done; **steps 3-6 remain the operator's call** and are still gated on

@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <cstdio>
 #include <map>
 #include <set>
 
@@ -42,6 +43,9 @@ struct SdlApi {
     int (*GetNumGamepadTouchpads)(void*);
     bool (*GetGamepadTouchpadFinger)(void*, int, int, bool*, float*, float*, float*);
     const char* (*GetJoystickNameForID)(SDL_JoystickID);
+    uint16_t (*GetJoystickVendorForID)(SDL_JoystickID);
+    uint16_t (*GetJoystickProductForID)(SDL_JoystickID);
+    int (*GetJoystickTypeForID)(SDL_JoystickID);
     void* (*OpenJoystick)(SDL_JoystickID);
     const char* (*GetJoystickSerial)(void*);
     void (*CloseJoystick)(void*);
@@ -59,6 +63,8 @@ constexpr uint32_t kInitJoystick = 0x00000200, kInitGamepad = 0x00002000;
 constexpr int kSensorAccel = 1, kSensorGyro = 2;
 constexpr int kTypeXbox360 = 2, kTypeXboxOne = 3, kTypePs4 = 5, kTypePs5 = 6, kTypeSwitchPro = 7;
 constexpr int kTypeJoyConLeft = 8, kTypeJoyConRight = 9;
+// SDL_JoystickType values for the kinds of device DirectInput and force feedback own (KB-209).
+constexpr int kJoystickWheel = 2, kJoystickFlightStick = 4, kJoystickThrottle = 9;
 constexpr int kAxisLeftX = 0, kAxisLeftY = 1, kAxisRightX = 2, kAxisRightY = 3, kAxisLeftTrigger = 4, kAxisRightTrigger = 5;
 
 // JoyMoco's three button tables, by SDL gamepad button index.
@@ -77,6 +83,29 @@ const std::map<int, const char*> kPrimaryButtons = {
 float axis(int16_t raw) { return std::clamp(raw / (raw >= 0 ? 32767.0f : 32768.0f), -1.0f, 1.0f); }
 
 std::string narrow(const char* s) { return s ? std::string(s) : std::string(); }
+
+std::string vidPid(uint16_t vid, uint16_t pid)
+{
+    char buf[16];
+    snprintf(buf, sizeof(buf), "%04X:%04X", vid, pid);
+    return buf;
+}
+
+// `SDL_JOYSTICK_IGNORE_DEVICES`: "0xVVVV/0xPPPP,...". Nintendo and Sony are left out even when DirectInput
+// lists them, because they are the motion hands and only SDL can read their IMU; Microsoft because an Xbox
+// pad is only ever opened to read its serial. Everything else DirectInput owns, SDL never enumerates.
+std::string ignoreHint(const std::set<std::string>& owned)
+{
+    std::string out;
+    for (const auto& key : owned) {
+        if (key.size() < 9 || key[4] != ':') continue;
+        const std::string vid = key.substr(0, 4);
+        if (vid == "057E" || vid == "054C" || vid == "045E") continue;
+        if (!out.empty()) out += ',';
+        out += "0x" + vid + "/0x" + key.substr(5, 4);
+    }
+    return out;
+}
 
 int64_t nowNs()
 {
@@ -129,6 +158,9 @@ struct SdlInput::Impl {
             {reinterpret_cast<void**>(&api.GetNumGamepadTouchpads), "SDL_GetNumGamepadTouchpads"},
             {reinterpret_cast<void**>(&api.GetGamepadTouchpadFinger), "SDL_GetGamepadTouchpadFinger"},
             {reinterpret_cast<void**>(&api.GetJoystickNameForID), "SDL_GetJoystickNameForID"},
+            {reinterpret_cast<void**>(&api.GetJoystickVendorForID), "SDL_GetJoystickVendorForID"},
+            {reinterpret_cast<void**>(&api.GetJoystickProductForID), "SDL_GetJoystickProductForID"},
+            {reinterpret_cast<void**>(&api.GetJoystickTypeForID), "SDL_GetJoystickTypeForID"},
             {reinterpret_cast<void**>(&api.OpenJoystick), "SDL_OpenJoystick"},
             {reinterpret_cast<void**>(&api.GetJoystickSerial), "SDL_GetJoystickSerial"},
             {reinterpret_cast<void**>(&api.CloseJoystick), "SDL_CloseJoystick"},
@@ -158,6 +190,14 @@ void SdlInput::stop()
 {
     if (!running_.exchange(false)) return;
     if (thread_.joinable()) thread_.join();
+}
+
+void SdlInput::setOwnedElsewhere(std::set<std::string> vidPids)
+{
+    std::lock_guard lock(mutex_);
+    if (vidPids == ownedElsewhere_) return;
+    ownedElsewhere_ = std::move(vidPids);
+    ownedChanged_ = true;
 }
 
 void SdlInput::setAssignments(const json& assignments)
@@ -196,6 +236,13 @@ void SdlInput::run()
     sdl.SetHint("SDL_JOYSTICK_HIDAPI_COMBINE_JOY_CONS", "0");
     sdl.SetHint("SDL_JOYSTICK_ALLOW_BACKGROUND_EVENTS", "1");
     sdl.SetHint("SDL_JOYSTICK_THREAD", "1");
+    // KB-209. SDL 3.4 ships a HIDAPI driver for Logitech wheels that sends the wheel its own commands on
+    // open; with it running, ARM killed the G29's force feedback until a replug. Force feedback belongs to
+    // DirectInput (ffb_output), so that driver is off and every device DirectInput reads is hidden from SDL.
+    sdl.SetHint("SDL_JOYSTICK_HIDAPI_LG4FF", "0");
+    std::set<std::string> owned;
+    { std::lock_guard lock(mutex_); owned = ownedElsewhere_; ownedChanged_ = false; }
+    sdl.SetHint("SDL_JOYSTICK_IGNORE_DEVICES", ignoreHint(owned).c_str());
     if (!sdl.Init(kInitGamepad | kInitJoystick)) {
         const std::string why = narrow(sdl.GetError());
         setStatus("SDL_Init failed: " + why);
@@ -280,6 +327,11 @@ void SdlInput::run()
         std::set<SDL_JoystickID> seen;
         for (int i = 0; jids && i < jcount; ++i) {
             if (sdl.IsGamepad(jids[i])) continue;
+            // Belt and braces for the hint above (KB-209): a wheel base, pedals or a flight stick is
+            // DirectInput's, and so is anything DirectInput already lists. Never opened, not even to read.
+            const int jtype = sdl.GetJoystickTypeForID(jids[i]);
+            if (jtype == kJoystickWheel || jtype == kJoystickThrottle || jtype == kJoystickFlightStick) continue;
+            if (owned.count(vidPid(sdl.GetJoystickVendorForID(jids[i]), sdl.GetJoystickProductForID(jids[i])))) continue;
             seen.insert(jids[i]);
             if (std::any_of(impl.sticks.begin(), impl.sticks.end(), [&](const auto& s) { return s.id == jids[i]; })) continue;
             void* js = sdl.OpenJoystick(jids[i]);
@@ -371,9 +423,21 @@ void SdlInput::run()
         {
             std::lock_guard lock(mutex_);
             if (assignmentsChanged_) { assignments = assignments_; assignmentsChanged_ = false; rediscover = true; }
+            if (ownedChanged_) { owned = ownedElsewhere_; ownedChanged_ = false; rediscover = true; }
             rumbles.swap(rumbles_);
         }
-        if (rediscover) { discover(assignments); lastDiscover = std::chrono::steady_clock::now(); }
+        if (rediscover) {
+            sdl.SetHint("SDL_JOYSTICK_IGNORE_DEVICES", ignoreHint(owned).c_str());
+            // A device DirectInput has since claimed is released here rather than kept open.
+            for (auto it = impl.sticks.begin(); it != impl.sticks.end();) {
+                if (!owned.count(vidPid(sdl.GetJoystickVendorForID(it->id), sdl.GetJoystickProductForID(it->id)))) { ++it; continue; }
+                if (log_) log_(false, "SDL3 released " + it->key + ": DirectInput owns it");
+                sdl.CloseJoystick(it->handle);
+                it = impl.sticks.erase(it);
+            }
+            discover(assignments);
+            lastDiscover = std::chrono::steady_clock::now();
+        }
         for (const auto& r : rumbles)
             for (const auto& p : impl.pads)
                 if (p.hand == r.hand)

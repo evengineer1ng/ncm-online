@@ -176,7 +176,17 @@ Post-upgrade health, in one line each: `migrations: N applied` → `ownership le
 `ncm_world started v…` → `class ceilings published` → `scheduler started: 5 series`. If the series line is
 missing, NCM did not start.
 
-## Required mods (state as of 2026-09-28 17:34 UTC)
+## Required mods (state as of 2026-09-29 15:45 UTC)
+
+**Declared on Online:** `ncm-carrier` 0.1.30, `ncm-rig-bridge` 0.1.7, **`ncm-vision` 0.3.0** (sha256
+`e44ecafa7de0da94b217fcaeb2aa73ffdac7249690f8774a75076d755b4d50c9`, 253,778 bytes: the QUICKHACKS and SCAN DATA
+panels, and the looked-at point in the report, `KB-211`); manifest digest
+`879af3286c16ed2ecd971024a8febbbe81ead75744576f4d4280f73a9fb82c99`. `ncm-radial` is not declared (pulled,
+`KB-182`, radial row). The consent note names all three versions. Same deploy: `ncm_league` collection (record
+index off the request path, network vehicle by position) and `ncm_scanner`/`ncm_world` chrome. Backup
+`/opt/ncm/backups/pre-carrier-prod-20260929T154321Z`. Blob downloaded back over HTTPS with a matching hash.
+
+### 2026-09-28 17:34 UTC
 
 **`ncm-vision` is 0.2.1** (sha256 `73ce73ae831faccf5847fcb9291719be9341a6a208f6d682b8f86ca7436dda15`), manifest digest `46cfc0588afe325a3cff98a2b4475e967a2296973285bcd53bf38442769c13a9`. Everything else is as in the 17:29 entry below. 0.2.0 stopped the game from starting (`KB-182`) and was live about 5 minutes. 0.2.1 was published with the same tool, and the consent note names it. After the restart every NCM resource started and the blob downloaded over HTTPS with a matching hash.
 

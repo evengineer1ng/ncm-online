@@ -576,7 +576,10 @@ end
 -- name travels only in the reply to a scan the server admitted, or for a machine the Driver already knows.
 
 local attested = {}      -- ncmDriverId -> { ms, ... } client-attested reveals, pruned to the last hour
-local recordIndex = nil  -- record key -> record, built on first use
+local recordIndex = nil  -- record key -> record, built in the background at start (see buildRecordIndex)
+local indexing = false
+local INDEX_SLICE = 8    -- records per yield: ~80k VM instructions on the slowest XOR path, far under quota
+local NEAREST_M = 6.0    -- a looked-at point this close to a network vehicle IS that vehicle
 local queryBudget = {}   -- pid -> { at = ms window start, n = count }
 local QUERIES_PER_S = 20
 local queryLog = {}      -- pid -> lines logged this session; the first few answers are logged for diagnosis
@@ -594,12 +597,65 @@ local function knows(driverId, vehicleKey)
     return ownedKeys(driverId)[vehicleKey] == true
 end
 
+--- The record index, built a slice at a time with a yield between slices. **Never on the request path**
+--- (live, 2026-09-29): built inside a query handler it blew OPEN//77's instruction quota, the handler died
+--- without replying, and every vanilla car read "READING..." forever. Until it is ready, vanilla queries are
+--- answered busy and the client asks again.
+local function buildRecordIndex()
+    if recordIndex or indexing then return end
+    indexing = true
+    CreateThread(function()
+        local records, index, from = Catalogue.allRecords(), {}, 1
+        while from do
+            from = Scanner.recordIndexStep(records, index, from, INDEX_SLICE)
+            Wait(0)
+        end
+        recordIndex, indexing = index, false
+        log("scanner record index ready: %d records", #records)
+    end)
+end
+
+--- The network vehicle at a looked-at point, if there is one. The client's own match (aimedEntity) misses
+--- often -- on foot beside a car, a moving car -- and a missed match turned players' cars and NCM traffic into
+--- "vanilla" guesses. The point comes from the client; the vehicle, its record and its bucket from here.
+local function networkedAt(pid, pos)
+    if type(pos) ~= "table" or not tonumber(pos.x) or not tonumber(pos.y) or not tonumber(pos.z) then return nil end
+    local at = { x = tonumber(pos.x), y = tonumber(pos.y), z = tonumber(pos.z) }
+    local okP, p = pcall(Open77.players.get, pid)
+    local bucket = okP and type(p) == "table" and tonumber(p.bucket or 0) or 0
+    local ok, list = pcall(Open77.vehicles.all)
+    if not ok or type(list) ~= "table" then return nil end
+    local best, bestD = nil, NEAREST_M
+    for _, item in ipairs(list) do
+        local id = tonumber(type(item) == "table" and (item.id or item.vehicleId) or item)
+        local v = id and snapshot(id)
+        if v and tonumber(v.bucket or 0) == bucket then
+            local d = distance(at, v.pos)
+            if d < bestD then best, bestD = id, d end
+        end
+    end
+    return best
+end
+
+--- Who is at the wheel of a network vehicle: a player's name, NCM traffic, or nobody.
+local function operatorOf(liveId, reg)
+    for _, other in ipairs(Open77.players.all() or {}) do
+        local okS, seat = pcall(Open77.players.getVehicleSeat, other)
+        local vid = okS and (type(seat) == "table" and tonumber(seat.vehicleId or seat.vehicle or seat.id) or tonumber(seat))
+        if vid == liveId then
+            local okP, p = pcall(Open77.players.get, other)
+            return "driver", okP and type(p) == "table" and p.name or nil
+        end
+    end
+    if reg and reg.context == "ambient" then return "traffic" end
+    return "parked"
+end
+
 --- What a target IS, re-derived server-side. Returns entry, facts or nil, reason.
 local function resolveTarget(pid, req)
     if type(req) ~= "table" then return nil, "bad_request" end
-    if req.kind == "networked" then
-        local liveId = tonumber(req.vehicleId)
-        if not liveId then return nil, "no_vehicle_id" end
+    local liveId = tonumber(req.vehicleId) or networkedAt(pid, req.pos)
+    if liveId then
         local v = snapshot(liveId)
         if not v then return nil, "no_snapshot" end
         local entry = Catalogue.resolveRecord(v.record)
@@ -612,7 +668,7 @@ local function resolveTarget(pid, req)
     elseif req.kind == "vanilla" then
         -- The client reports a record KEY (CRC32 + length of the TweakDBID, as redscript read it), never a
         -- name: the server maps it back to a record it knows, so the catalogue stays off the wire (`L193`).
-        recordIndex = recordIndex or Scanner.recordIndex(Catalogue.allRecords())
+        if not recordIndex then buildRecordIndex(); return nil, "indexing" end
         local key = type(req.recordKey) == "string" and #req.recordKey <= 20 and req.recordKey or nil
         local record = key and recordIndex[key] or nil
         if not record then return nil, key and "no_ncm_record" or "no_record" end
@@ -645,23 +701,34 @@ RegisterNetEvent("ncm:scanner.query", function(req)
         body = { phase = "query", indexable = false, reason = "no_driver" }
     else
         local entry, facts = resolveTarget(pid, req)
+        if facts == "indexing" then return reply(pid, token, { phase = "query", busy = true }) end
         if not entry then
             body = { phase = "query", indexable = false, reason = type(facts) == "string" and facts or "no_ncm_record" }
         else
             local known = knows(driver.ncmDriverId, entry.vehicleKey)
-            body = { phase = "query", indexable = true, known = known, label = known and label(entry) or nil }
+            -- The name and class only for a machine this Driver knows: fog of war holds on the wire.
+            body = { phase = "query", indexable = true, known = known, label = known and label(entry) or nil,
+                     category = known and entry.category or nil }
+        end
+        -- Where the target is a network vehicle, say which one, and who is driving it: the client learns the id
+        -- it needs for chrome, and the info panel can say PLAYER / NCM TRAFFIC / PARKED.
+        if type(facts) == "table" and facts.liveId then
+            body.vehicleId = facts.liveId
+            body.operator, body.operatorName = operatorOf(facts.liveId, facts.reg)
         end
     end
     local n = (queryLog[pid] or 0) + 1
     queryLog[pid] = n
     if n <= QUERY_LOG_MAX then
-        log("scan query player=%d kind=%s vehicle=%s key=%s -> indexable=%s known=%s reason=%s", pid,
-            tostring(type(req) == "table" and req.kind), tostring(type(req) == "table" and req.vehicleId),
-            tostring(type(req) == "table" and req.recordKey), tostring(body.indexable), tostring(body.known),
-            tostring(body.reason))
+        log("scan query player=%d kind=%s vehicle=%s key=%s -> network=%s operator=%s indexable=%s known=%s reason=%s",
+            pid, tostring(type(req) == "table" and req.kind), tostring(type(req) == "table" and req.vehicleId),
+            tostring(type(req) == "table" and req.recordKey), tostring(body.vehicleId), tostring(body.operator),
+            tostring(body.indexable), tostring(body.known), tostring(body.reason))
     end
     reply(pid, token, body)
 end)
+
+buildRecordIndex()
 
 --- A completed lock. The only write.
 RegisterNetEvent("ncm:scanner.scan", function(req)
@@ -703,7 +770,7 @@ RegisterNetEvent("ncm:scanner.scan", function(req)
         log("SCAN driver=%s key=%s kind=%s basis=%s first=%s", driver.ncmDriverId:sub(1, 8), entry.vehicleKey,
             facts.kind, basis, tostring(first == true))
         reply(pid, token, { phase = "scan", ok = true, first = first == true and not wasKnown,
-            label = label(entry), basis = basis })
+            label = label(entry), category = entry.category, basis = basis })
     end)
 end)
 

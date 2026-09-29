@@ -65,8 +65,10 @@ local discovered = {}   -- vehicle_key -> row
 Open77 = {
     time = { unix = function() return clock end },
     vehicles = { get = function(id) local v = vehicles[id]; if not v then return nil end
-        return { record = v.record, bucket = v.bucket, x = v.x, y = v.y, z = v.z } end },
-    players = { get = function(id) return players[id] end, all = function() return { 1 } end },
+        return { record = v.record, bucket = v.bucket, x = v.x, y = v.y, z = v.z } end,
+        all = function() return { 41, 42 } end },
+    players = { get = function(id) return players[id] end, all = function() return { 1 } end,
+        getVehicleSeat = function() return nil end },
 }
 MySQL = {
     query = { await = function(q)
@@ -147,7 +149,25 @@ fire("ncm:scanner.query", 1, { token = "v3", kind = "vanilla", recordKey = "123"
 r = lastReply()
 check("an unknown record key is answered, not dropped", r and r.token == "v3" and r.indexable == false)
 
--- 6. Garbage is answered too.
+-- 6. A car the client could not match to a network vehicle (aimedEntity missed) goes up as "vanilla" with its
+--    looked-at point; the server finds the network vehicle there and says which one, and who drives it
+--    (live, 2026-09-29: players' cars and NCM traffic read as vanilla guesses and could not be hacked).
+check("the record index was built off the request path", (function()
+    for _, l in ipairs(logs) do if l:find("scanner record index ready") then return true end end
+end)())
+TriggerEvent("ncm:collection:registerVehicle", 42, "Vehicle.v_standard2_archer_hella", "ambient")
+clock = clock + 2
+fire("ncm:scanner.query", 1, { token = "p1", kind = "vanilla", recordKey = "999", distance = 20,
+    pos = { x = 401.5, y = 2, z = 0 } })
+r = lastReply()
+check("a looked-at point beside a network car resolves to that car", r and r.vehicleId == 42)
+check("...as NCM traffic, an indexable machine", r and r.operator == "traffic" and r.indexable == true)
+fire("ncm:scanner.query", 1, { token = "p2", kind = "vanilla", recordKey = "999", distance = 20,
+    pos = { x = 250, y = 0, z = 0 } })
+r = lastReply()
+check("a point near no network car stays a vanilla lookup", r and r.vehicleId == nil and r.indexable == false)
+
+-- 7. Garbage is answered too.
 fire("ncm:scanner.query", 1, "nonsense")
 check("a malformed query is answered rather than ignored", lastReply() and lastReply().phase == "query")
 

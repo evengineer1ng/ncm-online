@@ -17,6 +17,7 @@
 #include <mutex>
 #include <string>
 #include <string_view>
+#include <vector>
 
 namespace ncm::vision {
 
@@ -40,8 +41,23 @@ struct Target {
     uint64_t record = 0;     // TweakDBID (masked) when the object is a vehicle, else 0
     int kind = 0;            // 0 none, 1 vehicle, 2 anything else
     float distance = -1.0f;
+    float x = 0.0f, y = 0.0f, z = 0.0f;   // the object's world position; the server finds network cars by it
     uint32_t seq = 0;
 };
+
+// The quickhack list and the info panel beside the reticle (0.3.0). They arrive with each Lua frame; an empty
+// list or an empty info title hides that panel.
+struct HackRow {
+    int state = 0;           // 0 ready, 1 unavailable, 2 slotting, 3 uploading, 4 cooling, 5 incoming
+    std::string label;
+    std::string right;       // free text: upload time, "COOLING 12s", "DRIVEN ONLY"...
+};
+struct InfoRow {
+    std::string key;
+    std::string value;
+};
+constexpr size_t kMaxHackRows = 12;
+constexpr size_t kMaxInfoRows = 6;
 
 class State {
 public:
@@ -53,9 +69,14 @@ public:
 
     // "revision|state|progress|title|detail"; an empty text field is sent as "~".
     std::string reticle(Clock::time_point now = Clock::now());
+    // "revision|selected|rows|infoTitle|infoSub|info": rows are "state`label`right" joined by '^', info rows are
+    // "key`value" joined by '^'; selected is -1 for none; an empty field is "~". Redscript reads it right after
+    // reticle() on the same tick, so the stale rule has already run.
+    std::string panel();
 
     // Called by redscript through a native, on the game thread.
-    void report(bool active, uint64_t entity, uint64_t record, int kind, float distance);
+    void report(bool active, uint64_t entity, uint64_t record, int kind, float distance,
+                float x = 0.0f, float y = 0.0f, float z = 0.0f);
     // The reply to every Lua message: {"vision":{...}}. The record travels as its KEY only; the server maps it
     // back to a catalogue record, so the catalogue never crosses the wire (L193).
     std::string targetJson();
@@ -63,12 +84,18 @@ public:
     std::string health();
 
 private:
+    void clearPanel();   // caller holds mutex_
     std::mutex mutex_;
     int revision_ = 0;
     int state_ = 0;
     float progress_ = 0.0f;
     std::string title_;
     std::string detail_;
+    int selected_ = -1;
+    std::vector<HackRow> hacks_;
+    std::string infoTitle_;
+    std::string infoSub_;
+    std::vector<InfoRow> info_;
     Clock::time_point lastFrame_{};
     bool haveFrame_ = false;
     bool staleCleared_ = false;
