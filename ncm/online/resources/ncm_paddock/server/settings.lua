@@ -68,6 +68,10 @@ local ok, settings = pcall(Open77.tunables.declare, {
     liveMinFinishShare = { value = 0.5, type = "number", min = 0.1, max = 1, apply = "live" },
     livePaceMaxMps = { value = 90, type = "number", min = 20, max = 150, unit = "m/s", apply = "live" },
     liveNpcDrivers = { value = true, type = "boolean", apply = "live" },
+    -- The race-start warning (L233): a native HUD banner (NCM Pace) for players this near a start line, this long out.
+    liveWarnLeadSec = { value = 150, type = "integer", min = 30, max = 900, unit = "s", apply = "live" },
+    liveWarnRadiusM = { value = 200, type = "integer", min = 30, max = 1000, unit = "m", apply = "live" },
+    liveSlotClearM = { value = 6, type = "integer", min = 2, max = 30, unit = "m", apply = "live" },
     -- The physical bubble (L229): model cars within bubbleInM of a player become physical; beyond bubbleOutM of every
     -- player they hand back to the model. First numbers: a client picks AI up somewhere between 186 m and 573 m.
     -- Night City on Eastern real time (clock.lua, KB-217). Needs NCM Clock on EVERY client (the engine at 1x); a client

@@ -46,6 +46,12 @@ void step(RED4ext::IScriptable*, RED4ext::CStackFrame* stack, RED4ext::CString* 
     if (out) *out = RED4ext::CString(cmd.c_str());
 }
 
+void banner(RED4ext::IScriptable*, RED4ext::CStackFrame* stack, RED4ext::CString* out, int64_t)
+{
+    stack->code++;
+    if (out) *out = RED4ext::CString(state().banner().c_str());
+}
+
 void note(RED4ext::IScriptable*, RED4ext::CStackFrame* stack, bool* out, int64_t)
 {
     RED4ext::CString text;
@@ -73,6 +79,7 @@ void postRegister()
     add("NcmPace_Entity", reinterpret_cast<RED4ext::ScriptingFunction_t<void*>>(&entity), "entEntityID", {{"Int32", "index"}});
     add("NcmPace_Step", reinterpret_cast<RED4ext::ScriptingFunction_t<void*>>(&step), "String",
         {{"Int32", "index"}, {"Float", "x"}, {"Float", "y"}, {"Float", "z"}});
+    add("NcmPace_Banner", reinterpret_cast<RED4ext::ScriptingFunction_t<void*>>(&banner), "String", {});
     add("NcmPace_Log", reinterpret_cast<RED4ext::ScriptingFunction_t<void*>>(&note), "Bool", {{"String", "text"}});
     PACE_INFO("redscript natives registered");
 }
@@ -85,6 +92,41 @@ void registerNatives()
         system->AddPostRegisterCallback(postRegister);
     } else {
         PACE_ERR("RTTI unavailable while registering natives");
+    }
+}
+// What the engine says the crowd/traffic null-area and density methods take (KB-219): their script signature could not
+// be found by compiling guesses, so the plugin reads it from the game's own type information at startup and logs it.
+// The next build wires the call to exactly that.
+void dumpSignatures()
+{
+    auto* rtti = RED4ext::CRTTISystem::Get();
+    if (!rtti) return;
+    for (const char* name : {"gameCommunitySystem", "CommunitySystem", "worldTrafficSystem", "gameTrafficSystem"}) {
+        RED4ext::CClass* cls = rtti->GetClass(RED4ext::CName(name));
+        if (!cls) cls = rtti->GetClassByScriptName(RED4ext::CName(name));
+        if (!cls) { PACE_INFO("rtti: no class %s", name); continue; }
+        int shown = 0;
+        for (auto* fn : cls->funcs) {
+            if (!fn) continue;
+            const std::string shortName = fn->shortName.ToString();
+            if (shortName.find("NullArea") == std::string::npos && shortName.find("Density") == std::string::npos &&
+                shortName.find("Traffic") == std::string::npos && shortName.find("Crowd") == std::string::npos) continue;
+            std::string sig = shortName + "(";
+            bool first = true;
+            for (auto* p : fn->params) {
+                if (!p) continue;
+                if (!first) sig += ", ";
+                first = false;
+                sig += std::string(p->name.ToString()) + ": " + (p->type ? p->type->GetName().ToString() : "?");
+                if (p->flags.isOut) sig += " out";
+                if (p->flags.isOptional) sig += " opt";
+            }
+            sig += ") -> ";
+            sig += (fn->returnType && fn->returnType->type) ? fn->returnType->type->GetName().ToString() : "Void";
+            PACE_INFO("rtti: %s.%s", name, sig.c_str());
+            ++shown;
+        }
+        PACE_INFO("rtti: %s -- %d matching method(s) of %u", name, shown, static_cast<uint32_t>(cls->funcs.size()));
     }
 }
 }

@@ -16,7 +16,7 @@
 //
 // RULES THIS FILE KEEPS, BECAUSE A REDSCRIPT COMPILE ERROR TAKES EVERY SCRIPT MOD DOWN WITH IT:
 //   * vanilla symbols and this package's own natives only -- nothing from OPEN//77, NCM Lua or any other mod;
-//   * no plan, no work: a 2 Hz idle poll of two integer natives; 20 Hz only while a plan lists cars;
+//   * no plan, no work: a 2 Hz idle poll of three natives (the banner included); 20 Hz only while a plan lists cars;
 //   * the local player's game only; a remote body is never ours to drive from.
 module NcmPace
 
@@ -39,6 +39,11 @@ public class NcmPaceSystem extends ScriptableSystem {
   private let m_seq: array<String>;
   private let m_commands: array<ref<AIVehicleCommand>>;
   private let m_vehicles: array<wref<VehicleObject>>;
+  private let m_banner: wref<NcmPaceBanner>;
+
+  public func SetBanner(banner: ref<NcmPaceBanner>) -> Void {
+    this.m_banner = banner;
+  }
 
   private func OnPlayerAttach(request: ref<PlayerAttachRequest>) -> Void {
     let player: ref<PlayerPuppet> = request.owner as PlayerPuppet;
@@ -74,6 +79,10 @@ public class NcmPaceSystem extends ScriptableSystem {
     let player: ref<PlayerPuppet> = this.m_player;
     if !IsDefined(player) {
       return;
+    }
+    let banner: ref<NcmPaceBanner> = this.m_banner;
+    if IsDefined(banner) {
+      banner.Apply(NcmPace_Banner());
     }
     let revision: Int32 = NcmPace_Revision();
     if revision != this.m_revision {
@@ -189,4 +198,111 @@ public class NcmPaceSystem extends ScriptableSystem {
       NcmPace_Log("released " + ToString(released) + " car(s): " + why);
     }
   }
+}
+
+// ---------------------------------------------------------------------------------------------------------------
+// The race-start warning (0.2.0): a native HUD banner in the vanilla crosshair container -- not a WebUI surface, so it
+// costs no WebUI page. The server shows it to players near a staging grid ("WARNING: IMPENDING RACE START / CLEAR THE
+// AREA") with a countdown; this file only draws what `NcmPace_Banner()` says: "rev|visible|title|detail|secondsLeft".
+
+public class NcmPaceBanner extends IScriptable {
+  private let root: ref<inkCanvas>;
+  private let band: ref<inkRectangle>;
+  private let edge: ref<inkRectangle>;
+  private let title: ref<inkText>;
+  private let detail: ref<inkText>;
+
+  public func Build(parent: ref<inkCompoundWidget>) -> Void {
+    if !IsDefined(parent) {
+      NcmPace_Log("banner host has no compound root; nothing drawn");
+      return;
+    }
+    this.root = parent.AddChild(n"inkCanvasWidget") as inkCanvas;
+    this.root.SetName(n"NcmPaceBanner");
+    this.root.SetAnchor(inkEAnchor.TopCenter);
+    this.root.SetAnchorPoint(new Vector2(0.5, 0.0));
+    this.root.SetMargin(0.0, 150.0, 0.0, 0.0);
+    this.root.SetSize(1500.0, 190.0);
+    this.root.SetVisible(false);
+    this.band = this.root.AddChild(n"inkRectangleWidget") as inkRectangle;
+    this.band.SetName(n"band");
+    this.band.SetSize(1500.0, 190.0);
+    this.band.SetTintColor(new HDRColor(0.05, 0.02, 0.02, 1.0));
+    this.band.SetOpacity(0.78);
+    this.edge = this.root.AddChild(n"inkRectangleWidget") as inkRectangle;
+    this.edge.SetName(n"edge");
+    this.edge.SetSize(1500.0, 8.0);
+    this.edge.SetTintColor(new HDRColor(1.0, 0.72, 0.2, 1.0));
+    this.title = this.Text(n"title", 62, 20.0, 1500.0, 90.0);
+    this.title.SetTintColor(new HDRColor(1.0, 0.72, 0.2, 1.0));
+    this.detail = this.Text(n"detail", 38, 110.0, 1500.0, 60.0);
+    this.detail.SetTintColor(new HDRColor(0.94, 0.96, 0.98, 1.0));
+  }
+
+  private func Text(name: CName, size: Int32, y: Float, w: Float, h: Float) -> ref<inkText> {
+    let label: ref<inkText> = this.root.AddChild(n"inkTextWidget") as inkText;
+    label.SetName(name);
+    label.SetFontFamily("base\\gameplay\\gui\\fonts\\raj\\raj.inkfontfamily", n"Medium");
+    label.SetFontSize(size);
+    label.SetFitToContent(false);
+    label.SetMargin(0.0, y, 0.0, 0.0);
+    label.SetSize(w, h);
+    label.SetHorizontalAlignment(textHorizontalAlignment.Center);
+    label.SetVerticalAlignment(textVerticalAlignment.Center);
+    return label;
+  }
+
+  public func Apply(feed: String) -> Void {
+    if !IsDefined(this.root) {
+      return;
+    }
+    let f: array<String> = StrSplit(feed, "|");
+    if ArraySize(f) != 5 || !Equals(f[1], "1") {
+      this.root.SetVisible(false);
+      return;
+    }
+    let title: String = Equals(f[2], "~") ? "" : f[2];
+    let detail: String = Equals(f[3], "~") ? "" : f[3];
+    let left: Int32 = StringToInt(f[4]);
+    if left > 0 {
+      detail = detail + "  ·  " + ToString(left / 60) + ":" + (left % 60 < 10 ? "0" : "") + ToString(left % 60);
+    }
+    this.title.SetText(title);
+    this.detail.SetText(detail);
+    this.root.SetVisible(true);
+  }
+}
+
+@addField(gameuiCrosshairContainerController)
+private let ncmPaceBanner: ref<NcmPaceBanner>;
+
+@wrapMethod(gameuiCrosshairContainerController)
+protected cb func OnInitialize() -> Bool {
+  let result: Bool = wrappedMethod();
+  let owner: ref<GameObject> = this.GetPlayerControlledObject();
+  let system: ref<NcmPaceSystem>;
+  if !IsDefined(this.ncmPaceBanner) && IsDefined(owner) {
+    this.ncmPaceBanner = new NcmPaceBanner();
+    this.ncmPaceBanner.Build(this.GetRootCompoundWidget());
+    system = GameInstance.GetScriptableSystemsContainer(owner.GetGame()).Get(n"NcmPace.NcmPaceSystem") as NcmPaceSystem;
+    if IsDefined(system) {
+      system.SetBanner(this.ncmPaceBanner);
+      NcmPace_Log("banner attached to gameuiCrosshairContainerController");
+    }
+  }
+  return result;
+}
+
+@wrapMethod(gameuiCrosshairContainerController)
+protected cb func OnUninitialize() -> Bool {
+  let owner: ref<GameObject> = this.GetPlayerControlledObject();
+  let system: ref<NcmPaceSystem>;
+  if IsDefined(owner) {
+    system = GameInstance.GetScriptableSystemsContainer(owner.GetGame()).Get(n"NcmPace.NcmPaceSystem") as NcmPaceSystem;
+    if IsDefined(system) {
+      system.SetBanner(null);
+    }
+  }
+  this.ncmPaceBanner = null;
+  return wrappedMethod();
 }

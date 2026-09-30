@@ -1,2 +1,2 @@
 #pragma once
-namespace ncm::pace::rtti { void registerNatives(); }
+namespace ncm::pace::rtti { void registerNatives(); void dumpSignatures(); }

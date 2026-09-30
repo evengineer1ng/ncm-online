@@ -175,7 +175,19 @@ local function stage(race, host, t)
     local gates = L.checkpoints(route, path, segments)
     -- the owner's own single-player grid: authored node heading, SP's road-axis correction, the route's tuning
     -- (data.grid_profiles); tools/test-grid-oracle.lua holds it to SP's code (L232)
-    local slots = L.gridSlots(route.start, route.finish, #field, NcmCore.get("data.grid_profiles").forRoot(race.routeId))
+    local allSlots = L.gridSlots(route.start, route.finish, #field + 8, NcmCore.get("data.grid_profiles").forRoot(race.routeId))
+    -- never set a car down on a person: a slot with a player within liveSlotClearM is skipped, and its car takes the
+    -- next free slot at the back (the banner told them to clear the area, L233)
+    local clearM = set("liveSlotClearM", 6)
+    local people = positions()
+    local slots, skipped = {}, 0
+    for _, s in ipairs(allSlots) do
+        local taken = false
+        for _, pos in pairs(people) do if L.dist(pos, s) <= clearM then taken = true break end end
+        if taken then skipped = skipped + 1 elseif #slots < #field then slots[#slots + 1] = s end
+    end
+    if #slots < #field then return cancel(lr, "the grid is blocked: players are standing on it") end
+    if skipped > 0 then log("stage %s: %d slot(s) had a player on them; those cars start further back", race.raceId, skipped) end
     local want = set("liveBackend", "auto")
     local pace = host and PaddockLive.paceClients[host.pid]
     local backend = (want == "pace" or (want == "auto" and pace and pace.ok)) and "pace" or "platform"
@@ -504,6 +516,43 @@ if Open77.vehicles and Open77.vehicles.ai and Open77.vehicles.ai.on then
     end
 end
 
+-- --------------------------------------------------------------------------------------------------------- warn
+
+local warned = {}                    -- raceId -> { [pid] = true }
+
+--- From liveWarnLeadSec before the lights, players near a start line get the HUD banner (NCM Pace draws it; a
+--- notification goes too, for a client without the plugin): WARNING: IMPENDING RACE START / CLEAR THE AREA.
+local function warn(t)
+    local lead, radius = set("liveWarnLeadSec", 150), set("liveWarnRadiusM", 200)
+    local people = positions()
+    for _, race in pairs(PaddockRaces.byId) do
+        local left = race.opensAt - t
+        local lr = byRace[race.raceId]
+        local skipped = lr and (lr.state == "skipped" or lr.state == "cancelled")
+        if left > 0 and left <= lead and (race.state == "scheduled" or race.state == "priced") and not skipped then
+            local route = PaddockWorld.route(race.routeId)
+            if route then
+                warned[race.raceId] = warned[race.raceId] or {}
+                for pid, pos in pairs(people) do
+                    pid = tonumber(pid)
+                    if L.dist(route.start, pos) <= radius and not warned[race.raceId][pid] then
+                        warned[race.raceId][pid] = true
+                        local detail = ("CLEAR THE AREA  ·  %s on %s"):format(PaddockWorld.seriesName(race.seriesId), PaddockWorld.routeName(race.routeId))
+                        TriggerClientEvent("ncm:paddock.live.warn", pid, { title = "WARNING: IMPENDING RACE START", detail = detail,
+                            seconds = left + set("liveCountdownSec", 5) })
+                        notify(pid, "Impending race start: the grid spawns here. Clear the area.", 8000)
+                    end
+                end
+            end
+        end
+    end
+    for id in pairs(warned) do
+        local race = PaddockRaces.byId[id]
+        if not race or race.opensAt < t - 600 then warned[id] = nil end
+    end
+end
+PaddockLive.warn = warn
+
 -- --------------------------------------------------------------------------------------------------------- tick
 
 local function running()
@@ -515,6 +564,7 @@ end
 --- One pass from the main scheduler: stage the next race that is due, start what is staged. Bounded.
 function PaddockLive.tick(t)
     local mode = set("liveMode", "watched")
+    if mode ~= "off" then pcall(warn, t) end
     for _, lr in pairs(byRace) do
         local race = PaddockRaces.byId[lr.raceId]
         if not race or race.state == "void" then

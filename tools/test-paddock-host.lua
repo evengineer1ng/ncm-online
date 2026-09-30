@@ -795,14 +795,42 @@ POS = { [1] = { x = 6000, y = -6000, z = 0, bucket = 0 } }          -- far from 
 local lrq = runLive(quiet)
 check("a race nobody is near stays simulated: nothing spawns", lrq and lrq.state == "skipped" and next(VEH) == nil)
 
+-- players near a start are warned before the grid spawns (the native HUD banner), and a car never lands on a person
+do
+    local warnRace = streetRace("street_a", 40)
+    local wr = PaddockWorld.route(warnRace.routeId)
+    clock = warnRace.opensAt - 120
+    POS = { [1] = { x = wr.start.x + 30, y = wr.start.y, z = 10, bucket = 0 } }
+    replies = {}
+    run(function() PaddockLive.tick(clock) end)
+    local banner
+    for _, r in ipairs(replies) do if r.name == "ncm:paddock.live.warn" and r.pid == 1 then banner = r.body end end
+    check("a player near the start gets the race-start banner", banner and banner.title == "WARNING: IMPENDING RACE START" and banner.seconds >= 120)
+    replies = {}
+    run(function() PaddockLive.tick(clock + 5) end)
+    local again = false
+    for _, r in ipairs(replies) do if r.name == "ncm:paddock.live.warn" then again = true end end
+    check("once per race, not every tick", not again)
+end
+
 -- a player at the start: it goes on the street by itself, no declaration; some cars get stuck and are rescued
 local liveRace = streetRace("street_a", 40)
 local liveRoute = PaddockWorld.route(liveRace.routeId)
-POS = { [1] = { x = liveRoute.start.x + 20, y = liveRoute.start.y, z = 10, bucket = 0 } }
+-- stand ON the grid: pole's slot, which the grid must skip
+do
+    local s1 = Live.gridSlots(liveRoute.start, liveRoute.finish, 1, NcmCore.get("data.grid_profiles").forRoot(liveRace.routeId))[1]
+    POS = { [1] = { x = s1.x + 1, y = s1.y, z = 10, bucket = 0 } }
+end
 STUCK_FROM, STUCK_UNTIL_RESET = 8, true          -- cars 9-12 stall until something puts them back on the road
 local lr = runLive(liveRace)
 STUCK_FROM = nil
 check("with a player at the start, the race goes on the street by itself", lr and lr.backend == "platform" and #lr.cars >= 8)
+check("no car was set down on the player standing on the grid", (function()
+    for _, c in ipairs(lr.cars) do
+        local v = VEH[c.vehicleId]
+        if v and v.pos and Live.dist(v.pos, POS[1]) <= 6 then return false end
+    end
+    return true end)())
 check(("the street run finished (%.0f s)"):format((lr.steps or 0) * 0.25), lr.state == "finished")
 check("LIVE follows the street race's real cars mid-race", lr.liveView and lr.liveView.street == true and #lr.liveView.rows == #lr.cars
     and lr.liveView.rows[1].pct > 0)

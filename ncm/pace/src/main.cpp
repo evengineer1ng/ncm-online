@@ -30,6 +30,7 @@ bool runningEnter(RED4ext::CGameApplication*)
         PACE_ERR("bridge failed to start: %s; live races fall back to platform AI", e.what());
     }
     PACE_INFO("NCM Pace %s started", NCM_PACE_VERSION);
+    try { ncm::pace::rtti::dumpSignatures(); } catch (...) { PACE_ERR("rtti dump failed"); }
     return true;
 }
 
@@ -45,7 +46,7 @@ RED4EXT_C_EXPORT void RED4EXT_CALL Query(RED4ext::v1::PluginInfo* info)
 {
     info->name = L"NCM Pace";
     info->author = L"Night City Motorsports";
-    info->version = RED4EXT_V1_SEMVER(0, 1, 0);
+    info->version = RED4EXT_V1_SEMVER(0, 2, 0);
     info->runtime = RED4EXT_V1_RUNTIME_VERSION_LATEST;
     info->sdk = RED4EXT_V1_SDK_VERSION_CURRENT;
 }

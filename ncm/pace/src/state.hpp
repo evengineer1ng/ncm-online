@@ -73,6 +73,10 @@ public:
     std::vector<std::string> outbox();
     std::string health();
 
+    // The race-start warning (0.2.0): a native HUD banner, not a WebUI page. "rev|visible|title|detail|secondsLeft";
+    // empty text fields are "~". Set by {"cmd":"banner","title":..,"detail":..,"seconds":N}; seconds 0 clears it.
+    std::string banner(Clock::time_point now = Clock::now());
+
     double advanceM = 40.0;         // switch to the next point this far before reaching the current one
 
 private:
@@ -89,6 +93,9 @@ private:
     Clock::time_point stoppedAt_{};
     std::vector<std::string> out_;
     uint64_t gateReports_ = 0;
+    int bannerRev_ = 0;
+    std::string bannerTitle_, bannerDetail_;
+    Clock::time_point bannerUntil_{};
 };
 
 State& state();

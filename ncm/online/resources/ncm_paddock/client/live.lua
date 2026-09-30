@@ -94,6 +94,14 @@ RegisterNetEvent("ncm:paddock.live.declared", function(m)
     log("declared %s: waypoint to %s (%s)", tostring(m.raceId), tostring(m.name), ok and "set" or tostring(why))
 end)
 
+-- The race-start warning: NCM Pace draws it natively in the HUD (no WebUI page); without the plugin, the server's
+-- notification is all there is.
+RegisterNetEvent("ncm:paddock.live.warn", function(m)
+    if type(m) ~= "table" then return end
+    local sent = send({ cmd = "banner", title = tostring(m.title or ""), detail = tostring(m.detail or ""), seconds = tonumber(m.seconds) or 0 })
+    log("warning banner %s (%s s)", sent and "sent to Pace" or "not shown: no Pace plugin", tostring(m.seconds))
+end)
+
 RegisterNetEvent("ncm:paddock.live.stage", function(m)
     if type(m) ~= "table" then return end
     log("staged %s: %d cars, backend %s", tostring(m.raceId), #(m.cars or {}), tostring(m.backend))

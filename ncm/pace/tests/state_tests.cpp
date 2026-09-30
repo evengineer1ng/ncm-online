@@ -102,6 +102,18 @@ int main()
         CHECK(h.find("\"health\"") != std::string::npos && h.find("\"version\"") != std::string::npos);
     }
 
+    {   // the race-start banner: shown for its seconds, separators cannot shift a field, seconds 0 clears it
+        State s;
+        CHECK(s.banner(t0) == "0|0|~|~|0");
+        CHECK(s.apply(R"({"cmd":"banner","title":"WARNING: IMPENDING RACE START","detail":"CLEAR THE AREA|now","seconds":90})", t0));
+        auto f = split(s.banner(t0 + 1500ms));
+        CHECK(f.size() == 5);
+        CHECK(f[1] == "1" && f[2] == "WARNING: IMPENDING RACE START" && f[3] == "CLEAR THE AREA now" && f[4] == "89");
+        CHECK(split(s.banner(t0 + 91s))[1] == "0");
+        CHECK(s.apply(R"({"cmd":"banner","title":"x","seconds":0})", t0));
+        CHECK(split(s.banner(t0))[1] == "0");
+    }
+
     if (failures == 0) std::printf("pace state: all checks passed\n");
     return failures == 0 ? 0 : 1;
 }

@@ -9,4 +9,5 @@ public static native func NcmPace_Count() -> Int32
 public static native func NcmPace_Revision() -> Int32
 public static native func NcmPace_Entity(index: Int32) -> EntityID
 public static native func NcmPace_Step(index: Int32, x: Float, y: Float, z: Float) -> String
+public static native func NcmPace_Banner() -> String
 public static native func NcmPace_Log(text: String) -> Bool

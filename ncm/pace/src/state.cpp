@@ -78,6 +78,18 @@ bool State::apply(const std::string& text, Clock::time_point now)
     if (!j.is_object()) return false;
     const std::string cmd = j.value("cmd", std::string());
     std::lock_guard lock(mutex_);
+    if (cmd == "banner") {
+        auto clean = [](std::string t) {
+            for (char& ch : t) if (ch == '|' || ch == 10 || ch == 13) ch = ' ';   // '|' splits fields; no line breaks
+            return t.substr(0, 120);
+        };
+        bannerTitle_ = clean(j.value("title", std::string()));
+        bannerDetail_ = clean(j.value("detail", std::string()));
+        const double secs = j.value("seconds", 0.0);
+        bannerUntil_ = now + std::chrono::milliseconds(static_cast<int64_t>(secs < 0 ? 0 : secs * 1000.0));
+        bannerRev_++;
+        return true;
+    }
     if (cmd == "drive.end" || cmd == "drive.cancel") {
         stopAll(cmd.c_str());
         return true;
@@ -243,6 +255,16 @@ std::string State::health()
     std::lock_guard lock(mutex_);
     return nlohmann::json{{"health", {{"version", NCM_PACE_VERSION}, {"active", active_}, {"cars", cars_.size()},
         {"race", raceId_}, {"revision", revision_}, {"gateReports", gateReports_}}}}.dump();
+}
+
+std::string State::banner(Clock::time_point now)
+{
+    std::lock_guard lock(mutex_);
+    const int64_t left = std::chrono::duration_cast<std::chrono::milliseconds>(bannerUntil_ - now).count();
+    const bool visible = left > 0 && !bannerTitle_.empty();
+    auto field = [](const std::string& t) { return t.empty() ? std::string("~") : t; };
+    return std::to_string(bannerRev_) + "|" + (visible ? "1" : "0") + "|" + field(bannerTitle_) + "|" + field(bannerDetail_) + "|" +
+           std::to_string(visible ? (left + 999) / 1000 : 0);
 }
 
 State& state()

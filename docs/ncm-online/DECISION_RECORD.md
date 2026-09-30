@@ -4480,3 +4480,12 @@ The owner saw bright sun at 21:30 Eastern. The server alone cannot fix it: OPEN/
 **Ruling applied:** the Paddock street grid is NCM single player's formation, not a new one. The authored start-node heading, SP's road-axis correction, the per-route tuning from `default_roots_pack.lua` and SP's defaults are all carried over (`data.grid_profiles`, generated). The widened grid is reverted. **The assurance** is `tools/test-grid-oracle.lua`: it executes SP's own grid functions from `ai_vehicles.lua` and requires the Online port to match on every Paddock route (it does, exactly). A car set down anywhere else on a line (resets, bubble spawns) takes SP's slot rotation too. KB-218 records the defect.
 
 **Not changed by this ruling:** the perseverance work (L228) and the one-row-at-a-time release stay until the owner rules otherwise.
+
+## L233 - OWNER REQUEST + BUILT / PADDOCK - clear the grid: native traffic exclusion and a native race-start warning
+
+**Owner (2026-09-29):** traffic exclusion near a race start could not land for NCM Online, "so vanilla traffic just drives right through the grid... even worse with AI racers. Could we do it with a native mod?"; and "we need some HUD element, not WebUI, to indicate WARNING: IMPENDING RACE START and to clear the area so humans don't get spawned on top of."
+
+**Built (NCM Pace 0.2.0, dev):**
+- A native HUD banner in the vanilla crosshair container (no WebUI page): the server sends it to players within `liveWarnRadiusM` (200 m) of a start line from `liveWarnLeadSec` (150 s) out, with a countdown, once per race; a notification goes too.
+- A grid slot with a player within `liveSlotClearM` (6 m) is skipped; its car takes the next free slot at the back. A grid with too few free slots is called off.
+- The traffic route: `CommunitySystem.EnableDynamicCrowdNullArea` / `DisableCrowdNullArea` is the engine's own area-scoped control (KB-219). Pace 0.2.0 reads its exact signature from the engine's RTTI at game start; the next build opens a null area over each grid on every nearby client and closes it once the field has gone.
