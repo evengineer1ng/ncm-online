@@ -1177,11 +1177,13 @@ check("a first session says what to do rather than 'nothing new'",
 // beyond "it drew": a refused line never offers a price button, a running race's box score says so, and the
 // page emits slips and manager actions with the fields the server validates.
 console.log("  -- paddock --");
-const pdText = () => dump(document.getElementById("paddockBody")).join(" | ");
+// the PADDOCK is three panes (rail, list, detail); the stub DOM keeps each id on its own, so read all three
+const pdText = () => ["paddockTabs", "paddockMain", "paddockDetail"].map(id => dump(document.getElementById(id)).join(" | ")).join(" | ");
+const pdErr = () => (emitted.find(e => e.name === "panel:error") || {}).data;
 const pdDrawn = () => emitted.some(e => e.name === "panel:drawn" && e.data.panel === "paddock");
 const pdShow = (payload) => { emitted.length = 0; fire("panel:show", { panel: "paddock" }); fire("panel:paddock", payload); };
 pdShow({ view: "wire", loading: true, rows: [] });
-check("paddock draws while loading", pdDrawn() && /Loading the Paddock/.test(pdText()), pdText());
+check("paddock draws while loading", pdDrawn() && /Loading the Paddock/.test(pdText()), pdText() + JSON.stringify(pdErr()));
 pdShow({ view: "wire", rows: [] });
 check("an empty wire says so", pdDrawn() && /Nothing on the wire yet/.test(pdText()), pdText());
 const bigWire = [];
@@ -1196,7 +1198,7 @@ pdShow({ view: "standings", seriesId: "premier", seriesName: "Pacific Apex", tie
          { pos: 2, id: "p2", name: "Kenji Mori", org: "Summit GP", pts: 36, wins: 0, pod: 2, starts: 2, dnfs: 0, tags: [] }] });
 check("standings draw names, points and earned tags", pdDrawn() && /Ana Silva/.test(pdText()) && /Rain specialist/.test(pdText()) && /50/.test(pdText()), pdText());
 emitted.length = 0;
-const standingRow = document.getElementById("paddockBody").querySelectorAll("tr")[1];
+const standingRow = document.getElementById("paddockMain").querySelectorAll("tr")[1];
 standingRow.click();
 check("a standings row asks for that driver's profile", emitted.some(e => e.name === "panel:paddock.request" && e.data.view === "profile" && e.data.id === "p1"), JSON.stringify(emitted));
 pdShow({ view: "results", series: [], next: [{ raceId: "r9", at: 1790001000, series: "Pacific Apex", route: "The Cut", state: "on the board", eastern: "15:00" }],
@@ -1207,8 +1209,8 @@ pdShow({ view: "results", series: [], rows: [], next: [
   { raceId: "r10", at: 1790002000, series: "Night Grid", route: "Hook", state: "scheduled", eastern: "20:00", canLive: true },
   { raceId: "r11", at: 1790003000, series: "Night Grid", route: "The Cut", state: "scheduled", eastern: "20:20", live: "staging · Ana" }] });
 check("NEXT UP offers RUN IT LIVE only where it can happen", pdDrawn() && /HOLD: RUN IT LIVE/.test(pdText()) && /LIVE · staging/.test(pdText())
-  && document.getElementById("paddockBody").querySelectorAll("button").filter(b => /RUN IT LIVE/.test(b._text)).length === 1, pdText());
-check("and says what a live run is", /spawns the real grid/.test(pdText()), pdText());
+  && document.getElementById("paddockMain").querySelectorAll("button").filter(b => /RUN IT LIVE/.test(b._text)).length === 1, pdText());
+check("and says what a live run is", /grid spawns at the start/.test(pdText()), pdText());
 pdShow({ view: "box", error: "not_resolved", rows: [] });
 check("a running race's box score is explained, never shown", pdDrawn() && /still on track/.test(pdText()), pdText());
 pdShow({ view: "box", raceId: "r1", series: "Night Grid", route: "Hook", at: 1790000000, weather: "rain", light: "night", wet: 0.9, provenance: "simulated", commit: "abcd1234",
@@ -1220,6 +1222,25 @@ check("pace says when there is not enough human data", pdDrawn() && /not enough 
 pdShow({ view: "directory", rows: [{ kind: "org", circuit: "npc", id: "o1", name: "Apex Racing", tier: "Night City Premier", org: "Pacific Apex", tags: ["Patient owner"], colour: "#ff0000" },
   { kind: "org", circuit: "sanctioned", id: "g1", name: "Human Team", tier: "Sanctioned", tags: [] }] });
 check("the directory lists NPC and human sanctioned teams", pdDrawn() && /Apex Racing/.test(pdText()) && /human sanctioned team/.test(pdText()), pdText());
+// 2026-09-29 live crash: Lua sends an empty list as {}, and `for (x of {})` threw inside DIRECTORY, then the cached
+// payload replayed the throw on every open. Every list the page reads must survive {} (and a missing key).
+pdShow({ view: "directory", meta: { eastern: "20:15", phase: "Street racing", seasonId: "2026-S3", cup: 13 },
+  rows: [{ kind: "org", circuit: "npc", id: "o7", name: "Tagless Racing", tier: "Street", org: "Night Grid", tags: {}, garage: { label: "Watson garage", hours: "18:00-01:00 ET", here: true } }] });
+check("a team with no tags ({} on the wire) renders instead of crashing the tab", pdDrawn() && !pdErr() && /Tagless Racing/.test(pdText()) && /IN NOW/.test(pdText()), JSON.stringify(pdErr()) + pdText());
+check("the header shows the Eastern clock, what is racing and the Cup", /20:15 ET/.test(dump(document.getElementById("paddockMeta")).join("|")) && /Street racing/.test(dump(document.getElementById("paddockMeta")).join("|")), dump(document.getElementById("paddockMeta")).join("|"));
+for (const v of ["today", "results", "standings", "wire", "board", "myorg", "pace", "directory"]) {
+  pdShow({ view: v, rows: {}, next: {}, results: {}, series: {}, races: {}, car: {}, pending: {}, me: {}, caps: {} });
+  check("view " + v + " survives every list arriving as {}", pdDrawn() && !pdErr(), JSON.stringify(pdErr()));
+}
+pdShow({ view: "today", next: [{ raceId: "r20", at: 1790002000, series: "Night Grid", route: "Hook", state: "scheduled", eastern: "20:40", canLive: true }],
+  results: [{ raceId: "r1", at: 1790000000, series: "Night Grid", route: "Hook", winner: "Omar Haddad", winnerOrg: "Metro Racing", provenance: "physical" }],
+  me: { knowsBillie: true, openSlips: 2, balance: 900, team: "Kabuki Night Racing", teamTier: "Street" },
+  rows: [{ id: "n1", at: 1790000000, kind: "race_result", headline: "Haddad takes Hook", body: "Body", prominence: 50 }] });
+check("TODAY shows next up, results, headlines and where you stand", pdDrawn() && /NEXT UP/.test(pdText()) && /Haddad takes Hook/.test(pdText())
+  && /Kabuki Night Racing/.test(pdText()) && /2 open slip/.test(pdText()) && /STREET/.test(pdText()), pdText());
+fire("panel:paddock", { view: "box", raceId: "r1", series: "Night Grid", route: "Hook", at: 1790000000, provenance: "physical", rows: [{ pos: 1, driver: "Omar Haddad", driverId: "p3", time: 99.1, gap: "leader", state: "finished", points: 25 }] });
+check("a box score opens in the detail pane, beside the list it came from", /Box score/.test(dump(document.getElementById("paddockDetail")).join("|"))
+  && /RUN ON THE STREET/.test(dump(document.getElementById("paddockDetail")).join("|")) && /Haddad takes Hook/.test(dump(document.getElementById("paddockMain")).join("|")), pdText());
 pdShow({ view: "profile", kind: "person", profile: { id: "p1", name: "Ana Silva", role: "driver", org: "Apex Racing", region: "Brazil", ageBand: "late 20s", tags: ["Clutch"], wins: 3, starts: 20, podiums: 8 },
   rows: [{ t: "result", raceId: "r1", pos: 1, grid: 2, state: "finished", series: "Pacific Apex", route: "The Cut", at: 1790000000 }] });
 check("a driver profile shows record and tags, no numbers behind them", pdDrawn() && /3 wins/.test(pdText()) && /Clutch/.test(pdText()), pdText());
@@ -1234,10 +1255,10 @@ const BOARD = { view: "board", knows: true, balance: 900, stakedToday: 100, caps
 pdShow(BOARD);
 check("Billie's board speaks in her voice and refuses in hers", pdDrawn() && /I take positions/.test(pdText()) && /Not that one/.test(pdText()) && /2.72/.test(pdText()), pdText());
 check("there is no Cancel Bet button anywhere on the board", !/cancel/i.test(pdText()), pdText());
-const lineEls = document.getElementById("paddockBody").children.filter(c => c.classList && c.classList.contains("pd-line"));
+const lineEls = document.getElementById("paddockMain").querySelectorAll(".pd-line");
 check("a refused line offers no price button", lineEls.length === 2 && lineEls[1].querySelectorAll("button").length === 0, String(lineEls.length));
 lineEls[0].querySelectorAll("button")[0].click();
-const writeBtn = document.getElementById("paddockBody").querySelectorAll("button").find(b => /WRITE PAPER/.test(b._text));
+const writeBtn = document.getElementById("paddockDetail").querySelectorAll("button").find(b => /WRITE PAPER/.test(b._text));  // the slip opens in the detail pane
 check("picking a price opens the stake form", !!writeBtn, pdText());
 pdShow(Object.assign({}, BOARD, { knows: false }));
 check("a stranger can read the board but is told how to get paper", pdDrawn() && /Rico knows a book/.test(pdText()), pdText());
@@ -1245,7 +1266,7 @@ pdShow({ view: "myorg", manager: false, affiliated: false, fee: 5000, grant: 150
   rows: [{ t: "offer", offerId: "of1", org: "Metro Racing", tier: "Street", from: "Sal Rivera", expiresAt: 1790600000 }] });
 check("MY ORG offers founding and shows offers", pdDrawn() && /FOUND A TEAM/.test(pdText()) && /Sal Rivera offers you Metro Racing/.test(pdText()), pdText());
 emitted.length = 0;
-document.getElementById("paddockBody").querySelectorAll("button").find(b => b._text === "ACCEPT").click();
+document.getElementById("paddockMain").querySelectorAll("button").find(b => b._text === "ACCEPT").click();
 check("accepting an offer emits the manager action", emitted.some(e => e.name === "panel:paddock.manager" && e.data.action === "accept" && e.data.args.offerId === "of1"), JSON.stringify(emitted));
 pdShow({ view: "myorg", manager: true, org: { name: "Kabuki Night Racing", tier: "street", series: "Night Grid", owner: "A Backer", tags: ["New team"] }, treasury: 20000,
   car: [{ area: "power_unit", level: 3, next: 5000 }], pending: [{ kind: "sign", driver: "Rookie One" }], withdrawnThisWeek: 0, weeklyCap: 2000, tax: 0.3,
@@ -1257,7 +1278,7 @@ pdShow({ view: "myorg", manager: true, org: { name: "Kabuki Night Racing", tier:
 check("a manager sees treasury, roster, car, free agents, sponsors and the book", pdDrawn() && /Kabuki Night Racing/.test(pdText()) && /POWER UNIT/.test(pdText())
   && /Free Agent/.test(pdText()) && /Kardos Motors/.test(pdText()) && /founding_grant/.test(pdText()) && /WAITING FOR THE CUP BOUNDARY/.test(pdText()), pdText());
 emitted.length = 0;
-document.getElementById("paddockBody").querySelectorAll("button").find(b => /OFFER 2 SEASONS/.test(b._text)).click();
+document.getElementById("paddockMain").querySelectorAll("button").find(b => /OFFER 2 SEASONS/.test(b._text)).click();
 check("an offer to a free agent carries driver, wage and length", emitted.some(e => e.name === "panel:paddock.manager" && e.data.action === "sign" && e.data.args.driverId === "p10" && e.data.args.wage === 120 && e.data.args.seasons === 2), JSON.stringify(emitted));
 emitted.length = 0;
 fire("panel:paddock.result", { op: "manager", ok: false, text: "The treasury can't cover it." });

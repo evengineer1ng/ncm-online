@@ -162,6 +162,8 @@ function PaddockViews.directory()
             if o.tier == tier and o.lifecycle == "active" then
                 local row = P.directoryRow("org", "npc", o.id, o.name, Season.TIERS[tier].label, nil, PaddockWorld.seriesName(o.seriesId), orgTags(o))
                 row.colour, row.human = o.colour, o.humanManagerDriverId ~= nil or nil
+                local g = PaddockGarages.describe(o)
+                if g then row.garage = { label = g.label, hours = g.hours, here = g.here or nil } end
                 out[#out + 1] = row
             end
         end
@@ -317,14 +319,56 @@ function PaddockViews.myorg(pid)
         balance = PaddockWallet.balance(d.ncmDriverId), rows = rows }
 end
 
-PaddockViews.BUILDERS = { wire = PaddockViews.wire, standings = PaddockViews.standings, results = PaddockViews.results,
+--- TODAY: the landing page. What races next (with the live button), what just finished, the top headlines, and
+--- where the player stands (Billie, their paper, their team, a live race they declared). One round trip.
+function PaddockViews.today(pid)
+    local t = U.now()
+    local res = PaddockViews.results(pid, {})
+    local wire = PaddockViews.wire(pid, {})
+    local results, news = {}, {}
+    for i = 1, math.min(8, #res.rows) do results[i] = res.rows[i] end
+    for i = 1, math.min(6, #wire.rows) do news[i] = wire.rows[i] end
+    local me = {}
+    local d = PaddockPlayers.driver(pid)
+    if d then
+        me.knowsBillie = PaddockBillie.knows(d.ncmDriverId) or nil
+        me.balance = PaddockWallet.balance(d.ncmDriverId)
+        me.openSlips = tonumber(MySQL.scalar.await([[SELECT COUNT(*) FROM paddock_slip WHERE server_id = ? AND ncm_driver_id = ?
+            AND state = 'open']], { U.sid(), d.ncmDriverId })) or 0
+        local org = PaddockWorld.orgManagedBy(d.ncmDriverId)
+        if org then me.team, me.teamTier = org.name, Season.TIERS[org.tier].label end
+        for _, lr in pairs(PaddockLive.byRace) do
+            if lr.driverId == d.ncmDriverId and PaddockLive.holds(lr.raceId) then
+                local race = PaddockRaces.byId[lr.raceId]
+                me.live = { state = lr.state, route = race and PaddockWorld.routeName(race.routeId), at = race and Clock.hhmm(race.opensAt) }
+            end
+        end
+    end
+    return { view = "today", next = res.next, results = results, me = me, rows = news }
+end
+
+-- What is on track now, by the daily rhythm (doc 44 §5.2), for the header.
+local function phaseNow(t)
+    local sod = Clock.eastern(t).secondsOfDay
+    local on = {}
+    for _, tier in ipairs(Season.TIER_ORDER) do
+        local r = Season.RHYTHM[tier]
+        local inWindow = (sod >= r.fromSec and sod < r.untilSec) or (sod + 86400 >= r.fromSec and sod + 86400 < r.untilSec)
+        if tier == "premier" then inWindow = sod >= r.fromSec - 1800 and sod < r.fromSec + 1800 end
+        if inWindow then on[#on + 1] = Season.TIERS[tier].label end
+    end
+    if #on == 0 then return "Quiet hours" end
+    return table.concat(on, " · ") .. " racing"
+end
+
+PaddockViews.BUILDERS = { today = PaddockViews.today, wire = PaddockViews.wire, standings = PaddockViews.standings, results = PaddockViews.results,
     box = PaddockViews.box, pace = PaddockViews.pace, directory = PaddockViews.directory, profile = PaddockViews.profile,
     board = PaddockViews.board, myorg = PaddockViews.myorg }
 
 --- Build and send one view to one player.
 function PaddockViews.send(pid, req)
     req = type(req) == "table" and req or {}
-    local build = PaddockViews.BUILDERS[tostring(req.view or "wire")]
+    local build = PaddockViews.BUILDERS[tostring(req.view or "today")]
     if not build then return end
     if not PaddockWorld.ready then
         PaddockStream.send(pid, "ncm:paddock", { view = req.view, error = "warming_up", rows = {} }, "rows")
@@ -334,6 +378,11 @@ function PaddockViews.send(pid, req)
     if not ok then
         print("[ncm_paddock/views] " .. tostring(req.view) .. " FAILED: " .. tostring(payload))
         payload = { view = req.view, error = "failed", rows = {} }
+    end
+    if type(payload) == "table" then
+        local t = U.now()
+        local world = w()
+        payload.meta = { eastern = Clock.hhmm(t), phase = phaseNow(t), seasonId = world and world.seasonId, cup = Season.cupOf(t).cup }
     end
     local clean, why = pcall(P.assertNoHidden, payload)
     if not clean then

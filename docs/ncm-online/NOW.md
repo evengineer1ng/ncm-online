@@ -458,7 +458,7 @@ rim using those source-verified provider patterns and preserves stable device id
 displace the live queue below.
 
 > **Claim before writing:** decisions through **L227**; MASTER_TEST through **§CH**; next QA letter **§CI**.
-> BACKLOG next free **IDEA-752**; known issues through **KB-215**. Read ledger tails before allocating.
+> BACKLOG next free **IDEA-752**; known issues through **KB-216**. Read ledger tails before allocating.
 > BACKLOG next free **IDEA-686**; known issues through **KB-186**. Read ledger tails before allocating.
 >
 > The next-free guard matters: overlapping 2026-09-26/27 sessions previously made this block stale several

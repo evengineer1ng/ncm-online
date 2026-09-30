@@ -560,42 +560,63 @@
     .landing-go:hover { background: #4ee6ee; }
 
     /* THE PADDOCK (doc 44): the NPC motorsport world. pd- prefix; reuses the shell's tokens. */
-    #paddock { display:flex; flex-direction:column; }
-    .pd-head { display:flex; align-items:end; justify-content:space-between; gap:20px; flex:none; }
+    /* THE PADDOCK: the MARKET frame (1820 x 960) -- a section rail, the list, and a detail pane beside it. */
+    #paddock { width:1820px; height:960px; max-height:960px; overflow:hidden; padding:24px 28px; box-sizing:border-box;
+               display:flex; flex-direction:column; }
+    .pd-head { display:flex; align-items:end; justify-content:space-between; gap:20px; flex:none; margin-bottom:14px; }
     .pd-head h1 { margin:4px 0; font-size:54px; }
-    .pd-meta { font-family:var(--mono); font-size:13px; color:var(--dim); text-align:right; }
-    .pd-tabs { display:flex; gap:6px; flex-wrap:wrap; margin:12px 0 8px; flex:none; }
-    .pd-tabs button, .pd-chipbar button { background:transparent; color:var(--dim); border:1px solid var(--line); padding:6px 12px; font-family:var(--display); font-size:15px; letter-spacing:.08em; cursor:pointer; }
-    .pd-tabs button.active, .pd-chipbar button.active { color:var(--text); border-color:var(--accent); background:rgba(34,216,226,.08); }
+    .pd-meta { font-family:var(--mono); font-size:13px; color:var(--dim); text-align:right; line-height:1.5; }
+    .pd-clock { font:700 28px/1 var(--mono); color:var(--accent); margin-bottom:4px; }
+    .pd-shell { flex:1; min-height:0; display:grid; grid-template-columns:240px minmax(0,1fr) 520px; gap:16px; }
+    .pd-rail { min-height:0; overflow:auto; display:flex; flex-direction:column; gap:6px; border:1px solid var(--line); padding:9px; background:rgba(2,10,18,.45); }
+    .pd-rail .eyebrow { margin-bottom:4px; }
+    .pd-rail-btn { text-align:left; width:100%; padding:11px 10px; background:transparent; color:var(--text); border:1px solid var(--line); cursor:pointer;
+                   font:700 15px/1.2 var(--mono); letter-spacing:.07em; }
+    .pd-rail-btn small { display:block; margin-top:4px; font-weight:500; font-size:11px; color:var(--dim); letter-spacing:.03em; }
+    .pd-rail-btn.selected { border-color:var(--accent); color:var(--accent); box-shadow:inset 0 0 0 1px var(--accent); }
+    .pd-main { min-height:0; overflow-y:auto; overflow-x:hidden; display:flex; flex-direction:column; gap:12px; padding-right:6px; }
+    .pd-block { border:1px solid var(--line); padding:10px 12px; background:rgba(2,10,18,.45); }
+    .pd-block-head { display:flex; justify-content:space-between; align-items:baseline; gap:12px; margin-bottom:8px;
+                     font:700 13px/1 var(--mono); letter-spacing:.13em; color:var(--accent); }
+    .pd-block-note { font-weight:500; letter-spacing:.03em; color:var(--dim); font-size:12px; }
+    .pd-detail { min-height:0; overflow:auto; border:1px solid var(--line); border-radius:10px; padding:18px; }
+    .pd-detail h2 { font-size:30px; margin:2px 0 8px; }
+    .pd-help { color:#c9d3dc; font-size:15px; line-height:1.45; margin:8px 0; }
+    .pd-empty { color:var(--dim); font-family:var(--mono); font-size:13px; padding:10px 2px; }
+    .pd-live { color:var(--ok); font:700 12px/1 var(--mono); letter-spacing:.1em; }
+    .pd-prov { margin:8px 0 12px; }
+    .pd-price { font:700 24px/1 var(--mono); color:var(--accent); margin:6px 0 10px; }
+    .pd-toggles { display:flex; gap:18px; flex-wrap:wrap; }
     .pd-chipbar { display:flex; gap:6px; flex-wrap:wrap; margin:0 0 10px; }
-    .pd-chipbar button { font-size:13px; padding:4px 10px; }
-    .pd-feedback { font-family:var(--mono); font-size:13px; padding:6px 10px; border-left:3px solid var(--accent); margin-bottom:8px; flex:none; }
-    .pd-feedback.bad { border-color:var(--red); color:#ffb3ba; }
-    .pd-body { flex:1; overflow-y:auto; overflow-x:hidden; min-height:0; padding-right:12px; }
+    .pd-chipbar button { background:transparent; color:var(--dim); border:1px solid var(--line); padding:5px 11px; font-family:var(--mono); font-size:13px; letter-spacing:.06em; cursor:pointer; }
+    .pd-chipbar button.active { color:var(--text); border-color:var(--accent); background:rgba(34,216,226,.08); }
+    .pd-feedback { font-family:var(--mono); font-size:13px; padding:8px 12px; border:1px solid var(--accent); color:var(--accent); margin:-6px 0 10px; flex:none; }
+    .pd-feedback.bad { border-color:var(--warn); color:var(--warn); }
     .pd-story { border-bottom:1px solid var(--line); padding:10px 0; }
+    .pd-story:last-child { border-bottom:none; }
     .pd-story b { display:block; font-family:var(--display); font-size:21px; letter-spacing:.02em; }
     .pd-story p { margin:4px 0 0; color:#c9d3dc; }
     .pd-story small, .pd-dim { color:var(--dim); font-family:var(--mono); font-size:12px; }
     .pd-table { width:100%; border-collapse:collapse; font-size:15px; }
-    .pd-table th { text-align:left; color:var(--dim); font-family:var(--mono); font-size:12px; font-weight:normal; border-bottom:1px solid var(--line); padding:4px 6px; }
-    .pd-table td { padding:6px; border-bottom:1px solid rgba(174,211,224,.10); vertical-align:top; }
+    .pd-table th { text-align:left; color:var(--dim); font-family:var(--mono); font-size:11px; letter-spacing:.1em; font-weight:normal; border-bottom:1px solid var(--line); padding:4px 6px; }
+    .pd-table td { padding:7px 6px; border-bottom:1px solid rgba(174,211,224,.10); vertical-align:middle; }
     .pd-table tr.pd-click { cursor:pointer; }
     .pd-table tr.pd-click:hover td { background:rgba(34,216,226,.06); }
     .pd-tag { display:inline-block; border:1px solid var(--line); color:var(--warn); font-family:var(--mono); font-size:11px; padding:1px 6px; margin:0 4px 2px 0; }
     .pd-swatch { display:inline-block; width:10px; height:10px; margin-right:6px; vertical-align:middle; }
-    .pd-section { font-family:var(--display); font-size:18px; letter-spacing:.1em; color:var(--accent); margin:16px 0 6px; }
+    .pd-section { font:700 13px/1 var(--mono); letter-spacing:.12em; color:var(--accent); margin:14px 0 6px; }
     .pd-quote { font-family:var(--display); font-size:22px; font-style:italic; color:var(--text); border-left:3px solid var(--warn); padding:4px 12px; margin:6px 0 12px; }
-    .pd-line { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:6px 8px; border:1px solid rgba(174,211,224,.14); margin-bottom:4px; }
+    .pd-line { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:7px 9px; border:1px solid rgba(174,211,224,.14); margin-bottom:4px; }
     .pd-line button { font-family:var(--mono); min-width:74px; background:transparent; color:var(--text); border:1px solid var(--accent); padding:4px 8px; cursor:pointer; }
     .pd-line.refused { color:var(--dim); }
     .pd-line.picked { border-color:var(--warn); }
     .pd-form { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin:8px 0; }
+    .pd-form-label { font-family:var(--mono); font-size:13px; min-width:260px; }
     .pd-form input { background:rgba(255,255,255,.04); color:var(--text); border:1px solid var(--line); padding:6px 8px; font-family:var(--mono); width:120px; }
-    .pd-form input.wide { width:260px; }
+    .pd-form input.wide { width:320px; }
     .pd-form button, .pd-act { background:transparent; color:var(--text); border:1px solid var(--accent); padding:6px 12px; font-family:var(--display); letter-spacing:.06em; cursor:pointer; }
-    .pd-act.small { padding:2px 8px; font-size:12px; }
-    .pd-kv { display:grid; grid-template-columns:160px 1fr; gap:4px 12px; font-size:15px; }
-    .pd-kv span:nth-child(odd) { color:var(--dim); font-family:var(--mono); font-size:12px; }
+    .pd-act.small { padding:3px 9px; font-size:12px; }
+    .pd-kv { display:grid; grid-template-columns:140px 1fr; gap:6px 12px; font-size:15px; margin:8px 0 10px; }
   </style>
 </head>
 <body class="closed">
@@ -676,10 +697,13 @@
     </div>
     <div id="paddock" class="card hidden">
       <div class="close">ESC · close</div>
-      <div class="pd-head"><div><div class="eyebrow">Night City Motorsports · The Paddock</div><h1>The Paddock</h1><div class="sub">The NPC motorsport world. Street by night, sanctioned by day. It races whether you watch or not.</div></div><div class="pd-meta" id="paddockMeta"></div></div>
-      <nav class="pd-tabs" id="paddockTabs" aria-label="Paddock views"></nav>
+      <div class="pd-head"><div><div class="eyebrow">Night City Motorsports · The Paddock</div><h1>The Paddock</h1><div class="sub">Night City's NPC motorsport world. Street by night, sanctioned by day. It races whether you watch or not.</div></div><div class="pd-meta" id="paddockMeta"></div></div>
       <div class="pd-feedback hidden" id="paddockFeedback"></div>
-      <div class="pd-body" id="paddockBody"></div>
+      <div class="pd-shell" id="paddockBody">
+        <nav class="pd-rail" id="paddockTabs" aria-label="Paddock sections"></nav>
+        <div class="pd-main" id="paddockMain"></div>
+        <aside class="pd-detail" id="paddockDetail"></aside>
+      </div>
       <div class="ncm-bottom" id="paddockNav"></div>
     </div>
     <div id="help" class="card hidden">
@@ -849,7 +873,7 @@
               first: which === "landing" ? "#landingDismiss" : null,
               scroller: document.getElementById(
                 which === "landing" ? "landingScroll" : which === "help" ? "helpScroll"
-                : which === "messages" ? "msgScroll" : which === "paddock" ? "paddockBody" : "") || null,
+                : which === "messages" ? "msgScroll" : which === "paddock" ? "paddockMain" : "") || null,
               // Back is ALSO resolved in Lua and does not wait for this. See client/nav_input.lua.
               onBack: () => Open77.emit("panel:closed", {}),
             });
@@ -2552,21 +2576,35 @@
       const paddockCard = document.getElementById("paddock");
       const paddockBody = document.getElementById("paddockBody");
       const paddockTabs = document.getElementById("paddockTabs");
+      const paddockMain = document.getElementById("paddockMain");
+      const paddockDetail = document.getElementById("paddockDetail");
       const paddockMeta = document.getElementById("paddockMeta");
       const paddockFeedback = document.getElementById("paddockFeedback");
-      const PADDOCK_TABS = [["wire", "WIRE"], ["standings", "STANDINGS"], ["results", "RESULTS"], ["pace", "PACE"],
-        ["directory", "DIRECTORY"], ["board", "BILLIE'S BOARD"], ["myorg", "MY ORG"]];
-      let paddockData = null, paddockView = "wire", paddockNotice = null, paddockPick = null;
+      // The rail. Each section is one server view; the subtitle says what it is for, so nobody has to guess.
+      const PADDOCK_TABS = [
+        ["today", "TODAY", "What's on now and what just happened"],
+        ["results", "RACES", "Upcoming and results · run one live"],
+        ["standings", "STANDINGS", "Season and Cup tables"],
+        ["directory", "TEAMS", "Every team and where they work"],
+        ["wire", "NEWS", "The Paddock wire"],
+        ["board", "BILLIE'S BOARD", "Positions on NPC races"],
+        ["myorg", "MY TEAM", "Found or run a team"],
+        ["pace", "PACE DATA", "NPC times against human times"]];
+      let paddockData = null, paddockDetailData = null, paddockView = "today", paddockNotice = null, paddockPick = null;
+      // Lua sends an empty list as {} (vocabulary.json cannot tell an empty array from an empty object). Every list this
+      // page reads goes through pdArr, so an empty one can never throw and take the whole tab down again.
+      const pdArr = (x) => Array.isArray(x) ? x : [];
       const pdEl = (tag, cls, txt) => { const e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = String(txt); return e; };
       const pdAsk = (req) => { if (req.view && req.view !== "box" && req.view !== "profile") paddockView = req.view; Open77.emit("panel:paddock.request", req); };
       const pdTime = (t) => { if (!t) return ""; const d = new Date(Number(t) * 1000); return String(d.getUTCHours()).padStart(2, "0") + ":" + String(d.getUTCMinutes()).padStart(2, "0") + " UTC"; };
-      const pdTags = (tags) => { const w = pdEl("span"); for (const t of (tags || [])) w.append(pdEl("span", "pd-tag", t)); return w; };
+      const pdTags = (tags) => { const w = pdEl("span"); for (const t of pdArr(tags)) w.append(pdEl("span", "pd-tag", t)); return w; };
       const pdCond = (r) => [r.weather || "", r.light === "night" ? "night" : "", Number(r.wet || 0) >= 0.5 ? "wet road" : ""].filter(Boolean).join(" · ");
+      const pdMoney = (n) => "€$" + Number(n || 0).toLocaleString();
       function pdTable(cols, rows, onRow) {
         const t = pdEl("table", "pd-table"), head = pdEl("tr");
         for (const c of cols) head.append(pdEl("th", null, c[0]));
         t.append(head);
-        for (const r of rows) {
+        for (const r of pdArr(rows)) {
           const tr = pdEl("tr", onRow ? "pd-click" : null);
           for (const c of cols) { const td = pdEl("td"); const v = c[1](r); if (v && typeof v === "object") td.append(v); else td.textContent = v == null ? "" : String(v); tr.append(td); }
           if (onRow) tr.addEventListener("click", () => onRow(r));
@@ -2579,11 +2617,21 @@
         for (const it of items) { const b = pdEl("button", it[0] === current ? "active" : null, it[1]); b.addEventListener("click", () => onPick(it[0])); bar.append(b); }
         return bar;
       }
+      // A titled block inside the main column or the detail pane.
+      function pdBlock(host, title, note) {
+        const box = pdEl("section", "pd-block");
+        const head = pdEl("div", "pd-block-head"); head.append(pdEl("span", null, title)); if (note) head.append(pdEl("span", "pd-block-note", note));
+        box.append(head); host.append(box);
+        return box;
+      }
+      const pdEmpty = (host, text) => host.append(pdEl("div", "pd-empty", text));
       function pdRenderTabs(current) {
         paddockTabs.innerHTML = "";
-        for (const [id, label] of PADDOCK_TABS) {
-          const b = pdEl("button", id === current ? "active" : null, label);
-          b.addEventListener("click", () => { paddockNotice = null; paddockPick = null; pdAsk({ view: id }); });
+        paddockTabs.append(pdEl("div", "eyebrow", "Sections"));
+        for (const [id, label, sub] of PADDOCK_TABS) {
+          const b = pdEl("button", "pd-rail-btn" + (id === current ? " selected" : ""));
+          b.append(pdEl("span", null, label), pdEl("small", null, sub));
+          b.addEventListener("click", () => { paddockNotice = null; paddockPick = null; paddockDetailData = null; pdAsk({ view: id }); });
           paddockTabs.append(b);
         }
       }
@@ -2592,234 +2640,324 @@
         if (paddockNotice) { paddockFeedback.textContent = paddockNotice.text; paddockFeedback.className = "pd-feedback" + (paddockNotice.ok ? "" : " bad"); }
       }
       const PD_ERRORS = { warming_up: "The Paddock is waking up. Give it a minute.", disabled: "The Paddock is switched off on this server.",
-        not_resolved: "That race is still on track. Results post when it finishes.", refused: "That view was refused.", failed: "That view failed to build." };
+        not_resolved: "That race is still on track. Results post when it finishes.", refused: "That view was refused.", failed: "That view failed to build.",
+        no_driver: "No Driver file on this server yet.", unknown: "Nothing by that name." };
 
-      function pdWire(d) {
-        const rows = d.rows || [];
-        if (!rows.length) { paddockBody.append(pdEl("div", "pd-dim", "Nothing on the wire yet. The first races post their results soon.")); return; }
-        for (const s of rows) {
+      // ---- shared pieces ---------------------------------------------------------------------------------------
+      function pdNextTable(host, next) {
+        const liveCell = (r) => {
+          if (r.live) return pdEl("span", "pd-live", "LIVE · " + r.live);
+          if (!r.canLive) return "";
+          const b = pdEl("button", "pd-act small", "HOLD: RUN IT LIVE");
+          holdAction(b, () => Open77.emit("panel:paddock.live", { raceId: r.raceId }));
+          return b;
+        };
+        host.append(pdTable([["ET", r => r.eastern], ["SERIES", r => r.series], ["ROUTE", r => r.route], ["STATUS", r => r.state], ["ON THE STREET", liveCell]], next));
+      }
+      function pdResultsTable(host, rows) {
+        host.append(pdTable([["WHEN", r => pdTime(r.at)], ["SERIES", r => r.series], ["ROUTE", r => r.route], ["WINNER", r => (r.winner || "") + (r.winnerOrg ? " · " + r.winnerOrg : "")],
+          ["", r => r.provenance === "physical" ? pdEl("span", "pd-live", "STREET") : pdCond(r)]], rows, (r) => pdAsk({ view: "box", raceId: r.raceId })));
+      }
+      function pdStories(host, rows) {
+        for (const s of pdArr(rows)) {
           const box = pdEl("div", "pd-story");
           box.append(pdEl("b", null, s.headline), pdEl("p", null, s.body), pdEl("small", null, pdTime(s.at)));
-          paddockBody.append(box);
+          host.append(box);
         }
       }
+      function pdHelp(title, lines) {
+        paddockDetail.append(pdEl("div", "eyebrow", "How this works"), pdEl("h2", null, title));
+        for (const l of lines) paddockDetail.append(pdEl("p", "pd-help", l));
+      }
+
+      // ---- main column, one per section -----------------------------------------------------------------------
+      function pdToday(d) {
+        const next = pdArr(d.next);
+        const b1 = pdBlock(paddockMain, "NEXT UP", "Races on the daily rhythm, Eastern time");
+        if (next.length) pdNextTable(b1, next); else pdEmpty(b1, "Nothing scheduled in the next two hours.");
+        const b2 = pdBlock(paddockMain, "LATEST RESULTS", "Click a race for its box score");
+        if (pdArr(d.results).length) pdResultsTable(b2, d.results); else pdEmpty(b2, "No finished races yet.");
+        const b3 = pdBlock(paddockMain, "HEADLINES", "From the wire");
+        if (pdArr(d.rows).length) pdStories(b3, d.rows); else pdEmpty(b3, "Nothing on the wire yet.");
+      }
+      function pdWire(d) {
+        const b = pdBlock(paddockMain, "THE WIRE", "The biggest stories rise; mid-table street results stay in RACES");
+        if (!pdArr(d.rows).length) { pdEmpty(b, "Nothing on the wire yet. The first races post their results soon."); return; }
+        pdStories(b, d.rows);
+      }
       function pdStandings(d) {
-        paddockBody.append(pdChips((d.series || []).map(s => [s.id, s.name + " · " + s.tier]), d.seriesId, (id) => pdAsk({ view: "standings", seriesId: id, scope: d.scope, kind: d.kind })));
-        paddockBody.append(pdChips([["season", "SEASON " + (d.seasonId || "")], ["cup", "THIS CUP (" + (d.cup || "") + ")"]], d.scope, (sc) => pdAsk({ view: "standings", seriesId: d.seriesId, scope: sc, kind: d.kind })));
-        paddockBody.append(pdChips([["driver", "DRIVERS"], ["org", "TEAMS"]], d.kind, (k) => pdAsk({ view: "standings", seriesId: d.seriesId, scope: d.scope, kind: k })));
-        const rows = d.rows || [];
-        if (!rows.length) { paddockBody.append(pdEl("div", "pd-dim", "No results in this " + (d.scope === "cup" ? "Cup" : "season") + " yet.")); return; }
+        const b = pdBlock(paddockMain, d.seriesName || "Standings", (d.tier || "") + (d.scope === "cup" ? " · this Cup" : " · season " + (d.seasonId || "")));
+        b.append(pdChips(pdArr(d.series).map(s => [s.id, s.name + " · " + s.tier]), d.seriesId, (id) => pdAsk({ view: "standings", seriesId: id, scope: d.scope, kind: d.kind })));
+        const toggles = pdEl("div", "pd-toggles");
+        toggles.append(pdChips([["season", "SEASON"], ["cup", "THIS CUP" + (d.cup ? " (" + d.cup + ")" : "")]], d.scope, (sc) => pdAsk({ view: "standings", seriesId: d.seriesId, scope: sc, kind: d.kind })),
+          pdChips([["driver", "DRIVERS"], ["org", "TEAMS"]], d.kind, (k) => pdAsk({ view: "standings", seriesId: d.seriesId, scope: d.scope, kind: k })));
+        b.append(toggles);
+        const rows = pdArr(d.rows);
+        if (!rows.length) { pdEmpty(b, "No results in this " + (d.scope === "cup" ? "Cup" : "season") + " yet."); return; }
         const cols = [["POS", r => r.pos], [d.kind === "org" ? "TEAM" : "DRIVER", r => { const w = pdEl("span"); if (r.colour) { const sw = pdEl("span", "pd-swatch"); sw.style.background = r.colour; w.append(sw); } w.append(pdEl("span", null, r.name + (r.human ? " (human-run)" : ""))); return w; }]];
         if (d.kind !== "org") cols.push(["TEAM", r => r.org]);
         cols.push(["PTS", r => r.pts], ["W", r => r.wins], ["POD", r => r.pod], ["STARTS", r => r.starts], ["", r => pdTags(r.tags)]);
-        paddockBody.append(pdTable(cols, rows, (r) => pdAsk({ view: "profile", kind: d.kind === "org" ? "org" : "person", id: r.id })));
+        b.append(pdTable(cols, rows, (r) => pdAsk({ view: "profile", kind: d.kind === "org" ? "org" : "person", id: r.id })));
       }
       function pdResults(d) {
-        if ((d.next || []).length) {
-          paddockBody.append(pdEl("div", "pd-section", "NEXT UP"));
-          // phase 5: a race inside its declaration window can be run live on the street (hold, because it spawns a grid)
-          const liveCell = (r) => {
-            if (r.live) return "LIVE · " + r.live;
-            if (!r.canLive) return "";
-            const b = pdEl("button", "pd-act small", "HOLD: RUN IT LIVE");
-            holdAction(b, () => Open77.emit("panel:paddock.live", { raceId: r.raceId }));
-            return b;
-          };
-          paddockBody.append(pdTable([["ET", r => r.eastern], ["SERIES", r => r.series], ["ROUTE", r => r.route], ["", r => r.state], ["", liveCell]], d.next));
-          if ((d.next || []).some(r => r.canLive)) paddockBody.append(pdEl("div", "pd-dim", "A live race spawns the real grid at the start line and runs it on the street. Be there before the lights; if the street run is clean, its result is the result."));
-        }
-        paddockBody.append(pdEl("div", "pd-section", "RESULTS"));
-        paddockBody.append(pdChips([["", "ALL"]].concat((d.series || []).map(s => [s.id, s.name])), d.seriesId || "", (id) => pdAsk({ view: "results", seriesId: id || null })));
-        const rows = d.rows || [];
-        if (!rows.length) { paddockBody.append(pdEl("div", "pd-dim", "No finished races yet.")); return; }
-        paddockBody.append(pdTable([["WHEN", r => pdTime(r.at)], ["SERIES", r => r.series], ["ROUTE", r => r.route], ["WINNER", r => r.winner + " · " + r.winnerOrg], ["CONDITIONS", r => pdCond(r)]],
-          rows, (r) => pdAsk({ view: "box", raceId: r.raceId })));
-      }
-      function pdBox(d) {
-        const back = pdEl("button", "pd-act small", "BACK TO RESULTS"); back.addEventListener("click", () => pdAsk({ view: "results" }));
-        paddockBody.append(back, pdEl("div", "pd-section", (d.series || "") + " · " + (d.route || "")));
-        paddockBody.append(pdEl("div", "pd-dim", [pdTime(d.at), pdCond(d), (d.provenance || "simulated").toUpperCase(), "seed commit " + (d.commit || "-")].filter(Boolean).join(" · ")));
-        paddockBody.append(pdTable([["POS", r => r.state === "finished" ? r.pos : "DNF"], ["GRID", r => r.grid], ["DRIVER", r => r.driver], ["TEAM", r => r.org], ["TIME", r => r.time != null ? r.time.toFixed(2) + "s" : ""], ["GAP", r => r.gap || ""], ["PTS", r => r.points || ""], ["", r => r.note || ""]],
-          d.rows || [], (r) => pdAsk({ view: "profile", kind: "person", id: r.driverId })));
+        const next = pdArr(d.next);
+        const b1 = pdBlock(paddockMain, "NEXT UP", "Hold RUN IT LIVE to race the grid on the street");
+        if (next.length) pdNextTable(b1, next); else pdEmpty(b1, "Nothing scheduled in the next two hours.");
+        const b2 = pdBlock(paddockMain, "RESULTS", "Click a race for its box score");
+        b2.append(pdChips([["", "ALL SERIES"]].concat(pdArr(d.series).map(s => [s.id, s.name])), d.seriesId || "", (id) => pdAsk({ view: "results", seriesId: id || null })));
+        if (!pdArr(d.rows).length) { pdEmpty(b2, "No finished races yet."); return; }
+        pdResultsTable(b2, d.rows);
       }
       function pdPace(d) {
-        paddockBody.append(pdEl("div", "pd-dim", (d.note || "") + " Human medians count only past " + d.minN + " runs from " + d.minDrivers + " drivers; until then the NPC sim runs on its declared baseline."));
-        const rows = d.rows || [];
-        if (!rows.length) { paddockBody.append(pdEl("div", "pd-dim", "No dry daylight finishes yet.")); return; }
-        paddockBody.append(pdTable([["ROUTE", r => r.route], ["TIER", r => r.tier], ["NPC MEDIAN", r => r.npcSec != null ? r.npcSec.toFixed(2) + "s" : "-"], ["NPC RACES", r => r.npcRaces],
+        const b = pdBlock(paddockMain, "PACE DATA", d.note || "");
+        const rows = pdArr(d.rows);
+        if (!rows.length) { pdEmpty(b, "No dry daylight finishes yet."); return; }
+        b.append(pdTable([["ROUTE", r => r.route], ["TIER", r => r.tier], ["NPC MEDIAN", r => r.npcSec != null ? r.npcSec.toFixed(2) + "s" : "-"], ["NPC RACES", r => r.npcRaces],
           ["SERVER HUMANS", r => r.humanSec != null ? r.humanSec.toFixed(2) + "s" : "not enough data"], ["RUNS / DRIVERS", r => (r.humanRuns || 0) + " / " + (r.humanDrivers || 0)]], rows));
       }
       function pdDirectory(d) {
-        let tier = null;
-        const rows = d.rows || [];
-        for (const r of rows) {
-          if (r.tier !== tier) { tier = r.tier; paddockBody.append(pdEl("div", "pd-section", (tier || "").toUpperCase())); }
-          const line = pdEl("div", "pd-line");
-          const name = pdEl("span"); if (r.colour) { const sw = pdEl("span", "pd-swatch"); sw.style.background = r.colour; name.append(sw); }
-          name.append(pdEl("b", null, r.name), pdEl("span", "pd-dim", "  " + (r.org || "") + (r.human ? " · human-run" : "") + (r.circuit === "sanctioned" ? " · human sanctioned team" : "")));
-          line.append(name, pdTags(r.tags));
-          if (r.circuit === "npc") { line.classList.add("pd-click"); line.addEventListener("click", () => pdAsk({ view: "profile", kind: "org", id: r.id })); }
-          paddockBody.append(line);
-        }
-      }
-      function pdProfile(d) {
-        const p = d.profile || {};
-        const back = pdEl("button", "pd-act small", "BACK"); back.addEventListener("click", () => pdAsk({ view: paddockView }));
-        paddockBody.append(back, pdEl("div", "pd-section", (p.name || "").toUpperCase()));
-        const kv = pdEl("div", "pd-kv");
-        const add = (k, v) => { if (v != null && v !== "") kv.append(pdEl("span", null, k), pdEl("span", null, v)); };
-        if (d.kind === "org") {
-          add("TIER", p.tier); add("SERIES", p.series); add("OWNER", p.owner); add("MANAGER", p.manager);
-          add("SPONSORS", (p.sponsors || []).join(", ")); add("FOUNDED", p.founded);
-          if (p.garage) add("GARAGE", p.garage.label + (p.garage.hours ? " · " + p.garage.hours : "") + (p.garage.here ? " · in now" : ""));
-        } else {
-          add("ROLE", p.role); add("TEAM", p.org); add("FROM", p.region); add("AGE", p.ageBand);
-          add("RECORD", (p.wins || 0) + " wins · " + (p.podiums || 0) + " podiums · " + (p.starts || 0) + " starts");
-        }
-        paddockBody.append(kv, pdTags(p.tags));
-        const rows = d.rows || [];
-        if (d.kind === "org") {
-          paddockBody.append(pdEl("div", "pd-section", "PEOPLE"));
-          paddockBody.append(pdTable([["NAME", r => r.name], ["ROLE", r => r.role + (r.seat && r.role === "driver" ? " · " + r.seat : "")], ["AGE", r => r.ageBand], ["", r => pdTags(r.tags)]],
-            rows, (r) => pdAsk({ view: "profile", kind: "person", id: r.id })));
-        } else if (rows.length) {
-          paddockBody.append(pdEl("div", "pd-section", "RECENT RACES"));
-          paddockBody.append(pdTable([["WHEN", r => pdTime(r.at)], ["SERIES", r => r.series], ["ROUTE", r => r.route], ["GRID", r => r.grid], ["FINISH", r => r.state === "finished" ? "P" + r.pos : "DNF"]],
-            rows, (r) => pdAsk({ view: "box", raceId: r.raceId })));
+        const rows = pdArr(d.rows);
+        const tiers = [];
+        for (const r of rows) if (!tiers.includes(r.tier)) tiers.push(r.tier);
+        if (!rows.length) { pdEmpty(paddockMain, "No teams yet."); return; }
+        for (const tier of tiers) {
+          const b = pdBlock(paddockMain, String(tier || "").toUpperCase());
+          b.append(pdTable([["TEAM", r => { const w = pdEl("span"); if (r.colour) { const sw = pdEl("span", "pd-swatch"); sw.style.background = r.colour; w.append(sw); }
+              w.append(pdEl("b", null, r.name)); if (r.human) w.append(pdEl("span", "pd-dim", " · human-run")); if (r.circuit === "sanctioned") w.append(pdEl("span", "pd-dim", " · human sanctioned team")); return w; }],
+            ["SERIES", r => r.org || ""],
+            ["GARAGE", r => r.garage ? (r.garage.label + (r.garage.hours ? " · " + r.garage.hours : "")) : ""],
+            ["", r => r.garage && r.garage.here ? pdEl("span", "pd-live", "IN NOW") : ""],
+            ["", r => pdTags(r.tags)]],
+            rows.filter(r => r.tier === tier), (r) => { if (r.circuit === "npc") pdAsk({ view: "profile", kind: "org", id: r.id }); }));
         }
       }
       function pdBoard(d) {
-        paddockBody.append(pdEl("div", "pd-quote", "“" + (d.voice || "") + "”  — BookQueen Billie"));
-        if (!d.knows) paddockBody.append(pdEl("div", "pd-dim", "Billie doesn't know you yet. The board is open to read; writing paper takes an introduction. Rico knows a book."));
-        paddockBody.append(pdEl("div", "pd-dim", "Today: " + Number(d.stakedToday || 0).toLocaleString() + " of " + Number((d.caps || {}).daily || 0).toLocaleString() +
-          " staked · up to " + Number((d.caps || {}).perSlip || 0).toLocaleString() + " a slip · balance €$" + Number(d.balance || 0).toLocaleString()));
-        const rows = d.rows || [];
-        const races = d.races || [];
-        if (!races.length) paddockBody.append(pdEl("div", "pd-dim", "Nothing on the board. Lines open fifteen minutes before a race."));
+        const rows = pdArr(d.rows);
+        const races = pdArr(d.races);
+        const b = pdBlock(paddockMain, "THE BOARD", "Pick a price to write a slip");
+        if (!races.length) pdEmpty(b, "Nothing on the board. Lines open fifteen minutes before a race.");
         for (const race of races) {
-          paddockBody.append(pdEl("div", "pd-section", race.eastern + " ET · " + race.series + " · " + race.route + (race.weather ? " · " + race.weather : "")));
+          b.append(pdEl("div", "pd-section", race.eastern + " ET · " + race.series + " · " + race.route + (race.weather ? " · " + race.weather : "")));
           for (const l of rows.filter(r => r.t === "line" && r.raceId === race.raceId)) {
             const line = pdEl("div", "pd-line" + (l.refused ? " refused" : "") + (paddockPick && paddockPick.lineId === l.lineId ? " picked" : ""));
             line.append(pdEl("span", null, l.label));
             if (l.refused) line.append(pdEl("span", "pd-dim", d.refusal || "Not that one."));
             else if (l.price && l.open) {
-              const b = pdEl("button", null, l.price.toFixed(2));
-              b.disabled = !d.knows;
-              b.addEventListener("click", () => { paddockPick = l; paddockNotice = null; renderPaddock(null); });
-              line.append(b);
+              const btn = pdEl("button", null, l.price.toFixed(2));
+              btn.disabled = !d.knows;
+              btn.addEventListener("click", () => { paddockPick = l; paddockNotice = null; renderPaddock(null); });
+              line.append(btn);
             } else line.append(pdEl("span", "pd-dim", l.price ? l.price.toFixed(2) + " · closed" : "no line"));
-            paddockBody.append(line);
-            if (paddockPick && paddockPick.lineId === l.lineId) {
-              const f = pdEl("div", "pd-form");
-              const stake = pdEl("input"); stake.type = "number"; stake.min = "1"; stake.step = "1"; stake.value = "50"; stake.setAttribute("aria-label", "Stake");
-              const ret = pdEl("span", "pd-dim", "");
-              const upd = () => { ret.textContent = "returns " + Math.floor((Number(stake.value) || 0) * l.price).toLocaleString(); };
-              stake.addEventListener("input", upd); upd();
-              const write = pdEl("button", null, "HOLD TO WRITE PAPER");
-              holdAction(write, () => Open77.emit("panel:paddock.slip", { lineId: l.lineId, version: l.version, stake: Math.floor(Number(stake.value) || 0), idem: uuid4() }));
-              f.append(pdEl("span", null, "STAKE"), stake, ret, write);
-              paddockBody.append(f);
-            }
+            b.append(line);
           }
-        }
-        const slips = rows.filter(r => r.t === "slip");
-        if (slips.length) {
-          paddockBody.append(pdEl("div", "pd-section", "YOUR PAPER"));
-          paddockBody.append(pdTable([["", r => r.label], ["STAKE", r => r.stake], ["AT", r => (r.price || 0).toFixed(2)], ["RETURNS", r => r.returns], ["", r => r.state === "won" ? "WON " + r.payout : r.state.toUpperCase()]], slips));
         }
       }
       function pdMyOrg(d) {
-        const rows = d.rows || [];
+        const rows = pdArr(d.rows);
         const act = (action, args) => Open77.emit("panel:paddock.manager", { action: action, args: args || {} });
         if (!d.manager) {
-          paddockBody.append(pdEl("div", "pd-section", "FOUND A TEAM"));
-          if (d.affiliated) { paddockBody.append(pdEl("div", "pd-dim", "You already hold a team role (" + d.affiliation + "). One team at a time.")); }
+          const b = pdBlock(paddockMain, "FOUND A TEAM", "Start at the bottom, in Street");
+          if (d.affiliated) { pdEmpty(b, "You already hold a team role (" + d.affiliation + "). One team at a time."); }
           else {
-            paddockBody.append(pdEl("div", "pd-dim", "Start at the bottom: a Street team for €$" + Number(d.fee || 0).toLocaleString() + " of your money, with a backer's €$" +
-              Number(d.grant || 0).toLocaleString() + " on top and two rookies. Your AI drivers race; you run the team. Balance €$" + Number(d.balance || 0).toLocaleString() + "."));
-            if (d.cooldownUntil != null && Number(d.seasonOrdinal) < Number(d.cooldownUntil)) paddockBody.append(pdEl("div", "pd-dim", "Your last team folded. You can found again next season."));
+            b.append(pdEl("p", "pd-help", "A Street team for " + pdMoney(d.fee) + " of your money, with a backer's " + pdMoney(d.grant) +
+              " on top and two rookies. Your AI drivers race; you run the team. Balance " + pdMoney(d.balance) + "."));
+            if (d.cooldownUntil != null && Number(d.seasonOrdinal) < Number(d.cooldownUntil)) b.append(pdEl("div", "pd-dim", "Your last team folded. You can found again next season."));
             const f = pdEl("div", "pd-form"); const name = pdEl("input", "wide"); name.placeholder = "Team name"; name.setAttribute("aria-label", "Team name");
             const go = pdEl("button", null, "HOLD TO FOUND"); holdAction(go, () => act("found", { name: name.value }));
-            f.append(name, go); paddockBody.append(f);
+            f.append(name, go); b.append(f);
           }
           const offers = rows.filter(r => r.t === "offer");
           if (offers.length) {
-            paddockBody.append(pdEl("div", "pd-section", "OFFERS"));
+            const o2 = pdBlock(paddockMain, "OFFERS", "An owner wants you to run their team");
             for (const o of offers) {
               const line = pdEl("div", "pd-line");
               line.append(pdEl("span", null, o.from + " offers you " + o.org + " (" + o.tier + ")"));
-              const b = pdEl("button", null, "ACCEPT"); b.addEventListener("click", () => act("accept", { offerId: o.offerId })); line.append(b);
-              paddockBody.append(line);
+              const btn = pdEl("button", null, "ACCEPT"); btn.addEventListener("click", () => act("accept", { offerId: o.offerId })); line.append(btn);
+              o2.append(line);
             }
           }
           return;
         }
         const org = d.org || {};
-        paddockBody.append(pdEl("div", "pd-section", (org.name || "") + " · " + (org.tier || "") + " · " + (org.series || "")), pdTags(org.tags));
+        const head = pdBlock(paddockMain, org.name || "Your team", (org.tier || "") + " · " + (org.series || ""));
+        head.append(pdTags(org.tags));
         const kv = pdEl("div", "pd-kv");
         const add = (k, v) => kv.append(pdEl("span", null, k), pdEl("span", null, v));
-        add("TREASURY", "€$" + Number(d.treasury || 0).toLocaleString()); add("OWNER", org.owner || "");
+        add("TREASURY", pdMoney(d.treasury)); add("OWNER", org.owner || "");
         add("ENGINEER", d.engineer || ""); add("STRATEGIST", d.strategist || "");
-        add("WITHDRAWN THIS CUP", Number(d.withdrawnThisWeek || 0) + " of " + Number(d.weeklyCap || 0) + " (tax " + Math.round(Number(d.tax || 0) * 100) + "%)");
-        paddockBody.append(kv);
-        if ((d.pending || []).length) {
-          paddockBody.append(pdEl("div", "pd-section", "WAITING FOR THE CUP BOUNDARY"));
-          for (const p of d.pending) paddockBody.append(pdEl("div", "pd-dim", p.kind + " " + (p.driver || "") + (p.seat ? " -> " + p.seat : "")));
+        head.append(kv);
+        if (pdArr(d.pending).length) {
+          const p = pdBlock(paddockMain, "WAITING FOR THE CUP BOUNDARY", "Roster moves land when the week turns");
+          for (const x of pdArr(d.pending)) p.append(pdEl("div", "pd-dim", x.kind + " " + (x.driver || "") + (x.seat ? " -> " + x.seat : "")));
         }
-        paddockBody.append(pdEl("div", "pd-section", "ROSTER"));
-        paddockBody.append(pdTable([["DRIVER", r => r.name], ["SEAT", r => r.seat], ["AGE", r => r.ageBand], ["WAGE", r => r.wage], ["RECORD", r => r.wins + "W / " + r.starts], ["", r => pdTags(r.tags)],
+        const r1 = pdBlock(paddockMain, "ROSTER");
+        r1.append(pdTable([["DRIVER", r => r.name], ["SEAT", r => r.seat], ["AGE", r => r.ageBand], ["WAGE", r => r.wage], ["RECORD", r => r.wins + "W / " + r.starts], ["", r => pdTags(r.tags)],
           ["", r => { const w = pdEl("span"); const seat = pdEl("button", "pd-act small", r.seat === "reserve" ? "TO RACE SEAT" : "TO RESERVE");
             seat.addEventListener("click", (e) => { if (e && e.stopPropagation) e.stopPropagation(); act("seat", { driverId: r.id, seat: r.seat === "reserve" ? "race1" : "reserve" }); });
             const rel = pdEl("button", "pd-act small", "RELEASE"); rel.addEventListener("click", (e) => { if (e && e.stopPropagation) e.stopPropagation(); act("release", { driverId: r.id }); });
             w.append(seat, rel); return w; }]], rows.filter(r => r.t === "driver")));
-        paddockBody.append(pdEl("div", "pd-section", "CAR DEVELOPMENT"));
-        for (const c of (d.car || [])) {
+        const c1 = pdBlock(paddockMain, "CAR DEVELOPMENT", "Money in, level out; each level costs more");
+        for (const c of pdArr(d.car)) {
           const f = pdEl("div", "pd-form"); const amt = pdEl("input"); amt.type = "number"; amt.value = String(c.next || 0); amt.setAttribute("aria-label", c.area + " spend");
-          const b = pdEl("button", null, "INVEST"); b.addEventListener("click", () => act("develop", { area: c.area, eddies: Math.floor(Number(amt.value) || 0) }));
-          f.append(pdEl("span", null, c.area.replace("_", " ").toUpperCase() + " · level " + c.level + " · next €$" + Number(c.next || 0).toLocaleString()), amt, b);
-          paddockBody.append(f);
+          const btn = pdEl("button", null, "INVEST"); btn.addEventListener("click", () => act("develop", { area: c.area, eddies: Math.floor(Number(amt.value) || 0) }));
+          f.append(pdEl("span", "pd-form-label", String(c.area || "").replace("_", " ").toUpperCase() + " · level " + c.level + " · next " + pdMoney(c.next)), amt, btn);
+          c1.append(f);
         }
-        paddockBody.append(pdEl("div", "pd-section", "FREE AGENTS"));
-        paddockBody.append(pdTable([["DRIVER", r => r.name], ["FROM", r => r.region], ["AGE", r => r.ageBand], ["ASKS", r => r.ask], ["", r => pdTags(r.tags)],
+        const fa = pdBlock(paddockMain, "FREE AGENTS", "Offers are decided at the Cup boundary");
+        fa.append(pdTable([["DRIVER", r => r.name], ["FROM", r => r.region], ["AGE", r => r.ageBand], ["ASKS", r => r.ask], ["", r => pdTags(r.tags)],
           ["", r => { const w = pdEl("span"); const wage = pdEl("input"); wage.type = "number"; wage.value = String(r.ask); wage.setAttribute("aria-label", "Wage offer");
-            const b = pdEl("button", "pd-act small", "OFFER 2 SEASONS"); b.addEventListener("click", () => act("sign", { driverId: r.id, wage: Math.floor(Number(wage.value) || 0), seasons: 2 }));
-            w.append(wage, b); return w; }]], rows.filter(r => r.t === "fa")));
+            const btn = pdEl("button", "pd-act small", "OFFER 2 SEASONS"); btn.addEventListener("click", () => act("sign", { driverId: r.id, wage: Math.floor(Number(wage.value) || 0), seasons: 2 }));
+            w.append(wage, btn); return w; }]], rows.filter(r => r.t === "fa")));
         const sponsors = rows.filter(r => r.t === "sponsor");
         if (sponsors.length) {
-          paddockBody.append(pdEl("div", "pd-section", "SPONSORS LOOKING"));
+          const s1 = pdBlock(paddockMain, "SPONSORS LOOKING");
           for (const s of sponsors) {
             const line = pdEl("div", "pd-line"); line.append(pdEl("span", null, s.name + " · " + s.industry + " · " + s.perDay + "/day"));
-            const b = pdEl("button", null, "SIGN"); b.addEventListener("click", () => act("sign_sponsor", { sponsorId: s.id })); line.append(b); paddockBody.append(line);
+            const btn = pdEl("button", null, "SIGN"); btn.addEventListener("click", () => act("sign_sponsor", { sponsorId: s.id })); line.append(btn); s1.append(line);
           }
         }
-        paddockBody.append(pdEl("div", "pd-section", "MONEY"));
-        const f = pdEl("div", "pd-form"); const amt = pdEl("input"); amt.type = "number"; amt.value = "500"; amt.setAttribute("aria-label", "Amount");
-        const dep = pdEl("button", null, "DEPOSIT"); dep.addEventListener("click", () => act("deposit", { eddies: Math.floor(Number(amt.value) || 0), idem: uuid4() }));
-        const wd = pdEl("button", null, "WITHDRAW"); wd.addEventListener("click", () => act("withdraw", { eddies: Math.floor(Number(amt.value) || 0), idem: uuid4() }));
-        f.append(amt, dep, wd); paddockBody.append(f);
-        const book = rows.filter(r => r.t === "book");
-        if (book.length) paddockBody.append(pdTable([["WHEN", r => pdTime(r.at)], ["", r => r.kind], ["AMOUNT", r => r.amount]], book));
-        const resign = pdEl("button", "pd-act", "HOLD TO STEP DOWN"); holdAction(resign, () => act("resign")); paddockBody.append(resign);
+      }
+
+      // ---- the detail pane: a selection, or the section's own explainer --------------------------------------------
+      function pdBoxDetail(d) {
+        paddockDetail.append(pdEl("div", "eyebrow", "Box score"), pdEl("h2", null, (d.route || "") + ""));
+        paddockDetail.append(pdEl("div", "pd-dim", [d.series, pdTime(d.at), pdCond(d)].filter(Boolean).join(" · ")));
+        paddockDetail.append(pdEl("div", d.provenance === "physical" ? "pd-live pd-prov" : "pd-dim pd-prov",
+          d.provenance === "physical" ? "RUN ON THE STREET · result is physical" : "SIMULATED · seed commit " + (d.commit || "-")));
+        paddockDetail.append(pdTable([["POS", r => r.state === "finished" ? r.pos : "DNF"], ["DRIVER", r => r.driver], ["TIME", r => r.time != null ? r.time.toFixed(2) + "s" : (r.note || "")], ["GAP", r => r.gap || ""], ["PTS", r => r.points || ""]],
+          d.rows, (r) => pdAsk({ view: "profile", kind: "person", id: r.driverId })));
+      }
+      function pdProfileDetail(d) {
+        const p = d.profile || {};
+        paddockDetail.append(pdEl("div", "eyebrow", d.kind === "org" ? "Team" : (p.role || "Person")), pdEl("h2", null, p.name || ""));
+        const kv = pdEl("div", "pd-kv");
+        const add = (k, v) => { if (v != null && v !== "") kv.append(pdEl("span", null, k), pdEl("span", null, v)); };
+        if (d.kind === "org") {
+          add("TIER", p.tier); add("SERIES", p.series); add("OWNER", p.owner); add("MANAGER", p.manager);
+          add("SPONSORS", pdArr(p.sponsors).join(", ")); add("FOUNDED", p.founded);
+          if (p.garage) add("GARAGE", p.garage.label + (p.garage.hours ? " · " + p.garage.hours : "") + (p.garage.here ? " · in now" : ""));
+        } else {
+          add("ROLE", p.role); add("TEAM", p.org); add("FROM", p.region); add("AGE", p.ageBand);
+          add("RECORD", (p.wins || 0) + " wins · " + (p.podiums || 0) + " podiums · " + (p.starts || 0) + " starts");
+        }
+        paddockDetail.append(kv, pdTags(p.tags));
+        const rows = pdArr(d.rows);
+        if (d.kind === "org") {
+          paddockDetail.append(pdEl("div", "pd-section", "PEOPLE"));
+          paddockDetail.append(pdTable([["NAME", r => r.name], ["ROLE", r => r.role + (r.seat && r.role === "driver" ? " · " + r.seat : "")], ["", r => pdTags(r.tags)]],
+            rows.filter(r => r.t === "person"), (r) => pdAsk({ view: "profile", kind: "person", id: r.id })));
+        } else if (rows.length) {
+          paddockDetail.append(pdEl("div", "pd-section", "RECENT RACES"));
+          paddockDetail.append(pdTable([["ROUTE", r => r.route], ["GRID", r => r.grid], ["FINISH", r => r.state === "finished" ? "P" + r.pos : "DNF"]],
+            rows, (r) => pdAsk({ view: "box", raceId: r.raceId })));
+        }
+      }
+      function pdSlipDetail(d, l) {
+        paddockDetail.append(pdEl("div", "eyebrow", "Your slip"), pdEl("h2", null, l.label));
+        paddockDetail.append(pdEl("div", "pd-price", "at " + l.price.toFixed(2)));
+        const f = pdEl("div", "pd-form");
+        const stake = pdEl("input"); stake.type = "number"; stake.min = "1"; stake.step = "1"; stake.value = "50"; stake.setAttribute("aria-label", "Stake");
+        const ret = pdEl("span", "pd-dim", "");
+        const upd = () => { ret.textContent = "returns " + Math.floor((Number(stake.value) || 0) * l.price).toLocaleString(); };
+        stake.addEventListener("input", upd); upd();
+        const write = pdEl("button", null, "HOLD TO WRITE PAPER");
+        holdAction(write, () => Open77.emit("panel:paddock.slip", { lineId: l.lineId, version: l.version, stake: Math.floor(Number(stake.value) || 0), idem: uuid4() }));
+        f.append(pdEl("span", "pd-form-label", "STAKE"), stake, ret, write);
+        paddockDetail.append(f);
+        paddockDetail.append(pdEl("p", "pd-help", "No cancel. Paper is paper. The price is locked when you sign; if it moved, Billie tells you to look again."));
+      }
+      function pdDefaultDetail(view, d) {
+        if (view === "today") {
+          const me = d.me || {};
+          paddockDetail.append(pdEl("div", "eyebrow", "You"), pdEl("h2", null, "Your Paddock"));
+          const kv = pdEl("div", "pd-kv");
+          const add = (k, v) => kv.append(pdEl("span", null, k), pdEl("span", null, v));
+          add("TEAM", me.team ? me.team + " · " + (me.teamTier || "") : "none · MY TEAM to found one");
+          add("BILLIE", me.knowsBillie ? (me.openSlips || 0) + " open slip(s)" : "not introduced · Rico knows a book");
+          add("BALANCE", pdMoney(me.balance));
+          if (me.live) add("LIVE RACE", me.live.state + " · " + (me.live.route || "") + " · " + (me.live.at || "") + " ET");
+          paddockDetail.append(kv);
+          pdHelp("The NPC world", ["Sixty teams race on their own calendar, Eastern time: Street at night, Regional and Pro by day, the Premier feature at 15:00.",
+            "Every race is simulated unless someone runs it live on the street. RACES → NEXT UP → hold RUN IT LIVE, then be at the start line.",
+            "Their people work out of rented garages. TEAMS shows where and when; walk up while they're in to talk."]);
+        } else if (view === "results") {
+          pdHelp("Races", ["Click a result for its box score here.",
+            "RUN IT LIVE declares a race for the street: the grid spawns at the start 75 seconds before the lights, and the cars drive at the pace the sim gave each driver.",
+            "Be at the start line (a waypoint is set). If the street run is clean, its result replaces the sim's and the box score says STREET."]);
+        } else if (view === "standings") {
+          pdHelp("Standings", ["Pick a series, then season or this Cup, drivers or teams.", "Click a row to see who they are. Tags are earned from results, never guessed."]);
+        } else if (view === "directory") {
+          pdHelp("Teams", ["Every NPC team, by tier, with the garage it rents and its hours (Eastern).", "IN NOW means the crew is at the garage: go there to meet them.", "Click a team for its people."]);
+        } else if (view === "wire") {
+          pdHelp("The wire", ["Headlines are written from what actually happened: results, upsets, streaks, signings, folds.", "Every story names the facts it came from."]);
+        } else if (view === "board") {
+          paddockDetail.append(pdEl("div", "pd-quote", "“" + (d.voice || "") + "”  — BookQueen Billie"));
+          const caps = d.caps || {};
+          paddockDetail.append(pdEl("div", "pd-dim", "Today " + Number(d.stakedToday || 0).toLocaleString() + " of " + Number(caps.daily || 0).toLocaleString() +
+            " staked · up to " + Number(caps.perSlip || 0).toLocaleString() + " a slip · balance " + pdMoney(d.balance)));
+          if (!d.knows) paddockDetail.append(pdEl("p", "pd-help", "Billie doesn't know you yet. The board is open to read; writing paper takes an introduction. Rico knows a book."));
+          const slips = pdArr(d.rows).filter(r => r.t === "slip");
+          if (slips.length) {
+            paddockDetail.append(pdEl("div", "pd-section", "YOUR PAPER"));
+            paddockDetail.append(pdTable([["", r => r.label], ["STAKE", r => r.stake], ["AT", r => (r.price || 0).toFixed(2)], ["", r => r.state === "won" ? "WON " + r.payout : String(r.state || "").toUpperCase()]], slips));
+          }
+        } else if (view === "myorg") {
+          if (d.manager) {
+            paddockDetail.append(pdEl("div", "eyebrow", "Money"), pdEl("h2", null, pdMoney(d.treasury)));
+            paddockDetail.append(pdEl("div", "pd-dim", "Withdrawn this Cup " + pdMoney(d.withdrawnThisWeek) + " of " + pdMoney(d.weeklyCap) + " · tax " + Math.round(Number(d.tax || 0) * 100) + "%"));
+            const f = pdEl("div", "pd-form"); const amt = pdEl("input"); amt.type = "number"; amt.value = "500"; amt.setAttribute("aria-label", "Amount");
+            const act = (action, args) => Open77.emit("panel:paddock.manager", { action: action, args: args || {} });
+            const dep = pdEl("button", null, "DEPOSIT"); dep.addEventListener("click", () => act("deposit", { eddies: Math.floor(Number(amt.value) || 0), idem: uuid4() }));
+            const wd = pdEl("button", null, "WITHDRAW"); wd.addEventListener("click", () => act("withdraw", { eddies: Math.floor(Number(amt.value) || 0), idem: uuid4() }));
+            f.append(amt, dep, wd); paddockDetail.append(f);
+            const book = pdArr(d.rows).filter(r => r.t === "book");
+            if (book.length) paddockDetail.append(pdTable([["WHEN", r => pdTime(r.at)], ["", r => r.kind], ["AMOUNT", r => r.amount]], book));
+            const resign = pdEl("button", "pd-act", "HOLD TO STEP DOWN"); holdAction(resign, () => act("resign")); paddockDetail.append(resign);
+          } else {
+            pdHelp("Running a team", ["You manage; the AI drivers race. No per-race orders: you pick the roster, the car development, the sponsors.",
+              "Moves land at the Cup boundary. One team at a time (the One-Team Rule)."]);
+          }
+        } else if (view === "pace") {
+          pdHelp("Pace data", ["How fast the NPC sim runs each route against real human times on this server.",
+            "Human medians count only past " + (d.minN || 8) + " runs from " + (d.minDrivers || 3) + " drivers; until then the sim runs on its declared baseline."]);
+        }
+      }
+
+      // A list view replaces the main column; a box score or a profile goes to the detail pane and leaves the list.
+      function pdTake(data) {
+        if (!data || typeof data !== "object") return;
+        if (data.view === "box" || data.view === "profile") paddockDetailData = data;
+        else { paddockData = data; if (data.view !== paddockView && !data.loading) paddockDetailData = null; }
       }
       function renderPaddock(data) {
-        if (data) paddockData = data;
+        if (data) pdTake(data);
         const d = paddockData || { view: paddockView, rows: [], loading: true };
         const view = d.view || paddockView;
-        pdRenderTabs(view === "box" || view === "profile" ? paddockView : view);
+        pdRenderTabs(view);
         pdFeedback();
-        paddockBody.innerHTML = "";
-        paddockMeta.textContent = d.seasonId ? (d.seasonId + (d.cup ? " · Cup " + d.cup : "")) : "";
-        if (d.loading) { paddockBody.append(pdEl("div", "pd-dim", "Loading the Paddock…")); return; }
-        if (d.error) { paddockBody.append(pdEl("div", "pd-dim", PD_ERRORS[d.error] || String(d.error))); return; }
-        if (view === "wire") pdWire(d);
+        paddockMain.innerHTML = "";
+        paddockDetail.innerHTML = "";
+        const meta = d.meta || (paddockDetailData && paddockDetailData.meta) || {};
+        paddockMeta.innerHTML = "";
+        if (meta.eastern) paddockMeta.append(pdEl("div", "pd-clock", meta.eastern + " ET"));
+        if (meta.phase) paddockMeta.append(pdEl("div", null, meta.phase));
+        if (meta.seasonId) paddockMeta.append(pdEl("div", null, meta.seasonId + (meta.cup ? " · Cup " + meta.cup : "")));
+        if (d.loading) pdEmpty(paddockMain, "Loading the Paddock…");
+        else if (d.error) pdEmpty(paddockMain, PD_ERRORS[d.error] || String(d.error));
+        else if (view === "today") pdToday(d);
+        else if (view === "wire") pdWire(d);
         else if (view === "standings") pdStandings(d);
         else if (view === "results") pdResults(d);
-        else if (view === "box") pdBox(d);
         else if (view === "pace") pdPace(d);
         else if (view === "directory") pdDirectory(d);
-        else if (view === "profile") pdProfile(d);
         else if (view === "board") pdBoard(d);
         else if (view === "myorg") pdMyOrg(d);
+        const det = paddockDetailData;
+        if (view === "board" && paddockPick && d.knows) pdSlipDetail(d, paddockPick);
+        else if (det && det.error) { pdEmpty(paddockDetail, PD_ERRORS[det.error] || String(det.error)); }
+        else if (det && det.view === "box") pdBoxDetail(det);
+        else if (det && det.view === "profile") pdProfileDetail(det);
+        else if (!d.loading && !d.error) pdDefaultDetail(view, d);
       }
 
       function drawnReport(what) {
@@ -3807,7 +3945,7 @@
       Open77.on("panel:graph", (d) => { lastGraphData = d; if (mode === "messages") guard("messages", renderMessages); });
       Open77.on("panel:trade", (d) => { tradeData=d||{state:"idle",rows:[]}; if(mode==="trade")guard("trade",()=>renderTrade(tradeData)); });
       Open77.on("panel:trade.result", (d) => { tradeNotice={ok:!!(d&&d.ok),text:(d&&d.ok)?(d.state==="settled"?"EXCHANGE COMPLETE · receipt recorded":d.state==="waiting"?"REVISION CONFIRMED · waiting for the other Driver":"EXCHANGE UPDATED"):String((d&&d.reason)||"Exchange refused")};if(mode==="trade")guard("trade",()=>renderTrade(null)); });
-      Open77.on("panel:paddock", (d) => { paddockData = d || { view: paddockView, rows: [] }; if (mode === "paddock") guard("paddock", () => renderPaddock(paddockData)); });
+      Open77.on("panel:paddock", (d) => { pdTake(d || { view: paddockView, rows: [] }); if (mode === "paddock") guard("paddock", () => renderPaddock(null)); });
       Open77.on("panel:paddock.result", (d) => { paddockNotice = { ok: !!(d && d.ok), text: String((d && d.text) || "") }; if (d && d.ok) paddockPick = null; if (mode === "paddock") guard("paddock", () => renderPaddock(null)); });
       Open77.on("panel:hide", () => { show(null); });
 
@@ -3840,7 +3978,7 @@
         else if (p.name === "panel:inbox") { lastInboxData = value; if (mode === "messages") guard("messages", renderMessages); }
         else if (p.name === "panel:graph") { lastGraphData = value; if (mode === "messages") guard("messages", renderMessages); }
         else if (p.name === "panel:trade") { tradeData=value;if(mode==="trade")guard("trade",()=>renderTrade(value)); }
-        else if (p.name === "panel:paddock") { paddockData = value; if (mode === "paddock") guard("paddock", () => renderPaddock(value)); }
+        else if (p.name === "panel:paddock") { pdTake(value); if (mode === "paddock") guard("paddock", () => renderPaddock(null)); }
       });
 
       document.addEventListener("keydown", (e) => {

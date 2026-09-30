@@ -566,7 +566,7 @@ check("the result is on the tape", story)
 
 -- every view passes the hidden-key guard, inside the quota
 maxSlice = 0
-for _, view in ipairs({ "wire", "standings", "results", "pace", "directory", "board", "myorg" }) do
+for _, view in ipairs({ "today", "wire", "standings", "results", "pace", "directory", "board", "myorg" }) do
     replies = {}
     logs = {}
     fire("ncm:paddock.request", 2, { view = view })

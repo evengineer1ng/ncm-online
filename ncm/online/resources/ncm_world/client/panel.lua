@@ -334,10 +334,13 @@ end
 local lastPaddock = nil
 local function showPaddock(req)
     if not page or not pageReady then return end
-    req = type(req) == "table" and req or { view = (lastPaddock and lastPaddock.view) or "wire" }
+    -- reopen on the last LIST view; a box score or a profile is a detail and needs its id, so it reopens on TODAY
+    local lastView = lastPaddock and lastPaddock.view
+    if lastView == "box" or lastView == "profile" or lastPaddock and lastPaddock.error then lastView = nil end
+    req = type(req) == "table" and req or { view = lastView or "today" }
     setOpen("paddock")
     page:send("panel:show", { panel = "paddock" })
-    sendBig("panel:paddock", lastPaddock or { view = req.view, rows = {}, loading = true }, "rows", 3)
+    sendBig("panel:paddock", (lastView and lastPaddock) or { view = req.view, rows = {}, loading = true }, "rows", 3)
     TriggerServerEvent("ncm:paddock.request", req)
 end
 
