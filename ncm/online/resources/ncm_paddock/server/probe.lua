@@ -9,6 +9,11 @@
 --   leg B     `vehicles.requestAuthority(car, player)`: does ASKING the player's client make it simulate the car?
 --   leg C     a remote-camera interest lease at the car (`open77_remote_camera` acquire) plus the request again: does
 --             streaming the car's surroundings to the player make it simulable? (the manager broadcast camera)
+--   leg D     the camera actually rendering the car on the player's HUD (openView)
+--   leg E     the platform AI removed: does the player's client accept authority over a car that far away?
+--
+-- v1 (2026-09-29): picked up somewhere between 186 m and 573 m; beyond that `waiting_for_simulator` in every leg;
+-- requestAuthority on an AI car is REFUSED by name (`ai_driven`); an interest lease alone did not help.
 --
 -- Every row lands in `paddock_live` as race_id `probe-<t>-<n>` (detail_json holds the samples), so the answer can be
 -- read back without the console. Console: `ncm.paddock.probe [playerId]`.
@@ -22,18 +27,19 @@ local Nodes = NcmCore.get("data.nodes")
 local Season = NcmCore.get("paddock.season")
 
 local NO_DRIVER = "00000000-0000-0000-0000-000000000000"
-local BANDS = { { 100, 250 }, { 250, 600 }, { 600, 1100 }, { 1100, 2200 }, { 2200, 5000 } }
+-- v2 (2026-09-29): v1 found your client picks an AI car up somewhere between 186 m and 573 m, so the ladder narrows
+local BANDS = { { 100, 200 }, { 200, 300 }, { 300, 400 }, { 400, 500 }, { 500, 650 } }
 local LEG_SEC = 25
 
--- Candidate road points: route nodes, the Paddock routes' lines, and garage sites (road-adjacent by construction).
+-- Candidate road points: route nodes and the Paddock routes' lines.
 local function candidates()
     local out = {}
     for _, n in ipairs(Nodes.LIST) do if n.road ~= false then out[#out + 1] = { x = n.x, y = n.y, z = n.z or 0, name = n.name } end end
     for _, rootId in pairs(Season.ROUTES) do
         local path = PaddockLive.pathFor(rootId)
-        if path then for i = 1, #path.points, 6 do local p = path.points[i]; out[#out + 1] = { x = p.x, y = p.y, z = p.z or 0, name = "line of " .. PaddockWorld.routeName(rootId) } end end
+        if path then for i = 1, #path.points, 2 do local p = path.points[i]; out[#out + 1] = { x = p.x, y = p.y, z = p.z or 0, name = "line of " .. PaddockWorld.routeName(rootId) } end end
     end
-    for _, s in ipairs(G.sites()) do out[#out + 1] = { x = s.x, y = s.y, z = s.z, name = s.id } end
+    -- no garage sites: v1's 186 m car spawned on a garage pin, was picked up, and could not drive (a pin is not a road)
     return out
 end
 
@@ -135,17 +141,43 @@ function PaddockProbe.run(pid)
     end
     log("probe: leg C (remote-camera interest at each car + request) for %d s", LEG_SEC)
     leg("C")
+    -- leg D: the camera actually RENDERING the car on the player's HUD (openView), not just an interest lease
+    for _, c in ipairs(cars) do
+        if cam and c.cam then
+            local okV, viewId, whyV = pcall(function() return cam:openView(pid, c.cam, { x = 40 + (c.band - 1) * 10, y = 140, width = 480, height = 270 }, "hud") end)
+            c.view = okV and viewId or nil
+            c.viewWhy = okV and (viewId and "ok" or tostring(whyV)) or tostring(viewId)
+        end
+    end
+    log("probe: leg D (a camera picture of each car on the player's HUD) for %d s", LEG_SEC)
+    leg("D")
+    for _, c in ipairs(cars) do if cam and c.view then pcall(function() return cam:closeView(c.view) end) end end
+    -- leg E: no platform AI at all -- will the player's client accept authority over a car this far away? (Pace or
+    -- kinematic playback would then drive it client-side)
+    for _, c in ipairs(cars) do
+        pcall(Open77.vehicles.ai.removeDriver, c.vid)
+        if c.npc then pcall(Open77.npcs.remove, c.npc); c.npc = nil end
+        local okR, st, why = pcall(Open77.vehicles.requestAuthority, c.vid, pid)
+        c.requestE = okR and st and "ok" or tostring(okR and (why or st) or st)
+    end
+    Wait(6000)
+    for _, c in ipairs(cars) do
+        local okO, owner = pcall(Open77.vehicles.owner, c.vid)
+        c.ownerE = okO and owner or nil
+    end
 
     local rows, summary = {}, {}
     for n, c in ipairs(cars) do
         local function mv(tag) local l = c.legs[tag] return l and ("%s %.0fm [%s]"):format(tag, l.moved, l.statuses) or tag .. " ?" end
-        local line = ("%.0f m: attached=%s drive=%s | %s | %s (request %s) | %s (lease %s)"):format(c.d, tostring(c.attached), tostring(c.drive),
-            mv("A"), mv("B"), tostring(c.request), mv("C"), tostring(c.leaseWhy))
+        local oe = c.ownerE or {}
+        local line = ("%.0f m: attached=%s drive=%s | %s | %s (request %s) | %s (lease %s) | %s (view %s) | E driverless request %s -> physicsOwner=%s authority=%s"):format(
+            c.d, tostring(c.attached), tostring(c.drive), mv("A"), mv("B"), tostring(c.request), mv("C"), tostring(c.leaseWhy),
+            mv("D"), tostring(c.viewWhy), tostring(c.requestE), tostring(oe.physicsOwner), tostring(oe.authorityPlayerId))
         summary[#summary + 1] = line
         log("probe %s", line)
         rows[#rows + 1] = { query = [[INSERT INTO paddock_live (server_id, race_id, declared_by, declared_at, state, cars, reason, detail_json, ended_at)
             VALUES (?, ?, ?, ?, 'finished', 1, ?, ?, ?)]], values = { U.sid(), ("probe-%d-%d"):format(t, n), NO_DRIVER, t, line:sub(1, 160),
-            U.encode({ line = line, samples = c.samples, owner = c.legs.C and c.legs.C.owner, at = c.at.name }) or "{}", U.now() } }
+            U.encode({ line = line, samples = c.samples, owner = c.legs.C and c.legs.C.owner, ownerE = c.ownerE, at = c.at.name }) or "{}", U.now() } }
     end
     local okT, err = U.transact(rows)
     if not okT then log("probe rows not stored: %s", tostring(err)) end

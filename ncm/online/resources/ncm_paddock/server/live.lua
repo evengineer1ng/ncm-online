@@ -211,9 +211,8 @@ local function stage(race, host, t)
                 log("stage %s: attachDriver %d refused: %s", race.raceId, vid, tostring(why or st))
                 return cancel(lr, "the AI would not take the wheel")
             end
-            -- .102 moves an AI car only when a client simulates it, and none volunteers from 3.6 km (probe, L228).
-            -- Ask the nearest watcher's client to take every car, so someone halfway along the route can start it.
-            if host then pcall(Open77.vehicles.requestAuthority, vid, host.pid) end
+            -- No requestAuthority here: the platform refuses it for an AI-driven car by name (`ai_driven`, probe v1, L229).
+            -- A client picks an AI car up by itself only within a few hundred metres; the physical bubble works with that.
         elseif host then
             local okR, st, why = pcall(Open77.vehicles.requestAuthority, vid, host.pid)
             if not okR or not st then log("stage %s: requestAuthority %d -> %d: %s", race.raceId, vid, host.pid, tostring(why or st)) end

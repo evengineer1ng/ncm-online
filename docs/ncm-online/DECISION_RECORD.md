@@ -4433,3 +4433,19 @@ model exactly. First-pass values; live test `§HB6`. Tracked by `IDEA-718`.
 - **Perseverance:** no progress for `liveRecoverSec` (8 s) re-sends the car from where it is on the line; for `liveResetSec` (20 s) puts it back on the road just behind where it stopped (`vehicles.setTransform`) and sends it on; only `liveRetireSec` (180 s) retires it. A failed or cancelled AI task is re-sent at once. Progress is distance from where the car last made way, so a slow car is never called stuck.
 - **The finish:** once the winner is home, everyone still running gets `liveFinishGraceSec` (90 s) or half the winner's time; cars still out then are `not_classified`. The hard deadline is 4x the sim winner's time + 2 min.
 - **A probe** (`ncm.paddock.probe`, and once 90 s after boot): one AI car far from every player, driven for 30 s; the answer goes to `paddock_live` as `probe-<t>`. If cars move with nobody near, `liveMode = always` is safe.
+
+## L229 - MEASURED / PADDOCK - what moves an AI car on build .102 (probe v1)
+
+`ncm.paddock.probe` on dev (build .102), one player online, five cars on a distance ladder, three legs of 25 s each:
+
+| Distance | A: unasked | B: `requestAuthority` to the player | C: remote-camera interest lease + request |
+|---|---|---|---|
+| 186 m | picked up by the player's client (`physicsOwner` 1, steward) but the drive **failed**: it spawned on a garage pin, not a road | failed | failed |
+| 573 m, 840 m, 1.6 km, 3.6 km | `waiting_for_simulator`, `physicsOwner` 0 | **refused `ai_driven`** | lease granted; still `waiting_for_simulator` |
+
+**Findings, stated no wider than the evidence:**
+1. A client picks an AI car up by itself somewhere **between 186 m and 573 m**. Beyond that nothing drives it. (An earlier single-car run, with nobody online and then with the player 3.6 km away, agreed.)
+2. **`requestAuthority` is refused for an AI-driven car**, by name. The live-race "ask the nearest watcher" change did nothing for platform AI and is removed.
+3. **A remote-camera interest lease alone** (no picture) did not make the client simulate. A camera actually rendering the car (`openView`) and a driverless car with a request (for Pace or kinematic playback) are **untested**: probe v2 legs D and E.
+
+**Consequence for the design (L228 all-of-the-above):** the continuous race model owns every car everywhere; physical cars exist only inside a bubble of a few hundred metres around a player (first numbers 250 m in / 400 m out, tuned by probe v2). Probe v2 narrows the ladder to 150-550 m on road points only.

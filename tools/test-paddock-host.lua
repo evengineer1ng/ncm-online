@@ -53,6 +53,8 @@ exports = { open77_remote_camera = {
     acquire = function(_, pid, cam) LEASES[#LEASES + 1] = { pid = pid, cam = cam }; return #LEASES end,
     release = function(_, lease) LEASES[lease] = nil; return true end,
     remove = function(_, id) CAMS[id] = nil; return true end,
+    openView = function(_, pid, cam) return "view" .. cam end,
+    closeView = function() return true end,
 } }
 local function vdist(a, b) local dx, dy = a.x - b.x, a.y - b.y return math.sqrt(dx * dx + dy * dy) end
 local function advance(v)
@@ -822,7 +824,7 @@ local W0 = PaddockWorld.route(Season.ROUTES.hook)
 POS = { [1] = { x = W0.start.x, y = W0.start.y, z = 10, bucket = 0 } }
 local probeOk, probeRes
 local co = coroutine.create(function() probeOk, probeRes = PaddockProbe.run(1) end)
-for _ = 1, 200 do
+for _ = 1, 400 do
     if coroutine.status(co) == "dead" then break end
     local ok, err = coroutine.resume(co); assert(ok, err)
     clock = clock + 1
@@ -830,7 +832,8 @@ end
 local probeRows = 0
 for id in pairs(DB.live) do if id:match("^probe%-") then probeRows = probeRows + 1 end end
 check(("the probe ladder records one row per distance (%d rows): %s"):format(probeRows, tostring(probeRes):sub(1, 160)), probeOk and probeRows >= 3)
-check("every leg ran for every car", tostring(probeRes):find("A ", 1, true) and tostring(probeRes):find("| B ", 1, true) and tostring(probeRes):find("| C ", 1, true))
+check("every leg ran for every car", tostring(probeRes):find("A ", 1, true) and tostring(probeRes):find("| B ", 1, true) and tostring(probeRes):find("| C ", 1, true)
+    and tostring(probeRes):find("| D ", 1, true) and tostring(probeRes):find("E driverless request", 1, true))
 check("the probe leaves nothing behind: cars, drivers, cameras, leases", next(VEH) == nil and next(CAMS) == nil and next(LEASES) == nil)
 POS = {}
 queue = {}
