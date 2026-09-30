@@ -17,7 +17,7 @@ a milestone or batch) → `built` (code + offline proof) → `validated` (live P
 **Where things live:** ideas and work → here. Choices made and questions for the owner → `DECISION_RECORD.md`.
 Defects → `KNOWN_BUGS.md`. Live PASS/FAIL → `wp/MASTER_TEST.md`. What to do next → `NOW.md`.
 
-**IDs are permanent.** Next free ID: **IDEA-755**.
+**IDs are permanent.** Next free ID: **IDEA-760**.
 *(This line has now been stale twice — left at IDEA-127 while the ledger ran to IDEA-183, then at IDEA-205 while it
 ran to IDEA-294. It is the only guard against reusing an ID. Check it against the last row before you append.)*
 
@@ -1264,3 +1264,8 @@ Built on dev, offline-green; awaiting `§CH` (L226, doc 44).
 | IDEA-752 | **PADDOCK/LIVE** | 2026-09-29 | **Per-driver launch and racecraft from the Paddock's own attributes**: SP varies launch forced-start, minimum speed, recommand cadence and stall thresholds by aggression, racecraft, launch skill and path variation; the Paddock port uses neutral values until its driver attributes are mapped onto those terms. | build, L234 | raw | `paddock.live.launchProfile`; SP `buildDriveProfile` |
 | IDEA-753 | **PADDOCK/LIVE** | 2026-09-29 | **Reset a wrecked Pace car back onto the road** (SP respawns a culled car; the server's setTransform reset runs only on the platform backend). Needs a client-side teleport in Pace, since a server setTransform revokes the physics lease. | build, L234 | raw | `persevere`; Pace redscript |
 | IDEA-754 | **PADDOCK/LIVE** | 2026-09-29 | **Traffic null area along the whole route while the field passes**, not just the start: move the area with the leader or open one per bubble segment, once the start area is proven. | build, L234 | raw | `EnableDynamicCrowdNullArea`; `PaddockBubble` |
+| IDEA-755 | **PRESENTATION/SFX** | 2026-09-30 | **Sound across the whole project, especially racing**: countdown and lights-out cues, finish horn, gate chimes, crowd and paddock ambience, UI sounds for the native HUD pieces. Owner: "theres definitely more we could do with sound." | owner, L235 | raw | native audio events via a required mod; `ncm-broadcast` |
+| IDEA-756 | **PRESENTATION/VFX** | 2026-09-30 | **Visual effects for races**: start lights, a finish line you can see, gate flashes, podium moments. | owner, L235 | raw | native world effects; `ncm-broadcast` |
+| IDEA-757 | **PRESENTATION/UI** | 2026-09-30 | **A presentation pass across NCM's UI**: "we are still lacking in true presentation across our whole project in terms of ui." Native pieces (banner, names, tower) set the style to carry forward. | owner, L235 | raw | panel, race HUD, `ncm-broadcast` |
+| IDEA-758 | **PADDOCK/PACE** | 2026-09-30 | **Prove higher tiers are genuinely faster on the street, and anchor street as the floor**: spectate a Pro or Premier street run and compare its times to a street run on the same route; feed human City Cup medians into calibration so street pace is bounded by real players. Owner: street "should be the baseline for the bare minimum, not the aggregate speed overall." | owner, L235 | raw | `paddock.calibration.TIER_SPEED`; `L.speedPlan` |
+| IDEA-759 | **BROADCAST/SPECTATE** | 2026-09-30 | **The tower and names for a race you are not near**: pick any live Paddock race (manager mode) or multiplayer session from F6 and follow it, not only the one around you or the one you are in. | build, L235 | raw | `ncm_broadcast`; `PaddockBroadcast` |

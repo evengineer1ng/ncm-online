@@ -3,6 +3,12 @@
 > **STATUS: LEDGER** - living session memory, rewritten at the end of every working session.
 > Authority map: [INDEX.md](INDEX.md) - classified 2026-09-24 (L125).
 
+**LATEST 2026-09-30 - FIRST FULLY SPECTATED STREET RACE WORKED; NCM BROADCAST BUILT (`L235`, `IDEA-755`-`IDEA-759`).**
+Owner watched the 23:40 street race at Hanford overpass from behind the grid: traffic kept off the grid, the warning fired, the field launched and raced hard, Derek Smith won by under a second, Emilia Vargas crashed, reversed out and finished 40 s back. `L234` (SP launch port, drivers, null area) worked on its first run.
+- **Built:** NCM Broadcast 0.1.0 (new required mod + new `ncm_broadcast` resource): native plates over Paddock cars (position, name, team) and an opt-in timing tower (`/ncm.tower`; `/ncm.names` toggles names) for Paddock races and the multiplayer session you are in, with usernames. The only WebUI surface is its hidden transport page, in the new resource's own budget (`kMaximumWebSurfaces` is 8 per resource; the owner's client ran 23 at once).
+- **Staged on dev 00:28 ET:** Broadcast published (6 required mods declared) and hand-installed in the game folder; **dev server NOT restarted** (the owner was in game). Gate ALL GREEN; paddock host 184; Broadcast state tests; redscript compiles with Pace.
+**THE ONE NEXT ACTION:** quit the game, restart the dev server, rejoin, and stand near the next street grid. Names should appear over the cars; `/ncm.tower` shows the tower. If names sit in the wrong place, send the `calibration:` line from `red4ext/plugins/ncm_broadcast/ncm_broadcast-<pid>.log`. Online stays frozen (`L223`).
+
 **LATEST 2026-09-29 (late night) - PADDOCK RACE AI PORTED FROM NCM SINGLE PLAYER; NCM PACE 0.3.0 ON DEV (`L234`, `KB-220`, `KB-219`, `IDEA-752`-`IDEA-754`).**
 The owner's live test: clock, grid and banner good; but the field rocketed into itself off the line, then stopped driving; no drivers; traffic still through the grid. Cause (`KB-220`): Pace launched every car at the full race ceiling with minimum 0, kinematically, and never re-commanded a crashed car. SP caps the first command (Sewer 18/8/4 m/s), waits 1.75 s, then re-commands every ~3 s and on any stall.
 - **Built:** Pace 0.3.0 carries SP's launch/recommand/stall rules (per-route SP tuning via `data.grid_profiles`), `useKinematic = false`, a fresh command each time as SP sends them; visible NPC drivers on the Pace backend (`attachDriver({npcId})`, no task; `livePaceDrivers`); the engine's traffic null area over each start on every warned client (`liveTrafficClear`).
@@ -464,8 +470,8 @@ next rig action is an in-process read-only P0 that composes the owner's G29, sep
 rim using those source-verified provider patterns and preserves stable device identity. This research does not
 displace the live queue below.
 
-> **Claim before writing:** decisions through **L234**; MASTER_TEST through **§CH**; next QA letter **§CI**.
-> BACKLOG next free **IDEA-755**; known issues through **KB-220**. Read ledger tails before allocating.
+> **Claim before writing:** decisions through **L235**; MASTER_TEST through **§CH**; next QA letter **§CI**.
+> BACKLOG next free **IDEA-760**; known issues through **KB-220**. Read ledger tails before allocating.
 > BACKLOG next free **IDEA-686**; known issues through **KB-186**. Read ledger tails before allocating.
 >
 > The next-free guard matters: overlapping 2026-09-26/27 sessions previously made this block stale several

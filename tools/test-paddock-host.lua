@@ -784,6 +784,11 @@ local function runLive(race, lr0)
         for _, co in ipairs(q) do local ok, err = resumeMetered(co); assert(ok, err); if coroutine.status(co) ~= "dead" then queue[#queue + 1] = co end end
         if steps % 40 == 0 then run(function() PaddockRaces.tick(math.floor(clock)) end) end
         if steps == 120 then run(function() lr.liveView = PaddockViews.live(1, { raceId = race.raceId }) end) end
+        if steps == 121 then
+            replies = {}
+            run(function() PaddockBroadcast.tick() end)
+            for _, r in ipairs(replies) do if r.name == "ncm:broadcast.paddock" and r.body.raceId == race.raceId then lr.bcast = r.body end end
+        end
     end
     lr.steps = steps
     return lr
@@ -841,6 +846,8 @@ check("no car was set down on the player standing on the grid", (function()
 check(("the street run finished (%.0f s)"):format((lr.steps or 0) * 0.25), lr.state == "finished")
 check("LIVE follows the street race's real cars mid-race", lr.liveView and lr.liveView.street == true and #lr.liveView.rows == #lr.cars
     and lr.liveView.rows[1].pct > 0)
+check("NCM Broadcast gets the street race's names, each with its car and a gap (L235)", lr.bcast and #lr.bcast.rows == #lr.cars
+    and lr.bcast.rows[1].vid ~= nil and (lr.bcast.rows[1].gap == "leader" or lr.bcast.rows[1].gap == "winner") and (lr.bcast.rows[2].gap or ""):match("^%+%d") ~= nil)
 check(("the timing loop fits the quota (max slice %d)"):format(maxSlice), maxSlice < 400000)
 local rescued = 0
 for _, c in ipairs(lr.cars) do if c.resets > 0 then rescued = rescued + 1 end end

@@ -75,6 +75,8 @@ CreateThread(function()
     PaddockGarages.start()
     PaddockBubble.start()
     PaddockClock.start()
+    Wait(0)
+    PaddockBroadcast.start()
     lastCalibration = U.now() - 3500     -- first recompute a minute after boot, not inside it
     log("the Paddock is running (season %s)", PaddockStore.world.seasonId)
     while true do

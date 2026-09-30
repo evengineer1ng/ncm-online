@@ -73,6 +73,9 @@ local ok, settings = pcall(Open77.tunables.declare, {
     livePaceDrivers = { value = true, type = "boolean", apply = "live" },
     -- L234: the native traffic null area (NCM Pace 0.3.0) over a start, radius = the route's SP trafficClearRadiusM;
     -- raised with the warning, held until this long after the lights.
+    -- L235: names over Paddock cars and the tower's rows, to players within broadcastRadiusM of a physical car.
+    broadcastEnabled = { value = true, type = "boolean", apply = "live" },
+    broadcastRadiusM = { value = 600, type = "integer", min = 100, max = 2000, unit = "m", apply = "live" },
     liveTrafficClear = { value = true, type = "boolean", apply = "live" },
     liveTrafficClearTailSec = { value = 60, type = "integer", min = 0, max = 600, unit = "s", apply = "live" },
     -- The race-start warning (L233): a native HUD banner (NCM Pace) for players this near a start line, this long out.

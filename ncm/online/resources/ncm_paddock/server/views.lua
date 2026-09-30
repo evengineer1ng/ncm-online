@@ -352,14 +352,26 @@ function PaddockViews.live(_, args)
             local d = (okP and type(pos) == "table") and Racestate.project(model, pos) or 0
             local tc = lr.timing and lr.timing.cars[c.personId]
             local state = (tc and tc.done) and "finished" or (lr.out[c.personId] and "out" or "racing")
-            rows[#rows + 1] = { id = c.personId, d = (tc and tc.done) and model.lengthM or d, state = state, finishMs = tc and tc.finishMs }
+            rows[#rows + 1] = { id = c.personId, d = (tc and tc.done) and model.lengthM or d, state = state, finishMs = tc and tc.finishMs,
+                vid = c.vehicleId, physical = true }
         end
         table.sort(rows, function(a, b)
             if (a.state == "finished") ~= (b.state == "finished") then return a.state == "finished" end
             if a.state == "finished" then return (a.finishMs or 0) < (b.finishMs or 0) end
             return a.d > b.d
         end)
-        for i, r in ipairs(rows) do r.pos = i end
+        -- gaps on the street (L235): finishers by their timed finish, the rest by distance behind the leader at the
+        -- sim leader's average speed -- an estimate, and labelled as a time like any other interval
+        local leadMps = (lr.simLeaderMs and lr.simLeaderMs > 0) and model.lengthM / (lr.simLeaderMs / 1000) or 30
+        local first = rows[1]
+        for i, r in ipairs(rows) do
+            r.pos = i
+            if r.state == "finished" and first and first.state == "finished" then
+                r.gapMs = (r.finishMs or 0) - (first.finishMs or 0)
+            elseif r.state == "racing" and first then
+                r.gapMs = math.max(0, math.floor((((first.state == "finished") and model.lengthM or first.d) - r.d) / leadMps * 1000))
+            end
+        end
     else
         rows = Racestate.standings(model, tMs)
         -- a car physically in a player's bubble right now: show where it really is
@@ -369,7 +381,7 @@ function PaddockViews.live(_, args)
                 local car = bub.cars[r.id]
                 if car then
                     local okP, pos = pcall(Open77.vehicles.getPosition, car.vid)
-                    if okP and type(pos) == "table" then r.d = Racestate.project(model, pos); r.physical = true end
+                    if okP and type(pos) == "table" then r.d = Racestate.project(model, pos); r.physical = true; r.vid = car.vid end
                 end
             end
         end
@@ -382,7 +394,7 @@ function PaddockViews.live(_, args)
             pct = math.floor(math.min(1, math.max(0, (r.d or 0) / math.max(1, model.lengthM))) * 1000) / 10,
             gap = r.state == "finished" and (r.gapMs and (r.gapMs == 0 and "winner" or ("+%.1fs"):format(r.gapMs / 1000)) or "finished")
                 or (r.state == "out" and "out") or (r.gapMs and (r.gapMs == 0 and "leader" or ("+%.1fs"):format(r.gapMs / 1000)) or ""),
-            state = r.state, physical = r.physical or nil }
+            state = r.state, physical = r.physical or nil, vid = r.vid }
     end
     return { view = "live", races = races, raceId = pick.raceId, series = PaddockWorld.seriesName(pick.seriesId),
         route = PaddockWorld.routeName(pick.routeId), elapsed = math.max(0, math.floor(tMs / 1000)), lengthM = math.floor(model.lengthM),
