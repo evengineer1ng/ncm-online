@@ -14,7 +14,7 @@
 local Core = NcmCore
 
 Core.define("paddock.world", function(C)
-    local M = { version = "0.1.0", GENESIS_VERSION = 1, FREE_AGENTS = 40 }
+    local M = { version = "0.1.0", GENESIS_VERSION = 2, FREE_AGENTS = 120 }   -- L236: ~3x cast
     local Hash = C.get("vocabulary.hash")
     local Names = C.get("paddock.names")
     local Attr = C.get("paddock.attributes")

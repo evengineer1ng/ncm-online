@@ -3,7 +3,8 @@
 --
 -- The rhythm keys to US Eastern (`world.clock`, L221/L222): street racing at night, sanctioned racing by day
 -- (L224.3). A season is the UTC quarter (L100) and is split into 13 weekly Cups. First numbers are tunables in
--- `ncm_paddock/server/settings.lua`; the defaults below give doc 44's 45 races a day, and a test holds that.
+-- `ncm_paddock/server/settings.lua`; the defaults below give 129 races a day (L236; doc 44's first 45), and a test
+-- holds that.
 local Core = NcmCore
 
 Core.define("paddock.season", function(C)
@@ -26,29 +27,40 @@ Core.define("paddock.season", function(C)
     }
     M.ROUTES = R
 
-    -- tier -> { orgs, divisions, carsPerOrg (race seats), roster (contracted drivers), vehicle band, routes }
+    -- tier -> { orgs, divisions, carsPerOrg (race seats), roster (contracted drivers), vehicle band, routes, gen }.
+    -- L236 (owner: "a much wider breadth and cast"; ~3x): seven street leagues -- five of them district leagues that
+    -- race out of their own district -- four regional, three pro and the premier. `routes` are the named roots a tier
+    -- still races on part of its slots; `gen` is the course.generator filter for the rest; `regions[d]` pins
+    -- division d's starts to a district (nil = anywhere in the city).
     M.TIERS = {
-        street = { rank = 1, orgs = 24, divisions = 2, carsPerOrg = 1, roster = 2, label = "Street",
+        street = { rank = 1, orgs = 84, divisions = 7, carsPerOrg = 1, roster = 2, label = "Street",
             band = { classes = { "Muscle", "Sport", "Tech" }, prestigeMax = 2 },
-            routes = { R.snake, R.troll, R.overbridge, R.hook, R.sewer, R.cut } },
-        regional = { rank = 2, orgs = 16, divisions = 2, carsPerOrg = 1, roster = 2, label = "Regional",
+            routes = { R.snake, R.troll, R.overbridge, R.hook, R.sewer, R.cut },
+            regions = { "Watson", "Westbrook", "City Center", "Heywood", "Pacifica" },
+            gen = { minM = 900, maxM = 3500, checkpoints = 2, checkpointShare = 0.45, share = 0.75 }, ovalShare = 0.15 },
+        regional = { rank = 2, orgs = 48, divisions = 4, carsPerOrg = 1, roster = 2, label = "Regional",
             band = { classes = { "Muscle", "Sport", "Tech" }, prestigeMin = 2, prestigeMax = 3 },
-            routes = { R.hook, R.overbridge, R.snake, R.cut, R.reverse, R.troll } },
-        pro = { rank = 3, orgs = 12, divisions = 1, carsPerOrg = 1, roster = 3, label = "Pro",
+            routes = { R.hook, R.overbridge, R.snake, R.cut, R.reverse, R.troll },
+            gen = { minM = 1500, maxM = 4500, checkpoints = 2, checkpointShare = 0.5, share = 0.7 }, ovalShare = 0.1 },
+        pro = { rank = 3, orgs = 30, divisions = 3, carsPerOrg = 1, roster = 3, label = "Pro",
             band = { classes = { "Sport", "Muscle" }, prestigeMin = 3, prestigeMax = 4 },
-            routes = { R.cut, R.reverse, R.sewer, R.snake, R.ukulele } },
+            routes = { R.cut, R.reverse, R.sewer, R.snake, R.ukulele },
+            gen = { minM = 2000, maxM = 6000, checkpoints = 2, checkpointShare = 0.5, share = 0.65 }, ovalShare = 0.05 },
         premier = { rank = 4, orgs = 8, divisions = 1, carsPerOrg = 2, roster = 3, label = "Night City Premier",
             band = { classes = { "Sport" }, prestigeMin = 5 },
-            routes = { R.ukulele, R.cut, R.sewer, R.reverse } },
+            routes = { R.ukulele, R.cut, R.sewer, R.reverse },
+            gen = { minM = 3000, maxM = 7000, checkpoints = 2, checkpointShare = 0.4, share = 0.5 } },
     }
     M.TIER_ORDER = { "street", "regional", "pro", "premier" }
 
     -- The daily rhythm (doc 44 §5.2), Eastern seconds-of-day. `untilSec` may pass 86400: the night runs on.
     local H = 3600
+    -- L236: ~129 races a day. Street every 6 minutes through the night (seven leagues, each every 42 min), regional
+    -- four an hour by day, pro every 40 minutes, the premier at 15:00.
     M.RHYTHM = {
-        street = { fromSec = 20 * H, untilSec = 28 * H, everySec = 40 * 60, staggerSec = 20 * 60 },
-        regional = { fromSec = 12 * H, untilSec = 20 * H, everySec = 60 * 60, staggerSec = 30 * 60 },
-        pro = { fromSec = 10 * H, untilSec = 18 * H, everySec = 2 * H, staggerSec = 0 },
+        street = { fromSec = 20 * H, untilSec = 28 * H, everySec = 42 * 60, staggerSec = 6 * 60 },
+        regional = { fromSec = 12 * H, untilSec = 20 * H, everySec = 60 * 60, staggerSec = 15 * 60 },
+        pro = { fromSec = 10 * H, untilSec = 18 * H, everySec = 2 * H, staggerSec = 40 * 60 },
         premier = { fromSec = 15 * H, untilSec = 15 * H + 1, everySec = 24 * H, staggerSec = 0 },
     }
 
@@ -117,11 +129,53 @@ Core.define("paddock.season", function(C)
     --- The stable race id for a series slot.
     function M.raceId(seriesId, utc) return "pr-" .. seriesId .. "-" .. tostring(math.floor(utc)) end
 
-    --- The route for a race: a seeded rotation through the tier's pool, so consecutive races differ.
+    --- The division letter of a series id ("street_c" -> 3; a single-division tier -> 1).
+    function M.divisionOf(seriesId)
+        local l = tostring(seriesId):match("_(%a)$")
+        return l and (l:byte() - 96) or 1
+    end
+
+    --- The district a series races out of, or nil for the whole city.
+    function M.regionOf(seriesId)
+        local spec = M.TIERS[M.tierOfSeries(seriesId)]
+        return spec and spec.regions and spec.regions[M.divisionOf(seriesId)] or nil
+    end
+
+    --- The route for a race (L236): on `gen.share` of slots a generated route under the tier's filter (starting in
+    --- the league's district, if it has one); otherwise a seeded rotation through the tier's named roots (those that
+    --- start in the district, when there are any). Deterministic per (seed, series, slot).
     function M.routeFor(seed, seriesId, utc)
         local tier = M.tierOfSeries(seriesId)
-        local pool = M.TIERS[tier].routes
+        local spec = M.TIERS[tier]
+        local region = M.regionOf(seriesId)
         local k = math.floor(utc / 60)
+        local pool = spec.routes
+        if region then
+            local Routes = C.get("course.routes")
+            local local_ = {}
+            for _, rid in ipairs(spec.routes) do
+                local r = Routes.resolve(rid)
+                if r and r.start.region == region then local_[#local_ + 1] = rid end
+            end
+            pool = local_
+        end
+        -- an oval night (L236): once the owner has authored roundabouts, a share of slots race one -- the league's own
+        -- district's first, else any
+        local ovals = C.get("data.ovals")
+        if (spec.ovalShare or 0) > 0 and #ovals.LIST > 0 and Hash.unit(seed, "route-oval", seriesId, k) < spec.ovalShare then
+            local list = region and ovals.ids(region) or {}
+            if #list == 0 then list = ovals.ids() end
+            return list[1 + Hash.fnv1a32(Hash.key(seed, "oval", seriesId, k)) % #list]
+        end
+        local g = spec.gen
+        if g and (#pool == 0 or Hash.unit(seed, "route-gen", seriesId, k) < (g.share or 0.7)) then
+            local opts = {}
+            for key, v in pairs(g) do opts[key] = v end
+            opts.startRegion = region
+            local id = C.get("course.generator").pick(opts, seed, "paddock", seriesId, k)
+            if id then return id end
+        end
+        if #pool == 0 then pool = spec.routes end
         return pool[1 + (Hash.fnv1a32(Hash.key(seed, "route", seriesId)) + k) % #pool]
     end
 

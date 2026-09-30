@@ -176,7 +176,8 @@ local function stage(race, host, t)
     local gates = L.checkpoints(route, path, segments)
     -- the owner's own single-player grid: authored node heading, SP's road-axis correction, the route's tuning
     -- (data.grid_profiles); tools/test-grid-oracle.lua holds it to SP's code (L232)
-    local allSlots = L.gridSlots(route.start, route.finish, #field + 8, NcmCore.get("data.grid_profiles").forRoot(race.routeId))
+    local allSlots = route.oval and L.ovalSlots(route.oval, #field + 8)        -- round the roundabout, not a straight grid (L236)
+        or L.gridSlots(route.start, route.finish, #field + 8, NcmCore.get("data.grid_profiles").forRoot(race.routeId))
     -- never set a car down on a person: a slot with a player within liveSlotClearM is skipped, and its car takes the
     -- next free slot at the back (the banner told them to clear the area, L233)
     local clearM = set("liveSlotClearM", 6)
@@ -186,6 +187,16 @@ local function stage(race, host, t)
         local taken = false
         for _, pos in pairs(people) do if L.dist(pos, s) <= clearM then taken = true break end end
         if taken then skipped = skipped + 1 elseif #slots < #field then slots[#slots + 1] = s end
+    end
+    -- an oval's points may come from map waypoints, whose height is not the road's: ground every oval slot (L236)
+    if route.oval then
+        for _, sl in ipairs(slots) do
+            local zOk, z = pcall(Open77.world.groundZ, { x = sl.x, y = sl.y }, { radius = 400, fromZ = (sl.z or 0) + 30, timeout = 1500, cache = true })
+            if zOk and type(z) == "number" then sl.z = z end
+        end
+    end
+    if #slots < #field and route.oval and #slots >= 4 then
+        for i = #field, #slots + 1, -1 do field[i] = nil end            -- an oval grids what it has room for
     end
     if #slots < #field then return cancel(lr, "the grid is blocked: players are standing on it") end
     if skipped > 0 then log("stage %s: %d slot(s) had a player on them; those cars start further back", race.raceId, skipped) end
@@ -317,7 +328,10 @@ local function go(lr, race)
         for i, g in ipairs(lr.gates) do gates[i] = { x = g.x, y = g.y, z = g.z, dx = g.dir.x, dy = g.dir.y, halfWidth = g.halfWidthM, capture = g.captureM } end
         -- SP's launch: the capped release, the grace, the recommand cadence and the stall rule, per route (L234)
         TriggerClientEvent("ncm:paddock.live.drive", lr.pid, { raceId = lr.raceId, goInMs = lr.goMs - nowMs(), points = lr.path.points,
-            gates = gates, cars = cars, launch = L.launchProfile(NcmCore.get("data.grid_profiles").forRoot(race.routeId)) })
+            gates = gates, cars = cars, launch = L.launchProfile(NcmCore.get("data.grid_profiles").forRoot(race.routeId)),
+            -- switch to the next point sooner on authored points than on a ghost line: a generated route's checkpoint or
+            -- an oval's pole must actually be reached, or its gate is missed (L236)
+            advanceM = (lr.path.source == "ghost") and 40 or (lr.route.oval and math.max(6, math.min(15, lr.route.oval.radius * 0.5)) or 15) })
     end
     log("go %s at +%d ms: %d cars, deadline %d s", lr.raceId, lr.goMs - nowMs(), #lr.cars, math.floor(lr.deadlineMs / 1000))
     CreateThread(function()

@@ -479,17 +479,17 @@ check("genesis ran and the world is ready", PaddockWorld.ready and PaddockStore.
 -- the boot thread before that tick ran -- run it here rather than depend on where the drop landed
 if not PaddockStore.world.cupId then run(function() PaddockLife.cupBoundary(clock) end) end
 local W = PaddockStore.world
-check("60 organizations and their people exist", #W.orgOrder == 60 and #W.personOrder > 400)
+check("170 organizations and their people exist (L236: ~3x)", #W.orgOrder == 170 and #W.personOrder > 1100)
 local persisted = 0
 for _ in pairs(DB.org) do persisted = persisted + 1 end
-check("every org was persisted", persisted == 60)
+check("every org was persisted", persisted == 170)
 check("genesis wrote a founding story", next(DB.news) ~= nil)
 
 -- reload round-trip: the store reads back what it wrote
 do
     local copy = PaddockStore.load and nil
     run(function() PaddockStore.flush(); copy = PaddockStore.load() end)
-    check("reloaded world has the same orgs and names", copy and #copy.orgOrder == 60 and copy.orgs.o001.name == W.orgs.o001.name
+    check("reloaded world has the same orgs and names", copy and #copy.orgOrder == 170 and copy.orgs.o001.name == W.orgs.o001.name
         and copy.people.p00001.display == W.people.p00001.display and copy.seed == W.seed)
     local did
     for _, pid in ipairs(W.personOrder) do if W.people[pid].role == "driver" then did = pid break end end
@@ -503,7 +503,7 @@ local Clock = NcmCore.get("world.clock")
 local day = Clock.eastern(clock).dayIndex
 clock = Clock.utcAt(day, 14 * 3600 + 50 * 60)
 local premierId = Season.raceId("premier", Clock.utcAt(day, 15 * 3600))
-W.orgs.o061 = nil
+W.orgs[("o%03d"):format(#W.orgOrder + 1)] = nil   -- the first org past genesis (o061 before L236)
 -- make one premier org human-managed so Billie must refuse its drivers
 local humanOrg
 for _, oid in ipairs(W.orgOrder) do if W.orgs[oid].seriesId == "premier" then humanOrg = W.orgs[oid]; break end end
@@ -700,7 +700,10 @@ for pid, b in pairs(PaddockGarages.bodies) do if b.siteId == site.id then here[#
 check(("a player at the garage meets its crew (%d bodies)"):format(#here), #here >= 1 and #here <= G.MAX_BODIES)
 check(("a presence pass fits the quota (max slice %d)"):format(maxSlice), maxSlice < 400000)
 local told = false
-for _, r in ipairs(replies) do if r.name == "ncm:paddock.bodies" and r.pid == -1 and #r.body.rows == #here then told = true end end
+-- every body the server placed, at any garage near the player (at ~3x the cast a neighbouring garage can be on shift too)
+local placed = 0
+for _ in pairs(PaddockGarages.bodies) do placed = placed + 1 end
+for _, r in ipairs(replies) do if r.name == "ncm:paddock.bodies" and r.pid == -1 and #r.body.rows == placed then told = true end end
 check("every client is told who is standing there", told)
 local visitor = here[1]
 local b1 = PaddockGarages.bodies[visitor]
@@ -802,7 +805,7 @@ check("a race nobody is near stays simulated: nothing spawns", lrq and lrq.state
 
 -- players near a start are warned before the grid spawns (the native HUD banner), and a car never lands on a person
 do
-    local warnRace = streetRace("street_a", 40)
+    local warnRace = streetRace("street_a", 42)
     local wr = PaddockWorld.route(warnRace.routeId)
     clock = warnRace.opensAt - 120
     POS = { [1] = { x = wr.start.x + 30, y = wr.start.y, z = 10, bucket = 0 } }
@@ -826,7 +829,7 @@ do
 end
 
 -- a player at the start: it goes on the street by itself, no declaration; some cars get stuck and are rescued
-local liveRace = streetRace("street_a", 40)
+local liveRace = streetRace("street_a", 42)
 local liveRoute = PaddockWorld.route(liveRace.routeId)
 -- stand ON the grid: pole's slot, which the grid must skip
 do
@@ -869,7 +872,7 @@ queue = {}
 for id in pairs(VEH) do VEH[id] = nil end
 
 -- a player halfway along the route counts as watching
-local race2 = streetRace("street_b", 60)
+local race2 = streetRace("street_b", 48)
 local r2 = PaddockWorld.route(race2.routeId)
 local path2 = PaddockLive.pathFor(race2.routeId)
 local mid = path2.points[math.floor(#path2.points / 2)]
@@ -889,7 +892,7 @@ for id in pairs(VEH) do VEH[id] = nil end
 
 -- the Pace backend (L234): a visible driver in every seat, and SP's launch profile in the drive plan
 do
-    local paceRace = streetRace("street_a", 80)
+    local paceRace = streetRace("street_a", 84)
     local pr = PaddockWorld.route(paceRace.routeId)
     POS = { [1] = { x = pr.start.x + 60, y = pr.start.y, z = 10, bucket = 0 } }
     PaddockLive.paceClients[1] = { ok = true, version = "0.3.0" }
@@ -917,7 +920,7 @@ end
 
 -- the physical bubble: nobody at the start, so the race runs on its model; a player halfway along the line sees the
 -- field arrive, race past physically, and hand back to the model; the result is MIXED
-local race4 = streetRace("street_a", 120)
+local race4 = streetRace("street_a", 126)
 POS = { [1] = { x = 6000, y = -6000, z = 0, bucket = 0 } }                 -- far away at staging: no street race
 clock = race4.opensAt - 70
 for _ = 1, 6 do run(function() PaddockRaces.tick(clock) end) end
@@ -986,7 +989,7 @@ check("the treasury holds fee plus grant", mine.cash == 20000)
 check("the One-Team affiliation row exists", activeAff("driver-2") ~= nil)
 clock = clock + 1
 fire("ncm:paddock.manager", 2, { action = "found", args = { name = "Second Team" } })
-check("a second team is refused by the One-Team Rule", #W.orgOrder == 61 and ledgerTotal("driver-2") == 25000)
+check("a second team is refused by the One-Team Rule", #W.orgOrder == 171 and ledgerTotal("driver-2") == 25000)
 clock = clock + 1
 fire("ncm:paddock.manager", 2, { action = "withdraw", args = { eddies = 1500, idem = "w1" } })
 check("a withdrawal pays out after tax", ledgerTotal("driver-2") == 25000 + 1050 and mine.cash == 18500)

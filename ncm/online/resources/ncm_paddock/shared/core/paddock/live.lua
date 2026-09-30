@@ -87,9 +87,13 @@ Core.define("paddock.live", function(C)
             local out, total = M.resample(pts, n or 48)
             if out and total and total > 200 then return { points = out, lengthM = total, source = "ghost" } end
         end
+        -- no ghost: the authored points themselves (start, any checkpoints, finish); the native planner finds the
+        -- roads between them (L236: every generated route starts here, having never been driven by a human)
         local s, f = route.start, route.finish
-        return { points = { { x = s.x, y = s.y, z = s.z or 0 }, { x = f.x, y = f.y, z = f.z or 0 } },
-            lengthM = route.distanceM or dist(s, f), source = "direct" }
+        local pts = { { x = s.x, y = s.y, z = s.z or 0 } }
+        for _, m in ipairs(route.intermediate or {}) do pts[#pts + 1] = { x = m.x, y = m.y, z = m.z or 0 } end
+        pts[#pts + 1] = { x = f.x, y = f.y, z = f.z or 0 }
+        return { points = pts, lengthM = route.distanceM or dist(s, f), source = "direct" }
     end
 
     --- The point `f` (0..1) of the way along a path by distance.
@@ -114,13 +118,22 @@ Core.define("paddock.live", function(C)
     --- straight between its neighbours (course.gates.build).
     function M.checkpoints(route, path, segments)
         local mids = {}
-        if path.source == "ghost" and (segments or 0) >= 2 then
+        if path.source ~= "ghost" and route.intermediate and #route.intermediate > 0 then
+            -- a checkpointed route without a ghost is timed at its checkpoints, facing the way the race arrives
+            for _, m in ipairs(route.intermediate) do mids[#mids + 1] = { x = m.x, y = m.y, z = m.z, name = m.name } end
+        elseif path.source == "ghost" and (segments or 0) >= 2 then
             for k = 1, segments - 1 do
                 local p = M.along(path.points, k / segments)
                 mids[#mids + 1] = { x = p.x, y = p.y, z = p.z, name = "S" .. k }
             end
         end
-        return Gates.build(route, { intermediate = mids, halfWidthM = M.GATE_HALF_WIDTH_M, captureM = M.GATE_CAPTURE_M })
+        -- an oval's gates are sized to its roundabout, or a small one would be "passed" several gates at a time
+        local half, cap = M.GATE_HALF_WIDTH_M, M.GATE_CAPTURE_M
+        if route.oval then
+            half = math.max(8, math.min(half, route.oval.radius * 0.6))
+            cap = math.max(6, math.min(cap, route.oval.radius * 0.45))
+        end
+        return Gates.build(route, { intermediate = mids, halfWidthM = half, captureM = cap })
     end
 
     -- ---------------------------------------------------------------------------------------------- the grid
@@ -209,6 +222,24 @@ Core.define("paddock.live", function(C)
             stallMps = (p.aiStallSpeedThreshMps or 8) + 2.0,
             stallS = clamp((p.aiStallTimeThreshS or 1.2) - 0.5, 0.9, 2.6),
         }
+    end
+
+    --- An oval's grid (L236): two abreast round the loop behind the line, in the driving direction, each car on the
+    --- circle (inner and outer lane) and facing along it. A straight SP grid would run off a roundabout.
+    function M.ovalSlots(geom, n)
+        local out = {}
+        n = math.min(n, geom.fieldMax or n)
+        for i = 1, n do
+            local row = math.floor((i - 1) / 2)
+            local lane = (i % 2 == 1) and -1 or 1
+            local back = 10 + row * 9
+            local a = geom.startAngle - geom.sign * back / geom.radius
+            local r = geom.radius + lane * 2.2
+            local tx, ty = -math.sin(a) * geom.sign, math.cos(a) * geom.sign
+            out[i] = { x = geom.cx + r * math.cos(a), y = geom.cy + r * math.sin(a), z = geom.cz, yaw = M.yawFromDir(tx, ty),
+                row = row + 1, heading = math.deg(atan2(ty, tx)) }
+        end
+        return out
     end
 
     --- The index of the path point nearest `pos` (1-based).

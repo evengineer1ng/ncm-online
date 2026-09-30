@@ -15,11 +15,20 @@
 local Core = NcmCore
 
 Core.define("paddock.sim", function(C)
-    local M = { version = "0.1.0", SIM_VERSION = 1 }
+    local M = { version = "0.2.0", SIM_VERSION = 2 }
 
-    M.DNF_BASE = 0.025          -- per race, stat 50, dry, day
-    M.MISTAKE_BASE = 0.14       -- per race: non-fatal errors that cost time
-    M.PACE_SPREAD = 0.06        -- +-6% of segment time across the 0..100 performance range
+    -- L236 (owner: "simulated times in races are wildly too close together ... the real race showed a p1 to p12 gap
+    -- of 40 seconds, a sim race showed 5.58 seconds. reality is more variable and dnfs exist"). Version 2 widens the
+    -- field the way the street does: more pace spread, noisier segments, a held-up car sits a real gap behind rather
+    -- than glued 0.02 s to the bumper, the grid leaves in rows, and mistakes include the big one -- into the wall,
+    -- reverse out, carry on. `CHAOS` scales the incident terms by tier: street is wild, the premier is not.
+    M.DNF_BASE = 0.05           -- per race, stat 50, dry, day, street chaos
+    M.MISTAKE_BASE = 0.40       -- per race: errors that cost time
+    M.MAJOR_SHARE = 0.25        -- of mistakes, the ones that cost 8-40 s (a wall, a spin, a reverse out)
+    M.PACE_SPREAD = 0.12        -- +-12% of segment time across the 0..100 performance range
+    M.HELD_UP_GAP = 0.25        -- seconds behind a car it could not pass
+    M.GRID_GAP = 0.35           -- seconds per grid slot off the line
+    M.CHAOS = { street = 1.0, regional = 0.85, pro = 0.7, premier = 0.6 }
     M.CAR_WEIGHT = 0.4          -- FTB phase weights: driver 0.6 / car 0.4
     M.DIRTY_AIR_GAP = 0.6       -- seconds
     M.DIRTY_AIR_COST = 0.0015   -- fraction of a segment
@@ -92,6 +101,7 @@ Core.define("paddock.sim", function(C)
         local wet = tonumber(cond.roadWetness) or 0
         local condRisk = M.conditionRisk(cond)
         local noiseCond = (1 + 0.5 * wet) * ((cond.family == "hazardous") and 1.3 or 1)
+        local chaos = tonumber(opts.chaos) or M.CHAOS[opts.tier or "street"] or 1
 
         local cars = {}
         for i, e in ipairs(field) do
@@ -102,10 +112,10 @@ Core.define("paddock.sim", function(C)
             cars[i] = {
                 id = e.id, orgId = e.orgId, attrs = a, grid = i,
                 seg = baseSeg * mult * M.conditionFactor(a, cond),
-                sigma = (0.006 + (100 - st(a, "consistency")) / 100 * 0.016) * noiseCond,
-                pDnf = M.hazard(M.DNF_BASE * risk * condRisk, n),
-                pMistake = M.hazard(M.MISTAKE_BASE * risk * condRisk, n),
-                t = (i - 1) * 0.12,        -- grid spacing: an eighth of a second per slot
+                sigma = (0.010 + (100 - st(a, "consistency")) / 100 * 0.030) * noiseCond * (0.6 + 0.4 * chaos),
+                pDnf = M.hazard(M.DNF_BASE * chaos * risk * condRisk, n),
+                pMistake = M.hazard(M.MISTAKE_BASE * chaos * risk * condRisk, n),
+                t = (i - 1) * M.GRID_GAP,  -- the grid leaves in rows, not all at once
                 dnf = false, splits = (not light) and {} or nil,
             }
         end
@@ -140,7 +150,8 @@ Core.define("paddock.sim", function(C)
                         c.dnfReason = (rng() < 0.3) and "mechanical" or "crash"
                         event(c.dnfReason == "mechanical" and "retirement" or "crash_out", s, { c.id })
                     elseif rng() < c.pMistake then
-                        local loss = 1.5 + rng() * 4.5
+                        -- most are a lift or a wide line; a quarter are the wall-and-reverse kind
+                        local loss = (rng() < M.MAJOR_SHARE) and (8 + rng() * 32) or (1.5 + rng() * 4.5)
                         dt = dt + loss
                         event("mistake", s, { c.id }, { lossSec = math.floor(loss * 10 + 0.5) / 10 })
                     end
@@ -174,7 +185,7 @@ Core.define("paddock.sim", function(C)
                                 end
                             end
                         else
-                            att.t = def.t + 0.02      -- held up
+                            att.t = def.t + M.HELD_UP_GAP      -- held up: a real gap behind, not glued to the bumper
                         end
                     end
                 end

@@ -49,7 +49,7 @@ function PaddockBillie.price(race)
     local per = PaddockSettings.get("billieSimsPerYield", 4)
     local pricingSeed = Hash.seed("billie", race.raceId, race.commit)     -- public inputs only
     for k = 1, n do
-        local r = Sim.simulate(field, route, cond, Hash.stream(pricingSeed, k), { baseSec = base, light = true })
+        local r = Sim.simulate(field, route, cond, Hash.stream(pricingSeed, k), { baseSec = base, light = true, tier = race.tier })
         local finished = {}
         for _, e in ipairs(r.entrants) do if e.state == "finished" then finished[e.id] = true end end
         pricer.add(r.order, finished)

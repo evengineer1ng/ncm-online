@@ -7,6 +7,8 @@ Core.define("course.routes", function(C)
     local M = { version = "0.0.1" }
     local nodes = C.get("data.nodes")
     local roots = C.get("data.roots")
+    local generator = C.get("course.generator")
+    local ovals = C.get("data.ovals")
 
     function M.planarDistance(a, b)
         local dx, dy = (a.x or 0) - (b.x or 0), (a.y or 0) - (b.y or 0)
@@ -15,10 +17,12 @@ Core.define("course.routes", function(C)
 
     --- Resolve a rootId. Returns route or nil, reason.
     function M.resolve(rootId, label)
-        local root = roots.byId(rootId)
+        -- a generated id carries its own nodes (L236): nothing to register, it resolves anywhere, after any restart
+        local root = roots.byId(rootId) or generator.decode(rootId) or ovals.root(rootId)
         if not root then return nil, "unknown_root" end
-        local start = nodes.byId(root.startNodeId)
-        local finish = nodes.byId(root.endNodeId)
+        -- an oval carries its own line node (L236): it is not a node anyone else may start from
+        local start = root.startNode or nodes.byId(root.startNodeId)
+        local finish = root.endNode or nodes.byId(root.endNodeId)
         if not start or not finish then return nil, "missing_node" end
         -- an authored route carries its intermediate gates and its path length (the sum of legs), not the crow-flies
         local distance = M.planarDistance(start, finish)
@@ -28,6 +32,8 @@ Core.define("course.routes", function(C)
             for _, p in ipairs(root.intermediate) do distance = distance + M.planarDistance(prev, p); prev = p end
             distance = distance + M.planarDistance(prev, finish)
         end
+        -- an oval is driven round the circle, not along its chords
+        if root.oval then distance = root.oval.laps * root.oval.circumference end
         return {
             routeId = rootId,
             name = label or root.displayName or rootId,
@@ -41,6 +47,9 @@ Core.define("course.routes", function(C)
             disciplineId = root.disciplineId,
             laps = root.laps,
             custom = root.custom or nil,
+            generated = root.generated or nil,
+            oval = root.oval,
+            checkpoints = root.checkpoints,
             description = root.description,
         }
     end

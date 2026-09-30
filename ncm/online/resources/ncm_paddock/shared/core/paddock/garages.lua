@@ -98,7 +98,9 @@ Core.define("paddock.garages", function(C)
     --- Returns orgId -> siteId for EVERY org (existing good assignments kept as they are). Deterministic.
     --- Preference, in order: a site holding one tenant of the OTHER time class (a day team pairs with a night
     --- team), then an empty site, then any site under DEPTH.
-    function M.assign(seed, orgs, bad, depth)
+    --- `yield` (optional): a host's way to give the instruction quota back (Wait(0)) -- called every 16 orgs placed; at
+    --- ~3x the cast (L236) one pass no longer fits one slice.
+    function M.assign(seed, orgs, bad, depth, yield)
         bad = bad or {}
         depth = depth or M.DEPTH
         -- Each site's rank is hashed ONCE, not inside the comparator: a sort calls it ~n log n times, and on the
@@ -129,8 +131,11 @@ Core.define("paddock.garages", function(C)
                 add(o.garageId, o.tier)
             end
         end
+        local placed = 0
         for _, o in ipairs(sorted) do
             if not out[o.id] and #pool > 0 then
+                placed = placed + 1
+                if yield and placed % 16 == 0 then yield() end
                 local night = nightTier(o.tier)
                 local start = Hash.fnv1a32(Hash.key(seed, "rent", o.id)) % #pool
                 local pick, pickRank

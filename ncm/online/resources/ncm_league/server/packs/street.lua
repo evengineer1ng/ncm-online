@@ -60,6 +60,9 @@ NcmPackStreet = {
             eligibility = { classes = { "Muscle", "Sport", "Tech" }, prestigeMax = 2 },
             economy = economy(1, "city_cup_v1"),
             capacity = 20,
+            -- L236: most slots race a generated route (course.generator) from the owner's hand-picked nodes, under
+            -- this distance filter, with up to two checkpoints; the named routes below keep the rest
+            generator = { minM = 1200, maxM = 4500, checkpoints = 2, checkpointShare = 0.5, share = 0.75 },
             -- Eight point-to-point roots, rotated in order: series.routes[(k % #routes) + 1].
             -- The same pool is consumed by every championship below; a route may host several at different times.
             routes = {
@@ -85,6 +88,9 @@ NcmPackStreet = {
             eligibility = { records = { "Vehicle.v_standard2_makigai_maimai" } },
             economy = economy(1, "maimai_cup_v1"),
             capacity = 20,
+            -- L236: most slots race a generated route (course.generator) from the owner's hand-picked nodes, under
+            -- this distance filter, with up to two checkpoints; the named routes below keep the rest
+            generator = { minM = 900, maxM = 3000, checkpoints = 2, checkpointShare = 0.5, share = 0.75 },
             routes = {
                 { rootId = "root_hill_abode_505_1229__to__downtown_2362_117" },                 -- Snake in the Grass
                 { rootId = "root_glenview_lofts_1489_964__to__corpo_plaza_1103_19" },           -- Overbridge Curve
@@ -107,6 +113,9 @@ NcmPackStreet = {
             eligibility = { classes = { "Sport", "Muscle" }, prestigeMin = 3, prestigeMax = 4 },
             economy = economy(10, "night_city_gt_v1"),
             capacity = 20,
+            -- L236: most slots race a generated route (course.generator) from the owner's hand-picked nodes, under
+            -- this distance filter, with up to two checkpoints; the named routes below keep the rest
+            generator = { minM = 2000, maxM = 6500, checkpoints = 2, checkpointShare = 0.5, share = 0.7 },
             routes = {
                 { rootId = "root_tip_1035_3652__to__trench_2899_2711" },                        -- Ukulele
                 { rootId = "root_parque_del_mar_2326_1125__to__gold_niwaki_plaza_264_304" },    -- The Cut
@@ -128,6 +137,9 @@ NcmPackStreet = {
             eligibility = { classes = { "Sport" }, prestigeMin = 5 },
             economy = economy(100, "hypercar_v1"),
             capacity = 20,
+            -- L236: most slots race a generated route (course.generator) from the owner's hand-picked nodes, under
+            -- this distance filter, with up to two checkpoints; the named routes below keep the rest
+            generator = { minM = 3000, maxM = 7000, checkpoints = 2, checkpointShare = 0.4, share = 0.6 },
             routes = {
                 { rootId = "root_tip_1035_3652__to__trench_2899_2711" },                        -- Ukulele
                 { rootId = "root_parque_del_mar_2326_1125__to__gold_niwaki_plaza_264_304" },    -- The Cut

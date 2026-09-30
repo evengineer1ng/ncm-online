@@ -21,10 +21,23 @@ Core.define("paddock.calibration", function(C)
     M.HUMAN_SERIES_TIER = { city_cup = "street", maimai_cup = "street", night_city_gt = "pro", hypercar = "premier" }
 
     --- The declared baseline for (route, tier): distance / tier speed, +-3% seeded route character.
-    function M.baseline(seed, routeId, distanceM, tier)
+    function M.baseline(seed, routeId, distanceM, tier, route)
         local v = M.TIER_SPEED[tier] or M.TIER_SPEED.street
         local character = 0.97 + 0.06 * Hash.unit(seed, "route_character", routeId)
-        return (tonumber(distanceM) or 3000) / v * character
+        -- an oval's length is exact (laps x the loop) and its average speed a roundabout's, not a street's
+        if route and route.oval then return (tonumber(distanceM) or 2400) / (v * M.OVAL_SPEED_FACTOR) * character end
+        return M.roadM(distanceM) / v * character
+    end
+    M.OVAL_SPEED_FACTOR = 0.55
+
+    --- The road distance a route's crow-flies (or summed-leg) distance stands for (L236). A route's `distanceM` is
+    --- planar; the road between two city nodes is longer, and relatively longer the shorter the hop (Troll Pass is
+    --- 550 m crow-flies and a minute-plus of driving; the v1 sim raced it in 18 s). First numbers, replaced by the
+    --- human median wherever one qualifies.
+    M.ROAD_FACTOR, M.ROAD_SHORT_EXTRA, M.ROAD_SHORT_M = 1.35, 0.9, 1000
+    function M.roadM(distanceM)
+        local d = tonumber(distanceM) or 3000
+        return d * (M.ROAD_FACTOR + M.ROAD_SHORT_EXTRA * math.exp(-d / M.ROAD_SHORT_M))
     end
 
     --- Median and quartile of a list of milliseconds, with the distinct-driver count.
@@ -58,7 +71,7 @@ Core.define("paddock.calibration", function(C)
     --- The base (seconds) for a race. `human` is the summary for (route, tier, condition bucket) or nil; `cond`
     --- are the race conditions. Returns baseSec, source ("baseline" | "human").
     function M.basePace(seed, route, tier, cond, human, minN, minDrivers)
-        local base = M.baseline(seed, route.routeId, route.distanceM, tier)
+        local base = M.baseline(seed, route.routeId, route.distanceM, tier, route)
         if M.qualifies(human, minN, minDrivers) then
             -- back out what the conditions cost a stat-50 driver, so the sim's own condition model is not doubled
             local f = Sim.conditionFactor({}, human.cond or cond or {})

@@ -50,18 +50,18 @@ return {
             local o = w.orgs[oid]
             byTier[o.tier] = (byTier[o.tier] or 0) + 1
         end
-        T.eq(byTier.street, 24); T.eq(byTier.regional, 16); T.eq(byTier.pro, 12); T.eq(byTier.premier, 8)
+        T.eq(byTier.street, 84); T.eq(byTier.regional, 48); T.eq(byTier.pro, 30); T.eq(byTier.premier, 8)   -- L236: ~3x
         for _, pid in ipairs(w.personOrder) do
             local p = w.people[pid]
             if p.role == "driver" and p.state == "active" then drivers = drivers + 1 end
             if p.role == "driver" and p.state == "free_agent" then fa = fa + 1 end
             if p.role == "owner" then owners = owners + 1 end
         end
-        T.eq(drivers, 140, "contracted drivers"); T.eq(fa, 40, "free agents"); T.eq(owners, 60)
-        T.eq(#W.field(w, "street_a"), 12); T.eq(#W.field(w, "premier"), 16); T.eq(#W.field(w, "regional_b"), 8)
+        T.eq(drivers, 378, "contracted drivers"); T.eq(fa, 120, "free agents"); T.eq(owners, 170)
+        T.eq(#W.field(w, "street_a"), 12); T.eq(#W.field(w, "premier"), 16); T.eq(#W.field(w, "regional_b"), 12); T.eq(#W.field(w, "pro_c"), 10)
         local seriesCount = 0
         for _ in pairs(w.series) do seriesCount = seriesCount + 1 end
-        T.eq(seriesCount, 6)
+        T.eq(seriesCount, 15)
     end,
 
     genesis_is_deterministic_and_unique = function(T)
@@ -111,13 +111,13 @@ return {
         T.eq(young.aggression, nil, "traits never grow on their own")
     end,
 
-    daily_rhythm_is_45_races_including_dst_days = function(T)
+    daily_rhythm_is_125_races_including_dst_days = function(T)
         local Season = T.Core.get("paddock.season")
         local Clock = T.Core.get("world.clock")
         for _, date in ipairs({ { 2026, 9, 29 }, { 2026, 3, 8 }, { 2026, 11, 1 }, { 2027, 1, 12 } }) do
             local day = Clock.daysFromCivil(date[1], date[2], date[3])
             local races = Season.dayRhythm(day)
-            T.eq(#races, 45, "45 races on " .. table.concat(date, "-"))
+            T.eq(#races, 125, "125 races on " .. table.concat(date, "-"))
             local ids = {}
             for _, r in ipairs(races) do
                 local id = Season.raceId(r.seriesId, r.utc)
@@ -134,7 +134,7 @@ return {
             elseif r.tier == "premier" then premier = h
             else T.ok(h >= 10 and h < 20, "sanctioned by day, got " .. h) end
         end
-        T.eq(street, 24); T.eq(premier, 15)
+        T.eq(street, 80); T.eq(premier, 15)
     end,
 
     window_covers_days_without_duplicates = function(T)
@@ -142,7 +142,7 @@ return {
         local Clock = T.Core.get("world.clock")
         local from = Clock.utcAt(Clock.daysFromCivil(2026, 9, 29), 0)
         local list = Season.window(from, from + 3 * 86400)
-        T.eq(#list, 135, "three Eastern days, 45 each")
+        T.eq(#list, 375, "three Eastern days, 125 each")
         local seen = {}
         for _, r in ipairs(list) do
             local id = Season.raceId(r.seriesId, r.utc)

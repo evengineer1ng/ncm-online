@@ -39,8 +39,8 @@ return {
         local H = T.Core.get("vocabulary.hash")
         local f = field(T, 6, { { pace = 70 }, { pace = 60 }, {}, { consistency = 20 }, {}, { pace = 30 } })
         local r = Sim.simulate(f, COURSE, DRY, H.stream("golden", 1), { baseSec = 160 })
-        T.eq(H.fnv1a32(fingerprint(r)), 349166164, "golden fingerprint (Lua 5.4 and LuaJIT must agree)")
-        T.eq(Sim.SIM_VERSION, 1)
+        T.eq(H.fnv1a32(fingerprint(r)), 1865222589, "golden fingerprint (Lua 5.4 and LuaJIT must agree)")
+        T.eq(Sim.SIM_VERSION, 2)
     end,
 
     finishers_are_ordered_and_gaps_consistent = function(T)
@@ -70,7 +70,7 @@ return {
             if r.entrants[1].state == "dnf" then dnf = dnf + 1 end
         end
         local rate = dnf / total
-        T.ok(rate >= 0.015 and rate <= 0.035, "DNF rate " .. rate .. " within 1.5-3.5% (FTB1 was ~3.6% per lap)")
+        T.ok(rate >= 0.035 and rate <= 0.065, "DNF rate " .. rate .. " within 3.5-6.5% at street chaos (sim v2, L236)")
     end,
 
     faster_drivers_win_more = function(T)
@@ -81,7 +81,8 @@ return {
             local r = Sim.simulate(field(T, 8, { [4] = { pace = 80, race_pace = 80 } }), COURSE, DRY, H.stream("fast", k), { baseSec = 160, light = true })
             if r.order[1] == "d4" then wins = wins + 1 end
         end
-        T.ok(wins > 120, "a clearly faster driver from mid-grid wins most races: " .. wins .. "/300")
+        -- street chaos (sim v2): talent shows at well over twice parity (37.5 of 300), but the street still bites
+        T.ok(wins > 95, "a clearly faster driver from mid-grid wins far above parity: " .. wins .. "/300")
         T.ok(wins < 300, "but not all of them")
     end,
 
@@ -107,7 +108,7 @@ return {
         local Cal = T.Core.get("paddock.calibration")
         local route = { routeId = "r", distanceM = 3000 }
         local base, src = Cal.basePace(1, route, "street", DRY, nil)
-        T.eq(src, "baseline"); T.ok(base > 80 and base < 120, "about 100 s for 3 km at street pace: " .. base)
+        T.eq(src, "baseline"); T.ok(base > 120 and base < 160, "about 140 s for 3 km crow-flies (~4.2 km of road) at street pace: " .. base)
         local _, src2 = Cal.basePace(1, route, "street", DRY, { n = 5, drivers = 2, median = 90000 })
         T.eq(src2, "baseline", "too little human data keeps the declared baseline")
         local s = Cal.summarise({ { ms = 90000, driverId = "a" }, { ms = 92000, driverId = "b" }, { ms = 91000, driverId = "c" },

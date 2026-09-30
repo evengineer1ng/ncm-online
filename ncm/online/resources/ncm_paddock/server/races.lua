@@ -48,9 +48,12 @@ function PaddockRaces.materialise(t)
     local w = PaddockStore.world
     local horizon = PaddockSettings.get("horizonMinutes", 120) * 60
     local st = {}
+    local made = 0
     for _, slot in ipairs(Season.window(t, t + horizon)) do
         local id = Season.raceId(slot.seriesId, slot.utc)
         if not PaddockRaces.byId[id] then
+            made = made + 1
+            if made % 6 == 0 then Wait(0) end        -- ~125 races a day (L236): route picks are metered too
             local cup = Season.cupOf(slot.utc)
             local seed = math.random(1, 2147483646)
             local race = { raceId = id, seriesId = slot.seriesId, tier = slot.tier, seasonId = cup.seasonId,
@@ -97,6 +100,12 @@ function PaddockRaces.buildField(race)
     if not ids then
         field = Sim.qualify(field, Hash.stream(race.seed, "quali", race.raceId))
     end
+    -- an oval grids only what its roundabout can hold (L236): the qualifying order decides who starts
+    local route = PaddockWorld.route(race.routeId)
+    local cap = route and route.oval and route.oval.fieldMax
+    if cap and #field > cap then
+        for i = #field, cap + 1, -1 do field[i] = nil end
+    end
     return field
 end
 
@@ -131,7 +140,8 @@ function PaddockRaces.run(race, t)
         return
     end
     local cond, route, base, source = PaddockRaces.setup(race)
-    local r = Sim.simulate(field, route, cond, Hash.stream(race.seed, race.raceId), { baseSec = base })
+    local r = Sim.simulate(field, route, cond, Hash.stream(race.seed, race.raceId), { baseSec = base, tier = race.tier })
+    Wait(0)                                           -- the sim and the result's encode each want a slice of their own
     local purse = Finance.purse(race.tier, #field)
     local lastMs = 0
     local st = {}

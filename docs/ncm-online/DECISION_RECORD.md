@@ -4521,3 +4521,51 @@ The owner saw bright sun at 21:30 Eastern. The server alone cannot fix it: OPEN/
 - **Paddock feed:** `ncm_paddock/server/broadcast.lua` sends 1 Hz rows to players within `broadcastRadiusM` (600 m) of a physical car: a staged grid (grid order, "GRID"), a street run, or bubble cars. Rows come from `PaddockViews.live`, which now carries each car's vehicle id and a real street gap (distance behind the leader at the sim leader's average speed) where it was blank before.
 
 **Tier pace (answer, from code):** each tier's sim targets a faster average -- street 30.5, regional 32.5, pro 34.5, premier 37.5 m/s (`paddock.calibration.TIER_SPEED`, "first numbers") -- and a higher car prestige band. A street car's per-leg ceiling is its sim split speed x1.08 (Pace cap 90 m/s). So a higher tier is faster by construction, but only street has run on the street; that the premier field is genuinely faster physically is unproven (IDEA-758). The calibration already replaces a tier's baseline with the human median once 8 runs by 3 drivers exist, which is how "street = the bare minimum" gets anchored to real players.
+
+## L236 - OWNER REQUEST + BUILT / ROUTES + PADDOCK - a procedural race generator, a ~3x Paddock, a wider sim, authored ovals
+
+**Owner (2026-09-30):**
+- **Routes:** "we schedule all races across our 10 named routes ... race 10 times, congrats youve done em all. we need a procedural race generator which applies a distance filter and spits out eligible races unnamed routes and even checkpointed races up to 2 checkpoints ... all nodes were handpicked by me to be start/finish locations."
+- **Drag:** "i will tag drag races myself ... treat them like ovals, authored nodes."
+- **Schedule:** "the paddock schedule and league roster is wonky ... modern amateur cup and island trophy are alternating every 20 mins ... we need a much wider breadth and cast of characters. we can simulate them cheaply ... but right now we are too cheap and see through."
+- **Sim:** "simulated times in races are wildly too close together ... the real race showed a p1 to p12 gap of 40 seconds, a sim race showed 5.58 seconds. reality is more variable and dnfs exist."
+- **Ovals:** "if i get you 4 coordinates around a roundabout ... could you program oval races for varying field sizes?"
+- **Size, answered by question:** ~3x the cast, and regenerate the dev world.
+
+**Built (dev):**
+- **`course.generator`:**
+  - every eligible race from the 35 authored race-legal nodes: 1,032 sprints between 0.9 and 7 km, plus checkpointed races through 1-2 other nodes (each leg >= 450 m, detour cap 1.9x);
+  - ids encode their nodes (`gen-k3f9-a8d2-zz01`), so a generated route resolves anywhere, after any restart, with no registry;
+  - unnamed ("Hanford Overpass to Stadium via Chapel");
+  - never tags a discipline (drag stays authored); oval nodes are excluded.
+- **Multiplayer:** a series may declare `generator = { minM, maxM, checkpoints, checkpointShare, share }`. City Cup 1.2-4.5 km, MaiMai 0.9-3 km, GT 2-6.5 km and Hypercar 3-7 km now race generated routes on 60-75% of slots. Street Drag is untouched. Checkpoints become gates through the existing `discipline.buildCourse`.
+- **Paddock ~3x (genesis v2):**
+  - 170 orgs, about 1,300 people, 120 free agents;
+  - 15 series: 7 street leagues, the first five being district leagues that start in Watson, Westbrook, City Center, Heywood and Pacifica; 4 regional; 3 pro; the premier;
+  - 125 races a day: street every 6 minutes through the night, regional four an hour, pro every 40 minutes, the premier at 15:00;
+  - a generated route under a per-tier filter on 50-75% of slots.
+- **Sim v2:**
+  - pace spread 12%, noisier segments;
+  - a held-up car sits 0.25 s behind, not glued 0.02 s;
+  - the grid leaves in rows;
+  - a quarter of mistakes are 8-40 s (the wall-and-reverse-out kind);
+  - DNF 5% per car at street, with a tier chaos scale (street 1.0 down to premier 0.6).
+  - Monte Carlo on real genesis fields: street P1-to-last median about 31-34 s (p90 about 60 s), P1-P2 about 1 s, a DNF in about half of street races. A driver 30 points faster wins about 38% of 8-car street races.
+  - Sim durations had used crow-flies distance (Troll Pass raced in 18 s). The baseline now uses a road estimate (crow x1.35, more on short hops).
+- **`data.ovals`:**
+  - four authored points become a lapped race: anticlockwise from the author's first point; about 2.4 km in 5-15 laps; the field the roundabout grids, 4-16;
+  - gates sized to the roundabout; a grid two abreast round the loop behind the line, grounded server-side;
+  - oval pace at 0.55 of tier speed;
+  - a share of street (15%), regional (10%) and pro (5%) slots once any oval exists.
+  - The list is empty until the owner marks the roundabouts. Multiplayer ovals will feed the same data into the existing `discipline.ovalCourse` lap adapter (IDEA-761).
+- **`/ncm.mark` (ncm_paddock client; owner: "need a way to add pins temporarily in game that you can read"):**
+  - marks the map waypoint (or your position); `/ncm.mark.set`, `.here`, `.undo`, `.list`, `.clear`;
+  - drops numbered map pins;
+  - writes `NCMMARK {...}` lines to the client's own log, which `tools/read-marks.py` reads back (`--oval` prints a ready entry).
+- **3x exposed instruction-quota overruns, all fixed:**
+  - garage housing (yield inside `garages.assign`);
+  - store load;
+  - race materialise, run and story;
+  - the free-agent sort (a rating inside the comparator, KB-214's shape).
+  - The garage a player stands in now fills first, since spawns per pass are capped.
+- **Dev `ncm_paddock` serverId (KB-221):** it had been "ncm-dev" while ncm_league/ncm_world are "ncm-devbox". Dev's `tunables.json` now overrides it. The next dev boot finds no world under ncm-devbox and runs genesis v2: that is the regeneration. The old "ncm-dev" Paddock rows stay in the dev database, orphaned.

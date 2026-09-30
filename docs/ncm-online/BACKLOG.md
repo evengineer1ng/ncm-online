@@ -17,7 +17,7 @@ a milestone or batch) → `built` (code + offline proof) → `validated` (live P
 **Where things live:** ideas and work → here. Choices made and questions for the owner → `DECISION_RECORD.md`.
 Defects → `KNOWN_BUGS.md`. Live PASS/FAIL → `wp/MASTER_TEST.md`. What to do next → `NOW.md`.
 
-**IDs are permanent.** Next free ID: **IDEA-760**.
+**IDs are permanent.** Next free ID: **IDEA-764**.
 *(This line has now been stale twice — left at IDEA-127 while the ledger ran to IDEA-183, then at IDEA-205 while it
 ran to IDEA-294. It is the only guard against reusing an ID. Check it against the last row before you append.)*
 
@@ -1269,3 +1269,7 @@ Built on dev, offline-green; awaiting `§CH` (L226, doc 44).
 | IDEA-757 | **PRESENTATION/UI** | 2026-09-30 | **A presentation pass across NCM's UI**: "we are still lacking in true presentation across our whole project in terms of ui." Native pieces (banner, names, tower) set the style to carry forward. | owner, L235 | raw | panel, race HUD, `ncm-broadcast` |
 | IDEA-758 | **PADDOCK/PACE** | 2026-09-30 | **Prove higher tiers are genuinely faster on the street, and anchor street as the floor**: spectate a Pro or Premier street run and compare its times to a street run on the same route; feed human City Cup medians into calibration so street pace is bounded by real players. Owner: street "should be the baseline for the bare minimum, not the aggregate speed overall." | owner, L235 | raw | `paddock.calibration.TIER_SPEED`; `L.speedPlan` |
 | IDEA-759 | **BROADCAST/SPECTATE** | 2026-09-30 | **The tower and names for a race you are not near**: pick any live Paddock race (manager mode) or multiplayer session from F6 and follow it, not only the one around you or the one you are in. | build, L235 | raw | `ncm_broadcast`; `PaddockBroadcast` |
+| IDEA-760 | **ROUTES/GENERATOR** | 2026-09-30 | **Formalise the generated routes that race well**: the generator exists partly to find them (owner: "this will get us data on potential routes to formalize"). Rank generated routes by finishes, incidents and human times; promote the best to named roots. | owner, L236 | raw | `course.generator.census`; ghost laps |
+| IDEA-761 | **OVALS/MP** | 2026-09-30 | **Multiplayer oval series**: feed `data.ovals` into `competition.discipline.ovalCourse` (laps adapter, lap display) and give oval nights a championship of their own. | owner, L236 | raw | `data.ovals`; `discipline.ovalCourse` |
+| IDEA-762 | **PADDOCK/CAST** | 2026-09-30 | **Invitationals across tiers** (a 16th series): one-off events that pull the best drivers of several leagues onto one grid. | build, L236 | raw | `paddock.season` |
+| IDEA-763 | **PADDOCK/CALIBRATION** | 2026-09-30 | **Calibrate the road-distance baseline from street runs**: every physical Paddock race records real times; compare them with the sim baseline per route and fit `ROAD_FACTOR` (first numbers: crow x1.35 plus a short-hop term). | build, L236 | raw | `paddock.calibration.roadM`; `paddock_live` |

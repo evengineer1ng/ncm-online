@@ -60,7 +60,13 @@ end
 
 local function freeAgentsBest()
     local fas = World.freeAgents(w())
-    table.sort(fas, function(a, b) return Attr.rating(a.attrs) > Attr.rating(b.attrs) end)
+    -- each rating once, not inside the comparator (the KB-214 shape; 120 free agents since L236)
+    local r = {}
+    for _, p in ipairs(fas) do r[p] = Attr.rating(p.attrs) end
+    table.sort(fas, function(a, b)
+        if r[a] ~= r[b] then return r[a] > r[b] end
+        return a.id < b.id
+    end)
     return fas
 end
 
@@ -167,6 +173,7 @@ local function replaceFolded(t)
             PaddockLife.reseat(n)
             PaddockStore.markOrg(n.id)
             for _, p in ipairs(World.members(world, n.id)) do PaddockStore.markPerson(p.id) end
+            Wait(0)                                   -- a reindex walks the whole cast
             for _, sid in ipairs(n.sponsorIds) do PaddockStore.markSponsor(sid) end
             events[#events + 1] = Tape.event("founded", n.id, t, { entities = { { "org", n.id } },
                 facts = { org = n.name, tier = Season.TIERS[n.tier].label, founder = PaddockWorld.personName(n.ownerId) } })
@@ -255,6 +262,7 @@ local function titles(kind, seasonId, cupId, t)
     local events = {}
     local world = w()
     for id, s in pairs(world.series) do
+        Wait(0)                                       -- fifteen series (L236)
         local top = PaddockLife.standings("driver", seasonId, id, cupId, 1)[1]
         if top and top.points > 0 then
             local p = world.people[top.id]
@@ -367,14 +375,15 @@ function PaddockLife.cupBoundary(t)
         for _, e in ipairs(titles("cup_title", prevSeason, previous, t)) do events[#events + 1] = e end
     end
     -- queued human-manager roster moves land now (doc 44 §10)
-    for _, oid in ipairs(world.orgOrder) do
+    for i, oid in ipairs(world.orgOrder) do
+        if i % 40 == 0 then Wait(0) end
         local o = world.orgs[oid]
         if o.lifecycle == "active" and o.humanManagerDriverId and o.pending and #o.pending > 0 then
             for _, e in ipairs(PaddockManager.applyPending(o, t)) do events[#events + 1] = e end
         end
     end
     local medians = {}
-    for _, tier in ipairs(Season.TIER_ORDER) do medians[tier] = tierMedian(tier) end
+    for _, tier in ipairs(Season.TIER_ORDER) do medians[tier] = tierMedian(tier); Wait(0) end   -- ~1,200 people (L236)
     for _, oid in ipairs(world.orgOrder) do
         local o = world.orgs[oid]
         if o.lifecycle == "active" then

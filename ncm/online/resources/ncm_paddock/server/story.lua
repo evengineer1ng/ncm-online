@@ -28,7 +28,8 @@ function PaddockStory.record(events)
     if not events or #events == 0 then return {} end
     local sid = U.sid()
     local st, stories = {}, {}
-    for _, e in ipairs(events) do
+    for i, e in ipairs(events) do
+        if i % 10 == 0 then Wait(0) end               -- a Cup boundary at ~3x the cast (L236) writes a lot of news
         local ok = Tape.validate(e)
         if ok then
             e.day = e.day or Clock.eastern(e.at).dayIndex

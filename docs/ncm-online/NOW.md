@@ -3,6 +3,15 @@
 > **STATUS: LEDGER** - living session memory, rewritten at the end of every working session.
 > Authority map: [INDEX.md](INDEX.md) - classified 2026-09-24 (L125).
 
+**LATEST 2026-09-30 (later) - PROCEDURAL ROUTES, A ~3x PADDOCK, SIM v2, AUTHORED OVALS, /ncm.mark (`L236`, `KB-221`, `KB-222`, `IDEA-760`-`IDEA-763`).**
+- **Routes:** `course.generator` turns the owner's 35 race-legal nodes into 1,032 sprints plus 1-2-checkpoint races. Multiplayer series race generated routes on 60-75% of slots, the Paddock on 50-75%.
+- **Paddock:** 170 orgs, about 1,300 people, 15 series (district street leagues), 125 races a day. Sim v2 spreads a street field about 30 s, with DNFs.
+- **Ovals:** `data.ovals` builds lapped roundabout races from four marked points; the list is empty until marked.
+- **`/ncm.mark`:** set a map waypoint (or stand there) and mark it in game; `tools/read-marks.py --oval` reads the marks out of the client log.
+- Gate ALL GREEN (core 844, paddock host 294).
+- **Dev:** `ncm_paddock` serverId fixed to ncm-devbox (KB-221), so the next dev boot regenerates the Paddock at the new size. **Dev server NOT restarted yet**; NCM Broadcast (L235) also waits on that restart.
+**THE ONE NEXT ACTION:** quit the game, restart the dev server (genesis v2 runs; allow a minute), rejoin. Then per roundabout: `/ncm.mark.set <name>`, a waypoint on each pole and `/ncm.mark` (four points, the start/finish line first). Tell Claude the set names; it reads them with `tools/read-marks.py --oval` and adds the ovals. Online stays frozen (`L223`).
+
 **LATEST 2026-09-30 - FIRST FULLY SPECTATED STREET RACE WORKED; NCM BROADCAST BUILT (`L235`, `IDEA-755`-`IDEA-759`).**
 Owner watched the 23:40 street race at Hanford overpass from behind the grid: traffic kept off the grid, the warning fired, the field launched and raced hard, Derek Smith won by under a second, Emilia Vargas crashed, reversed out and finished 40 s back. `L234` (SP launch port, drivers, null area) worked on its first run.
 - **Built:** NCM Broadcast 0.1.0 (new required mod + new `ncm_broadcast` resource): native plates over Paddock cars (position, name, team) and an opt-in timing tower (`/ncm.tower`; `/ncm.names` toggles names) for Paddock races and the multiplayer session you are in, with usernames. The only WebUI surface is its hidden transport page, in the new resource's own budget (`kMaximumWebSurfaces` is 8 per resource; the owner's client ran 23 at once).
@@ -470,8 +479,8 @@ next rig action is an in-process read-only P0 that composes the owner's G29, sep
 rim using those source-verified provider patterns and preserves stable device identity. This research does not
 displace the live queue below.
 
-> **Claim before writing:** decisions through **L235**; MASTER_TEST through **§CH**; next QA letter **§CI**.
-> BACKLOG next free **IDEA-760**; known issues through **KB-220**. Read ledger tails before allocating.
+> **Claim before writing:** decisions through **L236**; MASTER_TEST through **§CH**; next QA letter **§CI**.
+> BACKLOG next free **IDEA-764**; known issues through **KB-222**. Read ledger tails before allocating.
 > BACKLOG next free **IDEA-686**; known issues through **KB-186**. Read ledger tails before allocating.
 >
 > The next-free guard matters: overlapping 2026-09-26/27 sessions previously made this block stale several

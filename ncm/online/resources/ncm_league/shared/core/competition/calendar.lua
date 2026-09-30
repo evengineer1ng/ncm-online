@@ -8,6 +8,7 @@ Core.define("competition.calendar", function(C)
     local routes = C.get("course.routes")
     local ids = C.get("vocabulary.ids")
     local seasons = C.get("competition.seasons")
+    local generator = C.get("course.generator")
 
     --- Validate a series definition. Returns true or false, reason.
     function M.validateSeries(s)
@@ -17,7 +18,12 @@ Core.define("competition.calendar", function(C)
         if not ids.isSlug(s.rulesetId) then return false, "invalid_ruleset_id" end
         local c = s.cadence
         if type(c) ~= "table" or type(c.everyMinutes) ~= "number" or c.everyMinutes < 1 then return false, "invalid_cadence" end
-        if type(s.routes) ~= "table" or #s.routes == 0 then return false, "routes_required" end
+        if type(s.routes) ~= "table" or (#s.routes == 0 and type(s.generator) ~= "table") then return false, "routes_required" end
+        if s.generator ~= nil then
+            local g = s.generator
+            if type(g) ~= "table" or type(g.minM) ~= "number" or type(g.maxM) ~= "number" or g.minM >= g.maxM then return false, "invalid_generator" end
+            if g.share ~= nil and (type(g.share) ~= "number" or g.share < 0 or g.share > 1) then return false, "invalid_generator_share" end
+        end
         for _, r in ipairs(s.routes) do
             local rid = type(r) == "table" and r.rootId or r
             if not routes.resolve(rid) then return false, "unknown_route:" .. tostring(rid) end
@@ -49,9 +55,18 @@ Core.define("competition.calendar", function(C)
         local out = {}
         local startsAt, k = slotStartsAfter(everySec, offsetSec, nowUnix)
         while startsAt <= nowUnix + horizonSec do
-            local r = series.routes[(k % #series.routes) + 1]
-            local rid = type(r) == "table" and r.rootId or r
-            local label = type(r) == "table" and r.label or nil
+            -- L236: a series with a generator races generated routes on `share` of its slots (seeded by the slot, so a
+            -- re-materialise picks the same one) and its named rotation on the rest
+            local r, rid, label
+            local g = series.generator
+            if g and (#series.routes == 0 or C.get("vocabulary.hash").unit("calendar-gen", series.seriesId, math.floor(startsAt)) < (g.share or 0.75)) then
+                rid = generator.pick(g, series.seriesId, math.floor(startsAt))
+            end
+            if not rid then
+                r = series.routes[(k % #series.routes) + 1]
+                rid = type(r) == "table" and r.rootId or r
+                label = type(r) == "table" and r.label or nil
+            end
             local route = routes.resolve(rid, label)
             out[#out + 1] = {
                 eventId = series.seriesId .. "@" .. tostring(math.floor(startsAt)),
@@ -67,6 +82,7 @@ Core.define("competition.calendar", function(C)
                 tier = series.tier,
                 routeId = rid,
                 routeName = route.name,
+                generated = route.generated or nil,
                 startsAt = startsAt,
                 entryOpensAt = startsAt - opens,
                 entryClosesAt = startsAt - closes,

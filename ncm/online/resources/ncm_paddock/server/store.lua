@@ -137,7 +137,9 @@ function PaddockStore.load()
         w.takenSeriesNames[r.name] = true
     end
     Wait(0)
+    local yo = U.yielder(20)                       -- ~170 orgs (L236): the decode does not fit one slice
     for _, r in ipairs(MySQL.query.await("SELECT * FROM paddock_org WHERE server_id = ? ORDER BY org_id", { sid }) or {}) do
+        yo()
         local o = {
             id = r.org_id, tier = r.tier, seriesId = r.series_id, name = r.name, short = r.short, colour = r.colour,
             prestige = num(r.prestige, 50), cash = num(r.cash, 0), facility = num(r.facility, 50),
@@ -155,7 +157,7 @@ function PaddockStore.load()
     end
     Wait(0)
     local rows = MySQL.query.await("SELECT * FROM paddock_person WHERE server_id = ? ORDER BY person_id", { sid }) or {}
-    local y = U.yielder(40)
+    local y = U.yielder(25)
     for _, r in ipairs(rows) do
         local p = {
             id = r.person_id, role = r.role, orgId = r.org_id, seat = r.seat, first = r.first, last = r.last,
@@ -169,7 +171,9 @@ function PaddockStore.load()
         w.takenNames[p.display] = true
         y()
     end
+    local ys = U.yielder(40)
     for _, r in ipairs(MySQL.query.await("SELECT * FROM paddock_sponsor WHERE server_id = ? ORDER BY sponsor_id", { sid }) or {}) do
+        ys()
         local s = { id = r.sponsor_id, name = r.name, short = r.short, industry = r.industry, tier = r.tier,
             personality = U.decode(r.personality_json) or {}, orgId = r.org_id, perDay = num(r.per_day, 0) }
         w.sponsors[s.id] = s

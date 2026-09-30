@@ -58,9 +58,10 @@ function PaddockGarages.ensure()
         local o = w.orgs[id]
         if active(o) then orgs[#orgs + 1] = { id = o.id, tier = o.tier, garageId = o.garageId } end
     end
-    local a = G.assign(w.seed, orgs, PaddockGarages.bad)
+    local a = G.assign(w.seed, orgs, PaddockGarages.bad, nil, function() Wait(0) end)
     local tenants, moved = {}, 0
-    for _, x in ipairs(orgs) do
+    for i, x in ipairs(orgs) do
+        if i % 25 == 0 then Wait(0) end                 -- ~170 orgs (L236): shifts hash per org, one slice is not enough
         local o = w.orgs[x.id]
         local changed = false
         if a[o.id] and a[o.id] ~= o.garageId then o.garageId = a[o.id]; changed = true; moved = moved + 1 end
@@ -168,12 +169,13 @@ function PaddockGarages.tick()
     local busy = busySeries(t)
     local liveAway = PaddockLive and PaddockLive.awayPeople and PaddockLive.awayPeople() or {}
     -- who should be standing where
-    local want, siteNear, siteBucket = {}, {}, {}
+    local want, siteNear, siteBucket, siteDist = {}, {}, {}, {}
     for _, pos in pairs(positions) do
         for siteId, orgIds in pairs(PaddockGarages.tenants) do
             local site = G.site(siteId)
             local d = G.distance(site, pos)
             if d <= leaveM then siteNear[siteId] = true end
+            if d <= nearM and (not siteDist[siteId] or d < siteDist[siteId]) then siteDist[siteId] = d end
             if d <= nearM and not want[siteId] then
                 siteBucket[siteId] = pos.bucket or 0
                 local crew = {}
@@ -210,7 +212,17 @@ function PaddockGarages.tick()
     local count = 0
     for _ in pairs(bodies) do count = count + 1 end
     local spawns = 0
-    for siteId, crew in pairs(want) do
+    -- the garage a player is standing in fills first: spawns per pass are capped, and at ~3x the cast (L236) the
+    -- next garage along is often on shift too
+    local order = {}
+    for siteId in pairs(want) do order[#order + 1] = siteId end
+    table.sort(order, function(a, b)
+        local da, db = siteDist[a] or math.huge, siteDist[b] or math.huge
+        if da ~= db then return da < db end
+        return a < b
+    end)
+    for _, siteId in ipairs(order) do
+        local crew = want[siteId]
         local site = G.site(siteId)
         for i, x in ipairs(crew) do
             if count >= cap or spawns >= 4 then break end

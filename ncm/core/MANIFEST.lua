@@ -20,6 +20,8 @@ return {
     "data/nodes.lua",
     "data/fuel_locations.lua",
     "data/roots.lua",
+    "course/generator.lua",
+    "data/ovals.lua",
     "course/routes.lua",
     "world/ambient.lua",
     "world/presence.lua",
