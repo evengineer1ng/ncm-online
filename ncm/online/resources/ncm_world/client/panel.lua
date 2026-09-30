@@ -870,6 +870,33 @@ end
 -- the race guide (owner, 2026-09-28). The mapping id stays `ncm.guidepage` so nobody's rebinding is lost.
 pcall(function() RegisterKeyMapping("ncm.guidepage", "NCM: hub", "F6", toggleGuide) end)
 RegisterCommand("ncm.guidepage", toggleGuide, false)
+
+-- The hub on a controller: Start, which nothing else in the build claims (the radial that defaulted to it is
+-- pulled, KB-182). Polled, not a `RegisterKeyMapping`: whether a mapping accepts pad controls is unproven (the
+-- radial's `§BX8` never ran), and a pad mapping was the one thing the radial did that KB-182 never cleared.
+-- The read is physical, so it is gated like calendar.lua's pad X: nothing opens while something else holds input
+-- (chat). Closing is NOT gated -- the open panel is what holds input -- and goes through `hide()` in Lua, the same
+-- path as pad B, never through the page (KB-61). One native call per tick, press edge only, no auto-repeat.
+local PAD_HUB = "padStart"
+local PAD_HUB_TICK_MS = 50
+CreateThread(function()
+    local wasDown = false
+    while true do
+        local okP, down = pcall(Open77.input.isDown, PAD_HUB)
+        down = okP and down == true
+        if down and not wasDown then
+            if open then
+                hide()
+            else
+                local captured = false
+                pcall(function() captured = Open77.input.isCaptured() == true end)
+                if not captured then showGuide() end
+            end
+        end
+        wasDown = down
+        Wait(PAD_HUB_TICK_MS)
+    end
+end)
 NcmQuickActions = NcmQuickActions or {}
 NcmQuickActions.hub = toggleGuide
 
