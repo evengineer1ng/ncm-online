@@ -150,6 +150,13 @@ function PaddockRaces.run(race, t)
     race.closesAt = race.opensAt + math.ceil(lastMs / 1000) + 30
     race.cond, race.baseSec, race.baseSource = cond, base, source
     race.result = r
+    -- the continuous race (paddock.racestate): where every car is, every moment, watched or not -- LIVE reads it, and
+    -- the physical bubble will hand cars in and out of it
+    local path = PaddockLive and PaddockLive.pathFor(race.routeId)
+    if path then
+        local okM, model = pcall(NcmCore.get("paddock.racestate").new, path, r.entrants, r.segments)
+        if okM then race.model, race.modelGoAt = model, race.opensAt end
+    end
     race.state = "running"
     local detail = { frozen = race.frozen, splits = splits, events = r.events, segments = r.segments }
     st[#st + 1] = { query = [[UPDATE paddock_race SET state = 'running', window_closes_at = ?, weather = NULLIF(?, ''),

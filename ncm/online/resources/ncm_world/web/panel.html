@@ -617,6 +617,12 @@
     .pd-form button, .pd-act { background:transparent; color:var(--text); border:1px solid var(--accent); padding:6px 12px; font-family:var(--display); letter-spacing:.06em; cursor:pointer; }
     .pd-act.small { padding:3px 9px; font-size:12px; }
     .pd-kv { display:grid; grid-template-columns:140px 1fr; gap:6px 12px; font-size:15px; margin:8px 0 10px; }
+    .pd-track { position:relative; height:64px; margin:10px 8px 14px; }
+    .pd-track-line { position:absolute; left:0; right:0; top:30px; height:3px; background:var(--line); }
+    .pd-track-end { position:absolute; top:18px; font:700 11px/1 var(--mono); color:var(--dim); letter-spacing:.1em; }
+    .pd-dot { position:absolute; top:22px; width:18px; height:18px; margin-left:-9px; border-radius:50%; border:2px solid var(--panel);
+              font:700 10px/14px var(--mono); text-align:center; color:#000; background:var(--accent); }
+    .pd-dot.out { opacity:.35; }
   </style>
 </head>
 <body class="closed">
@@ -2583,7 +2589,8 @@
       // The rail. Each section is one server view; the subtitle says what it is for, so nobody has to guess.
       const PADDOCK_TABS = [
         ["today", "TODAY", "What's on now and what just happened"],
-        ["results", "RACES", "Upcoming and results · run one live"],
+        ["live", "LIVE", "Races on track right now"],
+        ["results", "RACES", "Upcoming and results"],
         ["standings", "STANDINGS", "Season and Cup tables"],
         ["directory", "TEAMS", "Every team and where they work"],
         ["wire", "NEWS", "The Paddock wire"],
@@ -2674,6 +2681,33 @@
         if (pdArr(d.results).length) pdResultsTable(b2, d.results); else pdEmpty(b2, "No finished races yet.");
         const b3 = pdBlock(paddockMain, "HEADLINES", "From the wire");
         if (pdArr(d.rows).length) pdStories(b3, d.rows); else pdEmpty(b3, "Nothing on the wire yet.");
+      }
+      // LIVE: a strip of the route with every car on it, and the timing tower; refreshed while the section is open
+      let pdLiveTimer = null;
+      function pdLiveRefresh(raceId) {
+        if (pdLiveTimer) clearTimeout(pdLiveTimer);
+        pdLiveTimer = setTimeout(() => { pdLiveTimer = null; if (mode === "paddock" && paddockView === "live") pdAsk({ view: "live", raceId: raceId }); }, 1500);
+      }
+      function pdLive(d) {
+        const races = pdArr(d.races);
+        if (!races.length) { pdEmpty(paddockMain, "Nothing on track right now. TODAY shows what's next."); return; }
+        const b = pdBlock(paddockMain, (d.series || "") + " · " + (d.route || ""), (d.street ? "ON THE STREET · " : "SIMULATED · ") + Math.floor((d.elapsed || 0) / 60) + ":" + String((d.elapsed || 0) % 60).padStart(2, "0"));
+        if (races.length > 1) b.append(pdChips(races.map(r => [r.raceId, r.eastern + " " + r.series + (r.street ? " · street" : "")]), d.raceId, (id) => pdAsk({ view: "live", raceId: id })));
+        const track = pdEl("div", "pd-track");
+        track.append(pdEl("div", "pd-track-line"));
+        const st = pdEl("span", "pd-track-end", "START"); st.style.left = "0"; track.append(st);
+        const fin = pdEl("span", "pd-track-end", "FINISH"); fin.style.right = "0"; track.append(fin);
+        for (const r of pdArr(d.rows).slice().reverse()) {
+          const dot = pdEl("span", "pd-dot" + (r.state === "out" ? " out" : ""), r.pos);
+          dot.style.left = Math.max(0, Math.min(100, Number(r.pct) || 0)) + "%";
+          if (r.colour) dot.style.background = r.colour;
+          track.append(dot);
+        }
+        b.append(track);
+        b.append(pdTable([["POS", r => r.pos], ["DRIVER", r => { const w = pdEl("span"); if (r.colour) { const sw = pdEl("span", "pd-swatch"); sw.style.background = r.colour; w.append(sw); } w.append(pdEl("span", null, r.name)); return w; }],
+          ["TEAM", r => r.org || ""], ["GAP", r => r.gap || ""], ["", r => r.state === "finished" ? pdEl("span", "pd-live", "FINISHED") : (r.state === "out" ? "OUT" : "")]],
+          d.rows, (r) => pdAsk({ view: "profile", kind: "person", id: r.id })));
+        pdLiveRefresh(d.raceId);
       }
       function pdWire(d) {
         const b = pdBlock(paddockMain, "THE WIRE", "The biggest stories rise; mid-table street results stay in RACES");
@@ -2875,6 +2909,10 @@
           pdHelp("The NPC world", ["Sixty teams race on their own calendar, Eastern time: Street at night, Regional and Pro by day, the Premier feature at 15:00.",
             "When you are near a race's route as it starts, it runs on the street: the grid spawns at the start and races the route. Otherwise it is simulated.",
             "Their people work out of rented garages. TEAMS shows where and when; walk up while they're in to talk."]);
+        } else if (view === "live") {
+          pdHelp("Live", ["Every race on track right now, simulated or on the street. The strip is the route; each dot is a car.",
+            "A simulated race moves as the sim runs it. A race on the street shows where the real cars are.",
+            "Click a driver for who they are."]);
         } else if (view === "results") {
           pdHelp("Races", ["Click a result for its box score here.",
             "Races run on the street by themselves when a player is near the route: the grid spawns at the start 75 seconds before the lights, and the cars race at the pace the sim gave each driver.",
@@ -2940,6 +2978,7 @@
         if (d.loading) pdEmpty(paddockMain, "Loading the Paddock…");
         else if (d.error) pdEmpty(paddockMain, PD_ERRORS[d.error] || String(d.error));
         else if (view === "today") pdToday(d);
+        else if (view === "live") pdLive(d);
         else if (view === "wire") pdWire(d);
         else if (view === "standings") pdStandings(d);
         else if (view === "results") pdResults(d);

@@ -318,6 +318,66 @@ function PaddockViews.myorg(pid)
         balance = PaddockWallet.balance(d.ncmDriverId), rows = rows }
 end
 
+--- LIVE: every race on track now, and for the one picked, a track strip and a timing tower. A simulated race reads the
+--- continuous model (paddock.racestate); a street race reads its cars' real positions, projected onto the same line.
+--- Betting closed when the window opened, so live order is coverage, not a leak.
+function PaddockViews.live(_, args)
+    local t = U.now()
+    local Racestate = NcmCore.get("paddock.racestate")
+    local list = {}
+    for _, race in pairs(PaddockRaces.byId) do
+        if race.state == "running" and race.model and t >= race.opensAt then list[#list + 1] = race end
+    end
+    table.sort(list, function(a, b) return a.opensAt < b.opensAt end)
+    local races = {}
+    for i, race in ipairs(list) do
+        local lr = PaddockLive.byRace[race.raceId]
+        races[i] = { raceId = race.raceId, series = PaddockWorld.seriesName(race.seriesId), route = PaddockWorld.routeName(race.routeId),
+            eastern = Clock.hhmm(race.opensAt), street = (lr and lr.state == "running") or nil }
+    end
+    local pick
+    for _, race in ipairs(list) do if race.raceId == args.raceId then pick = race end end
+    pick = pick or list[1]
+    if not pick then return { view = "live", races = races, rows = {} } end
+    local model = pick.model
+    local lr = PaddockLive.byRace[pick.raceId]
+    local street = lr and lr.state == "running" and lr.goMs
+    local tMs = street and ((Open77.time.unix() or 0) * 1000 - lr.goMs) or (t - pick.modelGoAt) * 1000
+    local rows = {}
+    if street then
+        -- real positions: where each car is on the line, and the gates it has timed
+        local w = PaddockStore.world
+        for _, c in ipairs(lr.cars) do
+            local okP, pos = pcall(Open77.vehicles.getPosition, c.vehicleId)
+            local d = (okP and type(pos) == "table") and Racestate.project(model, pos) or 0
+            local tc = lr.timing and lr.timing.cars[c.personId]
+            local state = (tc and tc.done) and "finished" or (lr.out[c.personId] and "out" or "racing")
+            rows[#rows + 1] = { id = c.personId, d = (tc and tc.done) and model.lengthM or d, state = state, finishMs = tc and tc.finishMs }
+        end
+        table.sort(rows, function(a, b)
+            if (a.state == "finished") ~= (b.state == "finished") then return a.state == "finished" end
+            if a.state == "finished" then return (a.finishMs or 0) < (b.finishMs or 0) end
+            return a.d > b.d
+        end)
+        for i, r in ipairs(rows) do r.pos = i end
+    else
+        rows = Racestate.standings(model, tMs)
+    end
+    local out = {}
+    for i, r in ipairs(rows) do
+        local p = PaddockStore.world.people[r.id]
+        local o = PaddockStore.world.orgs[(p and p.orgId) or r.orgId or ""]
+        out[i] = { pos = r.pos, id = r.id, name = p and p.display or "?", org = o and o.name, colour = o and o.colour,
+            pct = math.floor(math.min(1, math.max(0, (r.d or 0) / math.max(1, model.lengthM))) * 1000) / 10,
+            gap = r.state == "finished" and (r.gapMs and (r.gapMs == 0 and "winner" or ("+%.1fs"):format(r.gapMs / 1000)) or "finished")
+                or (r.state == "out" and "out") or (r.gapMs and (r.gapMs == 0 and "leader" or ("+%.1fs"):format(r.gapMs / 1000)) or ""),
+            state = r.state }
+    end
+    return { view = "live", races = races, raceId = pick.raceId, series = PaddockWorld.seriesName(pick.seriesId),
+        route = PaddockWorld.routeName(pick.routeId), elapsed = math.max(0, math.floor(tMs / 1000)), lengthM = math.floor(model.lengthM),
+        street = street and true or nil, rows = out }
+end
+
 --- TODAY: the landing page. What races next (with the live button), what just finished, the top headlines, and
 --- where the player stands (Billie, their paper, their team, a live race they declared). One round trip.
 function PaddockViews.today(pid)
@@ -361,7 +421,7 @@ local function phaseNow(t)
     return table.concat(on, " · ") .. " racing"
 end
 
-PaddockViews.BUILDERS = { today = PaddockViews.today, wire = PaddockViews.wire, standings = PaddockViews.standings, results = PaddockViews.results,
+PaddockViews.BUILDERS = { today = PaddockViews.today, live = PaddockViews.live, wire = PaddockViews.wire, standings = PaddockViews.standings, results = PaddockViews.results,
     box = PaddockViews.box, pace = PaddockViews.pace, directory = PaddockViews.directory, profile = PaddockViews.profile,
     board = PaddockViews.board, myorg = PaddockViews.myorg }
 

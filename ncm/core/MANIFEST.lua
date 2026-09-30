@@ -110,4 +110,5 @@ return {
     "paddock/garages.lua",
     "paddock/talk.lua",
     "paddock/live.lua",
+    "paddock/racestate.lua",
 }

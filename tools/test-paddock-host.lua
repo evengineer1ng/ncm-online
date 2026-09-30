@@ -562,6 +562,10 @@ check(("a race run fits one slice (max %d instructions)"):format(maxSlice), maxS
 local box
 run(function() box = PaddockViews.box(1, { raceId = premierId }) end)
 check("a RUNNING race never shows its result", box.error == "not_resolved" and #box.rows == 0)
+local liveV
+run(function() liveV = PaddockViews.live(1, {}) end)
+check("LIVE shows the running race from its continuous model", liveV.raceId ~= nil and #liveV.rows >= 8 and liveV.street == nil
+    and liveV.rows[1].pos == 1)
 local res
 run(function() res = PaddockViews.results(1, {}) end)
 local leaked = false
@@ -751,6 +755,7 @@ local function runLive(race, lr0)
         local q = queue; queue = {}
         for _, co in ipairs(q) do local ok, err = resumeMetered(co); assert(ok, err); if coroutine.status(co) ~= "dead" then queue[#queue + 1] = co end end
         if steps % 40 == 0 then run(function() PaddockRaces.tick(math.floor(clock)) end) end
+        if steps == 120 then run(function() lr.liveView = PaddockViews.live(1, { raceId = race.raceId }) end) end
     end
     lr.steps = steps
     return lr
@@ -771,6 +776,8 @@ local lr = runLive(liveRace)
 STUCK_FROM = nil
 check("with a player at the start, the race goes on the street by itself", lr and lr.backend == "platform" and #lr.cars >= 8)
 check(("the street run finished (%.0f s)"):format((lr.steps or 0) * 0.25), lr.state == "finished")
+check("LIVE follows the street race's real cars mid-race", lr.liveView and lr.liveView.street == true and #lr.liveView.rows == #lr.cars
+    and lr.liveView.rows[1].pct > 0)
 check(("the timing loop fits the quota (max slice %d)"):format(maxSlice), maxSlice < 400000)
 local rescued = 0
 for _, c in ipairs(lr.cars) do if c.resets > 0 then rescued = rescued + 1 end end

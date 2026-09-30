@@ -150,6 +150,7 @@ shared_script "shared/core/paddock/garages_data.lua"
 shared_script "shared/core/paddock/garages.lua"
 shared_script "shared/core/paddock/talk.lua"
 shared_script "shared/core/paddock/live.lua"
+shared_script "shared/core/paddock/racestate.lua"
 -- ncm-core:end
 
 server_script "server/identity.lua"

@@ -1228,7 +1228,7 @@ pdShow({ view: "directory", meta: { eastern: "20:15", phase: "Street racing", se
   rows: [{ kind: "org", circuit: "npc", id: "o7", name: "Tagless Racing", tier: "Street", org: "Night Grid", tags: {}, garage: { label: "Watson garage", hours: "18:00-01:00 ET", here: true } }] });
 check("a team with no tags ({} on the wire) renders instead of crashing the tab", pdDrawn() && !pdErr() && /Tagless Racing/.test(pdText()) && /IN NOW/.test(pdText()), JSON.stringify(pdErr()) + pdText());
 check("the header shows the Eastern clock, what is racing and the Cup", /20:15 ET/.test(dump(document.getElementById("paddockMeta")).join("|")) && /Street racing/.test(dump(document.getElementById("paddockMeta")).join("|")), dump(document.getElementById("paddockMeta")).join("|"));
-for (const v of ["today", "results", "standings", "wire", "board", "myorg", "pace", "directory"]) {
+for (const v of ["today", "live", "results", "standings", "wire", "board", "myorg", "pace", "directory"]) {
   pdShow({ view: v, rows: {}, next: {}, results: {}, series: {}, races: {}, car: {}, pending: {}, me: {}, caps: {} });
   check("view " + v + " survives every list arriving as {}", pdDrawn() && !pdErr(), JSON.stringify(pdErr()));
 }
@@ -1241,6 +1241,16 @@ check("TODAY shows next up, results, headlines and where you stand", pdDrawn() &
 fire("panel:paddock", { view: "box", raceId: "r1", series: "Night Grid", route: "Hook", at: 1790000000, provenance: "physical", rows: [{ pos: 1, driver: "Omar Haddad", driverId: "p3", time: 99.1, gap: "leader", state: "finished", points: 25 }] });
 check("a box score opens in the detail pane, beside the list it came from", /Box score/.test(dump(document.getElementById("paddockDetail")).join("|"))
   && /RUN ON THE STREET/.test(dump(document.getElementById("paddockDetail")).join("|")) && /Haddad takes Hook/.test(dump(document.getElementById("paddockMain")).join("|")), pdText());
+pdShow({ view: "live", races: [], rows: [] });
+check("LIVE with nothing on track says so", pdDrawn() && !pdErr() && /Nothing on track/.test(pdText()), pdText());
+pdShow({ view: "live", races: [{ raceId: "r30", series: "Night Grid", route: "Sewer", eastern: "20:40", street: true }, { raceId: "r31", series: "Coastal Cup", route: "Hook", eastern: "15:00" }],
+  raceId: "r30", series: "Night Grid", route: "Sewer", elapsed: 95, lengthM: 4200, street: true,
+  rows: [{ pos: 1, id: "p1", name: "Ana Silva", org: "Apex", colour: "#ff0044", pct: 61.5, gap: "leader", state: "racing" },
+         { pos: 2, id: "p2", name: "Kenji Mori", org: "Summit", pct: 58.0, gap: "+2.4s", state: "racing" },
+         { pos: 3, id: "p3", name: "Out Car", org: "Metro", pct: 12.0, gap: "out", state: "out" }] });
+check("LIVE draws the strip and the tower for a street race", pdDrawn() && !pdErr() && /ON THE STREET · 1:35/.test(pdText()) && /Ana Silva/.test(pdText())
+  && /\+2.4s/.test(pdText()) && document.getElementById("paddockMain").querySelectorAll(".pd-dot").length === 3, pdText());
+check("LIVE offers the other race on track", /Coastal Cup/.test(pdText()), pdText());
 pdShow({ view: "profile", kind: "person", profile: { id: "p1", name: "Ana Silva", role: "driver", org: "Apex Racing", region: "Brazil", ageBand: "late 20s", tags: ["Clutch"], wins: 3, starts: 20, podiums: 8 },
   rows: [{ t: "result", raceId: "r1", pos: 1, grid: 2, state: "finished", series: "Pacific Apex", route: "The Cut", at: 1790000000 }] });
 check("a driver profile shows record and tags, no numbers behind them", pdDrawn() && /3 wins/.test(pdText()) && /Clutch/.test(pdText()), pdText());
