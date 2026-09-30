@@ -10,6 +10,10 @@ retyped:
     gridHeadingOffsetDeg  startSlotHeadingOffsetDeg  aiSlotHeadingOffsetDeg  gridLateralShiftM  aiGridRowSpacingM
     aiGridStartSetbackM  aiGridColOffsetM
 
+and (L234) the keys SP's ai_vehicles.lua drives its race AI with: the capped launch release, the launch grace, the
+recommand cadence, the stall thresholds, the race minimum-speed fraction, the target distance, the finish run-off and
+the traffic clear radius.
+
 SP's slot rotation is startSlotHeadingOffsetDeg when set (its default is -90), else aiSlotHeadingOffsetDeg
 (ai_vehicles.lua resolveUnifiedSlotHeadingOffsetDeg).
 
@@ -29,7 +33,11 @@ SP = os.path.join(ROOT, "ncm-localized", "bin", "x64", "plugins", "cyber_engine_
 PACK = os.path.join(SP, "data", "default_roots_pack.lua")
 SETTINGS = os.path.join(SP, "modules", "settings.lua")
 OUT = os.path.join(ROOT, "ncm", "core", "data", "grid_profiles.lua")
-KEYS = ["gridHeadingOffsetDeg", "startSlotHeadingOffsetDeg", "aiSlotHeadingOffsetDeg", "gridLateralShiftM", "aiGridRowSpacingM", "aiGridStartSetbackM", "aiGridColOffsetM"]
+KEYS = ["gridHeadingOffsetDeg", "startSlotHeadingOffsetDeg", "aiSlotHeadingOffsetDeg", "gridLateralShiftM", "aiGridRowSpacingM", "aiGridStartSetbackM", "aiGridColOffsetM",
+        # the launch and race-driving keys (L234): how SP gets its AI off the line and keeps it racing
+        "aiLaunchGraceTimeS", "aiLaunchReleaseMaxSpeedCapMps", "aiLaunchReleaseMinSpeedCapMps", "aiLaunchReleaseForcedSpeedCapMps",
+        "aiLaunchReleaseTargetDistanceM", "aiAutonomousTargetDistanceM", "aiRecommandIntervalS", "aiStallSpeedThreshMps",
+        "aiStallTimeThreshS", "aiMinSpeedFrac", "aiFinishRunoffDistanceM", "trafficClearRadiusM"]
 
 
 def defaults():

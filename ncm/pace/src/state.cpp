@@ -2,6 +2,7 @@
 
 #include <nlohmann/json.hpp>
 
+#include <algorithm>
 #include <cmath>
 #include <cstdio>
 
@@ -90,6 +91,15 @@ bool State::apply(const std::string& text, Clock::time_point now)
         bannerRev_++;
         return true;
     }
+    if (cmd == "area") {
+        const double secs = j.value("seconds", 0.0);
+        areaAt_ = {j.value("x", 0.0), j.value("y", 0.0), j.value("z", 0.0)};
+        areaHalf_ = std::min(400.0, std::max(0.0, j.value("half", 140.0)));
+        areaHalfZ_ = std::min(100.0, std::max(5.0, j.value("halfZ", 30.0)));
+        areaUntil_ = now + std::chrono::milliseconds(static_cast<int64_t>(secs < 0 ? 0 : std::min(secs, 3600.0) * 1000.0));
+        areaRev_++;
+        return true;
+    }
     if (cmd == "drive.end" || cmd == "drive.cancel") {
         stopAll(cmd.c_str());
         return true;
@@ -138,6 +148,18 @@ bool State::apply(const std::string& text, Clock::time_point now)
     gates_ = std::move(gates);
     cars_ = std::move(cars);
     advanceM = j.value("advanceM", 40.0);
+    Launch l;
+    if (j.contains("launch") && j["launch"].is_object()) {
+        const auto& x = j["launch"];
+        l.graceS = x.value("graceS", l.graceS);
+        l.relMax = x.value("relMax", l.relMax); l.relMin = x.value("relMin", l.relMin);
+        l.relForced = x.value("relForced", l.relForced); l.relDist = x.value("relDist", l.relDist);
+        l.minFrac = x.value("minFrac", l.minFrac); l.forcedFrac = x.value("forcedFrac", l.forcedFrac);
+        l.raceDist = x.value("raceDist", l.raceDist);
+        l.recommandS = std::max(0.6, x.value("recommandS", l.recommandS));
+        l.stallMps = x.value("stallMps", l.stallMps); l.stallS = std::max(0.5, x.value("stallS", l.stallS));
+    }
+    launch = l;
     const int64_t goIn = j.value("goInMs", static_cast<int64_t>(0));
     goAt_ = now + std::chrono::milliseconds(goIn < 0 ? 0 : goIn);
     active_ = true;
@@ -178,7 +200,7 @@ uint64_t State::entity(int index)
 std::string State::step(int index, double x, double y, double z, Clock::time_point now)
 {
     std::lock_guard lock(mutex_);
-    if (index < 0 || static_cast<size_t>(index) >= cars_.size()) return "0|2|0|0|0|0";
+    if (index < 0 || static_cast<size_t>(index) >= cars_.size()) return "0|2|0|0|0|0|0|0|0|0";
     Car& c = cars_[static_cast<size_t>(index)];
     const Point pos{x, y, z};
     const int64_t tMs = std::chrono::duration_cast<std::chrono::milliseconds>(now - goAt_).count();
@@ -196,6 +218,7 @@ std::string State::step(int index, double x, double y, double z, Clock::time_poi
             if (c.nextGate >= gates_.size()) c.finished = true;
         }
         c.last = pos;
+        c.prevMs = c.lastMs;
         c.lastMs = tMs;
         c.haveLast = true;
         // Move the target on before the car reaches it (so the planner never brakes for an intermediate point),
@@ -208,6 +231,14 @@ std::string State::step(int index, double x, double y, double z, Clock::time_poi
             const bool passed = (pos.x - t.x) * (t.x - p.x) + (pos.y - t.y) * (t.y - p.y) > 0;
             if (!near && !passed) break;
             c.target++;
+        }
+    }
+    // speed over >= 250 ms windows of the reported positions (20 Hz reports are too close together to difference)
+    if (active_ && tMs >= 0) {
+        if (!c.haveSpeedAt) { c.speedAt = pos; c.speedAtMs = tMs; c.haveSpeedAt = true; }
+        else if (tMs - c.speedAtMs >= 250) {
+            c.speed = dist(pos, c.speedAt) / ((tMs - c.speedAtMs) / 1000.0);
+            c.speedAt = pos; c.speedAtMs = tMs;
         }
     }
     int mode;
@@ -224,22 +255,55 @@ std::string State::step(int index, double x, double y, double z, Clock::time_poi
         if (c.target < points_.size()) {
             want = points_[c.target];
         } else {
-            // past the last point: aim 80 m beyond the finish so the car crosses the line instead of parking on it
+            // past the last point: aim beyond the finish so the car crosses the line instead of parking on it
             const Point& a = points_[points_.size() - 2];
             const Point& b = points_.back();
             const double len = std::max(1e-6, dist(a, b));
             want = {b.x + (b.x - a.x) / len * 80.0, b.y + (b.y - a.y) / len * 80.0, b.z};
         }
     }
-    if (mode != c.mode || (mode == 1 && (std::fabs(want.x - c.cmd.x) > 0.5 || std::fabs(want.y - c.cmd.y) > 0.5 ||
+    bool renew = false;
+    if (mode == 1) {
+        const double sinceGo = tMs / 1000.0;
+        const int phase = sinceGo < launch.graceS ? 1 : 2;
+        if (phase != c.phase) { c.phase = phase; renew = true; }        // the release, then SP's post-launch command
+        if (phase == 2) {
+            // SP's stall rule: under stallMps for stallS -> a fresh command now; otherwise one every recommandS
+            if (c.speed < launch.stallMps) {
+                c.stallMs += std::max<int64_t>(0, tMs - c.prevMs);
+            } else {
+                c.stallMs = 0;
+            }
+            if (c.stallMs > static_cast<int64_t>(launch.stallS * 1000)) { renew = true; c.stallMs = 0; }
+            if (tMs - c.cmdMs > static_cast<int64_t>(launch.recommandS * 1000)) renew = true;
+        }
+    } else {
+        c.phase = 0;
+    }
+    if (renew || mode != c.mode || (mode == 1 && (std::fabs(want.x - c.cmd.x) > 0.5 || std::fabs(want.y - c.cmd.y) > 0.5 ||
                                          std::fabs(speed - c.cmdSpeed) > 0.05f))) {
+        if (renew && mode == c.mode) c.renewals++;
         c.mode = mode;
         c.cmd = want;
         c.cmdSpeed = speed;
+        c.cmdMs = tMs;
         c.seq++;
     }
+    // what to hold: the capped launch release, or the race command (SP buildLaunchReleaseProfile / buildDriveProfile)
+    double mx = c.cmdSpeed, mn = 0, forced = 0, dd = launch.raceDist;
+    int boost = 0;
+    if (c.mode == 1 && c.phase == 1) {
+        mx = std::min<double>(c.cmdSpeed, launch.relMax);
+        mn = std::min(launch.relMin, mx);
+        forced = std::min(launch.relForced, mx);
+        dd = std::max(4.0, launch.relDist);
+    } else if (c.mode == 1) {
+        mn = mx * launch.minFrac;
+        forced = mx * launch.forcedFrac;
+        boost = 1;
+    }
     return std::to_string(c.seq) + "|" + std::to_string(c.mode) + "|" + fmt(c.cmd.x) + "|" + fmt(c.cmd.y) + "|" +
-           fmt(c.cmd.z) + "|" + fmt(c.cmdSpeed);
+           fmt(c.cmd.z) + "|" + fmt(mx) + "|" + fmt(mn) + "|" + fmt(forced) + "|" + fmt(dd) + "|" + std::to_string(boost);
 }
 
 std::vector<std::string> State::outbox()
@@ -265,6 +329,15 @@ std::string State::banner(Clock::time_point now)
     auto field = [](const std::string& t) { return t.empty() ? std::string("~") : t; };
     return std::to_string(bannerRev_) + "|" + (visible ? "1" : "0") + "|" + field(bannerTitle_) + "|" + field(bannerDetail_) + "|" +
            std::to_string(visible ? (left + 999) / 1000 : 0);
+}
+
+std::string State::area(Clock::time_point now)
+{
+    std::lock_guard lock(mutex_);
+    const int64_t left = std::chrono::duration_cast<std::chrono::milliseconds>(areaUntil_ - now).count();
+    const bool visible = left > 0 && areaHalf_ > 0;
+    return std::to_string(areaRev_) + "|" + (visible ? "1" : "0") + "|" + fmt(areaAt_.x) + "|" + fmt(areaAt_.y) + "|" +
+           fmt(areaAt_.z) + "|" + fmt(areaHalf_) + "|" + fmt(areaHalfZ_) + "|" + std::to_string(visible ? (left + 999) / 1000 : 0);
 }
 
 State& state()

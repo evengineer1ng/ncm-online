@@ -187,6 +187,30 @@ Core.define("paddock.live", function(C)
         return out, { x = fx, y = fy }
     end
 
+    local function clamp(v, lo, hi) return math.max(lo, math.min(hi, v)) end
+
+    --- How SP gets its AI off the line and keeps it racing (ai_vehicles.lua buildDriveProfile/buildLaunchReleaseProfile,
+    --- L234), from a route's data.grid_profiles entry. The race-active terms are SP's; the per-driver skill terms
+    --- (aggression, racecraft, launch skill, path variation) are taken at their neutral value until the Paddock's
+    --- own driver attributes are mapped onto them.
+    function M.launchProfile(profile)
+        local p = profile or {}
+        local relMax = p.aiLaunchReleaseMaxSpeedCapMps or 35
+        return {
+            graceS = p.aiLaunchGraceTimeS or 1.75,
+            relMax = relMax,
+            relMin = math.min(p.aiLaunchReleaseMinSpeedCapMps or 18, relMax),
+            relForced = p.aiLaunchReleaseForcedSpeedCapMps or 18,
+            relDist = math.max(4, p.aiLaunchReleaseTargetDistanceM or 7.5),
+            minFrac = clamp((p.aiMinSpeedFrac or 0.55) + 0.02, 0.50, 0.82),
+            forcedFrac = clamp(0.18 + 0.5 * 0.18 + 0.5 * 0.05, 0.16, 0.46),
+            raceDist = 8 + (1 - 0.5) * 4,
+            recommandS = clamp((p.aiRecommandIntervalS or 1) - 0.9, 0.6, 4.0),
+            stallMps = (p.aiStallSpeedThreshMps or 8) + 2.0,
+            stallS = clamp((p.aiStallTimeThreshS or 1.2) - 0.5, 0.9, 2.6),
+        }
+    end
+
     --- The index of the path point nearest `pos` (1-based).
     function M.nearestIndex(points, pos)
         local best, bestD = 1, math.huge

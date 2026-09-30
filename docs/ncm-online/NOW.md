@@ -3,6 +3,13 @@
 > **STATUS: LEDGER** - living session memory, rewritten at the end of every working session.
 > Authority map: [INDEX.md](INDEX.md) - classified 2026-09-24 (L125).
 
+**LATEST 2026-09-29 (late night) - PADDOCK RACE AI PORTED FROM NCM SINGLE PLAYER; NCM PACE 0.3.0 ON DEV (`L234`, `KB-220`, `KB-219`, `IDEA-752`-`IDEA-754`).**
+The owner's live test: clock, grid and banner good; but the field rocketed into itself off the line, then stopped driving; no drivers; traffic still through the grid. Cause (`KB-220`): Pace launched every car at the full race ceiling with minimum 0, kinematically, and never re-commanded a crashed car. SP caps the first command (Sewer 18/8/4 m/s), waits 1.75 s, then re-commands every ~3 s and on any stall.
+- **Built:** Pace 0.3.0 carries SP's launch/recommand/stall rules (per-route SP tuning via `data.grid_profiles`), `useKinematic = false`, a fresh command each time as SP sends them; visible NPC drivers on the Pace backend (`attachDriver({npcId})`, no task; `livePaceDrivers`); the engine's traffic null area over each start on every warned client (`liveTrafficClear`).
+- **Deployed to dev 23:15 ET:** Pace 0.3.0 published (dev store) and hand-installed in the game folder; dev server restarted. Gate ALL GREEN; paddock host 183; Pace state tests; redscript compiles.
+- **Unproven live:** does a seated (`ai_driven`) car still obey the host's native command? If not, `livePaceDrivers = false`. Does the null area remove cars already on the road or only stop new spawns?
+**THE ONE NEXT ACTION (Paddock):** stand at a start for the next street race; watch it launch and finish. Then read `red4ext/plugins/ncm_pace/ncm_pace-<pid>.log` for `driving (max .., min .., forced ..)` and `area: null area ...` lines. Online stays frozen (`L223`).
+
 **LATEST 2026-09-29 (night) - THE PADDOCK PHASES 4-5 BUILT AND RUNNING ON DEV (`L227`, doc 44 §19, `KB-214`, `IDEA-745`-`IDEA-751`).**
 Owner rulings: phase 3 (sightings) skipped except what 4-5 need; MASTER_TEST is the 1.0 release bar, not a dev gate.
 - **Garages (phase 4):** 83 sites from the game's own pins; 60 orgs rent 36 of them on persisted shifts. Walk up to a garage whose team is on shift and its crew is there with a **Talk** prompt (one line from facts; meetings remembered).
@@ -457,8 +464,8 @@ next rig action is an in-process read-only P0 that composes the owner's G29, sep
 rim using those source-verified provider patterns and preserves stable device identity. This research does not
 displace the live queue below.
 
-> **Claim before writing:** decisions through **L233**; MASTER_TEST through **§CH**; next QA letter **§CI**.
-> BACKLOG next free **IDEA-752**; known issues through **KB-219**. Read ledger tails before allocating.
+> **Claim before writing:** decisions through **L234**; MASTER_TEST through **§CH**; next QA letter **§CI**.
+> BACKLOG next free **IDEA-755**; known issues through **KB-220**. Read ledger tails before allocating.
 > BACKLOG next free **IDEA-686**; known issues through **KB-186**. Read ledger tails before allocating.
 >
 > The next-free guard matters: overlapping 2026-09-26/27 sessions previously made this block stale several

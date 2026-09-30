@@ -17,7 +17,7 @@ a milestone or batch) → `built` (code + offline proof) → `validated` (live P
 **Where things live:** ideas and work → here. Choices made and questions for the owner → `DECISION_RECORD.md`.
 Defects → `KNOWN_BUGS.md`. Live PASS/FAIL → `wp/MASTER_TEST.md`. What to do next → `NOW.md`.
 
-**IDs are permanent.** Next free ID: **IDEA-752**.
+**IDs are permanent.** Next free ID: **IDEA-755**.
 *(This line has now been stale twice — left at IDEA-127 while the ledger ran to IDEA-183, then at IDEA-205 while it
 ran to IDEA-294. It is the only guard against reusing an ID. Check it against the last row before you append.)*
 
@@ -1261,3 +1261,6 @@ Built on dev, offline-green; awaiting `§CH` (L226, doc 44).
 | IDEA-749 | **PADDOCK/PLACE** | 2026-09-29 | **Garage pins on the map for the orgs a player follows**, via `NcmMapPins.register` (blips die after save load otherwise), with "in now" from the shift. | build, L227 | raw | `open77_blips`; memory: blips after save load |
 | IDEA-750 | **PADDOCK/PLACE** | 2026-09-29 | **Walk every rented garage once in engine** and mark it good or bad (`ncm.paddock.garage`). A map pin is not a doorway; 36 sites are in use on dev. | build, L227 | raw | `paddock_garage_check` |
 | IDEA-751 | **PADDOCK/TALK** | 2026-09-29 | **Garage talk grows past one line**: ask about the next race, the last one, a rival, or Billie; the people remember what you asked. Waits for native dialogue (IDEA-727) or the Messages thread. | build, L227 | raw | `paddock.talk`; `graph.conversation` |
+| IDEA-752 | **PADDOCK/LIVE** | 2026-09-29 | **Per-driver launch and racecraft from the Paddock's own attributes**: SP varies launch forced-start, minimum speed, recommand cadence and stall thresholds by aggression, racecraft, launch skill and path variation; the Paddock port uses neutral values until its driver attributes are mapped onto those terms. | build, L234 | raw | `paddock.live.launchProfile`; SP `buildDriveProfile` |
+| IDEA-753 | **PADDOCK/LIVE** | 2026-09-29 | **Reset a wrecked Pace car back onto the road** (SP respawns a culled car; the server's setTransform reset runs only on the platform backend). Needs a client-side teleport in Pace, since a server setTransform revokes the physics lease. | build, L234 | raw | `persevere`; Pace redscript |
+| IDEA-754 | **PADDOCK/LIVE** | 2026-09-29 | **Traffic null area along the whole route while the field passes**, not just the start: move the area with the leader or open one per bubble segment, once the start area is proven. | build, L234 | raw | `EnableDynamicCrowdNullArea`; `PaddockBubble` |

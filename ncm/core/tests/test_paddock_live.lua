@@ -153,6 +153,14 @@ return {
         local tuned = L.gridSlots(sewer.start, sewer.finish, 2, Profiles.forRoot(sewer.routeId))
         local d = (plain[1].heading - tuned[1].heading) % 360
         T.ok(math.abs(d - 180) < 0.01, "Sewer's gridHeadingOffsetDeg -180 is applied")
+        -- SP's launch for Sewer (L234): a gentle capped release, then race minimums at 74% of the ceiling
+        local lp = L.launchProfile(Profiles.forRoot(sewer.routeId))
+        T.eq(lp.relMax, 18, "Sewer release cap is SP's 18 m/s")
+        T.eq(lp.relForced, 4, "Sewer release forced start is SP's 4 m/s")
+        T.eq(lp.relDist, 5, "Sewer release target distance is SP's 5 m")
+        T.ok(math.abs(lp.minFrac - 0.74) < 1e-9, "race minimum fraction is aiMinSpeedFrac + SP's race term")
+        T.ok(math.abs(lp.recommandS - 3.1) < 1e-9 and math.abs(lp.stallMps - 5.5) < 1e-9 and math.abs(lp.stallS - 1.9) < 1e-9,
+            "recommand and stall follow SP's race-active terms")
         local off = { x = p.points[20].x + 30, y = p.points[20].y }
         local rp = L.resetPoint(p.points, off)
         T.ok(rp.index <= 20 and rp.index >= 18, "reset goes to the line just behind the car (" .. rp.index .. ")")

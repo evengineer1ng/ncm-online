@@ -102,6 +102,16 @@ RegisterNetEvent("ncm:paddock.live.warn", function(m)
     log("warning banner %s (%s s)", sent and "sent to Pace" or "not shown: no Pace plugin", tostring(m.seconds))
 end)
 
+-- The traffic null area over a start (L234): NCM Pace 0.3.0 calls the engine's EnableDynamicCrowdNullArea on this
+-- client; seconds 0 takes it down. Without the plugin there is nothing to call.
+RegisterNetEvent("ncm:paddock.live.area", function(m)
+    if type(m) ~= "table" then return end
+    local seconds = tonumber(m.seconds) or 0
+    local sent = send({ cmd = "area", x = tonumber(m.x) or 0, y = tonumber(m.y) or 0, z = tonumber(m.z) or 0,
+        half = tonumber(m.half) or 140, halfZ = tonumber(m.halfZ) or 30, seconds = seconds })
+    log("traffic null area %s for %s (%s s)", sent and "sent to Pace" or "not raised: no Pace plugin", tostring(m.raceId), tostring(seconds))
+end)
+
 RegisterNetEvent("ncm:paddock.live.stage", function(m)
     if type(m) ~= "table" then return end
     log("staged %s: %d cars, backend %s", tostring(m.raceId), #(m.cars or {}), tostring(m.backend))
@@ -129,7 +139,8 @@ RegisterNetEvent("ncm:paddock.live.drive", function(m)
         end
         current = { raceId = m.raceId, byEntity = byEntity }
         local goIn = math.max(0, (tonumber(m.goInMs) or 0) - (GetGameTimer() - startedAt))
-        local sent = send({ cmd = "drive.start", raceId = m.raceId, goInMs = goIn, points = m.points, gates = m.gates, cars = cars })
+        local sent = send({ cmd = "drive.start", raceId = m.raceId, goInMs = goIn, points = m.points, gates = m.gates, cars = cars,
+            launch = m.launch })
         log("drive.start %s: %d/%d cars mapped, go in %d ms, sent=%s", tostring(m.raceId), #cars, #(m.cars or {}), goIn, tostring(sent))
     end)
 end)

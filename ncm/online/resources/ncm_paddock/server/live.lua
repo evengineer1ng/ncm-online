@@ -152,6 +152,7 @@ local function cancel(lr, reason)
     setRow(lr, { state = "cancelled", reason = reason, ended_at = U.now() })
     removeCars(lr)
     for _, w in ipairs(lr.watchers or {}) do TriggerClientEvent("ncm:paddock.live.end", w, { raceId = lr.raceId }) end
+    PaddockLive.lowerAreas(lr.raceId)
     log("cancelled %s: %s", lr.raceId, tostring(reason))
 end
 
@@ -193,7 +194,7 @@ local function stage(race, host, t)
     local backend = (want == "pace" or (want == "auto" and pace and pace.ok)) and "pace" or "platform"
     if want == "pace" and not (pace and pace.ok) then return cancel(lr, "liveBackend is pace but the nearest player has no Pace plugin") end
     lr.backend, lr.path, lr.gates, lr.segments, lr.field = backend, path, gates, segments, field
-    local npcDrivers = backend == "platform" and set("liveNpcDrivers", true)
+    local npcDrivers = set("liveNpcDrivers", true) and (backend == "platform" or set("livePaceDrivers", true))
     for i, e in ipairs(field) do
         local s = slots[i]
         local org = w.orgs[e.orgId or ""]
@@ -206,7 +207,9 @@ local function stage(race, host, t)
         local car = { personId = e.id, orgId = e.orgId, vehicleId = vid, slot = i, row = s.row, recoveries = 0, resets = 0 }
         lr.cars[#lr.cars + 1] = car
         byVehicle[vid] = { raceId = race.raceId, personId = e.id }
-        if backend == "platform" then
+        if backend == "platform" or npcDrivers then
+            -- a visible driver at the wheel (SP seats one, L234). On the Pace backend the car gets no platform task:
+            -- the attach only seats the NPC, and the Pace plugin sends the drive commands on the host's client.
             local npcId
             if npcDrivers then
                 local p = w.people[e.id]
@@ -222,7 +225,12 @@ local function stage(race, host, t)
                 pcall(Open77.npcs.remove, npcId); car.npcId = nil
                 okA, st, why = pcall(Open77.vehicles.ai.attachDriver, vid, nil)
             end
-            if not okA or not st then
+            if (not okA or not st) and backend == "pace" then
+                -- a seat is a nicety on the Pace backend: fall back to 0.2.0's driverless car under the host
+                log("stage %s: attachDriver %d refused (%s); driverless under the host", race.raceId, vid, tostring(why or st))
+                local okR, stR, whyR = pcall(Open77.vehicles.requestAuthority, vid, host.pid)
+                if not okR or not stR then log("stage %s: requestAuthority %d -> %d: %s", race.raceId, vid, host.pid, tostring(whyR or stR)) end
+            elseif not okA or not st then
                 log("stage %s: attachDriver %d refused: %s", race.raceId, vid, tostring(why or st))
                 return cancel(lr, "the AI would not take the wheel")
             end
@@ -244,6 +252,7 @@ local function stage(race, host, t)
     for _, wch in ipairs(watchers(race.routeId)) do
         lr.watchers[#lr.watchers + 1] = wch.pid
         notify(wch.pid, msg, 9000)
+        PaddockLive.raiseArea(race, wch.pid, t)
         TriggerClientEvent("ncm:paddock.live.stage", wch.pid, { raceId = race.raceId, backend = backend, cars = names, opensAt = race.opensAt,
             series = PaddockWorld.seriesName(race.seriesId), route = PaddockWorld.routeName(race.routeId),
             start = { x = route.start.x, y = route.start.y, z = route.start.z } })
@@ -306,8 +315,9 @@ local function go(lr, race)
         for i, c in ipairs(lr.cars) do cars[i] = { vehicleId = c.vehicleId, personId = c.personId, speeds = c.plan } end
         local gates = {}
         for i, g in ipairs(lr.gates) do gates[i] = { x = g.x, y = g.y, z = g.z, dx = g.dir.x, dy = g.dir.y, halfWidth = g.halfWidthM, capture = g.captureM } end
+        -- SP's launch: the capped release, the grace, the recommand cadence and the stall rule, per route (L234)
         TriggerClientEvent("ncm:paddock.live.drive", lr.pid, { raceId = lr.raceId, goInMs = lr.goMs - nowMs(), points = lr.path.points,
-            gates = gates, cars = cars })
+            gates = gates, cars = cars, launch = L.launchProfile(NcmCore.get("data.grid_profiles").forRoot(race.routeId)) })
     end
     log("go %s at +%d ms: %d cars, deadline %d s", lr.raceId, lr.goMs - nowMs(), #lr.cars, math.floor(lr.deadlineMs / 1000))
     CreateThread(function()
@@ -435,6 +445,7 @@ local function finish(lr, race)
             or ("The street run didn't count (%s). The sim result stands."):format(tostring(lr.reason)), 9000)
         TriggerClientEvent("ncm:paddock.live.end", pid, { raceId = lr.raceId, verdict = lr.verdict })
     end
+    PaddockLive.lowerAreas(lr.raceId)
     log("finished %s: verdict=%s reason=%s finishers=%d/%d", lr.raceId, lr.verdict, tostring(lr.reason), c.finishers, #lr.cars)
     CreateThread(function()
         Wait(30000)
@@ -519,6 +530,32 @@ end
 -- --------------------------------------------------------------------------------------------------------- warn
 
 local warned = {}                    -- raceId -> { [pid] = true }
+local areas = {}                     -- raceId -> { [pid] = true }: who holds a traffic null area for it
+
+--- The native traffic null area over a start (L234, NCM Pace 0.3.0): gameCommunitySystem.EnableDynamicCrowdNullArea on
+--- the player's own client, a square of the route's SP trafficClearRadiusM around the start node, until
+--- liveTrafficClearTailSec after the lights. Traffic is simulated per client, so every nearby client needs its own.
+local function raiseArea(race, pid, t)
+    if not set("liveTrafficClear", true) then return end
+    local route = PaddockWorld.route(race.routeId)
+    if not route then return end
+    local prof = NcmCore.get("data.grid_profiles").forRoot(race.routeId)
+    local seconds = math.max(1, race.opensAt - t) + set("liveCountdownSec", 5) + set("liveTrafficClearTailSec", 60)
+    areas[race.raceId] = areas[race.raceId] or {}
+    areas[race.raceId][pid] = true
+    TriggerClientEvent("ncm:paddock.live.area", pid, { raceId = race.raceId, x = route.start.x, y = route.start.y, z = route.start.z or 0,
+        half = prof.trafficClearRadiusM or 140, halfZ = 30, seconds = seconds })
+end
+
+PaddockLive.raiseArea = raiseArea
+
+--- Take a race's null areas down on every client that holds one.
+function PaddockLive.lowerAreas(raceId)
+    for pid in pairs(areas[raceId] or {}) do
+        TriggerClientEvent("ncm:paddock.live.area", pid, { raceId = raceId, seconds = 0 })
+    end
+    areas[raceId] = nil
+end
 
 --- From liveWarnLeadSec before the lights, players near a start line get the HUD banner (NCM Pace draws it; a
 --- notification goes too, for a client without the plugin): WARNING: IMPENDING RACE START / CLEAR THE AREA.
@@ -541,6 +578,7 @@ local function warn(t)
                         TriggerClientEvent("ncm:paddock.live.warn", pid, { title = "WARNING: IMPENDING RACE START", detail = detail,
                             seconds = left + set("liveCountdownSec", 5) })
                         notify(pid, "Impending race start: the grid spawns here. Clear the area.", 8000)
+                        raiseArea(race, pid, t)
                     end
                 end
             end
@@ -549,6 +587,10 @@ local function warn(t)
     for id in pairs(warned) do
         local race = PaddockRaces.byId[id]
         if not race or race.opensAt < t - 600 then warned[id] = nil end
+    end
+    for id in pairs(areas) do
+        local race = PaddockRaces.byId[id]
+        if not race or race.opensAt < t - 3600 then areas[id] = nil end
     end
 end
 PaddockLive.warn = warn

@@ -55,7 +55,7 @@ int main()
         CHECK(s.entity(1) == 42);
         CHECK(s.entity(7) == 0);
         auto f = split(s.step(0, -10, 0, 0, t0 + 1000ms));
-        CHECK(f.size() == 6);
+        CHECK(f.size() == 10);
         CHECK(f[1] == "0");                                      // hold: the lights are not out
         f = split(s.step(0, -10, 0, 0, t0 + 2000ms));
         CHECK(f[1] == "1");                                      // go: drive
@@ -112,6 +112,47 @@ int main()
         CHECK(split(s.banner(t0 + 91s))[1] == "0");
         CHECK(s.apply(R"({"cmd":"banner","title":"x","seconds":0})", t0));
         CHECK(split(s.banner(t0))[1] == "0");
+    }
+
+    {   // SP's launch (L234): a capped release off the line, the grace, then the race command; a stalled car and a
+        // healthy one are both re-commanded -- SP's recommand loop -- so nothing ever parks after a crash.
+        State s;
+        std::string plan = kPlan;
+        plan.insert(plan.size() - 1, R"(,"launch":{"graceS":1.75,"relMax":18,"relMin":8,"relForced":4,"relDist":5,
+            "minFrac":0.72,"forcedFrac":0.25,"raceDist":12,"recommandS":3,"stallMps":5.5,"stallS":2})");
+        CHECK(s.apply(plan, t0));
+        auto f = split(s.step(0, -10, 0, 0, t0 + 2000ms));      // the lights: the release, capped
+        CHECK(f[1] == "1" && f[5] == "18.00" && f[6] == "8.00" && f[7] == "4.00" && f[8] == "5.00" && f[9] == "0");
+        const std::string launchSeq = f[0];
+        f = split(s.step(0, -4, 0, 0, t0 + 3000ms));
+        CHECK(f[0] == launchSeq);                                 // inside the grace nothing is judged
+        f = split(s.step(0, 2, 0, 0, t0 + 3800ms));              // grace over: SP's post-launch race command
+        CHECK(f[0] != launchSeq && f[5] == "30.00" && f[6] == "21.60" && f[7] == "7.50" && f[8] == "12.00" && f[9] == "1");
+        std::string seq = f[0];
+        // stuck against a wall: same place for over two seconds -> a fresh command without waiting for the cadence
+        s.step(0, 2, 0, 0, t0 + 4100ms);
+        s.step(0, 2, 0, 0, t0 + 4400ms);
+        s.step(0, 2, 0, 0, t0 + 5200ms);
+        f = split(s.step(0, 2, 0, 0, t0 + 6300ms));
+        CHECK(f[0] != seq && f[1] == "1");
+        seq = f[0];
+        // a healthy car on the same leg is still re-commanded every recommandS (3 s)
+        for (int ms = 6500; ms <= 9200; ms += 300) {
+            f = split(s.step(0, 2 + (ms - 6300) * 0.02, 0, 0, t0 + std::chrono::milliseconds(ms)));
+        }
+        CHECK(f[0] == seq);
+        f = split(s.step(0, 50, 0, 0, t0 + 9400ms));           // same leg (50 m from point 1): the cadence alone
+        CHECK(f[0] != seq);
+    }
+    {   // the traffic null area over a staging grid: shown for its seconds, then gone; seconds 0 clears it
+        State s;
+        CHECK(s.area(t0) == "0|0|0.00|0.00|0.00|0.00|0.00|0");
+        CHECK(s.apply(R"({"cmd":"area","x":10,"y":-20,"z":5,"half":140,"halfZ":30,"seconds":120})", t0));
+        auto f = split(s.area(t0 + 1s));
+        CHECK(f.size() == 8 && f[0] == "1" && f[1] == "1" && f[2] == "10.00" && f[5] == "140.00" && f[7] == "119");
+        CHECK(split(s.area(t0 + 121s))[1] == "0");
+        CHECK(s.apply(R"({"cmd":"area","seconds":0})", t0));
+        CHECK(split(s.area(t0))[1] == "0" && split(s.area(t0))[0] == "2");
     }
 
     if (failures == 0) std::printf("pace state: all checks passed\n");

@@ -52,6 +52,12 @@ void banner(RED4ext::IScriptable*, RED4ext::CStackFrame* stack, RED4ext::CString
     if (out) *out = RED4ext::CString(state().banner().c_str());
 }
 
+void area(RED4ext::IScriptable*, RED4ext::CStackFrame* stack, RED4ext::CString* out, int64_t)
+{
+    stack->code++;
+    if (out) *out = RED4ext::CString(state().area().c_str());
+}
+
 void note(RED4ext::IScriptable*, RED4ext::CStackFrame* stack, bool* out, int64_t)
 {
     RED4ext::CString text;
@@ -80,6 +86,7 @@ void postRegister()
     add("NcmPace_Step", reinterpret_cast<RED4ext::ScriptingFunction_t<void*>>(&step), "String",
         {{"Int32", "index"}, {"Float", "x"}, {"Float", "y"}, {"Float", "z"}});
     add("NcmPace_Banner", reinterpret_cast<RED4ext::ScriptingFunction_t<void*>>(&banner), "String", {});
+    add("NcmPace_Area", reinterpret_cast<RED4ext::ScriptingFunction_t<void*>>(&area), "String", {});
     add("NcmPace_Log", reinterpret_cast<RED4ext::ScriptingFunction_t<void*>>(&note), "Bool", {{"String", "text"}});
     PACE_INFO("redscript natives registered");
 }
@@ -96,7 +103,7 @@ void registerNatives()
 }
 // What the engine says the crowd/traffic null-area and density methods take (KB-219): their script signature could not
 // be found by compiling guesses, so the plugin reads it from the game's own type information at startup and logs it.
-// The next build wires the call to exactly that.
+// 0.3.0 calls EnableDynamicCrowdNullArea(Box, WorldTransform, Bool, Float) from NcmPace.reds with exactly that.
 void dumpSignatures()
 {
     auto* rtti = RED4ext::CRTTISystem::Get();

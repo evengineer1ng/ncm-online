@@ -806,11 +806,18 @@ do
     local banner
     for _, r in ipairs(replies) do if r.name == "ncm:paddock.live.warn" and r.pid == 1 then banner = r.body end end
     check("a player near the start gets the race-start banner", banner and banner.title == "WARNING: IMPENDING RACE START" and banner.seconds >= 120)
+    -- the warning also raises the native traffic null area on that client: SP's trafficClearRadiusM around the start (L234)
+    local area
+    for _, r in ipairs(replies) do if r.name == "ncm:paddock.live.area" and r.pid == 1 then area = r.body end end
+    check("the warning raises a traffic null area over the start", area and area.half == 140 and area.x == wr.start.x and area.seconds >= 120 + 60)
     replies = {}
     run(function() PaddockLive.tick(clock + 5) end)
     local again = false
     for _, r in ipairs(replies) do if r.name == "ncm:paddock.live.warn" then again = true end end
     check("once per race, not every tick", not again)
+    replies = {}
+    run(function() PaddockLive.lowerAreas(warnRace.raceId) end)
+    check("and the race's end lowers it", replies[1] and replies[1].name == "ncm:paddock.live.area" and replies[1].body.seconds == 0)
 end
 
 -- a player at the start: it goes on the street by itself, no declaration; some cars get stuck and are rescued
@@ -872,6 +879,34 @@ check("cars still out there at the close are 'not classified', not written off e
 check("and the sealed sim result stands", (DB.race[race2.raceId].provenance or "simulated") == "simulated")
 queue = {}
 for id in pairs(VEH) do VEH[id] = nil end
+
+-- the Pace backend (L234): a visible driver in every seat, and SP's launch profile in the drive plan
+do
+    local paceRace = streetRace("street_a", 80)
+    local pr = PaddockWorld.route(paceRace.routeId)
+    POS = { [1] = { x = pr.start.x + 60, y = pr.start.y, z = 10, bucket = 0 } }
+    PaddockLive.paceClients[1] = { ok = true, version = "0.3.0" }
+    clock = paceRace.opensAt - 70
+    for _ = 1, 6 do run(function() PaddockRaces.tick(clock) end) end
+    run(function() PaddockLive.tick(clock) end)
+    local plr = PaddockLive.byRace[paceRace.raceId]
+    check("a Pace race stages", plr and plr.state == "staging" and plr.backend == "pace")
+    local seated = 0
+    for _, c in ipairs(plr and plr.cars or {}) do if c.npcId and VEH[c.vehicleId] and VEH[c.vehicleId].driver == c.npcId then seated = seated + 1 end end
+    check(("every Pace car has a driver in the seat (%d of %d)"):format(seated, plr and #plr.cars or 0), plr and seated == #plr.cars and seated > 0)
+    clock = paceRace.opensAt
+    for _ = 1, 8 do if paceRace.state == "running" then break end run(function() PaddockRaces.tick(clock) end) end
+    replies = {}
+    run(function() PaddockLive.tick(clock) end)
+    local drive
+    for _, r in ipairs(replies) do if r.name == "ncm:paddock.live.drive" then drive = r.body end end
+    check("the drive plan carries SP's launch profile", drive and drive.launch and drive.launch.graceS == 1.75 and drive.launch.relMax > 0
+        and drive.launch.minFrac >= 0.5)
+    PaddockLive.paceClients[1] = nil
+    queue = {}
+    if plr then plr.state = "cancelled" end
+    for id in pairs(VEH) do VEH[id] = nil end
+end
 
 -- the physical bubble: nobody at the start, so the race runs on its model; a player halfway along the line sees the
 -- field arrive, race past physically, and hand back to the model; the result is MIXED

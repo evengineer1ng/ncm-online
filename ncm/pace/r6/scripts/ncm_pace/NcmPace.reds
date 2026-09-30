@@ -6,9 +6,10 @@
 // and dispatches whatever the DLL says the car should hold:
 //
 //   mode 0  hold     the lights are not out; nothing is issued
-//   mode 1  drive    the engine's own AIVehicleDriveToPointAutonomousCommand to the point, at up to the ceiling --
-//                    the same command, fields and dispatch OPEN//77 itself uses (Open77VehicleDriving.reds), minus
-//                    its 55 m/s server cap. A new target on a held command is an update, not a new command.
+//   mode 1  drive    the engine's own AIVehicleDriveToPointAutonomousCommand to the point -- sent the way NCM single
+//                    player's issueAutonomousCommand sends it (ai_vehicles.lua, L234): a fresh command every time the
+//                    DLL bumps `seq` (a new target, the launch release ending, SP's recommand cadence, a stall),
+//                    with SP's fields -- min/max speed, forced start speed, target distance, clearTrafficOnPath, and useKinematic = false (0.2.0 drove kinematic and the cars parked).
 //   mode 2  stop     cancel what is held (StopExecutingCommand when executing, else CancelCommand) and brake
 //
 // P-PACE-2 is the open question this file exists to answer: whether a native command on a car OPEN//77 created,
@@ -16,7 +17,7 @@
 //
 // RULES THIS FILE KEEPS, BECAUSE A REDSCRIPT COMPILE ERROR TAKES EVERY SCRIPT MOD DOWN WITH IT:
 //   * vanilla symbols and this package's own natives only -- nothing from OPEN//77, NCM Lua or any other mod;
-//   * no plan, no work: a 2 Hz idle poll of three natives (the banner included); 20 Hz only while a plan lists cars;
+//   * no plan, no work: a 2 Hz idle poll of four natives (banner and area included); 20 Hz only while a plan lists cars;
 //   * the local player's game only; a remote body is never ours to drive from.
 module NcmPace
 
@@ -40,6 +41,8 @@ public class NcmPaceSystem extends ScriptableSystem {
   private let m_commands: array<ref<AIVehicleCommand>>;
   private let m_vehicles: array<wref<VehicleObject>>;
   private let m_banner: wref<NcmPaceBanner>;
+  private let m_areaRev: Int32;
+  private let m_areaId: Uint64;
 
   public func SetBanner(banner: ref<NcmPaceBanner>) -> Void {
     this.m_banner = banner;
@@ -84,6 +87,7 @@ public class NcmPaceSystem extends ScriptableSystem {
     if IsDefined(banner) {
       banner.Apply(NcmPace_Banner());
     }
+    this.ApplyArea(player.GetGame(), NcmPace_Area());
     let revision: Int32 = NcmPace_Revision();
     if revision != this.m_revision {
       this.ReleaseAll("revision " + ToString(this.m_revision) + " -> " + ToString(revision));
@@ -114,7 +118,7 @@ public class NcmPaceSystem extends ScriptableSystem {
 
   private func Apply(i: Int32, vehicle: ref<VehicleObject>, command: String) -> Void {
     let f: array<String> = StrSplit(command, "|");
-    if ArraySize(f) != 6 {
+    if ArraySize(f) != 10 {
       return;
     }
     if Equals(f[0], this.m_seq[i]) {
@@ -135,31 +139,66 @@ public class NcmPaceSystem extends ScriptableSystem {
     if mode != 1 {
       return;
     }
-    let update: ref<DriveToPointAutonomousUpdate> = new DriveToPointAutonomousUpdate();
-    update.targetPosition = new Vector4(StringToFloat(f[2]), StringToFloat(f[3]), StringToFloat(f[4]), 1.0);
-    update.maxSpeed = StringToFloat(f[5]);
-    update.minSpeed = 0.0;
-    update.clearTrafficOnPath = true;
-    update.minimumDistanceToTarget = 6.0;
-    update.driveDownTheRoadIndefinitely = false;
-    let held: ref<AIVehicleCommand> = this.m_commands[i];
-    if IsDefined(held) && Equals(agent.GetCommandState(held), AICommandState.Executing) {
-      agent.SetDriveToPointAutonomousUpdate(update);
-      return;
-    }
-    let drive: ref<AIVehicleDriveToPointAutonomousCommand> = update.CreateCmd();
+    let drive: ref<AIVehicleDriveToPointAutonomousCommand> = new AIVehicleDriveToPointAutonomousCommand();
+    drive.targetPosition = new Vector3(StringToFloat(f[2]), StringToFloat(f[3]), StringToFloat(f[4]));
+    drive.maxSpeed = StringToFloat(f[5]);
+    drive.minSpeed = StringToFloat(f[6]);
+    drive.forcedStartSpeed = StringToFloat(f[7]);
+    drive.minimumDistanceToTarget = StringToFloat(f[8]);
+    // f[9] is SP's boostDrivingStats; the drive-to-point command has no such field (SP set it inside a pcall, a
+    // silent no-op there too), so it is carried on the wire and not applied.
+    drive.clearTrafficOnPath = true;
+    drive.driveDownTheRoadIndefinitely = false;
+    drive.useKinematic = false;
     drive.needDriver = false;
-    drive.useKinematic = true;
-    drive.forcedStartSpeed = -1.0;
+    let held: ref<AIVehicleCommand> = this.m_commands[i];
     if agent.SendCommand(drive) {
       this.m_commands[i] = drive;
       this.m_vehicles[i] = vehicle;
       if !IsDefined(held) {
-        NcmPace_Log("car " + ToString(i) + ": driving (max " + f[5] + " m/s)");
+        NcmPace_Log("car " + ToString(i) + ": driving (max " + f[5] + ", min " + f[6] + ", forced " + f[7] + " m/s)");
       }
     } else {
       NcmPace_Log("car " + ToString(i) + ": SendCommand refused");
     }
+  }
+
+  // The traffic null area over a staging grid (0.3.0, KB-219): the signature the plugin read from the game's own RTTI
+  // -- gameCommunitySystem.EnableDynamicCrowdNullArea(areaLocalBBox: Box, areaLocalToWorld: WorldTransform, savable:
+  // Bool, duration: Float) -> Uint64. Not savable; the engine expires it by itself after `duration`, and a new plan
+  // or a clear takes it down sooner.
+  private func ApplyArea(game: GameInstance, feed: String) -> Void {
+    let f: array<String> = StrSplit(feed, "|");
+    if ArraySize(f) != 8 {
+      return;
+    }
+    let rev: Int32 = StringToInt(f[0]);
+    if rev == this.m_areaRev {
+      return;
+    }
+    this.m_areaRev = rev;
+    let community: ref<CommunitySystem> = GameInstance.GetCommunitySystem(game);
+    if !IsDefined(community) {
+      NcmPace_Log("area: no community system");
+      return;
+    }
+    if this.m_areaId != 0ul {
+      community.DisableCrowdNullArea(this.m_areaId);
+      this.m_areaId = 0ul;
+    }
+    if !Equals(f[1], "1") {
+      NcmPace_Log("area: cleared");
+      return;
+    }
+    let half: Float = StringToFloat(f[5]);
+    let halfZ: Float = StringToFloat(f[6]);
+    let box: Box;
+    box.Min = new Vector4(-half, -half, -halfZ, 1.0);
+    box.Max = new Vector4(half, half, halfZ, 1.0);
+    let xf: WorldTransform;
+    WorldTransform.SetPosition(xf, new Vector4(StringToFloat(f[2]), StringToFloat(f[3]), StringToFloat(f[4]), 1.0));
+    this.m_areaId = community.EnableDynamicCrowdNullArea(box, xf, false, Cast<Float>(StringToInt(f[7])));
+    NcmPace_Log("area: null area " + ToString(this.m_areaId) + " over " + f[2] + ", " + f[3] + " (+/-" + f[5] + " m) for " + f[7] + " s");
   }
 
   private func Release(i: Int32, vehicle: ref<VehicleObject>, agent: ref<AIVehicleAgent>) -> Void {

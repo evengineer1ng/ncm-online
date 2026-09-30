@@ -68,6 +68,13 @@ local ok, settings = pcall(Open77.tunables.declare, {
     liveMinFinishShare = { value = 0.5, type = "number", min = 0.1, max = 1, apply = "live" },
     livePaceMaxMps = { value = 90, type = "number", min = 20, max = 150, unit = "m/s", apply = "live" },
     liveNpcDrivers = { value = true, type = "boolean", apply = "live" },
+    -- L234: a visible driver in every Pace car too (SP seats one). attachDriver with the NPC and no task; the Pace
+    -- plugin issues the drive commands. Off = the 0.2.0 driverless cars with authority requested for the host.
+    livePaceDrivers = { value = true, type = "boolean", apply = "live" },
+    -- L234: the native traffic null area (NCM Pace 0.3.0) over a start, radius = the route's SP trafficClearRadiusM;
+    -- raised with the warning, held until this long after the lights.
+    liveTrafficClear = { value = true, type = "boolean", apply = "live" },
+    liveTrafficClearTailSec = { value = 60, type = "integer", min = 0, max = 600, unit = "s", apply = "live" },
     -- The race-start warning (L233): a native HUD banner (NCM Pace) for players this near a start line, this long out.
     liveWarnLeadSec = { value = 150, type = "integer", min = 30, max = 900, unit = "s", apply = "live" },
     liveWarnRadiusM = { value = 200, type = "integer", min = 30, max = 1000, unit = "m", apply = "live" },
