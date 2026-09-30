@@ -105,11 +105,10 @@ function PaddockViews.results(_, args)
         local race = list[i]
         -- phase 5: a race can be declared live (run on the street) inside its window; show that, or its live state
         local live = PaddockLive.statusOf(race.raceId)
-        local canLive = (not live) and PaddockLive.eligible(race, t) or false
         nextRaces[i] = { raceId = race.raceId, at = race.opensAt, series = PaddockWorld.seriesName(race.seriesId),
             route = PaddockWorld.routeName(race.routeId), state = race.state == "running" and "on track" or (race.state == "priced" and "on the board" or "scheduled"),
-            eastern = Clock.hhmm(race.opensAt), canLive = canLive or nil,
-            live = live and (live.state .. (live.verdict and (" · " .. live.verdict) or "") .. (live.declaredBy and (" · " .. live.declaredBy) or "")) or nil }
+            eastern = Clock.hhmm(race.opensAt),
+            live = live and (live.state .. (live.verdict and (" · " .. live.verdict) or "")) or nil }
     end
     return { view = "results", seriesId = filter, series = seriesList(), next = nextRaces, rows = out }
 end
@@ -338,9 +337,10 @@ function PaddockViews.today(pid)
         local org = PaddockWorld.orgManagedBy(d.ncmDriverId)
         if org then me.team, me.teamTier = org.name, Season.TIERS[org.tier].label end
         for _, lr in pairs(PaddockLive.byRace) do
-            if lr.driverId == d.ncmDriverId and PaddockLive.holds(lr.raceId) then
+            if lr.pid == pid and PaddockLive.holds(lr.raceId) then
                 local race = PaddockRaces.byId[lr.raceId]
                 me.live = { state = lr.state, route = race and PaddockWorld.routeName(race.routeId), at = race and Clock.hhmm(race.opensAt) }
+                break
             end
         end
     end

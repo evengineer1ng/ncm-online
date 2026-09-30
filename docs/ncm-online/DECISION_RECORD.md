@@ -4416,3 +4416,20 @@ model exactly. First-pass values; live test `§HB6`. Tracked by `IDEA-718`.
 - **The first boot after schema 051 died on the instruction quota** (`KB-214`): the rental sort hashed site ids inside its comparator, in the same slice as the world and race loads. The harness now meters a from-scratch rental.
 
 **Boundary.** Running on dev, untested with a player in the city. Online stays frozen (L223). New ideas are `IDEA-745`-`IDEA-751`.
+
+## L228 - OWNER RULINGS / PADDOCK - live races run on schedule by themselves; racers persevere
+
+**First live race (owner, 2026-09-29, 20:40 street race from North Tunnel):** the grid spawned and raced, piled up at the start; most cars that crashed stopped and stayed; a few escaped, some hit traffic; one recovered late and hit a second pileup; the race was called "didn't finish". "Race neutralization was WAY too trigger happy, but overall this was a good proof."
+
+**Rulings:**
+1. **Nobody declares a live race.** "I don't want to ever have to hold to make live race happen. It should just happen on schedule as intended." The RUN IT LIVE button and the declaration flow are removed.
+2. **Racers must persevere:** "try much harder to persevere through a race desperately trying to win."
+3. **Proof order:** first a race that starts and finishes; then a player sitting halfway along a route sees the field pass.
+4. **The dev server is build .102**, and the platform docs index (op77.78) is stale for it. Platform facts about AI simulation are measured on .102, not taken from the .78 cards.
+
+**Built:**
+- `liveMode` = `watched` (default: a player within `liveWatchRadiusM` 600 m of the route's line or start at staging) / `always` / `off`. At most `liveMaxConcurrent` (2) at once.
+- **A wider grid** (rows 15 m apart, columns 6.8 m) and a **rolling start** (one row every `liveStartGapMs` 900 ms).
+- **Perseverance:** no progress for `liveRecoverSec` (8 s) re-sends the car from where it is on the line; for `liveResetSec` (20 s) puts it back on the road just behind where it stopped (`vehicles.setTransform`) and sends it on; only `liveRetireSec` (180 s) retires it. A failed or cancelled AI task is re-sent at once. Progress is distance from where the car last made way, so a slow car is never called stuck.
+- **The finish:** once the winner is home, everyone still running gets `liveFinishGraceSec` (90 s) or half the winner's time; cars still out then are `not_classified`. The hard deadline is 4x the sim winner's time + 2 min.
+- **A probe** (`ncm.paddock.probe`, and once 90 s after boot): one AI car far from every player, driven for 30 s; the answer goes to `paddock_live` as `probe-<t>`. If cars move with nobody near, `liveMode = always` is safe.

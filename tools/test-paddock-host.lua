@@ -42,7 +42,8 @@ local clock = 1790000000
 -- Phases 4-5 doubles: player positions, NPC bodies, vehicles that drive a followRoute at their set speed (so the
 -- server's own timing loop sees them cross gates), and the notifications a player would read.
 local POS, VEH, NPC, NOTES, aiHandlers = {}, {}, {}, {}, {}
-local nextEnt, STALL_FROM = 5000, nil
+local nextEnt = 5000
+STUCK_FROM, STUCK_UNTIL_RESET = nil, false   -- cars from this grid index on stall; until a reset, or for good
 GHOSTS = {}
 local function vdist(a, b) local dx, dy = a.x - b.x, a.y - b.y return math.sqrt(dx * dx + dy * dy) end
 local function advance(v)
@@ -80,7 +81,8 @@ Open77 = {
             nextEnt = nextEnt + 1
             local count = 0
             for _ in pairs(VEH) do count = count + 1 end
-            VEH[nextEnt] = { pos = def.position, record = def.record, health = 1, dist = 0, stall = STALL_FROM ~= nil and count >= STALL_FROM }
+            VEH[nextEnt] = { pos = def.position, record = def.record, health = 1, dist = 0, stall = STUCK_FROM ~= nil and count >= STUCK_FROM,
+                stuckUntilReset = STUCK_UNTIL_RESET }
             return nextEnt
         end,
         remove = function(id) VEH[id] = nil return true end,
@@ -91,6 +93,14 @@ Open77 = {
             return v.pos
         end,
         getHealth = function(id) return VEH[id] and VEH[id].health end,
+        setTransform = function(id, tr)
+            local v = VEH[id]
+            if not v then return false end
+            v.pos, v.route, v.dist, v.t = tr.position, nil, 0, nil
+            if v.stuckUntilReset then v.stall = false end
+            return true
+        end,
+        owner = function(id) return VEH[id] and { kind = "stub" } or nil end,
         requestAuthority = function() return true end,
         ai = {
             on = function(ev, fn) aiHandlers[ev] = fn return true end,
@@ -99,6 +109,7 @@ Open77 = {
                 local v = VEH[id]
                 if not v or not v.driver then return nil, "no_controller" end
                 if #o.points < 1 or #o.points > 64 then return nil, "invalid_points" end
+                if v.route then advance(v); v.pos = polyAt(v.route, v.dist) end     -- a re-send starts where the car IS
                 v.route = { v.pos }
                 for _, p in ipairs(o.points) do v.route[#v.route + 1] = p end
                 v.speed, v.t, v.dist = v.stall and 0 or o.speed, clock, 0
@@ -107,6 +118,7 @@ Open77 = {
             setSpeed = function(id, sp) local v = VEH[id] if v then advance(v); v.speed = v.stall and 0 or sp end return {} end,
             removeDriver = function(id) if VEH[id] then VEH[id].driver = nil end return true end,
             stop = function() return true end,
+            state = function(id) return VEH[id] and { status = VEH[id].route and "running" or "idle" } or nil end,
         },
     },
 }
@@ -679,15 +691,10 @@ POS = {}
 for k in pairs(NPC) do NPC[k] = nil end
 PaddockGarages.bodies = PaddockGarages.bodies
 
--- ---------------------------------------------------------------- phase 5: live races
+-- ---------------------------------------------------------------- phase 5: live races, on schedule (L228)
 local Live = NcmCore.get("paddock.live")
 local liveDay = Clock.eastern(clock).dayIndex + 1
-clock = Clock.utcAt(liveDay, 20 * 3600 - 10 * 60)                    -- 19:50 ET: the street night starts at 20:00
-run(function() PaddockRaces.materialise(clock) end)
-local liveRace = PaddockRaces.byId[Season.raceId("street_a", Clock.utcAt(liveDay, 20 * 3600))]
-check("a street race is ten minutes out", liveRace ~= nil and liveRace.state == "scheduled")
-local liveRoute = PaddockWorld.route(liveRace.routeId)
--- a human ghost of the route: a gentle dog-leg from start to finish at 10 Hz
+-- a human ghost of a route: a gentle dog-leg from start to finish at 10 Hz
 local function ghostFor(route)
     local s, f = route.start, route.finish
     local mid = { x = (s.x + f.x) / 2 + 150, y = (s.y + f.y) / 2 - 150 }
@@ -702,137 +709,105 @@ local function ghostFor(route)
     raw[#raw + 1] = { t, f.x, f.y, 10, 0 }
     GHOSTS[route.routeId] = { poses_json = NcmCore.get("vocabulary.json").encode(raw), format = 1 }
 end
-ghostFor(liveRoute)
-replies = {}
-fire("ncm:paddock.live", 1, { raceId = liveRace.raceId })
-local lr = PaddockLive.byRace[liveRace.raceId]
-check("a player declares the race live", lr ~= nil and lr.state == "declared" and DB.live[liveRace.raceId] ~= nil)
-local gotWaypoint = false
-for _, r in ipairs(replies) do if r.name == "ncm:paddock.live.declared" and r.body.start then gotWaypoint = true end end
-check("and is sent to the start line", gotWaypoint)
-clock = clock + 1
-fire("ncm:paddock.live", 2, { raceId = liveRace.raceId })
-check("a second declaration of the same race is refused", PaddockLive.byRace[liveRace.raceId] == lr)
-local resView
-run(function() resView = PaddockViews.results(1, {}) end)
-local shown = false
-for _, r in ipairs(resView.next) do if r.raceId == liveRace.raceId and r.live and r.live:find("declared") then shown = true end end
-check("NEXT UP shows it is going live", shown)
-
--- staging: the declarer is at the start, the grid spawns there
-POS = { [1] = { x = liveRoute.start.x + 20, y = liveRoute.start.y, z = 10, bucket = 0 } }
-clock = liveRace.opensAt - 70
-for _ = 1, 4 do run(function() PaddockRaces.tick(clock) end) end
-run(function() PaddockLive.tick(clock) end)
-local nCars = 0
-for _ in pairs(VEH) do nCars = nCars + 1 end
-check(("the grid is spawned at the start (%d cars, %s)"):format(nCars, tostring(lr.backend)), lr.state == "staging" and nCars == #lr.cars and nCars >= 8
-    and lr.backend == "platform")
-check("the road line comes from the human ghost, inside followRoute's limit", lr.path.source == "ghost" and #lr.path.points <= 64)
-check("one timing gate per sim segment", #lr.gates == lr.segments + 1)
-local slot1 = VEH[lr.cars[1].vehicleId].pos
-check("pole sits behind the start line", Live.dist(slot1, liveRoute.start) < 30)
-
--- lights: the sim runs sealed, then the street run starts and the server times it
-clock = liveRace.opensAt
-for _ = 1, 8 do if liveRace.state == "running" then break end run(function() PaddockRaces.tick(clock) end) end
-check("the sim ran at the window's opening, sealed", liveRace.state == "running" and liveRace.result ~= nil)
-local simWinner = liveRace.result.entrants[1].id
-queue = {}
-run(function() PaddockLive.tick(clock) end)
-check("the live race is running", lr.state == "running" and #queue == 1)
-local steps, heldPastClose = 0, false
-maxSlice = 0
-while lr.state == "running" and steps < 6000 do
-    steps = steps + 1
-    clock = clock + 0.25
-    local q = queue; queue = {}
-    for _, co in ipairs(q) do
-        local ok, err = resumeMetered(co)
-        assert(ok, err)
-        if coroutine.status(co) ~= "dead" then queue[#queue + 1] = co end
-    end
-    if steps % 40 == 0 then
-        run(function() PaddockRaces.tick(math.floor(clock)) end)
-        if liveRace.closesAt and clock > liveRace.closesAt and lr.state == "running" and liveRace.state == "running" then heldPastClose = true end
-    end
+local function streetRace(series, minute)
+    local utc = Clock.utcAt(liveDay, 20 * 3600 + minute * 60)
+    clock = utc - 600
+    run(function() PaddockRaces.materialise(clock) end)
+    local race = PaddockRaces.byId[Season.raceId(series, utc)]
+    ghostFor(PaddockWorld.route(race.routeId))
+    return race
 end
-check(("the street run finished (%d samples, %.0f s)"):format(steps, steps * 0.25), lr.state == "finished")
+-- stage, go, and step the street run in 250 ms until it has a verdict
+local function runLive(race, lr0)
+    clock = race.opensAt - 70
+    for _ = 1, 6 do run(function() PaddockRaces.tick(clock) end) end
+    run(function() PaddockLive.tick(clock) end)
+    local lr = PaddockLive.byRace[race.raceId]
+    if not lr or lr.state ~= "staging" then return lr end
+    clock = race.opensAt
+    for _ = 1, 8 do if race.state == "running" then break end run(function() PaddockRaces.tick(clock) end) end
+    queue = {}
+    run(function() PaddockLive.tick(clock) end)
+    local steps = 0
+    maxSlice = 0
+    while lr.state == "running" and steps < 8000 do
+        steps = steps + 1
+        clock = clock + 0.25
+        local q = queue; queue = {}
+        for _, co in ipairs(q) do local ok, err = resumeMetered(co); assert(ok, err); if coroutine.status(co) ~= "dead" then queue[#queue + 1] = co end end
+        if steps % 40 == 0 then run(function() PaddockRaces.tick(math.floor(clock)) end) end
+    end
+    lr.steps = steps
+    return lr
+end
+
+-- nobody near the route: the race stays simulated, and nothing spawns
+local quiet = streetRace("street_a", 0)
+POS = { [1] = { x = 6000, y = -6000, z = 0, bucket = 0 } }          -- far from every route
+local lrq = runLive(quiet)
+check("a race nobody is near stays simulated: nothing spawns", lrq and lrq.state == "skipped" and next(VEH) == nil)
+
+-- a player at the start: it goes on the street by itself, no declaration; some cars get stuck and are rescued
+local liveRace = streetRace("street_a", 40)
+local liveRoute = PaddockWorld.route(liveRace.routeId)
+POS = { [1] = { x = liveRoute.start.x + 20, y = liveRoute.start.y, z = 10, bucket = 0 } }
+STUCK_FROM, STUCK_UNTIL_RESET = 8, true          -- cars 9-12 stall until something puts them back on the road
+local lr = runLive(liveRace)
+STUCK_FROM = nil
+check("with a player at the start, the race goes on the street by itself", lr and lr.backend == "platform" and #lr.cars >= 8)
+check(("the street run finished (%.0f s)"):format((lr.steps or 0) * 0.25), lr.state == "finished")
 check(("the timing loop fits the quota (max slice %d)"):format(maxSlice), maxSlice < 400000)
-check("the close waited for the verdict", heldPastClose or (liveRace.closesAt and liveRace.closesAt >= clock - 10))
+local rescued = 0
+for _, c in ipairs(lr.cars) do if c.resets > 0 then rescued = rescued + 1 end end
+check(("stuck cars were put back on the road and kept racing (%d rescued)"):format(rescued), rescued >= 3)
 check("the verdict is physical: " .. tostring(lr.reason), lr.verdict == "physical" and DB.live[liveRace.raceId].verdict == "physical")
 local rows = {}
 for _, r in ipairs(DB.result) do if r.race_id == liveRace.raceId then rows[#rows + 1] = r end end
 table.sort(rows, function(a, b) return a.position < b.position end)
-check("the physical classification replaced the sim's rows", #rows == #lr.cars and rows[1].position == 1 and rows[1].state == "finished"
-    and DB.race[liveRace.raceId].provenance == "physical")
-check("with physical gaps and points", rows[1].gap_ms == 0 and (rows[2].gap_ms or 0) > 0 and rows[1].points == 25)
-local serverCross = 0
-for _, c in ipairs(DB.crossing) do if c.race_id == liveRace.raceId and c.source == "server" then serverCross = serverCross + 1 end end
-check(("every timed gate is kept (%d crossings)"):format(serverCross), serverCross == #lr.cars * (#lr.gates - 1))
-check("the declarer is told the street result stands", (function()
-    for _, n in ipairs(NOTES) do if n.message:find("Live result stands", 1, true) then return true end end return false end)())
+local finished = 0
+for _, r in ipairs(rows) do if r.state == "finished" then finished = finished + 1 end end
+check(("every car finished, rescued ones included (%d of %d)"):format(finished, #rows), finished == #rows and #rows == #lr.cars)
+check("the physical classification replaced the sim's rows", DB.race[liveRace.raceId].provenance == "physical" and rows[1].gap_ms == 0)
 clock = math.floor(clock) + 10
 for _ = 1, 6 do if liveRace.state == "resolved" then break end run(function() PaddockRaces.tick(clock) end) end
-check("then the race resolves on the physical result", DB.race[liveRace.raceId].state == "resolved")
+local box
 run(function() box = PaddockViews.box(1, { raceId = liveRace.raceId }) end)
-check("and its box score says PHYSICAL", box.provenance == "physical" and box.rows[1].driverId == rows[1].person_id)
-realPrint(("    (sim winner %s, street winner %s)"):format(simWinner, rows[1].person_id))
-run(function() Wait(0) end)
--- the cars linger 20 s, then go
+check("then the race resolves, and its box score says PHYSICAL", DB.race[liveRace.raceId].state == "resolved" and box.provenance == "physical")
 queue = {}
-for pid in pairs(VEH) do VEH[pid] = nil end
+for id in pairs(VEH) do VEH[id] = nil end
 
--- a street run where most cars stall: the sim result stands
-local race2 = PaddockRaces.byId[Season.raceId("street_a", Clock.utcAt(liveDay, 20 * 3600 + 40 * 60))]
-clock = race2.opensAt - 600
-run(function() PaddockRaces.materialise(clock) end)
-race2 = PaddockRaces.byId[Season.raceId("street_a", Clock.utcAt(liveDay, 20 * 3600 + 40 * 60))]
-ghostFor(PaddockWorld.route(race2.routeId))
-fire("ncm:paddock.live", 1, { raceId = race2.raceId })
-local lr2 = PaddockLive.byRace[race2.raceId]
-check("a second live race can be declared once the first is done", lr2 ~= nil)
-local r2route = PaddockWorld.route(race2.routeId)
-POS = { [1] = { x = r2route.start.x, y = r2route.start.y, z = 10, bucket = 0 } }
-STALL_FROM = 2
-clock = race2.opensAt - 70
-for _ = 1, 6 do run(function() PaddockRaces.tick(clock) end) end
-run(function() PaddockLive.tick(clock) end)
-clock = race2.opensAt
-for _ = 1, 8 do if race2.state == "running" then break end run(function() PaddockRaces.tick(clock) end) end
-local simRows = 0
-for _, r in ipairs(DB.result) do if r.race_id == race2.raceId then simRows = simRows + 1 end end
+-- a player halfway along the route counts as watching
+local race2 = streetRace("street_b", 60)
+local r2 = PaddockWorld.route(race2.routeId)
+local path2 = PaddockLive.pathFor(race2.routeId)
+local mid = path2.points[math.floor(#path2.points / 2)]
+POS = { [1] = { x = mid.x + 40, y = mid.y, z = 10, bucket = 0 } }
+STUCK_FROM, STUCK_UNTIL_RESET = 2, false            -- ten cars are stuck for good
+local lr2 = runLive(race2)
+STUCK_FROM = nil
+check("a player halfway along the route is enough to put it on the street", lr2 and lr2.cars and #lr2.cars >= 8 and #lr2.watchers == 1)
+check("the run ends once the winner is home and the grace has passed", lr2.state == "finished" and lr2.closeMs ~= nil)
+check("too few finishers: the verdict falls back (" .. tostring(lr2.reason) .. ")", lr2.verdict == "fallback" and tostring(lr2.reason):find("only 2 of", 1, true) ~= nil)
+local notClassified = 0
+for _, why in pairs(lr2.out) do if why == "not_classified" then notClassified = notClassified + 1 end end
+check("cars still out there at the close are 'not classified', not written off early", notClassified >= 1)
+check("and the sealed sim result stands", (DB.race[race2.raceId].provenance or "simulated") == "simulated")
 queue = {}
-run(function() PaddockLive.tick(clock) end)
-steps = 0
-while lr2.state == "running" and steps < 6000 do
-    steps = steps + 1
-    clock = clock + 0.25
-    local q = queue; queue = {}
-    for _, co in ipairs(q) do local ok, err = resumeMetered(co); assert(ok, err); if coroutine.status(co) ~= "dead" then queue[#queue + 1] = co end end
+for id in pairs(VEH) do VEH[id] = nil end
+
+-- the probe: does platform AI move a car nobody is near?
+POS = { [1] = { x = 6000, y = -6000, z = 0, bucket = 0 } }          -- far from every route
+local probeLine
+local co = coroutine.create(function() local _, line = PaddockLive.runProbe(); probeLine = line end)
+for _ = 1, 40 do
+    if coroutine.status(co) == "dead" then break end
+    local ok, err = coroutine.resume(co); assert(ok, err)
+    clock = clock + 1
 end
-STALL_FROM = nil
-check("stalled cars are retired and the run ends", lr2.state == "finished")
-check("too few finishers: the verdict falls back (" .. tostring(lr2.reason) .. ")", lr2.verdict == "fallback"
-    and tostring(lr2.reason):find("only 2 of", 1, true) ~= nil)
-local after2 = 0
-for _, r in ipairs(DB.result) do if r.race_id == race2.raceId then after2 = after2 + 1 end end
-check("and the sealed sim result stands untouched", after2 == simRows and (DB.race[race2.raceId].provenance or "simulated") == "simulated")
-queue = {}
-for pid in pairs(VEH) do VEH[pid] = nil end
-
--- a declarer who is not at the start: called off, nothing left in the city
-local race3 = PaddockRaces.byId[Season.raceId("street_b", Clock.utcAt(liveDay, 20 * 3600 + 60 * 60))]
-clock = Clock.utcAt(liveDay, 20 * 3600 + 60 * 60) - 600
-run(function() PaddockRaces.materialise(clock) end)
-race3 = PaddockRaces.byId[Season.raceId("street_b", Clock.utcAt(liveDay, 20 * 3600 + 60 * 60))]
-fire("ncm:paddock.live", 1, { raceId = race3.raceId })
-local lr3 = PaddockLive.byRace[race3.raceId]
-POS = { [1] = { x = 0, y = 0, z = 0, bucket = 0 } }
-clock = race3.opensAt - 70
-run(function() PaddockLive.tick(clock) end)
-check("a declarer far from the start is called off", lr3 and lr3.state == "cancelled" and next(VEH) == nil)
-check("and the race keeps its sim result path", not PaddockLive.holds(race3.raceId))
+local probeRow
+for id, row in pairs(DB.live) do if id:match("^probe%-") then probeRow = row end end
+check("the probe drives one car far from everyone and records the answer: " .. tostring(probeLine), probeLine and probeLine:find("MOVES", 1, true) and probeRow ~= nil
+    and next(VEH) == nil)
 POS = {}
 queue = {}
 

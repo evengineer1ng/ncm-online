@@ -75,8 +75,8 @@ end, false)
 -- ---------------------------------------------------------------------------------------------- phases 4-5
 --   ncm.paddock.garage <playerId>                 the garage nearest that player: site, tenants, shifts, bodies
 --   ncm.paddock.garage <playerId|siteId> good|bad [note]   the in-engine look: a bad site leaves the rental pool
---   ncm.paddock.live                              live races and the Pace clients
---   ncm.paddock.live <playerId> [raceId]          declare the soonest eligible (or named) race live for a player
+--   ncm.paddock.live                              live races, the Pace clients and the last probe
+--   ncm.paddock.probe                             does platform AI move a car nobody is near? (30 s)
 local G = NcmCore.get("paddock.garages")
 
 local function siteFor(arg)
@@ -117,29 +117,18 @@ RegisterCommand("ncm.paddock.garage", function(source, args)
     print(("  stats spawned=%d removed=%d refused=%d talks=%d groundMisses=%d"):format(s.spawned, s.removed, s.refused, s.talks, s.groundMisses))
 end, false)
 
-RegisterCommand("ncm.paddock.live", function(source, args)
+RegisterCommand("ncm.paddock.live", function(source)
     if not console(source) then return end
-    local pid = tonumber(args and args[1])
-    if not pid then
-        for id, lr in pairs(PaddockLive.byRace) do
-            print(("[ncm_paddock] live %s state=%s backend=%s verdict=%s reason=%s cars=%d declarer=%s"):format(id, lr.state,
-                tostring(lr.backend), tostring(lr.verdict), tostring(lr.reason), #(lr.cars or {}), tostring(lr.declaredByName)))
-        end
-        for p, info in pairs(PaddockLive.paceClients) do print(("  pace client %d ok=%s version=%s"):format(p, tostring(info.ok), info.version)) end
-        return
+    print(("[ncm_paddock] liveMode=%s backend=%s"):format(tostring(PaddockSettings.get("liveMode", "watched")), tostring(PaddockSettings.get("liveBackend", "auto"))))
+    for id, lr in pairs(PaddockLive.byRace) do
+        print(("  live %s state=%s backend=%s verdict=%s reason=%s cars=%d"):format(id, lr.state, tostring(lr.backend), tostring(lr.verdict),
+            tostring(lr.reason), #(lr.cars or {})))
     end
-    CreateThread(function()
-        local raceId = args[2]
-        if not raceId then
-            local t, best = U.now(), nil
-            for _, r in pairs(PaddockRaces.byId) do
-                if PaddockLive.eligible(r, t) and (not best or r.opensAt < best.opensAt) then best = r end
-            end
-            raceId = best and best.raceId
-        end
-        if not raceId then print("[ncm_paddock] no eligible race") return end
-        local ok, res = PaddockLive.declare(pid, raceId)
-        print(("[ncm_paddock] declare %s for player %d: %s"):format(raceId, pid, ok and ("ok, start " .. tostring(res.name)) or tostring(res)))
-        if ok then TriggerClientEvent("ncm:paddock.live.declared", pid, { raceId = raceId, start = res.start, name = res.name }) end
-    end)
+    for p, info in pairs(PaddockLive.paceClients) do print(("  pace client %d ok=%s version=%s"):format(p, tostring(info.ok), info.version)) end
+    if PaddockLive.probe then print("  " .. PaddockLive.probe.line) end
+end, false)
+
+RegisterCommand("ncm.paddock.probe", function(source)
+    if not console(source) then return end
+    CreateThread(function() local ok, line = PaddockLive.runProbe(); print("[ncm_paddock] " .. tostring(line)) end)
 end, false)

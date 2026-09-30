@@ -25,7 +25,6 @@ local Core = NcmCore
 Core.define("paddock.live", function(C)
     local M = { version = "0.1.0" }
     local Gates = C.get("course.gates")
-    local Grid = C.get("session.grid")
     local Routes = C.get("course.routes")
 
     M.MAX_POINTS = 64            -- Open77.vehicles.ai.followRoute accepts 1..64 points
@@ -35,7 +34,8 @@ Core.define("paddock.live", function(C)
     M.MIN_FINISH_SHARE = 0.5
     M.GATE_HALF_WIDTH_M = 28     -- a race line is wider than a practice gate: cars run side by side
     M.GATE_CAPTURE_M = 35        -- a gate spaced along a curving road is also passed by reaching its point
-    M.STALL_SEC = 30             -- no progress this long is a DNF ("stalled")
+    M.STALL_SEC = 30
+    M.PROGRESS_M = 6             -- a car that has moved this far from where it last made way is still racing             -- no progress this long is a DNF ("stalled")
 
     local function dist(a, b)
         local dx, dy = (a.x or 0) - (b.x or 0), (a.y or 0) - (b.y or 0)
@@ -117,14 +117,59 @@ Core.define("paddock.live", function(C)
         return Gates.build(route, { intermediate = mids, halfWidthM = M.GATE_HALF_WIDTH_M, captureM = M.GATE_CAPTURE_M })
     end
 
-    --- Grid slots behind the start gate, pole first, with REDengine yaw.
+    -- A human grid (session.grid) packs rows 7 m apart; AI cars released from that pile into each other at the
+    -- first corner (live, 2026-09-29, twelve cars at North Tunnel). The live grid is wider and deeper.
+    M.GRID_FIRST_ROW_M = 12
+    M.GRID_ROW_M = 15
+    M.GRID_COLUMN_M = 3.4
+
+    --- Grid slots behind the start gate, pole first (left column), with REDengine yaw.
     function M.gridSlots(startGate, n)
         local out = {}
+        local fx, fy = startGate.dir.x, startGate.dir.y
+        local lx, ly = -fy, fx
         for i = 1, n do
-            local p = Grid.slotPosition(startGate, i)
-            out[i] = { x = p.x, y = p.y, z = p.z, yaw = M.yawFromDir(startGate.dir.x, startGate.dir.y) }
+            local row = math.floor((i - 1) / 2)
+            local col = ((i - 1) % 2 == 0) and -1 or 1
+            local back = M.GRID_FIRST_ROW_M + row * M.GRID_ROW_M
+            out[i] = { x = startGate.x - fx * back + lx * col * M.GRID_COLUMN_M, y = startGate.y - fy * back + ly * col * M.GRID_COLUMN_M,
+                z = startGate.z or 0, yaw = M.yawFromDir(fx, fy), row = row + 1 }
         end
         return out
+    end
+
+    --- The index of the path point nearest `pos` (1-based).
+    function M.nearestIndex(points, pos)
+        local best, bestD = 1, math.huge
+        for i, p in ipairs(points) do
+            local d = dist(p, pos)
+            if d < bestD then best, bestD = i, d end
+        end
+        return best, bestD
+    end
+
+    --- Shortest planar distance from `pos` to the polyline.
+    function M.distToPath(points, pos)
+        local best = math.huge
+        for i = 2, #points do
+            local a, b = points[i - 1], points[i]
+            local vx, vy = b.x - a.x, b.y - a.y
+            local len2 = vx * vx + vy * vy
+            local u = len2 > 0 and (((pos.x - a.x) * vx + (pos.y - a.y) * vy) / len2) or 0
+            if u < 0 then u = 0 elseif u > 1 then u = 1 end
+            local d = dist({ x = a.x + vx * u, y = a.y + vy * u }, pos)
+            if d < best then best = d end
+        end
+        if #points == 1 then best = dist(points[1], pos) end
+        return best
+    end
+
+    --- Where to put a stuck car back on the road: the path point just behind its nearest one, facing along the line.
+    function M.resetPoint(points, pos)
+        local i = M.nearestIndex(points, pos)
+        i = math.max(1, math.min(#points - 1, i - 1))
+        local a, b = points[i], points[i + 1]
+        return { x = a.x, y = a.y, z = a.z or 0, yaw = M.yawFromDir(b.x - a.x, b.y - a.y), index = i }
     end
 
     --- One car's speed ceiling for each leg of the path (leg i ends at point i+1), from its own sim splits.
@@ -176,9 +221,10 @@ Core.define("paddock.live", function(C)
         if not c or c.done or type(pos) ~= "table" then return {} end
         local crossed = {}
         local prev, prevMs = c.lastPos, c.lastMs
+        -- progress is distance from where the car last made way, not per sample: at 250 ms samples a per-sample
+        -- threshold would call a car doing 10 m/s "stuck"
+        if not c.anchor or dist(c.anchor, pos) > M.PROGRESS_M then c.anchor = { x = pos.x, y = pos.y }; c.progressMs = tMs end
         if prev then
-            local moved = dist(prev, pos)
-            if moved > 3 then c.progressMs = tMs end
             local guard = 0
             while c.next <= #timing.gates and guard < #timing.gates do
                 guard = guard + 1
@@ -191,11 +237,27 @@ Core.define("paddock.live", function(C)
                 c.next = c.next + 1
             end
             if c.next > #timing.gates then c.done = true; c.finishMs = c.times[#timing.gates] end
-        else
-            c.progressMs = tMs
         end
         c.lastPos, c.lastMs = { x = pos.x, y = pos.y, z = pos.z }, tMs
         return crossed
+    end
+
+    --- Forget a car's last sample (after it was moved by hand), so the jump is never read as a gate crossing.
+    function M.forget(timing, id, tMs)
+        local c = timing.cars[id]
+        if not c then return end
+        c.lastPos, c.lastMs, c.anchor = nil, nil, nil
+        c.progressMs = tMs or c.progressMs
+    end
+
+    --- The first car to cross the finish line, in ms since the go, or nil.
+    function M.leaderMs(timing)
+        local best
+        for _, id in ipairs(timing.order) do
+            local c = timing.cars[id]
+            if c.done and c.finishMs and (not best or c.finishMs < best) then best = c.finishMs end
+        end
+        return best
     end
 
     --- Has a car stopped making progress?

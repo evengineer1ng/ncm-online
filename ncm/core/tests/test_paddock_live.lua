@@ -135,6 +135,29 @@ return {
         T.falsy(L.corroborate(t2, nil), "no client times, no pace corroboration")
     end,
 
+    the_live_grid_leaves_room_and_a_stuck_car_goes_back_on_the_line = function(T)
+        local L = T.Core.get("paddock.live")
+        local r = route(T)
+        local p = L.path(r, ghost(r))
+        local gates = L.checkpoints(r, p, 6)
+        local slots = L.gridSlots(gates[1], 12)
+        for i = 3, 12 do T.ok(L.dist(slots[i], slots[i - 2]) >= 14, "rows are at least 14 m apart") end
+        T.ok(L.dist(slots[1], slots[2]) >= 6, "the two columns have room")
+        T.eq(slots[1].row, 1); T.eq(slots[12].row, 6)
+        local off = { x = p.points[20].x + 30, y = p.points[20].y }
+        local rp = L.resetPoint(p.points, off)
+        T.ok(rp.index <= 20 and rp.index >= 18, "reset goes to the line just behind the car (" .. rp.index .. ")")
+        T.ok(L.distToPath(p.points, p.points[10]) < 0.01, "on the line is zero from the line")
+        T.ok(math.abs(L.distToPath(p.points, off) - 30) < 31, "off the line is measured to the line")
+        -- a slow car is not stuck: 5 m/s sampled every 250 ms moves 1.25 m a sample
+        local timing = L.newTiming(gates, { "slow" })
+        for k = 0, 160 do L.observe(timing, "slow", { x = r.start.x + k * 1.25, y = r.start.y }, k * 250) end
+        T.falsy(L.stalled(timing, "slow", 40000, 8), "a car making slow way is still racing")
+        L.forget(timing, "slow", 41000)
+        T.falsy(timing.cars.slow.lastPos, "a moved car's last sample is forgotten, so the jump crosses no gate")
+        T.eq(L.leaderMs(timing), nil, "no leader before anyone finishes")
+    end,
+
     a_stopped_car_is_stalled = function(T)
         local L = T.Core.get("paddock.live")
         local r = route(T)

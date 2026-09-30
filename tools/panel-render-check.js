@@ -1204,13 +1204,13 @@ check("a standings row asks for that driver's profile", emitted.some(e => e.name
 pdShow({ view: "results", series: [], next: [{ raceId: "r9", at: 1790001000, series: "Pacific Apex", route: "The Cut", state: "on the board", eastern: "15:00" }],
   rows: [{ raceId: "r1", at: 1790000000, series: "Night Grid", route: "Hook", state: "resolved", weather: "rain", light: "night", wet: 0.9, provenance: "simulated", winner: "Omar Haddad", winnerOrg: "Metro Racing", commit: "abcd1234" }] });
 check("results show what is next and what happened", pdDrawn() && /NEXT UP/.test(pdText()) && /Omar Haddad/.test(pdText()) && /wet road/.test(pdText()), pdText());
-// phase 5: a race inside its window offers a hold-to-declare live run; one already declared shows its live state
+// phase 5 (L228): races go on the street by themselves; the page only reports it, and there is no button to hold
 pdShow({ view: "results", series: [], rows: [], next: [
-  { raceId: "r10", at: 1790002000, series: "Night Grid", route: "Hook", state: "scheduled", eastern: "20:00", canLive: true },
-  { raceId: "r11", at: 1790003000, series: "Night Grid", route: "The Cut", state: "scheduled", eastern: "20:20", live: "staging · Ana" }] });
-check("NEXT UP offers RUN IT LIVE only where it can happen", pdDrawn() && /HOLD: RUN IT LIVE/.test(pdText()) && /LIVE · staging/.test(pdText())
-  && document.getElementById("paddockMain").querySelectorAll("button").filter(b => /RUN IT LIVE/.test(b._text)).length === 1, pdText());
-check("and says what a live run is", /grid spawns at the start/.test(pdText()), pdText());
+  { raceId: "r10", at: 1790002000, series: "Night Grid", route: "Hook", state: "scheduled", eastern: "20:00" },
+  { raceId: "r11", at: 1790003000, series: "Night Grid", route: "The Cut", state: "on track", eastern: "20:20", live: "running" }] });
+check("NEXT UP reports a race on the street and offers nothing to hold", pdDrawn() && /ON THE STREET · running/.test(pdText())
+  && document.getElementById("paddockMain").querySelectorAll("button").filter(b => /LIVE/.test(b._text)).length === 0, pdText());
+check("and says how a race gets onto the street", /grid spawns at the start/.test(pdText()) && /near the route/.test(pdText()), pdText());
 pdShow({ view: "box", error: "not_resolved", rows: [] });
 check("a running race's box score is explained, never shown", pdDrawn() && /still on track/.test(pdText()), pdText());
 pdShow({ view: "box", raceId: "r1", series: "Night Grid", route: "Hook", at: 1790000000, weather: "rain", light: "night", wet: 0.9, provenance: "simulated", commit: "abcd1234",
@@ -1232,7 +1232,7 @@ for (const v of ["today", "results", "standings", "wire", "board", "myorg", "pac
   pdShow({ view: v, rows: {}, next: {}, results: {}, series: {}, races: {}, car: {}, pending: {}, me: {}, caps: {} });
   check("view " + v + " survives every list arriving as {}", pdDrawn() && !pdErr(), JSON.stringify(pdErr()));
 }
-pdShow({ view: "today", next: [{ raceId: "r20", at: 1790002000, series: "Night Grid", route: "Hook", state: "scheduled", eastern: "20:40", canLive: true }],
+pdShow({ view: "today", next: [{ raceId: "r20", at: 1790002000, series: "Night Grid", route: "Hook", state: "scheduled", eastern: "20:40" }],
   results: [{ raceId: "r1", at: 1790000000, series: "Night Grid", route: "Hook", winner: "Omar Haddad", winnerOrg: "Metro Racing", provenance: "physical" }],
   me: { knowsBillie: true, openSlips: 2, balance: 900, team: "Kabuki Night Racing", teamTier: "Street" },
   rows: [{ id: "n1", at: 1790000000, kind: "race_result", headline: "Haddad takes Hook", body: "Body", prominence: 50 }] });

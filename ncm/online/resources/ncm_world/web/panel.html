@@ -2645,14 +2645,9 @@
 
       // ---- shared pieces ---------------------------------------------------------------------------------------
       function pdNextTable(host, next) {
-        const liveCell = (r) => {
-          if (r.live) return pdEl("span", "pd-live", "LIVE · " + r.live);
-          if (!r.canLive) return "";
-          const b = pdEl("button", "pd-act small", "HOLD: RUN IT LIVE");
-          holdAction(b, () => Open77.emit("panel:paddock.live", { raceId: r.raceId }));
-          return b;
-        };
-        host.append(pdTable([["ET", r => r.eastern], ["SERIES", r => r.series], ["ROUTE", r => r.route], ["STATUS", r => r.state], ["ON THE STREET", liveCell]], next));
+        // races go on the street by themselves when someone is near the route (L228); this only reports it
+        const liveCell = (r) => r.live ? pdEl("span", "pd-live", "ON THE STREET · " + r.live) : "";
+        host.append(pdTable([["ET", r => r.eastern], ["SERIES", r => r.series], ["ROUTE", r => r.route], ["STATUS", r => r.state], ["", liveCell]], next));
       }
       function pdResultsTable(host, rows) {
         host.append(pdTable([["WHEN", r => pdTime(r.at)], ["SERIES", r => r.series], ["ROUTE", r => r.route], ["WINNER", r => (r.winner || "") + (r.winnerOrg ? " · " + r.winnerOrg : "")],
@@ -2701,7 +2696,7 @@
       }
       function pdResults(d) {
         const next = pdArr(d.next);
-        const b1 = pdBlock(paddockMain, "NEXT UP", "Hold RUN IT LIVE to race the grid on the street");
+        const b1 = pdBlock(paddockMain, "NEXT UP", "Be near the route and the race runs on the street");
         if (next.length) pdNextTable(b1, next); else pdEmpty(b1, "Nothing scheduled in the next two hours.");
         const b2 = pdBlock(paddockMain, "RESULTS", "Click a race for its box score");
         b2.append(pdChips([["", "ALL SERIES"]].concat(pdArr(d.series).map(s => [s.id, s.name])), d.seriesId || "", (id) => pdAsk({ view: "results", seriesId: id || null })));
@@ -2878,12 +2873,12 @@
           if (me.live) add("LIVE RACE", me.live.state + " · " + (me.live.route || "") + " · " + (me.live.at || "") + " ET");
           paddockDetail.append(kv);
           pdHelp("The NPC world", ["Sixty teams race on their own calendar, Eastern time: Street at night, Regional and Pro by day, the Premier feature at 15:00.",
-            "Every race is simulated unless someone runs it live on the street. RACES → NEXT UP → hold RUN IT LIVE, then be at the start line.",
+            "When you are near a race's route as it starts, it runs on the street: the grid spawns at the start and races the route. Otherwise it is simulated.",
             "Their people work out of rented garages. TEAMS shows where and when; walk up while they're in to talk."]);
         } else if (view === "results") {
           pdHelp("Races", ["Click a result for its box score here.",
-            "RUN IT LIVE declares a race for the street: the grid spawns at the start 75 seconds before the lights, and the cars drive at the pace the sim gave each driver.",
-            "Be at the start line (a waypoint is set). If the street run is clean, its result replaces the sim's and the box score says STREET."]);
+            "Races run on the street by themselves when a player is near the route: the grid spawns at the start 75 seconds before the lights, and the cars race at the pace the sim gave each driver.",
+            "Watch from the start or anywhere along the route. If the street run finishes cleanly, its result replaces the sim's and the box score says STREET."]);
         } else if (view === "standings") {
           pdHelp("Standings", ["Pick a series, then season or this Cup, drivers or teams.", "Click a row to see who they are. Tags are earned from results, never guessed."]);
         } else if (view === "directory") {

@@ -1,18 +1,26 @@
--- ncm_paddock / server / live -- declared physical-authoritative Paddock races (doc 44 §12, phase 5, L222).
+-- ncm_paddock / server / live -- Paddock races on the street, on schedule (doc 44 §12, phase 5, L222, L228).
 --
---   declare  (F6 RESULTS, NEXT UP)   a player asks for an upcoming race to run on the street; the field freezes
---   stage    (liveStageLeadSec out)  the declarer must be at the start: the grid is spawned there, pole first
---   go       (window opens + count)  every car drives the route at a ceiling taken from ITS OWN sim splits:
---              platform  Open77.vehicles.ai.followRoute over a human ghost's line, capped at 55 m/s by the platform
---              pace      the Pace DLL (ncm/pace) on the declarer's client, uncapped, with 20 Hz gate reports
---   run      (every liveSampleMs)    the SERVER times every gate from canonical positions, whatever the backend
---   verdict  (all done or timeout)   `paddock.live.classify`: physical -> the result replaces the sealed sim result
---                                    before the close; fallback -> the sim result stands and the reason is kept
+-- Nobody declares a live race (owner, 2026-09-29: "it should just happen on schedule as intended"). Every scheduled
+-- race is considered at its staging time; `liveMode` decides which run physically:
+--   watched  (default) a race goes live when a player is near its route -- anywhere along it, not only the start
+--   always   every race goes live whenever anyone is online (set this once the probe shows cars move with nobody near)
+--   off      simulation only
 --
--- The race's close waits for the verdict (`PaddockLive.holds`), and Billie settles at the close, so a physical
--- result settles slips exactly once and nothing is ever re-settled. The sim ran at the window's opening as always:
--- a live race can fail at any step and the Paddock still has its result.
-PaddockLive = { byRace = {}, paceClients = {} }
+--   stage    (liveStageLeadSec out)  the grid spawns at the start, pole first, with room between rows
+--   go       (window opens + count)  a ROLLING start: rows are released one after another, never twelve cars at once
+--   run      (every liveSampleMs)    the SERVER times every gate from canonical positions, and keeps the field racing:
+--              no progress for liveRecoverSec  -> the car is sent on again from where it is on the line
+--              no progress for liveResetSec    -> it is put back on the road just behind where it stopped, and sent on
+--              no progress for liveRetireSec   -> only then is it out
+--   finish   once the winner is home, everyone still running gets liveFinishGraceSec (or half the winner's time) to
+--            finish; the hard deadline is liveTimeoutFactor x the sim winner's time
+--   verdict  `paddock.live.classify`: physical -> the result replaces the sealed sim result before the close;
+--            fallback -> the sim result stands and the reason is kept
+--
+-- The race's close waits for the verdict (`PaddockLive.holds`), and Billie settles at the close, so a physical result
+-- settles slips exactly once. The sim still runs at the window's opening: a street run can fail at any step and the
+-- Paddock keeps its result.
+PaddockLive = { byRace = {}, paceClients = {}, probe = nil }
 
 local U = PaddockUtil
 local log = U.logger("live")
@@ -24,19 +32,26 @@ local Hash = NcmCore.get("vocabulary.hash")
 local Pose = NcmCore.get("replay.pose")
 local Json = NcmCore.get("vocabulary.json")
 local Pool = NcmCore.get("data.vehicle_pool")
+local Clock = NcmCore.get("world.clock")
 
 local byRace = PaddockLive.byRace
 local byVehicle = {}                 -- vehicleId -> { raceId, personId }
+local NO_DRIVER = "00000000-0000-0000-0000-000000000000"
 
 local function nowMs() return math.floor((Open77.time.unix() or 0) * 1000) end
+local function set(k, d) return PaddockSettings.get(k, d) end
 local function notify(pid, msg, ms)
     if pid then pcall(Open77.notifications.send, pid, { type = "info", title = "PADDOCK LIVE", message = msg, icon = "NCM", durationMs = ms or 6000 }) end
+end
+local function positions()
+    local ok, p = pcall(Open77.players.positions)
+    return (ok and type(p) == "table") and p or {}
 end
 
 --- Is a race's close held for a live verdict?
 function PaddockLive.holds(raceId)
     local lr = byRace[raceId]
-    return lr ~= nil and (lr.state == "declared" or lr.state == "staging" or lr.state == "running")
+    return lr ~= nil and (lr.state == "staging" or lr.state == "running")
 end
 
 --- People physically in a live race right now (garages.lua keeps them off the garage floor).
@@ -54,7 +69,7 @@ end
 function PaddockLive.statusOf(raceId)
     local lr = byRace[raceId]
     if not lr then return nil end
-    return { state = lr.state, backend = lr.backend, declaredBy = lr.declaredByName, verdict = lr.verdict }
+    return { state = lr.state, backend = lr.backend, verdict = lr.verdict }
 end
 
 local function setRow(lr, fields)
@@ -64,67 +79,9 @@ local function setRow(lr, fields)
     pcall(MySQL.update.await, "UPDATE paddock_live SET " .. table.concat(sets, ", ") .. " WHERE server_id = ? AND race_id = ?", vals)
 end
 
--- ------------------------------------------------------------------------------------------------------ declare
+-- ------------------------------------------------------------------------------------------------------ the line
 
-local function activeCount()
-    local n = 0
-    for _, lr in pairs(byRace) do if PaddockLive.holds(lr.raceId) then n = n + 1 end end
-    return n
-end
-
---- Whether a race could be declared live right now, and why not. Used by the view (the button) and declare.
-function PaddockLive.eligible(race, t)
-    if not PaddockSettings.get("liveEnabled", true) then return false, "disabled" end
-    if not race or (race.state ~= "scheduled" and race.state ~= "priced") then return false, "not_open" end
-    if byRace[race.raceId] then return false, "already_live" end
-    local lead = race.opensAt - t
-    if lead < PaddockSettings.get("liveDeclareLeadSec", 150) then return false, "too_late" end
-    if lead > PaddockSettings.get("liveDeclareHorizonMin", 90) * 60 then return false, "too_early" end
-    if activeCount() > 0 then return false, "one_at_a_time" end
-    return true
-end
-
-function PaddockLive.declare(pid, raceId)
-    local t = U.now()
-    local race = PaddockRaces.byId[raceId or ""]
-    local ok, why = PaddockLive.eligible(race, t)
-    if not ok then return false, why end
-    local d = PaddockPlayers.driver(pid)
-    if not d then return false, "no_driver" end
-    PaddockRaces.freeze(race)
-    local n = #(race.frozen and race.frozen.grid or {})
-    if n < 2 then return false, "no_field" end
-    if n > PaddockSettings.get("liveMaxCars", 16) then return false, "field_too_big" end
-    local route = PaddockWorld.route(race.routeId)
-    if not route then return false, "no_route" end
-    local okDb = pcall(MySQL.update.await, [[INSERT INTO paddock_live (server_id, race_id, declared_by, declared_at, state, cars)
-        VALUES (?, ?, ?, ?, 'declared', ?)]], { U.sid(), race.raceId, d.ncmDriverId, t, n })
-    if not okDb then return false, "database" end
-    byRace[race.raceId] = { raceId = race.raceId, state = "declared", pid = pid, driverId = d.ncmDriverId,
-        declaredByName = d.display, declaredAt = t, route = route }
-    log("declared %s by %s (%d cars, opens %s)", race.raceId, tostring(d.display), n, NcmCore.get("world.clock").hhmm(race.opensAt))
-    return true, { start = { x = route.start.x, y = route.start.y, z = route.start.z }, name = route.start.name or route.name,
-        opensAt = race.opensAt, cars = n }
-end
-
-local function cancel(lr, reason)
-    lr.state, lr.reason = "cancelled", reason
-    setRow(lr, { state = "cancelled", reason = reason, ended_at = U.now() })
-    for _, c in ipairs(lr.cars or {}) do
-        if c.vehicleId then
-            byVehicle[c.vehicleId] = nil
-            pcall(Open77.vehicles.ai.removeDriver, c.vehicleId)
-            pcall(Open77.vehicles.remove, c.vehicleId)
-        end
-        if c.npcId then pcall(Open77.npcs.remove, c.npcId) end
-    end
-    if lr.pid then TriggerClientEvent("ncm:paddock.live.end", lr.pid, { raceId = lr.raceId }) end
-    notify(lr.pid, "Live run of " .. PaddockWorld.routeName(PaddockRaces.byId[lr.raceId] and PaddockRaces.byId[lr.raceId].routeId) ..
-        " called off: " .. tostring(reason) .. ". The sim result stands.")
-    log("cancelled %s: %s", lr.raceId, tostring(reason))
-end
-
--- -------------------------------------------------------------------------------------------------------- stage
+local pathCache = {}                 -- routeId -> { path, at }
 
 local function bestGhost(routeId)
     local okQ, row = pcall(MySQL.single.await, [[SELECT poses_json, format FROM ghost_lap WHERE server_id = ? AND route_id = ?
@@ -132,9 +89,36 @@ local function bestGhost(routeId)
     if not okQ or not row or type(row.poses_json) ~= "string" then return nil end
     local okJ, raw = pcall(Json.decode, row.poses_json)
     if not okJ then return nil end
-    local poses = Pose.decode(raw, tonumber(row.format))
-    return poses
+    return Pose.decode(raw, tonumber(row.format))
 end
+
+--- The road line for a route (a human ghost when one exists), cached for ten minutes.
+function PaddockLive.pathFor(routeId)
+    local c = pathCache[routeId]
+    if c and U.now() - c.at < 600 then return c.path end
+    local route = PaddockWorld.route(routeId)
+    if not route then return nil end
+    local path = L.path(route, bestGhost(routeId))
+    pathCache[routeId] = { path = path, at = U.now() }
+    return path
+end
+
+--- Players near a route: within liveWatchRadiusM of its line or its start. Returns a list of { pid, d, pos }.
+local function watchers(routeId)
+    local path = PaddockLive.pathFor(routeId)
+    local route = PaddockWorld.route(routeId)
+    if not path or not route then return {} end
+    local radius = set("liveWatchRadiusM", 600)
+    local out = {}
+    for pid, pos in pairs(positions()) do
+        local d = math.min(L.distToPath(path.points, pos), L.dist(route.start, pos))
+        if d <= radius then out[#out + 1] = { pid = tonumber(pid), d = d, pos = pos } end
+    end
+    table.sort(out, function(a, b) return a.d < b.d end)
+    return out
+end
+
+-- -------------------------------------------------------------------------------------------------------- stage
 
 local function recordFor(org, tier)
     local band = (Season.TIERS[tier] or {}).band or {}
@@ -151,27 +135,50 @@ end
 local DRIVER_RECORDS = { m = { "Character.WorkerMale", "Character.YoungsterMale", "Character.AsianMale" },
     f = { "Character.YoungsterFemale", "Character.AsianFemale" } }
 
-local function stage(lr, race, t)
-    local okP, positions = pcall(Open77.players.positions)
-    local me = okP and type(positions) == "table" and positions[lr.pid] or nil
-    if not me then return cancel(lr, "you were not in the city") end
-    local route = lr.route
-    local dStart = L.dist(me, route.start)
-    if dStart > PaddockSettings.get("liveStartRadiusM", 300) then
-        return cancel(lr, ("you were %.0f m from the start"):format(dStart))
+local function removeCars(lr)
+    for _, c in ipairs(lr.cars or {}) do
+        if c.vehicleId then
+            byVehicle[c.vehicleId] = nil
+            pcall(Open77.vehicles.ai.removeDriver, c.vehicleId)
+            pcall(Open77.vehicles.remove, c.vehicleId)
+        end
+        if c.npcId then pcall(Open77.npcs.remove, c.npcId) end
     end
+end
+
+local function cancel(lr, reason)
+    lr.state, lr.reason = "cancelled", reason
+    setRow(lr, { state = "cancelled", reason = reason, ended_at = U.now() })
+    removeCars(lr)
+    for _, w in ipairs(lr.watchers or {}) do TriggerClientEvent("ncm:paddock.live.end", w, { raceId = lr.raceId }) end
+    log("cancelled %s: %s", lr.raceId, tostring(reason))
+end
+
+local function stage(race, host, t)
     local w = PaddockStore.world
+    local route = PaddockWorld.route(race.routeId)
+    local path = PaddockLive.pathFor(race.routeId)
+    if not route or not path then return end
+    PaddockRaces.freeze(race)
     local field = PaddockRaces.buildField(race)
+    if #field < 2 then return end
+    if #field > set("liveMaxCars", 16) then log("%s not live: %d cars is over liveMaxCars", race.raceId, #field) return end
+    local d = host and PaddockPlayers.driver(host.pid)
+    local lr = { raceId = race.raceId, state = "staging", pid = host and host.pid, route = route, cars = {}, bucket = host and host.pos.bucket or 0,
+        watchers = {} }
+    byRace[race.raceId] = lr
+    pcall(MySQL.update.await, [[INSERT INTO paddock_live (server_id, race_id, declared_by, declared_at, state, cars)
+        VALUES (?, ?, ?, ?, 'staging', ?) ON DUPLICATE KEY UPDATE state = 'staging', declared_at = VALUES(declared_at)]],
+        { U.sid(), race.raceId, d and d.ncmDriverId or NO_DRIVER, t, #field })
     local segments = Sim.segments(route.distanceM, route.laps)
-    local path = L.path(route, bestGhost(race.routeId))
     local gates = L.checkpoints(route, path, segments)
     local slots = L.gridSlots(gates[1], #field)
-    local want = PaddockSettings.get("liveBackend", "auto")
-    local pace = PaddockLive.paceClients[lr.pid]
+    local want = set("liveBackend", "auto")
+    local pace = host and PaddockLive.paceClients[host.pid]
     local backend = (want == "pace" or (want == "auto" and pace and pace.ok)) and "pace" or "platform"
-    if want == "pace" and not (pace and pace.ok) then return cancel(lr, "the Pace plugin is not running on your game") end
-    lr.backend, lr.path, lr.gates, lr.segments, lr.field, lr.cars, lr.bucket = backend, path, gates, segments, field, {}, me.bucket or 0
-    local npcDrivers = backend == "platform" and PaddockSettings.get("liveNpcDrivers", true)
+    if want == "pace" and not (pace and pace.ok) then return cancel(lr, "liveBackend is pace but the nearest player has no Pace plugin") end
+    lr.backend, lr.path, lr.gates, lr.segments, lr.field = backend, path, gates, segments, field
+    local npcDrivers = backend == "platform" and set("liveNpcDrivers", true)
     for i, e in ipairs(field) do
         local s = slots[i]
         local org = w.orgs[e.orgId or ""]
@@ -181,7 +188,7 @@ local function stage(lr, race, t)
             log("stage %s: car %d (%s) refused: %s", race.raceId, i, e.id, tostring(reason or vid))
             return cancel(lr, "the grid could not be built")
         end
-        local car = { personId = e.id, orgId = e.orgId, vehicleId = vid, slot = i }
+        local car = { personId = e.id, orgId = e.orgId, vehicleId = vid, slot = i, row = s.row, recoveries = 0, resets = 0 }
         lr.cars[#lr.cars + 1] = car
         byVehicle[vid] = { raceId = race.raceId, personId = e.id }
         if backend == "platform" then
@@ -204,30 +211,31 @@ local function stage(lr, race, t)
                 log("stage %s: attachDriver %d refused: %s", race.raceId, vid, tostring(why or st))
                 return cancel(lr, "the AI would not take the wheel")
             end
-        else
-            -- The Pace DLL drives on the declarer's client, so that client must simulate every car.
-            local okR, st, why = pcall(Open77.vehicles.requestAuthority, vid, lr.pid)
-            if not okR or not st then log("stage %s: requestAuthority %d -> %d: %s", race.raceId, vid, lr.pid, tostring(why or st)) end
+        elseif host then
+            local okR, st, why = pcall(Open77.vehicles.requestAuthority, vid, host.pid)
+            if not okR or not st then log("stage %s: requestAuthority %d -> %d: %s", race.raceId, vid, host.pid, tostring(why or st)) end
         end
         Wait(0)
     end
-    lr.state = "staging"
     setRow(lr, { state = "staging", backend = backend, path_source = path.source })
     local names = {}
     for i, c in ipairs(lr.cars) do
-        names[i] = { vehicleId = c.vehicleId, personId = c.personId, name = PaddockWorld.personName(c.personId),
-            org = PaddockWorld.orgName(c.orgId), slot = c.slot }
+        names[i] = { vehicleId = c.vehicleId, personId = c.personId, name = PaddockWorld.personName(c.personId), org = PaddockWorld.orgName(c.orgId), slot = c.slot }
     end
-    TriggerClientEvent("ncm:paddock.live.stage", lr.pid, { raceId = race.raceId, backend = backend, cars = names,
-        opensAt = race.opensAt, series = PaddockWorld.seriesName(race.seriesId), route = PaddockWorld.routeName(race.routeId) })
-    notify(lr.pid, ("%s on %s: the grid is out. %s. Lights at %s ET."):format(PaddockWorld.seriesName(race.seriesId),
-        PaddockWorld.routeName(race.routeId), backend == "pace" and "Pace plugin driving" or "Platform AI driving",
-        NcmCore.get("world.clock").hhmm(race.opensAt)), 9000)
-    log("staged %s: %d cars, backend=%s, path=%s (%d pts, %.0f m), %d gates", race.raceId, #lr.cars, backend,
-        path.source, #path.points, path.lengthM or 0, #gates)
+    local msg = ("%s on %s: the grid is out at %s. Lights at %s ET."):format(PaddockWorld.seriesName(race.seriesId),
+        PaddockWorld.routeName(race.routeId), route.start.name or "the start", Clock.hhmm(race.opensAt))
+    for _, wch in ipairs(watchers(race.routeId)) do
+        lr.watchers[#lr.watchers + 1] = wch.pid
+        notify(wch.pid, msg, 9000)
+        TriggerClientEvent("ncm:paddock.live.stage", wch.pid, { raceId = race.raceId, backend = backend, cars = names, opensAt = race.opensAt,
+            series = PaddockWorld.seriesName(race.seriesId), route = PaddockWorld.routeName(race.routeId),
+            start = { x = route.start.x, y = route.start.y, z = route.start.z } })
+    end
+    log("staged %s: %d cars, backend=%s, path=%s (%d pts, %.0f m), %d gates, %d watcher(s)", race.raceId, #lr.cars, backend,
+        path.source, #path.points, path.lengthM or 0, #gates, #lr.watchers)
 end
 
--- ----------------------------------------------------------------------------------------------------------- go
+-- ----------------------------------------------------------------------------------------------------- driving
 
 local function splitsOf(race, personId)
     local r = race.result
@@ -236,25 +244,47 @@ local function splitsOf(race, personId)
     return nil
 end
 
+--- Send a car along the line from path point `from` (>= 2) on the platform backend. The route's point k is path point
+--- (from - 1 + k); `c.base` remembers the offset so per-leg ceilings stay aligned after a re-issue.
+local function drive(lr, c, from)
+    local pts = lr.path.points
+    from = math.max(2, math.min(#pts, from or 2))
+    local route = {}
+    for i = from, #pts do route[#route + 1] = pts[i] end
+    -- carry on past the finish so the line is crossed, not parked on
+    local a, b = pts[#pts - 1], pts[#pts]
+    local len = math.max(1, L.dist(a, b))
+    route[#route + 1] = { x = b.x + (b.x - a.x) / len * 80, y = b.y + (b.y - a.y) / len * 80, z = b.z or 0 }
+    while #route > 64 do table.remove(route, 1) end
+    c.base = #pts + 1 - #route
+    local okF, st, why = pcall(Open77.vehicles.ai.followRoute, c.vehicleId, { points = route,
+        speed = c.plan[math.max(1, c.base)] or c.plan[#c.plan] or 20, behavior = "aggressive", arrivalRadius = 12,
+        timeoutMilliseconds = math.min(3600000, lr.deadlineMs + 120000) })
+    if not okF or not st then log("%s: followRoute for %s refused: %s", lr.raceId, c.personId, tostring(why or st)) return false end
+    return true
+end
+
 local function go(lr, race)
-    local points = {}
-    for i = 2, #lr.path.points do points[#points + 1] = lr.path.points[i] end   -- the grid is point 1
-    local cap = lr.backend == "pace" and PaddockSettings.get("livePaceMaxMps", 90) or L.PLATFORM_MAX_MPS
-    local leaderMs
+    local cap = lr.backend == "pace" and set("livePaceMaxMps", 90) or L.PLATFORM_MAX_MPS
     for _, c in ipairs(lr.cars) do
         c.plan = L.speedPlan(lr.path.points, lr.path.lengthM, splitsOf(race, c.personId), lr.segments, cap)
     end
-    if race.result and race.result.entrants and race.result.entrants[1] then leaderMs = race.result.entrants[1].finishMs end
+    local leaderMs = race.result and race.result.entrants and race.result.entrants[1] and race.result.entrants[1].finishMs
     leaderMs = leaderMs or math.floor((lr.path.lengthM or 3000) / 30 * 1000)
-    lr.goMs = nowMs() + PaddockSettings.get("liveCountdownSec", 5) * 1000
-    lr.deadlineMs = math.floor(leaderMs * PaddockSettings.get("liveTimeoutFactor", 2.5)) + 30000
-    lr.timing = L.newTiming(lr.gates, (function() local ids = {} for i, c in ipairs(lr.cars) do ids[i] = c.personId end return ids end)())
+    lr.simLeaderMs = leaderMs
+    lr.goMs = nowMs() + set("liveCountdownSec", 5) * 1000
+    lr.deadlineMs = math.floor(leaderMs * set("liveTimeoutFactor", 4)) + 120000
+    local ids = {}
+    for i, c in ipairs(lr.cars) do ids[i] = c.personId end
+    lr.timing = L.newTiming(lr.gates, ids)
     lr.out, lr.client = {}, {}
     lr.state = "running"
     setRow(lr, { state = "running", go_at = lr.goMs / 1000 })
-    TriggerClientEvent("ncm:paddock.live.countdown", lr.pid, { raceId = lr.raceId, goInMs = lr.goMs - nowMs() })
-    notify(lr.pid, ("Lights out in %d seconds."):format(PaddockSettings.get("liveCountdownSec", 5)), 4000)
-    if lr.backend == "pace" then
+    for _, pid in ipairs(lr.watchers) do
+        notify(pid, ("Lights out in %d seconds."):format(set("liveCountdownSec", 5)), 4000)
+        TriggerClientEvent("ncm:paddock.live.countdown", pid, { raceId = lr.raceId, goInMs = lr.goMs - nowMs() })
+    end
+    if lr.backend == "pace" and lr.pid then
         local cars = {}
         for i, c in ipairs(lr.cars) do cars[i] = { vehicleId = c.vehicleId, personId = c.personId, speeds = c.plan } end
         local gates = {}
@@ -266,20 +296,53 @@ local function go(lr, race)
     CreateThread(function()
         while nowMs() < lr.goMs do Wait(50) end
         if lr.backend == "platform" then
-            for _, c in ipairs(lr.cars) do
-                local okF, st, why = pcall(Open77.vehicles.ai.followRoute, c.vehicleId, { points = points, speed = c.plan[1] or 20,
-                    behavior = "aggressive", arrivalRadius = 12, timeoutMilliseconds = math.min(3600000, lr.deadlineMs + 60000) })
-                if not okF or not st then
-                    log("go %s: followRoute %d refused: %s", lr.raceId, c.vehicleId, tostring(why or st))
-                    lr.out[c.personId] = "no_start"
+            -- rolling start: one grid row at a time, so the field strings out instead of arriving at turn one together
+            local gap = set("liveStartGapMs", 900)
+            local row = 1
+            while lr.state == "running" do
+                local any = false
+                for _, c in ipairs(lr.cars) do
+                    if c.row == row then any = true; if not drive(lr, c, 2) then lr.out[c.personId] = "no_start" end end
                 end
+                if not any then break end
+                row = row + 1
+                Wait(gap)
             end
         end
-        PaddockLive.sample(lr, race)
     end)
+    CreateThread(function() PaddockLive.sample(lr, race) end)
 end
 
--- ----------------------------------------------------------------------------------------------------- run/finish
+-- ----------------------------------------------------------------------------------------------------- recovery
+
+--- Keep a stuck car racing. Returns nothing; may retire the car only after liveRetireSec with no progress.
+local function persevere(lr, c, pos, tMs)
+    local tc = lr.timing.cars[c.personId]
+    local idle = tMs - (tc.progressMs or 0)
+    if idle > set("liveRetireSec", 180) * 1000 then
+        lr.out[c.personId] = "stalled"
+        log("%s: %s retired after %d s without progress (%d re-sends, %d resets)", lr.raceId, c.personId, math.floor(idle / 1000), c.recoveries, c.resets)
+        return
+    end
+    if lr.backend ~= "platform" then return end            -- the Pace plugin keeps its own cars moving
+    -- two clocks: a re-send every liveRecoverSec while stuck, and a reset every liveResetSec -- a re-send must never
+    -- postpone the reset, or a car that cannot drive out is re-sent forever and never put back on the road
+    local resetSec = set("liveResetSec", 20) * 1000
+    if idle > resetSec and tMs - (c.lastResetMs or -1e9) > resetSec then
+        local rp = L.resetPoint(lr.path.points, pos)
+        local okT = pcall(Open77.vehicles.setTransform, c.vehicleId, { position = { x = rp.x, y = rp.y, z = (rp.z or 0) + 1.0 }, yaw = rp.yaw })
+        L.forget(lr.timing, c.personId, tMs)
+        c.resets, c.lastResetMs, c.lastHelpMs = c.resets + 1, tMs, tMs
+        if okT then drive(lr, c, rp.index + 1) end
+        log("%s: %s put back on the road at point %d (reset %d)", lr.raceId, c.personId, rp.index, c.resets)
+    elseif idle > set("liveRecoverSec", 8) * 1000 and tMs - (c.lastHelpMs or -1e9) > set("liveRecoverSec", 8) * 1000 then
+        local i = L.nearestIndex(lr.path.points, pos)
+        c.recoveries, c.lastHelpMs = c.recoveries + 1, tMs
+        drive(lr, c, i + 1)
+    end
+end
+
+-- ----------------------------------------------------------------------------------------------------- finish
 
 local function writeBack(lr, race, c)
     local purse = Finance.purse(race.tier, #c.entrants)
@@ -331,7 +394,7 @@ local function finish(lr, race)
     for i, c in ipairs(lr.cars) do fieldIds[i] = { id = c.personId, orgId = c.orgId } end
     local clientOk
     if lr.backend == "pace" then clientOk = L.corroborate(lr.timing, lr.client) end
-    local c = L.classify(lr.timing, fieldIds, lr.out, { clientOk = clientOk })
+    local c = L.classify(lr.timing, fieldIds, lr.out, { clientOk = clientOk, minFinishShare = set("liveMinFinishShare", 0.5) })
     lr.verdict, lr.reason = c.verdict, c.reason
     if c.verdict == "physical" then
         local ok, err = writeBack(lr, race, c)
@@ -339,53 +402,57 @@ local function finish(lr, race)
     end
     storeCrossings(lr)
     lr.state = "finished"
+    local help = {}
+    for _, car in ipairs(lr.cars) do help[car.personId] = { resends = car.recoveries, resets = car.resets } end
     setRow(lr, { state = "finished", verdict = lr.verdict, reason = lr.reason or "", ended_at = U.now(),
-        detail_json = U.encode({ finishers = c.finishers, out = lr.out }) or "{}" })
+        detail_json = U.encode({ finishers = c.finishers, out = lr.out, help = help }) or "{}" })
     local winner = c.entrants[1] and c.entrants[1].state == "finished" and PaddockWorld.personName(c.entrants[1].id) or nil
-    notify(lr.pid, lr.verdict == "physical"
-        and ("Live result stands: %s wins on the street. %d of %d finished."):format(tostring(winner), c.finishers, #lr.cars)
-        or ("The street run didn't count (%s). The sim result stands."):format(tostring(lr.reason)), 9000)
-    TriggerClientEvent("ncm:paddock.live.end", lr.pid, { raceId = lr.raceId, verdict = lr.verdict })
+    for _, pid in ipairs(lr.watchers) do
+        notify(pid, lr.verdict == "physical"
+            and ("Street result stands: %s wins. %d of %d finished."):format(tostring(winner), c.finishers, #lr.cars)
+            or ("The street run didn't count (%s). The sim result stands."):format(tostring(lr.reason)), 9000)
+        TriggerClientEvent("ncm:paddock.live.end", pid, { raceId = lr.raceId, verdict = lr.verdict })
+    end
     log("finished %s: verdict=%s reason=%s finishers=%d/%d", lr.raceId, lr.verdict, tostring(lr.reason), c.finishers, #lr.cars)
-    -- the cars linger a moment where they stopped, then go
     CreateThread(function()
-        Wait(20000)
-        for _, car in ipairs(lr.cars) do
-            byVehicle[car.vehicleId] = nil
-            pcall(Open77.vehicles.ai.removeDriver, car.vehicleId)
-            pcall(Open77.vehicles.remove, car.vehicleId)
-            if car.npcId then pcall(Open77.npcs.remove, car.npcId) end
-        end
+        Wait(30000)
+        removeCars(lr)
     end)
 end
 
---- The server's own timing loop. Every car's canonical position every `liveSampleMs`, until every car is done or
---- out, or the deadline passes.
+--- The server's own timing loop: every car's canonical position every `liveSampleMs`, keeping the field racing,
+--- until every car is home or out, the finish window closes, or the hard deadline passes.
 function PaddockLive.sample(lr, race)
-    local stallSec = PaddockSettings.get("liveStallSec", 30)
     while lr.state == "running" do
         local tMs = nowMs() - lr.goMs
-        for _, c in ipairs(lr.cars) do
-            if not lr.out[c.personId] and not lr.timing.cars[c.personId].done then
-                local okP, pos = pcall(Open77.vehicles.getPosition, c.vehicleId)
-                if not okP or type(pos) ~= "table" then
-                    lr.out[c.personId] = "lost"
-                else
-                    L.observe(lr.timing, c.personId, pos, tMs)
-                    local okH, health = pcall(Open77.vehicles.getHealth, c.vehicleId)
-                    if okH and type(health) == "number" and health <= 0 then lr.out[c.personId] = "wrecked"
-                    elseif tMs > 15000 and L.stalled(lr.timing, c.personId, tMs, stallSec) then lr.out[c.personId] = "stalled" end
+        if tMs >= 0 then
+            for _, c in ipairs(lr.cars) do
+                if not lr.out[c.personId] and not lr.timing.cars[c.personId].done then
+                    local okP, pos = pcall(Open77.vehicles.getPosition, c.vehicleId)
+                    if not okP or type(pos) ~= "table" then
+                        lr.out[c.personId] = "lost"
+                    else
+                        L.observe(lr.timing, c.personId, pos, tMs)
+                        persevere(lr, c, pos, tMs)
+                    end
                 end
             end
         end
-        if L.allDone(lr.timing, lr.out) or tMs > lr.deadlineMs then
+        local leader = L.leaderMs(lr.timing)
+        if leader and not lr.closeMs then
+            lr.closeMs = leader + math.max(set("liveFinishGraceSec", 90) * 1000, math.floor(leader * 0.5))
+            log("%s: the winner is home at %.1f s; the rest have until %.0f s", lr.raceId, leader / 1000, lr.closeMs / 1000)
+        end
+        if L.allDone(lr.timing, lr.out) or tMs > lr.deadlineMs or (lr.closeMs and tMs > lr.closeMs) then
             for _, c in ipairs(lr.cars) do
-                if not lr.timing.cars[c.personId].done and not lr.out[c.personId] then lr.out[c.personId] = "timeout" end
+                if not lr.timing.cars[c.personId].done and not lr.out[c.personId] then
+                    lr.out[c.personId] = lr.closeMs and "not_classified" or "timeout"
+                end
             end
             finish(lr, race)
             return
         end
-        Wait(PaddockSettings.get("liveSampleMs", 250))
+        Wait(set("liveSampleMs", 250))
     end
 end
 
@@ -399,39 +466,86 @@ if Open77.vehicles and Open77.vehicles.ai and Open77.vehicles.ai.on then
         if not lr or lr.state ~= "running" then return end
         for _, c in ipairs(lr.cars) do
             if c.vehicleId == vid then
-                -- followRoute's points are path points 2..N, so route point k ends plan leg k. The card does not say
-                -- whether `routeIndex` counts from 0 or 1; either way this picks the leg after the one just ended,
-                -- or the one after that, and a ceiling one leg early is harmless.
-                local idx = (tonumber(state.routeIndex) or 0) + 1
-                local v = c.plan and (c.plan[idx + 1] or c.plan[#c.plan])
+                -- the route's point k is path point (base - 1 + k); the card does not say whether routeIndex counts from 0
+                -- or 1, so this picks the leg after the one just ended or the one after that -- one leg early is harmless
+                local leg = (c.base or 2) + (tonumber(state.routeIndex) or 0)
+                local v = c.plan and (c.plan[leg] or c.plan[#c.plan])
                 if v then pcall(Open77.vehicles.ai.setSpeed, vid, v) end
                 return
             end
         end
     end)
+    -- a failed or cancelled task is re-sent at once from where the car is; waiting would only lose it places
+    for _, ev in ipairs({ "failed", "cancelled" }) do
+        pcall(Open77.vehicles.ai.on, ev, function(state)
+            local vid = tonumber(state and state.vehicleId)
+            local ref = vid and byVehicle[vid]
+            local lr = ref and byRace[ref.raceId]
+            if not lr or lr.state ~= "running" or lr.out[ref.personId] then return end
+            for _, c in ipairs(lr.cars) do
+                if c.vehicleId == vid and not lr.timing.cars[c.personId].done then
+                    local okP, pos = pcall(Open77.vehicles.getPosition, vid)
+                    if okP and type(pos) == "table" then c.recoveries = c.recoveries + 1; drive(lr, c, L.nearestIndex(lr.path.points, pos) + 1) end
+                    return
+                end
+            end
+        end)
+    end
 end
 
 -- --------------------------------------------------------------------------------------------------------- tick
 
---- One pass from the main scheduler: stage what is due, start what is staged. Bounded: at most one of each.
+local function running()
+    local n = 0
+    for _, lr in pairs(byRace) do if PaddockLive.holds(lr.raceId) then n = n + 1 end end
+    return n
+end
+
+--- One pass from the main scheduler: stage the next race that is due, start what is staged. Bounded.
 function PaddockLive.tick(t)
+    local mode = set("liveMode", "watched")
     for _, lr in pairs(byRace) do
         local race = PaddockRaces.byId[lr.raceId]
         if not race or race.state == "void" then
             if PaddockLive.holds(lr.raceId) then cancel(lr, "the race was voided") end
-        elseif lr.state == "declared" and t >= race.opensAt - PaddockSettings.get("liveStageLeadSec", 75) then
-            local ok, err = pcall(stage, lr, race, t)
-            if not ok then log("stage %s FAILED: %s", lr.raceId, tostring(err)); if lr.state ~= "cancelled" then cancel(lr, "staging failed") end end
-            return
         elseif lr.state == "staging" and t >= race.opensAt and race.state == "running" then
             local ok, err = pcall(go, lr, race)
             if not ok then log("go %s FAILED: %s", lr.raceId, tostring(err)); cancel(lr, "the start failed") end
             return
         end
     end
-    -- forget finished records after a while
+    if mode ~= "off" and running() < set("liveMaxConcurrent", 2) then
+        local lead = set("liveStageLeadSec", 75)
+        local due
+        for _, race in pairs(PaddockRaces.byId) do
+            if not byRace[race.raceId] and (race.state == "scheduled" or race.state == "priced")
+                and t >= race.opensAt - lead and t < race.opensAt and (not due or race.opensAt < due.opensAt) then due = race end
+        end
+        if due then
+            byRace[due.raceId] = { raceId = due.raceId, state = "considered" }
+            local host
+            if mode == "always" then
+                local list = watchers(due.routeId)
+                host = list[1]
+                if not host then
+                    for pid, pos in pairs(positions()) do host = { pid = tonumber(pid), pos = pos, d = math.huge } break end
+                end
+                if not host then byRace[due.raceId] = { raceId = due.raceId, state = "skipped", reason = "nobody online" } return end
+            else
+                host = watchers(due.routeId)[1]
+                if not host then byRace[due.raceId] = { raceId = due.raceId, state = "skipped", reason = "nobody near the route" } return end
+            end
+            local ok, err = pcall(stage, due, host, t)
+            if not ok then
+                log("stage %s FAILED: %s", due.raceId, tostring(err))
+                local lr = byRace[due.raceId]
+                if lr and lr.state ~= "cancelled" and lr.cars then cancel(lr, "staging failed") end
+            end
+        end
+    end
     for id, lr in pairs(byRace) do
-        if (lr.state == "finished" or lr.state == "cancelled") and (lr.declaredAt or 0) < t - 6 * 3600 then byRace[id] = nil end
+        local race = PaddockRaces.byId[id]
+        if (lr.state ~= "staging" and lr.state ~= "running") and (not race or race.opensAt < t - 6 * 3600) then byRace[id] = nil end
     end
 end
 
@@ -441,27 +555,60 @@ function PaddockLive.boot()
         WHERE server_id = ? AND state IN ('declared','staging','running')]], { U.now(), U.sid() })
 end
 
--- --------------------------------------------------------------------------------------------------------- events
+-- ------------------------------------------------------------------------------------------------------- probe
 
-RegisterNetEvent("ncm:paddock.live", function(req)
-    local pid = tonumber(source) or 0
-    if pid <= 0 or type(req) ~= "table" or not PaddockWorld.ready then return end
-    CreateThread(function()
-        local ok, res = PaddockLive.declare(pid, tostring(req.raceId or ""))
-        local REASONS = { disabled = "Live races are switched off.", not_open = "That race is not open.", already_live = "It's already going live.",
-            too_late = "Too close to the lights. Declare a live run at least a few minutes out.", too_early = "Too far out. Come back nearer the time.",
-            one_at_a_time = "One live race at a time.", no_driver = "No Driver on file.", no_field = "No field.", field_too_big = "That grid is too big to run live.",
-            no_route = "No route.", database = "The ledger refused it." }
-        if ok then
-            TriggerClientEvent("ncm:paddock.result", pid, { op = "live", ok = true,
-                text = ("Declared. Be at %s before %s ET; the grid spawns there."):format(tostring(res.name), NcmCore.get("world.clock").hhmm(res.opensAt)) })
-            TriggerClientEvent("ncm:paddock.live.declared", pid, { raceId = req.raceId, start = res.start, name = res.name })
-        else
-            TriggerClientEvent("ncm:paddock.result", pid, { op = "live", ok = false, text = REASONS[res] or tostring(res) })
+--- Does platform AI drive a car that no player is near (build .102)? One car, far from everyone, a 30 s drive.
+--- The answer goes to the console and to `paddock_live` as race_id `probe-<t>` (reason = the verdict line), so it
+--- can be read back without the console. Decides whether `liveMode = always` is safe.
+function PaddockLive.runProbe()
+    local t = U.now()
+    local players = positions()
+    local best, bestD
+    for _, rootId in pairs(Season.ROUTES) do
+        local r = PaddockWorld.route(rootId)
+        if r then
+            local nearest = math.huge
+            for _, pos in pairs(players) do nearest = math.min(nearest, L.dist(r.start, pos)) end
+            if not bestD or nearest > bestD then best, bestD = r, nearest end
         end
-        PaddockViews.send(pid, { view = "results" })
-    end)
-end)
+    end
+    if not best then return false, "no route" end
+    local id = "probe-" .. t
+    local okV, vid = pcall(Open77.vehicles.create, { record = "Vehicle.v_sport2_quadra_type66", position = { x = best.start.x, y = best.start.y, z = (best.start.z or 0) + 0.6 }, yaw = 0, bucket = 0 })
+    if not okV or not vid then return false, "vehicle refused: " .. tostring(vid) end
+    local okN, npc = pcall(Open77.npcs.create, { record = "Character.WorkerMale", position = { x = best.start.x, y = best.start.y, z = (best.start.z or 0) + 0.6 },
+        yaw = 0, bucket = 0, aiMode = Open77.npcs.ai and Open77.npcs.ai.tasks or nil, despawnWhenUnobserved = false, persistent = false })
+    local okA, st, why = pcall(Open77.vehicles.ai.attachDriver, vid, (okN and npc) and { npcId = npc } or nil)
+    if not okA or not st then pcall(Open77.vehicles.remove, vid); if okN and npc then pcall(Open77.npcs.remove, npc) end return false, "attachDriver refused: " .. tostring(why or st) end
+    local okF = pcall(Open77.vehicles.ai.followRoute, vid, { points = { { x = best.finish.x, y = best.finish.y, z = best.finish.z or 0 } }, speed = 20, behavior = "aggressive" })
+    local p0 = select(2, pcall(Open77.vehicles.getPosition, vid))
+    local statuses, moved, samples = {}, 0, {}
+    for i = 1, 30 do
+        Wait(1000)
+        local okP, p = pcall(Open77.vehicles.getPosition, vid)
+        local okS, s = pcall(Open77.vehicles.ai.state, vid)
+        local status = okS and type(s) == "table" and (tostring(s.status) .. (s.reason and ("/" .. tostring(s.reason)) or "")) or "?"
+        statuses[status] = (statuses[status] or 0) + 1
+        if okP and type(p) == "table" and type(p0) == "table" then moved = L.dist(p0, p) end
+        if i % 5 == 0 then samples[#samples + 1] = ("%ds %.0fm %s"):format(i, moved, status) end
+    end
+    local okO, owner = pcall(Open77.vehicles.owner, vid)
+    pcall(Open77.vehicles.ai.removeDriver, vid); pcall(Open77.vehicles.remove, vid)
+    if okN and npc then pcall(Open77.npcs.remove, npc) end
+    local st2 = {}
+    for k, v in pairs(statuses) do st2[#st2 + 1] = k .. "x" .. v end
+    local verdict = moved > 50 and "MOVES with nobody near" or "DOES NOT MOVE with nobody near"
+    local line = ("probe: platform AI %s -- %.0f m in 30 s at %s, %.0f m from the nearest player; followRoute=%s; statuses %s; owner %s")
+        :format(verdict, moved, best.name or "?", bestD or -1, tostring(okF), table.concat(st2, " "), U.encode(okO and owner or nil) or "nil")
+    log("%s", line)
+    log("probe samples: %s", table.concat(samples, " | "))
+    pcall(MySQL.update.await, [[INSERT INTO paddock_live (server_id, race_id, declared_by, declared_at, state, cars, reason, detail_json, ended_at)
+        VALUES (?, ?, ?, ?, 'finished', 1, ?, ?, ?)]], { U.sid(), id, NO_DRIVER, t, line:sub(1, 160), U.encode({ line = line, samples = samples }) or "{}", U.now() })
+    PaddockLive.probe = { moved = moved, line = line, at = t }
+    return true, line
+end
+
+-- --------------------------------------------------------------------------------------------------------- events
 
 -- The client says whether the Pace plugin answered on loopback (client/live.lua).
 RegisterNetEvent("ncm:paddock.live.pace", function(info)
@@ -470,8 +617,8 @@ RegisterNetEvent("ncm:paddock.live.pace", function(info)
     PaddockLive.paceClients[pid] = { ok = info.ok == true, version = tostring(info.version or "") }
 end)
 
--- Gate reports from the Pace DLL, relayed by the declarer's client. Evidence, not authority: they count only when
--- the server's own times agree (paddock.live.corroborate).
+-- Gate reports from the Pace DLL, relayed by the host's client. Evidence, not authority: they count only when the
+-- server's own times agree (paddock.live.corroborate).
 RegisterNetEvent("ncm:paddock.live.gate", function(msg)
     local pid = tonumber(source) or 0
     if type(msg) ~= "table" then return end
@@ -486,19 +633,10 @@ RegisterNetEvent("ncm:paddock.live.gate", function(msg)
 end)
 
 AddEventHandler("onPlayerDisconnected", function(playerId)
-    local pid = tonumber(playerId) or 0
-    PaddockLive.paceClients[pid] = nil
-    for _, lr in pairs(byRace) do
-        if lr.pid == pid and (lr.state == "declared" or lr.state == "staging") then cancel(lr, "the declarer left") end
-    end
+    PaddockLive.paceClients[tonumber(playerId) or 0] = nil
 end)
 
 AddEventHandler("onResourceStop", function(name)
     if name ~= "ncm_paddock" then return end
-    for _, lr in pairs(byRace) do
-        for _, c in ipairs(lr.cars or {}) do
-            pcall(Open77.vehicles.remove, c.vehicleId)
-            if c.npcId then pcall(Open77.npcs.remove, c.npcId) end
-        end
-    end
+    for _, lr in pairs(byRace) do removeCars(lr) end
 end)
