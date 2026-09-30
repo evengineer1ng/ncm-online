@@ -4460,3 +4460,15 @@ model exactly. First-pass values; live test `§HB6`. Tracked by `IDEA-718`.
 - Schema 052 adds `mixed` to `paddock_race.provenance`.
 
 **PROVISIONAL, awaiting the owner:** when any car of a race drove physically in a bubble, the result is the model's classification with every anchor applied. It is `physical` when every car drove at least 95% of its line physically, else `mixed`, and `detail_json.live.physicalPct` names each car's share. A whole street race (grid at the start) is unchanged: `physical` or `fallback`.
+
+## L231 - BUILT / WORLD - Night City on US Eastern real time (KB-217, IDEA-729)
+
+The owner saw bright sun at 21:30 Eastern. The server alone cannot fix it: OPEN//77's weather guide says the engine always runs at 8x and every clock correction is a world time-jump, so any other server rate means a jump about every 15 s. The owner pointed at Nexus mods for the native route, and two of them (Custom Timescale 7955, the 2:1 Gametime tweak 19244 after Game Time Tweaks 870) each ship one 8 kB archive that replaces `base\gameplay\game_time.curveset`.
+
+**Measured:** that resource holds one curve, `time_of_the_day_to_timescale`, a multiplier on the engine's 8x base by hour of day (about 1.0, dipping to about 0.72 at dawn and dusk to stretch them).
+
+**Built:**
+- **NCM Clock** (`tools/build-clock.ps1`, package `ncm-clock` 0.1.0): the curve flattened to 0.125, so the engine runs at exactly 8 x 0.125 = 1x. It is regenerated from the local game at every build (one named file extracted), so nothing of CDPR's is committed. Published to dev `requiredMods` and hand-installed on the owner's game (KB-215).
+- **The clock service** (`ncm_paddock/server/clock.lua`): rate 1.0 and Eastern time at boot; every 10 minutes it re-reads the clock and writes only past a 120 s drift. `clockMode = eastern | off`.
+
+**Caveat:** every client needs NCM Clock; one without it still runs 8x and is jumped back about every 15 s. Quests that set their own time still do.

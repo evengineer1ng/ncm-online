@@ -70,9 +70,15 @@ local ok, settings = pcall(Open77.tunables.declare, {
     liveNpcDrivers = { value = true, type = "boolean", apply = "live" },
     -- The physical bubble (L229): model cars within bubbleInM of a player become physical; beyond bubbleOutM of every
     -- player they hand back to the model. First numbers: a client picks AI up somewhere between 186 m and 573 m.
+    -- Night City on Eastern real time (clock.lua, KB-217). Needs NCM Clock on EVERY client (the engine at 1x); a client
+    -- without it runs 8x and is jumped back about every 15 s. `off` leaves the OPEN//77 default day alone.
+    clockMode = { value = "eastern", type = "string", apply = "live" },
+    clockSyncSeconds = { value = 600, type = "integer", min = 30, max = 3600, unit = "s", apply = "live" },
+    clockToleranceSec = { value = 120, type = "integer", min = 10, max = 3600, unit = "s", apply = "live" },
     bubbleEnabled = { value = true, type = "boolean", apply = "live" },
     bubbleInM = { value = 250, type = "integer", min = 50, max = 800, unit = "m", apply = "live" },
-    bubbleOutM = { value = 400, type = "integer", min = 80, max = 1200, unit = "m", apply = "live" },
+    -- 300 until the exact limit is measured: probe v2 found a driverless car accepted at 131 m and refused `too_far` at 573 m
+    bubbleOutM = { value = 300, type = "integer", min = 80, max = 1200, unit = "m", apply = "live" },
     bubbleSpawnsPerPass = { value = 3, type = "integer", min = 1, max = 16, apply = "live" },
     bubbleTickMs = { value = 500, type = "integer", min = 200, max = 5000, unit = "ms", apply = "live" },
 })

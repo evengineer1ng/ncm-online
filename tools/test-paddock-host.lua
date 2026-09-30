@@ -55,6 +55,7 @@ exports = { open77_remote_camera = {
     remove = function(_, id) CAMS[id] = nil; return true end,
     openView = function(_, pid, cam) return "view" .. cam end,
     closeView = function() return true end,
+    getView = function(_, id) return { id = id, state = "stub" } end,
 } }
 local function vdist(a, b) local dx, dy = a.x - b.x, a.y - b.y return math.sqrt(dx * dx + dy * dy) end
 local function advance(v)
@@ -78,6 +79,13 @@ Open77 = {
     tunables = { declare = function(spec) local p = {} for k, v in pairs(spec) do p[k] = v.value end return p end },
     notifications = { send = function(pid, n) NOTES[#NOTES + 1] = { pid = pid, title = n.title, message = n.message } return true end },
     players = { positions = function() return POS end },
+    environment = {
+        state = { rate = 8, secondsOfDay = 12 * 3600, frozen = false },
+        getState = function() return Open77.environment.state end,
+        setTimeRate = function(r) Open77.environment.state.rate = r return Open77.environment.state end,
+        setTimeFrozen = function(f) Open77.environment.state.frozen = f return Open77.environment.state end,
+        setTime = function(h, m, sec) Open77.environment.state.secondsOfDay = h * 3600 + m * 60 + sec; Open77.environment.setCalls = (Open77.environment.setCalls or 0) + 1 return Open77.environment.state end,
+    },
     world = { groundZ = function(p, o) return (o.fromZ or 1.5) - 1.5 end },
     npcs = {
         ai = { tasks = 1 }, damage = { invulnerable = 2 },
@@ -446,7 +454,7 @@ realPrint("paddock host harness")
 do
     local offenders = {}
     for _, f in ipairs({ "settings", "util", "store", "players", "stream", "wallet", "story", "world", "calibration", "races",
-        "billie", "life", "manager", "spotlight", "garages", "live", "probe", "bubble", "views", "requests", "admin", "main" }) do
+        "billie", "life", "manager", "spotlight", "garages", "live", "probe", "bubble", "clock", "views", "requests", "admin", "main" }) do
         local text = assert(io.open(RES .. "ncm_paddock/server/" .. f .. ".lua")):read("a")
         text = text:gsub("%-%-[^\n]*", "")   -- code only: comments may name the resource they mirror
         for g in text:gmatch("(Ncm%u%a+)%.") do
@@ -615,6 +623,24 @@ clock = clock + 1
 fire("ncm:paddock.request", 2, { view = "profile", kind = "org", id = "o002" })
 clock = clock + 1
 check(("every view handler fits the quota (max slice %d)"):format(maxSlice), maxSlice < 400000)
+
+-- ---------------------------------------------------------------- the clock: Night City on Eastern real time (KB-217)
+do
+    local env = Open77.environment
+    env.state.rate, env.state.secondsOfDay, env.setCalls = 8, 12 * 3600, 0
+    run(function() PaddockClock.sync(true) end)
+    local e = Clock.eastern(clock)
+    check("the clock runs at 1x (NCM Clock makes the engine agree)", env.state.rate == 1.0)
+    check("and shows Eastern time", math.abs(PaddockClock.circular(e.secondsOfDay, env.state.secondsOfDay)) <= 1)
+    local calls = env.setCalls
+    env.state.secondsOfDay = env.state.secondsOfDay + 60                        -- a minute of drift is left alone
+    run(function() PaddockClock.sync(false) end)
+    check("a small drift is not corrected (every write is a jump)", env.setCalls == calls)
+    env.state.secondsOfDay = env.state.secondsOfDay + 3600
+    run(function() PaddockClock.sync(false) end)
+    check("a real drift is corrected", env.setCalls == calls + 1)
+    check("the circle wraps at midnight", PaddockClock.circular(86000, 100) == 500 and PaddockClock.circular(100, 86000) == -500)
+end
 
 -- ---------------------------------------------------------------- phase 4: garages, bodies, talk
 local G = NcmCore.get("paddock.garages")

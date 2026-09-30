@@ -29,6 +29,9 @@ local Season = NcmCore.get("paddock.season")
 local NO_DRIVER = "00000000-0000-0000-0000-000000000000"
 -- v2 (2026-09-29): v1 found your client picks an AI car up somewhere between 186 m and 573 m, so the ladder narrows
 local BANDS = { { 100, 200 }, { 200, 300 }, { 300, 400 }, { 400, 500 }, { 500, 650 } }
+-- v2 (twice): a driverless car is ACCEPTED at 131 m and REFUSED `too_far` at 573 m; an AI car at 131 m was owned by the
+-- client but its driveTo failed; openView returned ok but nothing drew. v3 records why a drive fails and the view's own
+-- state, and samples road points densely (the ladder had only two points near North Tunnel).
 local LEG_SEC = 25
 
 -- Candidate road points: route nodes and the Paddock routes' lines.
@@ -37,7 +40,7 @@ local function candidates()
     for _, n in ipairs(Nodes.LIST) do if n.road ~= false then out[#out + 1] = { x = n.x, y = n.y, z = n.z or 0, name = n.name } end end
     for _, rootId in pairs(Season.ROUTES) do
         local path = PaddockLive.pathFor(rootId)
-        if path then for i = 1, #path.points, 2 do local p = path.points[i]; out[#out + 1] = { x = p.x, y = p.y, z = p.z or 0, name = "line of " .. PaddockWorld.routeName(rootId) } end end
+        if path then for i = 1, #path.points do local p = path.points[i]; out[#out + 1] = { x = p.x, y = p.y, z = p.z or 0, name = "line of " .. PaddockWorld.routeName(rootId) } end end
     end
     -- no garage sites: v1's 186 m car spawned on a garage pin, was picked up, and could not drive (a pin is not a road)
     return out
@@ -103,7 +106,7 @@ function PaddockProbe.run(pid)
             Wait(1000)
             for _, c in ipairs(cars) do
                 local okS, s = pcall(Open77.vehicles.ai.state, c.vid)
-                local status = okS and type(s) == "table" and tostring(s.status) or "?"
+                local status = okS and type(s) == "table" and (tostring(s.status) .. ((s.reason and s.reason ~= "" and s.reason ~= "none") and ("/" .. tostring(s.reason)) or "")) or "?"
                 statuses[c][status] = (statuses[c][status] or 0) + 1
                 if i % 5 == 0 then
                     local okP, p = pcall(Open77.vehicles.getPosition, c.vid)
@@ -159,9 +162,17 @@ function PaddockProbe.run(pid)
             c.viewWhy = okV and (viewId and "ok" or tostring(whyV)) or tostring(viewId)
         end
     end
+    Wait(4000)
     local views = {}
-    for _, c in ipairs(cars) do views[#views + 1] = ("%.0fm:%s"):format(c.d, tostring(c.viewWhy)) end
-    note("views", "openView " .. table.concat(views, " "))
+    for _, c in ipairs(cars) do
+        local vs = "-"
+        if cam and c.view then
+            local okG, v = pcall(function() return cam:getView(c.view) end)
+            vs = okG and U.encode(v) or tostring(v)
+        end
+        views[#views + 1] = ("%.0fm:%s %s"):format(c.d, tostring(c.viewWhy), tostring(vs):sub(1, 300))
+    end
+    note("views", "openView " .. table.concat(views, " || "))
     log("probe: leg D (a camera picture of each car on the player's HUD) for %d s", LEG_SEC)
     leg("D")
     for _, c in ipairs(cars) do if cam and c.view then pcall(function() return cam:closeView(c.view) end) end end
