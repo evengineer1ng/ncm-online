@@ -43,6 +43,15 @@ local function candidates()
     return out
 end
 
+--- A row the database keeps whatever happens, so a probe that dies still says where (v2's first run left nothing).
+local function note(tag, text)
+    local t = U.now()
+    pcall(MySQL.update.await, [[INSERT INTO paddock_live (server_id, race_id, declared_by, declared_at, state, cars, reason, detail_json, ended_at)
+        VALUES (?, ?, ?, ?, 'finished', 0, ?, ?, ?) ON DUPLICATE KEY UPDATE reason = VALUES(reason), detail_json = VALUES(detail_json)]],
+        { U.sid(), ("probe-%d-%s"):format(t, tag), NO_DRIVER, t, tostring(text):sub(1, 160), U.encode({ line = tostring(text) }) or "{}", t })
+end
+PaddockProbe.note = note
+
 local function camera()
     return exports and exports.open77_remote_camera or nil
 end
@@ -81,7 +90,8 @@ function PaddockProbe.run(pid)
             end
         end
     end
-    if #cars == 0 then return false, "no road point in any distance band" end
+    if #cars == 0 then return false, "no road point in any distance band (" .. #pool .. " candidates)" end
+    note("cars", ("%d car(s) spawned from %.0f m to %.0f m"):format(#cars, cars[1].d, cars[#cars].d))
     log("probe: %d car(s) from %.0f m to %.0f m away; leg A (unasked) for %d s", #cars, cars[1].d, cars[#cars].d, LEG_SEC)
 
     local function leg(tag)
@@ -149,6 +159,9 @@ function PaddockProbe.run(pid)
             c.viewWhy = okV and (viewId and "ok" or tostring(whyV)) or tostring(viewId)
         end
     end
+    local views = {}
+    for _, c in ipairs(cars) do views[#views + 1] = ("%.0fm:%s"):format(c.d, tostring(c.viewWhy)) end
+    note("views", "openView " .. table.concat(views, " "))
     log("probe: leg D (a camera picture of each car on the player's HUD) for %d s", LEG_SEC)
     leg("D")
     for _, c in ipairs(cars) do if cam and c.view then pcall(function() return cam:closeView(c.view) end) end end
@@ -193,10 +206,15 @@ function PaddockProbe.run(pid)
     return true, table.concat(summary, " || ")
 end
 
+
+
 RegisterCommand("ncm.paddock.probe", function(source, args)
     if (tonumber(source) or 0) ~= 0 then return end
     CreateThread(function()
-        local ok, res = PaddockProbe.run(tonumber(args and args[1]))
+        note("start", "probe started for player " .. tostring(args and args[1] or "first online"))
+        local called, ok, res = pcall(PaddockProbe.run, tonumber(args and args[1]))
+        if not called then ok, res = false, "ERROR " .. tostring(ok) end
+        if not ok then note("fail", res) end
         print("[ncm_paddock] probe " .. (ok and "done" or "FAILED") .. ": " .. tostring(res))
     end)
 end, false)
