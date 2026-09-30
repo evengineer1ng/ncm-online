@@ -24,10 +24,8 @@ Core.define("paddock.racestate", function(C)
         return math.sqrt(dx * dx + dy * dy)
     end
 
-    local function yawOf(dx, dy)
-        if math.atan2 then return (math.deg(math.atan2(-dx, dy)) + 360) % 360 end
-        return (math.deg(math.atan(-dx, dy)) + 360) % 360
-    end
+    -- spawn yaw along the line: NCM single player's rule (heading + 90), shared with paddock.live (L232)
+    local function yawOf(dx, dy) return C.get("paddock.live").yawFromDir(dx, dy) end
 
     --- Build the model. path = { points, lengthM } (paddock.live.path); entrants = the sim's entrant list (id, orgId,
     --- grid, state, splits, dnfSegment); segments = the sim's segment count.

@@ -152,7 +152,9 @@ function PaddockBubble.tick()
     for _, race in pairs(PaddockRaces.byId) do
         local lr = PaddockLive.byRace[race.raceId]
         local street = lr and (lr.state == "staging" or lr.state == "running" or lr.state == "finished")
-        if race.state == "running" and race.model and not street then
+        -- only on a real road line: without a recorded human line the model's "line" is a straight segment from start
+        -- to finish, and a car set down on it would stand in a building (L232)
+        if race.state == "running" and race.model and not street and race.model.path.source == "ghost" then
             local b = state(race.raceId)
             local tMs = now - race.modelGoAt * 1000
             -- physical cars: time them, keep them racing, hand back the ones nobody is near

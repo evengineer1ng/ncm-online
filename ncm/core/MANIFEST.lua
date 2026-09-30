@@ -106,6 +106,7 @@ return {
     "paddock/spotlight.lua",
     "competition/affiliation.lua",
     -- Paddock phases 4-5: rented garages, garage talk, physical-authoritative races.
+    "data/grid_profiles.lua",
     "paddock/garages_data.lua",
     "paddock/garages.lua",
     "paddock/talk.lua",

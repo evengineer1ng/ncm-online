@@ -173,7 +173,9 @@ local function stage(race, host, t)
         { U.sid(), race.raceId, d and d.ncmDriverId or NO_DRIVER, t, #field })
     local segments = Sim.segments(route.distanceM, route.laps)
     local gates = L.checkpoints(route, path, segments)
-    local slots = L.gridSlots(gates[1], #field)
+    -- the owner's own single-player grid: authored node heading, SP's road-axis correction, the route's tuning
+    -- (data.grid_profiles); tools/test-grid-oracle.lua holds it to SP's code (L232)
+    local slots = L.gridSlots(route.start, route.finish, #field, NcmCore.get("data.grid_profiles").forRoot(race.routeId))
     local want = set("liveBackend", "auto")
     local pace = host and PaddockLive.paceClients[host.pid]
     local backend = (want == "pace" or (want == "auto" and pace and pace.ok)) and "pace" or "platform"

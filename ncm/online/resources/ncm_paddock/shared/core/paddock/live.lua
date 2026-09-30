@@ -43,13 +43,19 @@ Core.define("paddock.live", function(C)
     end
     M.dist = dist
 
-    --- REDengine yaw for a travel direction: forward = (-sin yaw, cos yaw), so +Y is 0 and +X is -90 (270).
-    function M.yawFromDir(dx, dy)
-        return (math.deg(math.atan(-dx, dy)) + 360) % 360
+    local function atan2(y, x)
+        if math.atan2 then return math.atan2(y, x) end
+        return math.atan(y, x)
     end
-    -- Lua 5.1/LuaJIT math.atan takes one argument; 5.4 takes two. atan2 semantics either way.
-    if math.atan2 then
-        function M.yawFromDir(dx, dy) return (math.deg(math.atan2(-dx, dy)) + 360) % 360 end
+    local function norm(deg) return deg % 360 end
+
+    --- The spawn yaw for a travel direction, by NCM single player's own rule (ai_vehicles.lua resolveGridBasis and
+    --- resolveUnifiedSlotHeadingOffsetDeg): the heading is the math angle of the direction, and a car is placed at
+    --- heading + startSlotHeadingOffsetDeg (default -90; aiSlotHeadingOffsetDeg only when that is unset). The first
+    --- street grid turned 90 degrees because its DIRECTION was the straight line to the finish, not the road (L232).
+    M.SLOT_YAW_OFFSET = -90
+    function M.yawFromDir(dx, dy, slotOffset)
+        return norm(math.deg(atan2(dy, dx)) + (slotOffset or M.SLOT_YAW_OFFSET))
     end
 
     --- Resample a polyline to `n` points evenly spaced by distance (first and last kept). Points are { x, y, z }.
@@ -117,25 +123,68 @@ Core.define("paddock.live", function(C)
         return Gates.build(route, { intermediate = mids, halfWidthM = M.GATE_HALF_WIDTH_M, captureM = M.GATE_CAPTURE_M })
     end
 
-    -- A human grid (session.grid) packs rows 7 m apart; AI cars released from that pile into each other at the
-    -- first corner (live, 2026-09-29, twelve cars at North Tunnel). The live grid is wider and deeper.
-    M.GRID_FIRST_ROW_M = 12
-    M.GRID_ROW_M = 15
-    M.GRID_COLUMN_M = 3.4
+    -- ---------------------------------------------------------------------------------------------- the grid
+    -- NCM single player's formation, ported line for line (ai_vehicles.lua resolveGridForwardHeading, resolveGridBasis
+    -- and the standing-grid branch of the slot builder), with the owner's per-route tuning (data.grid_profiles).
+    -- tools/test-paddock-host and test_paddock_live compare it against SP's own source.
 
-    --- Grid slots behind the start gate, pole first (left column), with REDengine yaw.
-    function M.gridSlots(startGate, n)
-        local out = {}
-        local fx, fy = startGate.dir.x, startGate.dir.y
-        local lx, ly = -fy, fx
-        for i = 1, n do
-            local row = math.floor((i - 1) / 2)
-            local col = ((i - 1) % 2 == 0) and -1 or 1
-            local back = M.GRID_FIRST_ROW_M + row * M.GRID_ROW_M
-            out[i] = { x = startGate.x - fx * back + lx * col * M.GRID_COLUMN_M, y = startGate.y - fy * back + ly * col * M.GRID_COLUMN_M,
-                z = startGate.z or 0, yaw = M.yawFromDir(fx, fy), row = row + 1 }
+    --- SP resolveGridForwardHeading: the start node's authored heading turned onto the road axis (+/-90, whichever
+    --- side faces the finish), flipped if it still points away; else the start->finish vector. Math degrees.
+    function M.spForwardHeading(startNode, finishNode)
+        local raw = startNode and tonumber(startNode.heading) and norm(startNode.heading) or nil
+        local routeHeading
+        if startNode and finishNode then
+            local dx, dy = (finishNode.x or 0) - (startNode.x or 0), (finishNode.y or 0) - (startNode.y or 0)
+            if math.abs(dx) >= 0.01 or math.abs(dy) >= 0.01 then routeHeading = norm(math.deg(atan2(dy, dx))) end
         end
-        return out
+        local function unit(h) local r = math.rad(h or 0) return math.cos(r), math.sin(r) end
+        local road = raw
+        if raw then
+            local plus, minus = norm(raw + 90), norm(raw - 90)
+            if routeHeading then
+                local rx, ry = unit(routeHeading)
+                local px, py = unit(plus)
+                local mx, my = unit(minus)
+                road = ((px * rx + py * ry) >= (mx * rx + my * ry)) and plus or minus
+            else
+                road = plus
+            end
+        end
+        if road and routeHeading then
+            local ax, ay = unit(road)
+            local rx, ry = unit(routeHeading)
+            if ax * rx + ay * ry < 0 then return norm(road + 180), "road_heading_axis_corrected_flipped_to_route" end
+            return road, "road_heading_axis_corrected"
+        end
+        if road then return road, "road_heading_axis_corrected_only" end
+        if routeHeading then return routeHeading, "route_vector" end
+        return 0, "fallback_zero"
+    end
+
+    --- SP's standing grid (no player in it): two columns, pole on the left, rows behind the start node, every slot at
+    --- the start node's height. profile = data.grid_profiles.forRoot(rootId). Returns slots { x, y, z, yaw, row } and
+    --- the grid's forward vector.
+    function M.gridSlots(startNode, finishNode, n, profile)
+        profile = profile or {}
+        local stack = M.spForwardHeading(startNode, finishNode)
+        stack = norm(stack + (profile.gridHeadingOffsetDeg or 0))
+        -- SP resolveUnifiedSlotHeadingOffsetDeg: the stage offset wins, the AI offset is only its fallback
+        local slotYaw = norm(stack + (profile.startSlotHeadingOffsetDeg or profile.aiSlotHeadingOffsetDeg or M.SLOT_YAW_OFFSET))
+        local r = math.rad(stack)
+        local fx, fy = math.cos(r), math.sin(r)
+        local rx, ry = -fy, fx
+        local rowM, backM, colM = profile.aiGridRowSpacingM or 12, profile.aiGridStartSetbackM or 12, profile.aiGridColOffsetM or 4
+        local shift = profile.gridLateralShiftM or 0
+        local out = {}
+        for i = 1, n do
+            local row = math.ceil(i / 2) - 1
+            local col = (i % 2 == 0) and 1 or -1
+            local back = -(backM + rowM * row)
+            local side = col * colM + shift
+            out[i] = { x = startNode.x + back * fx + side * rx, y = startNode.y + back * fy + side * ry, z = startNode.z or 0,
+                yaw = slotYaw, row = row + 1, heading = stack }
+        end
+        return out, { x = fx, y = fy }
     end
 
     --- The index of the path point nearest `pos` (1-based).
@@ -169,7 +218,7 @@ Core.define("paddock.live", function(C)
         local i = M.nearestIndex(points, pos)
         i = math.max(1, math.min(#points - 1, i - 1))
         local a, b = points[i], points[i + 1]
-        return { x = a.x, y = a.y, z = a.z or 0, yaw = M.yawFromDir(b.x - a.x, b.y - a.y), index = i }
+        return { x = a.x, y = a.y, z = a.z or 0, yaw = M.yawFromDir(b.x - a.x, b.y - a.y), index = i }   -- SP rule (L232)
     end
 
     --- One car's speed ceiling for each leg of the path (leg i ends at point i+1), from its own sim splits.

@@ -135,15 +135,24 @@ return {
         T.falsy(L.corroborate(t2, nil), "no client times, no pace corroboration")
     end,
 
-    the_live_grid_leaves_room_and_a_stuck_car_goes_back_on_the_line = function(T)
+    the_grid_is_single_players_and_a_stuck_car_goes_back_on_the_line = function(T)
         local L = T.Core.get("paddock.live")
+        local Profiles = T.Core.get("data.grid_profiles")
         local r = route(T)
         local p = L.path(r, ghost(r))
         local gates = L.checkpoints(r, p, 6)
-        local slots = L.gridSlots(gates[1], 12)
-        for i = 3, 12 do T.ok(L.dist(slots[i], slots[i - 2]) >= 14, "rows are at least 14 m apart") end
-        T.ok(L.dist(slots[1], slots[2]) >= 6, "the two columns have room")
+        local slots = L.gridSlots(r.start, r.finish, 12, Profiles.forRoot(r.routeId))
+        for i = 3, 12 do T.ok(math.abs(L.dist(slots[i], slots[i - 2]) - 12) < 0.01, "SP rows: 12 m apart") end
+        T.ok(math.abs(L.dist(slots[1], slots[2]) - 8) < 0.01, "SP columns: 4 m either side")
+        T.ok(math.abs(L.dist(slots[1], r.start) - math.sqrt(12 * 12 + 4 * 4)) < 0.01, "SP setback: pole 12 m behind the node")
+        T.eq(slots[1].z, r.start.z, "every slot at the start node's height, like SP")
         T.eq(slots[1].row, 1); T.eq(slots[12].row, 6)
+        -- the Sewer profile rotates the whole grid 180 degrees (the owner's SP tuning)
+        local sewer = T.Core.get("course.routes").resolve("root_north_tunnel_1450_2467__to__japantown_crossway_373_0")
+        local plain = L.gridSlots(sewer.start, sewer.finish, 2, Profiles.forRoot("none"))
+        local tuned = L.gridSlots(sewer.start, sewer.finish, 2, Profiles.forRoot(sewer.routeId))
+        local d = (plain[1].heading - tuned[1].heading) % 360
+        T.ok(math.abs(d - 180) < 0.01, "Sewer's gridHeadingOffsetDeg -180 is applied")
         local off = { x = p.points[20].x + 30, y = p.points[20].y }
         local rp = L.resetPoint(p.points, off)
         T.ok(rp.index <= 20 and rp.index >= 18, "reset goes to the line just behind the car (" .. rp.index .. ")")

@@ -4472,3 +4472,11 @@ The owner saw bright sun at 21:30 Eastern. The server alone cannot fix it: OPEN/
 - **The clock service** (`ncm_paddock/server/clock.lua`): rate 1.0 and Eastern time at boot; every 10 minutes it re-reads the clock and writes only past a 120 s drift. `clockMode = eastern | off`.
 
 **Caveat:** every client needs NCM Clock; one without it still runs 8x and is jumped back about every 15 s. Quests that set their own time still do.
+
+## L232 - OWNER CORRECTION / PADDOCK - the street grid is the owner's single-player grid, proven against its code
+
+**Owner (2026-09-29):** the grid was rotated about 90 degrees and lined up off the road above the water at Parque del Mar; "I didn't ask to space out the grid, I asked for better racing"; "I authored every node myself in NCM single player... check SP"; "we need assurances".
+
+**Ruling applied:** the Paddock street grid is NCM single player's formation, not a new one. The authored start-node heading, SP's road-axis correction, the per-route tuning from `default_roots_pack.lua` and SP's defaults are all carried over (`data.grid_profiles`, generated). The widened grid is reverted. **The assurance** is `tools/test-grid-oracle.lua`: it executes SP's own grid functions from `ai_vehicles.lua` and requires the Online port to match on every Paddock route (it does, exactly). A car set down anywhere else on a line (resets, bubble spawns) takes SP's slot rotation too. KB-218 records the defect.
+
+**Not changed by this ruling:** the perseverance work (L228) and the one-row-at-a-time release stay until the owner rules otherwise.
