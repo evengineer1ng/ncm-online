@@ -76,7 +76,7 @@ end, false)
 --   ncm.paddock.garage <playerId>                 the garage nearest that player: site, tenants, shifts, bodies
 --   ncm.paddock.garage <playerId|siteId> good|bad [note]   the in-engine look: a bad site leaves the rental pool
 --   ncm.paddock.live                              live races, the Pace clients and the last probe
---   ncm.paddock.probe                             does platform AI move a car nobody is near? (30 s)
+--   ncm.paddock.probe [playerId]                  what moves an AI car: distance ladder x (unasked, asked, camera) (server/probe.lua)
 local G = NcmCore.get("paddock.garages")
 
 local function siteFor(arg)
@@ -125,10 +125,6 @@ RegisterCommand("ncm.paddock.live", function(source)
             tostring(lr.reason), #(lr.cars or {})))
     end
     for p, info in pairs(PaddockLive.paceClients) do print(("  pace client %d ok=%s version=%s"):format(p, tostring(info.ok), info.version)) end
-    if PaddockLive.probe then print("  " .. PaddockLive.probe.line) end
+    if PaddockProbe and PaddockProbe.last then for _, l in ipairs(PaddockProbe.last.lines) do print("  probe " .. l) end end
 end, false)
 
-RegisterCommand("ncm.paddock.probe", function(source)
-    if not console(source) then return end
-    CreateThread(function() local ok, line = PaddockLive.runProbe(); print("[ncm_paddock] " .. tostring(line)) end)
-end, false)

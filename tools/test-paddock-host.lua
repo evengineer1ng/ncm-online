@@ -45,6 +45,15 @@ local POS, VEH, NPC, NOTES, aiHandlers = {}, {}, {}, {}, {}
 local nextEnt = 5000
 STUCK_FROM, STUCK_UNTIL_RESET = nil, false   -- cars from this grid index on stall; until a reset, or for good
 GHOSTS = {}
+-- open77_remote_camera's server exports, as far as the probe uses them
+local CAMS, LEASES = {}, {}
+exports = { open77_remote_camera = {
+    create = function(_, d) local id = #CAMS + 1; CAMS[id] = d; return { id = id } end,
+    setAccess = function() return true end,
+    acquire = function(_, pid, cam) LEASES[#LEASES + 1] = { pid = pid, cam = cam }; return #LEASES end,
+    release = function(_, lease) LEASES[lease] = nil; return true end,
+    remove = function(_, id) CAMS[id] = nil; return true end,
+} }
 local function vdist(a, b) local dx, dy = a.x - b.x, a.y - b.y return math.sqrt(dx * dx + dy * dy) end
 local function advance(v)
     if v.route and v.t then v.dist = v.dist + (v.speed or 0) * (clock - v.t); v.t = clock end
@@ -119,6 +128,12 @@ Open77 = {
             removeDriver = function(id) if VEH[id] then VEH[id].driver = nil end return true end,
             stop = function() return true end,
             state = function(id) return VEH[id] and { status = VEH[id].route and "running" or "idle" } or nil end,
+            driveTo = function(id, o)
+                local v = VEH[id]
+                if not v or not v.driver then return nil, "no_controller" end
+                v.route, v.speed, v.t, v.dist = { v.pos, o.position }, v.stall and 0 or o.speed, clock, 0
+                return { status = "running" }
+            end,
         },
     },
 }
@@ -429,7 +444,7 @@ realPrint("paddock host harness")
 do
     local offenders = {}
     for _, f in ipairs({ "settings", "util", "store", "players", "stream", "wallet", "story", "world", "calibration", "races",
-        "billie", "life", "manager", "spotlight", "garages", "live", "views", "requests", "admin", "main" }) do
+        "billie", "life", "manager", "spotlight", "garages", "live", "probe", "views", "requests", "admin", "main" }) do
         local text = assert(io.open(RES .. "ncm_paddock/server/" .. f .. ".lua")):read("a")
         text = text:gsub("%-%-[^\n]*", "")   -- code only: comments may name the resource they mirror
         for g in text:gmatch("(Ncm%u%a+)%.") do
@@ -795,19 +810,21 @@ check("and the sealed sim result stands", (DB.race[race2.raceId].provenance or "
 queue = {}
 for id in pairs(VEH) do VEH[id] = nil end
 
--- the probe: does platform AI move a car nobody is near?
-POS = { [1] = { x = 6000, y = -6000, z = 0, bucket = 0 } }          -- far from every route
-local probeLine
-local co = coroutine.create(function() local _, line = PaddockLive.runProbe(); probeLine = line end)
-for _ = 1, 40 do
+-- the probe suite: a distance ladder of cars, each tried unasked, asked (requestAuthority) and with a camera lease
+local W0 = PaddockWorld.route(Season.ROUTES.hook)
+POS = { [1] = { x = W0.start.x, y = W0.start.y, z = 10, bucket = 0 } }
+local probeOk, probeRes
+local co = coroutine.create(function() probeOk, probeRes = PaddockProbe.run(1) end)
+for _ = 1, 200 do
     if coroutine.status(co) == "dead" then break end
     local ok, err = coroutine.resume(co); assert(ok, err)
     clock = clock + 1
 end
-local probeRow
-for id, row in pairs(DB.live) do if id:match("^probe%-") then probeRow = row end end
-check("the probe drives one car far from everyone and records the answer: " .. tostring(probeLine), probeLine and probeLine:find("MOVES", 1, true) and probeRow ~= nil
-    and next(VEH) == nil)
+local probeRows = 0
+for id in pairs(DB.live) do if id:match("^probe%-") then probeRows = probeRows + 1 end end
+check(("the probe ladder records one row per distance (%d rows): %s"):format(probeRows, tostring(probeRes):sub(1, 160)), probeOk and probeRows >= 3)
+check("every leg ran for every car", tostring(probeRes):find("A ", 1, true) and tostring(probeRes):find("| B ", 1, true) and tostring(probeRes):find("| C ", 1, true))
+check("the probe leaves nothing behind: cars, drivers, cameras, leases", next(VEH) == nil and next(CAMS) == nil and next(LEASES) == nil)
 POS = {}
 queue = {}
 

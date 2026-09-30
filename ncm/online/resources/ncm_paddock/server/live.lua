@@ -211,6 +211,9 @@ local function stage(race, host, t)
                 log("stage %s: attachDriver %d refused: %s", race.raceId, vid, tostring(why or st))
                 return cancel(lr, "the AI would not take the wheel")
             end
+            -- .102 moves an AI car only when a client simulates it, and none volunteers from 3.6 km (probe, L228).
+            -- Ask the nearest watcher's client to take every car, so someone halfway along the route can start it.
+            if host then pcall(Open77.vehicles.requestAuthority, vid, host.pid) end
         elseif host then
             local okR, st, why = pcall(Open77.vehicles.requestAuthority, vid, host.pid)
             if not okR or not st then log("stage %s: requestAuthority %d -> %d: %s", race.raceId, vid, host.pid, tostring(why or st)) end
@@ -555,58 +558,7 @@ function PaddockLive.boot()
         WHERE server_id = ? AND state IN ('declared','staging','running')]], { U.now(), U.sid() })
 end
 
--- ------------------------------------------------------------------------------------------------------- probe
-
---- Does platform AI drive a car that no player is near (build .102)? One car, far from everyone, a 30 s drive.
---- The answer goes to the console and to `paddock_live` as race_id `probe-<t>` (reason = the verdict line), so it
---- can be read back without the console. Decides whether `liveMode = always` is safe.
-function PaddockLive.runProbe()
-    local t = U.now()
-    local players = positions()
-    local best, bestD
-    for _, rootId in pairs(Season.ROUTES) do
-        local r = PaddockWorld.route(rootId)
-        if r then
-            local nearest = math.huge
-            for _, pos in pairs(players) do nearest = math.min(nearest, L.dist(r.start, pos)) end
-            if not bestD or nearest > bestD then best, bestD = r, nearest end
-        end
-    end
-    if not best then return false, "no route" end
-    local id = "probe-" .. t
-    local okV, vid = pcall(Open77.vehicles.create, { record = "Vehicle.v_sport2_quadra_type66", position = { x = best.start.x, y = best.start.y, z = (best.start.z or 0) + 0.6 }, yaw = 0, bucket = 0 })
-    if not okV or not vid then return false, "vehicle refused: " .. tostring(vid) end
-    local okN, npc = pcall(Open77.npcs.create, { record = "Character.WorkerMale", position = { x = best.start.x, y = best.start.y, z = (best.start.z or 0) + 0.6 },
-        yaw = 0, bucket = 0, aiMode = Open77.npcs.ai and Open77.npcs.ai.tasks or nil, despawnWhenUnobserved = false, persistent = false })
-    local okA, st, why = pcall(Open77.vehicles.ai.attachDriver, vid, (okN and npc) and { npcId = npc } or nil)
-    if not okA or not st then pcall(Open77.vehicles.remove, vid); if okN and npc then pcall(Open77.npcs.remove, npc) end return false, "attachDriver refused: " .. tostring(why or st) end
-    local okF = pcall(Open77.vehicles.ai.followRoute, vid, { points = { { x = best.finish.x, y = best.finish.y, z = best.finish.z or 0 } }, speed = 20, behavior = "aggressive" })
-    local p0 = select(2, pcall(Open77.vehicles.getPosition, vid))
-    local statuses, moved, samples = {}, 0, {}
-    for i = 1, 30 do
-        Wait(1000)
-        local okP, p = pcall(Open77.vehicles.getPosition, vid)
-        local okS, s = pcall(Open77.vehicles.ai.state, vid)
-        local status = okS and type(s) == "table" and (tostring(s.status) .. (s.reason and ("/" .. tostring(s.reason)) or "")) or "?"
-        statuses[status] = (statuses[status] or 0) + 1
-        if okP and type(p) == "table" and type(p0) == "table" then moved = L.dist(p0, p) end
-        if i % 5 == 0 then samples[#samples + 1] = ("%ds %.0fm %s"):format(i, moved, status) end
-    end
-    local okO, owner = pcall(Open77.vehicles.owner, vid)
-    pcall(Open77.vehicles.ai.removeDriver, vid); pcall(Open77.vehicles.remove, vid)
-    if okN and npc then pcall(Open77.npcs.remove, npc) end
-    local st2 = {}
-    for k, v in pairs(statuses) do st2[#st2 + 1] = k .. "x" .. v end
-    local verdict = moved > 50 and "MOVES with nobody near" or "DOES NOT MOVE with nobody near"
-    local line = ("probe: platform AI %s -- %.0f m in 30 s at %s, %.0f m from the nearest player; followRoute=%s; statuses %s; owner %s")
-        :format(verdict, moved, best.name or "?", bestD or -1, tostring(okF), table.concat(st2, " "), U.encode(okO and owner or nil) or "nil")
-    log("%s", line)
-    log("probe samples: %s", table.concat(samples, " | "))
-    pcall(MySQL.update.await, [[INSERT INTO paddock_live (server_id, race_id, declared_by, declared_at, state, cars, reason, detail_json, ended_at)
-        VALUES (?, ?, ?, ?, 'finished', 1, ?, ?, ?)]], { U.sid(), id, NO_DRIVER, t, line:sub(1, 160), U.encode({ line = line, samples = samples }) or "{}", U.now() })
-    PaddockLive.probe = { moved = moved, line = line, at = t }
-    return true, line
-end
+-- The AI-motion probe is its own file now (server/probe.lua): a distance ladder with three legs per car.
 
 -- --------------------------------------------------------------------------------------------------------- events
 

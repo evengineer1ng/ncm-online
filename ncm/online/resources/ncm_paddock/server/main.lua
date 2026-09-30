@@ -73,9 +73,6 @@ CreateThread(function()
     PaddockLive.boot()
     Wait(0)
     PaddockGarages.start()
-    if PaddockSettings.get("liveProbeAtBoot", true) then
-        CreateThread(function() Wait(90000); local ok, err = pcall(PaddockLive.runProbe); if not ok then log("probe FAILED: %s", tostring(err)) end end)
-    end
     lastCalibration = U.now() - 3500     -- first recompute a minute after boot, not inside it
     log("the Paddock is running (season %s)", PaddockStore.world.seasonId)
     while true do

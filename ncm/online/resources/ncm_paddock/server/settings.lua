@@ -68,8 +68,6 @@ local ok, settings = pcall(Open77.tunables.declare, {
     liveMinFinishShare = { value = 0.5, type = "number", min = 0.1, max = 1, apply = "live" },
     livePaceMaxMps = { value = 90, type = "number", min = 20, max = 150, unit = "m/s", apply = "live" },
     liveNpcDrivers = { value = true, type = "boolean", apply = "live" },
-    -- Does platform AI move a car nobody is near? Asked once, 90 s after boot; answered in paddock_live 'probe-*'.
-    liveProbeAtBoot = { value = true, type = "boolean", apply = "live" },
 })
 if not ok then print("[ncm_paddock/settings] tunables.declare FAILED: " .. tostring(settings)) settings = nil end
 PaddockSettings.proxy = settings
