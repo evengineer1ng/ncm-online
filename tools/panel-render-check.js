@@ -1251,6 +1251,8 @@ pdShow({ view: "live", races: [{ raceId: "r30", series: "Night Grid", route: "Se
 check("LIVE draws the strip and the tower for a street race", pdDrawn() && !pdErr() && /ON THE STREET · 1:35/.test(pdText()) && /Ana Silva/.test(pdText())
   && /\+2.4s/.test(pdText()) && document.getElementById("paddockMain").querySelectorAll(".pd-dot").length === 3, pdText());
 check("LIVE offers the other race on track", /Coastal Cup/.test(pdText()), pdText());
+fire("panel:paddock", { view: "box", raceId: "r40", series: "Night Grid", route: "Sewer", at: 1790000000, provenance: "mixed", rows: [{ pos: 1, driver: "Ana Silva", driverId: "p1", time: 120.5, gap: "leader", state: "finished", points: 25 }] });
+check("a mixed race says which part was real", /PART ON THE STREET/.test(dump(document.getElementById("paddockDetail")).join("|")), pdText());
 pdShow({ view: "profile", kind: "person", profile: { id: "p1", name: "Ana Silva", role: "driver", org: "Apex Racing", region: "Brazil", ageBand: "late 20s", tags: ["Clutch"], wins: 3, starts: 20, podiums: 8 },
   rows: [{ t: "result", raceId: "r1", pos: 1, grid: 2, state: "finished", series: "Pacific Apex", route: "The Cut", at: 1790000000 }] });
 check("a driver profile shows record and tags, no numbers behind them", pdDrawn() && /3 wins/.test(pdText()) && /Clutch/.test(pdText()), pdText());

@@ -241,6 +241,8 @@ end
 --- Make a closed race public and apply everything that follows from it.
 function PaddockRaces.resolve(race, t)
     local w = PaddockStore.world
+    -- cars that drove physically in a player's bubble: the result is the model's, with their anchors (bubble.lua)
+    if PaddockBubble then pcall(PaddockBubble.writeBack, race) end
     local entrants, simEvents = resultsOf(race)
     local cond = race.cond or { roadWetness = race.roadWetness, light = race.light, weather = race.weather }
     local n = #entrants
@@ -358,7 +360,8 @@ function PaddockRaces.tick(t)
     local runNext, resolveNext, priceNext
     for _, race in pairs(PaddockRaces.byId) do
         -- a declared live race holds its close until the street run has a verdict (live.lua); Billie settles after
-        if race.state == "running" and race.closesAt and t >= race.closesAt and not (PaddockLive and PaddockLive.holds(race.raceId)) then
+        if race.state == "running" and race.closesAt and t >= race.closesAt and not (PaddockLive and PaddockLive.holds(race.raceId))
+            and not (PaddockBubble and PaddockBubble.holds(race, t)) then
             if not resolveNext or race.closesAt < resolveNext.closesAt then resolveNext = race end
         elseif (race.state == "scheduled" or race.state == "priced") and t >= race.opensAt then
             if not runNext or race.opensAt < runNext.opensAt then runNext = race end

@@ -247,9 +247,9 @@ local function exec(q, v)
         local keep = {}
         for _, r in ipairs(DB.result) do if r.race_id ~= v[2] then keep[#keep + 1] = r end end
         DB.result = keep
-    elseif has(q, "UPDATE paddock_race SET provenance = 'physical'") then
-        local r = DB.race[v[5]]
-        if r then r.provenance, r.backend, r.detail_json, r.window_closes_at = "physical", v[1], v[2], v[3] end
+    elseif has(q, "UPDATE paddock_race SET provenance = ?") then
+        local r = DB.race[v[6]]
+        if r then r.provenance, r.backend, r.detail_json, r.window_closes_at = v[1], v[2], v[3], v[4] end
     elseif has(q, "INTO paddock_live_crossing") then
         DB.crossing[#DB.crossing + 1] = { race_id = v[2], person_id = v[3], gate = v[4], source = has(q, "'pace'") and "pace" or "server", t_ms = v[5] }
     elseif has(q, "INSERT INTO paddock_live") then
@@ -330,7 +330,7 @@ MySQL = {
     update = { await = function(q, v) return exec(q, v) end },
     insert = { await = function(q, v) return exec(q, v) end },
     scalar = { await = function(q, v)
-        if has(q, "MAX(version) FROM schema_migrations") then return 51 end
+        if has(q, "MAX(version) FROM schema_migrations") then return 52 end
         if has(q, "FROM ncm_driver_binding") then return 2 end
         if has(q, "SUM(amount),0) FROM ledger") then return ledgerTotal(v[1]) end
         if has(q, "COUNT(*) FROM ledger WHERE idem_key") then return DB.idem[v[1]] and 1 or 0 end
@@ -446,7 +446,7 @@ realPrint("paddock host harness")
 do
     local offenders = {}
     for _, f in ipairs({ "settings", "util", "store", "players", "stream", "wallet", "story", "world", "calibration", "races",
-        "billie", "life", "manager", "spotlight", "garages", "live", "probe", "views", "requests", "admin", "main" }) do
+        "billie", "life", "manager", "spotlight", "garages", "live", "probe", "bubble", "views", "requests", "admin", "main" }) do
         local text = assert(io.open(RES .. "ncm_paddock/server/" .. f .. ".lua")):read("a")
         text = text:gsub("%-%-[^\n]*", "")   -- code only: comments may name the resource they mirror
         for g in text:gmatch("(Ncm%u%a+)%.") do
@@ -818,6 +818,47 @@ check("cars still out there at the close are 'not classified', not written off e
 check("and the sealed sim result stands", (DB.race[race2.raceId].provenance or "simulated") == "simulated")
 queue = {}
 for id in pairs(VEH) do VEH[id] = nil end
+
+-- the physical bubble: nobody at the start, so the race runs on its model; a player halfway along the line sees the
+-- field arrive, race past physically, and hand back to the model; the result is MIXED
+local race4 = streetRace("street_a", 120)
+POS = { [1] = { x = 6000, y = -6000, z = 0, bucket = 0 } }                 -- far away at staging: no street race
+clock = race4.opensAt - 70
+for _ = 1, 6 do run(function() PaddockRaces.tick(clock) end) end
+run(function() PaddockLive.tick(clock) end)
+check("with nobody near at staging, no street race is staged", not PaddockLive.byRace[race4.raceId] or PaddockLive.byRace[race4.raceId].state == "skipped")
+clock = race4.opensAt
+for _ = 1, 8 do if race4.state == "running" then break end run(function() PaddockRaces.tick(clock) end) end
+check("the race runs on its continuous model", race4.state == "running" and race4.model ~= nil)
+local path4 = race4.model.path.points
+local stand = path4[math.floor(#path4 * 0.55)]
+POS = { [1] = { x = stand.x + 15, y = stand.y, z = 10, bucket = 0 } }        -- the player walks to the middle of the route
+local maxCars, steps4 = 0, 0
+maxSlice = 0
+local simClose = race4.closesAt
+while race4.state == "running" and steps4 < 4000 do
+    steps4 = steps4 + 1
+    clock = clock + 0.5
+    run(function() PaddockBubble.tick() end)
+    local n = 0
+    for _ in pairs(VEH) do n = n + 1 end
+    if n > maxCars then maxCars = n end
+    if steps4 % 10 == 0 then run(function() PaddockRaces.tick(math.floor(clock)) end) end
+end
+local bs = PaddockBubble.stats
+check(("the field became physical as it reached the player (%d spawned, at most %d at once)"):format(bs.spawned, maxCars), bs.spawned >= 6 and maxCars >= 1)
+check(("and handed back to the model as it drove away (%d handed back)"):format(bs.handedBack), bs.handedBack >= 6)
+check(("a bubble pass fits the quota (max slice %d)"):format(maxSlice), maxSlice < 400000)
+check("the race resolved, with the model's result and its anchors", DB.race[race4.raceId].state == "resolved" and DB.race[race4.raceId].provenance == "mixed")
+local rows4 = 0
+for _, r in ipairs(DB.result) do if r.race_id == race4.raceId then rows4 = rows4 + 1 end end
+check("every car is classified", rows4 == #race4.frozen.grid)
+local detail4 = NcmCore.get("vocabulary.json").decode(DB.race[race4.raceId].detail_json or "{}") or {}
+local shared = 0
+for _, pct in pairs((detail4.live or {}).physicalPct or {}) do if pct > 0 then shared = shared + 1 end end
+check(("each car's physical share is recorded (%d cars drove part of it for real)"):format(shared), shared >= 6)
+check("nothing is left on the road", next(VEH) == nil)
+POS = {}
 
 -- the probe suite: a distance ladder of cars, each tried unasked, asked (requestAuthority) and with a camera lease
 local W0 = PaddockWorld.route(Season.ROUTES.hook)

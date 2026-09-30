@@ -457,7 +457,7 @@ next rig action is an in-process read-only P0 that composes the owner's G29, sep
 rim using those source-verified provider patterns and preserves stable device identity. This research does not
 displace the live queue below.
 
-> **Claim before writing:** decisions through **L229**; MASTER_TEST through **§CH**; next QA letter **§CI**.
+> **Claim before writing:** decisions through **L230**; MASTER_TEST through **§CH**; next QA letter **§CI**.
 > BACKLOG next free **IDEA-752**; known issues through **KB-216**. Read ledger tails before allocating.
 > BACKLOG next free **IDEA-686**; known issues through **KB-186**. Read ledger tails before allocating.
 >

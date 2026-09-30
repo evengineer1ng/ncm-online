@@ -2658,7 +2658,7 @@
       }
       function pdResultsTable(host, rows) {
         host.append(pdTable([["WHEN", r => pdTime(r.at)], ["SERIES", r => r.series], ["ROUTE", r => r.route], ["WINNER", r => (r.winner || "") + (r.winnerOrg ? " · " + r.winnerOrg : "")],
-          ["", r => r.provenance === "physical" ? pdEl("span", "pd-live", "STREET") : pdCond(r)]], rows, (r) => pdAsk({ view: "box", raceId: r.raceId })));
+          ["", r => r.provenance === "physical" ? pdEl("span", "pd-live", "STREET") : (r.provenance === "mixed" ? pdEl("span", "pd-live", "PART STREET") : pdCond(r))]], rows, (r) => pdAsk({ view: "box", raceId: r.raceId })));
       }
       function pdStories(host, rows) {
         for (const s of pdArr(rows)) {
@@ -2705,7 +2705,7 @@
         }
         b.append(track);
         b.append(pdTable([["POS", r => r.pos], ["DRIVER", r => { const w = pdEl("span"); if (r.colour) { const sw = pdEl("span", "pd-swatch"); sw.style.background = r.colour; w.append(sw); } w.append(pdEl("span", null, r.name)); return w; }],
-          ["TEAM", r => r.org || ""], ["GAP", r => r.gap || ""], ["", r => r.state === "finished" ? pdEl("span", "pd-live", "FINISHED") : (r.state === "out" ? "OUT" : "")]],
+          ["TEAM", r => r.org || ""], ["GAP", r => r.gap || ""], ["", r => r.state === "finished" ? pdEl("span", "pd-live", "FINISHED") : (r.state === "out" ? "OUT" : (r.physical ? pdEl("span", "pd-live", "ON THE STREET") : ""))]],
           d.rows, (r) => pdAsk({ view: "profile", kind: "person", id: r.id })));
         pdLiveRefresh(d.raceId);
       }
@@ -2851,8 +2851,10 @@
       function pdBoxDetail(d) {
         paddockDetail.append(pdEl("div", "eyebrow", "Box score"), pdEl("h2", null, (d.route || "") + ""));
         paddockDetail.append(pdEl("div", "pd-dim", [d.series, pdTime(d.at), pdCond(d)].filter(Boolean).join(" · ")));
-        paddockDetail.append(pdEl("div", d.provenance === "physical" ? "pd-live pd-prov" : "pd-dim pd-prov",
-          d.provenance === "physical" ? "RUN ON THE STREET · result is physical" : "SIMULATED · seed commit " + (d.commit || "-")));
+        paddockDetail.append(pdEl("div", d.provenance === "simulated" || !d.provenance ? "pd-dim pd-prov" : "pd-live pd-prov",
+          d.provenance === "physical" ? "RUN ON THE STREET · result is physical"
+            : d.provenance === "mixed" ? "PART ON THE STREET · real where it passed a player, simulated elsewhere"
+            : "SIMULATED · seed commit " + (d.commit || "-")));
         paddockDetail.append(pdTable([["POS", r => r.state === "finished" ? r.pos : "DNF"], ["DRIVER", r => r.driver], ["TIME", r => r.time != null ? r.time.toFixed(2) + "s" : (r.note || "")], ["GAP", r => r.gap || ""], ["PTS", r => r.points || ""]],
           d.rows, (r) => pdAsk({ view: "profile", kind: "person", id: r.driverId })));
       }

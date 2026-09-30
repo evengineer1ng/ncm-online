@@ -4449,3 +4449,14 @@ model exactly. First-pass values; live test `§HB6`. Tracked by `IDEA-718`.
 3. **A remote-camera interest lease alone** (no picture) did not make the client simulate. A camera actually rendering the car (`openView`) and a driverless car with a request (for Pace or kinematic playback) are **untested**: probe v2 legs D and E.
 
 **Consequence for the design (L228 all-of-the-above):** the continuous race model owns every car everywhere; physical cars exist only inside a bubble of a few hundred metres around a player (first numbers 250 m in / 400 m out, tuned by probe v2). Probe v2 narrows the ladder to 150-550 m on road points only.
+
+## L230 - BUILT + PROVISIONAL RULE / PADDOCK - the continuous race and the physical bubble
+
+**Built (dev, offline-green):**
+- `paddock.racestate`: every running race has a continuous model from its window's opening, watched or not. Each car's line position at every millisecond comes from its own sim splits. With no physical stretch the model reproduces the sim exactly (tested).
+- **Anchors** write the street back: a physical car's real (distance, time) re-anchors it, and it continues at its own sim pace from there, so what it lost or gained carries to the flag.
+- **The physical bubble** (`ncm_paddock/server/bubble.lua`): a model car within `bubbleInM` (250 m) of a player is spawned where the model says, facing along the line, and driven physically with the street race's perseverance; beyond `bubbleOutM` (400 m) of every player it is anchored back into the model and removed. First numbers from probe v1 (a client picks AI up between 186 m and 573 m).
+- **F6 PADDOCK -> LIVE**: every race on track, a route strip with every car and a timing tower; street and bubble cars at their real positions.
+- Schema 052 adds `mixed` to `paddock_race.provenance`.
+
+**PROVISIONAL, awaiting the owner:** when any car of a race drove physically in a bubble, the result is the model's classification with every anchor applied. It is `physical` when every car drove at least 95% of its line physically, else `mixed`, and `detail_json.live.physicalPct` names each car's share. A whole street race (grid at the start) is unchanged: `physical` or `fallback`.

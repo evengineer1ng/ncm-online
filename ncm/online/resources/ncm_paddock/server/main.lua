@@ -1,13 +1,13 @@
 -- ncm_paddock / server / main -- boot and the one scheduler loop.
 --
--- Boot waits for ncm_league's migrations to reach 051, checks that this resource's `serverId` is the world's (its
+-- Boot waits for ncm_league's migrations to reach 052, checks that this resource's `serverId` is the world's (its
 -- rows must key the same way as the binding table's), loads or creates the world, and starts the loop. Every pass is
 -- bounded: at most one race run, one resolve and one pricing per tick, and the daily/Cup/season passes are
 -- idempotent by key, so a server that was down for a day catches up over a few minutes instead of in one handler.
 local U = PaddockUtil
 local log = U.logger("main")
 
-local SCHEMA_REQUIRED = 51
+local SCHEMA_REQUIRED = 52
 
 local function schemaReady()
     local ok, v = pcall(MySQL.scalar.await, "SELECT MAX(version) FROM schema_migrations")
@@ -73,6 +73,7 @@ CreateThread(function()
     PaddockLive.boot()
     Wait(0)
     PaddockGarages.start()
+    PaddockBubble.start()
     lastCalibration = U.now() - 3500     -- first recompute a minute after boot, not inside it
     log("the Paddock is running (season %s)", PaddockStore.world.seasonId)
     while true do

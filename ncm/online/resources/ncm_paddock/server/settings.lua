@@ -68,6 +68,13 @@ local ok, settings = pcall(Open77.tunables.declare, {
     liveMinFinishShare = { value = 0.5, type = "number", min = 0.1, max = 1, apply = "live" },
     livePaceMaxMps = { value = 90, type = "number", min = 20, max = 150, unit = "m/s", apply = "live" },
     liveNpcDrivers = { value = true, type = "boolean", apply = "live" },
+    -- The physical bubble (L229): model cars within bubbleInM of a player become physical; beyond bubbleOutM of every
+    -- player they hand back to the model. First numbers: a client picks AI up somewhere between 186 m and 573 m.
+    bubbleEnabled = { value = true, type = "boolean", apply = "live" },
+    bubbleInM = { value = 250, type = "integer", min = 50, max = 800, unit = "m", apply = "live" },
+    bubbleOutM = { value = 400, type = "integer", min = 80, max = 1200, unit = "m", apply = "live" },
+    bubbleSpawnsPerPass = { value = 3, type = "integer", min = 1, max = 16, apply = "live" },
+    bubbleTickMs = { value = 500, type = "integer", min = 200, max = 5000, unit = "ms", apply = "live" },
 })
 if not ok then print("[ncm_paddock/settings] tunables.declare FAILED: " .. tostring(settings)) settings = nil end
 PaddockSettings.proxy = settings

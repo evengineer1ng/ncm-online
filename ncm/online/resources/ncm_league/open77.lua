@@ -179,6 +179,7 @@ server_script "server/schema/049_billie.lua"
 server_script "server/schema/050_paddock_economy.lua"
 -- 051: the Paddock in the city (phases 4-5): live races, their gate crossings, garage meetings and checks.
 server_script "server/schema/051_paddock_live.lua"
+server_script "server/schema/052_paddock_mixed.lua"
 server_script "server/migrations.lua"
 server_script "server/stream.lua"
 server_script "server/packs/street.lua"

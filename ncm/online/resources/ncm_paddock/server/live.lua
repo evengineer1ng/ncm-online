@@ -134,6 +134,7 @@ end
 
 local DRIVER_RECORDS = { m = { "Character.WorkerMale", "Character.YoungsterMale", "Character.AsianMale" },
     f = { "Character.YoungsterFemale", "Character.AsianFemale" } }
+PaddockLive.recordFor = recordFor
 
 local function removeCars(lr)
     for _, c in ipairs(lr.cars or {}) do
@@ -346,11 +347,13 @@ end
 
 -- ----------------------------------------------------------------------------------------------------- finish
 
-local function writeBack(lr, race, c)
-    local purse = Finance.purse(race.tier, #c.entrants)
+--- Replace a race's sealed sim rows with a classification the street produced (the whole street run, or the model
+--- with the bubble's anchors). provenance: physical | mixed. Before the close only, so Billie settles once, after this.
+function PaddockLive.writeResult(race, entrants, provenance, backend, detailExtra)
+    local purse = Finance.purse(race.tier, #entrants)
     local st = { { query = "DELETE FROM paddock_result WHERE server_id = ? AND race_id = ?", values = { U.sid(), race.raceId } } }
     local splits = {}
-    for _, e in ipairs(c.entrants) do
+    for _, e in ipairs(entrants) do
         e.points = Season.pointsFor(e.position, e.state)
         e.purse = (e.state == "finished") and (purse[e.position] or 0) or 0
         splits[e.id] = e.splits
@@ -360,17 +363,20 @@ local function writeBack(lr, race, c)
             values = { U.sid(), race.raceId, e.id, e.orgId or "", race.seriesId, race.seasonId, race.cupId, e.position,
                 e.grid, e.state, e.finishMs or -1, e.gapMs or -1, e.points, e.purse, e.dnfReason or "", race.opensAt } }
     end
-    local detail = { frozen = race.frozen, splits = splits, events = {}, segments = lr.segments, live = { backend = lr.backend,
-        path = lr.path.source, gates = #lr.gates } }
-    st[#st + 1] = { query = [[UPDATE paddock_race SET provenance = 'physical', backend = ?, detail_json = ?, window_closes_at = ?
-        WHERE server_id = ? AND race_id = ?]], values = { lr.backend == "pace" and "pace" or "platformAI", U.encode(detail) or "{}",
-        U.now() + 5, U.sid(), race.raceId } }
+    local detail = { frozen = race.frozen, splits = splits, events = {}, segments = race.result and race.result.segments, live = detailExtra }
+    st[#st + 1] = { query = [[UPDATE paddock_race SET provenance = ?, backend = ?, detail_json = ?, window_closes_at = ?
+        WHERE server_id = ? AND race_id = ?]], values = { provenance, backend, U.encode(detail) or "{}", U.now() + 5, U.sid(), race.raceId } }
     local ok, err = U.transact(st)
     if not ok then return false, err end
-    race.result = { entrants = c.entrants, events = {}, segments = lr.segments }
-    race.provenance = "physical"
+    race.result = { entrants = entrants, events = {}, segments = race.result and race.result.segments }
+    race.provenance = provenance
     race.closesAt = U.now() + 5
     return true
+end
+
+local function writeBack(lr, race, c)
+    return PaddockLive.writeResult(race, c.entrants, "physical", lr.backend == "pace" and "pace" or "platformAI",
+        { backend = lr.backend, path = lr.path.source, gates = #lr.gates })
 end
 
 local function storeCrossings(lr)
@@ -463,7 +469,7 @@ if Open77.vehicles and Open77.vehicles.ai and Open77.vehicles.ai.on then
     pcall(Open77.vehicles.ai.on, "waypointReached", function(state)
         local vid = tonumber(state and state.vehicleId)
         local ref = vid and byVehicle[vid]
-        if not ref then return end
+        if not ref then if PaddockBubble then PaddockBubble.onAi("waypointReached", state) end return end
         local lr = byRace[ref.raceId]
         if not lr or lr.state ~= "running" then return end
         for _, c in ipairs(lr.cars) do
@@ -482,6 +488,7 @@ if Open77.vehicles and Open77.vehicles.ai and Open77.vehicles.ai.on then
         pcall(Open77.vehicles.ai.on, ev, function(state)
             local vid = tonumber(state and state.vehicleId)
             local ref = vid and byVehicle[vid]
+            if not ref and PaddockBubble then PaddockBubble.onAi(ev, state) return end
             local lr = ref and byRace[ref.raceId]
             if not lr or lr.state ~= "running" or lr.out[ref.personId] then return end
             for _, c in ipairs(lr.cars) do

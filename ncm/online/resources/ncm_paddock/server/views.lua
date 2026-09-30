@@ -362,6 +362,17 @@ function PaddockViews.live(_, args)
         for i, r in ipairs(rows) do r.pos = i end
     else
         rows = Racestate.standings(model, tMs)
+        -- a car physically in a player's bubble right now: show where it really is
+        local bub = PaddockBubble and PaddockBubble.byRace[pick.raceId]
+        if bub then
+            for _, r in ipairs(rows) do
+                local car = bub.cars[r.id]
+                if car then
+                    local okP, pos = pcall(Open77.vehicles.getPosition, car.vid)
+                    if okP and type(pos) == "table" then r.d = Racestate.project(model, pos); r.physical = true end
+                end
+            end
+        end
     end
     local out = {}
     for i, r in ipairs(rows) do
@@ -371,7 +382,7 @@ function PaddockViews.live(_, args)
             pct = math.floor(math.min(1, math.max(0, (r.d or 0) / math.max(1, model.lengthM))) * 1000) / 10,
             gap = r.state == "finished" and (r.gapMs and (r.gapMs == 0 and "winner" or ("+%.1fs"):format(r.gapMs / 1000)) or "finished")
                 or (r.state == "out" and "out") or (r.gapMs and (r.gapMs == 0 and "leader" or ("+%.1fs"):format(r.gapMs / 1000)) or ""),
-            state = r.state }
+            state = r.state, physical = r.physical or nil }
     end
     return { view = "live", races = races, raceId = pick.raceId, series = PaddockWorld.seriesName(pick.seriesId),
         route = PaddockWorld.routeName(pick.routeId), elapsed = math.max(0, math.floor(tMs / 1000)), lengthM = math.floor(model.lengthM),
