@@ -9,7 +9,7 @@ Owner rulings: phase 3 (sightings) skipped except what 4-5 need; MASTER_TEST is 
 - **Live races (phase 5):** F6 → PADDOCK → RESULTS → NEXT UP → **HOLD: RUN IT LIVE** on a race 2.5-90 min out, then be at the start line (waypoint set). The grid spawns at T-75 s and drives a human ghost's line at each car's own sim pace; the server times every gate; a clean run replaces the sim result as `physical`, otherwise the sim stands.
 - **NCM Pace** (`ncm/pace` 0.1.0) is on dev `requiredMods` (4 declared): it drives the same native command uncapped and reports gate times. `liveBackend = auto` picks it when your client has it.
 - Gate: `tools/ncm-test.ps1` ALL GREEN (core 830 under 5.4 and LuaJIT; paddock host 168; migration dry-run 043-051 twice; Pace state tests; redscript compiles). Dev boot verified after the KB-214 fix.
-**THE ONE NEXT ACTION (Paddock): relaunch through the launcher (it projects NCM Pace), go to a garage on shift, then declare a live street race and watch it; read `ncm_pace-<pid>.log` beside the DLL for P-PACE-2.** Online stays frozen (`L223`).
+**Dev never receives required mods by raw-address join (`KB-126`, `KB-215`); they are hand-installed with `tools/dev-hand-install-mods.py` (re-run after any republish). THE ONE NEXT ACTION (Paddock): restart the game, confirm Rig Bridge/Scanner/Pace load (`ncm_pace-<pid>.log` beside the DLL), go to a garage on shift, then declare a live street race and watch it (P-PACE-2).** Online stays frozen (`L223`).
 
 **LATEST 2026-09-29 (evening) - THE PADDOCK PHASES 1-2 BUILT, OFFLINE-GREEN, NOT DEPLOYED (`L226`, doc 44, `IDEA-738`-`IDEA-744`).**
 The NPC motorsport world is built on dev terms:
@@ -458,7 +458,7 @@ rim using those source-verified provider patterns and preserves stable device id
 displace the live queue below.
 
 > **Claim before writing:** decisions through **L227**; MASTER_TEST through **§CH**; next QA letter **§CI**.
-> BACKLOG next free **IDEA-752**; known issues through **KB-214**. Read ledger tails before allocating.
+> BACKLOG next free **IDEA-752**; known issues through **KB-215**. Read ledger tails before allocating.
 > BACKLOG next free **IDEA-686**; known issues through **KB-186**. Read ledger tails before allocating.
 >
 > The next-free guard matters: overlapping 2026-09-26/27 sessions previously made this block stale several
