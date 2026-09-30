@@ -4,7 +4,15 @@
 #include "state.hpp"
 
 #include <RED4ext/RED4ext.hpp>
+#include <RED4ext/ResourceLoader.hpp>
 #include <RED4ext/Scripting/Natives/Generated/ent/EntityID.hpp>
+#include <RED4ext/Scripting/Natives/Generated/world/TrafficPersistentResource.hpp>
+#include <RED4ext/Scripting/Natives/Generated/world/StreamingWorld.hpp>
+
+#include <array>
+#include <cstring>
+#include <shared_mutex>
+#include <windows.h>
 
 // The natives `NcmPaceNatives.reds` declares. Script -> native only, polled from redscript's own tick: native code
 // must never call a scripted function (doing so without a script frame terminates the process). Every AI command
@@ -135,5 +143,188 @@ void dumpSignatures()
         }
         PACE_INFO("rtti: %s -- %d matching method(s) of %u", name, shown, static_cast<uint32_t>(cls->funcs.size()));
     }
+    // Engine route probe: discover callable GPS/traffic path methods in the running game build before
+    // binding Pace to any of them. The in-world navigation mod reads the player's minimap polyline via
+    // a build-specific hook; Pace needs a route request for arbitrary race legs instead.
+    for (const char* name : {"gamegpsGPSSystem", "gamegpsIGPSSystem", "gameuiMinimapContainerController",
+                              "worldITrafficSystem", "navRuntimeSystemPathfinding", "worldNavigationScriptInterface",
+                              "AIVehicleAgent"}) {
+        RED4ext::CClass* cls = rtti->GetClass(RED4ext::CName(name));
+        if (!cls) cls = rtti->GetClassByScriptName(RED4ext::CName(name));
+        if (!cls) { PACE_INFO("route-rtti: no class %s", name); continue; }
+        int shown = 0;
+        for (auto* fn : cls->funcs) {
+            if (!fn) continue;
+            const std::string shortName = fn->shortName.ToString();
+            if (shortName.find("Path") == std::string::npos && shortName.find("Route") == std::string::npos &&
+                shortName.find("GPS") == std::string::npos && shortName.find("Lane") == std::string::npos &&
+                shortName.find("Navigation") == std::string::npos) continue;
+            std::string sig = shortName + "(";
+            bool first = true;
+            for (auto* p : fn->params) {
+                if (!p) continue;
+                if (!first) sig += ", ";
+                first = false;
+                sig += std::string(p->name.ToString()) + ": " + (p->type ? p->type->GetName().ToString() : "?");
+                if (p->flags.isOut) sig += " out";
+                if (p->flags.isOptional) sig += " opt";
+            }
+            sig += ") -> ";
+            sig += (fn->returnType && fn->returnType->type) ? fn->returnType->type->GetName().ToString() : "Void";
+            PACE_INFO("route-rtti: %s.%s", name, sig.c_str());
+            ++shown;
+        }
+        PACE_INFO("route-rtti: %s -- %d matching method(s) of %u", name, shown, static_cast<uint32_t>(cls->funcs.size()));
+    }
+}
+
+// Dev-only, read-only resource probe. This is invoked by the Running update only when the local
+// probe_traffic.flag marker exists beside the DLL. It copies a few primitive values while holding
+// the loader's shared lock and never retains engine pointers across frames.
+bool probeTrafficResources()
+{
+    // These depot paths are referenced by the installed 03_night_city.streamingworld.
+    // Request all three; cooked lane metadata stores outlines and edges in separate resources.
+    static constexpr const char* paths[] = {
+        "base\\worlds\\03_night_city\\sectors\\_generated\\traffic\\all.traffic_persistent",
+        "base\\worlds\\03_night_city\\sectors\\_generated\\traffic\\all.lane_connections",
+        "base\\worlds\\03_night_city\\sectors\\_generated\\traffic\\all.lane_polygons"
+    };
+    static RED4ext::SharedPtr<RED4ext::ResourceToken<>> direct[3];
+    auto* directLoader = RED4ext::ResourceLoader::Get();
+    if (!directLoader) { PACE_INFO("traffic-direct: no loader"); return false; }
+    bool complete = true;
+    for (size_t i = 0; i < 3; ++i) {
+        if (!direct[i]) {
+            direct[i] = directLoader->LoadAsync(RED4ext::ResourcePath(paths[i]));
+            PACE_INFO("traffic-direct: request %zu path=%s token=%d", i, paths[i], direct[i] ? 1 : 0);
+        }
+        if (!direct[i] || (!direct[i]->IsLoaded() && !direct[i]->IsFailed())) { complete = false; continue; }
+        auto* resource = direct[i]->IsLoaded() ? direct[i]->Get().GetPtr() : nullptr;
+        PACE_INFO("traffic-direct: %zu loaded=%d failed=%d class=%s", i,
+                  direct[i]->IsLoaded() ? 1 : 0, direct[i]->IsFailed() ? 1 : 0,
+                  resource && resource->GetType() ? resource->GetType()->name.ToString() : "null");
+        if (i == 0 && resource) {
+            auto* road = static_cast<RED4ext::world::TrafficPersistentResource*>(resource);
+            PACE_INFO("traffic-direct: persistent lanes=%u first-outline=%u first-out=%u",
+                      static_cast<unsigned>(road->data.lanes.size()),
+                      road->data.lanes.size() ? static_cast<unsigned>(road->data.lanes[0].outline.size()) : 0,
+                      road->data.lanes.size() ? static_cast<unsigned>(road->data.lanes[0].outLanes.size()) : 0);
+        }
+        if (resource && i > 0) {
+            auto* cls = resource->GetType();
+            for (auto* prop : cls->props) if (prop)
+                PACE_INFO("traffic-direct: %zu property=%s offset=%u type=%s", i,
+                          prop->name.ToString(), prop->valueOffset,
+                          prop->type ? prop->type->GetName().ToString() : "null");
+            const auto* bytes = reinterpret_cast<const uint8_t*>(resource);
+            for (size_t at = 0x40; at < 0x70; at += 16) {
+                uint64_t low = 0, high = 0;
+                std::memcpy(&low, bytes + at, sizeof(low));
+                std::memcpy(&high, bytes + at + 8, sizeof(high));
+                PACE_INFO("traffic-direct: %zu memory+%02zx=%016llx %016llx", i, at,
+                          static_cast<unsigned long long>(low), static_cast<unsigned long long>(high));
+            }
+            for (size_t at : {size_t(0x40), size_t(0x50)}) {
+                uintptr_t pointer = 0;
+                std::memcpy(&pointer, bytes + at, sizeof(pointer));
+                MEMORY_BASIC_INFORMATION region{};
+                const bool readable = pointer && VirtualQuery(reinterpret_cast<const void*>(pointer), &region, sizeof(region)) == sizeof(region) &&
+                    region.State == MEM_COMMIT && (region.Protect & (PAGE_READONLY | PAGE_READWRITE | PAGE_WRITECOPY | PAGE_EXECUTE_READ | PAGE_EXECUTE_READWRITE | PAGE_EXECUTE_WRITECOPY)) &&
+                    pointer + 64 <= reinterpret_cast<uintptr_t>(region.BaseAddress) + region.RegionSize;
+                PACE_INFO("traffic-direct: %zu array+%02zx ptr=%llx readable=%d", i, at,
+                          static_cast<unsigned long long>(pointer), readable ? 1 : 0);
+                if (!readable) continue;
+                for (size_t offset = 0; offset < 64; offset += 16) {
+                    uint64_t low = 0, high = 0;
+                    std::memcpy(&low, reinterpret_cast<const uint8_t*>(pointer) + offset, sizeof(low));
+                    std::memcpy(&high, reinterpret_cast<const uint8_t*>(pointer) + offset + 8, sizeof(high));
+                    PACE_INFO("traffic-direct: %zu array+%02zx data+%02zx=%016llx %016llx", i, at, offset,
+                              static_cast<unsigned long long>(low), static_cast<unsigned long long>(high));
+                }
+            }
+        }
+    }
+    if (complete) return true;
+    static RED4ext::ResourcePath trafficPath;
+    static RED4ext::SharedPtr<RED4ext::ResourceToken<>> requested;
+    auto* loader = RED4ext::ResourceLoader::Get();
+    auto* rtti = RED4ext::CRTTISystem::Get();
+    auto* wanted = rtti ? rtti->GetClass(RED4ext::CName("worldTrafficPersistentResource")) : nullptr;
+    auto* worldClass = rtti ? rtti->GetClass(RED4ext::CName("worldStreamingWorld")) : nullptr;
+    if (!loader || !wanted || !worldClass) {
+        PACE_INFO("traffic-resource: loader=%d class=%d worldClass=%d",
+                  loader ? 1 : 0, wanted ? 1 : 0, worldClass ? 1 : 0);
+        return false;
+    }
+    struct Sample { uint32_t lane = 0, points = 0, out = 0, edge[3]{}; float x = 0, y = 0, z = 0; };
+    std::array<Sample, 8> samples{};
+    uint32_t tokens = 0, loaded = 0, matched = 0, worlds = 0, lanes = 0;
+    uint64_t path = 0;
+    {
+        std::shared_lock lock(loader->tokenLock);
+        loader->tokens.ForEach([&](const RED4ext::ResourcePath& key,
+                                   RED4ext::WeakPtr<RED4ext::ResourceToken<>>& weak) {
+            ++tokens;
+            auto token = weak.Lock();
+            if (!token || !token->IsLoaded()) return;
+            auto* resource = token->Get().GetPtr();
+            if (!resource) return;
+            ++loaded;
+            if (resource->GetType() == worldClass) {
+                ++worlds;
+                auto* world = static_cast<RED4ext::world::StreamingWorld*>(resource);
+                if (trafficPath.IsEmpty()) trafficPath = world->trafficPersistentResource.path;
+            }
+            if (resource->GetType() != wanted) return;
+            ++matched;
+            path = key.hash;
+            auto* road = static_cast<RED4ext::world::TrafficPersistentResource*>(resource);
+            lanes = static_cast<uint32_t>(road->data.lanes.size());
+            for (uint32_t i = 0, n = 0; i < lanes && n < samples.size(); ++i) {
+                const auto& lane = road->data.lanes[i];
+                if (lane.outline.size() == 0) continue;
+                const auto& p = lane.outline[0];
+                Sample sample{};
+                sample.lane = i; sample.points = static_cast<uint32_t>(lane.outline.size());
+                sample.out = static_cast<uint32_t>(lane.outLanes.size());
+                sample.x = p.X; sample.y = p.Y; sample.z = p.Z;
+                if (sample.out) std::memcpy(sample.edge, lane.outLanes[0].unk00, sizeof(sample.edge));
+                samples[n++] = sample;
+            }
+        });
+    }
+    if (!trafficPath.IsEmpty() && !requested) {
+        requested = loader->LoadAsync(trafficPath);
+        PACE_INFO("traffic-resource: requested async path=%llu", static_cast<unsigned long long>(trafficPath.hash));
+    }
+    if (requested && requested->IsLoaded()) {
+        auto* resource = requested->Get().GetPtr();
+        if (resource && resource->GetType() == wanted) {
+            auto* road = static_cast<RED4ext::world::TrafficPersistentResource*>(resource);
+            matched = 1;
+            path = trafficPath.hash;
+            lanes = static_cast<uint32_t>(road->data.lanes.size());
+            for (uint32_t i = 0, n = 0; i < lanes && n < samples.size(); ++i) {
+                const auto& lane = road->data.lanes[i];
+                if (lane.outline.size() == 0) continue;
+                const auto& p = lane.outline[0];
+                Sample sample{};
+                sample.lane = i; sample.points = static_cast<uint32_t>(lane.outline.size());
+                sample.out = static_cast<uint32_t>(lane.outLanes.size());
+                sample.x = p.X; sample.y = p.Y; sample.z = p.Z;
+                if (sample.out) std::memcpy(sample.edge, lane.outLanes[0].unk00, sizeof(sample.edge));
+                samples[n++] = sample;
+            }
+        }
+    }
+    PACE_INFO("traffic-resource: tokens=%u loaded=%u worlds=%u matched=%u lanes=%u path=%llu target=%llu request=%d failed=%d",
+              tokens, loaded, worlds, matched, lanes, static_cast<unsigned long long>(path),
+              static_cast<unsigned long long>(trafficPath.hash), requested ? 1 : 0,
+              requested && requested->IsFailed() ? 1 : 0);
+    for (const auto& s : samples) if (s.points)
+        PACE_INFO("traffic-resource: lane=%u points=%u out=%u first=(%.1f,%.1f,%.1f) edge=%08x/%08x/%08x",
+                  s.lane, s.points, s.out, s.x, s.y, s.z, s.edge[0], s.edge[1], s.edge[2]);
+    return matched > 0;
 }
 }

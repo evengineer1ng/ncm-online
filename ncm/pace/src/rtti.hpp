@@ -1,2 +1,2 @@
 #pragma once
-namespace ncm::pace::rtti { void registerNatives(); void dumpSignatures(); }
+namespace ncm::pace::rtti { void registerNatives(); void dumpSignatures(); bool probeTrafficResources(); }

@@ -323,10 +323,15 @@ void Bridge::serve(uintptr_t value)
                 if (cmd == "hello" || cmd == "health") {
                     if (!sendText(s, state().health())) break;
                 } else if (!state().apply(payload)) {
-                    if (++refused <= 5) PACE_WARN("message not understood (%zu bytes)", payload.size());
+                    // 0.4.0 (KB-223): say WHY, and show the head of what arrived -- every refusal, not the first five
+                    ++refused;
+                    PACE_WARN("refused (%zu bytes): %s | %.200s", payload.size(), state().refusal().c_str(), payload.c_str());
+                } else if (cmd.rfind("drive.", 0) == 0 || cmd == "car.add" || cmd == "car.remove") {
+                    PACE_INFO("accepted %s (%zu bytes)", cmd.c_str(), payload.size());
                 }
             }
         }
+        for (const auto& line : state().drainLog()) PACE_INFO("%s", line.c_str());
         bool ok = true;
         for (const auto& message : state().outbox()) {
             if (!sendText(s, message)) { ok = false; break; }

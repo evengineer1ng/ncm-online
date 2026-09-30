@@ -1,16 +1,22 @@
 #include "bridge.hpp"
 #include "log.hpp"
 #include "rtti.hpp"
+#include "road_loader.hpp"
 
 #include <RED4ext/RED4ext.hpp>
 
 #include <windows.h>
 
 #include <memory>
+#include <chrono>
 
 namespace {
 HMODULE module = nullptr;
 std::unique_ptr<ncm::pace::Bridge> bridge;
+bool trafficProbeEnabled = false;
+bool trafficProbeDone = false;
+bool trafficProbeUpdateSeen = false;
+std::chrono::steady_clock::time_point trafficProbeNext;
 
 std::wstring directoryOf(HMODULE value)
 {
@@ -23,6 +29,10 @@ std::wstring directoryOf(HMODULE value)
 
 bool runningEnter(RED4ext::CGameApplication*)
 {
+    trafficProbeEnabled = GetFileAttributesW((directoryOf(module) + L"\\probe_traffic.flag").c_str()) != INVALID_FILE_ATTRIBUTES;
+    trafficProbeDone = false;
+    trafficProbeUpdateSeen = false;
+    trafficProbeNext = std::chrono::steady_clock::now();
     try {
         bridge = std::make_unique<ncm::pace::Bridge>();
         bridge->start();
@@ -30,8 +40,24 @@ bool runningEnter(RED4ext::CGameApplication*)
         PACE_ERR("bridge failed to start: %s; live races fall back to platform AI", e.what());
     }
     PACE_INFO("NCM Pace %s started", NCM_PACE_VERSION);
+    PACE_INFO("traffic-resource probe enabled=%d", trafficProbeEnabled ? 1 : 0);
     try { ncm::pace::rtti::dumpSignatures(); } catch (...) { PACE_ERR("rtti dump failed"); }
+    if (trafficProbeEnabled) {
+        try { trafficProbeDone = ncm::pace::rtti::probeTrafficResources(); }
+        catch (...) { PACE_ERR("traffic-resource initial probe failed"); }
+    }
     return true;
+}
+
+bool runningUpdate(RED4ext::CGameApplication*)
+{
+    try { ncm::pace::pollRoadGraph(); } catch (...) { PACE_ERR("road graph load failed"); }
+    if (!trafficProbeUpdateSeen) { PACE_INFO("traffic-resource Running update called"); trafficProbeUpdateSeen = true; }
+    if (!trafficProbeEnabled || trafficProbeDone || std::chrono::steady_clock::now() < trafficProbeNext) return false;
+    trafficProbeNext = std::chrono::steady_clock::now() + std::chrono::seconds(20);
+    try { trafficProbeDone = ncm::pace::rtti::probeTrafficResources(); }
+    catch (...) { PACE_ERR("traffic-resource probe failed"); trafficProbeDone = true; }
+    return false;
 }
 
 bool runningExit(RED4ext::CGameApplication*)
@@ -46,7 +72,7 @@ RED4EXT_C_EXPORT void RED4EXT_CALL Query(RED4ext::v1::PluginInfo* info)
 {
     info->name = L"NCM Pace";
     info->author = L"Night City Motorsports";
-    info->version = RED4EXT_V1_SEMVER(0, 3, 0);
+    info->version = RED4EXT_V1_SEMVER(0, 5, 0);
     info->runtime = RED4EXT_V1_RUNTIME_VERSION_LATEST;
     info->sdk = RED4EXT_V1_SDK_VERSION_CURRENT;
 }
@@ -61,7 +87,7 @@ RED4EXT_C_EXPORT bool RED4EXT_CALL Main(RED4ext::v1::PluginHandle handle,
         module = static_cast<HMODULE>(handle);
         ncm::pace::log::init(directoryOf(module));
         ncm::pace::rtti::registerNatives();
-        RED4ext::v1::GameState state{.OnEnter = &runningEnter, .OnUpdate = nullptr, .OnExit = &runningExit};
+        RED4ext::v1::GameState state{.OnEnter = &runningEnter, .OnUpdate = &runningUpdate, .OnExit = &runningExit};
         if (!sdk || !sdk->gameStates || !sdk->gameStates->Add(handle, RED4ext::EGameStateType::Running, &state))
             PACE_ERR("could not register Running-state lifecycle; plugin remains inert");
     }

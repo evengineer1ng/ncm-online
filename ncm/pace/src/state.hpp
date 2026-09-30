@@ -19,16 +19,28 @@
 #include <chrono>
 #include <cstdint>
 #include <mutex>
+#include <memory>
 #include <string>
 #include <vector>
 
 namespace ncm::pace {
+class RoadGraph;
 
-constexpr size_t kMaxPoints = 64;
-constexpr size_t kMaxCars = 24;
-constexpr size_t kMaxGates = 80;
+// A plan arrives as a TAPE (0.3.1, KB-223): `drive.start` with the first stretch and `"more": true`, then `drive.more`
+// messages appending points, gates and each car's per-leg speeds, the last with `"last": true`. One WebUI message
+// could not carry an oval (the hop drops large payloads silently), and the tape lifts the 64-point cap with it.
+//
+// DYNAMIC plans (0.4.0, KB-223): the continuous race model (L230) makes cars physical near a player and hands them
+// back when they leave, so a car joins and leaves mid-race. `drive.start` with `"dynamic": true` may carry no cars;
+// `car.add` appends one at a line point with one speed ceiling; `car.remove` retires it IN PLACE. Nothing mid-race
+// bumps the revision or reorders the list: redscript keys its per-car state by index, and a revision change
+// releases every car.
+constexpr size_t kMaxPoints = 4096;
+constexpr size_t kMaxCars = 64;
+constexpr size_t kMaxGates = 1024;
 
 struct Point { double x = 0, y = 0, z = 0; };
+struct RoadSpeedLeg { std::vector<Point> points; std::vector<double> limits; };
 
 struct Gate {
     double x = 0, y = 0, z = 0;
@@ -61,7 +73,8 @@ struct Car {
     uint64_t entity = 0;
     int64_t vehicleId = 0;
     std::vector<float> speeds;      // ceiling per leg: leg i runs from point i to point i+1
-    size_t target = 1;              // index of the point being driven to
+    size_t target = 1;              // index of the next point on the line (legs, gates, "passed")
+    size_t aim = 0;                 // with lookaheadM: the point the car is actually sent to, far ahead (0.4.1)
     size_t nextGate = 1;            // gate 0 is the start line; timing starts at 1
     bool haveLast = false;
     Point last{};
@@ -80,6 +93,19 @@ struct Car {
     bool haveSpeedAt = false;
     double speed = 0;
     uint32_t renewals = 0;
+    uint32_t logged = 0;
+    bool dynamic = false;           // joined mid-race (car.add): ended only by car.remove, never by a gate
+    // the wrong-way guard (0.4.6): its motion over >= 300 ms windows, how long it has gone against the ring
+    bool haveMotion = false;
+    Point motionFrom{};
+    int64_t motionMs = 0;
+    int64_t wrongMs = 0;
+    int64_t forceUntil = -1;
+    Point forceAt{};
+    uint32_t wrongEvents = 0;
+    size_t roadIndex = 0;
+    size_t roadLeg = 0;
+    bool roadLocated = false;
 };
 
 class State {
@@ -88,6 +114,7 @@ public:
 
     // A message from the resource. Returns false (and changes nothing) for anything it does not understand.
     bool apply(const std::string& json, Clock::time_point now = Clock::now());
+    void setRoadGraph(std::shared_ptr<const RoadGraph> graph);
     void disconnect();
 
     int count(Clock::time_point now = Clock::now());
@@ -97,6 +124,10 @@ public:
 
     std::vector<std::string> outbox();
     std::string health();
+    // Why the last `apply` returned false, for the log (0.4.0: "not understood" alone cost a night, KB-223).
+    std::string refusal();
+    // Log lines made on the game thread, for the bridge thread to write (0.4.3: no file IO on the game thread).
+    std::vector<std::string> drainLog();
 
     // The race-start warning (0.2.0): a native HUD banner, not a WebUI page. "rev|visible|title|detail|secondsLeft";
     // empty text fields are "~". Set by {"cmd":"banner","title":..,"detail":..,"seconds":N}; seconds 0 clears it.
@@ -108,19 +139,43 @@ public:
     std::string area(Clock::time_point now = Clock::now());
 
     double advanceM = 40.0;         // switch to the next point this far before reaching the current one
+    // 0.4.1 (KB-223): send the car to a point this far AHEAD along the line, not to the next point. A dense line (an
+    // oval's ring, 15 m a point) otherwise completes each command inside minimumDistanceToTarget and the car stops
+    // and starts every few metres; SP and the street run always aim far (the next checkpoint, the finish). The aim
+    // moves on once the car has covered half of it. 0 = the next point (the street run, unchanged).
+    double lookaheadM = 0.0;
+    // 0.4.5: re-aim once the car's remaining distance to its aim falls under this share of the look-ahead. 0.5
+    // let a car close on its aim and brake for it ("braking at checkpoints", 06:12); ~0.9 keeps it always ahead.
+    double reaimFrac = 0.5;
+    // 0.4.6, the WRONG-WAY GUARD (owner, 06:48: "they do good for a few turns, then wonder which way round is fastest
+    // and turn around ... harden their forward travel"). A plan may carry its ring {cx, cy, sign}: a car moving
+    // against the ring's direction for wrongWayMs (0.3 s) is sent 25 m further ROUND the ring, the race direction, for 2.5 s -- the
+    // planner is left no road but forward -- then back to its mark.
+    bool haveRing = false;
+    double ringCx = 0, ringCy = 0, ringSign = 1;
+    int64_t wrongWayMs = 300;      // owner: 0.7 s was too long; judged on 150 ms windows of real motion
     Launch launch;
 
 private:
+    void planRoad(); // caller holds mutex_
     void stopAll(const char* why);  // caller holds mutex_
     void push(const std::string& json);
     std::mutex mutex_;
     int revision_ = 0;
     std::string raceId_;
     std::vector<Point> points_;
+    std::shared_ptr<const RoadGraph> roadGraph_;
+    std::vector<Point> road_;
+    std::vector<double> roadLimits_;
+    std::vector<RoadSpeedLeg> roadLegs_;
     std::vector<Gate> gates_;
     std::vector<Car> cars_;
     Clock::time_point goAt_{};
     bool active_ = false;
+    bool complete_ = true;          // false while a tape is still arriving: no car finishes on a partial plan
+    bool dynamic_ = false;          // cars join (car.add) and leave (car.remove) mid-race
+    std::string refusal_;
+    std::vector<std::string> logQueue_;
     Clock::time_point stoppedAt_{};
     std::vector<std::string> out_;
     uint64_t gateReports_ = 0;
