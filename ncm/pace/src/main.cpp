@@ -2,6 +2,7 @@
 #include "log.hpp"
 #include "rtti.hpp"
 #include "road_loader.hpp"
+#include "spline_refs.hpp"
 
 #include <RED4ext/RED4ext.hpp>
 
@@ -52,6 +53,7 @@ bool runningEnter(RED4ext::CGameApplication*)
 bool runningUpdate(RED4ext::CGameApplication*)
 {
     try { ncm::pace::pollRoadGraph(); } catch (...) { PACE_ERR("road graph load failed"); }
+    try { ncm::pace::pollSplineRefs(); } catch (...) { PACE_ERR("spline refs load failed"); }
     if (!trafficProbeUpdateSeen) { PACE_INFO("traffic-resource Running update called"); trafficProbeUpdateSeen = true; }
     if (!trafficProbeEnabled || trafficProbeDone || std::chrono::steady_clock::now() < trafficProbeNext) return false;
     trafficProbeNext = std::chrono::steady_clock::now() + std::chrono::seconds(20);
@@ -72,7 +74,7 @@ RED4EXT_C_EXPORT void RED4EXT_CALL Query(RED4ext::v1::PluginInfo* info)
 {
     info->name = L"NCM Pace";
     info->author = L"Night City Motorsports";
-    info->version = RED4EXT_V1_SEMVER(0, 7, 1);
+    info->version = RED4EXT_V1_SEMVER(0, 7, 2);
     info->runtime = RED4EXT_V1_RUNTIME_VERSION_LATEST;
     info->sdk = RED4EXT_V1_SDK_VERSION_CURRENT;
 }

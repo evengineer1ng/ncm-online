@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.21)
-project(ncm_pace VERSION 0.7.1 LANGUAGES CXX)
+project(ncm_pace VERSION 0.7.2 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -24,6 +24,7 @@ add_library(ncm_pace SHARED
     src/speed_profile.cpp
     src/road_graph.cpp
     src/road_loader.cpp
+    src/spline_refs.cpp
     src/rtti.cpp
     src/bridge.cpp
 )
@@ -41,7 +42,7 @@ endif()
 
 include(CTest)
 if (BUILD_TESTING)
-    add_executable(ncm_pace_state_tests tests/state_tests.cpp src/state.cpp src/speed_profile.cpp src/road_graph.cpp)
+    add_executable(ncm_pace_state_tests tests/state_tests.cpp tests/spline_refs_stub.cpp src/state.cpp src/speed_profile.cpp src/road_graph.cpp)
     target_include_directories(ncm_pace_state_tests PRIVATE src "${DEPS_ROOT}/json")
     target_compile_definitions(ncm_pace_state_tests PRIVATE NCM_PACE_VERSION="${PROJECT_VERSION}" NOMINMAX)
     add_test(NAME ncm_pace_state COMMAND ncm_pace_state_tests)

@@ -1,4 +1,5 @@
 #include "state.hpp"
+#include "spline_refs.hpp"
 #include "road_graph.hpp"
 #include "speed_profile.hpp"
 
@@ -77,7 +78,10 @@ uint64_t State::spline(int index)
 {
     std::lock_guard lock(mutex_);
     if (index < 0 || static_cast<size_t>(index) >= cars_.size() || legHashes_.empty()) return 0;
-    return legHashes_[std::min(cars_[static_cast<size_t>(index)].leg, legHashes_.size() - 1)];
+    const size_t leg = std::min(cars_[static_cast<size_t>(index)].leg, legHashes_.size() - 1);
+    // the engine's own hash for the spline, read from the loaded sector (spline_refs.cpp); ours until it is known
+    const uint64_t engine = engineSplineRef(legNames_[leg]);
+    return engine ? engine : legHashes_[leg];
 }
 
 void State::stopAll(const char* why)
