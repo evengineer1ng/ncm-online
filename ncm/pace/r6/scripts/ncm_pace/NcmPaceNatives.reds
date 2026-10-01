@@ -12,3 +12,4 @@ public static native func NcmPace_Step(index: Int32, x: Float, y: Float, z: Floa
 public static native func NcmPace_Banner() -> String
 public static native func NcmPace_Area() -> String
 public static native func NcmPace_Log(text: String) -> Bool
+public static native func NcmPace_Spline(index: Int32) -> NodeRef

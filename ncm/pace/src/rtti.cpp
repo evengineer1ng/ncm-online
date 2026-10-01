@@ -41,6 +41,16 @@ void entity(RED4ext::IScriptable*, RED4ext::CStackFrame* stack, RED4ext::ent::En
     if (out) *out = RED4ext::ent::EntityID(state().entity(index));
 }
 
+// 0.7.0 (L246): the race spline car `index` is on, as the NodeRef AIVehicleRacingCommand.splineRef takes. A NodeRef is
+// one 64-bit hash, so it is written straight into the result.
+void spline(RED4ext::IScriptable*, RED4ext::CStackFrame* stack, uint64_t* out, int64_t)
+{
+    int32_t index = -1;
+    RED4ext::GetParameter(stack, &index);
+    stack->code++;
+    if (out) *out = state().spline(index);
+}
+
 void step(RED4ext::IScriptable*, RED4ext::CStackFrame* stack, RED4ext::CString* out, int64_t)
 {
     int32_t index = -1;
@@ -93,6 +103,7 @@ void postRegister()
     add("NcmPace_Entity", reinterpret_cast<RED4ext::ScriptingFunction_t<void*>>(&entity), "entEntityID", {{"Int32", "index"}});
     add("NcmPace_Step", reinterpret_cast<RED4ext::ScriptingFunction_t<void*>>(&step), "String",
         {{"Int32", "index"}, {"Float", "x"}, {"Float", "y"}, {"Float", "z"}});
+    add("NcmPace_Spline", reinterpret_cast<RED4ext::ScriptingFunction_t<void*>>(&spline), "NodeRef", {{"Int32", "index"}});
     add("NcmPace_Banner", reinterpret_cast<RED4ext::ScriptingFunction_t<void*>>(&banner), "String", {});
     add("NcmPace_Area", reinterpret_cast<RED4ext::ScriptingFunction_t<void*>>(&area), "String", {});
     add("NcmPace_Log", reinterpret_cast<RED4ext::ScriptingFunction_t<void*>>(&note), "Bool", {{"String", "text"}});

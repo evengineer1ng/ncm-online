@@ -24,6 +24,8 @@
 #include <vector>
 
 namespace ncm::pace {
+
+uint64_t nodeRefHash(const std::string& path);
 class RoadGraph;
 
 // A plan arrives as a TAPE (0.3.1, KB-223): `drive.start` with the first stretch and `"more": true`, then `drive.more`
@@ -123,6 +125,8 @@ struct Car {
     bool missing = false;
     uint32_t dropouts = 0;
     int64_t statusMs = -1000000;
+    size_t leg = 0;                 // 0.7.0: the leg (race spline) the car's racing command is on
+    int64_t slowMs = 0;             // 0.7.0: time under 2 m/s since the racing command was sent
 };
 
 class State {
@@ -137,6 +141,8 @@ public:
     int count(Clock::time_point now = Clock::now());
     int revision();
     uint64_t entity(int index);
+    // 0.7.0: the NodeRef (hash) of the race spline car `index` is on now; 0 when the plan has none
+    uint64_t spline(int index);
     std::string step(int index, double x, double y, double z, Clock::time_point now = Clock::now());
 
     std::vector<std::string> outbox();
@@ -188,7 +194,9 @@ private:
     std::vector<Point> road_;
     std::vector<double> roadLimits_;
     std::vector<RoadSpeedLeg> roadLegs_;
-    std::vector<size_t> pointRoad_;     // 0.5.2: each plan point's index on the continuous road_, in race order
+    std::vector<size_t> pointRoad_;       // 0.5.2: each plan point's index on the continuous road_, in race order
+    std::vector<std::string> legNames_;   // 0.7.0: the race spline for each leg, by node path
+    std::vector<uint64_t> legHashes_;     // ...and its NodeRef hash
     std::vector<Gate> gates_;
     std::vector<Car> cars_;
     Clock::time_point goAt_{};

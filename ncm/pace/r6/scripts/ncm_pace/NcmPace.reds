@@ -44,6 +44,7 @@ public class NcmPaceSystem extends ScriptableSystem {
   private let m_areaRev: Int32;
   private let m_areaId: Uint64;
   private let m_dumped: Bool;
+  private let m_ended: array<Bool>;
 
   public func SetBanner(banner: ref<NcmPaceBanner>) -> Void {
     this.m_banner = banner;
@@ -108,6 +109,7 @@ public class NcmPaceSystem extends ScriptableSystem {
       ArrayPush(this.m_seq, "");
       ArrayPush(this.m_commands, null);
       ArrayPush(this.m_vehicles, null);
+      ArrayPush(this.m_ended, false);
     }
     let game: GameInstance = player.GetGame();
     let i: Int32 = 0;
@@ -116,6 +118,7 @@ public class NcmPaceSystem extends ScriptableSystem {
       if IsDefined(vehicle) {
         let at: Vector4 = vehicle.GetWorldPosition();
         this.Apply(i, vehicle, NcmPace_Step(i, at.X, at.Y, at.Z));
+        this.ReportEnd(i, vehicle);
       }
       i += 1;
     }
@@ -140,6 +143,29 @@ public class NcmPaceSystem extends ScriptableSystem {
     if mode == 2 {
       this.Release(i, vehicle, agent);
       vehicle.ForceBrakesUntilStoppedOrFor(4.0);
+      return;
+    }
+    if mode == 3 {
+      // 0.7.0 (L246): the engine's own racer on this leg's race spline -- the vehicle's drivingParamsRace profile, no
+      // rubber banding, joining the spline wherever the car is. Whatever it held before is released first.
+      this.Release(i, vehicle, agent);
+      let race: ref<AIVehicleRacingCommand> = new AIVehicleRacingCommand();
+      race.splineRef = NcmPace_Spline(i);
+      race.startFromClosest = true;
+      race.reverseSpline = false;
+      race.driveBackwards = false;
+      race.rubberBandingBool = false;
+      race.secureTimeOut = 60.0;
+      race.needDriver = false;
+      race.useKinematic = false;
+      if agent.SendCommand(race) {
+        this.m_commands[i] = race;
+        this.m_ended[i] = false;
+        this.m_vehicles[i] = vehicle;
+        NcmPace_Log("car " + ToString(i) + ": racing leg " + f[2]);
+      } else {
+        NcmPace_Log("car " + ToString(i) + ": racing command refused on leg " + f[2]);
+      }
       return;
     }
     if mode != 1 {
@@ -220,6 +246,24 @@ public class NcmPaceSystem extends ScriptableSystem {
     this.m_commands[i] = null;
   }
 
+  // 0.7.0: a racing command the engine ends by itself -- a spline ref it could not resolve fails at once -- is said
+  // out loud, once per command, so a bad race spline never looks like a car that simply sat still.
+  private func ReportEnd(i: Int32, vehicle: ref<VehicleObject>) -> Void {
+    let held: ref<AIVehicleCommand> = this.m_commands[i];
+    if !IsDefined(held) || this.m_ended[i] {
+      return;
+    }
+    let agent: ref<AIVehicleAgent> = vehicle.GetAIComponent();
+    if !IsDefined(agent) {
+      return;
+    }
+    let st: AICommandState = agent.GetCommandState(held);
+    if Equals(st, AICommandState.Failure) || Equals(st, AICommandState.Success) {
+      this.m_ended[i] = true;
+      NcmPace_Log("car " + ToString(i) + ": command ended " + (Equals(st, AICommandState.Failure) ? "FAILURE" : "success"));
+    }
+  }
+
   // A new plan, an ended plan or a detach: nothing held from before may keep driving.
   private func ReleaseAll(why: String) -> Void {
     let released: Int32 = 0;
@@ -239,6 +283,7 @@ public class NcmPaceSystem extends ScriptableSystem {
     ArrayClear(this.m_seq);
     ArrayClear(this.m_commands);
     ArrayClear(this.m_vehicles);
+    ArrayClear(this.m_ended);
     if released > 0 {
       NcmPace_Log("released " + ToString(released) + " car(s): " + why);
     }

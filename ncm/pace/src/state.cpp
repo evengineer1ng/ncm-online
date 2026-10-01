@@ -64,6 +64,22 @@ void State::push(const std::string& json)
     if (out_.size() < 512) out_.push_back(json);
 }
 
+// A NodeRef is the FNV-1a 64 hash of its path -- the same hash WolvenKit writes when it cooks the path string, and
+// what the engine resolves at load (L246). Logged beside the path on every racing command, so a mismatch shows at once.
+uint64_t nodeRefHash(const std::string& path)
+{
+    uint64_t h = 0xcbf29ce484222325ull;
+    for (unsigned char ch : path) { h ^= ch; h *= 0x100000001b3ull; }
+    return h;
+}
+
+uint64_t State::spline(int index)
+{
+    std::lock_guard lock(mutex_);
+    if (index < 0 || static_cast<size_t>(index) >= cars_.size() || legHashes_.empty()) return 0;
+    return legHashes_[std::min(cars_[static_cast<size_t>(index)].leg, legHashes_.size() - 1)];
+}
+
 void State::stopAll(const char* why)
 {
     if (!active_) return;
@@ -344,6 +360,24 @@ bool State::apply(const std::string& text, Clock::time_point now)
         if (car.speeds.empty()) car.speeds.push_back(20.0f);
         cars.push_back(car);
     }
+    // 0.7.0 (L246): a street plan names the engine race spline for each leg (`$/mod/ncm_pace/#leg_<from>__<to>`, baked by
+    // tools/bake-race-splines.py and loaded by ArchiveXL). Race profile, or nothing (L245): a street plan without them
+    // is refused, never driven another way.
+    std::vector<std::string> legNames;
+    if (!dynamic) {
+        const auto& lg = j.contains("legs") ? j["legs"] : nlohmann::json();
+        if (!lg.is_array() || lg.empty()) return no("drive.start: no race splines (legs) -- a street plan is driven on race splines only");
+        // a long plan arrives as a tape (`more`), so the count is checked against the whole plan only when it is whole
+        if (!j.value("more", false) && lg.size() != points.size() - 1)
+            return no("drive.start: " + std::to_string(lg.size()) + " race splines for " + std::to_string(points.size() - 1) + " legs");
+        for (const auto& name : lg) {
+            if (!name.is_string() || name.get<std::string>().rfind("$/", 0) != 0) return no("drive.start: a race spline is not a node path");
+            legNames.push_back(name.get<std::string>());
+        }
+    }
+    legNames_ = std::move(legNames);
+    legHashes_.clear();
+    for (const auto& n : legNames_) legHashes_.push_back(nodeRefHash(n));
     raceId_ = j.value("raceId", std::string());
     points_ = std::move(points);
     gates_ = std::move(gates);
@@ -644,6 +678,43 @@ std::string State::step(int index, double x, double y, double z, Clock::time_poi
             }
         }
         if (tMs < c.forceUntil) want = c.forceAt;
+    }
+    // 0.7.0 (L246): ON RACE SPLINES. A street plan is driven by the engine's own racer -- AIVehicleRacingCommand on the
+    // leg's race spline, the vehicle's drivingParamsRace profile, no rubber banding -- not by drive-to-point. One command
+    // per leg, held for the whole leg: no ceilings, no re-aims, no churn. It is re-sent only when the car moves on to the
+    // next leg, comes back after a dropout, or has crawled under 2 m/s for 6 s since its last command.
+    if (mode == 1 && !legHashes_.empty()) {
+        const size_t leg = std::min(c.target >= 1 ? c.target - 1 : 0, legHashes_.size() - 1);
+        if (c.mode == 3 && tMs - c.prevMs >= 0) c.slowMs = c.speed < 2.0 ? c.slowMs + std::max<int64_t>(0, tMs - c.prevMs) : 0;
+        const char* why = nullptr;
+        if (c.mode != 3) why = "go";
+        else if (leg != c.leg) why = "next leg";
+        else if (reacquired) why = "back: fresh command";
+        else if (c.slowMs >= 6000 && tMs - c.cmdMs >= 6000) why = "stalled: fresh command";
+        if (why) {
+            c.leg = leg;
+            c.mode = 3;
+            c.phase = 2;
+            c.cmdMs = tMs;
+            c.slowMs = 0;
+            c.seq++;
+            if (c.logged < 400) {
+                c.logged++;
+                char line[400]{};
+                std::snprintf(line, sizeof(line), "car %d race cmd %u: %s, leg %zu/%zu at %.0f,%.0f %.1f m/s, spline %s (%016llx)",
+                    index, c.seq, why, leg + 1, legHashes_.size(), pos.x, pos.y, c.speed, legNames_[leg].c_str(),
+                    static_cast<unsigned long long>(legHashes_[leg]));
+                if (logQueue_.size() < 2000) logQueue_.emplace_back(line);
+            }
+        }
+        if (tMs - c.statusMs >= 5000) {
+            c.statusMs = tMs;
+            char line[260]{};
+            std::snprintf(line, sizeof(line), "car %d status: at %.0f,%.0f %.1f m/s, leg %zu/%zu, point %zu/%zu, cmds %u, dropouts %u",
+                index, pos.x, pos.y, c.speed, c.leg + 1, legHashes_.size(), c.target, points_.size(), c.seq, c.dropouts);
+            if (logQueue_.size() < 2000) logQueue_.emplace_back(line);
+        }
+        return std::to_string(c.seq) + "|3|" + std::to_string(c.leg) + "|0|0|0|0|0|0|0";
     }
     bool renew = false;
     const char* why = (mode == 1 && haveRing && tMs < c.forceUntil) ? "wrong-way guard" : "target moved";

@@ -26,7 +26,7 @@ static std::vector<std::string> split(const std::string& s)
 }
 
 // A straight 1 km road east, eleven points; gates at 0 (start), 500 and 1000 (finish).
-static const char* kPlan = R"({"cmd":"drive.start","raceId":"pr-test","goInMs":2000,
+static const char* kPlan = R"({"cmd":"drive.start","dynamic":true,"raceId":"pr-test","goInMs":2000,
   "points":[{"x":0,"y":0,"z":0},{"x":100,"y":0,"z":0},{"x":200,"y":0,"z":0},{"x":300,"y":0,"z":0},{"x":400,"y":0,"z":0},
             {"x":500,"y":0,"z":0},{"x":600,"y":0,"z":0},{"x":700,"y":0,"z":0},{"x":800,"y":0,"z":0},{"x":900,"y":0,"z":0},
             {"x":1000,"y":0,"z":0}],
@@ -67,7 +67,7 @@ int main()
     }
     {   // a tape (0.3.1, KB-223): the first stretch, then the rest; nobody finishes on a partial plan
         State s;
-        CHECK(s.apply(R"({"cmd":"drive.start","raceId":"pr-tape","goInMs":0,"launch":{"rampFloorMps":40},"more":true,
+        CHECK(s.apply(R"({"cmd":"drive.start","dynamic":true,"raceId":"pr-tape","goInMs":0,"launch":{"rampFloorMps":40},"more":true,
           "points":[{"x":0,"y":0},{"x":100,"y":0}],
           "gates":[{"x":0,"y":0,"dx":1,"dy":0},{"x":100,"y":0,"dx":1,"dy":0}],
           "cars":[{"entity":"42","speeds":[30]}]})", t0));
@@ -187,7 +187,7 @@ int main()
     }
     {   // a plan: held before the lights, then driven, gates timed, target advanced ahead, stop at the end
         State s;
-        CHECK(!s.apply(R"({"cmd":"drive.start","points":[],"gates":[],"cars":[]})", t0));
+        CHECK(!s.apply(R"({"cmd":"drive.start","dynamic":true,"points":[],"gates":[],"cars":[]})", t0));
         CHECK(s.count(t0) == 0);
         std::string flat = kPlan;                                // this case is about holds and targets, not the curve
         flat.insert(flat.size() - 1, R"(,"launch":{"rampFloorMps":40})");
@@ -309,7 +309,7 @@ int main()
         CHECK(graph->route({0,-40,0},{90,40,0}).size() >= 10); // a grid anchor beside the lane
         State s;
         s.setRoadGraph(graph);
-        CHECK(s.apply(R"({"cmd":"drive.start","raceId":"road-test","goInMs":0,"launch":{"rampFloorMps":40},
+        CHECK(s.apply(R"({"cmd":"drive.start","dynamic":true,"raceId":"road-test","goInMs":0,"launch":{"rampFloorMps":40},
           "points":[{"x":0,"y":0,"z":0},{"x":90,"y":40,"z":0}],
           "gates":[{"x":0,"y":0,"z":0,"dx":1,"dy":0},{"x":90,"y":40,"z":0,"dx":0,"dy":1}],
           "cars":[{"entity":"42","vehicleId":5,"speeds":[25]}]})",t0));
@@ -324,7 +324,7 @@ int main()
         graph->lanes[0].line={{0,0,0},{20,0,0},{40,0,0},{60,0,0},{80,0,0},{100,0,0}};
         graph->lanes[1].line={{100,100,0},{120,100,0},{140,100,0},{160,100,0},{180,100,0},{200,100,0}};
         State s;s.setRoadGraph(graph);
-        CHECK(s.apply(R"({"cmd":"drive.start","raceId":"segmented","goInMs":0,
+        CHECK(s.apply(R"({"cmd":"drive.start","dynamic":true,"raceId":"segmented","goInMs":0,
           "points":[{"x":0,"y":0,"z":0},{"x":100,"y":50,"z":0},{"x":200,"y":100,"z":0}],
           "gates":[{"x":0,"y":0,"dx":1,"dy":0},{"x":100,"y":50,"dx":1,"dy":0},{"x":200,"y":100,"dx":1,"dy":0}],
           "cars":[{"entity":"42","vehicleId":5,"speeds":[25,25]}]})",t0));
@@ -340,7 +340,7 @@ int main()
         for (int x=500;x<=1000;x+=10) graph->lanes[1].line.push_back({static_cast<double>(x),0,0});
         graph->lanes[0].out={1};
         State s;s.setRoadGraph(graph);
-        CHECK(s.apply(R"({"cmd":"drive.start","raceId":"along","goInMs":0,"lookaheadM":150,"reaimFrac":0.9,
+        CHECK(s.apply(R"({"cmd":"drive.start","dynamic":true,"raceId":"along","goInMs":0,"lookaheadM":150,"reaimFrac":0.9,
           "points":[{"x":0,"y":0,"z":0},{"x":500,"y":3,"z":0},{"x":1000,"y":0,"z":0}],
           "gates":[{"x":0,"y":0,"dx":1,"dy":0},{"x":500,"y":3,"dx":1,"dy":0},{"x":1000,"y":0,"dx":1,"dy":0}],
           "cars":[{"entity":"42","vehicleId":5,"speeds":[25,25]}]})",t0));
@@ -365,7 +365,7 @@ int main()
         for (int x=500;x>=300;x-=10) graph->lanes[2].line.push_back({static_cast<double>(x),500,0});
         graph->lanes[0].out={1}; graph->lanes[1].out={2};
         State s;s.setRoadGraph(graph);
-        CHECK(s.apply(R"({"cmd":"drive.start","raceId":"bend","goInMs":0,
+        CHECK(s.apply(R"({"cmd":"drive.start","dynamic":true,"raceId":"bend","goInMs":0,
           "points":[{"x":0,"y":0,"z":0},{"x":300,"y":500,"z":0}],
           "gates":[{"x":0,"y":0,"dx":1,"dy":0},{"x":300,"y":500,"dx":-1,"dy":0}],
           "cars":[{"entity":"42","vehicleId":5,"speeds":[25]}]})",t0));
@@ -391,7 +391,7 @@ int main()
         graph->lanes.resize(1);
         for (int x=0;x<=1000;x+=10) graph->lanes[0].line.push_back({static_cast<double>(x),0,0});
         State s;s.setRoadGraph(graph);
-        CHECK(s.apply(R"({"cmd":"drive.start","raceId":"grid","goInMs":0,
+        CHECK(s.apply(R"({"cmd":"drive.start","dynamic":true,"raceId":"grid","goInMs":0,
           "points":[{"x":0,"y":0,"z":0},{"x":1000,"y":0,"z":0}],
           "gates":[{"x":0,"y":0,"dx":1,"dy":0},{"x":1000,"y":0,"dx":1,"dy":0}],
           "cars":[{"entity":"42","vehicleId":5,"speeds":[78]},{"entity":"43","vehicleId":6,"speeds":[78]}]})",t0));
@@ -406,7 +406,7 @@ int main()
         graph->lanes.resize(1);
         for (int x=0;x<=2000;x+=10) graph->lanes[0].line.push_back({static_cast<double>(x),0,0});
         State s;s.setRoadGraph(graph);
-        CHECK(s.apply(R"({"cmd":"drive.start","raceId":"ramp","goInMs":0,"launch":{"graceS":0.1,"rampFloorMps":6,"rampMps2":4},
+        CHECK(s.apply(R"({"cmd":"drive.start","dynamic":true,"raceId":"ramp","goInMs":0,"launch":{"graceS":0.1,"rampFloorMps":6,"rampMps2":4},
           "points":[{"x":0,"y":0,"z":0},{"x":2000,"y":0,"z":0}],
           "gates":[{"x":0,"y":0,"dx":1,"dy":0},{"x":2000,"y":0,"dx":1,"dy":0}],
           "cars":[{"entity":"42","vehicleId":5,"speeds":[40]}]})",t0));
@@ -424,7 +424,7 @@ int main()
         graph->lanes.resize(1);
         for (int x=0;x<=600;x+=10) graph->lanes[0].line.push_back({static_cast<double>(x),0,0});
         State s;s.setRoadGraph(graph);
-        CHECK(s.apply(R"({"cmd":"drive.start","raceId":"plaza","goInMs":0,"launch":{"rampFloorMps":40},
+        CHECK(s.apply(R"({"cmd":"drive.start","dynamic":true,"raceId":"plaza","goInMs":0,"launch":{"rampFloorMps":40},
           "points":[{"x":0,"y":0,"z":0},{"x":640,"y":70,"z":0}],
           "gates":[{"x":0,"y":0,"dx":1,"dy":0},{"x":640,"y":70,"dx":1,"dy":0}],
           "cars":[{"entity":"42","vehicleId":5,"speeds":[30]}]})",t0));
@@ -439,7 +439,7 @@ int main()
         graph->lanes.resize(1);
         for (int x=0;x<=1000;x+=10) graph->lanes[0].line.push_back({static_cast<double>(x),0,0});
         State s;s.setRoadGraph(graph);
-        CHECK(s.apply(R"({"cmd":"drive.start","raceId":"fwd","goInMs":0,"launch":{"rampFloorMps":40},
+        CHECK(s.apply(R"({"cmd":"drive.start","dynamic":true,"raceId":"fwd","goInMs":0,"launch":{"rampFloorMps":40},
           "points":[{"x":0,"y":0,"z":0},{"x":1000,"y":0,"z":0}],
           "gates":[{"x":0,"y":0,"dx":1,"dy":0},{"x":1000,"y":0,"dx":1,"dy":0}],
           "cars":[{"entity":"42","vehicleId":5,"speeds":[30]}]})",t0));
@@ -455,7 +455,7 @@ int main()
         State s;s.setRoadGraph(graph);
         std::string pts, gts;
         for (int i=0;i<=30;++i) {pts+=(i?",":"")+std::string("{\"x\":")+std::to_string(i*30)+",\"y\":0,\"z\":0}";}
-        CHECK(s.apply(R"({"cmd":"drive.start","raceId":"dense","goInMs":0,"points":[)"+pts+R"(],
+        CHECK(s.apply(R"({"cmd":"drive.start","dynamic":true,"raceId":"dense","goInMs":0,"points":[)"+pts+R"(],
           "gates":[{"x":0,"y":0,"dx":1,"dy":0},{"x":900,"y":0,"dx":1,"dy":0}],
           "cars":[{"entity":"42","vehicleId":5,"speeds":[25]}]})",t0));
         bool skipped=false;
@@ -483,6 +483,45 @@ int main()
         bool back = false;
         for (const auto& line : s.drainLog()) if (line.find("car 1 BACK after") != std::string::npos) back = true;
         CHECK(back);
+    }
+
+    {   // 0.7.0 (L246): a street plan is driven on race splines or not at all.
+        State s;
+        CHECK(!s.apply(R"({"cmd":"drive.start","raceId":"no-legs","goInMs":0,
+          "points":[{"x":0,"y":0,"z":0},{"x":500,"y":0,"z":0}],
+          "gates":[{"x":0,"y":0,"dx":1,"dy":0},{"x":500,"y":0,"dx":1,"dy":0}],
+          "cars":[{"entity":"42","vehicleId":5,"speeds":[30]}]})", t0));
+        CHECK(s.refusal().find("no race splines") != std::string::npos);
+        CHECK(!s.apply(R"({"cmd":"drive.start","raceId":"one-short","goInMs":0,"legs":["$/mod/ncm_pace/#leg_a__b"],
+          "points":[{"x":0,"y":0,"z":0},{"x":500,"y":0,"z":0},{"x":900,"y":0,"z":0}],
+          "gates":[{"x":0,"y":0,"dx":1,"dy":0},{"x":500,"y":0,"dx":1,"dy":0},{"x":900,"y":0,"dx":1,"dy":0}],
+          "cars":[{"entity":"42","vehicleId":5,"speeds":[30]}]})", t0));
+        CHECK(s.refusal().find("1 race splines for 2 legs") != std::string::npos);
+    }
+    {   // 0.7.0: one racing command per leg, held; the next leg's spline at the checkpoint; a fresh one after a crawl.
+        State s;
+        CHECK(s.apply(R"({"cmd":"drive.start","raceId":"legs","goInMs":0,
+          "legs":["$/mod/ncm_pace/#leg_a__b","$/mod/ncm_pace/#leg_b__c"],
+          "points":[{"x":0,"y":0,"z":0},{"x":500,"y":0,"z":0},{"x":900,"y":0,"z":0}],
+          "gates":[{"x":0,"y":0,"dx":1,"dy":0},{"x":500,"y":0,"dx":1,"dy":0},{"x":900,"y":0,"dx":1,"dy":0}],
+          "cars":[{"entity":"42","vehicleId":5,"speeds":[30]}]})", t0));
+        auto f = split(s.step(0, 0, 0, 0, t0 + 1000ms));
+        CHECK(f.size() == 10 && f[1] == "3" && f[2] == "0");                   // racing, leg 1
+        CHECK(s.spline(0) == ncm::pace::nodeRefHash("$/mod/ncm_pace/#leg_a__b"));
+        CHECK(ncm::pace::nodeRefHash("a") == 0xaf63dc4c8601ec8cull);          // FNV-1a 64, the NodeRef hash
+        const std::string seq = f[0];
+        auto at = t0 + 1000ms;
+        for (int x = 20; x <= 400; x += 20) { at += 100ms; f = split(s.step(0, x, 0, 0, at)); }
+        CHECK(f[0] == seq);                                                  // held for the whole leg: no churn
+        for (int x = 420; x <= 600; x += 20) { at += 100ms; f = split(s.step(0, x, 0, 0, at)); }
+        CHECK(f[0] != seq && f[2] == "1");                                   // past the checkpoint: leg 2
+        CHECK(s.spline(0) == ncm::pace::nodeRefHash("$/mod/ncm_pace/#leg_b__c"));
+        const std::string seq2 = f[0];
+        for (int k = 0; k < 70; ++k) { at += 100ms; f = split(s.step(0, 600, 0, 0, at)); }  // 7 s parked
+        CHECK(f[0] != seq2);                                                 // a fresh racing command
+        bool logged = false;
+        for (const auto& line : s.drainLog()) if (line.find("spline $/mod/ncm_pace/#leg_b__c") != std::string::npos) logged = true;
+        CHECK(logged);
     }
 
     if (failures == 0) std::printf("pace state: all checks passed\n");

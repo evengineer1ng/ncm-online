@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.21)
-project(ncm_pace VERSION 0.6.0 LANGUAGES CXX)
+project(ncm_pace VERSION 0.7.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -45,4 +45,12 @@ if (BUILD_TESTING)
     target_include_directories(ncm_pace_state_tests PRIVATE src "${DEPS_ROOT}/json")
     target_compile_definitions(ncm_pace_state_tests PRIVATE NCM_PACE_VERSION="${PROJECT_VERSION}" NOMINMAX)
     add_test(NAME ncm_pace_state COMMAND ncm_pace_state_tests)
+endif()
+
+# bake_legs (L246): the road line for every race leg, from the archive export of the traffic graph. A tool, not
+# part of the plugin: tools/bake-race-splines.py runs it and turns its lines into race splines.
+if (BUILD_TESTING)
+    add_executable(ncm_pace_bake_legs tools/bake_legs.cpp src/road_graph.cpp)
+    target_include_directories(ncm_pace_bake_legs PRIVATE src "${DEPS_ROOT}/json")
+    target_compile_definitions(ncm_pace_bake_legs PRIVATE NOMINMAX)
 endif()
