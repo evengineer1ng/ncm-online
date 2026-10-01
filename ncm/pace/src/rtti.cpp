@@ -51,6 +51,16 @@ void spline(RED4ext::IScriptable*, RED4ext::CStackFrame* stack, uint64_t* out, i
     if (out) *out = state().spline(index);
 }
 
+// 0.7.5: the NodeRef for any node path, hashed as Pace hashes its race splines -- so a vanilla spline can be probed
+// by its path as a control (KB-249).
+void nodeRef(RED4ext::IScriptable*, RED4ext::CStackFrame* stack, uint64_t* out, int64_t)
+{
+    RED4ext::CString path;
+    RED4ext::GetParameter(stack, &path);
+    stack->code++;
+    if (out) *out = nodeRefHash(path.c_str());
+}
+
 void step(RED4ext::IScriptable*, RED4ext::CStackFrame* stack, RED4ext::CString* out, int64_t)
 {
     int32_t index = -1;
@@ -108,6 +118,7 @@ void postRegister()
     add("NcmPace_Step", reinterpret_cast<RED4ext::ScriptingFunction_t<void*>>(&step), "String",
         {{"Int32", "index"}, {"Float", "x"}, {"Float", "y"}, {"Float", "z"}});
     add("NcmPace_Spline", reinterpret_cast<RED4ext::ScriptingFunction_t<void*>>(&spline), "NodeRef", {{"Int32", "index"}});
+    add("NcmPace_NodeRef", reinterpret_cast<RED4ext::ScriptingFunction_t<void*>>(&nodeRef), "NodeRef", {{"String", "path"}});
     add("NcmPace_Banner", reinterpret_cast<RED4ext::ScriptingFunction_t<void*>>(&banner), "String", {});
     add("NcmPace_Area", reinterpret_cast<RED4ext::ScriptingFunction_t<void*>>(&area), "String", {});
     add("NcmPace_Log", reinterpret_cast<RED4ext::ScriptingFunction_t<void*>>(&note), "Bool", {{"String", "text"}});

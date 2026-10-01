@@ -4,7 +4,7 @@
 The engine's racer (`AIVehicleRacingCommand`) drives a world spline (`splineRef: NodeRef`) -- the same thing vanilla
 street races drive (sq024's `worldRaceSplineNode`). Every Paddock race is a chain of authored nodes, so one spline per
 ordered node pair covers every race. `ncm_pace_bake_legs` routes each pair over the game's own lane graph; this turns
-those lines into `worldRaceSplineNode`s in AlwaysLoaded sectors, a streaming block listing them, and the ArchiveXL
+those lines into `worldRaceSplineNode`s in open-world (Exterior level 6) sectors, a streaming block listing them, and the ArchiveXL
 registration, then packs an archive with WolvenKit.
 
 Each spline's ref is  $/mod/ncm_pace/#leg_<fromNodeId>__<toNodeId>  (Pace hashes the same string at runtime).
@@ -82,8 +82,10 @@ def main():
         chunk = legs[s:s + PER_SECTOR]
         sec = copy.deepcopy(tpl)
         r = sec["Data"]["RootChunk"]
-        r["category"] = "AlwaysLoaded"
-        r["level"] = 255
+        # Exterior, level 6 -- where vanilla keeps its long open-world splines (sq024's city-race speed spline lives in
+        # exterior_-1_-1_0_6); our AlwaysLoaded sectors merged but their splines never resolved (KB-249).
+        r["category"] = "Exterior"
+        r["level"] = 6
         r["variantIndices"] = [0]
         r["variantNodes"] = []
         r["persistentNodes"] = []
@@ -124,9 +126,9 @@ def main():
             # 15131.8 / 512). The quest template's 288 has the 0x100 bit every quest-sector node has and no
             # always-loaded node has: a node flagged quest-owned is never registered without its quest prefab, and both
             # racing and spline commands failed at once on these splines (KB-249).
-            e["Uk10"], e["Uk11"], e["Uk12"] = 1056, 512, 0
+            e["Uk10"], e["Uk11"], e["Uk12"] = 1056, 512, 0          # as vanilla exterior spline nodes
             e["MaxStreamingDistance"] = 15131.8018
-            e["UkFloat1"] = 512.0
+            e["UkFloat1"] = 16232.1182
             nd.append(e)
         r["nodeData"]["Data"] = nd
         name = f"legs_{s // PER_SECTOR:03d}.streamingsector"
@@ -135,13 +137,13 @@ def main():
         descriptors.append({
             "$type": "worldStreamingSectorDescriptor",
             "blockIndex": {"$type": "worldStreamingBlockIndex", "oup": "Base", "rldGridCell": 0},
-            "category": "AlwaysLoaded",
+            "category": "Exterior",
             "data": {"DepotPath": {"$type": "ResourcePath", "$storage": "string", "$value": DEPOT + "\\" + name}, "Flags": "Soft"},
-            "level": 0, "numNodeRanges": 1,
+            "level": 6, "numNodeRanges": 1,
             "questPrefabNodeRef": {"$type": "NodeRef", "$storage": "uint64", "$value": "0"},
             "streamingBox": {"$type": "Box",
-                             "Max": {"$type": "Vector4", "W": 3.40282347e+38, "X": 3.40282347e+38, "Y": 3.40282347e+38, "Z": 3.40282347e+38},
-                             "Min": {"$type": "Vector4", "W": -3.40282347e+38, "X": -3.40282347e+38, "Y": -3.40282347e+38, "Z": -3.40282347e+38}},
+                             "Max": {"$type": "Vector4", "W": 1, "X": 64000.0, "Y": 64000.0, "Z": 64000.0},
+                             "Min": {"$type": "Vector4", "W": 1, "X": -64000.0, "Y": -64000.0, "Z": -64000.0}},
             "variants": []})
 
     block = {"Header": copy.deepcopy(tpl["Header"]), "Data": copy.deepcopy(tpl["Data"])}
@@ -161,7 +163,7 @@ def main():
     shutil.rmtree(src)
     subprocess.run([WKIT, "pack", pack_root, "-o", a.out], check=True)
     with open(os.path.join(a.out, "ncm_pace_race_splines.archive.xl"), "w", encoding="utf-8", newline="\n") as f:
-        f.write("# NCM Pace race splines (L246, IDEA-788): one engine race spline per race leg, AlwaysLoaded.\n")
+        f.write("# NCM Pace race splines (L246, IDEA-788): one engine race spline per race leg, open-world (Exterior level 6).\n")
         f.write("streaming:\n  blocks:\n    - " + DEPOT + "\\race_splines.streamingblock\n")
     print("archive + .xl in", a.out)
 

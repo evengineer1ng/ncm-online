@@ -49,6 +49,9 @@ public class NcmPaceSystem extends ScriptableSystem {
   private let m_probeCar: Int32;
   private let m_probeDone: Bool;
   private let m_probeSaid: Bool;
+  private let m_control: ref<AIVehicleCommand>;
+  private let m_controlCar: Int32;
+  private let m_controlSaid: Bool;
 
   public func SetBanner(banner: ref<NcmPaceBanner>) -> Void {
     this.m_banner = banner;
@@ -272,6 +275,14 @@ public class NcmPaceSystem extends ScriptableSystem {
           + (Equals(ps, AICommandState.Executing) ? " -- the spline RESOLVES; the racer wants more" : ""));
       }
     }
+    if IsDefined(this.m_control) && this.m_controlCar == i {
+      let cs: AICommandState = agent.GetCommandState(this.m_control);
+      if !this.m_controlSaid && !Equals(cs, AICommandState.NotExecuting) {
+        this.m_controlSaid = true;
+        NcmPace_Log("control: AIVehicleOnSplineCommand on VANILLA spline #test_nc_sq024_city_center is " + ToString(cs)
+          + (Equals(cs, AICommandState.Executing) ? " -- Pace's NodeRef hash is right; our sectors are the problem" : ""));
+      }
+    }
     let st: AICommandState = agent.GetCommandState(held);
     if Equals(st, AICommandState.Failure) || Equals(st, AICommandState.Success) {
       this.m_ended[i] = true;
@@ -288,6 +299,25 @@ public class NcmPaceSystem extends ScriptableSystem {
         this.m_probe = probe;
         this.m_probeCar = i;
         NcmPace_Log("probe: sending AIVehicleOnSplineCommand to car " + ToString(i) + ": " + (agent.SendCommand(probe) ? "accepted" : "REFUSED"));
+        // the CONTROL (0.7.5): a vanilla open-world speed spline (exterior_-1_-1_0_6), by its full path through Pace's
+        // hash, on a second car. If it executes, the hash is right and our sectors are what the engine is not finding.
+        let other: Int32 = i == 0 ? 1 : 0;
+        let otherVehicle: ref<VehicleObject> = this.m_vehicles[other];
+        if IsDefined(otherVehicle) {
+          let otherAgent: ref<AIVehicleAgent> = otherVehicle.GetAIComponent();
+          if IsDefined(otherAgent) {
+            let control: ref<AIVehicleOnSplineCommand> = new AIVehicleOnSplineCommand();
+            control.splineRef = NcmPace_NodeRef("$/03_night_city/#c_city_center/corpo_plaza/loc_sq024_citycenter_racetrack_prefabK3D7W4Y/loc_sq024_citycenter_racetrack_openworld_prefabPMPERBY/#test_nc_sq024_city_center");
+            control.startFromClosest = true;
+            control.stopAtPathEnd = true;
+            control.needDriver = false;
+            control.useKinematic = false;
+            control.secureTimeOut = 60.0;
+            this.m_control = control;
+            this.m_controlCar = other;
+            NcmPace_Log("control: sending the vanilla spline to car " + ToString(other) + ": " + (otherAgent.SendCommand(control) ? "accepted" : "REFUSED"));
+          }
+        }
       }
     }
   }
