@@ -52,6 +52,9 @@ public class NcmPaceSystem extends ScriptableSystem {
   private let m_control: ref<AIVehicleCommand>;
   private let m_controlCar: Int32;
   private let m_controlSaid: Bool;
+  private let m_probeLast: AICommandState;
+  private let m_controlLast: AICommandState;
+  private let m_testTicks: Int32;      // 0.7.6: while > 0 the two test cars get no race commands (20 s at 20 Hz)
 
   public func SetBanner(banner: ref<NcmPaceBanner>) -> Void {
     this.m_banner = banner;
@@ -129,6 +132,12 @@ public class NcmPaceSystem extends ScriptableSystem {
       }
       i += 1;
     }
+    if this.m_testTicks > 0 {
+      this.m_testTicks -= 1;
+      if this.m_testTicks == 0 {
+        NcmPace_Log("probe/control: test window over");
+      }
+    }
     this.Schedule(0.05);
   }
 
@@ -139,6 +148,9 @@ public class NcmPaceSystem extends ScriptableSystem {
     }
     if Equals(f[0], this.m_seq[i]) {
       return;
+    }
+    if this.m_testTicks > 0 && ((IsDefined(this.m_probe) && i == this.m_probeCar) || (IsDefined(this.m_control) && i == this.m_controlCar)) {
+      return;                          // a test car is left alone with its test command (0.7.6)
     }
     this.m_seq[i] = f[0];
     let mode: Int32 = StringToInt(f[1]);
@@ -267,20 +279,18 @@ public class NcmPaceSystem extends ScriptableSystem {
     // 0.7.3 DIAGNOSTIC, once per game: does the engine find the race spline at all? The racing command fails at once
     // on it; the plain spline command on the SAME ref tells a ref that does not resolve (it fails too) from a racer
     // that wants something more (it executes). Logged only -- it never races.
-    if IsDefined(this.m_probe) && this.m_probeCar == i {
+    if IsDefined(this.m_probe) && this.m_probeCar == i && this.m_testTicks > 0 {
       let ps: AICommandState = agent.GetCommandState(this.m_probe);
-      if !this.m_probeSaid && !Equals(ps, AICommandState.NotExecuting) {
-        this.m_probeSaid = true;
-        NcmPace_Log("probe: AIVehicleOnSplineCommand on the same spline is " + ToString(ps)
-          + (Equals(ps, AICommandState.Executing) ? " -- the spline RESOLVES; the racer wants more" : ""));
+      if !Equals(ps, this.m_probeLast) {
+        this.m_probeLast = ps;
+        NcmPace_Log("probe: OUR spline (OnSpline) -> " + ToString(ps) + " at " + IntToString(400 - this.m_testTicks) + " ticks");
       }
     }
-    if IsDefined(this.m_control) && this.m_controlCar == i {
+    if IsDefined(this.m_control) && this.m_controlCar == i && this.m_testTicks > 0 {
       let cs: AICommandState = agent.GetCommandState(this.m_control);
-      if !this.m_controlSaid && !Equals(cs, AICommandState.NotExecuting) {
-        this.m_controlSaid = true;
-        NcmPace_Log("control: AIVehicleOnSplineCommand on VANILLA spline #test_nc_sq024_city_center is " + ToString(cs)
-          + (Equals(cs, AICommandState.Executing) ? " -- Pace's NodeRef hash is right; our sectors are the problem" : ""));
+      if !Equals(cs, this.m_controlLast) {
+        this.m_controlLast = cs;
+        NcmPace_Log("control: VANILLA spline (OnSpline) -> " + ToString(cs) + " at " + IntToString(400 - this.m_testTicks) + " ticks");
       }
     }
     let st: AICommandState = agent.GetCommandState(held);
@@ -298,6 +308,9 @@ public class NcmPaceSystem extends ScriptableSystem {
         probe.secureTimeOut = 60.0;
         this.m_probe = probe;
         this.m_probeCar = i;
+        this.m_testTicks = 400;
+        this.m_probeLast = AICommandState.NotExecuting;
+        this.m_controlLast = AICommandState.NotExecuting;
         NcmPace_Log("probe: sending AIVehicleOnSplineCommand to car " + ToString(i) + ": " + (agent.SendCommand(probe) ? "accepted" : "REFUSED"));
         // the CONTROL (0.7.5): a vanilla open-world speed spline (exterior_-1_-1_0_6), by its full path through Pace's
         // hash, on a second car. If it executes, the hash is right and our sectors are what the engine is not finding.
