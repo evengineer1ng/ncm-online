@@ -74,7 +74,7 @@ RED4EXT_C_EXPORT void RED4EXT_CALL Query(RED4ext::v1::PluginInfo* info)
 {
     info->name = L"NCM Pace";
     info->author = L"Night City Motorsports";
-    info->version = RED4EXT_V1_SEMVER(0, 7, 8);
+    info->version = RED4EXT_V1_SEMVER(0, 7, 9);
     info->runtime = RED4EXT_V1_RUNTIME_VERSION_LATEST;
     info->sdk = RED4EXT_V1_SDK_VERSION_CURRENT;
 }
