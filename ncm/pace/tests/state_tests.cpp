@@ -329,6 +329,51 @@ int main()
         for(const auto& line:s.drainLog()) if(line.find("2/2 legs, segmented")!=std::string::npos) segmented=true;
         CHECK(segmented);
     }
+    {   // 0.5.0: with a road plan the car is sent ALONG the road, past a checkpoint, never to the checkpoint itself and
+        // then the finish 1 km off (the field left the planned road at the first checkpoint, owner 2026-09-30).
+        auto graph=std::make_shared<ncm::pace::RoadGraph>();
+        graph->lanes.resize(2);
+        for (int x=0;x<=500;x+=10) graph->lanes[0].line.push_back({static_cast<double>(x),0,0});
+        for (int x=500;x<=1000;x+=10) graph->lanes[1].line.push_back({static_cast<double>(x),0,0});
+        graph->lanes[0].out={1};
+        State s;s.setRoadGraph(graph);
+        CHECK(s.apply(R"({"cmd":"drive.start","raceId":"along","goInMs":0,"lookaheadM":150,"reaimFrac":0.9,
+          "points":[{"x":0,"y":0,"z":0},{"x":500,"y":3,"z":0},{"x":1000,"y":0,"z":0}],
+          "gates":[{"x":0,"y":0,"dx":1,"dy":0},{"x":500,"y":3,"dx":1,"dy":0},{"x":1000,"y":0,"dx":1,"dy":0}],
+          "cars":[{"entity":"42","vehicleId":5,"speeds":[25,25]}]})",t0));
+        bool joint=false,straightJoint=false;
+        for(const auto& line:s.drainLog()) if(line.find("road joint at checkpoint 1")!=std::string::npos){joint=true;straightJoint=line.find("turn 0 deg")!=std::string::npos;}
+        CHECK(joint && straightJoint);
+        auto w=split(s.step(0,400,0,0,t0+3000ms));
+        CHECK(w[1]=="1" && std::stod(w[2])>650.0 && std::fabs(std::stod(w[3]))<1.0);   // 300 m along the road, beyond the checkpoint
+        // short of the re-aim distance it holds its destination; inside it, the destination rolls on
+        CHECK(split(s.step(0,450,0,0,t0+3500ms))[2]==w[2]);
+        CHECK(std::stod(split(s.step(0,560,0,0,t0+5000ms))[2])>std::stod(w[2]));
+        // near the end of the plan it hands back to the line, which aims beyond the finish
+        CHECK(std::stod(split(s.step(0,980,0,0,t0+9000ms))[2])>1000.0);
+    }
+    {   // 0.5.0: a car the game stops reporting is logged once as a dropout; when it is back it gets a FRESH command
+        // (a re-created vehicle object holds none), even though nothing about the plan changed.
+        State s;
+        CHECK(s.apply(kPlan, t0));
+        CHECK(s.count(t0 + 2000ms) == 2);
+        const auto a = split(s.step(1, 10, 0, 0, t0 + 3000ms));
+        s.step(1, 20, 0, 0, t0 + 3050ms);
+        s.drainLog();
+        CHECK(s.count(t0 + 6000ms) == 2);
+        CHECK(s.count(t0 + 6100ms) == 2);
+        int drops = 0, backs = 0;
+        for (const auto& line : s.drainLog()) {
+            if (line.find("car 1 DROPOUT #1") != std::string::npos) drops++;
+            if (line.find("car 1 BACK") != std::string::npos) backs++;
+        }
+        CHECK(drops == 1 && backs == 0);       // once, not every tick
+        const auto b = split(s.step(1, 120, 0, 0, t0 + 7000ms));
+        CHECK(b[0] != a[0] && b[1] == "1");    // a new seq: redscript re-sends to the new object
+        bool back = false;
+        for (const auto& line : s.drainLog()) if (line.find("car 1 BACK after") != std::string::npos) back = true;
+        CHECK(back);
+    }
 
     if (failures == 0) std::printf("pace state: all checks passed\n");
     return failures == 0 ? 0 : 1;

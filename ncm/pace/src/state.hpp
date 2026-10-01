@@ -106,6 +106,19 @@ struct Car {
     size_t roadIndex = 0;
     size_t roadLeg = 0;
     bool roadLocated = false;
+    // 0.5.0: the native driver is sent along the road plan, not to the next checkpoint (owner, 2026-09-30: the field
+    // fell apart at the first checkpoint once the aim jumped to the finish and the engine replanned its own way)
+    size_t roadAim = 0;
+    bool roadAimed = false;
+    bool onRoad = true;             // last reported: within reach of the road plan
+    uint32_t roadEvents = 0;
+    // 0.5.0: a car the game stops reporting (streamed out, destroyed) and that comes back must be re-commanded:
+    // redscript only sends on a new seq, so a re-created vehicle object would otherwise sit with no command
+    std::chrono::steady_clock::time_point lastStepAt{};
+    bool haveStep = false;
+    bool missing = false;
+    uint32_t dropouts = 0;
+    int64_t statusMs = -1000000;
 };
 
 class State {
@@ -147,6 +160,9 @@ public:
     // 0.4.5: re-aim once the car's remaining distance to its aim falls under this share of the look-ahead. 0.5
     // let a car close on its aim and brake for it ("braking at checkpoints", 06:12); ~0.9 keeps it always ahead.
     double reaimFrac = 0.5;
+    // 0.5.0: with a road plan the car is sent this far along it, and re-aimed once fewer than roadReaimM remain
+    double roadAimM = 300.0;
+    double roadReaimM = 180.0;
     // 0.4.6, the WRONG-WAY GUARD (owner, 06:48: "they do good for a few turns, then wonder which way round is fastest
     // and turn around ... harden their forward travel"). A plan may carry its ring {cx, cy, sign}: a car moving
     // against the ring's direction for wrongWayMs (0.3 s) is sent 25 m further ROUND the ring, the race direction, for 2.5 s -- the

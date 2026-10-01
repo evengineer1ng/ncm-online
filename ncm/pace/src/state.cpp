@@ -91,7 +91,12 @@ void State::planRoad()
     bool connected=true;
     size_t validLegs=0;
     for (size_t i=1;i<points_.size();++i) {
-        auto segment=roadGraph_->route(points_[i-1],points_[i]);
+        // 0.5.0: a leg after the first continues from where the previous leg's road ENDS, not from the checkpoint
+        // coordinate. Snapped separately, the two legs could meet on different lanes (the opposite carriageway, a
+        // cross street), and the joint read as a hairpin that braked every car into the checkpoint.
+        const Point from=(i>1 && !roadLegs_[i-2].points.empty()) ? roadLegs_[i-2].points.back() : points_[i-1];
+        auto segment=roadGraph_->route(from,points_[i]);
+        if (segment.empty() && i>1) segment=roadGraph_->route(points_[i-1],points_[i]);
         if (segment.empty()) {
             if (logQueue_.size()<2000) logQueue_.push_back("road speed plan unavailable: leg "+std::to_string(i)+
                 " of "+std::to_string(points_.size()-1)+" from "+std::to_string(static_cast<int>(points_[i-1].x))+","+
@@ -129,7 +134,24 @@ void State::planRoad()
         else if (logQueue_.size()<2000) logQueue_.push_back("road speed plan segmented: invalid checkpoint spacing");
     }
     if (roadLimits_.empty()) road_.clear();
-    for (auto& c:cars_) c.roadLocated=false;
+    // every checkpoint joint, said out loud: how sharp the road turns there and how slow the plan goes near it
+    if (!road_.empty()) for (size_t i=1;i+1<points_.size();++i) {
+        size_t at=0; double best=1e100;
+        for (size_t k=0;k<road_.size();++k) {const double d=std::hypot(road_[k].x-points_[i].x,road_[k].y-points_[i].y);if(d<best){best=d;at=k;}}
+        const size_t a=at>=3?at-3:0, b=std::min(road_.size()-1,at+3);
+        const double ux=road_[at].x-road_[a].x, uy=road_[at].y-road_[a].y, vx=road_[b].x-road_[at].x, vy=road_[b].y-road_[at].y;
+        const double nu=std::hypot(ux,uy), nv=std::hypot(vx,vy);
+        const double turn=(nu>1e-6&&nv>1e-6)?std::acos(std::clamp((ux*vx+uy*vy)/(nu*nv),-1.0,1.0))*57.2958:0.0;
+        double slow=1e100; double walked=0;
+        for (size_t k=at;k>0&&walked<150.0;--k) {walked+=std::hypot(road_[k].x-road_[k-1].x,road_[k].y-road_[k-1].y);slow=std::min(slow,roadLimits_[k-1]);}
+        walked=0;
+        for (size_t k=at;k+1<road_.size()&&walked<150.0;++k) {walked+=std::hypot(road_[k+1].x-road_[k].x,road_[k+1].y-road_[k].y);slow=std::min(slow,roadLimits_[k+1]);}
+        char line[200]{};
+        std::snprintf(line,sizeof(line),"road joint at checkpoint %zu: road %.0f m from it, turn %.0f deg, slowest %.1f m/s within 150 m",
+            i,best,turn,std::min(slow,roadLimits_[at]));
+        if (logQueue_.size()<2000) logQueue_.emplace_back(line);
+    }
+    for (auto& c:cars_) {c.roadLocated=false;c.roadAimed=false;}
     if (logQueue_.size()<2000) logQueue_.push_back("road speed plan ready: "+std::to_string(validLegs)+"/"+
         std::to_string(roadLegs_.size())+" legs, "+(roadLimits_.empty()?"segmented":"continuous")+" profile");
 }
@@ -308,6 +330,8 @@ bool State::apply(const std::string& text, Clock::time_point now)
     advanceM = j.value("advanceM", 40.0);
     lookaheadM = std::max(0.0, j.value("lookaheadM", 0.0));
     reaimFrac = std::min(0.98, std::max(0.1, j.value("reaimFrac", 0.5)));
+    roadAimM = std::clamp(j.value("roadAimM", 300.0), 80.0, 1000.0);
+    roadReaimM = std::clamp(j.value("roadReaimM", 180.0), 40.0, roadAimM - 20.0);
     haveRing = false;
     if (j.contains("ring") && j["ring"].is_object()) {
         ringCx = j["ring"].value("cx", 0.0);
@@ -352,6 +376,17 @@ int State::count(Clock::time_point now)
     // After a stop the cars stay listed for ten seconds, so redscript sees mode 2 and brakes them; then the list
     // goes and redscript falls back to its idle poll.
     if (!active_ && (cars_.empty() || now - stoppedAt_ > std::chrono::seconds(10))) return 0;
+    // redscript steps only the cars whose vehicle it can find, so a car the game has streamed out or destroyed
+    // simply stops being stepped. This is the one place that still runs every tick: say so once per dropout.
+    if (active_) for (size_t i=0;i<cars_.size();++i) {
+        Car& c=cars_[i];
+        if (!c.haveStep || c.missing || c.finished || c.entity==0 || now-c.lastStepAt<std::chrono::milliseconds(1500)) continue;
+        c.missing=true; c.dropouts++;
+        char line[200]{};
+        std::snprintf(line,sizeof(line),"car %zu DROPOUT #%u: not reported for 1.5 s (the game has no vehicle for it); last at %.0f,%.0f, %.1f m/s, point %zu/%zu",
+            i,c.dropouts,c.last.x,c.last.y,c.speed,c.target,points_.size());
+        if (logQueue_.size()<2000) logQueue_.emplace_back(line);
+    }
     return static_cast<int>(cars_.size());
 }
 
@@ -375,6 +410,21 @@ std::string State::step(int index, double x, double y, double z, Clock::time_poi
     Car& c = cars_[static_cast<size_t>(index)];
     const Point pos{x, y, z};
     const int64_t tMs = std::chrono::duration_cast<std::chrono::milliseconds>(now - goAt_).count();
+    // Back after a gap (streamed back in, or re-created under the same id): find it on the road afresh, measure its
+    // speed afresh, and send it a fresh command whatever it held before -- a new vehicle object has none.
+    bool reacquired = false;
+    if (c.haveStep && active_ && !c.finished && now - c.lastStepAt > std::chrono::milliseconds(1000)) {
+        reacquired = true;
+        const double gapS = std::chrono::duration<double>(now - c.lastStepAt).count();
+        char line[220]{};
+        std::snprintf(line, sizeof(line), "car %d BACK after %.1f s at %.0f,%.0f (%.0f m from where it was last seen), point %zu/%zu",
+            index, gapS, x, y, c.haveLast ? dist(pos, c.last) : 0.0, c.target, points_.size());
+        if (logQueue_.size() < 2000) logQueue_.emplace_back(line);
+        c.roadLocated = false; c.roadAimed = false; c.haveSpeedAt = false; c.stallMs = 0;
+    }
+    c.missing = false;
+    c.lastStepAt = now;
+    c.haveStep = true;
     if (active_ && tMs >= 0 && !c.finished) {
         if (c.haveLast) {
             while (c.nextGate < gates_.size()) {
@@ -404,6 +454,10 @@ std::string State::step(int index, double x, double y, double z, Clock::time_poi
             const bool passed = (pos.x - t.x) * (t.x - p.x) + (pos.y - t.y) * (t.y - p.y) > 0;
             if (!near && !passed) break;
             c.target++;
+            char line[200]{};
+            std::snprintf(line, sizeof(line), "car %d past point %zu/%zu at %.0f,%.0f, %.1f m/s (%s)",
+                index, c.target - 1, points_.size(), pos.x, pos.y, c.speed, near ? "reached" : "went beyond");
+            if (logQueue_.size() < 2000) logQueue_.emplace_back(line);
         }
     }
     // speed over >= 250 ms windows of the reported positions (20 Hz reports are too close together to difference)
@@ -418,6 +472,9 @@ std::string State::step(int index, double x, double y, double z, Clock::time_poi
     Point want{};
     float speed = 0;
     bool roadGuided = false;
+    bool roadSteer = false;          // want comes from the road plan, not the checkpoint line
+    Point roadWant{};
+    double roadOff = -1;
     if (!active_ || c.finished) {
         mode = 2;
     } else if (tMs < 0) {
@@ -433,7 +490,7 @@ std::string State::step(int index, double x, double y, double z, Clock::time_poi
             const size_t chosen=std::min(leg,roadLegs_.size()-1);
             if (!roadLegs_[chosen].limits.empty()) {
                 speedRoad=&roadLegs_[chosen].points;speedLimits=&roadLegs_[chosen].limits;
-                if (c.roadLeg!=chosen) {c.roadLeg=chosen;c.roadLocated=false;}
+                if (c.roadLeg!=chosen) {c.roadLeg=chosen;c.roadLocated=false;c.roadAimed=false;}
             }
         }
         roadGuided=speedRoad && speedLimits;
@@ -450,7 +507,17 @@ std::string State::step(int index, double x, double y, double z, Clock::time_poi
             auto [distance,at] = c.roadLocated ? closest(c.roadIndex>10?c.roadIndex-10:0,
                 std::min(speedRoad->size(),c.roadIndex+100)) : closest(0,speedRoad->size());
             if (distance>60.0) std::tie(distance,at)=closest(0,speedRoad->size());
-            if (distance<50.0) {
+            roadOff=distance;
+            const bool on=distance<50.0;
+            if (on!=c.onRoad && c.roadEvents<60) {
+                c.roadEvents++;
+                char line[200]{};
+                std::snprintf(line,sizeof(line),"car %d %s the road plan at %.0f,%.0f: nearest plan point %.0f m (index %zu/%zu)",
+                    index,on?"back on":"OFF",pos.x,pos.y,distance,at,speedRoad->size());
+                if (logQueue_.size()<2000) logQueue_.emplace_back(line);
+            }
+            c.onRoad=on;
+            if (on) {
                 c.roadIndex=at;c.roadLocated=true;
                 // The profile already propagates corner limits upstream. Sampling beyond a bend
                 // can pick the post-corner acceleration and cancel the required braking.
@@ -459,9 +526,23 @@ std::string State::step(int index, double x, double y, double z, Clock::time_poi
                 // limits stay common, so faster entrants do not exceed the lateral grip budget.
                 const double straightCap=std::clamp(static_cast<double>(speed)*1.6,38.0,44.0);
                 speed=static_cast<float>(std::min((*speedLimits)[preview],straightCap));
+                // Steer along the plan (0.5.0). The native driver picks its own way to whatever destination it is
+                // given; given the next checkpoint, then the finish 1+ km off, it replanned at the checkpoint and the
+                // field left the road the speeds were computed for. A destination roadAimM along the plan keeps it on
+                // that road, through every checkpoint, and beyond its braking distance (a near one makes it brake).
+                auto along=[&](size_t from,size_t to){double s=0;for(size_t k=from;k<to&&k+1<speedRoad->size();++k)s+=std::hypot((*speedRoad)[k+1].x-(*speedRoad)[k].x,(*speedRoad)[k+1].y-(*speedRoad)[k].y);return s;};
+                if (!c.roadAimed || c.roadAim<=at || along(at,c.roadAim)<roadReaimM) {
+                    size_t k=at; double acc=0;
+                    while (k+1<speedRoad->size() && acc<roadAimM) {acc+=std::hypot((*speedRoad)[k+1].x-(*speedRoad)[k].x,(*speedRoad)[k+1].y-(*speedRoad)[k].y);++k;}
+                    c.roadAim=k; c.roadAimed=true;
+                }
+                // the plan's last stretch hands back to the line, which knows to aim beyond the finish
+                if (c.roadAim+1<speedRoad->size()) {roadSteer=true;roadWant=(*speedRoad)[c.roadAim];}
             }
         }
-        if (c.target < points_.size() && lookaheadM > 0) {
+        if (roadSteer) {
+            want = roadWant;
+        } else if (c.target < points_.size() && lookaheadM > 0) {
             // aim far along the line (0.4.1): re-aim only when the car is within half the lookahead of its aim
             bool reaim = c.aim < c.target || c.aim >= points_.size();
             if (!reaim) {
@@ -534,6 +615,7 @@ std::string State::step(int index, double x, double y, double z, Clock::time_poi
             if (c.stallMs > static_cast<int64_t>(launch.stallS * 1000)) { renew = true; c.stallMs = 0; why = "stall kick"; }
             else if (tMs - c.cmdMs > static_cast<int64_t>((roadGuided ? std::max(3.0,launch.recommandS) : launch.recommandS) * 1000)) { renew = true; why = "recommand"; }
         }
+        if (reacquired) { renew = true; c.stallMs = 0; why = "back: fresh command"; }
     } else {
         c.phase = 0;
     }
@@ -542,15 +624,15 @@ std::string State::step(int index, double x, double y, double z, Clock::time_poi
                                           (speed < c.cmdSpeed || tMs-c.cmdMs>=300))))) {
         if (renew && mode == c.mode) c.renewals++;
         if (mode != c.mode) why = mode == 1 ? "go" : (mode == 2 ? "stop" : "hold");
-        // 0.4.2 (KB-223): every command a car is given, and why -- the first 40 per car -- so a car that starts and
-        // stops can be read, not guessed at
-        if (c.logged < 40) {
+        // 0.4.2 (KB-223): every command a car is given, and why, so a car that starts and stops can be read, not
+        // guessed at. 0.5.0: 400, not 40 -- 40 ran out a minute into a street race, before its first checkpoint.
+        if (c.logged < 400) {
             c.logged++;
             // queued, not written: this runs on the GAME thread; the bridge thread writes it (drainLog)
             char line[320]{};
-            std::snprintf(line, sizeof(line), "car %d cmd %u: %s, mode %d, at %.0f,%.0f speed %.1f m/s, to %.0f,%.0f (%.0f m away, point %zu/%zu), ceiling %.1f",
+            std::snprintf(line, sizeof(line), "car %d cmd %u: %s, mode %d, at %.0f,%.0f speed %.1f m/s, to %.0f,%.0f (%.0f m away, %s, point %zu/%zu), ceiling %.1f",
                 index, c.seq + 1, why, mode, pos.x, pos.y, c.speed, want.x, want.y, dist(pos, want),
-                (c.aim ? c.aim : c.target), points_.size(), static_cast<double>(speed));
+                roadSteer ? "along road" : "line", c.target, points_.size(), static_cast<double>(speed));
             if (logQueue_.size() < 2000) logQueue_.emplace_back(line);
         }
         c.mode = mode;
@@ -558,6 +640,15 @@ std::string State::step(int index, double x, double y, double z, Clock::time_poi
         c.cmdSpeed = speed;
         c.cmdMs = tMs;
         c.seq++;
+    }
+    // one line per car every 5 s whatever happens, so a race can be followed end to end
+    if (mode == 1 && tMs - c.statusMs >= 5000) {
+        c.statusMs = tMs;
+        char line[320]{};
+        std::snprintf(line, sizeof(line), "car %d status: at %.0f,%.0f %.1f m/s, ceiling %.1f, %s, road %s (%.0f m off, index %zu), point %zu/%zu, %.0f m to destination, cmds %u, dropouts %u",
+            index, pos.x, pos.y, c.speed, static_cast<double>(c.cmdSpeed), roadSteer ? "along road" : "line",
+            roadGuided ? (c.onRoad ? "on" : "OFF") : "none", roadOff, c.roadIndex, c.target, points_.size(), dist(pos, c.cmd), c.seq, c.dropouts);
+        if (logQueue_.size() < 2000) logQueue_.emplace_back(line);
     }
     // what to hold: the capped launch release, or the race command (SP buildLaunchReleaseProfile / buildDriveProfile)
     double mx = c.cmdSpeed, mn = 0, forced = 0, dd = launch.raceDist;
