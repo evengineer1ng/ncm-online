@@ -65,12 +65,18 @@ void State::push(const std::string& json)
     if (out_.size() < 512) out_.push_back(json);
 }
 
-// A NodeRef is the FNV-1a 64 hash of its path -- the same hash WolvenKit writes when it cooks the path string, and
-// what the engine resolves at load (L246). Logged beside the path on every racing command, so a mismatch shows at once.
+// The engine's NodeRef: FNV-1a 64 of the node path WITH EVERY '#' LEFT OUT (0.8.0, KB-249). Measured 2026-10-01 with
+// Codeware's CreateNodeRef against the refs the engine itself holds in a loaded sector, for one of our race splines
+// and for vanilla's Corpo Plaza cleaning-machine spline: both match only with the '#' removed. Every Pace before
+// 0.8.0 hashed the '#' too, so every racing command named a spline that does not exist.
 uint64_t nodeRefHash(const std::string& path)
 {
     uint64_t h = 0xcbf29ce484222325ull;
-    for (unsigned char ch : path) { h ^= ch; h *= 0x100000001b3ull; }
+    for (unsigned char ch : path) {
+        if (ch == '#') continue;
+        h ^= ch;
+        h *= 0x100000001b3ull;
+    }
     return h;
 }
 

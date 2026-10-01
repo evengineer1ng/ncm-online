@@ -51,7 +51,7 @@ if (-not $SkipScriptCheck) {
     if (Test-Path $scratch) { Remove-Item -Recurse -Force $scratch }
     New-Item -ItemType Directory -Force (Join-Path $scratch "scripts\ncm_pace"), (Join-Path $scratch "cache") | Out-Null
     Get-ChildItem (Join-Path $game "r6\scripts") -Directory |
-        Where-Object { $_.Name -ne "ncm_pace" } |
+        Where-Object { $_.Name -ne "ncm_pace" -and $_.Name -ne "ncm_pace_diag" } |   # the diag is dev-only and needs Codeware
         ForEach-Object { Copy-Item -Recurse $_.FullName (Join-Path $scratch "scripts") }
     Copy-Item (Join-Path $scripts "*.reds") (Join-Path $scratch "scripts\ncm_pace")
     Copy-Item (Join-Path $game "r6\cache\final.redscripts") (Join-Path $scratch "cache")

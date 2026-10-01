@@ -508,7 +508,11 @@ int main()
         auto f = split(s.step(0, 0, 0, 0, t0 + 1000ms));
         CHECK(f.size() == 10 && f[1] == "3" && f[2] == "0");                   // racing, leg 1
         CHECK(s.spline(0) == ncm::pace::nodeRefHash("$/mod/ncm_pace/#leg_a__b"));
-        CHECK(ncm::pace::nodeRefHash("a") == 0xaf63dc4c8601ec8cull);          // FNV-1a 64, the NodeRef hash
+        CHECK(ncm::pace::nodeRefHash("a") == 0xaf63dc4c8601ec8cull);          // FNV-1a 64...
+        // ...with every '#' left out: the engine's own values, read in game through Codeware (KB-249, 2026-10-01)
+        CHECK(ncm::pace::nodeRefHash("$/mod/ncm_pace/#leg_a_bit_-2832_-2675__allfoods_intersection_-558_2522") == 0xe9819f95dc072143ull);
+        CHECK(ncm::pace::nodeRefHash("$/03_night_city/#c_city_center/corpo_plaza/corpo_plaza_openworld_prefabKKRD5RI/"
+            "corpo_plaza_openworld_community_prefabMBEYQOY/#cct_cpz_roundabout_cleaning_machine_spl") == 0x0a13e2f0fdb27076ull);
         const std::string seq = f[0];
         auto at = t0 + 1000ms;
         for (int x = 20; x <= 400; x += 20) { at += 100ms; f = split(s.step(0, x, 0, 0, at)); }
