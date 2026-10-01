@@ -81,8 +81,12 @@ void note(RED4ext::IScriptable*, RED4ext::CStackFrame* stack, bool* out, int64_t
     RED4ext::CString text;
     RED4ext::GetParameter(stack, &text);
     stack->code++;
-    static int logged = 0;
-    if (++logged <= 300) PACE_INFO("reds: %s", std::string(text.c_str()).substr(0, 300).c_str());
+    // two budgets (0.7.1): the startup TweakDB dump (`tdb:`) has its own, so it can never use up the lines a race needs
+    // -- in 0.7.0 its 355 lines spent the shared 300 and every racing-command report of the next race was dropped
+    static int logged = 0, dumped = 0;
+    const std::string line(text.c_str());
+    const bool dump = line.rfind("tdb:", 0) == 0;
+    if (dump ? (++dumped <= 600) : (++logged <= 3000)) PACE_INFO("reds: %s", line.substr(0, 300).c_str());
     if (out) *out = true;
 }
 
