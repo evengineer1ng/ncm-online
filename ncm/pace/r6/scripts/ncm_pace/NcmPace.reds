@@ -43,6 +43,7 @@ public class NcmPaceSystem extends ScriptableSystem {
   private let m_banner: wref<NcmPaceBanner>;
   private let m_areaRev: Int32;
   private let m_areaId: Uint64;
+  private let m_dumped: Bool;
 
   public func SetBanner(banner: ref<NcmPaceBanner>) -> Void {
     this.m_banner = banner;
@@ -55,6 +56,11 @@ public class NcmPaceSystem extends ScriptableSystem {
     }
     this.m_player = player;
     this.m_generation += 1;
+    // 0.6.0: the engine's driving profiles as this game build has them, once per game start (L244, IDEA-788)
+    if !this.m_dumped {
+      this.m_dumped = true;
+      NcmPace_DumpDriving();
+    }
     this.Schedule(0.5);
   }
 
