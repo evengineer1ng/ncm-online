@@ -37,6 +37,9 @@ class RoadGraph;
 // releases every car.
 constexpr size_t kMaxPoints = 4096;
 constexpr size_t kMaxCars = 64;
+constexpr size_t kMaxRoadLegs = 24;        // 0.5.2: beyond this a plan is a dense line, not checkpoints (KB-241)
+constexpr double kBehindStartM = 150.0;    // 0.5.2: a grid car this far behind the plan's first point is on it (KB-243)
+constexpr double kOffPlanCapMps = 38.0;    // 0.5.2: the ceiling off the plan in a road-planned race (KB-243)
 constexpr size_t kMaxGates = 1024;
 
 struct Point { double x = 0, y = 0, z = 0; };
@@ -184,6 +187,7 @@ private:
     std::vector<Point> road_;
     std::vector<double> roadLimits_;
     std::vector<RoadSpeedLeg> roadLegs_;
+    std::vector<size_t> pointRoad_;     // 0.5.2: each plan point's index on the continuous road_, in race order
     std::vector<Gate> gates_;
     std::vector<Car> cars_;
     Clock::time_point goAt_{};

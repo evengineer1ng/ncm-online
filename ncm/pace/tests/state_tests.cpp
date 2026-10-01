@@ -352,6 +352,65 @@ int main()
         // near the end of the plan it hands back to the line, which aims beyond the finish
         CHECK(std::stod(split(s.step(0,980,0,0,t0+9000ms))[2])>1000.0);
     }
+    {   // 0.5.2 (KB-243): the finish is passed by road progress, not by a chord. The road runs east 500 m, north 500 m,
+        // then west 200 m to the finish at (300,500) -- it arrives from BESIDE the finish, as at 20:30. At (500,400) the
+        // chord test (start->finish) already calls the finish passed, with 300 m still to drive.
+        auto graph=std::make_shared<ncm::pace::RoadGraph>();
+        graph->lanes.resize(3);
+        for (int x=0;x<=500;x+=10) graph->lanes[0].line.push_back({static_cast<double>(x),0,0});
+        for (int y=0;y<=500;y+=10) graph->lanes[1].line.push_back({500,static_cast<double>(y),0});
+        for (int x=500;x>=300;x-=10) graph->lanes[2].line.push_back({static_cast<double>(x),500,0});
+        graph->lanes[0].out={1}; graph->lanes[1].out={2};
+        State s;s.setRoadGraph(graph);
+        CHECK(s.apply(R"({"cmd":"drive.start","raceId":"bend","goInMs":0,
+          "points":[{"x":0,"y":0,"z":0},{"x":300,"y":500,"z":0}],
+          "gates":[{"x":0,"y":0,"dx":1,"dy":0},{"x":300,"y":500,"dx":-1,"dy":0}],
+          "cars":[{"entity":"42","vehicleId":5,"speeds":[25]}]})",t0));
+        s.drainLog();
+        auto at=t0+3000ms;
+        auto drive=[&](double x,double y){s.step(0,x,y,0,at);at+=100ms;};
+        for (int x=0;x<=500;x+=10) drive(x,0);
+        for (int y=10;y<=400;y+=10) drive(500,y);
+        // the old test, by hand, so this case keeps proving something
+        CHECK((500.0-300)*(300-0)+(400.0-500)*(500-0) > 0);
+        bool early=false;
+        for (const auto& line:s.drainLog()) if (line.find("past point 1/2")!=std::string::npos) early=true;
+        CHECK(!early);
+        for (int y=410;y<=500;y+=10) drive(500,y);
+        for (int x=490;x>=300;x-=10) drive(x,500);
+        bool done=false;
+        for (const auto& line:s.drainLog()) if (line.find("past point 1/2")!=std::string::npos) done=true;
+        CHECK(done);
+    }
+    {   // 0.5.2 (KB-243): a car 100 m behind the plan's first point (the back of the grid) is ON the plan, steered along
+        // it; a car off the plan never takes the server's flat ceiling above the straight cap.
+        auto graph=std::make_shared<ncm::pace::RoadGraph>();
+        graph->lanes.resize(1);
+        for (int x=0;x<=1000;x+=10) graph->lanes[0].line.push_back({static_cast<double>(x),0,0});
+        State s;s.setRoadGraph(graph);
+        CHECK(s.apply(R"({"cmd":"drive.start","raceId":"grid","goInMs":0,
+          "points":[{"x":0,"y":0,"z":0},{"x":1000,"y":0,"z":0}],
+          "gates":[{"x":0,"y":0,"dx":1,"dy":0},{"x":1000,"y":0,"dx":1,"dy":0}],
+          "cars":[{"entity":"42","vehicleId":5,"speeds":[78]},{"entity":"43","vehicleId":6,"speeds":[78]}]})",t0));
+        const auto back=split(s.step(0,-100,0,0,t0+3000ms));
+        CHECK(back[1]=="1" && std::stod(back[2])>150.0 && std::fabs(std::stod(back[3]))<1.0);   // aimed along the road
+        const auto off=split(s.step(1,500,400,0,t0+3000ms));                                      // 400 m off the road
+        CHECK(off[1]=="1" && std::stod(off[5])<=38.0+1e-6);
+    }
+    {   // 0.5.2 (KB-241): a dense line is not routed leg by leg under the game thread's lock.
+        auto graph=std::make_shared<ncm::pace::RoadGraph>();
+        graph->lanes.resize(1);
+        for (int x=0;x<=1000;x+=10) graph->lanes[0].line.push_back({static_cast<double>(x),0,0});
+        State s;s.setRoadGraph(graph);
+        std::string pts, gts;
+        for (int i=0;i<=30;++i) {pts+=(i?",":"")+std::string("{\"x\":")+std::to_string(i*30)+",\"y\":0,\"z\":0}";}
+        CHECK(s.apply(R"({"cmd":"drive.start","raceId":"dense","goInMs":0,"points":[)"+pts+R"(],
+          "gates":[{"x":0,"y":0,"dx":1,"dy":0},{"x":900,"y":0,"dx":1,"dy":0}],
+          "cars":[{"entity":"42","vehicleId":5,"speeds":[25]}]})",t0));
+        bool skipped=false;
+        for (const auto& line:s.drainLog()) if (line.find("road speed plan skipped: 30 legs")!=std::string::npos) skipped=true;
+        CHECK(skipped);
+    }
     {   // 0.5.0: a car the game stops reporting is logged once as a dropout; when it is back it gets a FRESH command
         // (a re-created vehicle object holds none), even though nothing about the plan changed.
         State s;

@@ -85,8 +85,16 @@ void State::setRoadGraph(std::shared_ptr<const RoadGraph> graph)
 
 void State::planRoad()
 {
-    road_.clear(); roadLimits_.clear(); roadLegs_.clear();
+    road_.clear(); roadLimits_.clear(); roadLegs_.clear(); pointRoad_.clear();
     if (!roadGraph_ || points_.size()<2 || haveRing) return;
+    // Every leg scans the whole graph twice and runs a search over it, under the lock the game thread takes every
+    // tick. A route's authored points are a handful; a dense line (a ghost tape, 48 points) would stall the game for
+    // seconds and needs no road plan anyway (KB-241).
+    if (points_.size()-1 > kMaxRoadLegs) {
+        if (logQueue_.size()<2000) logQueue_.push_back("road speed plan skipped: "+std::to_string(points_.size()-1)+
+            " legs is over "+std::to_string(kMaxRoadLegs)+" (a dense line, not a route's checkpoints)");
+        return;
+    }
     roadLegs_.resize(points_.size()-1);
     bool connected=true;
     size_t validLegs=0;
@@ -134,6 +142,19 @@ void State::planRoad()
         else if (logQueue_.size()<2000) logQueue_.push_back("road speed plan segmented: invalid checkpoint spacing");
     }
     if (roadLimits_.empty()) road_.clear();
+    // where each plan point sits on the road, searched forward so a road that passes near a checkpoint twice keeps
+    // race order: "past point k" is judged by road progress, not a chord (KB-243: on a bending approach the chord test
+    // fired ~130 m before the finish)
+    if (!road_.empty()) {
+        pointRoad_.assign(points_.size(),0);
+        size_t from=0;
+        for (size_t i=1;i<points_.size();++i) {
+            size_t at=from; double best=1e100;
+            for (size_t k=from;k<road_.size();++k) {const double d=std::hypot(road_[k].x-points_[i].x,road_[k].y-points_[i].y);if(d<best){best=d;at=k;}}
+            pointRoad_[i]=at; from=at;
+        }
+        pointRoad_.back()=road_.size()-1;
+    }
     // every checkpoint joint, said out loud: how sharp the road turns there and how slow the plan goes near it
     if (!road_.empty()) for (size_t i=1;i+1<points_.size();++i) {
         size_t at=0; double best=1e100;
@@ -451,12 +472,14 @@ std::string State::step(int index, double x, double y, double z, Clock::time_poi
             const Point& t = points_[c.target];
             const Point& p = points_[c.target - 1];
             const bool near = dist(pos, t) < advanceM;
-            const bool passed = (pos.x - t.x) * (t.x - p.x) + (pos.y - t.y) * (t.y - p.y) > 0;
+            const bool byRoad = !pointRoad_.empty() && c.roadLocated && c.onRoad;
+            const bool passed = byRoad ? c.roadIndex >= pointRoad_[c.target]
+                                       : (pos.x - t.x) * (t.x - p.x) + (pos.y - t.y) * (t.y - p.y) > 0;
             if (!near && !passed) break;
             c.target++;
             char line[200]{};
             std::snprintf(line, sizeof(line), "car %d past point %zu/%zu at %.0f,%.0f, %.1f m/s (%s)",
-                index, c.target - 1, points_.size(), pos.x, pos.y, c.speed, near ? "reached" : "went beyond");
+                index, c.target - 1, points_.size(), pos.x, pos.y, c.speed, near ? "reached" : (byRoad ? "passed on the road" : "went beyond"));
             if (logQueue_.size() < 2000) logQueue_.emplace_back(line);
         }
     }
@@ -508,7 +531,9 @@ std::string State::step(int index, double x, double y, double z, Clock::time_poi
                 std::min(speedRoad->size(),c.roadIndex+100)) : closest(0,speedRoad->size());
             if (distance>60.0) std::tie(distance,at)=closest(0,speedRoad->size());
             roadOff=distance;
-            const bool on=distance<50.0;
+            // a car behind the plan's first point is on the road INTO it: the back of a twelve-car grid sat 51-74 m
+            // behind and raced the whole first leg off the plan at a flat ceiling (KB-243)
+            const bool on=distance<(at==0 ? kBehindStartM : 50.0);
             if (on!=c.onRoad && c.roadEvents<60) {
                 c.roadEvents++;
                 char line[200]{};
@@ -540,6 +565,9 @@ std::string State::step(int index, double x, double y, double z, Clock::time_poi
                 if (c.roadAim+1<speedRoad->size()) {roadSteer=true;roadWant=(*speedRoad)[c.roadAim];}
             }
         }
+        // off the plan in a road-planned race, the line's ceiling is the server's flat estimate (77.8 m/s for one car at
+        // 20:30, KB-243): never above the plan's own straight-line cap
+        if (roadGuided && !c.onRoad) speed = std::min(speed, static_cast<float>(kOffPlanCapMps));
         if (roadSteer) {
             want = roadWant;
         } else if (c.target < points_.size() && lookaheadM > 0) {
