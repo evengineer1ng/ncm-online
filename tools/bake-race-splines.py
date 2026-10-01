@@ -32,6 +32,7 @@ PER_SECTOR = 40                     # splines per sector: keeps each file small
 CORRIDOR_M = 6.0                    # racing room each side of the line (vanilla: 7 m, 1.5-4 m in tight places)
 KEEP_SPACING_M = 15.0               # thin the lane line: a point at least every 15 m...
 KEEP_TURN_DEG = 8.0                 # ...or wherever the line turns
+NODE_ID_BASE = 0x3F000000000        # our global node ids (see nodeData Id below)
 
 
 def ref_of(a, b):
@@ -128,7 +129,11 @@ def main():
             # racing and spline commands failed at once on these splines (KB-249).
             e["Uk10"], e["Uk11"], e["Uk12"] = 1056, 512, 0          # as vanilla exterior spline nodes
             e["MaxStreamingDistance"] = 15131.8018
-            e["UkFloat1"] = 16232.1182
+            e["UkFloat1"] = float(round(leg["lengthM"]))         # vanilla: the spline's extent
+            # A GLOBAL NODE ID. Every one of 32,106 vanilla Exterior nodes has one (42-bit, cook-allocated,
+            # 0x248d0368450-0x24ac6e21f40 around Heywood); ours had 0, so the engine had no id to map a spline
+            # ref to (KB-249). Unique per spline, above the vanilla range, still 42-bit.
+            e["Id"] = str(NODE_ID_BASE + (s + i + 1) * 16)
             nd.append(e)
         r["nodeData"]["Data"] = nd
         name = f"legs_{s // PER_SECTOR:03d}.streamingsector"
