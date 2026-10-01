@@ -314,6 +314,31 @@ bool State::apply(const std::string& text, Clock::time_point now)
         }
         return no("car.set: no such car driving");
     }
+    if (cmd == "car.entity") {
+        // 0.8.1 (KB-238): the same car under a NEW engine entity -- the client streamed it out and back in, and the game
+        // re-created it. Swapped in place (redscript keys its state by index); the car keeps its leg, its point and its
+        // timing, and gets a fresh racing command at once, as a car that comes back does.
+        if (j.value("raceId", std::string()) != raceId_) return no("car.entity for race " + j.value("raceId", std::string()) + ", plan is " + raceId_);
+        auto hashOf = [&](const char* key) -> uint64_t {
+            if (j.contains(key) && j[key].is_string()) return parseHash(j[key].get<std::string>());
+            if (j.contains(key) && j[key].is_number_unsigned()) return j[key].get<uint64_t>();
+            return 0;
+        };
+        const uint64_t was = hashOf("old"), fresh = hashOf("entity");
+        if (was == 0 || fresh == 0) return no("car.entity: needs old and entity");
+        for (const auto& c : cars_) if (c.entity == fresh && !c.finished) return no("car.entity: the new entity is already driving");
+        for (size_t i = 0; i < cars_.size(); ++i) {
+            Car& c = cars_[i];
+            if (c.entity == was && !c.finished) {
+                c.entity = fresh;
+                c.reacquire = true;
+                push(nlohmann::json{{"ack", {{"what", "car.entity"}, {"detail", "car " + std::to_string(i) + " vehicle " +
+                    std::to_string(c.vehicleId) + " is a new entity"}}}}.dump());
+                return true;
+            }
+        }
+        return no("car.entity: no such car driving");
+    }
     if (cmd == "car.remove") {
         // retired IN PLACE: redscript keys its state by index, so the list never shrinks or reorders mid-race
         if (j.value("raceId", std::string()) != raceId_) return no("car.remove for race " + j.value("raceId", std::string()) + ", plan is " + raceId_);
@@ -373,8 +398,10 @@ bool State::apply(const std::string& text, Clock::time_point now)
     // 0.7.0 (L246): a street plan names the engine race spline for each leg (`$/mod/ncm_pace/#leg_<from>__<to>`, baked by
     // tools/bake-race-splines.py and loaded by ArchiveXL). Race profile, or nothing (L245): a street plan without them
     // is refused, never driven another way.
+    // 0.8.1: a DYNAMIC plan (the bubble's street race, L247) names them too: its points are the route's nodes, and a car
+    // that joins with car.add races the leg that ends at its `from` point. An oval's dynamic plan has none (yet).
     std::vector<std::string> legNames;
-    if (!dynamic) {
+    if (!dynamic || j.contains("legs")) {
         const auto& lg = j.contains("legs") ? j["legs"] : nlohmann::json();
         if (!lg.is_array() || lg.empty()) return no("drive.start: no race splines (legs) -- a street plan is driven on race splines only");
         // a long plan arrives as a tape (`more`), so the count is checked against the whole plan only when it is whole
@@ -480,8 +507,9 @@ std::string State::step(int index, double x, double y, double z, Clock::time_poi
     // Back after a gap (streamed back in, or re-created under the same id): find it on the road afresh, measure its
     // speed afresh, and send it a fresh command whatever it held before -- a new vehicle object has none.
     bool reacquired = false;
-    if (c.haveStep && active_ && !c.finished && now - c.lastStepAt > std::chrono::milliseconds(1000)) {
+    if (c.haveStep && active_ && !c.finished && (c.reacquire || now - c.lastStepAt > std::chrono::milliseconds(1000))) {
         reacquired = true;
+        c.reacquire = false;
         const double gapS = std::chrono::duration<double>(now - c.lastStepAt).count();
         char line[220]{};
         std::snprintf(line, sizeof(line), "car %d BACK after %.1f s at %.0f,%.0f (%.0f m from where it was last seen), point %zu/%zu",

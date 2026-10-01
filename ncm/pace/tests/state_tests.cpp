@@ -528,6 +528,37 @@ int main()
         CHECK(logged);
     }
 
+    {   // 0.8.1 (L247): the bubble's street race. A dynamic plan on the route's nodes with a race spline per leg; a car
+        // that joins at `from` races the leg ending there; the same car under a new entity keeps its leg and is
+        // re-commanded at once.
+        State s;
+        CHECK(s.apply(R"({"cmd":"drive.start","raceId":"bub","dynamic":true,"goInMs":0,
+          "legs":["$/mod/ncm_pace/#leg_a__b","$/mod/ncm_pace/#leg_b__c"],
+          "points":[{"x":0,"y":0,"z":0},{"x":500,"y":0,"z":0},{"x":900,"y":0,"z":0}],
+          "gates":[{"x":0,"y":0,"dx":1,"dy":0},{"x":900,"y":0,"dx":1,"dy":0}],"cars":[]})", t0));
+        CHECK(s.apply(R"({"cmd":"car.add","raceId":"bub","entity":"42","vehicleId":7,"from":2,"speed":30})", t0 + 1000ms));
+        auto f = split(s.step(0, 600, 0, 0, t0 + 1100ms));
+        CHECK(f[1] == "3" && f[2] == "1");                                   // racing, on leg 2 (b -> c)
+        CHECK(s.spline(0) == ncm::pace::nodeRefHash("$/mod/ncm_pace/#leg_b__c"));
+        const std::string seq = f[0];
+        f = split(s.step(0, 610, 0, 0, t0 + 1200ms));
+        CHECK(f[0] == seq);                                                  // held
+        CHECK(!s.apply(R"({"cmd":"car.entity","raceId":"bub","old":"99","entity":"77"})", t0 + 1250ms));
+        CHECK(s.refusal().find("no such car") != std::string::npos);
+        CHECK(s.apply(R"({"cmd":"car.entity","raceId":"bub","old":"42","entity":"77"})", t0 + 1300ms));
+        CHECK(s.entity(0) == 77 && s.count(t0 + 1300ms) == 1);
+        f = split(s.step(0, 620, 0, 0, t0 + 1400ms));                       // within a second: no gap, still fresh
+        CHECK(f[0] != seq && f[1] == "3" && f[2] == "1");                    // re-commanded on the same leg
+        bool back = false;
+        for (const auto& line : s.drainLog()) if (line.find("back: fresh command") != std::string::npos) back = true;
+        CHECK(back);
+        CHECK(!s.apply(R"({"cmd":"car.remove","raceId":"bub","entity":"42"})", t0 + 1500ms));   // the old entity is gone
+        CHECK(s.apply(R"({"cmd":"car.remove","raceId":"bub","entity":"77"})", t0 + 1500ms));
+        State o;                                                             // an oval's dynamic plan still needs none
+        CHECK(o.apply(R"({"cmd":"drive.start","raceId":"ring","dynamic":true,"goInMs":0,
+          "points":[{"x":0,"y":0},{"x":100,"y":0}],"gates":[{"x":0,"y":0,"dx":1,"dy":0},{"x":100,"y":0,"dx":1,"dy":0}],"cars":[]})", t0));
+    }
+
     if (failures == 0) std::printf("pace state: all checks passed\n");
     return failures == 0 ? 0 : 1;
 }
