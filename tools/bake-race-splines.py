@@ -120,8 +120,13 @@ def main():
             e["Bounds"] = {"$type": "Box", "Min": {"$type": "Vector4", "W": 0, "X": ox, "Y": oy, "Z": oz},
                            "Max": {"$type": "Vector4", "W": 0, "X": ox, "Y": oy, "Z": oz}}
             e["QuestPrefabRefHash"] = {"$type": "NodeRef", "$storage": "string", "$value": ref}
-            e["MaxStreamingDistance"] = 20000.0
-            e["UkFloat1"] = 20000.0
+            # Node streaming flags as a vanilla ALWAYS-LOADED sector's ref'd nodes carry them (always_loaded_0: 1056 / 512 /
+            # 15131.8 / 512). The quest template's 288 has the 0x100 bit every quest-sector node has and no
+            # always-loaded node has: a node flagged quest-owned is never registered without its quest prefab, and both
+            # racing and spline commands failed at once on these splines (KB-249).
+            e["Uk10"], e["Uk11"], e["Uk12"] = 1056, 512, 0
+            e["MaxStreamingDistance"] = 15131.8018
+            e["UkFloat1"] = 512.0
             nd.append(e)
         r["nodeData"]["Data"] = nd
         name = f"legs_{s // PER_SECTOR:03d}.streamingsector"

@@ -72,7 +72,7 @@ void pollSplineRefs()
         }
         auto* refs = field<RED4ext::DynArray<uint64_t>>(sector, "nodeRefs");
         auto* nodes = field<RED4ext::DynArray<RED4ext::Handle<RED4ext::ISerializable>>>(sector, "nodes");
-        if (!refs || !nodes) { PACE_ERR("spline refs: no nodeRefs/nodes property on the sector (see the property list)"); continue; }
+        if (!refs || !nodes) continue;      // the engine keeps a sector's nodes in packed content, not as properties
         const uint32_t n = std::min<uint32_t>(refs->size(), nodes->size());
         for (uint32_t i = 0; i < n; ++i) {
             auto* node = (*nodes)[i].GetPtr();
@@ -94,9 +94,13 @@ void pollSplineRefs()
     }
     tokens.clear();
     done = true;
-    PACE_INFO("spline refs: %d sector(s), %zu race splines; FNV-1a 64 %s (%d match, %d differ)", sectors, engineRefs.size(),
-              mismatched == 0 && matched > 0 ? "IS the engine's NodeRef hash" : "is NOT the engine's NodeRef hash -- using the engine's",
-              matched, mismatched);
+    if (matched + mismatched == 0)
+        PACE_INFO("spline refs: %d sector(s) loaded; their nodes are not exposed by reflection, so the NodeRef hash cannot be "
+                  "checked here -- Pace uses FNV-1a 64 of the path", sectors);
+    else
+        PACE_INFO("spline refs: %d sector(s), %zu race splines; FNV-1a 64 %s (%d match, %d differ)", sectors, engineRefs.size(),
+                  mismatched == 0 ? "IS the engine's NodeRef hash" : "is NOT the engine's NodeRef hash -- using the engine's",
+                  matched, mismatched);
 }
 
 uint64_t engineSplineRef(const std::string& path)
