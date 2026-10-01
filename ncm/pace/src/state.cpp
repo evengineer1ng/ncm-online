@@ -370,6 +370,8 @@ bool State::apply(const std::string& text, Clock::time_point now)
         l.relMax = x.value("relMax", l.relMax); l.relMin = x.value("relMin", l.relMin);
         l.relForced = x.value("relForced", l.relForced); l.relDist = x.value("relDist", l.relDist);
         l.minFrac = x.value("minFrac", l.minFrac); l.forcedFrac = x.value("forcedFrac", l.forcedFrac);
+        l.rampFloorMps = std::clamp(x.value("rampFloorMps", l.rampFloorMps), 0.0, 40.0);
+        l.rampMps2 = std::clamp(x.value("rampMps2", l.rampMps2), 0.5, 30.0);
         l.raceDist = x.value("raceDist", l.raceDist);
         l.recommandS = std::max(0.6, x.value("recommandS", l.recommandS));
         l.stallMps = x.value("stallMps", l.stallMps); l.stallS = std::max(0.5, x.value("stallS", l.stallS));
@@ -529,7 +531,9 @@ std::string State::step(int index, double x, double y, double z, Clock::time_poi
             };
             auto [distance,at] = c.roadLocated ? closest(c.roadIndex>10?c.roadIndex-10:0,
                 std::min(speedRoad->size(),c.roadIndex+100)) : closest(0,speedRoad->size());
-            if (distance>60.0) std::tie(distance,at)=closest(0,speedRoad->size());
+            // 0.5.3: re-finding a lost car never goes back down the road: a car 50 m off the plan mid-race was matched to
+            // the plan's START and sent 300 m along from there -- back the way it came (car 9, 21:19)
+            if (distance>60.0) std::tie(distance,at)=closest(c.roadLocated ? (c.roadIndex>30?c.roadIndex-30:0) : 0,speedRoad->size());
             roadOff=distance;
             // a car behind the plan's first point is on the road INTO it: the back of a twelve-car grid sat 51-74 m
             // behind and raced the whole first leg off the plan at a flat ceiling (KB-243)
@@ -561,9 +565,23 @@ std::string State::step(int index, double x, double y, double z, Clock::time_poi
                     while (k+1<speedRoad->size() && acc<roadAimM) {acc+=std::hypot((*speedRoad)[k+1].x-(*speedRoad)[k].x,(*speedRoad)[k+1].y-(*speedRoad)[k].y);++k;}
                     c.roadAim=k; c.roadAimed=true;
                 }
-                // the plan's last stretch hands back to the line, which knows to aim beyond the finish
                 if (c.roadAim+1<speedRoad->size()) {roadSteer=true;roadWant=(*speedRoad)[c.roadAim];}
+                else if (speedRoad==&road_ && speedRoad->size()>=2) {
+                    // 0.5.3: at the plan's end, carry on along the road's own last direction -- never to the authored
+                    // finish point. That point can be off any lane (Corpo Plaza is 136 m from the nearest): told to drive
+                    // to it, the engine parked all twelve cars at 0 m/s and nine were never classified (21:12, KB-245).
+                    const Point& a=(*speedRoad)[speedRoad->size()-2]; const Point& b=speedRoad->back();
+                    const double len=std::max(1e-6,std::hypot(b.x-a.x,b.y-a.y));
+                    roadSteer=true; roadWant={b.x+(b.x-a.x)/len*120.0,b.y+(b.y-a.y)/len*120.0,b.z};
+                }
             }
+        }
+        // 0.5.3: an acceleration curve from the lights. The ceiling grows from rampFloorMps at rampMps2 (0-100 km/h in
+        // ~6 s at the defaults), so a grid pulls away like cars, not like a teleport (owner, 21:18: "its bonkers their
+        // 0-60 time"). minSpeed follows the ceiling, so it cannot drag a car above the curve either.
+        if (tMs >= 0) {
+            const double ramp = launch.rampFloorMps + launch.rampMps2 * (tMs / 1000.0);
+            if (ramp < speed) speed = static_cast<float>(ramp);
         }
         // off the plan in a road-planned race, the line's ceiling is the server's flat estimate (77.8 m/s for one car at
         // 20:30, KB-243): never above the plan's own straight-line cap
@@ -681,16 +699,20 @@ std::string State::step(int index, double x, double y, double z, Clock::time_poi
     // what to hold: the capped launch release, or the race command (SP buildLaunchReleaseProfile / buildDriveProfile)
     double mx = c.cmdSpeed, mn = 0, forced = 0, dd = launch.raceDist;
     int boost = 0;
+    // 0.5.3: NO forcedStartSpeed, ever. It sets the car's speed outright when a command starts, and every command
+    // carried one: the release gave all twelve cars 18 m/s at the lights (they "rocketed into each other", 21:18), and
+    // each re-command, target move and stall kick gave a car 25% of its ceiling in whatever direction it faced -- a
+    // crashed car kicked every ~2 s spun in place (219 stall kicks in 21:18, "doing donuts"). Speed is the engine's to
+    // build; Pace only sets the ceiling, ramped from the lights (rampCap).
     if (c.mode == 1 && c.phase == 1) {
         mx = std::min<double>(c.cmdSpeed, launch.relMax);
-        mn = std::min(launch.relMin, mx);
-        forced = std::min(launch.relForced, mx);
+        mn = 0;
         dd = std::max(4.0, launch.relDist);
     } else if (c.mode == 1) {
         mn = mx * launch.minFrac;
-        forced = mx * launch.forcedFrac;
         boost = 1;
     }
+    (void)forced;
     return std::to_string(c.seq) + "|" + std::to_string(c.mode) + "|" + fmt(c.cmd.x) + "|" + fmt(c.cmd.y) + "|" +
            fmt(c.cmd.z) + "|" + fmt(mx) + "|" + fmt(mn) + "|" + fmt(forced) + "|" + fmt(dd) + "|" + std::to_string(boost);
 }

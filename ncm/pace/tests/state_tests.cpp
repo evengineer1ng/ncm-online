@@ -67,7 +67,7 @@ int main()
     }
     {   // a tape (0.3.1, KB-223): the first stretch, then the rest; nobody finishes on a partial plan
         State s;
-        CHECK(s.apply(R"({"cmd":"drive.start","raceId":"pr-tape","goInMs":0,"more":true,
+        CHECK(s.apply(R"({"cmd":"drive.start","raceId":"pr-tape","goInMs":0,"launch":{"rampFloorMps":40},"more":true,
           "points":[{"x":0,"y":0},{"x":100,"y":0}],
           "gates":[{"x":0,"y":0,"dx":1,"dy":0},{"x":100,"y":0,"dx":1,"dy":0}],
           "cars":[{"entity":"42","speeds":[30]}]})", t0));
@@ -160,7 +160,7 @@ int main()
         CHECK(!s.apply(R"({"cmd":"drive.start","raceId":"pr-dyn","points":[{"x":0,"y":0},{"x":100,"y":0}],
           "gates":[{"x":0,"y":0,"dx":1,"dy":0},{"x":100,"y":0,"dx":1,"dy":0}],"cars":[]})", t0));   // not dynamic: cars required
         CHECK(s.refusal().find("0 cars") != std::string::npos);
-        CHECK(s.apply(R"({"cmd":"drive.start","raceId":"pr-dyn","dynamic":true,"goInMs":0,
+        CHECK(s.apply(R"({"cmd":"drive.start","raceId":"pr-dyn","dynamic":true,"goInMs":0,"launch":{"rampFloorMps":40},
           "points":[{"x":0,"y":0},{"x":100,"y":0},{"x":200,"y":0},{"x":300,"y":0}],
           "gates":[{"x":0,"y":0,"dx":1,"dy":0},{"x":300,"y":0,"dx":1,"dy":0}],"cars":[]})", t0));
         CHECK(s.count(t0) == 0);
@@ -189,7 +189,9 @@ int main()
         State s;
         CHECK(!s.apply(R"({"cmd":"drive.start","points":[],"gates":[],"cars":[]})", t0));
         CHECK(s.count(t0) == 0);
-        CHECK(s.apply(kPlan, t0));
+        std::string flat = kPlan;                                // this case is about holds and targets, not the curve
+        flat.insert(flat.size() - 1, R"(,"launch":{"rampFloorMps":40})");
+        CHECK(s.apply(flat, t0));
         CHECK(s.count(t0) == 2);
         CHECK(s.entity(0) == 18446744073709551557ull);
         CHECK(s.entity(1) == 42);
@@ -259,15 +261,16 @@ int main()
         State s;
         std::string plan = kPlan;
         plan.insert(plan.size() - 1, R"(,"launch":{"graceS":1.75,"relMax":18,"relMin":8,"relForced":4,"relDist":5,
-            "minFrac":0.72,"forcedFrac":0.25,"raceDist":12,"recommandS":3,"stallMps":5.5,"stallS":2})");
+            "minFrac":0.72,"forcedFrac":0.25,"raceDist":12,"recommandS":3,"stallMps":5.5,"stallS":2,"rampFloorMps":40})");
         CHECK(s.apply(plan, t0));
         auto f = split(s.step(0, -10, 0, 0, t0 + 2000ms));      // the lights: the release, capped
-        CHECK(f[1] == "1" && f[5] == "18.00" && f[6] == "8.00" && f[7] == "4.00" && f[8] == "5.00" && f[9] == "0");
+        // 0.5.3: no forced start speed and no minimum in the release -- the engine builds the speed
+        CHECK(f[1] == "1" && f[5] == "18.00" && f[6] == "0.00" && f[7] == "0.00" && f[8] == "5.00" && f[9] == "0");
         const std::string launchSeq = f[0];
         f = split(s.step(0, -4, 0, 0, t0 + 3000ms));
         CHECK(f[0] == launchSeq);                                 // inside the grace nothing is judged
         f = split(s.step(0, 2, 0, 0, t0 + 3800ms));              // grace over: SP's post-launch race command
-        CHECK(f[0] != launchSeq && f[5] == "30.00" && f[6] == "21.60" && f[7] == "7.50" && f[8] == "12.00" && f[9] == "1");
+        CHECK(f[0] != launchSeq && f[5] == "30.00" && f[6] == "21.60" && f[7] == "0.00" && f[8] == "12.00" && f[9] == "1");
         std::string seq = f[0];
         // stuck against a wall: same place for over two seconds -> a fresh command without waiting for the cadence
         s.step(0, 2, 0, 0, t0 + 4100ms);
@@ -306,7 +309,7 @@ int main()
         CHECK(graph->route({0,-40,0},{90,40,0}).size() >= 10); // a grid anchor beside the lane
         State s;
         s.setRoadGraph(graph);
-        CHECK(s.apply(R"({"cmd":"drive.start","raceId":"road-test","goInMs":0,
+        CHECK(s.apply(R"({"cmd":"drive.start","raceId":"road-test","goInMs":0,"launch":{"rampFloorMps":40},
           "points":[{"x":0,"y":0,"z":0},{"x":90,"y":40,"z":0}],
           "gates":[{"x":0,"y":0,"z":0,"dx":1,"dy":0},{"x":90,"y":40,"z":0,"dx":0,"dy":1}],
           "cars":[{"entity":"42","vehicleId":5,"speeds":[25]}]})",t0));
@@ -396,6 +399,54 @@ int main()
         CHECK(back[1]=="1" && std::stod(back[2])>150.0 && std::fabs(std::stod(back[3]))<1.0);   // aimed along the road
         const auto off=split(s.step(1,500,400,0,t0+3000ms));                                      // 400 m off the road
         CHECK(off[1]=="1" && std::stod(off[5])<=38.0+1e-6);
+    }
+    {   // 0.5.3: the lights start an acceleration curve, never a teleport: no command ever carries a forced start speed,
+        // and the ceiling grows from rampFloorMps at rampMps2.
+        auto graph=std::make_shared<ncm::pace::RoadGraph>();
+        graph->lanes.resize(1);
+        for (int x=0;x<=2000;x+=10) graph->lanes[0].line.push_back({static_cast<double>(x),0,0});
+        State s;s.setRoadGraph(graph);
+        CHECK(s.apply(R"({"cmd":"drive.start","raceId":"ramp","goInMs":0,"launch":{"graceS":0.1,"rampFloorMps":6,"rampMps2":4},
+          "points":[{"x":0,"y":0,"z":0},{"x":2000,"y":0,"z":0}],
+          "gates":[{"x":0,"y":0,"dx":1,"dy":0},{"x":2000,"y":0,"dx":1,"dy":0}],
+          "cars":[{"entity":"42","vehicleId":5,"speeds":[40]}]})",t0));
+        auto at1=split(s.step(0,5,0,0,t0+1000ms));
+        CHECK(std::stod(at1[5])<=10.0+1e-6 && at1[7]=="0.00");          // 6 + 4*1
+        auto at10=split(s.step(0,200,0,0,t0+10000ms));
+        CHECK(std::stod(at10[5])>=38.0-1e-6 && at10[7]=="0.00");         // the curve has reached the plan
+        s.step(0,200,0,0,t0+10500ms); s.step(0,200,0,0,t0+11000ms);
+        auto kicked=split(s.step(0,200,0,0,t0+13000ms));                 // stalled: a stall kick, still no forced speed
+        CHECK(kicked[7]=="0.00");
+    }
+    {   // 0.5.3: at the end of the road plan the car carries on along the road -- never to the authored finish point,
+        // which may be off any lane (21:12: Corpo Plaza, 136 m from the nearest; all twelve cars parked).
+        auto graph=std::make_shared<ncm::pace::RoadGraph>();
+        graph->lanes.resize(1);
+        for (int x=0;x<=600;x+=10) graph->lanes[0].line.push_back({static_cast<double>(x),0,0});
+        State s;s.setRoadGraph(graph);
+        CHECK(s.apply(R"({"cmd":"drive.start","raceId":"plaza","goInMs":0,"launch":{"rampFloorMps":40},
+          "points":[{"x":0,"y":0,"z":0},{"x":640,"y":70,"z":0}],
+          "gates":[{"x":0,"y":0,"dx":1,"dy":0},{"x":640,"y":70,"dx":1,"dy":0}],
+          "cars":[{"entity":"42","vehicleId":5,"speeds":[30]}]})",t0));
+        auto at=t0+3000ms;
+        for (int x=0;x<=580;x+=10) {s.step(0,x,0,0,at);at+=100ms;}
+        auto f=split(s.step(0,590,0,0,at));
+        CHECK(f[1]=="1" && std::stod(f[2])>650.0 && std::fabs(std::stod(f[3]))<1.0);   // along the road's direction
+    }
+    {   // 0.5.3: a car found again after going off the plan is never matched back down the road (car 9, 21:19 was sent
+        // back toward the start). Located at x=600, then 55 m off the road near x=0: it stays located forward.
+        auto graph=std::make_shared<ncm::pace::RoadGraph>();
+        graph->lanes.resize(1);
+        for (int x=0;x<=1000;x+=10) graph->lanes[0].line.push_back({static_cast<double>(x),0,0});
+        State s;s.setRoadGraph(graph);
+        CHECK(s.apply(R"({"cmd":"drive.start","raceId":"fwd","goInMs":0,"launch":{"rampFloorMps":40},
+          "points":[{"x":0,"y":0,"z":0},{"x":1000,"y":0,"z":0}],
+          "gates":[{"x":0,"y":0,"dx":1,"dy":0},{"x":1000,"y":0,"dx":1,"dy":0}],
+          "cars":[{"entity":"42","vehicleId":5,"speeds":[30]}]})",t0));
+        auto at=t0+3000ms;
+        for (int x=0;x<=600;x+=20) {s.step(0,x,0,0,at);at+=100ms;}
+        auto f=split(s.step(0,20,10,0,at));
+        CHECK(!(std::stod(f[2])<400.0));                                  // never aimed back near the start
     }
     {   // 0.5.2 (KB-241): a dense line is not routed leg by leg under the game thread's lock.
         auto graph=std::make_shared<ncm::pace::RoadGraph>();

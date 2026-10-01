@@ -70,6 +70,7 @@ struct Launch {
     double forcedFrac = 0.25;       // race forced start speed = ceiling * forcedFrac (SP buildDriveProfile, raceActive)
     double raceDist = 12;           // minimumDistanceToTarget in the race
     double recommandS = 3.1, stallMps = 5.5, stallS = 1.9;
+    double rampFloorMps = 6.0, rampMps2 = 4.6;   // 0.5.3: the ceiling's curve from the lights (0-100 km/h in ~6 s)
 };
 
 struct Car {

@@ -143,6 +143,40 @@ void dumpSignatures()
         }
         PACE_INFO("rtti: %s -- %d matching method(s) of %u", name, shown, static_cast<uint32_t>(cls->funcs.size()));
     }
+    // 0.5.3: the engine's own RACING driver, read before it is used. Pace drives with the drive-to-point command; the
+    // game also has AIVehicleRacingCommand (what vanilla street races use) and every vehicle record carries a
+    // drivingParamsRace profile beside drivingParamsGeneric. Every property of every class in each chain, with its type,
+    // and every method of the handler/agent, so the next build binds to what this game build really has.
+    for (const char* name : {"AIVehicleRacingCommand", "AIVehicleDriveToPointAutonomousCommand", "AIVehicleOnSplineCommand",
+                              "AIVehicleToNodeCommand", "AIVehicleChaseCommand", "AIVehiclePanicCommand",
+                              "AIDriveRacingCommandHandler", "AIbehaviorDriveRacingTreeNodeDefinition",
+                              "gamedataVehicleDrivingParameters_Record", "gamedataDriving_Record", "AIVehicleAgent"}) {
+        RED4ext::CClass* cls = rtti->GetClass(RED4ext::CName(name));
+        if (!cls) cls = rtti->GetClassByScriptName(RED4ext::CName(name));
+        if (!cls) { PACE_INFO("race-rtti: no class %s", name); continue; }
+        for (RED4ext::CClass* c = cls; c; c = c->parent) {
+            for (auto* prop : c->props) if (prop)
+                PACE_INFO("race-rtti: %s <%s> prop %s: %s", name, c->GetName().ToString(), prop->name.ToString(),
+                          prop->type ? prop->type->GetName().ToString() : "?");
+            if (std::string(c->GetName().ToString()) == "IScriptable") break;
+        }
+        int shown = 0;
+        for (auto* fn : cls->funcs) {
+            if (!fn) continue;
+            std::string sig = std::string(fn->shortName.ToString()) + "(";
+            bool first = true;
+            for (auto* p : fn->params) {
+                if (!p) continue;
+                if (!first) sig += ", ";
+                first = false;
+                sig += std::string(p->name.ToString()) + ": " + (p->type ? p->type->GetName().ToString() : "?");
+            }
+            sig += ") -> ";
+            sig += (fn->returnType && fn->returnType->type) ? fn->returnType->type->GetName().ToString() : "Void";
+            PACE_INFO("race-rtti: %s method %s", name, sig.c_str());
+            if (++shown >= 80) break;
+        }
+    }
     // Engine route probe: discover callable GPS/traffic path methods in the running game build before
     // binding Pace to any of them. The in-world navigation mod reads the player's minimap polyline via
     // a build-specific hook; Pace needs a route request for arbitrary race legs instead.
