@@ -55,6 +55,8 @@ public class NcmPaceSystem extends ScriptableSystem {
   private let m_probeLast: AICommandState;
   private let m_controlLast: AICommandState;
   private let m_testTicks: Int32;      // 0.7.6: while > 0 the two test cars get no race commands (20 s at 20 Hz)
+  private let m_probeAtTicks: Int32;   // 0.7.8: counts down to the engine spline probe after load (30 s at 20 Hz)
+  private let m_probedRace: Bool;
 
   public func SetBanner(banner: ref<NcmPaceBanner>) -> Void {
     this.m_banner = banner;
@@ -67,6 +69,7 @@ public class NcmPaceSystem extends ScriptableSystem {
     }
     this.m_player = player;
     this.m_generation += 1;
+    this.m_probeAtTicks = 600;
     // 0.6.0: the engine's driving profiles as this game build has them, once per game start (L244, IDEA-788)
     if !this.m_dumped {
       this.m_dumped = true;
@@ -110,7 +113,15 @@ public class NcmPaceSystem extends ScriptableSystem {
       this.ReleaseAll("revision " + ToString(this.m_revision) + " -> " + ToString(revision));
       this.m_revision = revision;
     }
+    // 0.7.8: the engine spline probe, ~30 s after load, race or no race (counts real ticks: 0.5 s idle, 0.05 s racing)
     let count: Int32 = NcmPace_Count();
+    if this.m_probeAtTicks > 0 {
+      this.m_probeAtTicks -= count <= 0 ? 10 : 1;
+      if this.m_probeAtTicks <= 0 {
+        this.m_probeAtTicks = 0;
+        NcmPace_ProbeSplines(player.GetGame());
+      }
+    }
     if count <= 0 {
       this.Schedule(0.5);
       return;
@@ -168,6 +179,10 @@ public class NcmPaceSystem extends ScriptableSystem {
       // 0.7.0 (L246): the engine's own racer on this leg's race spline -- the vehicle's drivingParamsRace profile, no
       // rubber banding, joining the spline wherever the car is. Whatever it held before is released first.
       this.Release(i, vehicle, agent);
+      if !this.m_probedRace {
+        this.m_probedRace = true;
+        NcmPace_ProbeSplines(vehicle.GetGame());
+      }
       let race: ref<AIVehicleRacingCommand> = new AIVehicleRacingCommand();
       race.splineRef = NcmPace_Spline(i);
       race.startFromClosest = true;
