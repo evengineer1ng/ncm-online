@@ -45,6 +45,10 @@ public class NcmPaceSystem extends ScriptableSystem {
   private let m_areaId: Uint64;
   private let m_dumped: Bool;
   private let m_ended: array<Bool>;
+  private let m_probe: ref<AIVehicleCommand>;
+  private let m_probeCar: Int32;
+  private let m_probeDone: Bool;
+  private let m_probeSaid: Bool;
 
   public func SetBanner(banner: ref<NcmPaceBanner>) -> Void {
     this.m_banner = banner;
@@ -257,10 +261,34 @@ public class NcmPaceSystem extends ScriptableSystem {
     if !IsDefined(agent) {
       return;
     }
+    // 0.7.3 DIAGNOSTIC, once per game: does the engine find the race spline at all? The racing command fails at once
+    // on it; the plain spline command on the SAME ref tells a ref that does not resolve (it fails too) from a racer
+    // that wants something more (it executes). Logged only -- it never races.
+    if IsDefined(this.m_probe) && this.m_probeCar == i {
+      let ps: AICommandState = agent.GetCommandState(this.m_probe);
+      if !this.m_probeSaid && !Equals(ps, AICommandState.NotExecuting) {
+        this.m_probeSaid = true;
+        NcmPace_Log("probe: AIVehicleOnSplineCommand on the same spline is " + ToString(ps)
+          + (Equals(ps, AICommandState.Executing) ? " -- the spline RESOLVES; the racer wants more" : ""));
+      }
+    }
     let st: AICommandState = agent.GetCommandState(held);
     if Equals(st, AICommandState.Failure) || Equals(st, AICommandState.Success) {
       this.m_ended[i] = true;
       NcmPace_Log("car " + ToString(i) + ": command ended " + (Equals(st, AICommandState.Failure) ? "FAILURE" : "success"));
+      if Equals(st, AICommandState.Failure) && !this.m_probeDone && IsDefined(held as AIVehicleRacingCommand) {
+        this.m_probeDone = true;
+        let probe: ref<AIVehicleOnSplineCommand> = new AIVehicleOnSplineCommand();
+        probe.splineRef = NcmPace_Spline(i);
+        probe.startFromClosest = true;
+        probe.stopAtPathEnd = true;
+        probe.needDriver = false;
+        probe.useKinematic = false;
+        probe.secureTimeOut = 60.0;
+        this.m_probe = probe;
+        this.m_probeCar = i;
+        NcmPace_Log("probe: sending AIVehicleOnSplineCommand to car " + ToString(i) + ": " + (agent.SendCommand(probe) ? "accepted" : "REFUSED"));
+      }
     }
   }
 

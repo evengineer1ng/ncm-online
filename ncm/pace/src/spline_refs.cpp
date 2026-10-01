@@ -29,9 +29,11 @@ constexpr int kMaxSectors = 64;
 template<typename T> T* field(RED4ext::ISerializable* obj, const char* name)
 {
     if (!obj) return nullptr;
-    auto* cls = obj->GetType();
-    auto* prop = cls ? cls->GetProperty(name) : nullptr;
-    return prop ? prop->GetValuePtr<T>(obj) : nullptr;
+    const RED4ext::CName wanted(name);
+    for (auto* c = obj->GetType(); c; c = c->parent)          // the whole class chain, not only the leaf
+        for (auto* prop : c->props)
+            if (prop && prop->name == wanted) return prop->GetValuePtr<T>(obj);
+    return nullptr;
 }
 }
 
@@ -56,9 +58,21 @@ void pollSplineRefs()
         auto* sector = t->Get().GetPtr();
         if (!sector) continue;
         ++sectors;
+        // 0.7.3: say what the engine's sector type really is and what its properties are called (0.7.2 assumed
+        // WolvenKit's names and found neither), then use the ones that hold node refs and nodes
+        static bool described = false;
+        if (!described) {
+            described = true;
+            auto* cls = sector->GetType();
+            PACE_INFO("spline refs: loaded sector class %s", cls ? cls->GetName().ToString() : "?");
+            for (auto* c = cls; c; c = c->parent)
+                for (auto* prop : c->props) if (prop)
+                    PACE_INFO("spline refs: <%s> %s: %s", c->GetName().ToString(), prop->name.ToString(),
+                              prop->type ? prop->type->GetName().ToString() : "?");
+        }
         auto* refs = field<RED4ext::DynArray<uint64_t>>(sector, "nodeRefs");
         auto* nodes = field<RED4ext::DynArray<RED4ext::Handle<RED4ext::ISerializable>>>(sector, "nodes");
-        if (!refs || !nodes) { PACE_ERR("spline refs: a sector has no nodeRefs/nodes property"); continue; }
+        if (!refs || !nodes) { PACE_ERR("spline refs: no nodeRefs/nodes property on the sector (see the property list)"); continue; }
         const uint32_t n = std::min<uint32_t>(refs->size(), nodes->size());
         for (uint32_t i = 0; i < n; ++i) {
             auto* node = (*nodes)[i].GetPtr();
