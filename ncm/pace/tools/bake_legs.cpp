@@ -14,6 +14,7 @@
 #include "road_graph.hpp"
 #include <nlohmann/json.hpp>
 #include <cmath>
+#include <cstdint>
 #include <fstream>
 #include <iostream>
 #include <regex>
@@ -44,9 +45,80 @@ static void join(std::vector<Point>& out, const Point& a, const Point& b)
     }
 }
 
+// --grids (L247): the road BEHIND a leg's start, for the grid to stand on. From the lane point nearest the start node
+// that runs the way the race leaves (the routed line's first 30 m), back along that lane and on through the
+// predecessor that runs straightest into it, for `metres`. Start node first. Empty when the node is off every lane
+// (more than 20 m) or no lane there runs the race's way -- the server then lays SP's straight grid.
+static int whyNoGrid[4] = {0, 0, 0, 0};   // no direction, no lane near, chain too short, ok
+static std::vector<Point> behind(const RoadGraph& g, const std::vector<std::vector<uint32_t>>& in, const Point& node,
+                                 const std::vector<Point>& road, double metres)
+{
+    if (road.size() < 2) return {};
+    size_t k = 1;
+    double run = 0;
+    while (k + 1 < road.size() && run < 30.0) { run += dist(road[k - 1], road[k]); ++k; }
+    double fx = road[k].x - road.front().x, fy = road[k].y - road.front().y;
+    const double fl = std::hypot(fx, fy);
+    if (fl < 1) { ++whyNoGrid[0]; return {}; }
+    fx /= fl; fy /= fl;
+    // anchored on the node; a node off every lane (a plaza, a lot) on the point where the race joins the road
+    int64_t bestLane = -1; size_t bestAt = 0;
+    bool onNode = true;
+    for (const Point* anchor : {&node, &road.front()}) {
+        double bestD = 20.0;
+        for (size_t i = 0; i < g.lanes.size(); ++i) {
+            const auto& line = g.lanes[i].line;
+            for (size_t j = 0; j + 1 < line.size(); ++j) {
+                const double d = std::hypot(line[j].x - anchor->x, line[j].y - anchor->y);
+                if (d >= bestD || std::fabs(line[j].z - anchor->z) > 8.0) continue;
+                double dx = line[j + 1].x - line[j].x, dy = line[j + 1].y - line[j].y;
+                const double l = std::hypot(dx, dy);
+                if (l < 0.1 || (dx * fx + dy * fy) / l < 0.9) continue;
+                bestD = d; bestLane = static_cast<int64_t>(i); bestAt = j;
+            }
+        }
+        if (bestLane >= 0) break;
+        onNode = false;
+    }
+    if (bestLane < 0) { ++whyNoGrid[1]; return {}; }
+    std::vector<Point> out{onNode ? node : g.lanes[static_cast<size_t>(bestLane)].line[bestAt]};
+    double total = 0;
+    auto add = [&](const Point& p) {
+        if (dist(out.back(), p) < 0.5) return;
+        total += dist(out.back(), p);
+        out.push_back(p);
+    };
+    size_t lane = static_cast<size_t>(bestLane);
+    int64_t j = static_cast<int64_t>(bestAt);
+    for (int hops = 0; hops < 40 && total < metres; ++hops) {
+        const auto& line = g.lanes[lane].line;
+        for (; j >= 0 && total < metres; --j) add(line[static_cast<size_t>(j)]);
+        if (total >= metres || line.size() < 2) break;
+        // the predecessor whose last stretch runs straightest into this lane's first
+        double sx = line[1].x - line[0].x, sy = line[1].y - line[0].y;
+        const double sl = std::max(1e-6, std::hypot(sx, sy));
+        int64_t pick = -1; double pickDot = 0.34;   // the straightest on, down to a ~70 deg bend
+        for (uint32_t p : in[lane]) {
+            const auto& pl = g.lanes[p].line;
+            if (pl.size() < 2 || dist(pl.back(), line.front()) > 12.0) continue;
+            const double px = pl.back().x - pl[pl.size() - 2].x, py = pl.back().y - pl[pl.size() - 2].y;
+            const double pll = std::max(1e-6, std::hypot(px, py));
+            const double dot = (px * sx + py * sy) / (pll * sl);
+            if (dot > pickDot) { pickDot = dot; pick = p; }
+        }
+        if (pick < 0) break;
+        lane = static_cast<size_t>(pick);
+        j = static_cast<int64_t>(g.lanes[lane].line.size()) - 1;
+    }
+    if (total < 20.0) { ++whyNoGrid[2]; return {}; }      // shorter than the field: the server runs on straight from its end
+    ++whyNoGrid[3];
+    return out;
+}
+
 int main(int argc, char** argv)
 {
-    if (argc < 3) { std::cerr << "usage: bake_legs <road-data dir> <nodes.lua> [fromId toId]\n"; return 2; }
+    if (argc < 3) { std::cerr << "usage: bake_legs <road-data dir> <nodes.lua> [fromId toId | --grids]\n"; return 2; }
+    const bool grids = argc >= 4 && std::string(argv[3]) == "--grids";
     const std::string dir = argv[1];
     RoadGraph g;
     {
@@ -79,7 +151,9 @@ int main(int argc, char** argv)
         }
     }
     std::cerr << g.lanes.size() << " lanes, " << nodes.size() << " race nodes\n";
-    const std::string onlyFrom = argc >= 5 ? argv[3] : "", onlyTo = argc >= 5 ? argv[4] : "";
+    std::vector<std::vector<uint32_t>> in(g.lanes.size());            // predecessors, for --grids
+    for (uint32_t i = 0; i < g.lanes.size(); ++i) for (uint32_t o : g.lanes[i].out) if (o < in.size()) in[o].push_back(i);
+    const std::string onlyFrom = (argc >= 5 && !grids) ? argv[3] : "", onlyTo = (argc >= 5 && !grids) ? argv[4] : "";
     int written = 0, failed = 0;
     for (const auto& a : nodes) {
         for (const auto& b : nodes) {
@@ -87,6 +161,16 @@ int main(int argc, char** argv)
             if (!onlyFrom.empty() && (a.id != onlyFrom || b.id != onlyTo)) continue;
             const auto road = g.route(a.p, b.p);
             if (road.size() < 3) { std::cerr << "no route " << a.id << " -> " << b.id << "\n"; ++failed; continue; }
+            if (grids) {
+                const auto back = behind(g, in, a.p, road, 120.0);
+                if (back.empty()) { ++failed; continue; }
+                nlohmann::json j{{"from", a.id}, {"to", b.id}};
+                auto& arr = j["points"] = nlohmann::json::array();
+                for (const auto& p : back) arr.push_back({std::round(p.x * 100) / 100, std::round(p.y * 100) / 100, std::round(p.z * 100) / 100});
+                std::cout << j.dump() << "\n";
+                ++written;
+                continue;
+            }
             std::vector<Point> pts{a.p};
             join(pts, a.p, road.front());
             pts.insert(pts.end(), road.begin(), road.end());
@@ -115,5 +199,7 @@ int main(int argc, char** argv)
         }
     }
     std::cerr << written << " legs written, " << failed << " unroutable\n";
+    if (grids) std::cerr << "grids: " << whyNoGrid[3] << " ok, " << whyNoGrid[0] << " no direction, " << whyNoGrid[1]
+                         << " no lane the race's way within 20 m of the node, " << whyNoGrid[2] << " road behind too short\n";
     return 0;
 }

@@ -9,8 +9,12 @@ server-only Lua script for `ncm_paddock`, so `PaddockLive.pathFor` builds every 
 Each line is cut at its finish node (the bake's 80 m run-out is for the racer, not the model), thinned to a point every
 <= 25 m and at every turn of >= 10 degrees, rounded to 0.1 m, and stored as one string per leg ("x,y,z;x,y,z;...").
 
+It also carries each leg's GRID LINE (`--grids`, L247): the road behind the leg's start, walked back over the lane
+graph, for a street grid to stand on (thinned to every <= 8 m: the slots follow it).
+
 Usage:  ncm/pace/build/Release/ncm_pace_bake_legs.exe ncm/pace/build/road-data ncm/core/data/nodes.lua > legs.jsonl
-        python tools/gen-road-lines.py --legs legs.jsonl
+        ncm/pace/build/Release/ncm_pace_bake_legs.exe ncm/pace/build/road-data ncm/core/data/nodes.lua --grids > grids.jsonl
+        python tools/gen-road-lines.py --legs legs.jsonl --grids grids.jsonl
 """
 import argparse
 import json
@@ -33,7 +37,7 @@ def cut_runout(points, length):
     return out
 
 
-def thin(points):
+def thin(points, spacing=SPACING_M):
     out = [points[0]]
     for i in range(1, len(points) - 1):
         p, last, nxt = points[i], out[-1], points[i + 1]
@@ -41,7 +45,7 @@ def thin(points):
         h1 = math.atan2(p[1] - last[1], p[0] - last[0])
         h2 = math.atan2(nxt[1] - p[1], nxt[0] - p[0])
         turn = abs((math.degrees(h2 - h1) + 180) % 360 - 180)
-        if d >= SPACING_M or (turn >= TURN_DEG and d >= 4.0):
+        if d >= spacing or (turn >= TURN_DEG and d >= 4.0):
             out.append(p)
     out.append(points[-1])
     return out
@@ -50,7 +54,9 @@ def thin(points):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--legs", required=True)
+    ap.add_argument("--grids", required=True)
     a = ap.parse_args()
+    grids = sorted((json.loads(l) for l in open(a.grids, encoding="utf-8") if l.strip()), key=lambda l: (l["from"], l["to"]))
     legs = sorted((json.loads(l) for l in open(a.legs, encoding="utf-8") if l.strip()), key=lambda l: (l["from"], l["to"]))
     total = 0
     with open(OUT, "w", encoding="utf-8", newline="\n") as f:
@@ -64,7 +70,14 @@ def main():
             enc = ";".join(f"{x:.1f},{y:.1f},{z:.1f}" for x, y, z in pts)
             f.write(f'  ["{leg["from"]}__{leg["to"]}"] = "{enc}",\n')
         f.write("}\n")
-    print(f"{len(legs)} legs, {total} points, {os.path.getsize(OUT) // 1024} KB -> {os.path.relpath(OUT, ROOT)}")
+        f.write("-- The road behind each leg's start (start first, running back): where its grid stands (L247).\n")
+        f.write("PaddockGridLines = {\n")
+        for g in grids:
+            pts = thin([tuple(p) for p in g["points"]], 8.0)
+            enc = ";".join(f"{x:.1f},{y:.1f},{z:.1f}" for x, y, z in pts)
+            f.write(f'  ["{g["from"]}__{g["to"]}"] = "{enc}",\n')
+        f.write("}\n")
+    print(f"{len(legs)} legs, {len(grids)} grid lines, {total} points, {os.path.getsize(OUT) // 1024} KB -> {os.path.relpath(OUT, ROOT)}")
 
 
 if __name__ == "__main__":
