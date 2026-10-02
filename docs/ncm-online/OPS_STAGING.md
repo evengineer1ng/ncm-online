@@ -4,7 +4,7 @@
 > Authority map: [INDEX.md](INDEX.md) - classified 2026-09-24 (L125)
 
 Day-to-day recipe for the staging server. Facts: Ubuntu 24.04, 2 vCPU / 4 GB, static IP `52.60.225.137`,
-OPEN//77 `2.31.21+op77.120 linux-x64` (upgraded 2026-09-30, L239), server id `6b154fdc-d515-4903-97dd-df37cb966151`, name "NCM Online",
+OPEN//77 `2.31.21+op77.124 linux-x64` (platform-only upgrade 2026-10-02, L290), server id `6b154fdc-d515-4903-97dd-df37cb966151`, name "NCM Online",
 unlisted. Layout `/opt/ncm/{server,resources/ncm,mods,logs}`; systemd unit `ncm-server` (`Restart=always`, so any
 exit — including a Warden restart — comes straight back in 5 s). MariaDB 10.11 on the box, db `ncm`, user
 `ncm@127.0.0.1`; the password lives only in `/opt/ncm/server.env` (mode 600) and is never printed.

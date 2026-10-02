@@ -49,14 +49,19 @@ $log    = { param($m) Write-Host ("[o77-upgrade] " + $m) }
 
 # Removing a tree that contains a directory junction is dangerous: Remove-Item -Recurse can follow
 # the link and delete the TARGET. Here the target is ncm\online\resources -- the entire NCM source.
-# So: unlink any junction with rmdir (which removes the link only) before deleting anything.
+# So: unlink any junction without recursion before deleting anything.
 function Remove-TreeSafely([string]$path) {
     if (-not (Test-Path -LiteralPath $path)) { return }
+    $full = [System.IO.Path]::GetFullPath($path)
+    $safeRoot = [System.IO.Path]::GetFullPath($o77).TrimEnd('\') + '\'
+    if (-not $full.StartsWith($safeRoot, [System.StringComparison]::OrdinalIgnoreCase)) {
+        throw "refusing to remove path outside tools/open77: $full"
+    }
     Get-ChildItem -LiteralPath $path -Recurse -Force -Directory -ErrorAction SilentlyContinue |
         Where-Object { $_.LinkType -in @('Junction', 'SymbolicLink') } |
-        ForEach-Object { cmd /c rmdir "$($_.FullName)" 2>$null | Out-Null }
+        ForEach-Object { [System.IO.Directory]::Delete($_.FullName, $false) }
     $self = Get-Item -LiteralPath $path -Force -ErrorAction SilentlyContinue
-    if ($self -and $self.LinkType -in @('Junction', 'SymbolicLink')) { cmd /c rmdir "$path" 2>$null | Out-Null; return }
+    if ($self -and $self.LinkType -in @('Junction', 'SymbolicLink')) { [System.IO.Directory]::Delete($full, $false); return }
     Remove-Item -LiteralPath $path -Recurse -Force -ErrorAction SilentlyContinue
 }
 
@@ -147,7 +152,7 @@ if ($WhatIf) {
 foreach ($tree in @($active, $cand)) {
     $link = Join-Path $tree 'resources\ncm'
     $li = Get-Item -LiteralPath $link -Force -ErrorAction SilentlyContinue
-    if ($li -and $li.LinkType -in @('Junction', 'SymbolicLink')) { cmd /c rmdir "$link" 2>$null | Out-Null }
+    if ($li -and $li.LinkType -in @('Junction', 'SymbolicLink')) { [System.IO.Directory]::Delete($li.FullName, $false) }
     if (Test-Path -LiteralPath $link) { throw "resources\ncm in $tree is not a junction; refusing to swap (inspect it by hand)" }
 }
 New-Item -ItemType Directory -Force -Path (Split-Path -Parent $backup) | Out-Null
