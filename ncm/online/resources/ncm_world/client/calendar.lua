@@ -64,6 +64,10 @@ end
 
 local function applyCalendar(g, transport)
     if type(g) ~= "table" or type(g.next) ~= "table" then return false end
+    -- KB-225: GlobalState now replicates, but it can hold a snapshot minutes old while the net event brings a fresh
+    -- one every tick. Re-applying the stale one each heartbeat swapped the list back and dragged the KB-25 clock
+    -- down (a >30 s drop reads as a server restart), so the toast countdown stood still. Never go backwards.
+    if cal and (tonumber(g.serverNow) or 0) < (tonumber(cal.serverNow) or 0) then return false end
     if not cal or g.signature ~= cal.signature then
         log("calendar: %d upcoming via %s (%s)", #g.next, tostring(transport), tostring(g.signature))
     end
@@ -453,6 +457,14 @@ local function refreshHint()
             if candidate.eventId == entry.eventId then entryEvent = candidate; break end
         end
     end
+    -- KB-233: a route the calendar set FOR an entry ("entries open", /ncm.gps to "my entry") belongs to that entry.
+    -- Once the driver withdraws, or the entry is cancelled or leaves the calendar, the route goes with it. Before
+    -- this nothing released it, and nav.lua's 2 s re-verify kept taking the GPS back from the driver's own map
+    -- waypoint (owner, 2026-09-30: withdrawn from Kabuki Bridge -> Checkerboard, routing to Fuel Station 19).
+    if gps.eventId and gps.forEntry and not (entryEvent and entry.eventId == gps.eventId) then
+        NcmNav.release(("entry %s no longer yours (%s)"):format(tostring(gps.eventId), tostring(entryState or "none")))
+        gps = { eventId = nil }
+    end
     -- Venue discovery is world information, not a reward for clicking INTEREST: every race inside its window has
     -- its own ring at its own venue, Street Calls included (owner, 2026-09-28). An invitational is ringed only
     -- for the driver who holds a seat in it -- nobody else can do anything there.
@@ -588,7 +600,7 @@ end
 -- routable-blip recipe the platform's own race gamemode uses, and re-selects it when the driver's seat context
 -- changes. This function is kept as the calendar's spelling of "point me at a venue".
 routeTo = function(p, eventId, why)
-    gps = { eventId = eventId }
+    gps = { eventId = eventId, forEntry = (why == "entries open" or why == "command:my entry") }
     NcmNav.to(p, why)
 end
 
@@ -626,6 +638,14 @@ local function gpsCommand()
     CreateThread(function() routeTo(soonest.venue, soonest.eventId, "command") end)
 end
 RegisterCommand("ncm.gps", gpsCommand, false)
+-- /ncm.gps.off -- stop NCM routing you anywhere; your own map waypoint is left as it is (KB-233).
+RegisterCommand("ncm.gps.off", function()
+    local had = NcmNav.release("command:off")
+    gps = { eventId = nil }
+    pcall(function() call("open77_notifications", "show", { id = "ncm_gps_off", replace = true, type = "info",
+        title = "NAVIGATION", message = had and "NCM stopped routing you. Your own waypoint is untouched."
+            or "NCM is not routing you anywhere.", durationMs = 4000 }) end)
+end, false)
 NcmQuickActions = NcmQuickActions or {}
 NcmQuickActions.gps = gpsCommand
 

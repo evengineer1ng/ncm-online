@@ -15,6 +15,7 @@ function PaddockStore.markPerson(id) if id then dirty.person[id] = true end end
 function PaddockStore.markOrg(id) if id then dirty.org[id] = true end end
 function PaddockStore.markSponsor(id) if id then dirty.sponsor[id] = true end end
 function PaddockStore.markMeta() dirty.meta = true end
+function PaddockStore.markSeries(id) if id then dirty.series[id] = true end end
 
 local function orgRow(sid, o)
     return {
@@ -47,15 +48,18 @@ end
 local function personRow(sid, p)
     return {
         query = [[INSERT INTO paddock_person (server_id, person_id, role, org_id, seat, first, last, display, region, gender,
-            birth_year, attrs_json, personality_json, principal_json, morale, state, wage, contract_ends, evidence_json)
-            VALUES (?, ?, ?, NULLIF(?, ''), NULLIF(?, ''), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            birth_year, attrs_json, personality_json, principal_json, morale, state, wage, contract_ends, evidence_json,
+            league_id, car_json, cash)
+            VALUES (?, ?, ?, NULLIF(?, ''), NULLIF(?, ''), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULLIF(?, ''), NULLIF(?, ''), ?)
             ON DUPLICATE KEY UPDATE role = VALUES(role), org_id = VALUES(org_id), seat = VALUES(seat),
                 attrs_json = VALUES(attrs_json), principal_json = VALUES(principal_json), morale = VALUES(morale),
                 state = VALUES(state), wage = VALUES(wage), contract_ends = VALUES(contract_ends),
-                evidence_json = VALUES(evidence_json)]],
+                evidence_json = VALUES(evidence_json), league_id = VALUES(league_id), car_json = VALUES(car_json),
+                cash = VALUES(cash)]],
         values = { sid, p.id, p.role, p.orgId or "", p.seat or "", p.first, p.last, p.display, p.region, p.gender,
             p.birthYear, U.encode(p.attrs) or "null", U.encode(p.personality) or "null", U.encode(p.principal) or "null",
-            p.morale or 50, p.state or "active", math.floor(p.wage or 0), p.contractEnds or 0, U.encode(p.evidence or {}) or "{}" },
+            p.morale or 50, p.state or "active", math.floor(p.wage or 0), p.contractEnds or 0, U.encode(p.evidence or {}) or "{}",
+            p.leagueId or "", p.car and (U.encode(p.car) or "") or "", math.floor(tonumber(p.cash) or 0) },
     }
 end
 
@@ -113,6 +117,13 @@ function PaddockStore.flush()
     for id in pairs(snapshot.org) do if w.orgs[id] then st[#st + 1] = orgRow(sid, w.orgs[id]); y() end end
     for id in pairs(snapshot.person) do if w.people[id] then st[#st + 1] = personRow(sid, w.people[id]); y() end end
     for id in pairs(snapshot.sponsor) do if w.sponsors[id] then st[#st + 1] = sponsorRow(sid, w.sponsors[id]); y() end end
+    for id in pairs(snapshot.series) do
+        local s = w.series[id]
+        if s then
+            st[#st + 1] = { query = [[INSERT INTO paddock_series (server_id, series_id, tier, division, name) VALUES (?, ?, ?, ?, ?)
+                ON DUPLICATE KEY UPDATE name = VALUES(name)]], values = { sid, id, s.tier, s.division, s.name } }
+        end
+    end
     if #st == 0 then return true end
     local ok, err = U.transact(st)
     if not ok then log("flush FAILED (%d statements): %s", #st, tostring(err)) end
@@ -165,6 +176,8 @@ function PaddockStore.load()
             attrs = U.decode(r.attrs_json), personality = U.decode(r.personality_json), principal = U.decode(r.principal_json),
             morale = num(r.morale, 50), state = r.state, wage = num(r.wage, 0), contractEnds = num(r.contract_ends, 0),
             evidence = U.decode(r.evidence_json) or {},
+            leagueId = r.league_id, car = r.car_json and U.decode(r.car_json) or nil,     -- L249 pools
+            cash = num(r.cash, 0),                                                          -- L249 step 4
         }
         w.people[p.id] = p
         w.personOrder[#w.personOrder + 1] = p.id

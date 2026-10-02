@@ -452,6 +452,22 @@
     #driver, #guide, #market, #collection, #trade, #help { box-sizing:border-box; }
 
     /* ===== EXCHANGE ====================================================================== */
+    /* ===== EXCHANGE · THE BOARD (L249 step 5) ============================================= */
+    .xb-switch { grid-column:1/-1; display:flex; gap:8px; margin-bottom:6px; }
+    .xb-switch button { padding:8px 14px; border:1px solid var(--line); background:transparent; color:var(--dim); font:700 12px/1 var(--mono); letter-spacing:.08em; }
+    .xb-switch button.on { border-color:var(--accent); color:var(--accent); background:rgba(34,216,226,.07); }
+    #tradeBody.xb-shell { display:flex; flex-direction:column; margin-top:14px; }
+    .xb-cols { flex:1; min-height:0; display:grid; grid-template-columns:minmax(0,1.6fr) minmax(0,1fr); gap:16px; }
+    .xb-list, .xb-side { min-height:0; overflow:auto; border:1px solid var(--line); background:rgba(255,255,255,.02); padding:10px; }
+    .xb-row { display:grid; grid-template-columns:70px 1fr 150px 110px 70px; gap:10px; align-items:center; width:100%; text-align:left;
+      padding:9px 10px; border:1px solid transparent; background:transparent; color:var(--text); font:600 13px/1.3 var(--mono); }
+    .xb-row:hover { border-color:var(--line); } .xb-row.sel { border-color:var(--accent); background:rgba(34,216,226,.06); }
+    .xb-kind { font:800 11px/1 var(--mono); letter-spacing:.1em; color:var(--accent); } .xb-kind.want { color:#ffd27a; }
+    .xb-dim { color:var(--dim); font-size:12px; } .xb-h { font:800 12px/1 var(--mono); letter-spacing:.12em; color:var(--dim); margin:8px 0; }
+    .xb-form { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin:8px 0 14px; }
+    .xb-form input, .xb-form select { background:rgba(0,0,0,.35); border:1px solid var(--line); color:var(--text); padding:7px 8px; font:600 13px/1 var(--mono); }
+    .xb-form button, .xb-act { padding:8px 12px; border:1px solid var(--accent); background:rgba(34,216,226,.08); color:var(--accent); font:700 12px/1 var(--mono); letter-spacing:.06em; }
+    .xb-bid { display:flex; justify-content:space-between; align-items:center; gap:8px; padding:7px 0; border-bottom:1px solid var(--line); }
     #trade { width:1820px; height:960px; max-height:960px; overflow:hidden; padding:24px 28px; display:flex; flex-direction:column; }
     #tradeBody { flex:1; min-height:0; display:flex; flex-direction:column; }
     #tradeBody.trade-idle { display:grid; }
@@ -1296,6 +1312,28 @@
         // it be like. Each returns null when its data is absent, and null entries are dropped rather than
         // rendered as empty boxes.
         const blocks = [carBlock(r), regsBlock(r), economyBlock(r), weatherBlock(r, now)].filter(Boolean);
+        // L252: the Guide records interest only. Qualifying starts at the event venue panel.
+        if (r.paddock) {
+          const pk = r.paddock, open = now < (pk.closesAt || 0), entered = r.myState && r.myState !== "none" && r.myState !== "interested";
+          practice.textContent = pk.myBestMs ? "QUALIFYING BEST / " + fmtSec(pk.myBestMs / 1000) : (open ? "QUALIFY AT THE VENUE / until T-11" : "QUALIFYING CLOSED / the grid is set");
+          contract.innerHTML = "";
+          contract.append(blockEl(entered ? "YOU ARE ENTERED" : "YOUR INTEREST", "registered"));
+          lineEl(contract).textContent = entered
+            ? (pk.myBestMs ? "Your best qualifying time sets your place among the NPCs on the grid." : "You are entered and will start behind qualified drivers.")
+            : "Your interest marks this event and routes you to its venue. Qualifying and entry happen there.";
+          lineEl(contract, "muted").textContent = entered
+            ? "Run qualifying at the venue to improve your grid place. Entries close at T-11 (" + fmtTime((pk.closesAt || 0)) + ")."
+            : "No fee is charged and no grid place is reserved. Entries close at T-11 (" + fmtTime((pk.closesAt || 0)) + ").";
+          const out = [kicker, title, series, region, hero, facts, desc, ...blocks, practice, contract, action];
+          if (entered && open) {
+            const wd = document.createElement("button"); wd.className = "detail-action on";
+            wd.append(glyph("withdraw"), document.createTextNode("WITHDRAW"));
+            wd.addEventListener("click", () => { wd.disabled = true; Open77.emit("panel:interest", { eventId: r.eventId, action: "withdraw" }); });
+            out.push(wd);
+          }
+          guideDetail.append(...out);
+          return;
+        }
         guideDetail.append(kicker, title, series, region, hero, facts, desc, ...blocks, practice, contract, action);
       }
 
@@ -2460,6 +2498,101 @@
       }
 
       // ---- EXCHANGE ------------------------------------------------------------------------------
+
+      // ---- EXCHANGE · THE BOARD (L249 step 5) -----------------------------------------------------
+      // Posted wants and offers from players, Paddock teams and independent racers; bids against them; the poster
+      // accepts one and the server settles it in one transaction. Served by ncm_paddock (view "exchange").
+      let tradeMode = "board", boardData = null, boardPick = null;
+      const xbEl = (tag, cls, txt) => { const e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = String(txt); return e; };
+      const xbMoney = (n) => "€$" + Number(n || 0).toLocaleString();
+      const xbAsk = (action, args) => { Open77.emit("panel:paddock.exchange", { action: action, args: args || {} }); tradeNotice = { ok: true, text: "Working…" }; renderTrade(null); };
+      const xbWhat = (r) => r.item ? r.item + " · " + String(r.family || "").replaceAll("_", " ") + " · " + (r.tier || "")
+        : String(r.family || "").replaceAll("_", " ") + " · " + (r.tier || "");
+      function xbLeft(r) { const s = Math.max(0, Number(r.expiresAt || 0) - Math.floor(Date.now() / 1000)); return s > 3600 ? Math.floor(s / 3600) + "h" : Math.floor(s / 60) + "m"; }
+      function xbSelect(options, value) { const s = xbEl("select"); for (const o of options) { const op = xbEl("option", null, o[1]); op.value = o[0]; if (o[0] === value) op.selected = true; s.append(op); } return s; }
+      function xbCash(v) { const i = xbEl("input"); i.type = "number"; i.min = "0"; i.step = "1"; i.value = String(v || 0); i.style.width = "110px"; return i; }
+      function renderBoard(host) {
+        const d = boardData || { rows: [], loading: true };
+        const rows = Array.isArray(d.rows) ? d.rows : [];
+        const posts = rows.filter(r => r.t === "post"), parts = rows.filter(r => r.t === "part"), myBids = rows.filter(r => r.t === "mybid");
+        const cols = xbEl("div", "xb-cols"), left = xbEl("div", "xb-list"), side = xbEl("div", "xb-side");
+        cols.append(left, side); host.append(cols);
+        if (d.loading) { left.append(xbEl("div", "xb-dim", "Loading the board…")); return; }
+        if (d.error) { left.append(xbEl("div", "xb-dim", "The board is unavailable (" + d.error + ").")); return; }
+        left.append(xbEl("div", "xb-h", "THE BOARD · " + posts.length + " OPEN"));
+        if (!posts.length) left.append(xbEl("div", "xb-dim", "Nothing posted yet. Post a part you don't need, or what you're looking for."));
+        for (const r of posts) {
+          const b = xbEl("button", "xb-row" + (boardPick === r.id ? " sel" : ""));
+          b.append(xbEl("span", "xb-kind" + (r.kind === "want" ? " want" : ""), r.kind === "want" ? "WANTED" : "FOR SALE"), xbEl("span", null, xbWhat(r)),
+            xbEl("span", "xb-dim", (r.mine ? "YOU" : r.by) + " · " + r.who), xbEl("span", null, (r.kind === "want" ? "up to " : "") + xbMoney(r.cash)),
+            xbEl("span", "xb-dim", (r.bids || 0) + " bid · " + xbLeft(r)));
+          b.addEventListener("click", () => { boardPick = boardPick === r.id ? null : r.id; renderTrade(null); });
+          left.append(b);
+        }
+        const pick = posts.find(r => r.id === boardPick);
+        if (pick) xbPostDetail(side, pick, parts);
+        else xbPostForms(side, d, parts, myBids);
+      }
+      function xbPostDetail(side, r, parts) {
+        side.append(xbEl("div", "eyebrow", r.kind === "want" ? "Wanted" : "For sale"), xbEl("h2", null, xbWhat(r)));
+        side.append(xbEl("div", "xb-dim", (r.mine ? "Your post" : r.by + " · " + r.who) + " · " + (r.kind === "want" ? "pays up to " : "asking ") + xbMoney(r.cash) + " · " + xbLeft(r) + " left"));
+        if (r.note) side.append(xbEl("p", "xb-dim", r.note));
+        if (r.mine) {
+          side.append(xbEl("div", "xb-h", "BIDS"));
+          const offers = Array.isArray(r.offers) ? r.offers : [];
+          if (!offers.length) side.append(xbEl("div", "xb-dim", "No bids yet."));
+          for (const o of offers) {
+            const line = xbEl("div", "xb-bid");
+            line.append(xbEl("span", null, o.by + " · " + xbMoney(o.cash) + (o.item ? " + " + o.item : "")));
+            const acc = xbEl("button", "xb-act", "HOLD TO ACCEPT"); holdAction(acc, () => xbAsk("accept", { postId: r.id, bidId: o.id }));
+            line.append(acc); side.append(line);
+          }
+          const wd = xbEl("button", "xb-act", "WITHDRAW POST"); wd.addEventListener("click", () => xbAsk("withdraw_post", { postId: r.id }));
+          const wf = xbEl("div", "xb-form"); wf.append(wd); side.append(wf);
+          return;
+        }
+        side.append(xbEl("div", "xb-h", "YOUR BID"));
+        const f = xbEl("div", "xb-form");
+        if (r.kind === "offer") {
+          const cash = xbCash(r.cash);
+          const extra = xbSelect([["", "no part"]].concat(parts.map(p => [p.id, p.item + " · " + p.tier])), "");
+          const go = xbEl("button", null, "BID"); go.addEventListener("click", () => xbAsk("bid", { postId: r.id, revision: r.revision, cash: Math.floor(Number(cash.value) || 0), assetId: extra.value || null }));
+          f.append(xbEl("span", "xb-dim", "CASH"), cash, xbEl("span", "xb-dim", "+"), extra, go);
+        } else {
+          const fits = parts.filter(p => p.family === r.family && p.tier === r.tier);
+          if (!fits.length) { side.append(xbEl("div", "xb-dim", "You have no stored " + String(r.family).replaceAll("_", " ") + " part of tier " + r.tier + ".")); return; }
+          const part = xbSelect(fits.map(p => [p.id, p.item]), fits[0].id), cash = xbCash(r.cash);
+          const go = xbEl("button", null, "OFFER IT"); go.addEventListener("click", () => xbAsk("bid", { postId: r.id, revision: r.revision, cash: Math.floor(Number(cash.value) || 0), assetId: part.value }));
+          f.append(part, xbEl("span", "xb-dim", "FOR"), cash, go);
+        }
+        side.append(f, xbEl("p", "xb-dim", "A bid holds your part until it is accepted, declined or runs out. Money moves only when the poster accepts."));
+      }
+      function xbPostForms(side, d, parts, myBids) {
+        side.append(xbEl("div", "eyebrow", "Post"), xbEl("h2", null, "Sell a part, or ask for one"));
+        if (!d.signedIn) { side.append(xbEl("div", "xb-dim", "No Driver file on this server yet.")); return; }
+        side.append(xbEl("div", "xb-dim", "Balance " + xbMoney(d.balance)));
+        side.append(xbEl("div", "xb-h", "SELL A STORED PART"));
+        if (parts.length) {
+          const f = xbEl("div", "xb-form"), part = xbSelect(parts.map(p => [p.id, p.item + " · " + p.tier + " · list " + xbMoney(p.list)]), parts[0].id), cash = xbCash(parts[0].list);
+          part.addEventListener("change", () => { const p = parts.find(x => x.id === part.value); if (p) cash.value = String(p.list); });
+          const go = xbEl("button", null, "POST FOR SALE"); go.addEventListener("click", () => xbAsk("post_offer", { assetId: part.value, cash: Math.floor(Number(cash.value) || 0) }));
+          f.append(part, xbEl("span", "xb-dim", "ASKING"), cash, go); side.append(f);
+        } else side.append(xbEl("div", "xb-dim", "No parts in storage. Parts fitted to a Machine must come off first."));
+        side.append(xbEl("div", "xb-h", "ASK FOR A PART"));
+        const fams = Array.isArray(d.families) ? d.families : [], tiers = Array.isArray(d.tiers) ? d.tiers : [];
+        const w = xbEl("div", "xb-form"), fam = xbSelect(fams.map(x => [x, x.replaceAll("_", " ")]), fams[0]), tier = xbSelect(tiers.map(x => [x, x]), tiers[0]), max = xbCash(1000);
+        const go = xbEl("button", null, "POST WANTED"); go.addEventListener("click", () => xbAsk("post_want", { family: fam.value, tier: tier.value, cash: Math.floor(Number(max.value) || 0) }));
+        w.append(fam, tier, xbEl("span", "xb-dim", "UP TO"), max, go); side.append(w);
+        if (myBids.length) {
+          side.append(xbEl("div", "xb-h", "YOUR OPEN BIDS"));
+          for (const b of myBids) {
+            const line = xbEl("div", "xb-bid"); line.append(xbEl("span", null, xbMoney(b.cash) + " · " + xbLeft(b) + " left"));
+            const wd = xbEl("button", "xb-act", "WITHDRAW"); wd.addEventListener("click", () => xbAsk("withdraw_bid", { bidId: b.id }));
+            line.append(wd); side.append(line);
+          }
+        }
+        side.append(xbEl("p", "xb-dim", "Paddock teams and independent racers trade here too: they post what they don't need, ask for what they do, and bid on yours."));
+      }
       // The page edits only its own side. The server re-reads ownership, custody, installed bundles and money,
       // increments the shared revision, and clears both confirmations after every change.
       let tradeData = { state: "idle", rows: [] };
@@ -2519,8 +2652,13 @@
           : `<b>${(d.other&&d.other.display)||"OTHER DRIVER"}</b>REVISION ${Number(d.revision||0)} · ${Math.floor(remaining/60)}:${String(remaining%60).padStart(2,"0")} LEFT`;
         if(d.loading){tradeBody.className="trade-invite";tradeBody.innerHTML='<div class="trade-invite-box"><h2>LOADING EXCHANGE…</h2></div>';return;}
         if(d.state==="idle"){
-          tradeBody.className="trade-idle";const peers=tradeRows("peer");
-          if(!peers.length){tradeBody.innerHTML='<div class="trade-empty">NO OTHER DRIVERS ARE ONLINE. THE EXCHANGE OPENS WHEN SOMEBODY ELSE IS HERE.</div>';return;}
+          // L249 step 5: the BOARD (posted wants and offers, NPCs included) beside the DIRECT live trade
+          const sw=document.createElement("div");sw.className="xb-switch";
+          for(const [m,label] of [["board","THE BOARD"],["direct","DIRECT TRADE"]]){const b=document.createElement("button");b.textContent=label;if(tradeMode===m)b.className="on";
+            b.addEventListener("click",()=>{tradeMode=m;boardPick=null;if(m==="board")Open77.emit("panel:paddock.request",{view:"exchange"});renderTrade(null);});sw.append(b);}
+          if(tradeMode==="board"){tradeBody.className="xb-shell";tradeBody.append(sw);renderBoard(tradeBody);return;}
+          tradeBody.className="trade-idle";tradeBody.append(sw);const peers=tradeRows("peer");
+          if(!peers.length){const e=document.createElement("div");e.className="trade-empty";e.textContent="NO OTHER DRIVERS ARE ONLINE. THE BOARD WORKS WITHOUT THEM.";tradeBody.append(e);return;}
           for(const p of peers){const b=document.createElement("button");b.className="trade-peer";b.disabled=p.busy===true;
             const n=document.createElement("b");n.textContent=p.display||("Driver "+p.playerId);const s=document.createElement("span");s.textContent=p.busy?"ALREADY IN AN EXCHANGE":`PLAYER ${p.playerId} · OPEN DIRECT EXCHANGE`;
             b.append(n,s);b.addEventListener("click",()=>{tradeNotice={ok:true,text:"Sending invitation…"};renderTrade(null);Open77.emit("panel:trade.invite",{playerId:p.playerId});});tradeBody.append(b);}return;
@@ -2688,6 +2826,12 @@
         if (pdLiveTimer) clearTimeout(pdLiveTimer);
         pdLiveTimer = setTimeout(() => { pdLiveTimer = null; if (mode === "paddock" && paddockView === "live") pdAsk({ view: "live", raceId: raceId }); }, 1500);
       }
+      // a qualifying time (seconds) as m:ss.ss (L250 step 2); blank when the entrant has none (they start at the back)
+      function pdQuali(s) {
+        if (s == null || !isFinite(Number(s))) return "";
+        const v = Number(s), m = Math.floor(v / 60), r = v - m * 60;
+        return m + ":" + (r < 10 ? "0" : "") + r.toFixed(2);
+      }
       function pdLive(d) {
         const races = pdArr(d.races);
         if (!races.length) { pdEmpty(paddockMain, "Nothing on track right now. TODAY shows what's next."); return; }
@@ -2705,7 +2849,7 @@
         }
         b.append(track);
         b.append(pdTable([["POS", r => r.pos], ["DRIVER", r => { const w = pdEl("span"); if (r.colour) { const sw = pdEl("span", "pd-swatch"); sw.style.background = r.colour; w.append(sw); } w.append(pdEl("span", null, r.name)); return w; }],
-          ["TEAM", r => r.org || ""], ["GAP", r => r.gap || ""], ["", r => r.state === "finished" ? pdEl("span", "pd-live", "FINISHED") : (r.state === "out" ? "OUT" : (r.physical ? pdEl("span", "pd-live", "ON THE STREET") : ""))]],
+          ["TEAM", r => r.org || ""], ["GAP", r => r.gap || ""], ["QUALI", r => pdQuali(r.quali)], ["", r => r.state === "finished" ? pdEl("span", "pd-live", "FINISHED") : (r.state === "out" ? "OUT" : (r.physical ? pdEl("span", "pd-live", "ON THE STREET") : ""))]],
           d.rows, (r) => pdAsk({ view: "profile", kind: "person", id: r.id })));
         pdLiveRefresh(d.raceId);
       }
@@ -2855,7 +2999,7 @@
           d.provenance === "physical" ? "RUN ON THE STREET · result is physical"
             : d.provenance === "mixed" ? "PART ON THE STREET · real where it passed a player, simulated elsewhere"
             : "SIMULATED · seed commit " + (d.commit || "-")));
-        paddockDetail.append(pdTable([["POS", r => r.state === "finished" ? r.pos : "DNF"], ["DRIVER", r => r.driver], ["TIME", r => r.time != null ? r.time.toFixed(2) + "s" : (r.note || "")], ["GAP", r => r.gap || ""], ["PTS", r => r.points || ""]],
+        paddockDetail.append(pdTable([["POS", r => r.state === "finished" ? r.pos : "DNF"], ["DRIVER", r => r.driver], ["TIME", r => r.time != null ? r.time.toFixed(2) + "s" : (r.note || "")], ["GAP", r => r.gap || ""], ["GRID", r => r.grid || ""], ["QUALI", r => pdQuali(r.quali)], ["PTS", r => r.points || ""]],
           d.rows, (r) => pdAsk({ view: "profile", kind: "person", id: r.driverId })));
       }
       function pdProfileDetail(d) {
@@ -3982,6 +4126,8 @@
       Open77.on("panel:trade", (d) => { tradeData=d||{state:"idle",rows:[]}; if(mode==="trade")guard("trade",()=>renderTrade(tradeData)); });
       Open77.on("panel:trade.result", (d) => { tradeNotice={ok:!!(d&&d.ok),text:(d&&d.ok)?(d.state==="settled"?"EXCHANGE COMPLETE · receipt recorded":d.state==="waiting"?"REVISION CONFIRMED · waiting for the other Driver":"EXCHANGE UPDATED"):String((d&&d.reason)||"Exchange refused")};if(mode==="trade")guard("trade",()=>renderTrade(null)); });
       Open77.on("panel:paddock", (d) => { pdTake(d || { view: paddockView, rows: [] }); if (mode === "paddock") guard("paddock", () => renderPaddock(null)); });
+      Open77.on("panel:exchange.board", (d) => { boardData = d || { rows: [] }; if (mode === "trade") guard("trade", () => renderTrade(null)); });
+      Open77.on("panel:exchange.result", (d) => { tradeNotice = { ok: !!(d && d.ok), text: String((d && d.text) || "") }; if (d && d.ok) boardPick = null; if (mode === "trade") guard("trade", () => renderTrade(null)); });
       Open77.on("panel:paddock.result", (d) => { paddockNotice = { ok: !!(d && d.ok), text: String((d && d.text) || "") }; if (d && d.ok) paddockPick = null; if (mode === "paddock") guard("paddock", () => renderPaddock(null)); });
       Open77.on("panel:hide", () => { show(null); });
 
@@ -4015,6 +4161,7 @@
         else if (p.name === "panel:graph") { lastGraphData = value; if (mode === "messages") guard("messages", renderMessages); }
         else if (p.name === "panel:trade") { tradeData=value;if(mode==="trade")guard("trade",()=>renderTrade(value)); }
         else if (p.name === "panel:paddock") { pdTake(value); if (mode === "paddock") guard("paddock", () => renderPaddock(null)); }
+        else if (p.name === "panel:exchange.board") { boardData = value; if (mode === "trade") guard("trade", () => renderTrade(null)); }
       });
 
       document.addEventListener("keydown", (e) => {

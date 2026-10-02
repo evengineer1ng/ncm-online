@@ -20,6 +20,7 @@ local Entry = Core.get("competition.entry")
 local Format = Core.get("competition.format")
 local Discipline = Core.get("competition.discipline")
 local Teams = Core.get("competition.teams")
+local Mixed = Core.get("paddock.mixed")
 local ids = Core.get("vocabulary.ids")
 
 local function log(fmt, ...)
@@ -175,6 +176,8 @@ local function publish(rec, t)
     v.lengthM = rec.course and rec.course.lengthM or nil
     v.laps = rec.course and rec.course.laps or 1
     v.grid = rec.gridPoint
+    v.paddock = rec.paddock or nil                 -- L250: a mixed Paddock grid (beam + arrow to the slot)
+    v.fieldSize = rec.mixedField or rec.paddockField or nil
     v.next = rec.nextSpec and { kind = rec.nextSpec.kind, ordinal = rec.nextSpec.ordinal, gridFrom = rec.nextSpec.gridFrom, n = rec.nextSpec.n, at = rec.nextAt } or nil
     sessionViews[rec.s.sessionId] = v
     republishSessions(t)
@@ -214,6 +217,12 @@ end
 
 publishPractice = function(rec, t)
     local v = rec.kernel.publicView(rec.s)
+    -- L250: a driver who moved to another race's qualifying is not shown this one (their client would pick it)
+    if rec.left and next(rec.left) then
+        local kept = {}
+        for _, en in ipairs(v.entrants) do if not rec.left[en.driverId] then kept[#kept + 1] = en end end
+        v.entrants = kept
+    end
     for _, en in ipairs(v.entrants) do
         en.playerId = rec.playerOf[en.driverId]
         en.toNextM = rec.toNext and rec.toNext[en.driverId] or nil
@@ -223,6 +232,9 @@ publishPractice = function(rec, t)
     v.routeName = rec.routeName
     v.seriesName = rec.seriesName
     v.formatId = "practice"
+    -- L250: a Paddock race's qualifying is a solo run from a STANDING start -- the client stages the driver at the line
+    v.standing = rec.standing or nil
+    v.qualifying = rec.paddock or nil
     v.disciplineId = rec.disciplineId
     v.lengthM = rec.course and rec.course.lengthM or nil
     practiceViews[rec.eventId] = v
@@ -267,8 +279,29 @@ end
 local function courseFor(e, rules)
     local route = Routes.resolve(e.routeId, e.routeName)
     if not route then return nil, "route_unresolved" end
-    local course, why = Discipline.buildCourse(e.disciplineId or "street_sprint", route,
-        { laps = e.laps or 1, start = rules and rules.start or nil, formationM = rules and rules.formationM or nil })
+    local opts = { laps = e.laps or 1, start = rules and rules.start or nil, formationM = rules and rules.formationM or nil }
+    if route.oval and type(route.oval.loop) == "table" then
+        -- `data.ovals.root()` expands intermediate points across EVERY lap for display/path metadata.
+        -- `ovalCourse()` treats intermediates as ONE lap's template and repeats them by `laps`; feeding it
+        -- the expanded route multiplied a 19-lap oval into 1,446 gates and made the session view exceed
+        -- Open77's network-event complexity limit. Rebuild the template from the four authored oval marks.
+        opts.intermediate = {}
+        for i = 2, #route.oval.loop do
+            local point = route.oval.loop[i]
+            opts.intermediate[#opts.intermediate + 1] = {
+                x = point.x, y = point.y, z = point.z,
+                name = ("oval mark %d"):format(i),
+            }
+        end
+        -- Oval drivers follow the road lane, which can sit farther from the authored checkpoint pole than
+        -- a tight street route. Use the stock SP checkpoint capture radius so one missed pole does not leave
+        -- the gate sequence frozen for every later lap.
+        opts.captureM = 50
+        opts.armM = 100
+        opts.halfWidthM = 40
+        opts.laps = tonumber(e.laps) or tonumber(route.oval.laps) or 1
+    end
+    local course, why = Discipline.buildCourse(e.disciplineId or "street_sprint", route, opts)
     if not course then return nil, why end
     return course
 end
@@ -321,7 +354,10 @@ local function formSession(plan, spec, t, startsAt)
         for i, d in ipairs(order) do rank[d] = i end
         gridOpts = { order = rank }
     end
-    local slots = Grid.assign(entrants, gates[1], gridOpts)
+    local slots, paddockField
+    if e.class == "paddock" and NcmPaddockLink then slots, paddockField = NcmPaddockLink.slotsFor(e, entrants) end
+    if slots and #slots == 0 then log("cannot form %s: no entrant has a Paddock slot", e.eventId); return nil end
+    slots = slots or Grid.assign(entrants, gates[1], gridOpts)
     local slotOf, specEntrants = {}, {}
     for _, sl in ipairs(slots) do
         local team = sl.teamId and Teams.byId(sl.teamId)
@@ -343,6 +379,17 @@ local function formSession(plan, spec, t, startsAt)
         s = Quali.new({ sessionId = sessionId, eventId = e.eventId, kind = kind, startsAt = startsAt, windowSec = spec.windowSec, maxRuns = spec.maxRuns, gates = gates, entrants = specEntrants })
     else
         kernel = Race
+        if e.class == "paddock" then
+            -- Move into the visible light countdown at T-5; the kernel decides DNS only when green is due.
+            rules.gridHoldBeforeSec = Mixed.GRID_HOLD_SEC
+            local route = Routes.resolve(e.routeId, e.routeName)
+            if route and route.oval then
+                -- The generic 15-minute cap classified slow physical oval runs out around lap 2.
+                -- These races are long loops; allow an hour, with a longer finish window for stragglers.
+                rules.maxRaceSec = math.max(tonumber(rules.maxRaceSec) or 0, 3600)
+                rules.finishWindowSec = math.max(tonumber(rules.finishWindowSec) or 0, 1200)
+            end
+        end
         rules.holdReleasePct = setting("holdReleasePct", rules.holdReleasePct or 0.75)
         rules.holdMaxWaitSec = setting("holdMaxWaitSec", rules.holdMaxWaitSec or 60)
         if rules.incidents then rules.incidents.baseSec = setting("incidentBaseSec", rules.incidents.baseSec or 2) end
@@ -358,6 +405,7 @@ local function formSession(plan, spec, t, startsAt)
         results = nil, completeReason = nil, doneAt = nil, lastPos = {}, toNext = {}, progressM = {}, correctedM = {},
         gridPoint = venueGrid(gates[1]) or { x = gates[1].x, y = gates[1].y, z = gates[1].z, heading = 0 },
         rules = rules,
+        paddock = e.class == "paddock" and kind == "race" or nil, paddockField = paddockField,
     }
     sessions[sessionId] = rec
     byEvent[e.eventId] = sessionId
@@ -472,6 +520,11 @@ end
 -- Completion: persist, settle (zero eddies), announce
 -- ---------------------------------------------------------------------------------------------
 local function complete(rec, results, reason, t)
+    -- L250: a mixed Paddock grid is classified by the Paddock (NPCs and humans together); settle once it answers
+    if rec.paddock and not rec.classified and NcmPaddockLink and NcmPaddockLink.awaitClassification then
+        return NcmPaddockLink.awaitClassification(rec, results, reason, t, complete)
+    end
+    rec.provisional = nil
     rec.results = results
     rec.completeReason = reason
     rec.doneAt = t
@@ -508,7 +561,8 @@ local function complete(rec, results, reason, t)
     end
     -- L67 / IDEA-001: a race with a field of one is a TIME TRIAL. It is real, recorded and classified, but it is
     -- not won -- so it is never announced as a position. Core owns the predicate so host and rules agree.
-    local timeTrial = (rec.kind == "race") and Core.get("driver.progression").isTimeTrial({ fieldSize = #results })
+    local fieldN = tonumber(rec.mixedField) or #results
+    local timeTrial = (rec.kind == "race") and Core.get("driver.progression").isTimeTrial({ fieldSize = fieldN })
     -- **A time trial gets a ghost; a contested race does not** (`L166`). A time trial IS the solo activity
     -- practice is, under a different name and on the race kernel -- so the same rule applies to it. In a
     -- contested race a ghost would be clutter among real competitors and could be read as another entrant,
@@ -552,7 +606,7 @@ local function complete(rec, results, reason, t)
             end
         end
     end
-    local lines = {}
+    local lines, lineOf = {}, {}
     for _, r in ipairs(results) do
         local what
         if rec.kind ~= "race" then
@@ -568,6 +622,7 @@ local function complete(rec, results, reason, t)
         else
             lines[#lines + 1] = ("P%d %s %s"):format(r.position, tostring(r.display), what)
         end
+        lineOf[r.driverId] = lines[#lines]
     end
     -- QA G1/A2/G4: announce the finished session's own numbers. Facts only; nothing here reads the answer,
     -- and with the QA flag off the event is simply unobserved. See wp/QA_INSTRUMENTATION.md.
@@ -593,12 +648,12 @@ local function complete(rec, results, reason, t)
     for _, r in ipairs(results) do
         local pid = rec.playerOf[r.driverId]
         if pid then
-            tell(pid, ("%s: %s · %s — %s"):format(rec.kind == "race" and "Result" or (rec.kind == "quali" and "Qualifying" or "Practice"), rec.seriesName or "", rec.routeName or "", lines[r.position]))
+            tell(pid, ("%s: %s · %s — %s"):format(rec.kind == "race" and "Result" or (rec.kind == "quali" and "Qualifying" or "Practice"), rec.seriesName or "", rec.routeName or "", lineOf[r.driverId] or ""))
             local receipt = settlements and settlements[r.driverId] or nil
             if receipt then tell(pid, "Statement: " .. receipt.text .. " · BALANCE €$" .. tostring(receipt.balance)) end
             toast(pid, {
                 type = r.position == 1 and (r.state == "finished" or r.state == "timed") and "success" or "info",
-                title = timeTrial and "TIME TRIAL COMPLETE" or (("%s · P%d of %d"):format(rec.kind == "race" and "RESULT" or string.upper(rec.kind), r.position, #results)),
+                title = timeTrial and "TIME TRIAL COMPLETE" or (("%s · P%d of %d"):format(rec.kind == "race" and "RESULT" or string.upper(rec.kind), r.position, fieldN)),
                 message = (receipt and ((receipt.net >= 0 and "+€$" or "-€$") .. math.abs(receipt.net) .. " · balance €$" .. receipt.balance))
                     or ((rec.routeName or "") .. " · " .. ((r.state == "finished" or r.state == "timed") and fmtTime(r.correctedSec or r.totalSec or r.bestSec) or string.upper(r.state))),
                 icon = "NCM", durationMs = 15000,
@@ -606,7 +661,7 @@ local function complete(rec, results, reason, t)
             if rec.kind == "race" then
                 pcall(function()
                     local bag = Open77.state.player(pid)
-                    bag:set("ncmResult", { sessionId = s.sessionId, position = r.position, of = #results, state = r.state, totalSec = r.totalSec, correctedSec = r.correctedSec, incidentSec = r.incidentSec, gapSec = r.gapSec, routeName = rec.routeName, settlement = receipt, at = t })
+                    bag:set("ncmResult", { sessionId = s.sessionId, position = r.position, of = fieldN, state = r.state, totalSec = r.totalSec, correctedSec = r.correctedSec, incidentSec = r.incidentSec, gapSec = r.gapSec, routeName = rec.routeName, settlement = receipt, at = t })
                     if not nextSpec then pcall(function() bag:clear("ncmEntry") end) end
                 end)
             end
@@ -716,17 +771,36 @@ NcmRace.publish = publish
 -- ---------------------------------------------------------------------------------------------
 -- Tick
 -- ---------------------------------------------------------------------------------------------
-local function gridCheck(rec)
+local function gridCheck(rec, t)
     local s = rec.s
     if rec.kind ~= "race" or rec.lightsForced then return end   -- ncm.lights now: the marks stand wherever the cars are
+    if s.phase == "countdown" then
+        if t < s.startsAt then return end
+        local pmap = playersByDriver()
+        for driverId, pid in pairs(pmap) do rec.playerOf[driverId] = pid end
+        for _, sl in ipairs(rec.slots) do
+            local r = s.entrants[sl.driverId]
+            if r and r.state == "racing" then
+                local pos = positionOf(rec.playerOf[sl.driverId])
+                if not pos or Routes.planarDistance(pos, sl) > 30 then
+                    handle(rec, Race.leave(s, sl.driverId, t, "absent"), t)
+                end
+            end
+        end
+        return
+    end
     if s.phase ~= "forming" and s.phase ~= "gridded" then return end
     local pmap = playersByDriver()
     for driverId, pid in pairs(pmap) do rec.playerOf[driverId] = pid end
     for _, sl in ipairs(rec.slots) do
         local pid = rec.playerOf[sl.driverId]
         local pos = positionOf(pid)
-        local at = pos ~= nil and Routes.planarDistance(pos, sl) <= sl.radiusM
         local r = s.entrants[sl.driverId]
+        -- Mark attendance is a generous grid zone, with hysteresis. A driver who has checked in can
+        -- make a small correction without being reset to "entered" and DNSed by the start clock.
+        local distance = pos and Routes.planarDistance(pos, sl) or math.huge
+        local readyRadius = r and r.atMark and 30 or 12
+        local at = distance <= readyRadius
         if r and (r.state == "entered" or r.state == "ready") and r.atMark ~= at then
             Race.mark(s, sl.driverId, at)
             log("session=%s driver=%s %s the mark (P%d)", s.sessionId, sl.driverId, at and "AT" or "LEFT", sl.slot)
@@ -848,7 +922,8 @@ local function tick()
     end
     -- Form the first session of events about to start.
     for eid, e in pairs(NcmCalendar.events or {}) do
-        if not byEvent[eid] and e.state ~= "cancelled" and e.state ~= "closed" and e.startsAt - t <= setting("raceFormAtSec", 60) and e.startsAt > t - 5 then
+        local formLead = e.class == "paddock" and (Mixed.FREEZE_LEAD_SEC - 10) or setting("raceFormAtSec", 60)
+        if not byEvent[eid] and e.state ~= "cancelled" and e.state ~= "closed" and e.startsAt - t <= formLead and e.startsAt > t - 5 then
             local n = 0
             for _, en in pairs(e.entries or {}) do if en.state ~= "interested" and en.state ~= "withdrawn" then n = n + 1 end end   -- interest alone is not a grid
             if n > 0 then formPlan(e, t) elseif practices[eid] then NcmRace.practiceClose(eid, t, "no_entrants") end
@@ -859,7 +934,8 @@ local function tick()
     for sid, rec in pairs(sessions) do
         local s = rec.s
         if s.phase ~= "complete" then
-            gridCheck(rec)
+            if rec.paddock and NcmPaddockLink then pcall(NcmPaddockLink.autoPlace, rec, t) end
+            gridCheck(rec, t)
             if s.phase == "running" or s.phase == "finishing" or s.phase == "open" then
                 local pmap = playersByDriver()
                 for driverId, pid in pairs(pmap) do
@@ -879,10 +955,27 @@ local function tick()
                     if r and (r.state == "racing" or rec.kind ~= "race") then
                         local pos = positionOf(pid)
                         if pos then
+                            local previous = rec.lastPos[driverId]
+                            if rec.paddock and s.phase == "finishing" and r.state == "racing" and previous
+                                and Routes.planarDistance(pos, previous) > 0.5 then
+                                rec.lastMotionAt = rec.lastMotionAt or {}
+                                rec.lastMotionAt[driverId] = t
+                            end
                             rec.lastPos[driverId] = { x = pos.x, y = pos.y, z = pos.z }
                             local g = s.gates[((r.run and r.run.progress) or r.progress or 0) + 1]
                             if g then rec.toNext[driverId] = math.floor(Routes.planarDistance(pos, g)) end
                             if NcmTelemetry and NcmTelemetry.serverSample then NcmTelemetry.serverSample(rec, driverId, pos, t) end
+                        end
+                    end
+                end
+                if rec.paddock and s.phase == "finishing" then
+                    for driverId in pairs(rec.playerOf) do
+                        local r = s.entrants[driverId]
+                        local lastMotion = rec.lastMotionAt and rec.lastMotionAt[driverId]
+                        if r and r.state == "racing" and lastMotion and t - lastMotion <= 20 then
+                            -- Don't classify an actively moving human out just because the first finisher crossed.
+                            s.finishHoldUntil = t + 5
+                            break
                         end
                     end
                 end
@@ -893,6 +986,9 @@ local function tick()
             end
             local events = rec.kernel.step(s, t)
             if #events > 0 then handle(rec, events, t) end
+            if rec.paddock and NcmPaddockLink and NcmPaddockLink.publishProgress then
+                pcall(NcmPaddockLink.publishProgress, rec, t)
+            end
             publish(rec, t)
         elseif rec.nextSpec then
             if t >= rec.nextAt then toForm[#toForm + 1] = { sid = sid, rec = rec } else publish(rec, t) end
@@ -1190,7 +1286,15 @@ local function machineNow(rec, driverId)
     return { assetId = assetId, configurationRef = ref }
 end
 
-function NcmRace.reportGate(rec, pid, driver, gateIndex, pos, t, source)
+function NcmRace.reportGate(rec, pid, driver, gateIndex, pos, t, source, info)
+    -- L250: a Paddock qualifying run starts from a STANDING start -- the client stages the driver stopped at the line
+    -- and says so with the crossing; a flying crossing (or the server stream's) starts nothing
+    if rec.standing and tonumber(gateIndex) == 1 and not (source == "client" and type(info) == "table" and info.staged) then
+        if source == "client" then
+            toast(pid, { type = "warning", title = "STANDING START", message = "Stop on the start line, then go -- that run did not start", icon = "NCM", durationMs = 4000 })
+        end
+        return { ok = false, reason = "not_staged" }
+    end
     local res = rec.kernel.report(rec.s, { driverId = driver.ncmDriverId, gateIndex = tonumber(gateIndex), now = t, position = pos,
         machine = machineNow(rec, driver.ncmDriverId) })
     if NcmScenario and NcmScenario.traced[driver.ncmDriverId] then
@@ -1266,6 +1370,7 @@ function NcmRace.reportGate(rec, pid, driver, gateIndex, pos, t, source)
                     record = res.machine and res.machine.assetId and NcmGhost.recordFor(res.machine.assetId) or nil,
                 })
             end
+            if rec.paddockQuali and NcmPaddockLink then pcall(NcmPaddockLink.onQualiRun, rec, driver.ncmDriverId, pid, res, t) end
             local board, timed, mine = Practice.leaderboard(rec.s), 0, nil
             for _, row in ipairs(board) do if row.timed then timed = timed + 1 end; if row.driverId == driver.ncmDriverId then mine = row end end
             if mine then tell(pid, ("Practice: P%d of %d timed · best %s · %d run(s). /ncm.practice for the board."):format(mine.position, timed, fmtTime(mine.bestSec), mine.runs or 0)) end
@@ -1279,13 +1384,96 @@ function NcmRace.reportGate(rec, pid, driver, gateIndex, pos, t, source)
     return res
 end
 
-RegisterNetEvent("ncm:gate", function(sessionId, gateIndex)
+RegisterNetEvent("ncm:gate", function(sessionId, gateIndex, info)
     local pid = tonumber(source) or 0
     local rec = sessions[tostring(sessionId or "")]
     if not rec then return end
     local driver = NcmCalendar.resolveDriver(pid)
     if not driver then return end
-    NcmRace.reportGate(rec, pid, driver, gateIndex, positionOf(pid), now(), "client")
+    NcmRace.reportGate(rec, pid, driver, gateIndex, positionOf(pid), now(), "client", info)
+end)
+
+-- Player-requested exact grid placement (F7 by default): source identity, entrant state, session phase,
+-- proximity and seated vehicle are all checked here; the client cannot choose a slot or coordinates.
+local gridSnapBusy = {}
+RegisterNetEvent("ncm:grid.snap", function()
+    local pid = tonumber(source) or 0
+    if pid <= 0 then return end
+    if gridSnapBusy[pid] then tell(pid, "Race control: your grid snap is already in progress."); return end
+    local driver = NcmCalendar.resolveDriver(pid)
+    if not driver then tell(pid, "Race control: your driver identity is not ready yet."); return end
+    for _, rec in pairs(sessions) do
+        if rec.kind == "race" and (rec.s.phase == "forming" or rec.s.phase == "gridded") then
+            local id, sl = driver.ncmDriverId, rec.slotOf and rec.slotOf[driver.ncmDriverId]
+            local entrant = rec.s.entrants[id]
+            if sl and entrant and (entrant.state == "entered" or entrant.state == "ready") then
+                local pos = positionOf(pid)
+                if not pos then tell(pid, "Race control: I cannot read your position; try the grid snap again."); return end
+                local d = Routes.planarDistance(pos, sl)
+                if d > 20 then tell(pid, ("Race control: drive closer to P%d first; grid assist only moves a nearby car safely."):format(sl.slot)); return end
+                local okS, seat = pcall(Open77.vehicles.getPlayerSeat, pid)
+                local vid = okS and type(seat) == "table" and tonumber(seat.vehicleId) or nil
+                if not vid then tell(pid, "Race control: get in your car before using grid snap."); return end
+                -- Never teleport into an occupied slot. The previous unconditional transform could
+                -- put the player's car directly into another grid car and transfer full collision energy.
+                local okAll, allVehicles = pcall(Open77.vehicles.all)
+                if not okAll or type(allVehicles) ~= "table" then
+                    tell(pid, "Race control: I cannot confirm the grid spot is clear. Drive into your slot instead.")
+                    return
+                end
+                for _, other in pairs(allVehicles) do
+                    local otherId = tonumber(type(other) == "table" and (other.id or other.vehicleId) or nil)
+                    local otherPos = type(other) == "table" and (other.position or other) or nil
+                    if otherId and otherId ~= vid and type(otherPos) == "table"
+                        and Routes.planarDistance(otherPos, sl) < 6 then
+                        tell(pid, "Race control: your grid spot is occupied. Move into place manually; I will not snap you into another car.")
+                        log("GRID-SNAP refused session=%s player=%d slot=%d: vehicle=%d within 6m", rec.s.sessionId:sub(1, 8), pid, sl.slot, otherId)
+                        return
+                    end
+                end
+                gridSnapBusy[pid] = true
+                local okO, out, whyO = pcall(Open77.vehicles.forcePlayerOutOfVehicle, pid, vid)
+                for _ = 1, 30 do
+                    Wait(100)
+                    local okS2, s2 = pcall(Open77.vehicles.getPlayerSeat, pid)
+                    if not (okS2 and type(s2) == "table" and s2.vehicleId) then break end
+                end
+                local okOutCheck, afterOut = pcall(Open77.vehicles.getPlayerSeat, pid)
+                if not okOutCheck or (type(afterOut) == "table" and afterOut.vehicleId) then
+                    gridSnapBusy[pid] = nil
+                    log("GRID-SNAP failed session=%s player=%d slot=%d: could not safely unseat vehicle=%d", rec.s.sessionId:sub(1, 8), pid, sl.slot, vid)
+                    tell(pid, "Race control: could not move your car safely. Stay near your grid spot and try F7 again.")
+                    return
+                end
+                local okT, moved, whyT = pcall(Open77.vehicles.setTransform, vid,
+                    { position = { x = sl.x, y = sl.y, z = (sl.z or pos.z or 0) + 0.6 }, yaw = sl.yaw or sl.heading or 0 })
+                if not okT or moved ~= true then
+                    gridSnapBusy[pid] = nil
+                    log("GRID-SNAP failed session=%s player=%d slot=%d out=%s/%s move=%s/%s", rec.s.sessionId:sub(1, 8), pid, sl.slot,
+                        tostring(okO), tostring(out or whyO), tostring(okT), tostring(moved or whyT))
+                    tell(pid, "Race control: grid snap failed while moving your car; stay in the area and try again.")
+                    return
+                end
+                Wait(400)
+                local okW, warped, whyW = pcall(Open77.vehicles.warpPlayerIntoVehicle, pid, vid, "driver", { moveBucket = true })
+                local seatedSameCar = false
+                if okW and warped == true then
+                    for _ = 1, 15 do
+                        local okSeat, finalSeat = pcall(Open77.vehicles.getPlayerSeat, pid)
+                        if okSeat and type(finalSeat) == "table" and tonumber(finalSeat.vehicleId) == vid then seatedSameCar = true; break end
+                        Wait(100)
+                    end
+                end
+                gridSnapBusy[pid] = nil
+                log("GRID-SNAP session=%s player=%d vehicle=%d slot=%d from %.0f m: out=%s/%s move=%s/%s in=%s/%s", rec.s.sessionId:sub(1, 8), pid, vid, sl.slot, d,
+                    tostring(okO), tostring(out or whyO), tostring(okT), tostring(moved), tostring(okW), tostring(seatedSameCar or warped or whyW))
+                tell(pid, seatedSameCar and ("Race control: snapped your car to exact P%d and put you back in it. Hold here for the lights."):format(sl.slot)
+                    or "Race control: your car reached the grid, but I could not confirm you back in the same car. Re-enter and try F7 again.")
+                return
+            end
+        end
+    end
+    tell(pid, "Race control: no active race grid is available for your entry.")
 end)
 
 --- The telemetry stream saw a crossing (server-side detection, L63): report it as the server's own witness.
@@ -1326,7 +1514,8 @@ function NcmRace.practiceFor(e, t)
     local s = Practice.new({ sessionId = sessionId, eventId = e.eventId, gates = course.gates, closesAt = w.closesAt, openAt = t })
     rec = { s = s, kernel = Practice, kind = "practice", practice = true, spec = { kind = "practice" }, eventId = e.eventId, routeId = e.routeId,
             routeName = e.routeName, seriesName = e.seriesName, disciplineId = e.disciplineId, course = course,
-            playerOf = {}, lastPos = {}, toNext = {}, progressM = {}, correctedM = {} }
+            playerOf = {}, lastPos = {}, toNext = {}, progressM = {}, correctedM = {},
+            paddockQuali = e.class == "paddock" or nil, standing = e.standing or nil }
     practices[e.eventId] = rec
     sessions[sessionId] = rec
     pcall(function()
@@ -1345,6 +1534,9 @@ function NcmRace.practiceJoin(e, driver, pid, t)
     if not rec then return nil, why end
     local r, note = rec.kernel.join(rec.s, { driverId = driver.ncmDriverId, display = driver.display or (pid and GetPlayerName(pid)) or driver.ncmDriverId:sub(1, 8) })
     if not r then return nil, note end
+    -- L250: back to this race's qualifying after trying another's -- the driver's best here still stands
+    if r.state == "left" then r.state = r.bestSec and "timed" or "entered"; r.run = nil end
+    if rec.left then rec.left[driver.ncmDriverId] = nil end
     rec.playerOf[driver.ncmDriverId] = pid
     publish(rec, t)
     return true, note
@@ -1356,6 +1548,8 @@ function NcmRace.practiceLeave(eventId, driverId, t, reason)
     local events = rec.kernel.leave(rec.s, driverId, t, reason or "withdrawn")
     if events then handle(rec, events, t) end
     rec.playerOf[driverId] = nil
+    rec.left = rec.left or {}
+    rec.left[driverId] = true
     publish(rec, t)
     return true
 end

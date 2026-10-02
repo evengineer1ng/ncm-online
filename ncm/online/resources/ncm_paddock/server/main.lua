@@ -7,7 +7,7 @@
 local U = PaddockUtil
 local log = U.logger("main")
 
-local SCHEMA_REQUIRED = 52
+local SCHEMA_REQUIRED = 57             -- 057: humans in Paddock races (L250 steps 3-4)
 
 local function schemaReady()
     local ok, v = pcall(MySQL.scalar.await, "SELECT MAX(version) FROM schema_migrations")
@@ -48,9 +48,11 @@ local function tick()
     PaddockRaces.materialise(t)
     PaddockRaces.tick(t)
     if PaddockSettings.get("liveEnabled", true) then PaddockLive.tick(t) end
+    pcall(PaddockHumans.tick, t)
     PaddockLife.cupBoundary(t)
     PaddockLife.rollover(t)
     PaddockLife.daily(t)
+    if PaddockDays then PaddockDays.daily(t) end
     if t - lastSpotlight >= 60 then lastSpotlight = t; PaddockSpotlight.scan(t) end
     if t - lastCalibration >= 3600 then lastCalibration = t; PaddockCalibration.recompute() end
     if t - lastPrune >= 86400 then lastPrune = t; prune(t) end
@@ -69,11 +71,16 @@ CreateThread(function()
     if not PaddockWorld.boot() then log("BOOT FAILED: no world") return end
     PaddockCalibration.load()
     PaddockRaces.load()
+    PaddockHumans.load()
     Wait(0)                                  -- each boot step gets its own slice of the instruction quota (KB-211)
     PaddockLive.boot()
     Wait(0)
     PaddockGarages.start()
+    Wait(0)
+    PaddockDays.start()
     PaddockBubble.start()
+    PaddockMarkets.start()          -- L249 step 4: independents shop on a cadence
+    PaddockExchange.start()         -- L249 step 5: NPC traders on the board; expiry recovery at boot
     PaddockClock.start()
     Wait(0)
     PaddockBroadcast.start()

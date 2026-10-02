@@ -326,6 +326,8 @@ local function showTrade()
     page:send("panel:show", { panel = "trade" })
     sendBig("panel:trade", lastTrade or { state="idle", rows={}, loading=true }, "rows", 2)
     TriggerServerEvent("ncm:trade.request")
+    -- L249 step 5: the posted board lives in this card beside the direct trade (the Paddock serves it)
+    TriggerServerEvent("ncm:paddock.request", { view = "exchange" })
 end
 
 --- THE PADDOCK (doc 44). The NPC motorsport world lives in its own resource, `ncm_paddock`; this tab is its
@@ -420,7 +422,8 @@ AddEventHandler("onClientResourceStart", function(name)
     page:on("panel:interest", function(d)
         inputSeen = true
         if type(d) ~= "table" or not d.eventId then return end
-        if d.action == "withdraw" then TriggerServerEvent("ncm:guide.withdraw", d.eventId) else TriggerServerEvent("ncm:guide.interest", d.eventId) end
+        if d.action == "withdraw" then TriggerServerEvent("ncm:guide.withdraw", d.eventId)
+        else TriggerServerEvent("ncm:guide.interest", d.eventId) end
     end)
     page:on("panel:navigate", function(d)
         if type(d) ~= "table" then return end
@@ -493,6 +496,7 @@ AddEventHandler("onClientResourceStart", function(name)
     page:on("panel:paddock.request", function(d) if type(d) == "table" then TriggerServerEvent("ncm:paddock.request", d) end end)
     page:on("panel:paddock.slip", function(d) if type(d) == "table" then TriggerServerEvent("ncm:paddock.slip", d) end end)
     page:on("panel:paddock.manager", function(d) if type(d) == "table" then TriggerServerEvent("ncm:paddock.manager", d) end end)
+    page:on("panel:paddock.exchange", function(d) if type(d) == "table" then TriggerServerEvent("ncm:paddock.exchange", d) end end)
     -- Selecting an offering is a player-facing encounter with that model, which the server may treat as a
     -- Machine Index discovery. The client only reports the act; it never decides that anything was learned.
     -- The player opened PAST RESULTS. Ask for it; it is not in the Guide payload by design.
@@ -703,11 +707,18 @@ receiveStream("ncm:trade", "rows", function(value)
 end)
 
 receiveStream("ncm:paddock", "rows", function(value)
+    -- the posted Exchange board (L249 step 5) is drawn in the EXCHANGE card, not the PADDOCK tab
+    if type(value) == "table" and value.view == "exchange" then
+        if page and pageReady and open == "trade" then sendBig("panel:exchange.board", value, "rows", 3) end
+        return
+    end
     lastPaddock = value
     if page and pageReady and open == "paddock" then sendBig("panel:paddock", value, "rows", 3) end
 end)
 RegisterNetEvent("ncm:paddock.result", function(value)
-    if page and pageReady then page:send("panel:paddock.result", type(value) == "table" and value or {}) end
+    if not (page and pageReady) then return end
+    if type(value) == "table" and value.op == "exchange" then page:send("panel:exchange.result", value) return end
+    page:send("panel:paddock.result", type(value) == "table" and value or {})
 end)
 
 -- Legacy whole-payload receivers, kept for ONE mixed-version restart window, exactly as the Market hop kept its

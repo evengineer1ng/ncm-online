@@ -135,6 +135,8 @@ Core.define("paddock.racestate", function(C)
     function M.finishAt(model, id)
         local car = model.cars[id]
         if not car then return nil end
+        -- A live bubble crossing the finish is authoritative even if the sim had retired this car.
+        if car.physicalFinishMs then return car.physicalFinishMs end
         local a = anchorAt(car, math.huge)
         local finishT = origT(car, model.lengthM)
         if not a then return finishT end
@@ -180,27 +182,44 @@ Core.define("paddock.racestate", function(C)
     end
 
     --- The distance along the line nearest a world position (for handing a physical car back).
-    function M.project(model, pos)
+    --- `lo`/`hi` (optional) bound the answer to where the car is already known to be: a line that passes the same
+    --- place more than once -- every lap of an oval (L236, KB-223) -- otherwise snaps a car to the first pass.
+    --- With no window found on the line, the whole line is searched.
+    function M.project(model, pos, lo, hi)
         local pts, cum = model.path.points, model.cum
-        local bestD, bestGap = 0, math.huge
+        lo, hi = lo or -math.huge, hi or math.huge
+        local bestD, bestGap = nil, math.huge
         for i = 2, #pts do
-            local a, b = pts[i - 1], pts[i]
-            local vx, vy = b.x - a.x, b.y - a.y
-            local len2 = vx * vx + vy * vy
-            local u = len2 > 0 and (((pos.x - a.x) * vx + (pos.y - a.y) * vy) / len2) or 0
-            if u < 0 then u = 0 elseif u > 1 then u = 1 end
-            local gap = dist({ x = a.x + vx * u, y = a.y + vy * u }, pos)
-            if gap < bestGap then bestGap, bestD = gap, cum[i - 1] + (cum[i] - cum[i - 1]) * u end
+            local c0, c1 = cum[i - 1], cum[i]
+            local span = c1 - c0
+            if c1 >= lo and c0 <= hi then
+                local a, b = pts[i - 1], pts[i]
+                local vx, vy = b.x - a.x, b.y - a.y
+                local len2 = vx * vx + vy * vy
+                local u = len2 > 0 and (((pos.x - a.x) * vx + (pos.y - a.y) * vy) / len2) or 0
+                local uLo = span > 0 and math.max(0, (lo - c0) / span) or 0
+                local uHi = span > 0 and math.min(1, (hi - c0) / span) or 1
+                if u < uLo then u = uLo elseif u > uHi then u = uHi end
+                local gap = dist({ x = a.x + vx * u, y = a.y + vy * u }, pos)
+                if gap < bestGap then bestGap, bestD = gap, c0 + span * u end
+            end
+        end
+        if not bestD then
+            if lo ~= -math.huge or hi ~= math.huge then return M.project(model, pos) end
+            return 0, math.huge
         end
         return bestD, bestGap
     end
 
     --- A physical observation: car `id` was really at distance d at time t. From t on it runs from d at its own pace.
     --- `stopped = true` records a car that is physically out (it stays where it is).
-    function M.anchor(model, id, t, d, stopped)
+    function M.anchor(model, id, t, d, stopped, physicalFinishMs)
         local car = model.cars[id]
         if not car then return false end
         car.anchors[#car.anchors + 1] = { t = t, d = d, stopped = stopped or nil }
+        if physicalFinishMs then
+            car.physicalFinishMs = math.min(car.physicalFinishMs or physicalFinishMs, physicalFinishMs)
+        end
         return true
     end
 

@@ -45,12 +45,42 @@ local function serverId() return NcmCalendar.serverId() end
 -- ---------------------------------------------------------------------------------------------
 -- Rows
 -- ---------------------------------------------------------------------------------------------
+--- L249: the Paddock's next events as Guide events (ncm_paddock publishes them on GlobalState.ncmPaddockGuide;
+--- this VM cannot call the Paddock). Entering one is mixed grids (L249 step 3) -- until then they are watch-only.
+local function paddockEvents()
+    local list = NcmPaddockLink and NcmPaddockLink.feed() or (GlobalState and GlobalState.ncmPaddockGuide)
+    if type(list) ~= "table" then return {} end
+    local out = {}
+    for _, p in ipairs(list) do
+        -- L250: a race the league has adopted as an event (paddock_link) is listed once, as that event
+        if type(p) == "table" and p.raceId and p.startsAt and not NcmCalendar.events["paddock:" .. tostring(p.raceId)] then
+            out[#out + 1] = {
+                eventId = "paddock:" .. tostring(p.raceId), paddockRaceId = p.raceId, class = "paddock",
+                tier = p.tier == "street" and "street" or "sanctioned", seriesId = p.seriesId, seriesName = p.seriesName,
+                routeId = p.routeId, routeName = p.routeName, distanceM = p.distanceM,
+                venue = p.venue, finish = p.finish, startsAt = p.startsAt, postedAt = p.postedAt or (p.startsAt - 7200),
+                state = p.state == "running" and "closed" or "posted", entries = {},
+                seatsTotal = p.field or 0, disciplineId = p.oval and "oval" or "street_sprint", formatId = "sprint", classId = "street_open", laps = p.oval and (p.laps or 1) or 1,
+                paddock = { field = p.field, live = p.state == "running", oval = p.oval },
+            }
+        end
+    end
+    return out
+end
+
 local function orderedEvents()
     local out = {}
     for _, eid in ipairs(NcmCalendar.orderedIds()) do
         local e = NcmCalendar.events[eid]
-        if e then out[#out + 1] = e end
+        -- Legacy calendar championships are retained for history/standings, but race entry now lives in
+        -- the Paddock mixed grid only. Never surface a legacy event in the Guide.
+        if e and e.class == "paddock" then out[#out + 1] = e end
     end
+    for _, e in ipairs(paddockEvents()) do out[#out + 1] = e end
+    table.sort(out, function(a, b)
+        if (a.startsAt or 0) ~= (b.startsAt or 0) then return (a.startsAt or 0) < (b.startsAt or 0) end
+        return tostring(a.eventId) < tostring(b.eventId)
+    end)
     return out
 end
 
@@ -238,6 +268,13 @@ local function pushGuide(pid)
                 maxTagBounty=r.economy.maxTagBounty,
             } or nil,
             weather = eventWeather(wx, r.startsAt) }
+        -- L250: a Paddock race -- QUALIFY (a time enters you) / WITHDRAW until T-11, NPCs fill the field
+        local ev = NcmCalendar.events[r.eventId]
+        if ev and ev.class == "paddock" then
+            local bests = NcmPaddockLink and NcmPaddockLink.bests[r.eventId] or {}
+            slim[i].paddock = { closesAt = math.floor(ev.entryClosesAt or 0), myBestMs = driverId and bests[driverId] or nil,
+                field = ev.seatsTotal, qualifying = r.practice == "open" }
+        end
     end
     -- A bare `pcall` here swallowed every publish failure, which is why an empty Race Guide was indistinguishable
     -- from a server that had posted nothing: `/ncm.guide` read the same rows and listed them happily while the
@@ -402,6 +439,15 @@ function NcmGuide.venueOptions(pid)
             and armed.fromEventId == heldElsewhere.eventId and now() - armed.at <= SWITCH_ARM_S,
         formLeadSec = setting("raceFormAtSec", 60),
     })
+    if e.class == "paddock" and result and result.options then
+        for _, o in ipairs(result.options) do
+            if o.id == "practice" then o.label = "Qualify" elseif o.id == "leave_practice" then o.label = "Leave Qualifying" end
+            if o.id == "enter_race" and not (NcmPaddockLink and NcmPaddockLink.bests
+                and NcmPaddockLink.bests[e.eventId] and NcmPaddockLink.bests[e.eventId][driver and driver.ncmDriverId]) then
+                o.label = "Enter without qualifying"
+            end
+        end
+    end
     return result, e, heldElsewhere
 end
 
@@ -485,6 +531,8 @@ RegisterNetEvent("ncm:venue.option", function(optionId, eventId)
     elseif id == "confirm_switch" then
         switchArmed[pid] = nil
         NcmCalendar.enter(pid, e.eventId, { switchFrom = held.eventId })
+    elseif id == "practice" and e.class == "paddock" and NcmPaddockLink then
+        NcmPaddockLink.qualify(pid, e.eventId)
     elseif id == "practice" then
         -- L114: practice is an explicit act. Interest, entry and proximity never join a session.
         local driver = NcmCalendar.resolveDriver(pid)
@@ -594,11 +642,22 @@ end)
 local function eventByIndex(pid, ref)
     local rows = NcmGuide.rows(pid)
     local n = tonumber(ref)
+    local function resolve(r)
+        if not r then return nil end
+        local e = NcmCalendar.events[r.eventId]
+        -- The Guide can project a newly-published Paddock feed row before the 10 s adopter tick has
+        -- materialised its calendar event. Adopt the feed now so the row is actionable and can receive a ring.
+        if not e and tostring(r.eventId):match("^paddock:") and NcmPaddockLink and NcmPaddockLink.adoptAll then
+            pcall(NcmPaddockLink.adoptAll, now())
+            e = NcmCalendar.events[r.eventId]
+        end
+        return e, r
+    end
     if n then
         local r = rows[n]
-        return r and NcmCalendar.events[r.eventId] or nil, r
+        return resolve(r)
     end
-    for _, r in ipairs(rows) do if r.eventId == tostring(ref) then return NcmCalendar.events[r.eventId], r end end
+    for _, r in ipairs(rows) do if r.eventId == tostring(ref) then return resolve(r) end end
     return nil
 end
 
@@ -730,6 +789,11 @@ function NcmGuide.withdraw(pid, ref)
     local heldHere = busySid ~= nil and busyEvent == e.eventId and busyKind ~= "practice"
     local decision = Guide.withdraw({ existingEntry = e.entries[driver.ncmDriverId], inSession = heldHere })
     if not decision.ok then tell(pid, REASONS[decision.reason] or tostring(decision.reason)); return nil, decision.reason end
+    -- L250: a Paddock grid is set at T-10 with you in it; after T-11 leaving is a DNS, not a withdrawal
+    if e.class == "paddock" and now() >= (e.entryClosesAt or 0) then
+        tell(pid, "The grid is set for that one. Not starting is a DNS now.")
+        return nil, "grid_set"
+    end
     local was = e.entries[driver.ncmDriverId]
     pcall(function() MySQL.update.await("UPDATE entry SET state = 'withdrawn' WHERE entry_id = ?", { decision.entryId }) end)
     e.entries[driver.ncmDriverId] = { entryId = decision.entryId, state = "withdrawn" }   -- the row stays; a rejoin reuses it
@@ -738,6 +802,7 @@ function NcmGuide.withdraw(pid, ref)
         NcmOrganized.releaseSeat(e.eventId, driver.ncmDriverId, was.teamId, was.seatIndex)
     end
     publishEntryBag(pid, driver.ncmDriverId)   -- other live entries must survive this withdrawal
+    if e.class == "paddock" and NcmPaddockLink then NcmPaddockLink.announce(e, driver.ncmDriverId, driver.display, "withdrawn") end
     if NcmRace and NcmRace.practiceLeave then NcmRace.practiceLeave(e.eventId, driver.ncmDriverId, now()) end
     -- Leaving a list and withdrawing an entry are different acts (that is why they are different options);
     -- they must not report themselves with the same sentence.

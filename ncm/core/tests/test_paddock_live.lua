@@ -85,6 +85,24 @@ return {
         T.eq(#dnf, #p.points - 1, "a sim DNF still gets a full plan")
     end,
 
+    speed_plan_on_a_routes_own_points_averages_every_segment_it_spans = function(T)
+        -- L243: no ghosts, so a street line can be one leg start to finish. A car held up in ONE sim segment must not
+        -- run the whole race at that segment's speed (KB-244: 9.7 m/s for 2.4 km, unclassified).
+        local L = T.Core.get("paddock.live")
+        local pts = { { x = 0, y = 0, z = 0 }, { x = 2400, y = 0, z = 0 } }
+        local segs, segLen = 6, 400
+        local speeds = { 30, 30, 30, 8, 30, 30 }            -- the 4th segment held up; the midpoint (1200 m) lands in it
+        local splits, t = {}, 0
+        for s = 1, segs do t = t + segLen / speeds[s] * 1000; splits[s] = math.floor(t) end
+        local plan = L.speedPlan(pts, 2400, splits, segs, 55)
+        local avg = 2400 / (t / 1000)
+        T.eq(#plan, 1, "one leg")
+        T.ok(math.abs(plan[1] - avg * 1.08) < 0.6, ("the leg is the race's average, %.1f m/s, not the held-up segment's 8 (got %.1f)"):format(avg * 1.08, plan[1]))
+        -- a line shorter than the route (chords cut the corners) still covers the whole route's segments
+        local short = L.speedPlan({ { x = 0, y = 0 }, { x = 1800, y = 0 } }, 2400, splits, segs, 55)
+        T.ok(math.abs(short[1] - avg * 1.08) < 0.6, "chord length is scaled onto the route's length")
+    end,
+
     timing_orders_the_field_and_the_verdict_is_physical = function(T)
         local L = T.Core.get("paddock.live")
         local r = route(T)
@@ -164,6 +182,16 @@ return {
         local off = { x = p.points[20].x + 30, y = p.points[20].y }
         local rp = L.resetPoint(p.points, off)
         T.ok(rp.index <= 20 and rp.index >= 18, "reset goes to the line just behind the car (" .. rp.index .. ")")
+        -- L243: a route's line is its authored points. A car stuck 1.5 km down a two-point line goes back on the road
+        -- just behind where it stopped, never to the start (a vertex).
+        local two = { { x = 0, y = 0, z = 0 }, { x = 3000, y = 0, z = 0 } }
+        local mid = L.resetPoint(two, { x = 1500, y = 12 })
+        T.ok(math.abs(mid.x - (1500 - L.RESET_BACK_M)) < 0.01 and math.abs(mid.y) < 0.01 and mid.index == 1,
+            "on a sparse line the reset lands RESET_BACK_M behind the car, on the line (" .. mid.x .. ")")
+        local early = L.resetPoint(two, { x = 5, y = 0 })
+        T.ok(early.x >= 0 and early.index == 1, "never behind the start")
+        local corner = L.resetPoint({ { x = 0, y = 0 }, { x = 100, y = 0 }, { x = 100, y = 100 } }, { x = 100, y = 8 })
+        T.ok(corner.index == 1 and math.abs(corner.x - 88) < 0.01, "walking back crosses a vertex onto the leg before (" .. corner.x .. ")")
         T.ok(L.distToPath(p.points, p.points[10]) < 0.01, "on the line is zero from the line")
         T.ok(math.abs(L.distToPath(p.points, off) - 30) < 31, "off the line is measured to the line")
         -- a slow car is not stuck: 5 m/s sampled every 250 ms moves 1.25 m a sample

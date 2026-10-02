@@ -1,0 +1,32 @@
+﻿
+C:\Program Files (x86)\Steam\steamapps\common\Cyberpunk 2077\bin\x64\Cyberpunk2077.exe:	file format coff-x86-64
+
+Disassembly of section .text:
+
+0000000141d86850 <ctlWaitForPropertyChange>:
+142698a24: 48 89 5c 24 08              	movq	%rbx, 0x8(%rsp)
+142698a29: 48 89 74 24 10              	movq	%rsi, 0x10(%rsp)
+142698a2e: 57                          	pushq	%rdi
+142698a2f: 48 83 ec 30                 	subq	$0x30, %rsp
+142698a33: 49 8b d8                    	movq	%r8, %rbx
+142698a36: 48 8b f1                    	movq	%rcx, %rsi
+142698a39: e8 3e fc 32 fe              	callq	0x1409c867c <?Reserve@WriteBytesCount@AK@@UEAA_NH@Z+0x407c>
+142698a3e: 40 8a f8                    	movb	%al, %dil
+142698a41: 84 c0                       	testb	%al, %al
+142698a43: 74 29                       	je	0x142698a6e <ctlWaitForPropertyChange+0x91221e>
+142698a45: 48 8b d3                    	movq	%rbx, %rdx
+142698a48: 48 8d 4c 24 20              	leaq	0x20(%rsp), %rcx
+142698a4d: e8 6e d4 c4 fd              	callq	0x1402e5ec0 <ffxFsr2GetUpscaleRatioFromQualityMode+0xcaa84>
+142698a52: 48 8b c8                    	movq	%rax, %rcx
+142698a55: e8 2e a9 ea ff              	callq	0x142543388 <ctlWaitForPropertyChange+0x7bcb38>
+142698a5a: 48 8d 4c 24 20              	leaq	0x20(%rsp), %rcx
+142698a5f: 8a d8                       	movb	%al, %bl
+142698a61: e8 72 c5 a6 fd              	callq	0x140104fd8 <.text+0x103fd8>
+142698a66: 84 db                       	testb	%bl, %bl
+142698a68: 74 04                       	je	0x142698a6e <ctlWaitForPropertyChange+0x91221e>
+142698a6a: c6 46 61 01                 	movb	$0x1, 0x61(%rsi)
+142698a6e: 48 8b 5c 24 40              	movq	0x40(%rsp), %rbx
+142698a73: 40 8a c7                    	movb	%dil, %al
+142698a76: 48 8b 74 24 48              	movq	0x48(%rsp), %rsi
+142698a7b: 48 83 c4 30                 	addq	$0x30, %rsp
+142698a7f: 5f                          	popq	%rdi

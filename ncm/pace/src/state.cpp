@@ -399,9 +399,15 @@ bool State::apply(const std::string& text, Clock::time_point now)
     // tools/bake-race-splines.py and loaded by ArchiveXL). Race profile, or nothing (L245): a street plan without them
     // is refused, never driven another way.
     // 0.8.1: a DYNAMIC plan (the bubble's street race, L247) names them too: its points are the route's nodes, and a car
-    // that joins with car.add races the leg that ends at its `from` point. An oval's dynamic plan has none (yet).
+    // that joins with car.add races the leg that ends at its `from` point. A dynamic oval names one closed spline;
+    // its repeated marks still track lap progress, but the racing command stays on that spline across every seam.
     std::vector<std::string> legNames;
-    if (!dynamic || j.contains("legs")) {
+    if (dynamic && j.contains("loopSpline")) {
+        if (j.contains("legs")) return no("drive.start: loopSpline and legs are mutually exclusive");
+        if (!j["loopSpline"].is_string() || j["loopSpline"].get<std::string>().rfind("$/", 0) != 0)
+            return no("drive.start: loopSpline is not a node path");
+        legNames.push_back(j["loopSpline"].get<std::string>());
+    } else if (!dynamic || j.contains("legs")) {
         const auto& lg = j.contains("legs") ? j["legs"] : nlohmann::json();
         if (!lg.is_array() || lg.empty()) return no("drive.start: no race splines (legs) -- a street plan is driven on race splines only");
         // a long plan arrives as a tape (`more`), so the count is checked against the whole plan only when it is whole

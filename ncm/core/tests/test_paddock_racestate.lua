@@ -59,6 +59,21 @@ return {
         T.ok(math.abs(M.project(model, { x = 1234, y = 7 }) - 1234) < 0.5, "a world position projects back onto the line")
     end,
 
+    a_window_keeps_a_car_on_its_own_lap_of_a_loop = function(T)
+        -- three laps of a 400 m square (an oval's line passes every place once a lap, L236, KB-223)
+        local sq = { { x = 0, y = 0 }, { x = 100, y = 0 }, { x = 100, y = 100 }, { x = 0, y = 100 } }
+        local pts = { { x = 0, y = 0, z = 0 } }
+        for _ = 1, 3 do for i = 2, 5 do local p = sq[(i - 1) % 4 + 1]; pts[#pts + 1] = { x = p.x, y = p.y, z = 0 } end end
+        local M = T.Core.get("paddock.racestate")
+        local model = M.new({ points = pts, lengthM = 1200 }, {}, 1)
+        local pos = { x = 50, y = 2 }                                   -- halfway along the first side
+        T.ok(math.abs(M.project(model, pos) - 50) < 0.5, "unbounded, the first pass wins (the old behaviour)")
+        T.ok(math.abs(M.project(model, pos, 380, 700) - 450) < 0.5, "a lap-2 window gives lap 2")
+        T.ok(math.abs(M.project(model, pos, 800, 1200) - 850) < 0.5, "a lap-3 window gives lap 3")
+        T.ok(math.abs(M.project(model, { x = 100, y = 60 }, 380, 460) - 460) < 0.5, "outside the window, the window's nearest edge")
+        T.ok(math.abs(M.project(model, pos, 5000, 6000) - 50) < 0.5, "a window off the line falls back to the whole line")
+    end,
+
     standings_lead_with_the_leader_and_gaps_are_time = function(T)
         local M, model, r = race(T)
         local t = math.floor(r.entrants[1].finishMs * 0.6)

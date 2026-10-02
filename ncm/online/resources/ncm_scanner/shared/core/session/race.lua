@@ -361,7 +361,6 @@ Core.define("session.race", function(C)
         end
 
         if s.phase == "forming" and now >= s.startsAt - R.gridHoldBeforeSec then
-            if not R.hold then dnsAbsent() end   -- holding (L48/TW1): the absent are DNS at release, not now
             s.phase = "gridded"; s.gridChecked = true
             ev(events, "phase", { phase = "gridded" })
         end
@@ -385,12 +384,13 @@ Core.define("session.race", function(C)
                 return events
             end
             if R.hold then
-                dnsAbsent(); s.hold = nil
+                s.hold = nil
                 if s.startsAt ~= s.originalStartsAt then s.startsAt = now + R.countdownSec end   -- a held start restarts the full light count
             end
             local anyone = false
             for _, r in pairs(s.entrants) do
-                if r.state == "ready" then r.state = "racing"; anyone = true end
+                if r.state == "ready" then r.state = "racing"; anyone = true
+                elseif r.state == "entered" then anyone = true end
             end
             if not anyone then
                 complete(s, now, events, "no_starters")
@@ -407,6 +407,14 @@ Core.define("session.race", function(C)
                 ev(events, "light", { n = s.lightsShown, of = R.countdownSec })
             end
             if now >= s.startsAt then
+                -- DNS is decided at green, never when the grid closes or the light sequence begins.
+                dnsAbsent()
+                local starters = 0
+                for _, r in pairs(s.entrants) do if r.state == "racing" then starters = starters + 1 end end
+                if starters == 0 then
+                    complete(s, now, events, "no_starters")
+                    return events
+                end
                 -- KB-23: the lights go out at startsAt; the tick only notices afterwards. Dating green from the
                 -- tick (up to raceTickMs late) inflated every race time by a shared, invisible offset -- gaps
                 -- stayed right, which is why it went unseen, but absolute times and route records did not.
@@ -446,7 +454,7 @@ Core.define("session.race", function(C)
         if s.phase == "finishing" then
             if activeCount(s) == 0 then
                 complete(s, now, events, "all_classified")
-            elseif now >= s.firstFinishAt + R.finishWindowSec then
+            elseif now >= math.max(s.firstFinishAt + R.finishWindowSec, s.finishHoldUntil or 0) then
                 complete(s, now, events, "finish_window")
             end
         end

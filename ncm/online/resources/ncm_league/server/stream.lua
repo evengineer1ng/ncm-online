@@ -58,14 +58,17 @@ function NcmStream.send(pid, channel, payload, listKey, opts)
             channel, tostring(pid), headBytes, headWarn)
     end
 
-    local packets, oversized = Chunks.partitionBytes(list, budget, NcmStream.bytes)
+    seq = seq + 1
+    local id = ("%d:%d:%s"):format(math.floor(Open77.time.unix()), seq, tostring(pid))
+    -- The budget bounds the whole packet on the wire, envelope included (KB-228): measure the envelope with the
+    -- largest index it can carry and reserve it.
+    local reserve = NcmStream.bytes({ id = id, index = math.max(1, #list), items = {} }) - 2
+    local packets, oversized = Chunks.partitionBytes(list, budget, NcmStream.bytes, reserve)
     for _, o in ipairs(oversized) do
         log("ROW OVERSIZED channel=%s player=%s row=%d bytes=%d (budget %d) -- sent alone; one row must never " ..
             "approach the ceiling", channel, tostring(pid), o.index, o.bytes, budget)
     end
 
-    seq = seq + 1
-    local id = ("%d:%d:%s"):format(math.floor(Open77.time.unix()), seq, tostring(pid))
     TriggerClientEvent(channel .. ".stream.begin", pid, { id = id, head = head, parts = #packets, count = #list })
     for i, items in ipairs(packets) do
         TriggerClientEvent(channel .. ".stream.part", pid, { id = id, index = i, items = items })

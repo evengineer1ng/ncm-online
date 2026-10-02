@@ -27,6 +27,8 @@ if ($LASTEXITCODE -ne 0) { throw "cmake build failed" }
 
 & (Join-Path $project "build\$Configuration\ncm_pace_state_tests.exe")
 if ($LASTEXITCODE -ne 0) { throw "state tests failed" }
+& (Join-Path $project "build\$Configuration\ncm_pace_puppet_guard_tests.exe")
+if ($LASTEXITCODE -ne 0) { throw "puppet guard tests failed" }
 
 # KB-182: `scc` compiles a `native func` inside a `module` without complaint, but RED4ext validates natives by
 # FULLY QUALIFIED name at game start and closes the game when `Module.Name` is not registered. Refuse that shape,
@@ -69,10 +71,12 @@ $stage = Join-Path $dist "ncm_pace"
 if (Test-Path $stage) { Remove-Item -Recurse -Force $stage }
 $pluginDir = Join-Path $stage "red4ext\plugins\ncm_pace"
 $scriptDir = Join-Path $stage "r6\scripts\ncm_pace"
-New-Item -ItemType Directory -Force $pluginDir, $scriptDir | Out-Null
+$tweakDir = Join-Path $stage "r6\tweaks"
+New-Item -ItemType Directory -Force $pluginDir, $scriptDir, $tweakDir | Out-Null
 Copy-Item $dll $pluginDir
 Copy-Item (Join-Path $project "README.md") $pluginDir
 Copy-Item (Join-Path $scripts "*.reds") $scriptDir
+Copy-Item (Join-Path $project "r6\tweaks\ncm_pace") $tweakDir -Recurse
 # 0.7.0 (L246): the race splines -- one engine race spline per race leg, baked by tools/bake-race-splines.py into
 # dist/ncm_pace_race_splines and loaded by ArchiveXL. Pace drives street races on nothing else, so no splines, no package.
 $splines = Join-Path $dist "ncm_pace_race_splines"

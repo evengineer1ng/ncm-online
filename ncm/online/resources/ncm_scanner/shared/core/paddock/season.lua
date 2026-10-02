@@ -38,15 +38,15 @@ Core.define("paddock.season", function(C)
             routes = { R.snake, R.troll, R.overbridge, R.hook, R.sewer, R.cut },
             regions = { "Watson", "Westbrook", "City Center", "Heywood", "Pacifica" },
             gen = { minM = 900, maxM = 3500, checkpoints = 2, checkpointShare = 0.45, share = 0.75 }, ovalShare = 0.15 },
-        regional = { rank = 2, orgs = 48, divisions = 4, carsPerOrg = 1, roster = 2, label = "Regional",
+        regional = { rank = 2, orgs = 48, divisions = 4, carsPerOrg = 1, roster = 4, label = "Regional",
             band = { classes = { "Muscle", "Sport", "Tech" }, prestigeMin = 2, prestigeMax = 3 },
             routes = { R.hook, R.overbridge, R.snake, R.cut, R.reverse, R.troll },
             gen = { minM = 1500, maxM = 4500, checkpoints = 2, checkpointShare = 0.5, share = 0.7 }, ovalShare = 0.1 },
-        pro = { rank = 3, orgs = 30, divisions = 3, carsPerOrg = 1, roster = 3, label = "Pro",
+        pro = { rank = 3, orgs = 30, divisions = 3, carsPerOrg = 1, roster = 4, label = "Pro",
             band = { classes = { "Sport", "Muscle" }, prestigeMin = 3, prestigeMax = 4 },
             routes = { R.cut, R.reverse, R.sewer, R.snake, R.ukulele },
             gen = { minM = 2000, maxM = 6000, checkpoints = 2, checkpointShare = 0.5, share = 0.65 }, ovalShare = 0.05 },
-        premier = { rank = 4, orgs = 8, divisions = 1, carsPerOrg = 2, roster = 3, label = "Night City Premier",
+        premier = { rank = 4, orgs = 8, divisions = 1, carsPerOrg = 2, roster = 5, label = "Night City Premier",
             band = { classes = { "Sport" }, prestigeMin = 5 },
             routes = { R.ukulele, R.cut, R.sewer, R.reverse },
             gen = { minM = 3000, maxM = 7000, checkpoints = 2, checkpointShare = 0.4, share = 0.5 } },
@@ -55,12 +55,14 @@ Core.define("paddock.season", function(C)
 
     -- The daily rhythm (doc 44 §5.2), Eastern seconds-of-day. `untilSec` may pass 86400: the night runs on.
     local H = 3600
-    -- L236: ~129 races a day. Street every 6 minutes through the night (seven leagues, each every 42 min), regional
-    -- four an hour by day, pro every 40 minutes, the premier at 15:00.
+    -- L249 (owner: "yes widen the windows" -- a race always on, for a solo player at any hour): ~214 races a day.
+    -- Street every 6 minutes from 18:00 to 06:00 (seven leagues, each every 42 min: ~120); regional four an hour
+    -- from 06:00 to midnight (72); pro every 40 minutes from 08:00 to 22:00 (21); the premier at 15:00. Never more
+    -- than 15 minutes without a race. (L236 was 20-04 / 12-20 / 10-18, ~129 a day.)
     M.RHYTHM = {
-        street = { fromSec = 20 * H, untilSec = 28 * H, everySec = 42 * 60, staggerSec = 6 * 60 },
-        regional = { fromSec = 12 * H, untilSec = 20 * H, everySec = 60 * 60, staggerSec = 15 * 60 },
-        pro = { fromSec = 10 * H, untilSec = 18 * H, everySec = 2 * H, staggerSec = 40 * 60 },
+        street = { fromSec = 18 * H, untilSec = 30 * H, everySec = 42 * 60, staggerSec = 6 * 60 },
+        regional = { fromSec = 6 * H, untilSec = 24 * H, everySec = 60 * 60, staggerSec = 15 * 60 },
+        pro = { fromSec = 8 * H, untilSec = 22 * H, everySec = 2 * H, staggerSec = 40 * 60 },
         premier = { fromSec = 15 * H, untilSec = 15 * H + 1, everySec = 24 * H, staggerSec = 0 },
     }
 
@@ -141,44 +143,19 @@ Core.define("paddock.season", function(C)
         return spec and spec.regions and spec.regions[M.divisionOf(seriesId)] or nil
     end
 
-    --- The route for a race (L236): on `gen.share` of slots a generated route under the tier's filter (starting in
-    --- the league's district, if it has one); otherwise a seeded rotation through the tier's named roots (those that
-    --- start in the district, when there are any). Deterministic per (seed, series, slot).
+    --- Temporary point-to-point-only schedule while checkpointed splines are unavailable (L253).
+    --- Keep each tier's normal minimum/maximum distance filter and district start rule; generated routes need no named root.
     function M.routeFor(seed, seriesId, utc)
         local tier = M.tierOfSeries(seriesId)
         local spec = M.TIERS[tier]
-        local region = M.regionOf(seriesId)
+        local opts = {}
+        for key, value in pairs(spec.gen or {}) do opts[key] = value end
+        opts.startRegion = M.regionOf(seriesId)
+        opts.checkpoints = 0
+        opts.checkpointShare = 0
         local k = math.floor(utc / 60)
-        local pool = spec.routes
-        if region then
-            local Routes = C.get("course.routes")
-            local local_ = {}
-            for _, rid in ipairs(spec.routes) do
-                local r = Routes.resolve(rid)
-                if r and r.start.region == region then local_[#local_ + 1] = rid end
-            end
-            pool = local_
-        end
-        -- an oval night (L236): once the owner has authored roundabouts, a share of slots race one -- the league's own
-        -- district's first, else any
-        local ovals = C.get("data.ovals")
-        if (spec.ovalShare or 0) > 0 and #ovals.LIST > 0 and Hash.unit(seed, "route-oval", seriesId, k) < spec.ovalShare then
-            local list = region and ovals.ids(region) or {}
-            if #list == 0 then list = ovals.ids() end
-            return list[1 + Hash.fnv1a32(Hash.key(seed, "oval", seriesId, k)) % #list]
-        end
-        local g = spec.gen
-        if g and (#pool == 0 or Hash.unit(seed, "route-gen", seriesId, k) < (g.share or 0.7)) then
-            local opts = {}
-            for key, v in pairs(g) do opts[key] = v end
-            opts.startRegion = region
-            local id = C.get("course.generator").pick(opts, seed, "paddock", seriesId, k)
-            if id then return id end
-        end
-        if #pool == 0 then pool = spec.routes end
-        return pool[1 + (Hash.fnv1a32(Hash.key(seed, "route", seriesId)) + k) % #pool]
+        return C.get("course.generator").pick(opts, seed, "paddock", seriesId, k)
     end
-
     --- Season and Cup for an instant: { seasonId, cup (1..13), cupId, startUtc, endUtc, cupStartUtc, cupEndUtc }.
     function M.cupOf(utc)
         local season = Seasons.atUtc(math.floor(utc))

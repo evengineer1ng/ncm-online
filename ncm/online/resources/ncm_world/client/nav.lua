@@ -144,6 +144,18 @@ function NcmNav.clear()
     pcall(Open77.blips.clearWaypoint)
 end
 
+--- Stop navigating WITHOUT touching the player's own waypoint (KB-233). `clear()` also clears the vanilla
+--- waypoint, which is right when a race ends but wrong when NCM merely stops caring about a place: by then the
+--- player has usually set their own destination, and wiping it is the same hijack in a different shape.
+function NcmNav.release(why)
+    if not blipId and not target then return false end
+    log("released (%s)%s", tostring(why), target and (" -- was " .. tostring(target.name or "?")) or "")
+    if blipId then pcall(Open77.blips.remove, blipId) end
+    blipId, blipKey, target, trackedSeated = nil, nil, nil, nil
+    verifyAt = 0
+    return true
+end
+
 --- Where we are pointing, or nil. `/ncm.gps` reads this so a manual refresh re-routes to the live target
 --- instead of guessing one from the calendar.
 function NcmNav.target() return target end

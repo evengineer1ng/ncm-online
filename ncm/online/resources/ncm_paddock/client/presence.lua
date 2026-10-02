@@ -27,12 +27,14 @@ local function drop(npcId)
     if h then call("remove", h) end
 end
 
+local seenState = {}        -- npcId -> last logged stream state (log only on change: first live body, 2026-09-30)
+
 local function attach(npcId, row)
-    local ok, entity = pcall(Open77.npcs.entity, npcId)
-    if not ok or not entity then return end
-    local res, why = call("create", {
+    -- Anchored to the body's canonical standing point, which the server sends: bodies stand still. The entity route
+    -- is only a fallback -- live, `Open77.npcs.entity` and `isStreamedIn` both answered false for a body in plain
+    -- view (KB-235), which left every Paddock person without a name or a Talk prompt.
+    local def = {
         id = "ncm_paddock_" .. tostring(npcId),
-        entity = entity,
         offset = { x = 0.0, y = 0.0, z = 1.85 },
         distance = 2.6,
         markerDistance = 14.0,
@@ -43,9 +45,25 @@ local function attach(npcId, row)
         color = "#FFD84A",
         event = "ncm:paddock.talk.local",
         data = { personId = row.personId },
-    })
+    }
+    if tonumber(row.x) and tonumber(row.y) and tonumber(row.z) then
+        def.position = { x = tonumber(row.x), y = tonumber(row.y), z = tonumber(row.z) }
+    else
+        local ok, entity = pcall(Open77.npcs.entity, npcId)
+        if not ok or not entity then
+            if seenState[npcId] ~= "no_entity" then
+                seenState[npcId] = "no_entity"
+                log("%s (npc %s): no position from the server and no entity: %s", tostring(row.name), tostring(npcId), tostring(entity))
+            end
+            return
+        end
+        def.entity = entity
+    end
+    local res, why = call("create", def)
     if res then
         prompts[npcId] = res.handle
+        log("Talk prompt on %s (npc %s) at %s", tostring(row.name), tostring(npcId),
+            def.position and ("%.1f,%.1f,%.1f"):format(def.position.x, def.position.y, def.position.z) or "its entity")
     else
         failures = failures + 1
         if failures <= 5 then log("prompt for %s refused: %s", tostring(row.name), tostring(why)) end
@@ -58,6 +76,9 @@ RegisterNetEvent("ncm:paddock.bodies", function(msg)
         local id = tonumber(r.npcId)
         if id then next[id] = r end
     end
+    local n = 0
+    for _ in pairs(next) do n = n + 1 end
+    log("bodies: %d from the server", n)
     bodies = next
 end)
 
@@ -72,14 +93,10 @@ CreateThread(function()
     while true do
         Wait(1000)
         for npcId in pairs(prompts) do
-            local ok, streamed = pcall(Open77.npcs.isStreamedIn, npcId)
-            if not bodies[npcId] or not (ok and streamed) then drop(npcId) end
+            if not bodies[npcId] then drop(npcId) end
         end
         for npcId, row in pairs(bodies) do
-            if not prompts[npcId] then
-                local ok, streamed = pcall(Open77.npcs.isStreamedIn, npcId)
-                if ok and streamed then attach(npcId, row) end
-            end
+            if not prompts[npcId] then attach(npcId, row) end
         end
     end
 end)

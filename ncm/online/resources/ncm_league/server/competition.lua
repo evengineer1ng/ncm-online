@@ -91,6 +91,8 @@ function NcmCompetition.rulesFor(e)
     local d = Discipline.byId(e.disciplineId or "street_sprint")
     local start = e.startType or (rs.start) or ((d and d.adapter == "laps") and "rolling" or "standing")
     rules.start = start
+    -- L250: a mixed Paddock grid is placed at T-20 (paddock_link), so its DNS deadline is later than T-30
+    if e.class == "paddock" then rules.gridHoldBeforeSec = NcmCore.get("paddock.mixed").GRID_HOLD_SEC end
     if start == "rolling" then
         rules.formationM = tonumber(e.formationM) or (rs.formationM) or 300
         rules.paceKph = tonumber(e.paceKph) or (rs.paceKph) or 80

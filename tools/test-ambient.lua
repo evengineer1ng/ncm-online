@@ -121,7 +121,8 @@ Open77 = {
         remove = function(id) if not vehicles[id] then return false end; vehicles[id] = nil; return true end,
         owner = function(id)
             if not vehicles[id] then return nil, "not_streamed" end
-            return { authorityPlayerId = vehicles[id].authority or 0, physicsOwner = 0 }
+            -- a streamed car has a client simulating it (the seat handshake waits for that, KB-238)
+            return { authorityPlayerId = vehicles[id].authority or 0, physicsOwner = vehicles[id].physicsOwner or 1 }
         end,
         ai = {
             attachDriver = function(vid, o) attached[vid] = o and o.npcId; return true end,
@@ -148,7 +149,7 @@ NcmIdentity = { settings = Open77.tunables.declare({
     ambientPerPlayerVehicles = { value = 2 }, ambientPerPlayerPeds = { value = 3 },
     ambientSpawnPerTick = { value = 3 },
     ambientSpawnMinM = { value = 110 }, ambientSpawnMaxM = { value = 240 },
-    ambientRetireM = { value = 420 }, ambientSightM = { value = 220 },
+    ambientRetireM = { value = 300 }, ambientSightM = { value = 220 },
     ambientCorridorRadiusM = { value = 70 }, ambientLeadSeconds = { value = 240 },
     ambientHoldSeconds = { value = 180 },
     ambientCrowd = { value = 1.0 }, ambientTraffic = { value = 1.0 }, ambientPolice = { value = true },
@@ -174,6 +175,23 @@ tick()
 local cars, peds = ownedCount()
 check("a joined player gets ambient population", cars + peds == 3)
 
+-- KB-238: a car comes up EMPTY; its driver is seated only after a client has held it for ambientSeatDelayMs
+do
+    local before = {}
+    for k in pairs(NcmAmbient.owned) do before[k] = true end
+    local fresh
+    for _ = 1, 10 do
+        NcmAmbient.tick()
+        for k, e in pairs(NcmAmbient.owned) do if not before[k] and e.kind == "vehicle" then fresh = e end end
+        if fresh then break end
+        drain()
+        for k in pairs(NcmAmbient.owned) do before[k] = true end
+    end
+    check("a new ambient car comes up with no driver seated", fresh ~= nil and fresh.npcId == nil and attached[fresh.vehicleId] == nil)
+    drain()
+    check("...and has one once a client has held it past the delay", fresh ~= nil and fresh.npcId ~= nil
+        and attached[fresh.vehicleId] == fresh.npcId and joined[fresh.vehicleId] == true)
+end
 for _ = 1, 6 do tick() end
 cars, peds = ownedCount()
 check("the per-player cap holds", cars <= 2 and peds <= 3)
@@ -278,13 +296,26 @@ check("a finished session releases its corridor once the hold expires", #NcmAmbi
 GlobalState.ncmSessions = {}
 tick()
 
+-- ---------------------------------------------------------------- a Paddock race holds its line (KB-223)
+-- ncm_paddock publishes the races a player is near; without them the service spawned its own traffic into the
+-- roundabout all through every oval.
+GlobalState.ncmPaddockRaces = { { id = "pr-x", routeId = "oval_x", startsAt = clock + 60, points = {
+    { x = 100, y = 7000, z = 10 }, { x = 0, y = 7100, z = 10 }, { x = -100, y = 7000, z = 10 }, { x = 0, y = 6900, z = 10 }, { x = 100, y = 7000, z = 10 } } } }
+local pheld = NcmAmbient.corridors(clock)
+check("a Paddock race about to start holds a corridor", #pheld == 1 and pheld[1].id == "paddock:pr-x")
+check("...over its ring, not just its points", NcmCore.get("world.ambient").inCorridor(pheld, { x = 50, y = 7050 }) ~= nil)
+GlobalState.ncmPaddockRaces[1].startsAt = clock + 3600
+check("...but not an hour out", #NcmAmbient.corridors(clock) == 0)
+GlobalState.ncmPaddockRaces = {}
+
 -- ---------------------------------------------------------------- a projected entity is protected
--- Same geometry, but a client reports it as rendered: distance alone must not be enough.
+-- Same geometry, but a client reports it as rendered: distance alone must not be enough. A PED: a car past
+-- ambientRetireM goes watched or not (L247, KB-238 -- its seated driver at a client's streaming edge).
 roster[1] = { x = 1200, y = 900, z = 10, bucket = 0 }
 tick()
 local guarded = nil
 for _, e in pairs(NcmAmbient.owned) do
-    if e.npcId then
+    if e.npcId and e.kind == "ped" then
         e.x, e.y = 1200, 0
         npcs[e.npcId].x, npcs[e.npcId].y = 1200, 0
         npcs[e.npcId].readyClients = 1        -- somebody's client is drawing this

@@ -211,19 +211,26 @@ Core.define("paddock.sim", function(C)
             -- a finisher can never be classified ahead of a car it finished behind in time: enforce monotonic times
             if i > 1 and c.t <= finishers[i - 1].t then c.t = finishers[i - 1].t + 0.05 end
             out[#out + 1] = { id = c.id, orgId = c.orgId, position = i, grid = c.grid, state = "finished",
-                finishMs = math.floor(c.t * 1000 + 0.5), gapMs = math.floor((c.t - leader) * 1000 + 0.5), splits = c.splits }
+                finishMs = math.floor(c.t * 1000 + 0.5), gapMs = math.floor((c.t - leader) * 1000 + 0.5), splits = c.splits,
+                -- the car's CLEAN pace: seconds per segment from driver, car, form and conditions only, before
+                -- traffic (held up, dirty air) -- what a physical car may drive at; the street decides its own passes
+                segSec = c.seg }
             ids[#ids + 1] = c.id
         end
         for _, c in ipairs(dnfs) do
             out[#out + 1] = { id = c.id, orgId = c.orgId, position = #out + 1, grid = c.grid, state = "dnf",
-                dnfReason = c.dnfReason, dnfSegment = c.dnfSeg, splits = c.splits }
+                dnfReason = c.dnfReason, dnfSegment = c.dnfSeg, splits = c.splits, segSec = c.seg }
             ids[#ids + 1] = c.id
         end
         return { order = ids, entrants = out, events = events, simVersion = M.SIM_VERSION, segments = n }
     end
 
-    --- A qualifying order (Pro/Premier): one flying run on quali pace with noise. Returns ids fastest first.
-    function M.qualify(field, rng)
+    --- A qualifying order: one run on quali pace with noise. Returns the entrants fastest first. With `baseSec` (the
+    --- route's sim base time) each entrant also gets `qualiMs` (L250 step 2: NPC qualifying times are shown and set the
+    --- grid beside human times): a quarter of a percent of the base per point of score, so the order is exactly the
+    --- score's, and a consistent driver's time varies less run to run (the noise is the consistency term above).
+    M.QUALI_PCT_PER_POINT = 0.0025
+    function M.qualify(field, rng, baseSec)
         local runs = {}
         for i, e in ipairs(field) do
             local a = e.attrs or {}
@@ -233,7 +240,13 @@ Core.define("paddock.sim", function(C)
         end
         table.sort(runs, function(a, b) if a.score ~= b.score then return a.score > b.score end return a.e.id < b.e.id end)
         local out = {}
-        for i, r in ipairs(runs) do out[i] = r.e end
+        for i, r in ipairs(runs) do
+            if baseSec and baseSec > 0 then
+                local f = math.max(0.85, math.min(1.3, 1 + (60 - r.score) * M.QUALI_PCT_PER_POINT))
+                r.e.qualiMs = math.floor(baseSec * 1000 * f + 0.5)
+            end
+            out[i] = r.e
+        end
         return out
     end
 

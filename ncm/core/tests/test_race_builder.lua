@@ -301,4 +301,13 @@ cases.two_minutes_needs_the_start_where_you_are=function(T)
     T.ok(M.normalize(form{start=A,minutes=2},facts{position={x=n.x+20,y=n.y,z=n.z}}))  -- standing at it
 end
 
+-- L249: a time trial is on demand from the same form; a race stays the default
+cases.a_time_trial_is_a_mode_of_the_same_form=function(T)
+    T.eq(M.normalize(form(),facts()).mode,"race")
+    T.eq(M.normalize(form{mode="time_trial"},facts()).mode,"time_trial")
+    T.eq(M.spec(form{mode="time_trial"},facts()).mode,"time_trial")
+    T.eq(select(2,M.normalize(form{mode="drift"},facts())),"invalid_mode")
+    T.eq(#M.wire(facts()).mode,2)
+end
+
 return cases

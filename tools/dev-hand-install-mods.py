@@ -10,6 +10,12 @@ content-addressed store (`.open77/mods/<sha256>.blob`), and extracts it over the
 is recorded, with a copy of anything it overwrote, under `%LOCALAPPDATA%/NCM/dev-mods/<timestamp>/`, so
 `--uninstall` can put the folder back exactly.
 
+RED4ext's ignore list (KB-231, 2026-09-30): an Online launch makes the launcher write `red4ext/config.ini` with every
+plugin Online does not declare under `[plugins] ignored`, and that list survives into the next dev launch -- so even
+correctly installed DLLs never load. After installing, this tool removes exactly the installed packages' own plugin
+folders from that list (never anything else: `ncm_radial` stays out by owner ruling, and third-party single-player
+mods are left as the launcher set them). The original config.ini is kept with the record, and `--uninstall` restores it.
+
 Usage:  python tools/dev-hand-install-mods.py [--dry-run] [--only ncm-pace,...]
         python tools/dev-hand-install-mods.py --uninstall [<timestamp>]   (latest when omitted)
 """
@@ -65,9 +71,10 @@ def install(args):
             dest = os.path.join(GAME, *name.split("/"))
             existed = os.path.exists(dest)
             print(("overwrite " if existed else "new       ") + pkg["id"] + "  " + name)
-            if args.dry_run:
-                continue
             entry = {"package": pkg["id"], "path": name, "existed": existed}
+            if args.dry_run:
+                record["files"].append(entry)
+                continue
             if existed:
                 backup = os.path.join(root, "overwritten", *name.split("/"))
                 os.makedirs(os.path.dirname(backup), exist_ok=True)
@@ -76,11 +83,42 @@ def install(args):
             with z.open(info) as src, open(dest, "wb") as out:
                 shutil.copyfileobj(src, out)
             record["files"].append(entry)
+    plugin_dirs = sorted({e["path"].split("/")[2] for e in record["files"]
+                          if e["path"].startswith("red4ext/plugins/") and e["path"].count("/") >= 3})
     if args.dry_run:
+        print("would un-ignore in red4ext/config.ini: " + (", ".join(plugin_dirs) or "(nothing)"))
         return
     os.makedirs(root, exist_ok=True)
+    unignore(plugin_dirs, root, record)
     json.dump(record, open(os.path.join(root, "record.json"), "w"), indent=1)
     print("installed %d file(s); record %s" % (len(record["files"]), root))
+
+
+NEVER_UNIGNORE = {"ncm_radial"}          # owner ruling: Radial stays out (KB-182)
+
+
+def unignore(plugin_dirs, root, record):
+    cfg = os.path.join(GAME, "red4ext", "config.ini")
+    if not os.path.exists(cfg):
+        return
+    text = open(cfg, encoding="utf-8").read()
+    m = re.search(r"^(ignored\s*=\s*\[)([^\]]*)(\])", text, flags=re.M)
+    if not m:
+        print("red4ext/config.ini has no ignored list; nothing to un-ignore")
+        return
+    names = re.findall(r'"([^"]*)"', m.group(2))
+    drop = {d for d in plugin_dirs if d not in NEVER_UNIGNORE}
+    keep = [n for n in names if n not in drop]
+    removed = [n for n in names if n in drop]
+    if not removed:
+        print("red4ext/config.ini ignores none of the installed plugins")
+        return
+    shutil.copy2(cfg, os.path.join(root, "config.ini.before"))
+    record["configIni"] = "config.ini.before"
+    body = ", ".join('"%s"' % n for n in keep)
+    text = text[:m.start(2)] + body + text[m.end(2):]
+    open(cfg, "w", encoding="utf-8", newline="").write(text)
+    print("un-ignored in red4ext/config.ini: " + ", ".join(removed) + "  (still ignored: " + (", ".join(keep) or "none") + ")")
 
 
 def uninstall(args):
@@ -98,6 +136,9 @@ def uninstall(args):
         elif os.path.exists(dest):
             os.remove(dest)
             print("removed  " + e["path"])
+    if record.get("configIni"):
+        shutil.copy2(os.path.join(root, record["configIni"]), os.path.join(GAME, "red4ext", "config.ini"))
+        print("restored red4ext/config.ini")
 
 
 def main():

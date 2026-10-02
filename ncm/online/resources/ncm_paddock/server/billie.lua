@@ -33,7 +33,6 @@ local pricing = {}
 --- Price a race: freeze its field, simulate it N times on pricing streams, write versioned lines.
 function PaddockBillie.price(race)
     if race.state ~= "scheduled" or pricing[race.raceId] then return end
-    PaddockRaces.freeze(race)
     if not PaddockSettings.get("billieEnabled", true) then
         race.state = "priced"
         pcall(MySQL.update.await, "UPDATE paddock_race SET state = 'priced' WHERE server_id = ? AND race_id = ?", { U.sid(), race.raceId })
@@ -124,7 +123,9 @@ function PaddockBillie.place(pid, req)
         slip = { stake = math.floor(tonumber(req.stake) or 0), version = tonumber(req.version) },
         caps = PaddockBillie.caps(), stakedToday = PaddockBillie.stakedToday(d.ncmDriverId, t),
         balance = PaddockWallet.balance(d.ncmDriverId), knowsBillie = PaddockBillie.knows(d.ncmDriverId),
-        managesInSeries = managed ~= nil and managed.seriesId == race.seriesId, now = t, closesAt = race.opensAt,
+        -- L250: and no paper on a league you are entered in yourself
+        managesInSeries = (managed ~= nil and managed.seriesId == race.seriesId)
+            or (PaddockHumans ~= nil and PaddockHumans.enteredInSeries(d.ncmDriverId, race.seriesId)), now = t, closesAt = race.opensAt,
     }
     local ok, potential = Pricing.validateSlip(ctx)
     if not ok then return false, potential end

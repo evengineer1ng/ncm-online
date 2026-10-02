@@ -136,6 +136,7 @@ end
 function PaddockLife.fold(org, t)
     local world = w()
     org.lifecycle, org.foldedAt = "folded", t
+    if PaddockDays then PaddockDays.fact(PaddockDays.orgDistrict(org), "org_folded", 1) end
     local events = {}
     for _, p in ipairs(World.members(world, org.id)) do
         if p.state == "active" then
@@ -209,6 +210,7 @@ function PaddockLife.daily(t)
             local lines = Finance.dayLines(world, o)
             local net = Finance.sum(lines)
             o.cash = (o.cash or 0) + net
+            if PaddockDays then PaddockDays.fact(PaddockDays.orgDistrict(o), "cash_k", net / 1000) end
             if o.humanManagerDriverId then
                 for _, l in ipairs(lines) do PaddockManager.book(o, l.kind, l.amount, l.kind .. ":" .. o.id .. ":" .. day, tostring(day)) end
                 PaddockManager.digest(o, net, day)
@@ -330,7 +332,18 @@ local function ownerDecides(org, t, medians)
             d.contractEnds = world.seasonOrdinal + Contracts.lengthFor(owner and owner.principal, rng)
             PaddockStore.markPerson(d.id)
         elseif a.kind == "invest_dev" and a.area then
-            local _, gained, spent = Car.invest(org.car, a.area, a.cost)
+            -- L249 step 4: a real part off a real shelf first (it develops the area by more than its price); what is
+            -- left of the budget goes on workshop hours as before. The part's money moved in its own transaction.
+            local budget = a.cost or 0
+            if PaddockMarkets and not org.humanManagerDriverId then
+                local okB, part = pcall(PaddockMarkets.buyPart, "org", org.id, a.area, budget, t)
+                if okB and part then
+                    budget = math.max(0, budget - (part.price or 0))
+                    org.evidence = org.evidence or {}
+                    org.evidence.devSpendSeason = (org.evidence.devSpendSeason or 0) + (part.price or 0)
+                end
+            end
+            local _, gained, spent = Car.invest(org.car, a.area, budget)
             org.cash = (org.cash or 0) - (spent or 0)
             org.evidence = org.evidence or {}
             org.evidence.devSpendSeason = (org.evidence.devSpendSeason or 0) + (spent or 0)

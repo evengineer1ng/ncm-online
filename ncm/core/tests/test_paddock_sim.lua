@@ -21,6 +21,31 @@ local function fingerprint(r)
 end
 
 return {
+    qualifying_gives_times_in_order_and_consistency_narrows_them = function(T)
+        -- L250 step 2: a time per entrant against the route base, fastest first, deterministic per seed
+        local Sim = T.Core.get("paddock.sim")
+        local H = T.Core.get("vocabulary.hash")
+        local f = field(T, 12, { [5] = { quali_pace = 90, pace = 85 } })
+        local q = Sim.qualify(f, H.stream("seed", "quali", "r1"), 160)
+        T.eq(#q, 12)
+        for i = 2, #q do T.ok(q[i].qualiMs >= q[i - 1].qualiMs, "times in grid order") end
+        T.ok(q[1].qualiMs > 160000 * 0.85 and q[#q].qualiMs < 160000 * 1.3, "times near the base")
+        local again = Sim.qualify(field(T, 12, { [5] = { quali_pace = 90, pace = 85 } }), H.stream("seed", "quali", "r1"), 160)
+        T.eq(again[1].id, q[1].id); T.eq(again[1].qualiMs, q[1].qualiMs)
+        -- the same driver over many sessions: a consistent one varies less
+        local function spread(cons)
+            local lo, hi = math.huge, -math.huge
+            for k = 1, 60 do
+                local one = Sim.qualify(field(T, 1, { [1] = { consistency = cons } }), H.stream("spread", k), 160)[1].qualiMs
+                lo, hi = math.min(lo, one), math.max(hi, one)
+            end
+            return hi - lo
+        end
+        T.ok(spread(95) < spread(20), "consistency narrows the spread")
+        local none = Sim.qualify(field(T, 3), H.stream("seed", "x"))
+        T.eq(none[1].qualiMs, nil, "no base, no times (order only)")
+    end,
+
     replay_is_identical = function(T)
         local Sim = T.Core.get("paddock.sim")
         local H = T.Core.get("vocabulary.hash")

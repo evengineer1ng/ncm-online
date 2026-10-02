@@ -61,7 +61,7 @@ local function settings()
         spawnPerTick      = tonumber(tune("ambientSpawnPerTick", 3)),
         spawnMinM         = tonumber(tune("ambientSpawnMinM", 110)),
         spawnMaxM         = tonumber(tune("ambientSpawnMaxM", 240)),
-        retireM           = tonumber(tune("ambientRetireM", 420)),
+        retireM           = tonumber(tune("ambientRetireM", 300)),
         sightM            = tonumber(tune("ambientSightM", 220)),
         corridorRadiusM   = tonumber(tune("ambientCorridorRadiusM", 70)),
         leadSeconds       = tonumber(tune("ambientLeadSeconds", 240)),
@@ -182,6 +182,19 @@ function NcmAmbient.corridors(t)
         if A.isHeldClear({ startsAt = row.startsAt, entrants = row.entries }, t, s) then
             local c = corridorFor(row)
             if c and not seen[c.id] then seen[c.id] = true; out[#out + 1] = c end
+        end
+    end
+
+    -- Paddock races (KB-223): ncm_paddock publishes the ones a player is near, with their line. Without this the
+    -- service spawned its own traffic into the roundabout all through every oval.
+    for _, e in ipairs((GlobalState and GlobalState.ncmPaddockRaces) or {}) do
+        if type(e) == "table" and type(e.points) == "table" and #e.points >= 1 then
+            local held = A.isHeldClear({ startsAt = tonumber(e.startsAt), live = e.live == true }, t, s)
+            local id = "paddock:" .. tostring(e.id)
+            if held and not seen[id] then
+                seen[id] = true
+                out[#out + 1] = { id = id, points = A.densify(e.points, s.corridorStepM), radiusM = s.corridorRadiusM }
+            end
         end
     end
 
@@ -356,32 +369,54 @@ local function makeVehicle(site)
     -- engine's OWN lane enrollment -- not a destination and not a wander, because Cyberpunk traffic AI
     -- drives authored lanes and has no free roam. It takes no speed and no behaviour: asking for either
     -- is refused by name (`traffic_speed_unsupported`), which is better than a number nothing applies.
-    local driver = Open77.npcs.create({
-        record = A.pickDriver(hostRng),
-        position = { x = site.x, y = site.y, z = z + 0.5 },
-        yaw = site.heading or 0,
-        bucket = site.bucket or 0,
-        aiMode = Open77.npcs.ai.tasks,
-        damagePolicy = Open77.npcs.damage.invulnerable,
-        despawnWhenUnobserved = false,
-    })
-    if driver then
-        local ok, why = Open77.vehicles.ai.attachDriver(vid, { npcId = driver })
-        if not ok then
-            log("ambient car %d: attachDriver refused: %s (parked instead)", vid, tostring(why))
-        else
-            local joined, joinWhy = Open77.vehicles.ai.joinTraffic(vid, { pattern = "default" })
-            if not joined then log("ambient car %d: joinTraffic refused: %s", vid, tostring(joinWhy)) end
-        end
-    end
+    --
+    -- KB-238 (L247): the car comes up EMPTY and its driver is seated only once a client has held it for
+    -- `ambientSeatDelayMs`. Every new car goes through the engine's spawn physics cycle in the client's game (observed
+    -- ~1.0 s in, unobserved ~0.5 s later); a seat mount landing inside it preceded every logged crash (00:43 was an
+    -- ambient car seated 1.7 s after it appeared). A car no client takes in `ambientSeatTimeoutMs` stays parked scenery.
     -- `L197`: an ambient car is a real machine and a Scanner candidate. Registering it makes the collection
     -- watch it (sightings of known machines) and lets a scan of it resolve. No source Driver: nobody showed it.
     pcall(TriggerEvent, "ncm:collection:registerVehicle", vid, record, "ambient")
     nextKey = nextKey + 1
     local key = "v" .. nextKey
-    owned[key] = { key = key, kind = "vehicle", vehicleId = vid, npcId = driver, bucket = site.bucket or 0,
-                   x = site.x, y = site.y, z = z, bornAt = now(), record = record }
+    local entry = { key = key, kind = "vehicle", vehicleId = vid, npcId = nil, bucket = site.bucket or 0,
+                    x = site.x, y = site.y, z = z, bornAt = now(), record = record }
+    owned[key] = entry
     stats.spawned = stats.spawned + 1
+    CreateThread(function()
+        local delay = tonumber(tune("ambientSeatDelayMs", 0)) or 0
+        local timeout = tonumber(tune("ambientSeatTimeoutMs", 120000)) or 120000
+        local held, waited = nil, 0
+        while owned[key] == entry and waited < timeout do
+            Wait(500); waited = waited + 500
+            local ok, owner = pcall(Open77.vehicles.owner, vid)
+            local client = ok and type(owner) == "table"
+                and ((tonumber(owner.authorityPlayerId) or 0) > 0 or (tonumber(owner.physicsOwner) or 0) > 0)
+            held = client and (held or 0) + 500 or nil
+            if held and held >= delay then
+                if owned[key] ~= entry then return end
+                local driver = Open77.npcs.create({
+                    record = A.pickDriver(hostRng),
+                    position = { x = entry.x, y = entry.y, z = (entry.z or z) + 0.5 },
+                    yaw = site.heading or 0,
+                    bucket = site.bucket or 0,
+                    aiMode = Open77.npcs.ai.tasks,
+                    damagePolicy = Open77.npcs.damage.invulnerable,
+                    despawnWhenUnobserved = false,
+                })
+                if not driver then return end
+                entry.npcId = driver
+                local okA, why = Open77.vehicles.ai.attachDriver(vid, { npcId = driver })
+                if not okA then
+                    log("ambient car %d: attachDriver refused: %s (parked instead)", vid, tostring(why))
+                else
+                    local joined, joinWhy = Open77.vehicles.ai.joinTraffic(vid, { pattern = "default" })
+                    if not joined then log("ambient car %d: joinTraffic refused: %s", vid, tostring(joinWhy)) end
+                end
+                return
+            end
+        end
+    end)
     return true
 end
 

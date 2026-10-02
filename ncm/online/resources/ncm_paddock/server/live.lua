@@ -25,12 +25,11 @@ PaddockLive = { byRace = {}, paceClients = {}, probe = nil }
 local U = PaddockUtil
 local log = U.logger("live")
 local L = NcmCore.get("paddock.live")
+local Ovals = NcmCore.get("data.ovals")
 local Sim = NcmCore.get("paddock.sim")
 local Season = NcmCore.get("paddock.season")
 local Finance = NcmCore.get("paddock.finance")
 local Hash = NcmCore.get("vocabulary.hash")
-local Pose = NcmCore.get("replay.pose")
-local Json = NcmCore.get("vocabulary.json")
 local Pool = NcmCore.get("data.vehicle_pool")
 local Clock = NcmCore.get("world.clock")
 
@@ -83,24 +82,153 @@ end
 
 local pathCache = {}                 -- routeId -> { path, at }
 
-local function bestGhost(routeId)
-    local okQ, row = pcall(MySQL.single.await, [[SELECT poses_json, format FROM ghost_lap WHERE server_id = ? AND route_id = ?
-        ORDER BY elapsed_ms LIMIT 1]], { U.sid(), routeId })
-    if not okQ or not row or type(row.poses_json) ~= "string" then return nil end
-    local okJ, raw = pcall(Json.decode, row.poses_json)
-    if not okJ then return nil end
-    return Pose.decode(raw, tonumber(row.format))
+--- Use the exact closed line baked into Pace's oval spline for model positions and the grid. The old polar ring can
+--- be several metres off the traffic lane; a bubble car set down there may hit a wall before it joins the racer.
+local function ovalRoadPath(route)
+    local enc = type(PaddockOvalLines) == "table" and PaddockOvalLines[route.routeId]
+    if not enc then return nil end
+    local loop = {}
+    for x, y, z in enc:gmatch("([^,;]+),([^,;]+),([^,;]+)") do
+        loop[#loop + 1] = { x = tonumber(x), y = tonumber(y), z = tonumber(z) }
+    end
+    if #loop < 8 then return nil end
+    local cum = { 0 }
+    for i = 2, #loop do cum[i] = cum[i - 1] + L.dist(loop[i - 1], loop[i]) end
+    local lapLen = cum[#loop] + L.dist(loop[#loop], loop[1])
+    local markD = {}
+    for k = 2, #route.oval.loop do
+        local mark, best = route.oval.loop[k], math.huge
+        for i, p in ipairs(loop) do
+            local d = L.dist(mark, p)
+            if d < best then best, markD[k] = d, cum[i] end
+        end
+    end
+    local behind = { loop[1] }
+    for i = #loop, 1, -1 do behind[#behind + 1] = loop[i] end
+    local points, nodeD = {}, { 0 }
+    for lap = 0, route.oval.laps - 1 do
+        for _, p in ipairs(loop) do points[#points + 1] = p end
+        for k = 2, #route.oval.loop do nodeD[#nodeD + 1] = lap * lapLen + markD[k] end
+        nodeD[#nodeD + 1] = (lap + 1) * lapLen
+    end
+    points[#points + 1] = loop[1]
+    return { points = points, lengthM = lapLen * route.oval.laps, source = "ring", nodeD = nodeD, ovalBehind = behind }
 end
 
---- The road line for a route (a human ghost when one exists), cached for ten minutes.
+--- The line for a route: its authored points (start, checkpoints, finish), or an oval's ring. Cached ten minutes.
+--- **Never a ghost** (owner, 2026-09-30, L243): "ghosts are not there as a crutch for the race system". Whether a human
+--- once drove a route cannot decide how a race runs -- the route combinations are far too many -- and a 48-point ghost
+--- tape is what blew the host client's script budget at 20:42 (KB-241). Pace finds the road between the points.
 function PaddockLive.pathFor(routeId)
     local c = pathCache[routeId]
     if c and U.now() - c.at < 600 then return c.path end
     local route = PaddockWorld.route(routeId)
     if not route then return nil end
-    local path = L.path(route, bestGhost(routeId))
+    local path = (route.oval and ovalRoadPath(route)) or L.path(route, nil)
+    if path.source == "direct" then path = PaddockLive.roadPath(route, path) or path end
     pathCache[routeId] = { path = path, at = U.now() }
     return path
+end
+
+local roadCache = {}                 -- "from__to" -> decoded points
+
+--- One baked leg's road line, decoded once (nil if it was never baked).
+local function legLine(key)
+    local leg = roadCache[key]
+    if leg then return leg end
+    local enc = type(PaddockRoadLines) == "table" and PaddockRoadLines[key]
+    if not enc then return nil end
+    leg = {}
+    for x, y, z in enc:gmatch("([^,;]+),([^,;]+),([^,;]+)") do leg[#leg + 1] = { x = tonumber(x), y = tonumber(y), z = tonumber(z) } end
+    if #leg < 2 then return nil end
+    roadCache[key] = leg
+    return leg
+end
+
+--- A street route's ROAD line (IDEA-787, L247): each leg's line from NCM Pace's bake (server/roadlines_data.lua, the
+--- same lane-graph route the leg's race spline follows), joined end to end. The race model, the watchers and the
+--- bubble then stand on the road instead of a chord through the buildings between checkpoints. `nodes` keeps the
+--- authored points: Pace's leg index is the authored point a car is heading for, so its plan is still those.
+--- nil when a leg is not two race nodes or was never baked.
+function PaddockLive.roadPath(route, direct)
+    if type(PaddockRoadLines) ~= "table" then return nil end
+    local chain = { route.start and route.start.id }
+    for _, m in ipairs(route.intermediate or {}) do chain[#chain + 1] = m.nodeId or false end
+    chain[#chain + 1] = route.finish and route.finish.id
+    local pts, total, nodeD = {}, 0, { 0 }
+    for i = 2, #chain do
+        if not chain[i - 1] or not chain[i] then return nil end
+        local leg = legLine(chain[i - 1] .. "__" .. chain[i])
+        if not leg then return nil end
+        for k = (#pts > 0) and 2 or 1, #leg do
+            local p = leg[k]
+            if #pts > 0 then total = total + L.dist(pts[#pts], p) end
+            pts[#pts + 1] = p
+        end
+        nodeD[i] = total
+    end
+    if #pts < 2 then return nil end
+    -- nodeD[k]: how far along the road authored point k is (the bubble's car.add starts a car on the leg it is in)
+    return { points = pts, lengthM = total, source = "road", nodes = direct.points, nodeD = nodeD }
+end
+
+--- The road behind a street route's start, start first and running back (L247): where its grid stands. Baked per leg
+--- from the lane graph (`bake_legs --grids` -> server/roadlines_data.lua `PaddockGridLines`): from the lane the race
+--- leaves on, back through the predecessor that runs straightest into it. 1,099 of the 1,190 first legs have one (992
+--- long enough for twelve cars; roadSlots runs straight on from a shorter one's end). nil for the rest (under 20 m of
+--- road behind the start) -- SP's straight grid then stands as before. `needM` is unused (kept for callers).
+function PaddockLive.gridLine(route, needM)
+    if not route or not route.start or not route.start.id or type(PaddockGridLines) ~= "table" then return nil end
+    local nextId = (route.intermediate and route.intermediate[1] and route.intermediate[1].nodeId) or (route.finish and route.finish.id)
+    if not nextId then return nil end
+    local key = route.start.id .. "__" .. nextId
+    local c = roadCache["grid:" .. key]
+    if c then return c end
+    local enc = PaddockGridLines[key]
+    if not enc then return nil end
+    local line = {}
+    for x, y, z in enc:gmatch("([^,;]+),([^,;]+),([^,;]+)") do line[#line + 1] = { x = tonumber(x), y = tonumber(y), z = tonumber(z) } end
+    if #line < 2 then return nil end
+    roadCache["grid:" .. key] = line
+    return line
+end
+
+--- A street route's start grid (L250): the lane-based bake for its first leg, through course.grid_solver (hand
+--- overrides first). Returns slots ({ x, y, z, yaw, slot, col, row }) and a note ("baked", "override", "short",
+--- "none"); with no bake at all, the old straight grid along the road into the start (note "fallback").
+function PaddockLive.gridSlots(route, n, profile)
+    local nextId = (route.intermediate and route.intermediate[1] and route.intermediate[1].nodeId) or (route.finish and route.finish.id)
+    local key = route.start and route.start.id and nextId and (route.start.id .. "__" .. nextId)
+    local entry = key and type(PaddockGridSlots) == "table" and PaddockGridSlots[key] or nil
+    local slots, note = NcmCore.get("course.grid_solver").slotsFor(entry, route.start and route.start.id, nextId, n, profile)
+    if note ~= "none" then return slots, note end
+    local rowM, backM = profile.aiGridRowSpacingM or 12, profile.aiGridStartSetbackM or 12
+    local behind = PaddockLive.gridLine(route, backM + rowM * (math.ceil(n / 2) - 1) + 1)
+    return behind and L.roadSlots(behind, n, profile) or L.gridSlots(route.start, route.finish, n, profile), "fallback"
+end
+
+--- Does a race run on the continuous model and the physical bubble (L230, L247)? An oval (its ring), and a street
+--- route with a road line. Such a race is never a grid street run: the cars near a player are physical with a driver
+--- in the seat, the rest are the model, and no car with a driver is left out at the edge of anyone's streaming (KB-238).
+function PaddockLive.onBubble(routeId)
+    if Ovals.isOval(routeId) then return true end
+    local path = PaddockLive.pathFor(routeId)
+    return path ~= nil and path.source == "road"
+end
+
+--- The race spline for each leg of a route, in order: `$/mod/ncm_pace/#leg_<from>__<to>`, the refs
+--- tools/bake-race-splines.py bakes for every ordered pair of race nodes (L246). nil when a leg's ends are not both
+--- nodes (an authored point that is not a node has no spline).
+function PaddockLive.legsFor(route)
+    local chain = { route.start and route.start.id }
+    for _, m in ipairs(route.intermediate or {}) do chain[#chain + 1] = m.nodeId or false end
+    chain[#chain + 1] = route.finish and route.finish.id
+    local legs = {}
+    for i = 2, #chain do
+        if not chain[i - 1] or not chain[i] then return nil end
+        legs[#legs + 1] = ("$/mod/ncm_pace/#leg_%s__%s"):format(chain[i - 1], chain[i])
+    end
+    return legs
 end
 
 --- Players near a route: within liveWatchRadiusM of its line or its start. Returns a list of { pid, d, pos }.
@@ -120,7 +248,7 @@ end
 
 -- -------------------------------------------------------------------------------------------------------- stage
 
-local function recordFor(org, tier)
+local function recordFor(org, tier, oval)
     local band = (Season.TIERS[tier] or {}).band or {}
     local list = {}
     for _, class in ipairs(band.classes or { "Sport" }) do
@@ -129,7 +257,10 @@ local function recordFor(org, tier)
         end
     end
     if #list == 0 then list = { "Vehicle.v_sport2_quadra_type66" } end
-    return Hash.pick(list, "livecar", org and org.id or "none")
+    local record = Hash.pick(list, "livecar", org and org.id or "none")
+    -- Ovals only: NCM Pace ships isolated TweakXL racer clones with its higher RaceDrive profile.
+    if oval then return (record:gsub("^Vehicle%.", "Vehicle.ncm_racer_")) end
+    return record
 end
 
 local DRIVER_RECORDS = { m = { "Character.WorkerMale", "Character.YoungsterMale", "Character.AsianMale" },
@@ -161,6 +292,9 @@ local function stage(race, host, t)
     local route = PaddockWorld.route(race.routeId)
     local path = PaddockLive.pathFor(race.routeId)
     if not route or not path then return end
+    -- A live grid used to stage at T-75 and froze the field while entries were still allowed. Hold staging
+    -- until the shared T-1 cutoff; the scheduler will retry on its next tick.
+    if race.opensAt - t > NcmCore.get("paddock.mixed").FREEZE_LEAD_SEC then return end
     PaddockRaces.freeze(race)
     local field = PaddockRaces.buildField(race)
     if #field < 2 then return end
@@ -176,7 +310,7 @@ local function stage(race, host, t)
     local gates = L.checkpoints(route, path, segments)
     -- the owner's own single-player grid: authored node heading, SP's road-axis correction, the route's tuning
     -- (data.grid_profiles); tools/test-grid-oracle.lua holds it to SP's code (L232)
-    local allSlots = route.oval and L.ovalSlots(route.oval, #field + 8)        -- round the roundabout, not a straight grid (L236)
+    local allSlots = route.oval and L.ovalSlots(route.oval, #field + 8, NcmCore.get("data.grid_profiles").forRoot(race.routeId))   -- SP formation along the ring (L236, KB-223)
         or L.gridSlots(route.start, route.finish, #field + 8, NcmCore.get("data.grid_profiles").forRoot(race.routeId))
     -- never set a car down on a person: a slot with a player within liveSlotClearM is skipped, and its car takes the
     -- next free slot at the back (the banner told them to clear the area, L233)
@@ -189,10 +323,17 @@ local function stage(race, host, t)
         if taken then skipped = skipped + 1 elseif #slots < #field then slots[#slots + 1] = s end
     end
     -- an oval's points may come from map waypoints, whose height is not the road's: ground every oval slot (L236)
+    -- from just above the marked height first: a ray from 30 m up lands on whatever deck or walkway spans the road
+    -- (Corpo Circle, KB-223); the high ray only when the low one finds nothing
     if route.oval then
-        for _, sl in ipairs(slots) do
-            local zOk, z = pcall(Open77.world.groundZ, { x = sl.x, y = sl.y }, { radius = 400, fromZ = (sl.z or 0) + 30, timeout = 1500, cache = true })
+        for i, sl in ipairs(slots) do
+            local marked = sl.z or 0
+            local zOk, z = pcall(Open77.world.groundZ, { x = sl.x, y = sl.y }, { radius = 400, fromZ = marked + 4, timeout = 1500, cache = true })
+            if not (zOk and type(z) == "number") then
+                zOk, z = pcall(Open77.world.groundZ, { x = sl.x, y = sl.y }, { radius = 400, fromZ = marked + 30, timeout = 1500, cache = true })
+            end
             if zOk and type(z) == "number" then sl.z = z end
+            if i <= 2 then log("stage %s: oval slot %d at %.1f, %.1f z %.1f (marked %.1f) yaw %.0f", race.raceId, i, sl.x, sl.y, sl.z or 0, marked, sl.yaw or 0) end
         end
     end
     if #slots < #field and route.oval and #slots >= 4 then
@@ -200,16 +341,27 @@ local function stage(race, host, t)
     end
     if #slots < #field then return cancel(lr, "the grid is blocked: players are standing on it") end
     if skipped > 0 then log("stage %s: %d slot(s) had a player on them; those cars start further back", race.raceId, skipped) end
-    local want = set("liveBackend", "auto")
+    -- L246: a street run is the engine's racer on NCM Pace's race splines, or nothing -- the platform AI backend is
+    -- retired. No Pace on the host, or a route whose legs have no race spline, means the race stays the sim's.
     local pace = host and PaddockLive.paceClients[host.pid]
-    local backend = (want == "pace" or (want == "auto" and pace and pace.ok)) and "pace" or "platform"
-    if want == "pace" and not (pace and pace.ok) then return cancel(lr, "liveBackend is pace but the nearest player has no Pace plugin") end
+    if not (pace and pace.ok) then return cancel(lr, "the host has no NCM Pace: street runs are on race splines only") end
+    local backend = "pace"
+    local legs = PaddockLive.legsFor(route)
+    if not legs then return cancel(lr, "a leg of this route has no race spline") end
+    lr.legs = legs
+    -- the platform's followRoute takes 1..64 points; only Pace takes a longer plan, as a tape (0.3.1, KB-223)
+    if backend == "platform" and #path.points > L.MAX_POINTS then
+        return cancel(lr, ("a %d-point line needs the Pace plugin (platform AI takes %d)"):format(#path.points, L.MAX_POINTS))
+    end
     lr.backend, lr.path, lr.gates, lr.segments, lr.field = backend, path, gates, segments, field
     local npcDrivers = set("liveNpcDrivers", true) and (backend == "platform" or set("livePaceDrivers", true))
     for i, e in ipairs(field) do
         local s = slots[i]
         local org = w.orgs[e.orgId or ""]
-        local okV, vid, reason = pcall(Open77.vehicles.create, { record = recordFor(org, race.tier),
+        -- The vanilla record: the race profile is every vehicle record's own `drivingParamsRace`, which the engine's racing
+        -- command uses (L246). No custom records -- nothing the platform could refuse.
+        local record = recordFor(org, race.tier, route.oval ~= nil)
+        local okV, vid, reason = pcall(Open77.vehicles.create, { record = record,
             position = { x = s.x, y = s.y, z = (s.z or 0) + 0.6 }, yaw = s.yaw, bucket = lr.bucket })
         if not okV or not vid then
             log("stage %s: car %d (%s) refused: %s", race.raceId, i, e.id, tostring(reason or vid))
@@ -218,6 +370,8 @@ local function stage(race, host, t)
         local car = { personId = e.id, orgId = e.orgId, vehicleId = vid, slot = i, row = s.row, recoveries = 0, resets = 0 }
         lr.cars[#lr.cars + 1] = car
         byVehicle[vid] = { raceId = race.raceId, personId = e.id }
+        log("TRACE race=%s stage slot=%d person=%s vid=%s record=%s host=%s bucket=%s backend=%s",
+            race.raceId, i, e.id, tostring(vid), record, tostring(host and host.pid), tostring(lr.bucket), backend)
         if backend == "platform" or npcDrivers then
             -- a visible driver at the wheel (SP seats one, L234). On the Pace backend the car gets no platform task:
             -- the attach only seats the NPC, and the Pace plugin sends the drive commands on the host's client.
@@ -230,12 +384,16 @@ local function stage(race, host, t)
                     damagePolicy = Open77.npcs.damage and Open77.npcs.damage.invulnerable or nil,
                     despawnWhenUnobserved = false, persistent = false })
                 if okN and id then npcId = id; car.npcId = id end
+                log("TRACE race=%s driver slot=%d vid=%s npc=%s created=%s", race.raceId, i,
+                    tostring(vid), tostring(npcId), tostring(okN and id ~= nil))
             end
             local okA, st, why = pcall(Open77.vehicles.ai.attachDriver, vid, npcId and { npcId = npcId } or nil)
             if (not okA or not st) and npcId then
                 pcall(Open77.npcs.remove, npcId); car.npcId = nil
                 okA, st, why = pcall(Open77.vehicles.ai.attachDriver, vid, nil)
             end
+            log("TRACE race=%s attach slot=%d vid=%s npc=%s accepted=%s reason=%s", race.raceId, i,
+                tostring(vid), tostring(car.npcId), tostring(okA and st ~= nil and st ~= false), tostring(why))
             if (not okA or not st) and backend == "pace" then
                 -- a seat is a nicety on the Pace backend: fall back to 0.2.0's driverless car under the host
                 log("stage %s: attachDriver %d refused (%s); driverless under the host", race.raceId, vid, tostring(why or st))
@@ -303,8 +461,17 @@ end
 
 local function go(lr, race)
     local cap = lr.backend == "pace" and set("livePaceMaxMps", 90) or L.PLATFORM_MAX_MPS
+    local ceilingFactor = (lr.route and lr.route.oval)
+        and math.max(2.25, tonumber(set("liveOvalSpeedCeilingFactor", 2.25)) or 2.25) or 1
     for _, c in ipairs(lr.cars) do
-        c.plan = L.speedPlan(lr.path.points, lr.path.lengthM, splitsOf(race, c.personId), lr.segments, cap)
+        -- Pace's plan is the authored points, one per leg (its leg index is the point a car is heading for, L246)
+        local plan = L.speedPlan(lr.path.nodes or lr.path.points, lr.path.lengthM, splitsOf(race, c.personId), lr.segments, cap)
+        if ceilingFactor ~= 1 then
+            for i, mps in ipairs(plan) do
+                plan[i] = math.floor(math.min(cap, mps * ceilingFactor) * 10 + 0.5) / 10
+            end
+        end
+        c.plan = plan
     end
     local leaderMs = race.result and race.result.entrants and race.result.entrants[1] and race.result.entrants[1].finishMs
     leaderMs = leaderMs or math.floor((lr.path.lengthM or 3000) / 30 * 1000)
@@ -322,16 +489,43 @@ local function go(lr, race)
         TriggerClientEvent("ncm:paddock.live.countdown", pid, { raceId = lr.raceId, goInMs = lr.goMs - nowMs() })
     end
     if lr.backend == "pace" and lr.pid then
+        -- KB-223: the plan crosses a WebUI hop that drops large payloads without a word (KB-86: ~18 KB arrives, ~22.5 KB
+        -- does not). A street plan is ~1.5 KB; an oval's 33-61 points, gates and per-leg speeds reached 15-28 KB at full
+        -- precision, and no oval plan was ever acknowledged by Pace. Centimetres and 1e-4 directions are ample.
+        local function r(v, k) return math.floor(v * k + 0.5) / k end
         local cars = {}
         for i, c in ipairs(lr.cars) do cars[i] = { vehicleId = c.vehicleId, personId = c.personId, speeds = c.plan } end
         local gates = {}
-        for i, g in ipairs(lr.gates) do gates[i] = { x = g.x, y = g.y, z = g.z, dx = g.dir.x, dy = g.dir.y, halfWidth = g.halfWidthM, capture = g.captureM } end
-        -- SP's launch: the capped release, the grace, the recommand cadence and the stall rule, per route (L234)
-        TriggerClientEvent("ncm:paddock.live.drive", lr.pid, { raceId = lr.raceId, goInMs = lr.goMs - nowMs(), points = lr.path.points,
-            gates = gates, cars = cars, launch = L.launchProfile(NcmCore.get("data.grid_profiles").forRoot(race.routeId)),
-            -- switch to the next point sooner on authored points than on a ghost line: a generated route's checkpoint or
-            -- an oval's pole must actually be reached, or its gate is missed (L236)
-            advanceM = (lr.path.source == "ghost") and 40 or (lr.route.oval and math.max(6, math.min(15, lr.route.oval.radius * 0.5)) or 15) })
+        for i, g in ipairs(lr.gates) do gates[i] = { x = r(g.x, 100), y = r(g.y, 100), z = r(g.z or 0, 100), dx = r(g.dir.x, 1e4), dy = r(g.dir.y, 1e4),
+            halfWidth = r(g.halfWidthM, 10), capture = r(g.captureM, 10) } end
+        local points = {}
+        for i, p in ipairs(lr.path.nodes or lr.path.points) do points[i] = { x = r(p.x, 100), y = r(p.y, 100), z = r(p.z or 0, 100) } end
+        -- The plan crosses the NETWORK as a tape too (KB-223): a 25-lap oval in one event was "dropped malformed network
+        -- event payload" on the client, 1 ms after the go. Numbered parts of DRIVE_PART points, gates and per-leg speeds;
+        -- the client rebuilds the plan once every part is in. Part 1 carries the header. Never an empty list: an empty
+        -- Lua table crosses as {}, so a missing field means "none in this part".
+        local DRIVE_PART = 24
+        local function slice(t, a, b) local o = {} for i = a, math.min(b, #t) do o[#o + 1] = t[i] end return #o > 0 and o or nil end
+        local parts = math.max(1, math.ceil(math.max(#points, #gates) / DRIVE_PART))
+        for k = 1, parts do
+            local a, b = (k - 1) * DRIVE_PART + 1, k * DRIVE_PART
+            local speeds = {}
+            for i, c in ipairs(cars) do speeds[i] = slice(c.speeds or {}, a, b) or { (c.speeds and c.speeds[#c.speeds]) or 20 } end
+            local msg = { raceId = lr.raceId, part = k, parts = parts, points = slice(points, a, b), gates = slice(gates, a, b), speeds = speeds }
+            if k == 1 then
+                local header = {}
+                for i, c in ipairs(cars) do header[i] = { vehicleId = c.vehicleId, personId = c.personId } end
+                msg.cars = header
+                msg.goInMs = lr.goMs - nowMs()
+                -- SP's launch: the capped release, the grace, the recommand cadence and the stall rule, per route (L234)
+                msg.launch = L.launchProfile(NcmCore.get("data.grid_profiles").forRoot(race.routeId))
+                -- switch to the next point sooner on authored points than on a ghost line: a generated route's checkpoint
+                -- or an oval's pole must actually be reached, or its gate is missed (L236)
+                msg.advanceM = (lr.path.source == "ghost") and 40 or (lr.route.oval and math.max(6, math.min(15, lr.route.oval.radius * 0.5)) or 15)
+                msg.legs = lr.legs           -- L246: the race spline for each leg
+            end
+            TriggerClientEvent("ncm:paddock.live.drive", lr.pid, msg)
+        end
     end
     log("go %s at +%d ms: %d cars, deadline %d s", lr.raceId, lr.goMs - nowMs(), #lr.cars, math.floor(lr.deadlineMs / 1000))
     CreateThread(function()
@@ -393,7 +587,8 @@ function PaddockLive.writeResult(race, entrants, provenance, backend, detailExtr
     local splits = {}
     for _, e in ipairs(entrants) do
         e.points = Season.pointsFor(e.position, e.state)
-        e.purse = (e.state == "finished") and (purse[e.position] or 0) or 0
+        -- a human's pay is the league's (Economy v1, by the same place); the Paddock's purse is its NPCs'
+        e.purse = (e.state == "finished" and not e.human) and (purse[e.position] or 0) or 0
         splits[e.id] = e.splits
         st[#st + 1] = { query = [[INSERT INTO paddock_result (server_id, race_id, person_id, org_id, series_id, season_id,
             cup_id, position, grid, state, finish_ms, gap_ms, points, purse, dnf_reason, at)
@@ -481,6 +676,26 @@ function PaddockLive.sample(lr, race)
                     else
                         L.observe(lr.timing, c.personId, pos, tMs)
                         persevere(lr, c, pos, tMs)
+                        c.lastPos = pos
+                    end
+                end
+            end
+            -- an oval's first live runs are evidence (KB-223): where each car really is, off the ring and round it
+            local o = lr.route and lr.route.oval
+            if o then
+                for _, mark in ipairs({ 10000, 30000 }) do
+                    lr.ovalSnap = lr.ovalSnap or {}
+                    if tMs >= mark and not lr.ovalSnap[mark] then
+                        lr.ovalSnap[mark] = true
+                        for _, c in ipairs(lr.cars) do
+                            local p = c.lastPos
+                            if p then
+                                local off = L.dist({ x = o.cx, y = o.cy }, p) - o.radius
+                                local ang = math.deg((math.atan(p.y - o.cy, p.x - o.cx) - o.startAngle) * o.sign) % 360
+                                log("%s +%ds: %s off-ring %+.0f m, %.0f deg round, z %.1f, next gate %d%s", lr.raceId, math.floor(mark / 1000),
+                                    c.personId, off, ang, p.z or 0, lr.timing.cars[c.personId].next, lr.out[c.personId] and (" OUT " .. lr.out[c.personId]) or "")
+                            end
+                        end
                     end
                 end
             end
@@ -490,7 +705,15 @@ function PaddockLive.sample(lr, race)
             lr.closeMs = leader + math.max(set("liveFinishGraceSec", 90) * 1000, math.floor(leader * 0.5))
             log("%s: the winner is home at %.1f s; the rest have until %.0f s", lr.raceId, leader / 1000, lr.closeMs / 1000)
         end
-        if L.allDone(lr.timing, lr.out) or tMs > lr.deadlineMs or (lr.closeMs and tMs > lr.closeMs) then
+        local over = L.allDone(lr.timing, lr.out) or tMs > lr.deadlineMs or (lr.closeMs and tMs > lr.closeMs)
+        -- Pace's gate reports reach the server AFTER the server sees the crossing (client relay), so the last finisher's
+        -- would always be missing at the instant the race is over, and the whole result "not corroborated". Wait up to
+        -- livePaceReportGraceMs for them before the verdict (L246).
+        if over and lr.backend == "pace" and not L.corroborate(lr.timing, lr.client) then
+            lr.reportsBy = lr.reportsBy or (tMs + set("livePaceReportGraceMs", 3000))
+            if tMs < lr.reportsBy then over = false end
+        end
+        if over then
             for _, c in ipairs(lr.cars) do
                 if not lr.timing.cars[c.personId].done and not lr.out[c.personId] then
                     lr.out[c.personId] = lr.closeMs and "not_classified" or "timeout"
@@ -502,6 +725,24 @@ function PaddockLive.sample(lr, race)
         Wait(set("liveSampleMs", 250))
     end
 end
+
+-- KB-238: pair the client's native engine entity hashes with authoritative lease transitions.
+-- OPEN//77 event IDs arrive as strings; the race lookup is keyed by numeric vehicle ID.
+AddEventHandler("onVehicleAuthorityChanged", function(id, owner, epoch, reason)
+    local ref = byVehicle[tonumber(id)]
+    if not ref then return end
+    local ok, v = pcall(Open77.vehicles.get, tonumber(id))
+    local p = ok and type(v) == "table" and v.position or nil
+    log("TRACE race=%s authority person=%s vid=%s owner=%s epoch=%s reason=%s pos=%s", ref.raceId,
+        ref.personId, tostring(id), tostring(owner), tostring(epoch), tostring(reason),
+        type(p) == "table" and ("%.1f,%.1f,%.1f"):format(p.x or 0, p.y or 0, p.z or 0) or "nil")
+end)
+
+AddEventHandler("onVehicleRemoved", function(id, reason)
+    local ref = byVehicle[tonumber(id)]
+    if ref then log("TRACE race=%s removed person=%s vid=%s reason=%s", ref.raceId,
+        ref.personId, tostring(id), tostring(reason)) end
+end)
 
 -- Per-leg ceilings on the platform backend: each waypoint reached sets the next leg's speed.
 if Open77.vehicles and Open77.vehicles.ai and Open77.vehicles.ai.on then
@@ -555,10 +796,20 @@ local function raiseArea(race, pid, t)
     if not route then return end
     local prof = NcmCore.get("data.grid_profiles").forRoot(race.routeId)
     local seconds = math.max(1, race.opensAt - t) + set("liveCountdownSec", 5) + set("liveTrafficClearTailSec", 60)
+    -- an oval races ON the roundabout for its whole distance: hold the area for the race, not a start's minute
+    if route.oval then seconds = math.max(1, race.opensAt - t) + math.floor((route.distanceM or 0) / 25) + 120 end
     areas[race.raceId] = areas[race.raceId] or {}
     areas[race.raceId][pid] = true
-    TriggerClientEvent("ncm:paddock.live.area", pid, { raceId = race.raceId, x = route.start.x, y = route.start.y, z = route.start.z or 0,
-        half = prof.trafficClearRadiusM or 140, halfZ = 30, seconds = seconds })
+    local at, half = route.start, prof.trafficClearRadiusM or 140
+    local ovalMode = route.oval and set("liveOvalClearMode", "ring") or nil
+    if ovalMode == "off" then return end
+    -- an oval races the whole ring, not a start line: clear the roundabout and a margin round it (L236)
+    if ovalMode == "ring" then
+        at = { x = route.oval.cx, y = route.oval.cy, z = route.oval.cz }
+        half = math.max(half, route.oval.radius + set("liveOvalClearMarginM", 80))
+    end
+    TriggerClientEvent("ncm:paddock.live.area", pid, { raceId = race.raceId, x = at.x, y = at.y, z = at.z or 0,
+        half = half, halfZ = 30, seconds = seconds })
 end
 
 PaddockLive.raiseArea = raiseArea
@@ -586,12 +837,20 @@ local function warn(t)
                 warned[race.raceId] = warned[race.raceId] or {}
                 for pid, pos in pairs(people) do
                     pid = tonumber(pid)
-                    if L.dist(route.start, pos) <= radius and not warned[race.raceId][pid] then
+                    -- an oval's "start" is the whole ring: anyone within `radius` of the roundabout is at it (L236)
+                    local d = route.oval and math.max(0, L.dist({ x = route.oval.cx, y = route.oval.cy }, pos) - route.oval.radius)
+                        or L.dist(route.start, pos)
+                    if d <= radius and not warned[race.raceId][pid] then
                         warned[race.raceId][pid] = true
                         local detail = ("CLEAR THE AREA  ·  %s on %s"):format(PaddockWorld.seriesName(race.seriesId), PaddockWorld.routeName(race.routeId))
+                        -- the banner reaches 0 exactly when the cars go: the window's opening (modelGoAt, L247), by
+                        -- the clock NOW. Not `left + liveCountdownSec`: that was the retired grid run's 5 s countdown
+                        -- after the opening, and `t` is taken at the start of the scheduler pass, seconds of database
+                        -- work earlier -- cars went ~10 s before the banner cleared (owner, 2026-10-01).
                         TriggerClientEvent("ncm:paddock.live.warn", pid, { title = "WARNING: IMPENDING RACE START", detail = detail,
-                            seconds = left + set("liveCountdownSec", 5) })
-                        notify(pid, "Impending race start: the grid spawns here. Clear the area.", 8000)
+                            seconds = math.max(0, math.floor(race.opensAt * 1000 - nowMs()) / 1000) })
+                        notify(pid, route.oval and "Oval race about to start on this roundabout. Clear the road."
+                            or "Impending race start: the grid spawns here. Clear the area.", 8000)
                         raiseArea(race, pid, t)
                     end
                 end
@@ -635,7 +894,11 @@ function PaddockLive.tick(t)
         local lead = set("liveStageLeadSec", 75)
         local due
         for _, race in pairs(PaddockRaces.byId) do
-            if not byRace[race.raceId] and (race.state == "scheduled" or race.state == "priced")
+            -- an oval is never a grid street run: it runs on the continuous model and goes physical in the bubble
+            -- round whoever is at the roundabout (L230; KB-223 -- four oval grid runs never turned a wheel). Nor, since
+            -- L247, is a street route with a road line: the grid run kept twelve driven cars alive however far from the
+            -- host they got, and its CTDs (KB-238) came as they crossed the edge of the host's streaming.
+            if not byRace[race.raceId] and not PaddockLive.onBubble(race.routeId) and (race.state == "scheduled" or race.state == "priced")
                 and t >= race.opensAt - lead and t < race.opensAt and (not due or race.opensAt < due.opensAt) then due = race end
         end
         if due then
@@ -649,8 +912,17 @@ function PaddockLive.tick(t)
                 end
                 if not host then byRace[due.raceId] = { raceId = due.raceId, state = "skipped", reason = "nobody online" } return end
             else
-                host = watchers(due.routeId)[1]
-                if not host then byRace[due.raceId] = { raceId = due.raceId, state = "skipped", reason = "nobody near the route" } return end
+                -- the host is whoever is nearest THE GRID, and only within liveHostGridM of it: the cars spawn there and a
+                -- client only has a car in its game within streaming range. Near the route's far end is not near enough
+                -- (20:24, KB-242: the host was on the line, 0 of 12 cars ever reached its game, the LIVE tab showed twelve
+                -- parked cars for three minutes). Nobody that close: the race is the sim's, and LIVE shows the sim.
+                local route = PaddockWorld.route(due.routeId)
+                local gridM = set("liveHostGridM", 250)
+                for _, wch in ipairs(watchers(due.routeId)) do
+                    local d = route and L.dist(route.start, wch.pos) or math.huge
+                    if d <= gridM and (not host or d < host.gridD) then host = wch; host.gridD = d end
+                end
+                if not host then byRace[due.raceId] = { raceId = due.raceId, state = "skipped", reason = "nobody near the grid" } return end
             end
             local ok, err = pcall(stage, due, host, t)
             if not ok then
@@ -696,6 +968,35 @@ RegisterNetEvent("ncm:paddock.live.gate", function(msg)
     if not g or not ms or g < 2 or g > #lr.gates then return end
     lr.client[ref.personId] = lr.client[ref.personId] or {}
     lr.client[ref.personId][g] = math.floor(ms)
+end)
+
+-- The host's client says which cars actually reached its game before it fed Pace (client/live.lua). A car that never
+-- did can never be driven: it is taken off the grid and out of the classification at once. Fewer than half: the street
+-- run is called off now, not three minutes later by the stall rule, and the race is the sim's (KB-242).
+RegisterNetEvent("ncm:paddock.live.mapped", function(msg)
+    local pid = tonumber(source) or 0
+    if type(msg) ~= "table" then return end
+    local lr = byRace[tostring(msg.raceId or "")]
+    if not lr or lr.pid ~= pid or (lr.state ~= "staging" and lr.state ~= "running") then return end
+    local got = {}
+    for _, v in ipairs(type(msg.mapped) == "table" and msg.mapped or {}) do got[tonumber(v) or -1] = true end
+    local n = 0
+    for _, c in ipairs(lr.cars) do if got[c.vehicleId] then n = n + 1 end end
+    log("%s: %d of %d cars reached the host's game", lr.raceId, n, #lr.cars)
+    if n < math.max(2, math.ceil(#lr.cars / 2)) then
+        return cancel(lr, ("only %d of %d cars reached the host's game; the sim runs it"):format(n, #lr.cars))
+    end
+    lr.out = lr.out or {}
+    for _, c in ipairs(lr.cars) do
+        if not got[c.vehicleId] then
+            lr.out[c.personId] = "not_streamed"
+            byVehicle[c.vehicleId] = nil
+            pcall(Open77.vehicles.ai.removeDriver, c.vehicleId)
+            pcall(Open77.vehicles.remove, c.vehicleId)
+            if c.npcId then pcall(Open77.npcs.remove, c.npcId) end
+            log("%s: %s never reached the host's game: off the grid, out of the classification", lr.raceId, c.personId)
+        end
+    end
 end)
 
 AddEventHandler("onPlayerDisconnected", function(playerId)

@@ -240,8 +240,66 @@ local function scanData(frame, desc, s)
     return frame
 end
 
+-- ------------------------------------------------------------------------------------------------------------
+-- PEOPLE: the Scanner reads a Paddock person (L240; owner 2026-09-30, "this should be a scanner / vision
+-- surface"). `ncm-vision` reports anything that is not a vehicle as kind "other" with its world position; the
+-- point goes to `ncm_paddock` (`ncm:life.scan`), which alone decides whether a Paddock body stands there and
+-- what can be read off them. Vanilla crowds answer `found = false` and the reticle stays quiet over them.
+-- ------------------------------------------------------------------------------------------------------------
+local people = {}                -- entity -> { phase = "query"|"answered", found, data, retryAt, refreshAt, token }
+local personByToken = {}
+
+local function askPerson(t)
+    local p = people[t.entity]
+    local n = now()
+    local due = not p or (p.phase == "query" and n >= (p.retryAt or 0)) or (p.phase == "answered" and n >= (p.refreshAt or 0))
+    if not due then return p end
+    local tk = token()
+    p = p or { phase = "query" }
+    p.token, p.retryAt = tk, n + QUERY_RETRY_MS
+    if p.phase == "answered" then p.refreshAt = n + REFRESH_MS end
+    people[t.entity] = p
+    personByToken[tk] = t.entity
+    TriggerServerEvent("ncm:life.scan", { token = tk, pos = t.pos, distance = tonumber(t.distance) or -1 })
+    return p
+end
+
+RegisterNetEvent("ncm:life.scan.result", function(r)
+    if type(r) ~= "table" then return end
+    local entity = personByToken[tostring(r.token)]
+    personByToken[tostring(r.token)] = nil
+    if not entity then return end
+    local p = people[entity] or {}
+    people[entity] = p
+    p.phase, p.found, p.data, p.refreshAt = "answered", r.found == true, r, now() + REFRESH_MS
+    if p.found then log("person %s (%s, %s)", tostring(r.name), tostring(r.doing), tostring(r.at)) end
+end)
+
+--- A Paddock person under the reticle, or nil when this is not one (or not yet known to be one).
+local function composePerson(t)
+    if not t.active or t.kind ~= "other" or not t.entity or t.entity == "" or type(t.pos) ~= "table" then return nil end
+    local p = askPerson(t)
+    if not (p and p.phase == "answered" and p.found) then return nil end
+    local d = p.data
+    local rows = {}
+    if d.team then rows[#rows + 1] = { k = "TEAM", v = d.team } end
+    if d.doing then rows[#rows + 1] = { k = "DOING", v = d.doing } end
+    if d.at then rows[#rows + 1] = { k = "AT", v = d.at } end
+    if d.till then rows[#rows + 1] = { k = "UNTIL", v = d.till } end
+    if d.usually then rows[#rows + 1] = { k = "USUALLY", v = d.usually } end
+    if d.district then rows[#rows + 1] = { k = "DISTRICT", v = d.district } end
+    local dm = tonumber(t.distance)
+    if dm and dm >= 0 then rows[#rows + 1] = { k = "DISTANCE", v = ("%d M"):format(math.floor(dm + 0.5)) } end
+    lock = nil
+    setOutline(true)
+    return { state = R.known, title = tostring(d.name or ""):upper(), detail = d.role or "",
+        infoTitle = tostring(d.name or ""):upper(), infoSub = d.role, info = rows }
+end
+
 --- Everything the reticle says, from the current target, its status and the lock.
 local function compose(t)
+    local person = composePerson(t)
+    if person then return person, nil, nil end
     local desc = describe(t)
     if not desc then
         lock = Scanner.step(lock, { active = true }, now())
@@ -507,6 +565,7 @@ CreateThread(function()
             if wasActive then
                 -- Vision went off: forget the lock and every answer, so the next look asks again.
                 wasActive, lock, status, pendingByToken = false, nil, {}, {}
+                people, personByToken = {}, {}
                 setOutline(false)
                 -- Hacks are only possible while scanning: vision off ends an upload in flight.
                 uploadReleased()

@@ -35,7 +35,9 @@ Core.define("economy.settlement", function()
             if not tt then
                 local place=e.placement[tonumber(r.position)]
                 add(lines,"event_placement","P"..tostring(r.position),place,"placement")
-                local fb=math.min((e.fieldBonus.perEntrant or 0)*field,e.fieldBonus.max or 0)
+                -- a mixed Paddock grid (L250) places against the whole field but pays its bonus for the humans only
+                local fbN=math.max(0,math.floor(tonumber(req.fieldBonusCount) or field))
+                local fb=math.min((e.fieldBonus.perEntrant or 0)*fbN,e.fieldBonus.max or 0)
                 add(lines,"event_field_bonus","Field bonus",fb,"field")
             end
             local bestTarget=nil

@@ -2769,3 +2769,125 @@ Scope: `ncm_paddock` phase 1 on the Windows development server with two humans (
 | §CH14 | Offer a free agent a contract; release a driver; invest in a car area; withdraw 1,500 then 1,000. | Roster moves show under *Waiting for the Cup boundary*; development spends at once; the first withdrawal pays 1,050 after tax, the second is refused by the weekly cap. | **NOT RUN** |
 | §CH15 | `ncmtester2`: race a sanctioned event twice for podiums. | Spotlight rises; past 10 a WIRE mention names them; past 25 an NPC star calls them out (one message, an open arc); the next sanctioned result resolves it. | **NOT RUN** |
 | §CH16 | Cross a Cup boundary (or wait a week). | Cup standings archive and a Cup title story; queued manager moves apply; NPC owners make visible signings or firings; no quota error in the log. | **NOT RUN** |
+
+## §CI - The life sim M1: places, district climate, people's days, bodies at any place, the hidden trajectory (`L240`, `IDEA-764`-`IDEA-766`, `IDEA-772`, `IDEA-773`) - **§CI1, §CI3, §CI4, §CI11 PASS LIVE (owner, dev, 2026-09-30); the rest NOT RUN; DEV SERVER ONLY (`L223`)**
+
+| # | Do | Expect | Result |
+|---|---|---|---|
+| §CI1 | Boot the dev server after schema 053. | `migration 053 paddock_life applied`; `life sim up: N places` (N about 300); eight `[ncm_paddock/days]` district readings; every other subsystem as before. | **PASS** (dev, 2026-09-30 14:26 ET, server log: 303 places, city climate *a scene revival*) |
+| §CI2 | Console `ncm.life`, then `ncm.life.district Heywood`. | Eight readings, each "regime, condition"; one district's six axes with base and scar, its last causes and its transitions. | **NOT RUN** |
+| §CI3 | In the evening, stand at a food stall or street meet in a district where a team has its garage. | Within ~15 s up to four named Paddock people stand there with a Talk prompt; `ncm.life.near <pid>` lists them with their activity (eat, loiter, hang...). | **PASS** (dev, 2026-09-30 15:11-15:38 ET: Eleanor Howard at Fuel Station 19 on a fuel stop, as the offline plan predicted; Jia Guo at Fuel Station 23; four at a Glen food stall. Arrival took up to ~3 min at 8 plans a pass, now 40. Took KB-234 and KB-235 to get here.) |
+| §CI4 | Talk to one of them. | A line and "Name · Role, Team"; `ncm.life.player <pid>` shows evidence and the social axis rose; nothing about the trajectory reaches the client. | **PASS** (dev, 15:38 ET: six meetings with Jia Guo recorded in `paddock_meeting`, the first ever; Talk prompts anchored by position after KB-235.) |
+| §CI5 | `ncm.life.who <personId>` for that person. | A believable day: sleep in their own night, three meals or fewer, their garage shift at the garage, the current block marked `<- now`. | **NOT RUN** |
+| §CI6 | Walk 200 m away, then come back after their block has ended. | The bodies go when you leave; on return the person is wherever their day now says (or gone). | **NOT RUN** |
+| §CI7 | At a place whose pin is on a roof or inside a wall: `ncm.life.place <pid> bad`. | Recorded; nobody's new day goes there; bodies stop appearing there. | **NOT RUN** |
+| §CI8 | Leave the server up across an Eastern midnight while Paddock races resolve. | One `climate stepped to day N` line per day; `ncm.life.district <race district>` lists `street_race`/`sanctioned_race` among last causes; any regime change is logged with its causes. | **NOT RUN** |
+| §CI9 | Between 20:00 and 05:00 Eastern, stand at a street meet. | One `meet_visit` per player per meet per night in `ncm.life.player`. | **NOT RUN** |
+| §CI10 | An hour of moving through two districts with Paddock people about. | No quota or `tick FAILED` line from `ncm_paddock/days`; bodies never exceed the cap. | **NOT RUN** |
+| §CI11 | Press Tab and hold the reticle on a Paddock person (owner, 2026-09-30: "this should be a scanner / vision surface 100%"). | The reticle locks with their name and role; SCAN DATA shows TEAM, DOING, AT (the map's own station name for fuel), UNTIL, USUALLY, DISTRICT with its climate reading; vanilla pedestrians show nothing; no hidden stat on the wire. | **PASS** (dev, 15:24 ET: `player 1 scanned p00221 (Eleanor Howard, FUEL STOP) at fuel_station_19`; owner: "scanner worked, confirmed".) |
+
+## §CJ - Start opens the F6 hub on a controller (`IDEA-785`) - **BUILT, DEV SERVER ONLY (`L223`); AWAITING LIVE PASS**
+
+| Case | Steps | Pass condition | Result |
+|---|---|---|---|
+| §CJ1 | On foot with a pad, press Start; press Start again. | The hub opens on the first press and closes on the second; the pad drives normally afterwards (no `KB-182`-style keyboard/mouse takeover). | **NOT RUN** |
+| §CJ2 | Seated in a car, and during a Paddock/street race, press Start twice. | Same open/close; nothing else in the game reacts to Start. | **NOT RUN** |
+| §CJ3 | Open chat, press Start. | The hub does not open while chat holds input. | **NOT RUN** |
+| §CJ4 | Open the hub with F6, move tabs with the pad, close with Start; hold Start for two seconds. | Start closes whatever panel is open; holding does not toggle repeatedly. | **NOT RUN** |
+
+## §CK - Paddock live races without ghosts: host at the grid, mapped report, Pace 0.5.2 (`L243`, `KB-241`-`KB-244`) - **BUILT, DEV SERVER ONLY (`L223`); AWAITING LIVE PASS**
+
+| Case | Steps | Pass condition | Result |
+|---|---|---|---|
+| §CK1 | Stand at a street grid with Pace when a race stages; watch the lights. | Client log `drive.start ...: 12/12 cars mapped`, no `script execution budget exceeded`; Pace log `accepted drive.start` and `road speed plan ready`; the field moves at green. | **NOT RUN** |
+| §CK2 | Be near a route's far end (within 600 m of its line) but more than 250 m from its grid when it stages. | No street run is staged for you; LIVE shows the race moving on the sim model; the result is the sim's. | **NOT RUN** |
+| §CK3 | Stand at a grid, then drive well away before the lights. | Server log `N of 12 cars reached the host's game`; under half: the street run is cancelled at once and LIVE switches to the sim; otherwise unseen cars leave the grid. | **NOT RUN** |
+| §CK4 | Follow a 2-point street race from the back. | Back-row cars are on the road plan from the start (no `OFF the road plan` at index 0); `past point` lines say `passed on the road` at the finish, not ~130 m early; no ceiling above 44 m/s in the Pace log. | **NOT RUN** |
+
+## §CL - Paddock racers on the engine's race profile (NCM Pace 0.6.0, `L244`, `L245`, `IDEA-788`) - **BUILT, DEV SERVER ONLY (`L223`); AWAITING LIVE PASS**
+
+| Case | Steps | Pass condition | Result |
+|---|---|---|---|
+| §CL1 | Start the game with Pace 0.6.0. | `red4ext/plugins/TweakXL` log shows `racers.yaml` loaded with no errors; the Pace log has `tdb:` lines and `N of 355 driving flats read`. | **NOT RUN** |
+| §CL2 | Stand at a street grid when a race stages. | Server log TRACE `record=Vehicle.ncm_racer_...` for every car; no `refused`; the cars look like their vanilla models. | **NOT RUN** |
+| §CL3 | Watch the start and the first kilometre. | Cars pull away on the acceleration curve (no instant 18 m/s); no 10-11 m/s crawl on open road; no donuts after contact. Record pace and how they handle traffic against 21:12/21:18. | **NOT RUN** |
+
+## §CM - Street races on the engine's racer and baked race splines (NCM Pace 0.7.0, `L246`) - **BUILT, DEV SERVER ONLY (`L223`); AWAITING LIVE PASS**
+
+| Case | Steps | Pass condition | Result |
+|---|---|---|---|
+| §CM1 | Start the game with Pace 0.7.0. | ArchiveXL log lists `ncm_pace_race_splines` and its streaming block with no error; the game loads normally. | **PASS** (owner, dev, 2026-10-01 00:40-00:54: ArchiveXL merged the race-spline block; game loads) |
+| §CM2 | Stand at a street grid with Pace when a race stages; watch the lights. | Pace log: `race cmd 1: go, leg 1/N ... spline $/mod/ncm_pace/#leg_...` for every car and `reds: car N: racing leg 0`; NO `command ended FAILURE`; the field moves at green. | **PASS** (owner, dev, 2026-10-01: "they started!" -- Pace 0.8.0, after the NodeRef hash fix, `KB-249`) |
+| §CM3 | Follow the race through a checkpoint to the finish. | `race cmd ...: next leg` at each checkpoint; cars follow the road, race each other without rubber banding, and cross the finish (finish gates reported); verdict `physical` with every finisher classified. | **NOT RUN** |
+| §CM4 | Owner judgement. | Pace, launch, aggression and racecraft vs 21:12/21:18. | **PARTIAL** (owner: "racing well too"; three CTDs that session are `KB-238`, which also happens with no race) |
+
+## §CN - Street races on the bubble with drivers; nothing driven at the streaming edge (NCM Pace 0.8.1, `L247`, `KB-238`) - **BUILT, DEV SERVER ONLY (`L223`); AWAITING LIVE PASS**
+
+| Case | Steps | Pass condition | Result |
+|---|---|---|---|
+| §CN1 | Join dev with Pace 0.8.1 in the game folder (hand-installed on dev, `KB-250`). | Pace log header `ncm_pace 0.8.1`; ArchiveXL merges `ncm_pace_race_splines`; game loads. | **NOT RUN** |
+| §CN2 | Stand at a street race's start with Pace 30-60 s before the lights. | Server: `pre-grid <id> to slot N`, no `staged ... backend=pace` (no grid run). Every car has a driver; Pace log `drive.start` dynamic with legs, then at green `race cmd 1: go, leg 1/N` per car. | **NOT RUN** |
+| §CN3 | Follow at the back; let the front-runners get away. | Past 300 m a car vanishes: server `handed back ... nobody within 300 m` or `its Pace player 1 is ... m away`; Pace `car.remove`. No CTD. | **NOT RUN** |
+| §CN4 | Drive ahead down the route and meet the field mid-race. | Cars come in on the road (server `coming in ... from a player`), each with a driver; Pace `car.add ... from point k` and `race cmd: go, leg k/N` on the right leg; they race on. No CTD. | **NOT RUN** |
+| §CN5 | Opportunistic: a car streams out and back while near. | Client log `bubble car X re-created here: entity A -> B`; Pace `car.entity` ack and `back: fresh command`; the car keeps racing. No CTD. | **NOT RUN** |
+| §CN6 | Let the race close. | `paddock_race.provenance` `mixed` (or `physical`); every car classified; LIVE showed the model throughout. | **NOT RUN** |
+| §CN7 | Free roam with `ncm_world` traffic for 30 minutes, no race. | No `KB-238` CTD; ambient cars vanish only beyond ~300 m. | **NOT RUN** |
+| §CN9 | Watch a bubble car come in (pre-grid or mid-route) with the client log open. | `bubble car N settled here (3000+ ms); asking for its driver`, then server `driver seated ... ms after it was set down`, then `pace car.add`; the driver appears ~3 s after the car. No CTD through a full race session with hand-offs and returns. | **NOT RUN** |
+| §CN8 | Owner judgement over a race session. | No CTD across several races followed at the back and met mid-route. | **NOT RUN** |
+
+## §CQ - League driver pools and attendance (`L249` step 1) - **BUILT, DEV SERVER ONLY (`L223`); AWAITING LIVE CHECK**
+
+| Case | Steps | Pass condition | Result |
+|---|---|---|---|
+| §CQ1 | Open the PADDOCK tab standings for a street league. | ~56 drivers listed over the season; independents shown as "Independent". | **NOT RUN** |
+| §CQ2 | Watch three consecutive races of one street league (LIVE or results). | Different line-ups each race; never the same 12 every time; the field is still full or close to it. | **NOT RUN** |
+| §CQ3 | A sanctioned race's results. | Each team fields at most its race seats; teams with nobody available are missing, not padded. | **NOT RUN** |
+| §CQ4 | Open the PADDOCK tab. | League names are the approved ones (Kabuki Midnight, Hypercar Championship, ...). | **NOT RUN** |
+| §CQ5 | Press F5 (Street Call), set Type to Time trial, start it. | Nobody else is told or sees it in their Race Guide; the caller is entered and runs alone against the clock; no payout. | **NOT RUN** |
+| §CQ6 | Look at the Paddock schedule at 07:00 and at 23:00 ET. | A race within 15 minutes at any hour (regional by day, street from 18:00). | **NOT RUN** |
+
+## §CR / §CS - NPCs in the markets; the posted Exchange (`L249` steps 4-5) - **BUILT, DEV SERVER ONLY (`L223`); AWAITING LIVE USE**
+
+| Case | Steps | Pass condition | Result |
+|---|---|---|---|
+| §CR1 | Leave the server running an evening; open the MARKET. | Some parts/cars that were on the shelf are gone to NPCs (never anything listed under 20 minutes); stock refills on its cadence. | **NOT RUN** |
+| §CR2 | Check a team that developed its car. | Its development came with a real part it owns (`npc_money` and the transfer rows agree). | **NOT RUN** |
+| §CS1 | F6 -> EXCHANGE -> THE BOARD. | NPC posts (teams and racers: FOR SALE and WANTED) are listed with their prices and time left. | **NOT RUN** |
+| §CS2 | Post one of your stored parts for sale. | It appears on the board; an NPC who values it bids within a few minutes; HOLD TO ACCEPT moves the part to them and the eddies to you. | **NOT RUN** |
+| §CS3 | Bid on an NPC's FOR SALE post. | The NPC accepts if it clears their floor; the part lands in your Parts storage and your balance drops by the bid. | **NOT RUN** |
+| §CS4 | Post a WANTED you can't afford to pay for later, then let an NPC fill it with no money in your account. | The trade does not settle; nothing moves; the post stays up. | **NOT RUN** |
+
+
+## §CO - Ovals on closed race splines (NCM Pace 0.8.2, `IDEA-790`) - **BUILT LOCALLY; AWAITING LIVE PASS**
+
+Street spline movement in §CM2 did not exercise an oval. Ovals remain in the normal calendar at the tier's authored share; physical live validation remains pending. Dev boot restores deterministic oval slots from the earlier oval-off schedule and excludes only checkpointed non-oval courses.
+
+| Case | Steps | Pass condition | Result |
+|---|---|---|---|
+| §CO1 | Install Pace 0.8.3 and the matching Paddock resource on dev; wait for a Westbrook Short Ring slot from the normal calendar; stand near the ring before its lights. | Pace header says `0.8.3`; ArchiveXL loads the archive with three closed oval nodes; the pre-grid sits on the roundabout road with seated drivers. Plan part 1 names `$/mod/ncm_pace/#leg_oval_westbrook_short_ring__loop`. | **NOT RUN** |
+| §CO2 | Watch one car from green through at least two start-line crossings. | `race cmd 1: go` uses the oval spline; no command `FAILURE`, no island crossing, no repeated command at each mark or lap seam. Physical position and LIVE's LAP count advance together. | **NOT RUN** |
+| §CO3 | Follow the field through a full Westbrook race and let cars leave and re-enter the bubble. | Drivers stay seated while physical; a car is handed to the model before its Pace player passes 300 m, then returns near a Pace player on the same lap. No `KB-238` CTD. | **NOT RUN** |
+| §CO4 | Let the race close. | Every entrant classified once, provenance reflects the physical/model stretches, and the winner's lap count and finish agree with the model. | **NOT RUN** |
+| §CO5 | Repeat §CO2 at Corpo Circle and NCX Octagon. | Both follow their closed spline in the intended direction for two line crossings. NCX's authored ring is inspected for road and wall clearance. | **NOT RUN** |
+
+## §CR - KB-238 native null guard, Pace 0.8.3 - BUILT/INSTALLED DEV; LIVE PASS OWED
+
+Keep the current seat delay and bubble radii for this comparison. The guard fixes the observed dereference; successful racing and a logged interception are separate evidence. A clean race with no interception does not prove this path was exercised. KB-252 (64 lifetime slots) and KB-253 (command cleanup) were not changed.
+
+| Case | Steps | Pass condition | Result |
+|---|---|---|---|
+| §CR1 | Fresh game launch on dev. | Pace header 0.8.3 and `KB-238 guard ACTIVE`; no inactive/mismatch message. | **NOT RUN** |
+| §CR2 | Follow a street race, let racers hand back to the model, then meet them again mid-route. | Drivers remain seated; recreated cars keep racing. No CTD. Record whether `KB-238 guard prevented` appears and the total. | **NOT RUN** |
+| §CR3 | Repeat full races including the Kabuki Bridge to Deep Dive leg if scheduled. | Several races complete through repeated returns, no CTD and no new stuck/mount behavior. At least one logged interception is required to demonstrate the faulty path was actually exercised. | **NOT RUN** |
+| §CR4 | Free roam with NCM ambient traffic after the races. | Seated ambient drivers continue working; no KB-238 CTD or movement regression. | **NOT RUN** |
+
+Offline 2026-10-01: Release build, existing Pace state tests, five guard checks, native declaration check, installed-bundle redscript compile, executable signatures, and installed DLL hash match all pass. Package SHA256 7bb16746dbc46eafa68c39c665af48e5f9a17796cebf73d05031f1ebe9141bfe. Rollback: LocalAppData/NCM/dev-mods/20261001-160535.
+
+## §CT - Lane-based start grids, qualifying and mixed grids (`L250`) - **STEPS 1-4 BUILT, DEV SERVER ONLY (`L223`); AWAITING LIVE CHECK**
+
+| Case | Steps | Pass condition | Result |
+|---|---|---|---|
+| §CT1 | Watch the pre-grid of a street race from Hill Abode, and of two other starts. | All NPC cars sit on the road behind the line in lanes, none behind a gate or barrier, none touching; everyone gets a clear launch. | **NOT RUN** |
+| §CT2 | F2 Paddock -> LIVE for a race on track; after it, its box score. | Each driver shows a QUALI time (m:ss.ss); the grid order follows the times; box score shows GRID and QUALI. | **NOT RUN** |
+| §CT3 | F1 Race Guide -> a Paddock race 1-3 h out -> QUALIFY. Drive to the start, stop on the line (STAGED), go; finish. Then a flying crossing of the line. | The GPS routes to the start; the strip says how to stage; the run counts and a toast says QUALIFYING + ENTERED (fee charged once); the Guide card shows your best and WITHDRAW. A flying crossing starts no run ("STANDING START"). | **NOT RUN** |
+| §CT4 | Be at the venue before T-1 of that race. Watch the grid form; let T-20 pass off your slot once. | A beam on your slot, GPS and arrow; NPCs on the other slots, none on yours; at T-20 race control puts you on your slot in your car; one green with the NPCs; after the finish, RESULT P_n of the whole field and pay to match; LIVE and the standings list you. | **NOT RUN** |

@@ -3,6 +3,7 @@
 #include "rtti.hpp"
 #include "road_loader.hpp"
 #include "spline_refs.hpp"
+#include "puppet_guard.hpp"
 
 #include <RED4ext/RED4ext.hpp>
 
@@ -52,6 +53,7 @@ bool runningEnter(RED4ext::CGameApplication*)
 
 bool runningUpdate(RED4ext::CGameApplication*)
 {
+    ncm::pace::puppet_guard::report();
     try { ncm::pace::pollRoadGraph(); } catch (...) { PACE_ERR("road graph load failed"); }
     try { ncm::pace::pollSplineRefs(); } catch (...) { PACE_ERR("spline refs load failed"); }
     if (!trafficProbeUpdateSeen) { PACE_INFO("traffic-resource Running update called"); trafficProbeUpdateSeen = true; }
@@ -74,7 +76,7 @@ RED4EXT_C_EXPORT void RED4EXT_CALL Query(RED4ext::v1::PluginInfo* info)
 {
     info->name = L"NCM Pace";
     info->author = L"Night City Motorsports";
-    info->version = RED4EXT_V1_SEMVER(0, 8, 1);
+    info->version = RED4EXT_V1_SEMVER(0, 8, 3);
     info->runtime = RED4EXT_V1_RUNTIME_VERSION_LATEST;
     info->sdk = RED4EXT_V1_SDK_VERSION_CURRENT;
 }
@@ -88,10 +90,13 @@ RED4EXT_C_EXPORT bool RED4EXT_CALL Main(RED4ext::v1::PluginHandle handle,
     if (reason == RED4ext::v1::EMainReason::Load) {
         module = static_cast<HMODULE>(handle);
         ncm::pace::log::init(directoryOf(module));
+        ncm::pace::puppet_guard::attach(handle, sdk);
         ncm::pace::rtti::registerNatives();
         RED4ext::v1::GameState state{.OnEnter = &runningEnter, .OnUpdate = &runningUpdate, .OnExit = &runningExit};
         if (!sdk || !sdk->gameStates || !sdk->gameStates->Add(handle, RED4ext::EGameStateType::Running, &state))
             PACE_ERR("could not register Running-state lifecycle; plugin remains inert");
+    } else if (reason == RED4ext::v1::EMainReason::Unload) {
+        ncm::pace::puppet_guard::detach(handle, sdk);
     }
     return true;
 }

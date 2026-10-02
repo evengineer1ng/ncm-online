@@ -18,6 +18,34 @@ function PaddockWorld.boot()
         PaddockStore.world = w
         log("loaded world seed-commit=%s season=%s orgs=%d people=%d", NcmCore.get("vocabulary.hash").commit(w.seed),
             w.seasonId, #w.orgOrder, #w.personOrder)
+        -- L249: a world from before league pools grows into them here (street leagues to ~56, sanctioned rosters
+        -- deeper), a few people per slice; idempotent, so every boot of a full world does nothing
+        local grown = 0
+        while true do
+            local touched, more = World.growPools(w, 10)
+            for _, p in ipairs(touched) do PaddockStore.markPerson(p.id) end
+            grown = grown + #touched
+            if not more then break end
+            Wait(0)
+        end
+        -- L249: every league takes its authored name (approved by the owner); the old generated name goes
+        local renamed = 0
+        for id, s in pairs(w.series) do
+            local name = NcmCore.get("paddock.names").LEAGUES[id]
+            if name and s.name ~= name then
+                log("league %s renamed: %s -> %s", id, tostring(s.name), name)
+                w.takenSeriesNames[s.name] = nil
+                s.name = name
+                w.takenSeriesNames[name] = true
+                PaddockStore.markSeries(id)
+                renamed = renamed + 1
+            end
+        end
+        if renamed > 0 then PaddockStore.flush() end
+        if grown > 0 then
+            PaddockStore.flush()
+            log("league pools grown (L249): %d people joined or created; %d people now", grown, #w.personOrder)
+        end
         PaddockWorld.ready = true
         return w
     end
@@ -45,8 +73,17 @@ function PaddockWorld.w() return PaddockStore.world end
 
 function PaddockWorld.person(id) local w = PaddockStore.world return w and w.people[id] end
 function PaddockWorld.org(id) local w = PaddockStore.world return w and w.orgs[id] end
-function PaddockWorld.personName(id) local p = PaddockWorld.person(id) return p and p.display or "?" end
-function PaddockWorld.orgName(id) local o = PaddockWorld.org(id) return o and o.name or "?" end
+function PaddockWorld.personName(id)
+    -- L250: a human on a mixed grid is known by the name they entered under
+    if PaddockHumans and NcmCore.get("paddock.mixed").isHuman(id) then return PaddockHumans.names[id] or "?" end
+    local p = PaddockWorld.person(id) return p and p.display or "?"
+end
+-- an entrant with no team is an independent street racer (L249)
+function PaddockWorld.orgName(id)
+    if id == nil or id == "" then return "Independent" end
+    local o = PaddockWorld.org(id)
+    return o and o.name or "?"
+end
 function PaddockWorld.seriesName(id)
     local w = PaddockStore.world
     local s = w and w.series[id]

@@ -1,10 +1,11 @@
 -- ncm_broadcast / client -- feeds the NCM Broadcast plugin (L235): names over race cars, and the opt-in tower.
 --
 --   * transport: a hidden 16x16 loopback page to `ncm_broadcast.dll` (127.0.0.1:38680-38683, the L129 pattern the
---     Scanner and Pace use). It is this resource's only WebUI surface; nothing visible is a WebUI page.
+--     Scanner and Pace use), for the tower.
 --   * names (`/ncm.names`, on by default): every Paddock car near you gets a plate -- position, name, team. The
---     server's rows carry each car's OPEN//77 vehicle id; `Open77.vehicles.get(id).engineEntity` is the hash
---     redscript finds it by (the same mapping Pace proved). Players are never labelled here: they have nameplates.
+--     server's rows carry each car's OPEN//77 vehicle id; each car gets an `Open77.anchors` anchor on its
+--     `Open77.vehicles.get(id).entity`, and web/names.html draws the plates where the platform projects them (KB-223;
+--     the plugin's own plates piled up in one spot). Players are never labelled here: they have nameplates.
 --   * tower (`/ncm.tower`, off until you opt in): the multiplayer session you are an entrant of, with usernames;
 --     otherwise the nearest Paddock race the server says you are near.
 local function log(fmt, ...)
@@ -85,7 +86,7 @@ end, false)
 RegisterCommand("ncm.names", function()
     namesOn = not namesOn
     setPref("names", namesOn)
-    if not namesOn then send({ cmd = "labels", items = {} }) end
+    if not namesOn then namesDown() end
     toast(namesOn and "Race car names ON." or "Race car names OFF.")
 end, false)
 
@@ -96,7 +97,6 @@ end)
 -- ------------------------------------------------------------------------------------------------------ feeds
 local paddock = {}        -- raceId -> { at = ms, m = message }
 local sessions = {}       -- sessionId -> view (targeted ncm:session)
-local entities = {}       -- vehicleId -> { hash, at }
 
 RegisterNetEvent("ncm:broadcast.paddock", function(m)
     if type(m) ~= "table" or not m.raceId then return end
@@ -109,13 +109,81 @@ RegisterNetEvent("ncm:session", function(sessionId, view)
     sessions[sessionId] = type(view) == "table" and view or nil
 end)
 
-local function entityOf(vid, now)
-    local e = entities[vid]
-    if e and (e.hash or now - e.at < 2000) then return e.hash end
+-- ------------------------------------------------------------------------------------------------------ names
+-- KB-223: the plugin's own projection piled every plate in one spot on screen. Names now use the platform's proven
+-- path, the one player cards use: an `Open77.anchors` anchor on each car, projected natively every frame to a
+-- transparent page (web/names.html), which draws the plate. Lua sends only what the plates say, when it changes.
+-- OFF (2026-09-30 02:48, KB-223): the first live use crashed the owner's game to desktop 0.13 s after the page and
+-- its anchors came up, while the grid's cars were still spawning and having drivers seated. Suspected: an anchor on a
+-- car entity the platform replaced mid-spawn. Stays off until anchors wait for a settled car and are tested alone.
+local ANCHOR_NAMES = false
+local NAME_LIFT = { x = 0.0, y = 0.0, z = 1.9 }
+local namesPage, namesReady, namesIdleSince = nil, false, nil
+local anchorOf = {}        -- vehicleId -> { id, entity, seen }
+local lastPlates = nil
+
+local function vehicleEntity(vid)
     local ok, snap = pcall(Open77.vehicles.get, vid)
-    local hash = ok and type(snap) == "table" and snap.engineEntity and tostring(snap.engineEntity) or nil
-    entities[vid] = { hash = hash, at = now }
-    return hash
+    local e = ok and type(snap) == "table" and snap.entity or nil
+    return e ~= nil and tostring(e) or nil
+end
+
+local function dropAnchors()
+    for vid, a in pairs(anchorOf) do pcall(Open77.anchors.remove, a.id); anchorOf[vid] = nil end
+end
+
+local function namesUp()
+    if namesPage then return namesReady end
+    local page, why = WebUI.create({ entry = "web/names.html", layer = "hud", width = 1920, height = 1080,
+        fps = 60, zIndex = 630, transparent = true, visible = true })
+    if not page then log("race names page failed: %s", tostring(why)) return false end
+    namesPage, namesReady, lastPlates = page, false, nil
+    page:on("ncm-names:ready", function() namesReady = true end)
+    return false
+end
+
+local function namesDown()
+    dropAnchors()
+    if namesPage then pcall(function() namesPage:destroy() end) end
+    namesPage, namesReady, lastPlates = nil, false, nil
+end
+
+--- rows = the Paddock rows near us that carry a vehicle id. Keeps one anchor per car and sends the plates' text.
+local function showNames(rows, now)
+    if #rows == 0 then
+        -- keep the page a little while (between feeds), then give the surface back
+        namesIdleSince = namesIdleSince or now
+        if namesPage and now - namesIdleSince > 10000 then namesDown() end
+        if namesReady and lastPlates ~= "" then namesPage:send("ncm-names:plates", { plates = {} }); lastPlates = "" end
+        dropAnchors()
+        return
+    end
+    namesIdleSince = nil
+    if not namesUp() then return end
+    local plates, keys, live = {}, {}, {}
+    for _, r in ipairs(rows) do
+        local a = anchorOf[r.vid]
+        if not a then
+            local entity = vehicleEntity(r.vid)
+            if entity then
+                local id, why = Open77.anchors.create({ tag = "ncm.name." .. tostring(r.vid), entity = entity, offset = NAME_LIFT,
+                    maxDistance = 250, page = namesPage })
+                if id then a = { id = tostring(id), entity = entity }; anchorOf[r.vid] = a
+                else log("anchor for vehicle %s refused: %s", tostring(r.vid), tostring(why)) end
+            end
+        end
+        if a then
+            live[r.vid] = true
+            local accent = (r.state == "finished" and 2) or (r.state == "out" and 3) or (tonumber(r.pos) == 1 and 1) or 0
+            plates[#plates + 1] = { anchor = a.id, title = tostring(r.name or ""), sub = tostring(r.org or ""), chip = "P" .. tostring(r.pos or "?"), accent = accent }
+            keys[#keys + 1] = a.id .. ":" .. plates[#plates].chip .. ":" .. accent
+        end
+    end
+    for vid, a in pairs(anchorOf) do
+        if not live[vid] then pcall(Open77.anchors.remove, a.id); anchorOf[vid] = nil end
+    end
+    local sig = table.concat(keys, "|")
+    if sig ~= lastPlates then namesPage:send("ncm-names:plates", { plates = plates }); lastPlates = sig end
 end
 
 local function myPlayerId()
@@ -188,43 +256,36 @@ local towerShown = false
 
 CreateThread(function()
     Wait(6000)
-    local lastHealth = 0
+    local lastHealth, retryAt = 0, 0
     while true do
-        if not surface then bringUp() end
         local now = GetGameTimer()
+        -- no plugin: back off the transport, never the loop -- names do not need the plugin
+        if attempts >= PORT_SPAN * 3 then retryAt, attempts = now + 60000, 0 end
+        if not surface and now >= retryAt then bringUp() end
         if ready and now - lastHealth > 5000 then lastHealth = now; send({ cmd = "health" }) end
-        if ready then
-            -- the Paddock races the server says we are near, freshest first; stale ones drop out
-            local fresh = {}
-            for id, p in pairs(paddock) do
-                if now - p.at > 4000 then paddock[id] = nil else fresh[#fresh + 1] = p.m end
-            end
-            table.sort(fresh, function(a, b) return (tonumber(a.d) or 1e9) < (tonumber(b.d) or 1e9) end)
-            if namesOn then
-                local items = {}
-                for _, m in ipairs(fresh) do
-                    for _, r in ipairs(m.rows or {}) do
-                        if r.vid and #items < 32 then
-                            local hash = entityOf(r.vid, now)
-                            if hash then
-                                items[#items + 1] = { entity = hash, title = tostring(r.name or ""), sub = tostring(r.org or ""),
-                                    chip = "P" .. tostring(r.pos or "?"),
-                                    accent = (r.state == "finished" and 2) or (r.state == "out" and 3) or (tonumber(r.pos) == 1 and 1) or 0 }
-                            end
-                        end
-                    end
-                end
-                send({ cmd = "labels", ttl = 2, items = items })
-            end
-            if towerOn then
-                local v = mySession()
-                local msg = v and sessionTower(v, myPlayerId()) or (fresh[1] and paddockTower(fresh[1])) or nil
-                if msg then send(msg); towerShown = true
-                elseif towerShown then send({ cmd = "tower", rows = {} }); towerShown = false end
-            end
+        -- the Paddock races the server says we are near, freshest first; stale ones drop out
+        local fresh = {}
+        for id, p in pairs(paddock) do
+            if now - p.at > 4000 then paddock[id] = nil else fresh[#fresh + 1] = p.m end
         end
-        Wait(ready and 500 or 2000)
-        if attempts >= PORT_SPAN * 3 then Wait(60000); attempts = 0 end
+        table.sort(fresh, function(a, b) return (tonumber(a.d) or 1e9) < (tonumber(b.d) or 1e9) end)
+        -- names need no plugin: anchors and a page are the platform's own (KB-223)
+        if namesOn and ANCHOR_NAMES then
+            local rows = {}
+            for _, m in ipairs(fresh) do
+                for _, r in ipairs(m.rows or {}) do
+                    if r.vid and #rows < 32 then rows[#rows + 1] = r end     -- 32 anchors per resource
+                end
+            end
+            showNames(rows, now)
+        end
+        if ready and towerOn then
+            local v = mySession()
+            local msg = v and sessionTower(v, myPlayerId()) or (fresh[1] and paddockTower(fresh[1])) or nil
+            if msg then send(msg); towerShown = true
+            elseif towerShown then send({ cmd = "tower", rows = {} }); towerShown = false end
+        end
+        Wait(500)
     end
 end)
 
@@ -239,7 +300,8 @@ end, false)
 
 AddEventHandler("onClientResourceStop", function(name)
     if name ~= "ncm_broadcast" then return end
-    send({ cmd = "labels", items = {} })
+    namesDown()
+    pcall(Open77.anchors.clear)
     send({ cmd = "tower", rows = {} })
     tearDown()
 end)

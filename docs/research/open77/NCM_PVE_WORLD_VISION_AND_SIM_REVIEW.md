@@ -354,6 +354,13 @@ L218–L222 settle the direction. The world is a life sim in Night City, flavour
 | 11 | Solo incident frequency | Not locked; test and iterate over time |
 | 12 | Who writes dialogue | A mix; Night City's own dialogue will be studied for voice |
 
+### Answers of 2026-09-30 (L237)
+
+- **Emergent over authored:** "systems need to be as emergent as possible not authored." Where this document says *authored situations* or *authored situation families*, read *rules and vocabulary authored, situations emergent from sim state*. Voice stays authored (L183).
+- NPC days are chosen by needs (Money, Rest, Social, Drive) over real places, not timetables.
+- Jobs and turf land together; all 18 contacts stay deep; player property is deferred.
+- The build order is L237 M1-M6.
+
 ### Still open
 
 1. How managing an NPC organization overlaps with personally doing street jobs and turf.

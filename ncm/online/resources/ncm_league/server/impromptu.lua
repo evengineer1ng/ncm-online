@@ -133,6 +133,7 @@ local REFUSAL_TEXT = {
     too_many_checkpoints = "That is more checkpoints than a route may carry.",
     repeated_point = "Two points in a row are the same place -- that leg has no length.",
     invalid_class = "That class cannot enter a street race.",
+    invalid_mode = "Choose a race or a time trial.",
     invalid_minutes = "Pick one of the offered start times.",
     too_soon_for_start = "In 2 min only works when you start where you are -- entries close a minute before green. Pick 5 min or more for that start.",
     too_short = "That route is too short to be a race.",
@@ -233,7 +234,9 @@ local function create(pid, driver, spec, t)
         eventId = ("impromptu:%s@%d"):format(tag, startsAt),
         class = "impromptu", invitation = false, registration = "venue",
         packId = "ncm_pack_street",
-        seriesId = "impromptu", seriesName = "Street Call",
+        -- L249: a time trial is the caller alone, on demand -- never announced, never on anyone else's board
+        seriesId = "impromptu", seriesName = (spec.mode == "time_trial") and "Time Trial" or "Street Call",
+        timeTrial = spec.mode == "time_trial" or nil,
         rulesetId = "street_sprint_v0", tier = "street",
         routeId = route.routeId, routeName = route.name,
         startsAt = startsAt,
@@ -269,10 +272,12 @@ local function create(pid, driver, spec, t)
         e.laps > 1 and (" x " .. e.laps .. " laps") or "", gates,
         spec.startsHere and " | improvised start" or "", Entry.countdown(e.startsAt - t), tostring(driver.ncmDriverId))
 
-    -- announced to everyone, because that is what makes it a race rather than a private arrangement (P12)
+    -- announced to everyone, because that is what makes it a race rather than a private arrangement (P12); a time
+    -- trial is told to its caller only
     local caller = tostring(driver.display or "A driver")
     local via = gates > 0 and ((" via %d checkpoint(s)"):format(gates)) or ""
-    for _, other in ipairs(Open77.players.all()) do
+    local audience = e.timeTrial and { pid } or Open77.players.all()
+    for _, other in ipairs(audience) do
         toast(other, {
             type = other == pid and "success" or "info",
             title = "Street Call · " .. e.routeName,

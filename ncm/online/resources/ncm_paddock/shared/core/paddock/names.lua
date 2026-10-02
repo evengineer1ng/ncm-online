@@ -154,6 +154,28 @@ Core.define("paddock.names", function(C)
     end
 
     --- FTB `generate_league_name`: region + tier-appropriate type. Unique against `taken`.
+    --- Every league's own name (owner, 2026-10-01, L249: approved). Sanctioned leagues carry the Race Guide's
+    --- names; street leagues are their districts' night scenes. Keyed by series id, never generated.
+    M.LEAGUES = {
+        premier = "Hypercar Championship",
+        pro_a = "Night City GT", pro_b = "NCM City Cup", pro_c = "Night City Open",
+        regional_a = "Bedrock Championship", regional_b = "MaiMai Cup",
+        regional_c = "Northside Trophy", regional_d = "Badlands Cup",
+        street_a = "Kabuki Midnight", street_b = "Charter Hill Run", street_c = "Corpo Plaza Outlaws",
+        street_d = "Glen Blood Mile", street_e = "Pacifica Wreckers",
+        street_f = "Night Market Rats", street_g = "No Plates",
+    }
+
+    --- A league's name: its authored name (M.LEAGUES), else the old generated one.
+    function M.leagueNameFor(seriesId, seed, tier, idx, taken)
+        local name = M.LEAGUES[seriesId]
+        if name then
+            if taken then taken[name] = true end
+            return name
+        end
+        return M.leagueName(seed, tier, idx, taken)
+    end
+
     function M.leagueName(seed, tier, idx, taken)
         local rng = Hash.stream(seed, "league", tier, idx)
         local types = Data.LEAGUE_TYPES[LEAGUE_POOL[tier] or "street"]

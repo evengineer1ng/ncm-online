@@ -1,0 +1,1527 @@
+ncm_pace 0.8.2 pid=54512
+[15:21:27][info] redscript natives registered
+[15:21:41][info] NCM Pace 0.8.2 started
+[15:21:41][info] traffic-resource probe enabled=1
+[15:21:41][info] rtti: gameCommunitySystem.EnableDynamicCrowdNullArea(areaLocalBBox: Box, areaLocalToWorld: WorldTransform, savable: Bool, duration: Float) -> Uint64
+[15:21:41][info] listening on http://127.0.0.1:38640/pace.html
+[15:21:41][info] rtti: gameCommunitySystem.DisableCrowdNullArea(areaId: Uint64) -> Void
+[15:21:41][info] rtti: gameCommunitySystem.ChangeDensityModifier(modiefier: Float) -> Void
+[15:21:41][info] rtti: gameCommunitySystem.ResetDensityModifier() -> Void
+[15:21:41][info] rtti: gameCommunitySystem -- 4 matching method(s) of 4
+[15:21:41][info] rtti: CommunitySystem.EnableDynamicCrowdNullArea(areaLocalBBox: Box, areaLocalToWorld: WorldTransform, savable: Bool, duration: Float) -> Uint64
+[15:21:41][info] rtti: CommunitySystem.DisableCrowdNullArea(areaId: Uint64) -> Void
+[15:21:41][info] rtti: CommunitySystem.ChangeDensityModifier(modiefier: Float) -> Void
+[15:21:41][info] rtti: CommunitySystem.ResetDensityModifier() -> Void
+[15:21:41][info] rtti: CommunitySystem -- 4 matching method(s) of 4
+[15:21:41][info] rtti: no class worldTrafficSystem
+[15:21:41][info] rtti: no class gameTrafficSystem
+[15:21:41][info] race-rtti: AIVehicleRacingCommand <AIVehicleRacingCommand> prop splineRef: NodeRef
+[15:21:41][info] race-rtti: AIVehicleRacingCommand <AIVehicleRacingCommand> prop secureTimeOut: Float
+[15:21:41][info] race-rtti: AIVehicleRacingCommand <AIVehicleRacingCommand> prop reverseSpline: Bool
+[15:21:41][info] race-rtti: AIVehicleRacingCommand <AIVehicleRacingCommand> prop driveBackwards: Bool
+[15:21:41][info] race-rtti: AIVehicleRacingCommand <AIVehicleRacingCommand> prop startFromClosest: Bool
+[15:21:41][info] race-rtti: AIVehicleRacingCommand <AIVehicleRacingCommand> prop rubberBandingBool: Bool
+[15:21:41][info] race-rtti: AIVehicleRacingCommand <AIVehicleRacingCommand> prop rubberBandingTargetRef: whandle:gameObject
+[15:21:41][info] race-rtti: AIVehicleRacingCommand <AIVehicleRacingCommand> prop rubberBandingTargetForwardOffset: Float
+[15:21:41][info] race-rtti: AIVehicleRacingCommand <AIVehicleRacingCommand> prop rubberBandingMinDistance: Float
+[15:21:41][info] race-rtti: AIVehicleRacingCommand <AIVehicleRacingCommand> prop rubberBandingMaxDistance: Float
+[15:21:41][info] race-rtti: AIVehicleRacingCommand <AIVehicleRacingCommand> prop rubberBandingStopAndWait: Bool
+[15:21:41][info] race-rtti: AIVehicleRacingCommand <AIVehicleRacingCommand> prop rubberBandingTeleportToCatchUp: Bool
+[15:21:41][info] race-rtti: AIVehicleRacingCommand <AIVehicleRacingCommand> prop rubberBandingStayInFront: Bool
+[15:21:41][info] race-rtti: AIVehicleRacingCommand <AIVehicleCommand> prop useKinematic: Bool
+[15:21:41][info] race-rtti: AIVehicleRacingCommand <AIVehicleCommand> prop needDriver: Bool
+[15:21:41][info] race-rtti: AIVehicleRacingCommand <AICommand> prop id: Uint32
+[15:21:41][info] race-rtti: AIVehicleRacingCommand <AICommand> prop state: AICommandState
+[15:21:41][info] race-rtti: AIVehicleRacingCommand <AICommand> prop questBlockId: Uint64
+[15:21:41][info] race-rtti: AIVehicleRacingCommand <AICommand> prop category: CName
+[15:21:41][info] race-rtti: AIVehicleDriveToPointAutonomousCommand <AIVehicleDriveToPointAutonomousCommand> prop targetPosition: Vector3
+[15:21:41][info] race-rtti: AIVehicleDriveToPointAutonomousCommand <AIVehicleDriveToPointAutonomousCommand> prop maxSpeed: Float
+[15:21:41][info] race-rtti: AIVehicleDriveToPointAutonomousCommand <AIVehicleDriveToPointAutonomousCommand> prop minSpeed: Float
+[15:21:41][info] race-rtti: AIVehicleDriveToPointAutonomousCommand <AIVehicleDriveToPointAutonomousCommand> prop clearTrafficOnPath: Bool
+[15:21:41][info] race-rtti: AIVehicleDriveToPointAutonomousCommand <AIVehicleDriveToPointAutonomousCommand> prop minimumDistanceToTarget: Float
+[15:21:41][info] race-rtti: AIVehicleDriveToPointAutonomousCommand <AIVehicleDriveToPointAutonomousCommand> prop forcedStartSpeed: Float
+[15:21:41][info] race-rtti: AIVehicleDriveToPointAutonomousCommand <AIVehicleDriveToPointAutonomousCommand> prop driveDownTheRoadIndefinitely: Bool
+[15:21:41][info] race-rtti: AIVehicleDriveToPointAutonomousCommand <AIVehicleCommand> prop useKinematic: Bool
+[15:21:41][info] race-rtti: AIVehicleDriveToPointAutonomousCommand <AIVehicleCommand> prop needDriver: Bool
+[15:21:41][info] race-rtti: AIVehicleDriveToPointAutonomousCommand <AICommand> prop id: Uint32
+[15:21:41][info] race-rtti: AIVehicleDriveToPointAutonomousCommand <AICommand> prop state: AICommandState
+[15:21:41][info] race-rtti: AIVehicleDriveToPointAutonomousCommand <AICommand> prop questBlockId: Uint64
+[15:21:41][info] race-rtti: AIVehicleDriveToPointAutonomousCommand <AICommand> prop category: CName
+[15:21:41][info] race-rtti: AIVehicleOnSplineCommand <AIVehicleOnSplineCommand> prop splineRef: NodeRef
+[15:21:41][info] race-rtti: AIVehicleOnSplineCommand <AIVehicleOnSplineCommand> prop secureTimeOut: Float
+[15:21:41][info] race-rtti: AIVehicleOnSplineCommand <AIVehicleOnSplineCommand> prop driveBackwards: Bool
+[15:21:41][info] race-rtti: AIVehicleOnSplineCommand <AIVehicleOnSplineCommand> prop reverseSpline: Bool
+[15:21:41][info] race-rtti: AIVehicleOnSplineCommand <AIVehicleOnSplineCommand> prop startFromClosest: Bool
+[15:21:41][info] race-rtti: AIVehicleOnSplineCommand <AIVehicleOnSplineCommand> prop forcedStartSpeed: Float
+[15:21:41][info] race-rtti: AIVehicleOnSplineCommand <AIVehicleOnSplineCommand> prop stopAtPathEnd: Bool
+[15:21:41][info] race-rtti: AIVehicleOnSplineCommand <AIVehicleOnSplineCommand> prop keepDistanceBool: Bool
+[15:21:41][info] race-rtti: AIVehicleOnSplineCommand <AIVehicleOnSplineCommand> prop keepDistanceCompanion: whandle:gameObject
+[15:21:41][info] race-rtti: AIVehicleOnSplineCommand <AIVehicleOnSplineCommand> prop keepDistanceDistance: Float
+[15:21:41][info] race-rtti: AIVehicleOnSplineCommand <AIVehicleOnSplineCommand> prop rubberBandingBool: Bool
+[15:21:41][info] race-rtti: AIVehicleOnSplineCommand <AIVehicleOnSplineCommand> prop rubberBandingTargetRef: whandle:gameObject
+[15:21:41][info] race-rtti: AIVehicleOnSplineCommand <AIVehicleOnSplineCommand> prop rubberBandingTargetForwardOffset: Float
+[15:21:41][info] race-rtti: AIVehicleOnSplineCommand <AIVehicleOnSplineCommand> prop rubberBandingMinDistance: Float
+[15:21:41][info] race-rtti: AIVehicleOnSplineCommand <AIVehicleOnSplineCommand> prop rubberBandingMaxDistance: Float
+[15:21:41][info] race-rtti: AIVehicleOnSplineCommand <AIVehicleOnSplineCommand> prop rubberBandingStopAndWait: Bool
+[15:21:41][info] race-rtti: AIVehicleOnSplineCommand <AIVehicleOnSplineCommand> prop rubberBandingTeleportToCatchUp: Bool
+[15:21:41][info] race-rtti: AIVehicleOnSplineCommand <AIVehicleOnSplineCommand> prop rubberBandingStayInFront: Bool
+[15:21:41][info] race-rtti: AIVehicleOnSplineCommand <AIVehicleOnSplineCommand> prop audioCurvesParam: whandle:vehicleAudioCurvesParam
+[15:21:41][info] race-rtti: AIVehicleOnSplineCommand <AIVehicleCommand> prop useKinematic: Bool
+[15:21:41][info] race-rtti: AIVehicleOnSplineCommand <AIVehicleCommand> prop needDriver: Bool
+[15:21:41][info] race-rtti: AIVehicleOnSplineCommand <AICommand> prop id: Uint32
+[15:21:41][info] race-rtti: AIVehicleOnSplineCommand <AICommand> prop state: AICommandState
+[15:21:41][info] race-rtti: AIVehicleOnSplineCommand <AICommand> prop questBlockId: Uint64
+[15:21:41][info] race-rtti: AIVehicleOnSplineCommand <AICommand> prop category: CName
+[15:21:41][info] race-rtti: AIVehicleToNodeCommand <AIVehicleToNodeCommand> prop nodeRef: NodeRef
+[15:21:41][info] race-rtti: AIVehicleToNodeCommand <AIVehicleToNodeCommand> prop stopAtPathEnd: Bool
+[15:21:41][info] race-rtti: AIVehicleToNodeCommand <AIVehicleToNodeCommand> prop secureTimeOut: Float
+[15:21:41][info] race-rtti: AIVehicleToNodeCommand <AIVehicleToNodeCommand> prop isPlayer: Bool
+[15:21:41][info] race-rtti: AIVehicleToNodeCommand <AIVehicleToNodeCommand> prop useTraffic: Bool
+[15:21:41][info] race-rtti: AIVehicleToNodeCommand <AIVehicleToNodeCommand> prop speedInTraffic: Float
+[15:21:41][info] race-rtti: AIVehicleToNodeCommand <AIVehicleToNodeCommand> prop forceGreenLights: Bool
+[15:21:41][info] race-rtti: AIVehicleToNodeCommand <AIVehicleToNodeCommand> prop portals: handle:vehiclePortalsList
+[15:21:41][info] race-rtti: AIVehicleToNodeCommand <AIVehicleToNodeCommand> prop trafficTryNeighborsForStart: Bool
+[15:21:41][info] race-rtti: AIVehicleToNodeCommand <AIVehicleToNodeCommand> prop trafficTryNeighborsForEnd: Bool
+[15:21:41][info] race-rtti: AIVehicleToNodeCommand <AIVehicleToNodeCommand> prop ignoreNoAIDrivingLanes: Bool
+[15:21:41][info] race-rtti: AIVehicleToNodeCommand <AIVehicleCommand> prop useKinematic: Bool
+[15:21:41][info] race-rtti: AIVehicleToNodeCommand <AIVehicleCommand> prop needDriver: Bool
+[15:21:41][info] race-rtti: AIVehicleToNodeCommand <AICommand> prop id: Uint32
+[15:21:41][info] race-rtti: AIVehicleToNodeCommand <AICommand> prop state: AICommandState
+[15:21:41][info] race-rtti: AIVehicleToNodeCommand <AICommand> prop questBlockId: Uint64
+[15:21:41][info] race-rtti: AIVehicleToNodeCommand <AICommand> prop category: CName
+[15:21:41][info] race-rtti: AIVehicleChaseCommand <AIVehicleChaseCommand> prop target: whandle:gameObject
+[15:21:41][info] race-rtti: AIVehicleChaseCommand <AIVehicleChaseCommand> prop distanceMin: Float
+[15:21:41][info] race-rtti: AIVehicleChaseCommand <AIVehicleChaseCommand> prop distanceMax: Float
+[15:21:41][info] race-rtti: AIVehicleChaseCommand <AIVehicleChaseCommand> prop forcedStartSpeed: Float
+[15:21:41][info] race-rtti: AIVehicleChaseCommand <AIVehicleChaseCommand> prop aggressiveRamming: Bool
+[15:21:41][info] race-rtti: AIVehicleChaseCommand <AIVehicleChaseCommand> prop ignoreChaseVehiclesLimit: Bool
+[15:21:41][info] race-rtti: AIVehicleChaseCommand <AIVehicleChaseCommand> prop boostDrivingStats: Bool
+[15:21:41][info] race-rtti: AIVehicleChaseCommand <AIVehicleCommand> prop useKinematic: Bool
+[15:21:41][info] race-rtti: AIVehicleChaseCommand <AIVehicleCommand> prop needDriver: Bool
+[15:21:41][info] race-rtti: AIVehicleChaseCommand <AICommand> prop id: Uint32
+[15:21:41][info] race-rtti: AIVehicleChaseCommand <AICommand> prop state: AICommandState
+[15:21:41][info] race-rtti: AIVehicleChaseCommand <AICommand> prop questBlockId: Uint64
+[15:21:41][info] race-rtti: AIVehicleChaseCommand <AICommand> prop category: CName
+[15:21:41][info] race-rtti: AIVehiclePanicCommand <AIVehiclePanicCommand> prop allowSimplifiedMovement: Bool
+[15:21:41][info] race-rtti: AIVehiclePanicCommand <AIVehiclePanicCommand> prop ignoreTickets: Bool
+[15:21:41][info] race-rtti: AIVehiclePanicCommand <AIVehiclePanicCommand> prop disableStuckDetection: Bool
+[15:21:41][info] race-rtti: AIVehiclePanicCommand <AIVehiclePanicCommand> prop useSpeedBasedLookupRange: Bool
+[15:21:41][info] race-rtti: AIVehiclePanicCommand <AIVehiclePanicCommand> prop tryDriveAwayFromPlayer: Bool
+[15:21:41][info] race-rtti: AIVehiclePanicCommand <AIVehicleCommand> prop useKinematic: Bool
+[15:21:41][info] race-rtti: AIVehiclePanicCommand <AIVehicleCommand> prop needDriver: Bool
+[15:21:41][info] race-rtti: AIVehiclePanicCommand <AICommand> prop id: Uint32
+[15:21:41][info] race-rtti: AIVehiclePanicCommand <AICommand> prop state: AICommandState
+[15:21:41][info] race-rtti: AIVehiclePanicCommand <AICommand> prop questBlockId: Uint64
+[15:21:41][info] race-rtti: AIVehiclePanicCommand <AICommand> prop category: CName
+[15:21:41][info] race-rtti: AIDriveRacingCommandHandler <AIDriveRacingCommandHandler> prop outUseKinematic: handle:AIArgumentMapping
+[15:21:41][info] race-rtti: AIDriveRacingCommandHandler <AIDriveRacingCommandHandler> prop outNeedDriver: handle:AIArgumentMapping
+[15:21:41][info] race-rtti: AIDriveRacingCommandHandler <AIDriveRacingCommandHandler> prop outSpline: handle:AIArgumentMapping
+[15:21:41][info] race-rtti: AIDriveRacingCommandHandler <AIDriveRacingCommandHandler> prop outSecureTimeOut: handle:AIArgumentMapping
+[15:21:41][info] race-rtti: AIDriveRacingCommandHandler <AIDriveRacingCommandHandler> prop outDriveBackwards: handle:AIArgumentMapping
+[15:21:41][info] race-rtti: AIDriveRacingCommandHandler <AIDriveRacingCommandHandler> prop outReverseSpline: handle:AIArgumentMapping
+[15:21:41][info] race-rtti: AIDriveRacingCommandHandler <AIDriveRacingCommandHandler> prop outStartFromClosest: handle:AIArgumentMapping
+[15:21:41][info] race-rtti: AIDriveRacingCommandHandler <AIDriveRacingCommandHandler> prop outRubberBandingBool: handle:AIArgumentMapping
+[15:21:41][info] race-rtti: AIDriveRacingCommandHandler <AIDriveRacingCommandHandler> prop outRubberBandingTargetRef: handle:AIArgumentMapping
+[15:21:41][info] race-rtti: AIDriveRacingCommandHandler <AIDriveRacingCommandHandler> prop outRubberBandingTargetForwardOffset: handle:AIArgumentMapping
+[15:21:41][info] race-rtti: AIDriveRacingCommandHandler <AIDriveRacingCommandHandler> prop outRubberBandingMinDistance: handle:AIArgumentMapping
+[15:21:41][info] race-rtti: AIDriveRacingCommandHandler <AIDriveRacingCommandHandler> prop outRubberBandingMaxDistance: handle:AIArgumentMapping
+[15:21:41][info] race-rtti: AIDriveRacingCommandHandler <AIDriveRacingCommandHandler> prop outRubberBandingStopAndWait: handle:AIArgumentMapping
+[15:21:41][info] race-rtti: AIDriveRacingCommandHandler <AIDriveRacingCommandHandler> prop outRubberBandingTeleportToCatchUp: handle:AIArgumentMapping
+[15:21:41][info] race-rtti: AIDriveRacingCommandHandler <AIDriveRacingCommandHandler> prop outRubberBandingStayInFront: handle:AIArgumentMapping
+[15:21:41][info] race-rtti: AIDriveRacingCommandHandler <AICommandHandlerBase> prop inCommand: handle:AIArgumentMapping
+[15:21:41][info] race-rtti: AIDriveRacingCommandHandler method UpdateCommand(context: AIbehaviorScriptExecutionContext, command: handle:AICommand) -> AIbehaviorUpdateOutcome
+[15:21:41][info] race-rtti: AIbehaviorDriveRacingTreeNodeDefinition <AIbehaviorDriveRacingTreeNodeDefinition> prop useKinematic: handle:AIArgumentMapping
+[15:21:41][info] race-rtti: AIbehaviorDriveRacingTreeNodeDefinition <AIbehaviorDriveRacingTreeNodeDefinition> prop needDriver: handle:AIArgumentMapping
+[15:21:41][info] race-rtti: AIbehaviorDriveRacingTreeNodeDefinition <AIbehaviorDriveRacingTreeNodeDefinition> prop spline: handle:AIArgumentMapping
+[15:21:41][info] race-rtti: AIbehaviorDriveRacingTreeNodeDefinition <AIbehaviorDriveRacingTreeNodeDefinition> prop secureTimeOut: handle:AIArgumentMapping
+[15:21:41][info] race-rtti: AIbehaviorDriveRacingTreeNodeDefinition <AIbehaviorDriveRacingTreeNodeDefinition> prop backwards: handle:AIArgumentMapping
+[15:21:41][info] race-rtti: AIbehaviorDriveRacingTreeNodeDefinition <AIbehaviorDriveRacingTreeNodeDefinition> prop reverse: handle:AIArgumentMapping
+[15:21:41][info] race-rtti: AIbehaviorDriveRacingTreeNodeDefinition <AIbehaviorDriveRacingTreeNodeDefinition> prop closest: handle:AIArgumentMapping
+[15:21:41][info] race-rtti: AIbehaviorDriveRacingTreeNodeDefinition <AIbehaviorDriveRacingTreeNodeDefinition> prop forcedStartSpeed: handle:AIArgumentMapping
+[15:21:41][info] race-rtti: AIbehaviorDriveRacingTreeNodeDefinition <AIbehaviorDriveRacingTreeNodeDefinition> prop stopAtPathEnd: handle:AIArgumentMapping
+[15:21:41][info] race-rtti: AIbehaviorDriveRacingTreeNodeDefinition <AIbehaviorDriveRacingTreeNodeDefinition> prop keepDistanceParamBool: handle:AIArgumentMapping
+[15:21:41][info] race-rtti: AIbehaviorDriveRacingTreeNodeDefinition <AIbehaviorDriveRacingTreeNodeDefinition> prop keepDistanceParamCompanion: handle:AIArgumentMapping
+[15:21:41][info] race-rtti: AIbehaviorDriveRacingTreeNodeDefinition <AIbehaviorDriveRacingTreeNodeDefinition> prop keepDistanceParamDistance: handle:AIArgumentMapping
+[15:21:41][info] race-rtti: AIbehaviorDriveRacingTreeNodeDefinition <AIbehaviorDriveRacingTreeNodeDefinition> prop rubberBandingBool: handle:AIArgumentMapping
+[15:21:41][info] race-rtti: AIbehaviorDriveRacingTreeNodeDefinition <AIbehaviorDriveRacingTreeNodeDefinition> prop rubberBandingTargetRef: handle:AIArgumentMapping
+[15:21:41][info] race-rtti: AIbehaviorDriveRacingTreeNodeDefinition <AIbehaviorDriveRacingTreeNodeDefinition> prop rubberBandingTargetForwardOffset: handle:AIArgumentMapping
+[15:21:41][info] race-rtti: AIbehaviorDriveRacingTreeNodeDefinition <AIbehaviorDriveRacingTreeNodeDefinition> prop rubberBandingMinDistance: handle:AIArgumentMapping
+[15:21:41][info] race-rtti: AIbehaviorDriveRacingTreeNodeDefinition <AIbehaviorDriveRacingTreeNodeDefinition> prop rubberBandingMaxDistance: handle:AIArgumentMapping
+[15:21:41][info] race-rtti: AIbehaviorDriveRacingTreeNodeDefinition <AIbehaviorDriveRacingTreeNodeDefinition> prop rubberBandingStopAndWait: handle:AIArgumentMapping
+[15:21:41][info] race-rtti: AIbehaviorDriveRacingTreeNodeDefinition <AIbehaviorDriveRacingTreeNodeDefinition> prop rubberBandingTeleportToCatchUp: handle:AIArgumentMapping
+[15:21:41][info] race-rtti: AIbehaviorDriveRacingTreeNodeDefinition <AIbehaviorDriveRacingTreeNodeDefinition> prop rubberBandingStayInFront: handle:AIArgumentMapping
+[15:21:41][info] race-rtti: AIbehaviorDriveRacingTreeNodeDefinition <AIbehaviorActionTreeNodeDefinition> prop command: handle:AIArgumentMapping
+[15:21:41][info] race-rtti: no class gamedataVehicleDrivingParameters_Record
+[15:21:41][info] race-rtti: no class gamedataDriving_Record
+[15:21:41][info] race-rtti: AIVehicleAgent <AIVehicleAgent> prop keepStrategyOnSearch: Bool
+[15:21:41][info] race-rtti: AIVehicleAgent <AIVehicleAgent> prop initCmd: handle:AIVehicleCommand
+[15:21:41][info] race-rtti: AIVehicleAgent <gameComponent> prop persistentState: handle:gamePersistentState
+[15:21:41][info] race-rtti: AIVehicleAgent <entIComponent> prop name: CName
+[15:21:41][info] race-rtti: AIVehicleAgent <entIComponent> prop isReplicable: Bool
+[15:21:41][info] race-rtti: AIVehicleAgent <entIComponent> prop id: CRUID
+[15:21:41][info] race-rtti: AIVehicleAgent <entIComponent> prop appearanceName: CName
+[15:21:41][info] race-rtti: AIVehicleAgent <entIComponent> prop appearancePath: redResourceReferenceScriptToken
+[15:21:41][info] race-rtti: AIVehicleAgent method SetDriveToPointAutonomousUpdate(update: handle:AIDriveToPointAutonomousUpdate) -> Void
+[15:21:41][info] race-rtti: AIVehicleAgent method SetDrivePatrolUpdate(update: handle:AIDrivePatrolUpdate) -> Void
+[15:21:41][info] race-rtti: AIVehicleAgent method TryReserveSeatOrFirstAvailable(reserver: entEntityID, preferredSeatName: CName) -> CName
+[15:21:41][info] race-rtti: AIVehicleAgent method ReleaseSeat(seatName: CName) -> Void
+[15:21:41][info] race-rtti: AIVehicleAgent method ReleaseSeatReservedBy(reserver: entEntityID) -> Void
+[15:21:41][info] race-rtti: AIVehicleAgent method IsSeatReserved(seatName: CName) -> Bool
+[15:21:41][info] race-rtti: AIVehicleAgent method GetReservedSeatsCount() -> Uint32
+[15:21:41][info] race-rtti: AIVehicleAgent method KeepStrategyOnSearch() -> Bool
+[15:21:41][info] race-rtti: AIVehicleAgent method SetKeepStrategyOnSearch(keep: Bool) -> Void
+[15:21:41][info] race-rtti: AIVehicleAgent method GetInitCmd() -> handle:AIVehicleCommand
+[15:21:41][info] race-rtti: AIVehicleAgent method SetInitCmd(cmd: handle:AIVehicleCommand) -> Void
+[15:21:41][info] race-rtti: AIVehicleAgent method InitCommandIsA(commandClassName: CName) -> Bool
+[15:21:41][info] route-rtti: gamegpsGPSSystem -- 0 matching method(s) of 0
+[15:21:41][info] route-rtti: gamegpsIGPSSystem -- 0 matching method(s) of 0
+[15:21:41][info] route-rtti: gameuiMinimapContainerController -- 0 matching method(s) of 50
+[15:21:41][info] route-rtti: worldITrafficSystem -- 0 matching method(s) of 0
+[15:21:41][info] route-rtti: navRuntimeSystemPathfinding -- 0 matching method(s) of 0
+[15:21:41][info] route-rtti: worldNavigationScriptInterface.CalculatePathOnlyHumanNavmesh(startPoint: Vector4, endPoint: Vector4, agentSize: NavGenAgentSize, findPointTolerance: Float, costModCircle: handle:worldNavigationScriptCostModCircle opt) -> handle:worldNavigationScriptPath
+[15:21:41][info] route-rtti: worldNavigationScriptInterface -- 1 matching method(s) of 13
+[15:21:41][info] route-rtti: AIVehicleAgent -- 0 matching method(s) of 12
+[15:21:41][info] traffic-direct: request 0 path=base\worlds\03_night_city\sectors\_generated\traffic\all.traffic_persistent token=1
+[15:21:41][info] traffic-direct: request 1 path=base\worlds\03_night_city\sectors\_generated\traffic\all.lane_connections token=1
+[15:21:41][info] traffic-direct: request 2 path=base\worlds\03_night_city\sectors\_generated\traffic\all.lane_polygons token=1
+[15:21:41][info] traffic-resource: tokens=22795 loaded=17975 worlds=0 matched=0 lanes=0 path=0 target=0 request=0 failed=0
+[15:21:42][info] road graph: 33952 lanes 279906 points edge-continuity=51338/22/0/0/4 selected=0
+[15:21:42][info] road graph: copied 51338 connected edges; routing uses incoming race checkpoint coordinates
+[15:21:42][info] traffic-resource Running update called
+[15:21:42][info] traffic-direct: 0 loaded=1 failed=0 class=worldTrafficPersistentResource
+[15:21:42][info] traffic-direct: persistent lanes=33952 first-outline=0 first-out=0
+[15:21:42][info] traffic-direct: 1 loaded=1 failed=0 class=worldTrafficPersistentLaneConnectionsResource
+[15:21:42][info] traffic-direct: 1 memory+40=000002962c90de00 000084a0000084a0
+[15:21:42][info] traffic-direct: 1 memory+50=000002962c780000 00000030000084a0
+[15:21:42][info] traffic-direct: 1 memory+60=000084a0ffffffff 00007ff7b901b410
+[15:21:42][info] traffic-direct: 1 array+40 ptr=2962c90de00 readable=1
+[15:21:42][info] traffic-direct: 1 array+40 data+00=0000000100000000 0000000300000002
+[15:21:42][info] traffic-direct: 1 array+40 data+10=0000000500000004 0000000700000006
+[15:21:42][info] traffic-direct: 1 array+40 data+20=0000000900000008 0000000b0000000a
+[15:21:42][info] traffic-direct: 1 array+40 data+30=0000000d0000000c 0000000f0000000e
+[15:21:42][info] traffic-direct: 1 array+50 ptr=2962c780000 readable=1
+[15:21:42][info] traffic-direct: 1 array+50 data+00=00000000ffffffff 0000000000000000
+[15:21:42][info] traffic-direct: 1 array+50 data+10=0000028217c09968 0000000100000001
+[15:21:42][info] traffic-direct: 1 array+50 data+20=0000028217c09980 0000000100000001
+[15:21:42][info] traffic-direct: 1 array+50 data+30=00000001ffffffff 0000000000000001
+[15:21:42][info] traffic-direct: 2 loaded=1 failed=0 class=worldTrafficPersistentLanePolygonResource
+[15:21:42][info] traffic-direct: 2 memory+40=000002962cabde00 000084a0000084a0
+[15:21:42][info] traffic-direct: 2 memory+50=000002962c930000 00000030000084a0
+[15:21:42][info] traffic-direct: 2 memory+60=000084a0ffffffff 00007ff7b901b410
+[15:21:42][info] traffic-direct: 2 array+40 ptr=2962cabde00 readable=1
+[15:21:42][info] traffic-direct: 2 array+40 data+00=0000000100000000 0000000300000002
+[15:21:42][info] traffic-direct: 2 array+40 data+10=0000000500000004 0000000700000006
+[15:21:42][info] traffic-direct: 2 array+40 data+20=0000000900000008 0000000b0000000a
+[15:21:42][info] traffic-direct: 2 array+40 data+30=0000000d0000000c 0000000f0000000e
+[15:21:42][info] traffic-direct: 2 array+50 ptr=2962c930000 readable=1
+[15:21:42][info] traffic-direct: 2 array+50 data+00=00000000ffffffff 0000000000000000
+[15:21:42][info] traffic-direct: 2 array+50 data+10=000002821bcc7680 0000000a0000000a
+[15:21:42][info] traffic-direct: 2 array+50 data+20=00000282217d6980 0000001400000014
+[15:21:42][info] traffic-direct: 2 array+50 data+30=00000001ffffffff 0000000000000001
+[15:21:42][info] spline refs: loaded sector class worldStreamingSector
+[15:21:42][info] spline refs: <worldStreamingSector> localInplaceResource: array:rRef:CResource
+[15:21:42][info] spline refs: <worldStreamingSector> externInplaceResource: raRef:worldStreamingSectorInplaceContent
+[15:21:42][info] spline refs: <worldStreamingSector> level: Uint8
+[15:21:42][info] spline refs: <worldStreamingSector> category: worldStreamingSectorCategory
+[15:21:42][info] spline refs: <CResource> cookingPlatform: ECookingPlatform
+[15:21:42][info] spline refs: <CResource> path: redResourceReferenceScriptToken
+[15:21:42][info] spline refs: 30 sector(s) loaded; their nodes are not exposed by reflection, so the NodeRef hash cannot be checked here -- Pace uses FNV-1a 64 of the path
+[15:21:44][info] reds: tdb: Driving.AccelPIDBase.D = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.AccelPIDBase.I = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.AccelPIDBase.P = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.AccelPIDBase.integratorClampingLimit = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.AccelPIDBase.outputSaturationLimit = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.BrakePIDBase.D = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.BrakePIDBase.I = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.BrakePIDBase.P = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.BrakePIDBase.integratorClampingLimit = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.BrakePIDBase.outputSaturationLimit = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Default_2w.accel = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Default_2w.boostStats = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Default_2w.brake = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Default_2w.panic = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Default_2w.steering = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Default_2w.steeringReverse = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Default_2w.stopping = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Default_2w.traction = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Default_2w.vision = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Default_4w.accel = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Default_4w.boostStats = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Default_4w.brake = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Default_4w.panic = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Default_4w.steering = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Default_4w.steeringReverse = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Default_4w.stopping = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Default_4w.traction = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Default_4w.vision = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Default_Delamain.accel = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Default_Delamain.boostStats = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Default_Delamain.brake = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Default_Delamain.panic = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Default_Delamain.steering = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Default_Delamain.steeringReverse = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Default_Delamain.stopping = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Default_Delamain.traction = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Default_Delamain.vision = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Default_Driving.accel = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Default_Driving.boostStats = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Default_Driving.brake = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Default_Driving.panic = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Default_Driving.steering = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Default_Driving.steeringReverse = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Default_Driving.stopping = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Default_Driving.traction = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Default_Driving.vision = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Default_Driving_inline0.D = f=0.200000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Default_Driving_inline0.I = f=0.500000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Default_Driving_inline0.P = f=0.500000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Default_Driving_inline0.definitions = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Default_Driving_inline0.integratorClampingLimit = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Default_Driving_inline0.outputSaturationLimit = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Default_Driving_inline1.decreaseMul = f=3.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Default_Driving_inline1.errorMagnitudeForFullBrakingChange = f=4.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Default_Driving_inline1.errorMagnitudeForMildBrakingChange = f=1.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Default_Driving_inline1.fullBrakingChangeSpeed = f=4.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Default_Driving_inline1.mildBrakingChangeSpeed = f=2.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Default_Driving_inline2.maxLatTractionBoost = f=0.500000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Default_Driving_inline2.maxLongTractionBoost = f=0.500000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Default_Driving_inline2.maxTorqueBoost = f=1.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Default_Driving_inline3.D = f=0.200000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Default_Driving_inline3.I = f=0.500000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Default_Driving_inline3.P = f=0.500000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Default_Driving_inline3.integratorClampingLimit = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Default_Driving_inline3.outputSaturationLimit = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Default_Driving_inline4.D = f=-9999.000000 b=false i=-9999 fk=
+[15:21:44][info] reds: tdb: Driving.Default_Driving_inline4.I = f=-9999.000000 b=false i=-9999 fk=
+[15:21:44][info] reds: tdb: Driving.Default_Driving_inline4.P = f=-9999.000000 b=false i=-9999 fk=
+[15:21:44][info] reds: tdb: Driving.Default_Driving_inline4.errorMagnitudeForFullSteering = f=1.500000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Default_Driving_inline4.errorMagnitudeForMildSteering = f=0.500000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Default_Driving_inline4.fullSteeringSpeed = f=10.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Default_Driving_inline4.increaseSteeringDistForAvoidance = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Default_Driving_inline4.maxTargetDistance = f=8.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Default_Driving_inline4.mildSteeringSpeed = f=2.500000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Default_Driving_inline4.minTargetDistance = f=6.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Default_Driving_inline4.speedForMaxDistance = f=30.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Default_Driving_inline4.speedForMinDistance = f=6.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Default_Driving_inline4.vehicleMaxTurnSpeed = f=10000.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Default_Driving_inline4.vehicleMinTurnSpeed = f=100.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Default_Driving_inline5.errorMagnitudeForFullSteering = f=2.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Default_Driving_inline5.errorMagnitudeForMildSteering = f=1.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Default_Driving_inline5.fullSteeringSpeed = f=7.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Default_Driving_inline5.increaseSteeringDistForAvoidance = f=0.000000 b=true i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Default_Driving_inline5.maxLatTractionBoost = f=-9999.000000 b=false i=-9999 fk=
+[15:21:44][info] reds: tdb: Driving.Default_Driving_inline5.maxLongTractionBoost = f=-9999.000000 b=false i=-9999 fk=
+[15:21:44][info] reds: tdb: Driving.Default_Driving_inline5.maxTargetDistance = f=15.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Default_Driving_inline5.maxTorqueBoost = f=-9999.000000 b=false i=-9999 fk=
+[15:21:44][info] reds: tdb: Driving.Default_Driving_inline5.mildSteeringSpeed = f=4.500000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Default_Driving_inline5.minTargetDistance = f=6.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Default_Driving_inline5.speedForMaxDistance = f=30.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Default_Driving_inline5.speedForMinDistance = f=6.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Default_Driving_inline5.vehicleMaxTurnSpeed = f=500.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Default_Driving_inline5.vehicleMinTurnSpeed = f=100.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Default_Driving_inline6.maxDistance = f=13.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Default_Driving_inline6.maxStraightPathExtension = f=10.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Default_Driving_inline6.minDistance = f=3.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Default_Driving_inline6.numSweeps = f=0.000000 b=false i=30 fk=
+[15:21:44][info] reds: tdb: Driving.Default_Driving_inline6.offsetSmoothingFastChangeSpeed = f=10.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Default_Driving_inline6.offsetSmoothingReturnToNeutralSpeed = f=4.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Default_Driving_inline6.sideOverlapForwardOffset = f=0.500000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Default_Driving_inline6.sideOverlapLateralScale = f=0.750000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Default_Driving_inline6.sideOverlapLongitudinalScale = f=1.500000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Default_Driving_inline6.speedLimitDeceleration = f=7.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Default_Driving_inline6.speedLimitSafetyMargin = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Default_Driving_inline6.useSpeedLimit = f=0.000000 b=true i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Default_Driving_inline7.brakingAccelFactor = f=1.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Default_Driving_inline7.forwardAccelFactor = f=1.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Default_Driving_inline7.turningAccelFactor = f=1.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Default_Galena_Nomad.accel = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Default_Galena_Nomad.boostStats = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Default_Galena_Nomad.brake = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Default_Galena_Nomad.panic = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Default_Galena_Nomad.steering = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Default_Galena_Nomad.steeringReverse = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Default_Galena_Nomad.stopping = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Default_Galena_Nomad.traction = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Default_Galena_Nomad.vision = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Default_Thorton_Colby.accel = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Default_Thorton_Colby.boostStats = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Default_Thorton_Colby.brake = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Default_Thorton_Colby.panic = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Default_Thorton_Colby.steering = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Default_Thorton_Colby.steeringReverse = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Default_Thorton_Colby.stopping = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Default_Thorton_Colby.traction = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Default_Thorton_Colby.vision = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Panic_Driving.accel = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Panic_Driving.boostStats = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Panic_Driving.brake = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Panic_Driving.panic = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Panic_Driving.steering = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Panic_Driving.steeringReverse = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Panic_Driving.stopping = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Panic_Driving.traction = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Panic_Driving.vision = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Panic_Driving_inline0.errorMagnitudeForFullSteering = f=2.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Panic_Driving_inline0.errorMagnitudeForMildSteering = f=1.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Panic_Driving_inline0.fullSteeringSpeed = f=7.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Panic_Driving_inline0.increaseSteeringDistForAvoidance = f=0.000000 b=true i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Panic_Driving_inline0.maxTargetDistance = f=15.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Panic_Driving_inline0.mildSteeringSpeed = f=4.500000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Panic_Driving_inline0.minTargetDistance = f=6.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Panic_Driving_inline0.speedForMaxDistance = f=30.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Panic_Driving_inline0.speedForMinDistance = f=6.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Panic_Driving_inline0.vehicleMaxTurnSpeed = f=500.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Panic_Driving_inline0.vehicleMinTurnSpeed = f=100.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Panic_Driving_inline1.maxDistance = f=14.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Panic_Driving_inline1.maxStraightPathExtension = f=10.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Panic_Driving_inline1.minDistance = f=4.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Panic_Driving_inline1.numSweeps = f=0.000000 b=false i=30 fk=
+[15:21:44][info] reds: tdb: Driving.Panic_Driving_inline1.offsetSmoothingFastChangeSpeed = f=10.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Panic_Driving_inline1.offsetSmoothingReturnToNeutralSpeed = f=4.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Panic_Driving_inline1.sideOverlapForwardOffset = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Panic_Driving_inline1.sideOverlapLateralScale = f=1.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Panic_Driving_inline1.sideOverlapLongitudinalScale = f=1.200000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Panic_Driving_inline1.speedLimitDeceleration = f=7.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Panic_Driving_inline1.speedLimitSafetyMargin = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Panic_Driving_inline1.useSpeedLimit = f=0.000000 b=true i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Panic_Driving_inline2.maxLatTractionBoost = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Panic_Driving_inline2.maxLongTractionBoost = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Panic_Driving_inline2.maxTorqueBoost = f=1.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Panic_Regular.accel = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Panic_Regular.boostStats = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Panic_Regular.brake = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Panic_Regular.panic = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Panic_Regular.steering = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Panic_Regular.steeringReverse = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Panic_Regular.stopping = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Panic_Regular.traction = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Panic_Regular.vision = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Panic_Regular_inline0.errorMagnitudeForFullSteering = f=2.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Panic_Regular_inline0.errorMagnitudeForMildSteering = f=1.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Panic_Regular_inline0.fullSteeringSpeed = f=7.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Panic_Regular_inline0.increaseSteeringDistForAvoidance = f=0.000000 b=true i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Panic_Regular_inline0.maxTargetDistance = f=15.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Panic_Regular_inline0.mildSteeringSpeed = f=4.500000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Panic_Regular_inline0.minTargetDistance = f=6.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Panic_Regular_inline0.speedForMaxDistance = f=30.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Panic_Regular_inline0.speedForMinDistance = f=6.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Panic_Regular_inline0.vehicleMaxTurnSpeed = f=500.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Panic_Regular_inline0.vehicleMinTurnSpeed = f=100.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Panic_Sport.accel = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Panic_Sport.boostStats = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Panic_Sport.brake = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Panic_Sport.panic = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Panic_Sport.steering = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Panic_Sport.steeringReverse = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Panic_Sport.stopping = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Panic_Sport.traction = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Panic_Sport.vision = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Panic_Sport_inline0.errorMagnitudeForFullSteering = f=2.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Panic_Sport_inline0.errorMagnitudeForMildSteering = f=1.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Panic_Sport_inline0.fullSteeringSpeed = f=7.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Panic_Sport_inline0.increaseSteeringDistForAvoidance = f=0.000000 b=true i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Panic_Sport_inline0.maxTargetDistance = f=15.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Panic_Sport_inline0.mildSteeringSpeed = f=4.500000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Panic_Sport_inline0.minTargetDistance = f=6.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Panic_Sport_inline0.speedForMaxDistance = f=30.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Panic_Sport_inline0.speedForMinDistance = f=6.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Panic_Sport_inline0.vehicleMaxTurnSpeed = f=500.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Panic_Sport_inline0.vehicleMinTurnSpeed = f=100.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Panic_Sport_inline1.maxLatTractionBoost = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Panic_Sport_inline1.maxLongTractionBoost = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Panic_Sport_inline1.maxTorqueBoost = f=0.500000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Police_Cortes.accel = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Police_Cortes.boostStats = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Police_Cortes.brake = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Police_Cortes.panic = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Police_Cortes.steering = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Police_Cortes.steeringReverse = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Police_Cortes.stopping = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Police_Cortes.traction = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Police_Cortes.vision = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Police_Cortes_inline0.maxLatTractionBoost = f=1.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Police_Cortes_inline0.maxLongTractionBoost = f=1.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Police_Cortes_inline0.maxTorqueBoost = f=3.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Race_Driving.accel = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Race_Driving.boostStats = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Race_Driving.brake = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Race_Driving.panic = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Race_Driving.steering = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Race_Driving.steeringReverse = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Race_Driving.stopping = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Race_Driving.traction = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Race_Driving.vision = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Race_Driving_inline0.errorMagnitudeForFullSteering = f=2.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Race_Driving_inline0.errorMagnitudeForMildSteering = f=1.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Race_Driving_inline0.fullSteeringSpeed = f=10.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Race_Driving_inline0.increaseSteeringDistForAvoidance = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Race_Driving_inline0.maxTargetDistance = f=18.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Race_Driving_inline0.mildSteeringSpeed = f=4.500000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Race_Driving_inline0.minTargetDistance = f=13.500000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Race_Driving_inline0.speedForMaxDistance = f=30.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Race_Driving_inline0.speedForMinDistance = f=6.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Race_Driving_inline0.vehicleMaxTurnSpeed = f=10000.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Race_Driving_inline0.vehicleMinTurnSpeed = f=100.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Race_Driving_inline1.maxDistance = f=13.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Race_Driving_inline1.maxStraightPathExtension = f=10.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Race_Driving_inline1.minDistance = f=3.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Race_Driving_inline1.numSweeps = f=0.000000 b=false i=16 fk=
+[15:21:44][info] reds: tdb: Driving.Race_Driving_inline1.offsetSmoothingFastChangeSpeed = f=10.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Race_Driving_inline1.offsetSmoothingReturnToNeutralSpeed = f=4.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Race_Driving_inline1.sideOverlapForwardOffset = f=0.500000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Race_Driving_inline1.sideOverlapLateralScale = f=0.750000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Race_Driving_inline1.sideOverlapLongitudinalScale = f=1.500000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Race_Driving_inline1.speedLimitDeceleration = f=7.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Race_Driving_inline1.speedLimitSafetyMargin = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Race_Driving_inline1.useSpeedLimit = f=0.000000 b=true i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Race_Driving_inline2.brakingAccelFactor = f=2.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Race_Driving_inline2.forwardAccelFactor = f=2.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.Race_Driving_inline2.turningAccelFactor = f=2.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.SteeringParamsForwardBase.errorMagnitudeForFullSteering = f=2.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.SteeringParamsForwardBase.errorMagnitudeForMildSteering = f=1.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.SteeringParamsForwardBase.fullSteeringSpeed = f=10.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.SteeringParamsForwardBase.increaseSteeringDistForAvoidance = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.SteeringParamsForwardBase.maxTargetDistance = f=6.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.SteeringParamsForwardBase.mildSteeringSpeed = f=4.500000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.SteeringParamsForwardBase.minTargetDistance = f=4.500000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.SteeringParamsForwardBase.speedForMaxDistance = f=30.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.SteeringParamsForwardBase.speedForMinDistance = f=6.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.SteeringParamsForwardBase.vehicleMaxTurnSpeed = f=10000.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.SteeringParamsForwardBase.vehicleMinTurnSpeed = f=100.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.SteeringParamsForwardPanic.errorMagnitudeForFullSteering = f=2.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.SteeringParamsForwardPanic.errorMagnitudeForMildSteering = f=1.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.SteeringParamsForwardPanic.fullSteeringSpeed = f=7.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.SteeringParamsForwardPanic.increaseSteeringDistForAvoidance = f=0.000000 b=true i=0 fk=
+[15:21:44][info] reds: tdb: Driving.SteeringParamsForwardPanic.maxTargetDistance = f=15.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.SteeringParamsForwardPanic.mildSteeringSpeed = f=4.500000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.SteeringParamsForwardPanic.minTargetDistance = f=6.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.SteeringParamsForwardPanic.speedForMaxDistance = f=30.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.SteeringParamsForwardPanic.speedForMinDistance = f=6.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.SteeringParamsForwardPanic.vehicleMaxTurnSpeed = f=500.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.SteeringParamsForwardPanic.vehicleMinTurnSpeed = f=100.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.SteeringParamsForwardRace.errorMagnitudeForFullSteering = f=2.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.SteeringParamsForwardRace.errorMagnitudeForMildSteering = f=1.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.SteeringParamsForwardRace.fullSteeringSpeed = f=10.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.SteeringParamsForwardRace.increaseSteeringDistForAvoidance = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.SteeringParamsForwardRace.maxTargetDistance = f=18.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.SteeringParamsForwardRace.mildSteeringSpeed = f=4.500000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.SteeringParamsForwardRace.minTargetDistance = f=13.500000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.SteeringParamsForwardRace.speedForMaxDistance = f=30.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.SteeringParamsForwardRace.speedForMinDistance = f=6.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.SteeringParamsForwardRace.vehicleMaxTurnSpeed = f=10000.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.SteeringParamsForwardRace.vehicleMinTurnSpeed = f=100.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.SteeringParamsReverseBase.errorMagnitudeForFullSteering = f=1.500000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.SteeringParamsReverseBase.errorMagnitudeForMildSteering = f=0.500000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.SteeringParamsReverseBase.fullSteeringSpeed = f=10.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.SteeringParamsReverseBase.increaseSteeringDistForAvoidance = f=0.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.SteeringParamsReverseBase.maxTargetDistance = f=8.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.SteeringParamsReverseBase.mildSteeringSpeed = f=2.500000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.SteeringParamsReverseBase.minTargetDistance = f=6.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.SteeringParamsReverseBase.speedForMaxDistance = f=30.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.SteeringParamsReverseBase.speedForMinDistance = f=6.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.SteeringParamsReverseBase.vehicleMaxTurnSpeed = f=10000.000000 b=false i=0 fk=
+[15:21:44][info] reds: tdb: Driving.SteeringParamsReverseBase.vehicleMinTurnSpeed = f=100.000000 b=false i=0 fk=
+[15:21:45][info] reds: tdb: Driving.StoppingParamsBase.decreaseMul = f=3.000000 b=false i=0 fk=
+[15:21:45][info] reds: tdb: Driving.StoppingParamsBase.errorMagnitudeForFullBrakingChange = f=4.000000 b=false i=0 fk=
+[15:21:45][info] reds: tdb: Driving.StoppingParamsBase.errorMagnitudeForMildBrakingChange = f=1.000000 b=false i=0 fk=
+[15:21:45][info] reds: tdb: Driving.StoppingParamsBase.fullBrakingChangeSpeed = f=4.000000 b=false i=0 fk=
+[15:21:45][info] reds: tdb: Driving.StoppingParamsBase.mildBrakingChangeSpeed = f=2.000000 b=false i=0 fk=
+[15:21:45][info] reds: tdb: Driving.VehicleAITractionEstimationRace.brakingAccelFactor = f=2.000000 b=false i=0 fk=
+[15:21:45][info] reds: tdb: Driving.VehicleAITractionEstimationRace.forwardAccelFactor = f=2.000000 b=false i=0 fk=
+[15:21:45][info] reds: tdb: Driving.VehicleAITractionEstimationRace.turningAccelFactor = f=2.000000 b=false i=0 fk=
+[15:21:45][info] reds: tdb: Driving.VehicleImpactTraffic_DefaultParams.maxThreshold = f=70.000000 b=false i=0 fk=
+[15:21:45][info] reds: tdb: Driving.VehicleImpactTraffic_DefaultParams.maxTimerStunned = f=2.500000 b=false i=0 fk=
+[15:21:45][info] reds: tdb: Driving.VehicleImpactTraffic_DefaultParams.minThreshold = f=7.000000 b=false i=0 fk=
+[15:21:45][info] reds: tdb: Driving.VisionParamsBase.maxDistance = f=13.000000 b=false i=0 fk=
+[15:21:45][info] reds: tdb: Driving.VisionParamsBase.maxStraightPathExtension = f=10.000000 b=false i=0 fk=
+[15:21:45][info] reds: tdb: Driving.VisionParamsBase.minDistance = f=3.000000 b=false i=0 fk=
+[15:21:45][info] reds: tdb: Driving.VisionParamsBase.numSweeps = f=0.000000 b=false i=30 fk=
+[15:21:45][info] reds: tdb: Driving.VisionParamsBase.offsetSmoothingFastChangeSpeed = f=10.000000 b=false i=0 fk=
+[15:21:45][info] reds: tdb: Driving.VisionParamsBase.offsetSmoothingReturnToNeutralSpeed = f=4.000000 b=false i=0 fk=
+[15:21:45][info] reds: tdb: Driving.VisionParamsBase.sideOverlapForwardOffset = f=0.500000 b=false i=0 fk=
+[15:21:45][info] reds: tdb: Driving.VisionParamsBase.sideOverlapLateralScale = f=0.750000 b=false i=0 fk=
+[15:21:45][info] reds: tdb: Driving.VisionParamsBase.sideOverlapLongitudinalScale = f=1.500000 b=false i=0 fk=
+[15:21:45][info] reds: tdb: Driving.VisionParamsBase.speedLimitDeceleration = f=7.000000 b=false i=0 fk=
+[15:21:45][info] reds: tdb: Driving.VisionParamsBase.speedLimitSafetyMargin = f=0.000000 b=false i=0 fk=
+[15:21:45][info] reds: tdb: Driving.VisionParamsBase.useSpeedLimit = f=0.000000 b=true i=0 fk=
+[15:21:45][info] reds: tdb: Driving.VisionParamsPanic.maxDistance = f=14.000000 b=false i=0 fk=
+[15:21:45][info] reds: tdb: Driving.VisionParamsPanic.maxStraightPathExtension = f=10.000000 b=false i=0 fk=
+[15:21:45][info] reds: tdb: Driving.VisionParamsPanic.minDistance = f=4.000000 b=false i=0 fk=
+[15:21:45][info] reds: tdb: Driving.VisionParamsPanic.numSweeps = f=0.000000 b=false i=30 fk=
+[15:21:45][info] reds: tdb: Driving.VisionParamsPanic.offsetSmoothingFastChangeSpeed = f=10.000000 b=false i=0 fk=
+[15:21:45][info] reds: tdb: Driving.VisionParamsPanic.offsetSmoothingReturnToNeutralSpeed = f=4.000000 b=false i=0 fk=
+[15:21:45][info] reds: tdb: Driving.VisionParamsPanic.sideOverlapForwardOffset = f=0.000000 b=false i=0 fk=
+[15:21:45][info] reds: tdb: Driving.VisionParamsPanic.sideOverlapLateralScale = f=1.000000 b=false i=0 fk=
+[15:21:45][info] reds: tdb: Driving.VisionParamsPanic.sideOverlapLongitudinalScale = f=1.200000 b=false i=0 fk=
+[15:21:45][info] reds: tdb: Driving.VisionParamsPanic.speedLimitDeceleration = f=7.000000 b=false i=0 fk=
+[15:21:45][info] reds: tdb: Driving.VisionParamsPanic.speedLimitSafetyMargin = f=0.000000 b=false i=0 fk=
+[15:21:45][info] reds: tdb: Driving.VisionParamsPanic.useSpeedLimit = f=0.000000 b=true i=0 fk=
+[15:21:45][info] reds: tdb: Driving.VisionParamsRace.maxDistance = f=13.000000 b=false i=0 fk=
+[15:21:45][info] reds: tdb: Driving.VisionParamsRace.maxStraightPathExtension = f=10.000000 b=false i=0 fk=
+[15:21:45][info] reds: tdb: Driving.VisionParamsRace.minDistance = f=3.000000 b=false i=0 fk=
+[15:21:45][info] reds: tdb: Driving.VisionParamsRace.numSweeps = f=0.000000 b=false i=16 fk=
+[15:21:45][info] reds: tdb: Driving.VisionParamsRace.offsetSmoothingFastChangeSpeed = f=10.000000 b=false i=0 fk=
+[15:21:45][info] reds: tdb: Driving.VisionParamsRace.offsetSmoothingReturnToNeutralSpeed = f=4.000000 b=false i=0 fk=
+[15:21:45][info] reds: tdb: Driving.VisionParamsRace.sideOverlapForwardOffset = f=0.500000 b=false i=0 fk=
+[15:21:45][info] reds: tdb: Driving.VisionParamsRace.sideOverlapLateralScale = f=0.750000 b=false i=0 fk=
+[15:21:45][info] reds: tdb: Driving.VisionParamsRace.sideOverlapLongitudinalScale = f=1.500000 b=false i=0 fk=
+[15:21:45][info] reds: tdb: Driving.VisionParamsRace.speedLimitDeceleration = f=7.000000 b=false i=0 fk=
+[15:21:45][info] reds: tdb: Driving.VisionParamsRace.speedLimitSafetyMargin = f=0.000000 b=false i=0 fk=
+[15:21:45][info] reds: tdb: Driving.VisionParamsRace.useSpeedLimit = f=0.000000 b=true i=0 fk=
+[15:21:45][info] reds: tdb: Vehicle.v_sport2_quadra_type66.driving = f=0.000000 b=false i=0 fk=
+[15:21:45][info] reds: tdb: Vehicle.v_sport2_quadra_type66.drivingParamsGeneric = f=0.000000 b=false i=0 fk=
+[15:21:45][info] reds: tdb: Vehicle.v_sport2_quadra_type66.drivingParamsRace = f=0.000000 b=false i=0 fk=
+[15:21:45][info] reds: tdb: Vehicle.v_sport2_quadra_type66.drivingParamsPanic = f=0.000000 b=false i=0 fk=
+[15:21:45][info] reds: tdb: Vehicle.v_sport2_quadra_type66.vehDriveModelDataAI = f=0.000000 b=false i=0 fk=
+[15:21:45][info] reds: tdb: Vehicle.v_sport1_quadra_turbo.driving = f=0.000000 b=false i=0 fk=
+[15:21:45][info] reds: tdb: Vehicle.v_sport1_quadra_turbo.drivingParamsGeneric = f=0.000000 b=false i=0 fk=
+[15:21:45][info] reds: tdb: Vehicle.v_sport1_quadra_turbo.drivingParamsRace = f=0.000000 b=false i=0 fk=
+[15:21:45][info] reds: tdb: Vehicle.v_sport1_quadra_turbo.drivingParamsPanic = f=0.000000 b=false i=0 fk=
+[15:21:45][info] reds: tdb: Vehicle.v_sport1_quadra_turbo.vehDriveModelDataAI = f=0.000000 b=false i=0 fk=
+[15:21:45][info] reds: tdb: Character.WorkerMale.driving = f=0.000000 b=false i=0 fk=
+[15:21:45][info] reds: tdb: Character.WorkerMale.drivingParamsGeneric = f=-9999.000000 b=false i=-9999 fk=
+[15:21:45][info] reds: tdb: Character.WorkerMale.drivingParamsRace = f=-9999.000000 b=false i=-9999 fk=
+[15:21:45][info] reds: tdb: 355 of 355 driving flats read
+[15:21:45][info] reds: diag: Codeware diagnostic attached; first round in 15 s
+[15:21:58][info] resource connected
+[15:22:02][info] reds: tdb: Driving.AccelPIDBase.D = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.AccelPIDBase.I = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.AccelPIDBase.P = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.AccelPIDBase.integratorClampingLimit = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.AccelPIDBase.outputSaturationLimit = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.BrakePIDBase.D = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.BrakePIDBase.I = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.BrakePIDBase.P = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.BrakePIDBase.integratorClampingLimit = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.BrakePIDBase.outputSaturationLimit = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Default_2w.accel = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Default_2w.boostStats = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Default_2w.brake = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Default_2w.panic = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Default_2w.steering = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Default_2w.steeringReverse = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Default_2w.stopping = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Default_2w.traction = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Default_2w.vision = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Default_4w.accel = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Default_4w.boostStats = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Default_4w.brake = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Default_4w.panic = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Default_4w.steering = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Default_4w.steeringReverse = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Default_4w.stopping = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Default_4w.traction = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Default_4w.vision = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Default_Delamain.accel = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Default_Delamain.boostStats = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Default_Delamain.brake = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Default_Delamain.panic = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Default_Delamain.steering = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Default_Delamain.steeringReverse = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Default_Delamain.stopping = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Default_Delamain.traction = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Default_Delamain.vision = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Default_Driving.accel = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Default_Driving.boostStats = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Default_Driving.brake = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Default_Driving.panic = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Default_Driving.steering = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Default_Driving.steeringReverse = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Default_Driving.stopping = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Default_Driving.traction = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Default_Driving.vision = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Default_Driving_inline0.D = f=0.200000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Default_Driving_inline0.I = f=0.500000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Default_Driving_inline0.P = f=0.500000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Default_Driving_inline0.definitions = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Default_Driving_inline0.integratorClampingLimit = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Default_Driving_inline0.outputSaturationLimit = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Default_Driving_inline1.decreaseMul = f=3.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Default_Driving_inline1.errorMagnitudeForFullBrakingChange = f=4.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Default_Driving_inline1.errorMagnitudeForMildBrakingChange = f=1.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Default_Driving_inline1.fullBrakingChangeSpeed = f=4.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Default_Driving_inline1.mildBrakingChangeSpeed = f=2.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Default_Driving_inline2.maxLatTractionBoost = f=0.500000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Default_Driving_inline2.maxLongTractionBoost = f=0.500000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Default_Driving_inline2.maxTorqueBoost = f=1.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Default_Driving_inline3.D = f=0.200000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Default_Driving_inline3.I = f=0.500000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Default_Driving_inline3.P = f=0.500000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Default_Driving_inline3.integratorClampingLimit = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Default_Driving_inline3.outputSaturationLimit = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Default_Driving_inline4.D = f=-9999.000000 b=false i=-9999 fk=
+[15:22:02][info] reds: tdb: Driving.Default_Driving_inline4.I = f=-9999.000000 b=false i=-9999 fk=
+[15:22:02][info] reds: tdb: Driving.Default_Driving_inline4.P = f=-9999.000000 b=false i=-9999 fk=
+[15:22:02][info] reds: tdb: Driving.Default_Driving_inline4.errorMagnitudeForFullSteering = f=1.500000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Default_Driving_inline4.errorMagnitudeForMildSteering = f=0.500000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Default_Driving_inline4.fullSteeringSpeed = f=10.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Default_Driving_inline4.increaseSteeringDistForAvoidance = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Default_Driving_inline4.maxTargetDistance = f=8.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Default_Driving_inline4.mildSteeringSpeed = f=2.500000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Default_Driving_inline4.minTargetDistance = f=6.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Default_Driving_inline4.speedForMaxDistance = f=30.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Default_Driving_inline4.speedForMinDistance = f=6.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Default_Driving_inline4.vehicleMaxTurnSpeed = f=10000.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Default_Driving_inline4.vehicleMinTurnSpeed = f=100.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Default_Driving_inline5.errorMagnitudeForFullSteering = f=2.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Default_Driving_inline5.errorMagnitudeForMildSteering = f=1.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Default_Driving_inline5.fullSteeringSpeed = f=7.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Default_Driving_inline5.increaseSteeringDistForAvoidance = f=0.000000 b=true i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Default_Driving_inline5.maxLatTractionBoost = f=-9999.000000 b=false i=-9999 fk=
+[15:22:02][info] reds: tdb: Driving.Default_Driving_inline5.maxLongTractionBoost = f=-9999.000000 b=false i=-9999 fk=
+[15:22:02][info] reds: tdb: Driving.Default_Driving_inline5.maxTargetDistance = f=15.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Default_Driving_inline5.maxTorqueBoost = f=-9999.000000 b=false i=-9999 fk=
+[15:22:02][info] reds: tdb: Driving.Default_Driving_inline5.mildSteeringSpeed = f=4.500000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Default_Driving_inline5.minTargetDistance = f=6.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Default_Driving_inline5.speedForMaxDistance = f=30.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Default_Driving_inline5.speedForMinDistance = f=6.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Default_Driving_inline5.vehicleMaxTurnSpeed = f=500.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Default_Driving_inline5.vehicleMinTurnSpeed = f=100.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Default_Driving_inline6.maxDistance = f=13.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Default_Driving_inline6.maxStraightPathExtension = f=10.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Default_Driving_inline6.minDistance = f=3.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Default_Driving_inline6.numSweeps = f=0.000000 b=false i=30 fk=
+[15:22:02][info] reds: tdb: Driving.Default_Driving_inline6.offsetSmoothingFastChangeSpeed = f=10.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Default_Driving_inline6.offsetSmoothingReturnToNeutralSpeed = f=4.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Default_Driving_inline6.sideOverlapForwardOffset = f=0.500000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Default_Driving_inline6.sideOverlapLateralScale = f=0.750000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Default_Driving_inline6.sideOverlapLongitudinalScale = f=1.500000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Default_Driving_inline6.speedLimitDeceleration = f=7.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Default_Driving_inline6.speedLimitSafetyMargin = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Default_Driving_inline6.useSpeedLimit = f=0.000000 b=true i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Default_Driving_inline7.brakingAccelFactor = f=1.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Default_Driving_inline7.forwardAccelFactor = f=1.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Default_Driving_inline7.turningAccelFactor = f=1.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Default_Galena_Nomad.accel = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Default_Galena_Nomad.boostStats = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Default_Galena_Nomad.brake = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Default_Galena_Nomad.panic = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Default_Galena_Nomad.steering = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Default_Galena_Nomad.steeringReverse = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Default_Galena_Nomad.stopping = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Default_Galena_Nomad.traction = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Default_Galena_Nomad.vision = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Default_Thorton_Colby.accel = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Default_Thorton_Colby.boostStats = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Default_Thorton_Colby.brake = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Default_Thorton_Colby.panic = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Default_Thorton_Colby.steering = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Default_Thorton_Colby.steeringReverse = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Default_Thorton_Colby.stopping = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Default_Thorton_Colby.traction = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Default_Thorton_Colby.vision = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Panic_Driving.accel = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Panic_Driving.boostStats = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Panic_Driving.brake = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Panic_Driving.panic = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Panic_Driving.steering = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Panic_Driving.steeringReverse = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Panic_Driving.stopping = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Panic_Driving.traction = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Panic_Driving.vision = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Panic_Driving_inline0.errorMagnitudeForFullSteering = f=2.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Panic_Driving_inline0.errorMagnitudeForMildSteering = f=1.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Panic_Driving_inline0.fullSteeringSpeed = f=7.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Panic_Driving_inline0.increaseSteeringDistForAvoidance = f=0.000000 b=true i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Panic_Driving_inline0.maxTargetDistance = f=15.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Panic_Driving_inline0.mildSteeringSpeed = f=4.500000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Panic_Driving_inline0.minTargetDistance = f=6.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Panic_Driving_inline0.speedForMaxDistance = f=30.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Panic_Driving_inline0.speedForMinDistance = f=6.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Panic_Driving_inline0.vehicleMaxTurnSpeed = f=500.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Panic_Driving_inline0.vehicleMinTurnSpeed = f=100.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Panic_Driving_inline1.maxDistance = f=14.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Panic_Driving_inline1.maxStraightPathExtension = f=10.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Panic_Driving_inline1.minDistance = f=4.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Panic_Driving_inline1.numSweeps = f=0.000000 b=false i=30 fk=
+[15:22:02][info] reds: tdb: Driving.Panic_Driving_inline1.offsetSmoothingFastChangeSpeed = f=10.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Panic_Driving_inline1.offsetSmoothingReturnToNeutralSpeed = f=4.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Panic_Driving_inline1.sideOverlapForwardOffset = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Panic_Driving_inline1.sideOverlapLateralScale = f=1.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Panic_Driving_inline1.sideOverlapLongitudinalScale = f=1.200000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Panic_Driving_inline1.speedLimitDeceleration = f=7.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Panic_Driving_inline1.speedLimitSafetyMargin = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Panic_Driving_inline1.useSpeedLimit = f=0.000000 b=true i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Panic_Driving_inline2.maxLatTractionBoost = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Panic_Driving_inline2.maxLongTractionBoost = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Panic_Driving_inline2.maxTorqueBoost = f=1.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Panic_Regular.accel = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Panic_Regular.boostStats = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Panic_Regular.brake = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Panic_Regular.panic = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Panic_Regular.steering = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Panic_Regular.steeringReverse = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Panic_Regular.stopping = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Panic_Regular.traction = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Panic_Regular.vision = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Panic_Regular_inline0.errorMagnitudeForFullSteering = f=2.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Panic_Regular_inline0.errorMagnitudeForMildSteering = f=1.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Panic_Regular_inline0.fullSteeringSpeed = f=7.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Panic_Regular_inline0.increaseSteeringDistForAvoidance = f=0.000000 b=true i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Panic_Regular_inline0.maxTargetDistance = f=15.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Panic_Regular_inline0.mildSteeringSpeed = f=4.500000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Panic_Regular_inline0.minTargetDistance = f=6.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Panic_Regular_inline0.speedForMaxDistance = f=30.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Panic_Regular_inline0.speedForMinDistance = f=6.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Panic_Regular_inline0.vehicleMaxTurnSpeed = f=500.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Panic_Regular_inline0.vehicleMinTurnSpeed = f=100.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Panic_Sport.accel = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Panic_Sport.boostStats = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Panic_Sport.brake = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Panic_Sport.panic = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Panic_Sport.steering = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Panic_Sport.steeringReverse = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Panic_Sport.stopping = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Panic_Sport.traction = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Panic_Sport.vision = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Panic_Sport_inline0.errorMagnitudeForFullSteering = f=2.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Panic_Sport_inline0.errorMagnitudeForMildSteering = f=1.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Panic_Sport_inline0.fullSteeringSpeed = f=7.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Panic_Sport_inline0.increaseSteeringDistForAvoidance = f=0.000000 b=true i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Panic_Sport_inline0.maxTargetDistance = f=15.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Panic_Sport_inline0.mildSteeringSpeed = f=4.500000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Panic_Sport_inline0.minTargetDistance = f=6.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Panic_Sport_inline0.speedForMaxDistance = f=30.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Panic_Sport_inline0.speedForMinDistance = f=6.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Panic_Sport_inline0.vehicleMaxTurnSpeed = f=500.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Panic_Sport_inline0.vehicleMinTurnSpeed = f=100.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Panic_Sport_inline1.maxLatTractionBoost = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Panic_Sport_inline1.maxLongTractionBoost = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Panic_Sport_inline1.maxTorqueBoost = f=0.500000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Police_Cortes.accel = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Police_Cortes.boostStats = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Police_Cortes.brake = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Police_Cortes.panic = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Police_Cortes.steering = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Police_Cortes.steeringReverse = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Police_Cortes.stopping = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Police_Cortes.traction = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Police_Cortes.vision = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Police_Cortes_inline0.maxLatTractionBoost = f=1.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Police_Cortes_inline0.maxLongTractionBoost = f=1.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Police_Cortes_inline0.maxTorqueBoost = f=3.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Race_Driving.accel = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Race_Driving.boostStats = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Race_Driving.brake = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Race_Driving.panic = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Race_Driving.steering = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Race_Driving.steeringReverse = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Race_Driving.stopping = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Race_Driving.traction = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Race_Driving.vision = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Race_Driving_inline0.errorMagnitudeForFullSteering = f=2.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Race_Driving_inline0.errorMagnitudeForMildSteering = f=1.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Race_Driving_inline0.fullSteeringSpeed = f=10.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Race_Driving_inline0.increaseSteeringDistForAvoidance = f=0.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Race_Driving_inline0.maxTargetDistance = f=18.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Race_Driving_inline0.mildSteeringSpeed = f=4.500000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Race_Driving_inline0.minTargetDistance = f=13.500000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Race_Driving_inline0.speedForMaxDistance = f=30.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Race_Driving_inline0.speedForMinDistance = f=6.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Race_Driving_inline0.vehicleMaxTurnSpeed = f=10000.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Race_Driving_inline0.vehicleMinTurnSpeed = f=100.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Race_Driving_inline1.maxDistance = f=13.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Race_Driving_inline1.maxStraightPathExtension = f=10.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Race_Driving_inline1.minDistance = f=3.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Race_Driving_inline1.numSweeps = f=0.000000 b=false i=16 fk=
+[15:22:02][info] reds: tdb: Driving.Race_Driving_inline1.offsetSmoothingFastChangeSpeed = f=10.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Race_Driving_inline1.offsetSmoothingReturnToNeutralSpeed = f=4.000000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Race_Driving_inline1.sideOverlapForwardOffset = f=0.500000 b=false i=0 fk=
+[15:22:02][info] reds: tdb: Driving.Race_Driving_inline1.sideOverlapLateralScale = f=0.750000 b=false i=0 fk=
+[15:22:02][info] reds: diag: Codeware diagnostic attached; first round in 15 s
+[15:22:05][info] reds: banner attached to gameuiCrosshairContainerController
+[15:22:21][info] reds: diag round (player -2736,-2648)
+[15:22:21][info] reds: diag HASH ours: engine=-1620838924886269629 pace=-1620838924886269629 MATCH
+[15:22:21][info] reds: diag HASH vanilla cleaning machine: engine=726173489613140086 pace=726173489613140086 MATCH
+[15:22:21][info] reds: diag: depot says our sector exists=true our block exists=true
+[15:22:21][info] reds: diag BLOCKS: the live streaming world lists 0 block(s)
+[15:22:21][info] reds: diag SECTOR OURS legs_000: category=0 level=6 nodes=40 setups=40 refs=40
+[15:22:21][info] reds: diag SECTOR OURS legs_000 node 0 worldRaceSplineNode: engine ref=-1620838924886269629 == Pace's hash of $/mod/ncm_pace/#leg_a_bit_-2832_-2675__allfoods_intersection_-558_2522
+[15:22:21][info] reds: diag SECTOR OURS legs_000 node 1 worldRaceSplineNode: engine ref=300606465662302746 (Pace's hash of $/mod/ncm_pace/#leg_a_bit_-2832_-2675__allfoods_intersection_-558_2522 is -1620838924886269629)
+[15:22:21][info] reds: diag SECTOR OURS legs_000 node 2 worldRaceSplineNode: engine ref=-4093677892574074483 (Pace's hash of $/mod/ncm_pace/#leg_a_bit_-2832_-2675__allfoods_intersection_-558_2522 is -1620838924886269629)
+[15:22:21][info] reds: diag SECTOR VANILLA exterior_-2_0_0_4: still loading
+[15:22:21][info] reds: splineprobe [player -2736,-2648] OURS corpo_plaza->waterfront: start=true (-1103,-19) end=true (-531,2718) node=true (-1103,-19) path=$/mod/ncm_pace/#leg_corpo_plaza_-1103_-19__waterfront_-569_2648
+[15:22:21][info] reds: splineprobe [player -2736,-2648] OURS hanford->stadium: start=false end=false node=false path=$/mod/ncm_pace/#leg_hanford_overpass_-1281_-1107__stadium_-1326_-1656
+[15:22:21][info] reds: splineprobe [player -2736,-2648] VANILLA sq024 open-world (level 6): start=true (-723,-498) end=true (-2636,-398) node=true (-740,-518) path=$/03_night_city/#c_city_center/corpo_plaza/loc_sq024_citycenter_racetrack_prefabK3D7W4Y/loc_sq024_citycenter_racetrack_openworld_prefabPMPERBY/#test_nc_sq024_c
+[15:22:21][info] reds: splineprobe [player -2736,-2648] VANILLA cleaning machine (level 4, Corpo Plaza -1447,25): start=false end=false node=false path=$/03_night_city/#c_city_center/corpo_plaza/corpo_plaza_openworld_prefabKKRD5RI/corpo_plaza_openworld_community_prefabMBEYQOY/#cct_cpz_roundabout_cleaning_machine_spl
+[15:22:21][info] reds: splineprobe [player -2736,-2648] VANILLA cleaning machine, LOWER-CASE path: start=false end=false node=false path=$/03_night_city/#c_city_center/corpo_plaza/corpo_plaza_openworld_prefabkkrd5ri/corpo_plaza_openworld_community_prefabmbeyqoy/#cct_cpz_roundabout_cleaning_machine_spl
+[15:22:36][info] reds: diag round (player -2736,-2648)
+[15:22:36][info] reds: diag SECTOR VANILLA exterior_-2_0_0_4: category=0 level=4 nodes=1575 setups=1639 refs=741
+[15:22:36][info] reds: diag SECTOR VANILLA exterior_-2_0_0_4 node 25 worldSpeedSplineNode: engine ref=726173489613140086 == Pace's hash of $/03_night_city/#c_city_center/corpo_plaza/corpo_plaza_openworld_prefabKKRD5RI/corpo_plaza_openworld_community_prefabMBEYQOY/#cct_cpz_roundabout_cleaning_machine_spl
+[15:22:51][info] reds: diag round (player -2735,-2648)
+[15:23:06][info] reds: diag round (player -2730,-2645)
+[15:23:21][info] reds: diag round (player -2730,-2645)
+[15:23:36][info] reds: diag round (player -2730,-2645)
+[15:23:51][info] reds: diag round (player -2730,-2645)
+[15:24:06][info] reds: diag round (player -2728,-2643)
+[15:24:21][info] reds: diag round (player -2703,-2627)
+[15:24:36][info] reds: diag round (player -2422,-2490)
+[15:25:08][info] reds: splineprobe [player -1699,-1965] OURS hanford->stadium: start=true (-1281,-1107) end=true (-1323,-1736) node=true (-1281,-1107) path=$/mod/ncm_pace/#leg_hanford_overpass_-1281_-1107__stadium_-1326_-1656
+[15:25:38][info] reds: splineprobe [player -1363,-1227] VANILLA cleaning machine (level 4, Corpo Plaza -1447,25): start=true (-1456,23) end=true (-1456,23) node=true (-1448,25) path=$/03_night_city/#c_city_center/corpo_plaza/corpo_plaza_openworld_prefabKKRD5RI/corpo_plaza_openworld_community_prefabMBEYQOY/#cct_cpz_roundab
+[15:26:24][info] reds: splineprobe [player -383,-21] OURS hanford->stadium: start=false end=false node=false path=$/mod/ncm_pace/#leg_hanford_overpass_-1281_-1107__stadium_-1326_-1656
+[15:26:55][info] reds: splineprobe [player -176,703] VANILLA cleaning machine (level 4, Corpo Plaza -1447,25): start=false end=false node=false path=$/03_night_city/#c_city_center/corpo_plaza/corpo_plaza_openworld_prefabKKRD5RI/corpo_plaza_openworld_community_prefabMBEYQOY/#cct_cpz_roundabout_cleaning_machine_spl
+[15:28:08][info] reds: area: null area 1 over 505.00, 1229.00 (+/-140.00 m) for 178 s
+[15:29:30][info] accepted drive.start (595 bytes)
+[15:29:30][info] road speed plan ready: 1/1 legs, continuous profile
+[15:29:30][info] accepted car.add (118 bytes)
+[15:29:30][info] accepted car.add (118 bytes)
+[15:29:30][info] accepted car.add (118 bytes)
+[15:29:30][info] accepted car.add (118 bytes)
+[15:29:30][info] accepted car.add (118 bytes)
+[15:29:31][info] accepted car.add (118 bytes)
+[15:29:31][info] accepted car.add (118 bytes)
+[15:29:31][info] accepted car.add (118 bytes)
+[15:29:31][info] accepted car.add (118 bytes)
+[15:29:32][info] accepted car.add (118 bytes)
+[15:29:32][info] accepted car.add (118 bytes)
+[15:29:32][info] accepted car.add (118 bytes)
+[15:29:51][info] car 9 DROPOUT #1: not reported for 1.5 s (the game has no vehicle for it); last at 0,0, 0.0 m/s, point 1/2
+[15:30:00][info] reds: car 0: racing leg 0
+[15:30:00][info] reds: car 1: racing leg 0
+[15:30:00][info] reds: car 2: racing leg 0
+[15:30:00][info] reds: car 3: racing leg 0
+[15:30:00][info] reds: car 4: racing leg 0
+[15:30:00][info] reds: car 5: racing leg 0
+[15:30:00][info] reds: car 6: racing leg 0
+[15:30:00][info] reds: car 7: racing leg 0
+[15:30:00][info] reds: car 8: racing leg 0
+[15:30:00][info] reds: car 10: racing leg 0
+[15:30:00][info] reds: car 11: racing leg 0
+[15:30:00][info] car 0 race cmd 1: go, leg 1/1 at 507,1236 0.0 m/s, spline $/mod/ncm_pace/#leg_hill_abode_505_1229__ebunike_-1336_-713 (c3bb61aa70770963)
+[15:30:00][info] car 0 status: at 507,1236 0.0 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:30:00][info] car 1 race cmd 1: go, leg 1/1 at 515,1236 0.0 m/s, spline $/mod/ncm_pace/#leg_hill_abode_505_1229__ebunike_-1336_-713 (c3bb61aa70770963)
+[15:30:00][info] car 1 status: at 515,1236 0.0 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:30:00][info] car 2 race cmd 1: go, leg 1/1 at 508,1248 0.0 m/s, spline $/mod/ncm_pace/#leg_hill_abode_505_1229__ebunike_-1336_-713 (c3bb61aa70770963)
+[15:30:00][info] car 2 status: at 508,1248 0.0 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:30:00][info] car 3 race cmd 1: go, leg 1/1 at 516,1248 0.0 m/s, spline $/mod/ncm_pace/#leg_hill_abode_505_1229__ebunike_-1336_-713 (c3bb61aa70770963)
+[15:30:00][info] car 3 status: at 516,1248 0.0 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:30:00][info] car 4 race cmd 1: go, leg 1/1 at 508,1260 0.0 m/s, spline $/mod/ncm_pace/#leg_hill_abode_505_1229__ebunike_-1336_-713 (c3bb61aa70770963)
+[15:30:00][info] car 4 status: at 508,1260 0.0 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:30:00][info] car 5 race cmd 1: go, leg 1/1 at 516,1260 0.0 m/s, spline $/mod/ncm_pace/#leg_hill_abode_505_1229__ebunike_-1336_-713 (c3bb61aa70770963)
+[15:30:00][info] car 5 status: at 516,1260 0.0 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:30:00][info] car 6 race cmd 1: go, leg 1/1 at 508,1272 0.0 m/s, spline $/mod/ncm_pace/#leg_hill_abode_505_1229__ebunike_-1336_-713 (c3bb61aa70770963)
+[15:30:00][info] car 6 status: at 508,1272 0.0 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:30:00][info] car 7 race cmd 1: go, leg 1/1 at 516,1272 0.0 m/s, spline $/mod/ncm_pace/#leg_hill_abode_505_1229__ebunike_-1336_-713 (c3bb61aa70770963)
+[15:30:00][info] car 7 status: at 516,1272 0.0 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:30:00][info] car 8 OFF the road plan at 508,1284: nearest plan point 53 m (index 2/497)
+[15:30:00][info] car 8 race cmd 1: go, leg 1/1 at 508,1284 0.0 m/s, spline $/mod/ncm_pace/#leg_hill_abode_505_1229__ebunike_-1336_-713 (c3bb61aa70770963)
+[15:30:00][info] car 8 status: at 508,1284 0.0 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:30:00][info] car 10 OFF the road plan at 508,1296: nearest plan point 65 m (index 2/497)
+[15:30:00][info] car 10 race cmd 1: go, leg 1/1 at 508,1296 0.0 m/s, spline $/mod/ncm_pace/#leg_hill_abode_505_1229__ebunike_-1336_-713 (c3bb61aa70770963)
+[15:30:00][info] car 10 status: at 508,1296 0.0 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:30:00][info] car 11 OFF the road plan at 516,1314: nearest plan point 84 m (index 2/497)
+[15:30:00][info] car 11 race cmd 1: go, leg 1/1 at 516,1314 0.0 m/s, spline $/mod/ncm_pace/#leg_hill_abode_505_1229__ebunike_-1336_-713 (c3bb61aa70770963)
+[15:30:00][info] car 11 status: at 516,1314 0.0 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:30:01][info] car 8 back on the road plan at 507,1281: nearest plan point 50 m (index 2/497)
+[15:30:02][info] car 10 back on the road plan at 501,1282: nearest plan point 50 m (index 3/497)
+[15:30:03][info] accepted car.remove (76 bytes)
+[15:30:05][info] car 0 status: at 457,1238 18.5 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:30:05][info] car 1 status: at 466,1234 20.5 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:30:05][info] car 2 status: at 496,1232 13.2 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:30:05][info] car 3 status: at 471,1239 14.9 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:30:05][info] car 4 status: at 504,1258 0.3 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:30:05][info] car 5 status: at 511,1254 0.4 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:30:05][info] car 6 status: at 498,1254 0.5 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:30:05][info] car 7 status: at 515,1256 3.1 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:30:05][info] car 8 status: at 505,1278 0.7 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:30:05][info] car 10 status: at 495,1277 2.0 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:30:05][info] car 11 status: at 513,1299 0.1 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:30:09][info] reds: car 6: racing leg 0
+[15:30:09][info] car 6 race cmd 2: stalled: fresh command, leg 1/1 at 499,1254 0.7 m/s, spline $/mod/ncm_pace/#leg_hill_abode_505_1229__ebunike_-1336_-713 (c3bb61aa70770963)
+[15:30:10][info] car 0 status: at 406,1303 21.8 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:30:10][info] car 1 status: at 411,1242 3.1 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:30:10][info] car 2 status: at 413,1250 14.9 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:30:10][info] car 3 status: at 405,1257 15.6 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:30:10][info] car 4 status: at 508,1260 1.3 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:30:10][info] car 5 status: at 509,1254 3.4 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:30:10][info] car 6 status: at 498,1253 4.8 m/s, leg 1/1, point 1/2, cmds 2, dropouts 0
+[15:30:10][info] car 7 status: at 515,1242 24.4 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:30:10][info] car 8 status: at 502,1277 1.2 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:30:10][info] car 10 status: at 496,1278 0.4 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:30:10][info] car 11 status: at 512,1291 1.2 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:30:11][info] car 11 back on the road plan at 508,1280: nearest plan point 50 m (index 2/497)
+[15:30:12][info] reds: car 1: command ended success
+[15:30:12][info] accepted car.remove (76 bytes)
+[15:30:15][info] car 0 status: at 396,1402 21.1 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:30:15][info] car 2 status: at 420,1354 23.6 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:30:15][info] car 3 status: at 423,1365 23.0 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:30:15][info] car 4 status: at 477,1233 18.3 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:30:15][info] car 5 status: at 478,1231 16.5 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:30:15][info] car 6 status: at 429,1240 19.3 m/s, leg 1/1, point 1/2, cmds 2, dropouts 0
+[15:30:15][info] car 7 status: at 470,1236 13.7 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:30:15][info] car 8 status: at 498,1273 2.3 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:30:15][info] car 10 status: at 476,1248 33.0 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:30:15][info] car 11 status: at 485,1243 17.0 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:30:19][info] accepted car.remove (76 bytes)
+[15:30:19][info] accepted car.remove (76 bytes)
+[15:30:20][info] car 0 status: at 330,1344 23.6 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:30:20][info] car 2 status: at 357,1399 18.9 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:30:20][info] car 3 status: at 352,1394 18.9 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:30:20][info] car 4 status: at 409,1257 20.0 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:30:20][info] car 5 status: at 408,1248 20.7 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:30:20][info] car 6 status: at 417,1338 24.4 m/s, leg 1/1, point 1/2, cmds 2, dropouts 0
+[15:30:20][info] car 7 status: at 405,1271 18.5 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:30:20][info] car 11 status: at 405,1259 17.4 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:30:23][info] accepted car.add (118 bytes)
+[15:30:23][info] reds: car 12: racing leg 0
+[15:30:23][info] car 12 OFF the road plan at 508,1296: nearest plan point 66 m (index 2/497)
+[15:30:23][info] car 12 race cmd 1: go, leg 1/1 at 508,1296 0.0 m/s, spline $/mod/ncm_pace/#leg_hill_abode_505_1229__ebunike_-1336_-713 (c3bb61aa70770963)
+[15:30:23][info] car 12 status: at 508,1296 0.0 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:30:23][info] accepted car.remove (76 bytes)
+[15:30:24][info] accepted car.add (119 bytes)
+[15:30:24][info] reds: car 13: racing leg 0
+[15:30:24][info] car 13 OFF the road plan at 508,1284: nearest plan point 55 m (index 2/497)
+[15:30:24][info] car 13 race cmd 1: go, leg 1/1 at 508,1284 0.0 m/s, spline $/mod/ncm_pace/#leg_hill_abode_505_1229__ebunike_-1336_-713 (c3bb61aa70770963)
+[15:30:24][info] car 13 status: at 508,1284 0.0 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:30:24][info] accepted car.remove (76 bytes)
+[15:30:25][info] car 0 status: at 278,1229 13.6 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:30:25][info] car 2 status: at 319,1284 29.6 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:30:25][info] car 3 status: at 315,1282 28.0 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:30:25][info] car 4 status: at 422,1375 22.6 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:30:25][info] car 5 status: at 426,1358 14.4 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:30:25][info] car 6 status: at 368,1408 18.9 m/s, leg 1/1, point 1/2, cmds 2, dropouts 0
+[15:30:25][info] car 7 status: at 413,1392 22.0 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:30:25][info] car 11 status: at 421,1369 22.5 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:30:27][info] accepted car.add (119 bytes)
+[15:30:27][info] reds: car 14: racing leg 0
+[15:30:27][info] car 14 OFF the road plan at 508,1296: nearest plan point 66 m (index 2/497)
+[15:30:27][info] car 14 race cmd 1: go, leg 1/1 at 508,1296 0.0 m/s, spline $/mod/ncm_pace/#leg_hill_abode_505_1229__ebunike_-1336_-713 (c3bb61aa70770963)
+[15:30:27][info] car 14 status: at 508,1296 0.0 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:30:27][info] accepted car.remove (76 bytes)
+[15:30:28][info] accepted car.remove (76 bytes)
+[15:30:28][info] accepted car.remove (76 bytes)
+[15:30:28][info] accepted car.add (118 bytes)
+[15:30:28][info] reds: car 15: racing leg 0
+[15:30:28][info] car 15 OFF the road plan at 508,1284: nearest plan point 55 m (index 2/497)
+[15:30:28][info] car 15 race cmd 1: go, leg 1/1 at 508,1284 0.0 m/s, spline $/mod/ncm_pace/#leg_hill_abode_505_1229__ebunike_-1336_-713 (c3bb61aa70770963)
+[15:30:28][info] car 15 status: at 508,1284 0.0 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:30:28][info] accepted car.remove (76 bytes)
+[15:30:28][info] accepted car.remove (76 bytes)
+[15:30:30][info] car 0 status: at 228,1279 20.1 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:30:30][info] car 2 status: at 258,1252 13.4 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:30:30][info] car 3 status: at 257,1260 15.0 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:30:30][info] car 6 status: at 322,1310 28.3 m/s, leg 1/1, point 1/2, cmds 2, dropouts 0
+[15:30:30][info] car 7 status: at 338,1367 22.0 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:30:32][info] accepted car.add (119 bytes)
+[15:30:32][info] reds: car 16: racing leg 0
+[15:30:32][info] car 16 race cmd 1: go, leg 1/1 at 320,1306 0.0 m/s, spline $/mod/ncm_pace/#leg_hill_abode_505_1229__ebunike_-1336_-713 (c3bb61aa70770963)
+[15:30:32][info] car 16 status: at 320,1306 0.0 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:30:33][info] accepted car.add (118 bytes)
+[15:30:33][info] reds: car 17: racing leg 0
+[15:30:33][info] accepted car.add (118 bytes)
+[15:30:33][info] car 17 race cmd 1: go, leg 1/1 at 322,1315 0.0 m/s, spline $/mod/ncm_pace/#leg_hill_abode_505_1229__ebunike_-1336_-713 (c3bb61aa70770963)
+[15:30:33][info] car 17 status: at 322,1315 0.0 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:30:33][info] reds: car 18: racing leg 0
+[15:30:33][info] car 18 race cmd 1: go, leg 1/1 at 317,1293 0.0 m/s, spline $/mod/ncm_pace/#leg_hill_abode_505_1229__ebunike_-1336_-713 (c3bb61aa70770963)
+[15:30:33][info] car 18 status: at 317,1293 0.0 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:30:35][info] car 0 status: at 142,1269 2.9 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:30:35][info] car 2 status: at 165,1265 24.4 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:30:35][info] car 3 status: at 170,1271 9.4 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:30:35][info] car 6 status: at 267,1243 12.5 m/s, leg 1/1, point 1/2, cmds 2, dropouts 0
+[15:30:35][info] car 7 status: at 319,1283 12.3 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:30:37][info] car 16 status: at 320,1306 0.0 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:30:38][info] car 17 status: at 327,1314 0.0 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:30:38][info] car 18 status: at 324,1293 0.0 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:30:39][info] accepted car.remove (76 bytes)
+[15:30:39][info] reds: car 16: racing leg 0
+[15:30:39][info] car 16 race cmd 2: stalled: fresh command, leg 1/1 at 320,1306 0.0 m/s, spline $/mod/ncm_pace/#leg_hill_abode_505_1229__ebunike_-1336_-713 (c3bb61aa70770963)
+[15:30:40][info] car 0 status: at 130,1267 1.0 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:30:40][info] car 3 status: at 97,1244 22.6 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:30:40][info] car 6 status: at 182,1274 25.3 m/s, leg 1/1, point 1/2, cmds 2, dropouts 0
+[15:30:40][info] car 7 status: at 262,1255 16.3 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:30:41][info] reds: car 17: racing leg 0
+[15:30:41][info] car 17 race cmd 2: stalled: fresh command, leg 1/1 at 327,1314 0.0 m/s, spline $/mod/ncm_pace/#leg_hill_abode_505_1229__ebunike_-1336_-713 (c3bb61aa70770963)
+[15:30:42][info] reds: car 18: racing leg 0
+[15:30:42][info] car 18 race cmd 2: stalled: fresh command, leg 1/1 at 324,1293 0.0 m/s, spline $/mod/ncm_pace/#leg_hill_abode_505_1229__ebunike_-1336_-713 (c3bb61aa70770963)
+[15:30:42][info] car 16 status: at 320,1306 0.0 m/s, leg 1/1, point 1/2, cmds 2, dropouts 0
+[15:30:42][info] accepted car.remove (76 bytes)
+[15:30:42][info] reds: car 0: racing leg 0
+[15:30:42][info] car 0 race cmd 2: stalled: fresh command, leg 1/1 at 126,1265 1.4 m/s, spline $/mod/ncm_pace/#leg_hill_abode_505_1229__ebunike_-1336_-713 (c3bb61aa70770963)
+[15:30:42][info] accepted car.remove (76 bytes)
+[15:30:42][info] accepted car.remove (76 bytes)
+[15:30:44][info] accepted car.remove (76 bytes)
+[15:30:45][info] reds: car 7: command ended success
+[15:30:45][info] car 0 status: at 124,1264 1.3 m/s, leg 1/1, point 1/2, cmds 2, dropouts 0
+[15:30:45][info] car 6 status: at 89,1229 17.8 m/s, leg 1/1, point 1/2, cmds 2, dropouts 0
+[15:30:45][info] car 7 status: at 175,1273 10.4 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:30:45][info] accepted car.remove (76 bytes)
+[15:30:50][info] car 0 status: at 124,1272 8.1 m/s, leg 1/1, point 1/2, cmds 2, dropouts 0
+[15:30:50][info] car 6 status: at 47,1132 27.0 m/s, leg 1/1, point 1/2, cmds 2, dropouts 0
+[15:30:50][info] accepted car.remove (76 bytes)
+[15:30:53][info] accepted car.add (119 bytes)
+[15:30:53][info] reds: car 19: racing leg 0
+[15:30:53][info] car 19 race cmd 1: go, leg 1/1 at 61,1172 0.0 m/s, spline $/mod/ncm_pace/#leg_hill_abode_505_1229__ebunike_-1336_-713 (c3bb61aa70770963)
+[15:30:53][info] car 19 status: at 61,1172 0.0 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:30:54][info] accepted car.add (118 bytes)
+[15:30:54][info] reds: car 20: racing leg 0
+[15:30:54][info] car 20 race cmd 1: go, leg 1/1 at 52,1148 0.0 m/s, spline $/mod/ncm_pace/#leg_hill_abode_505_1229__ebunike_-1336_-713 (c3bb61aa70770963)
+[15:30:54][info] car 20 status: at 52,1148 0.0 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:30:55][info] car 6 status: at 32,994 28.4 m/s, leg 1/1, point 1/2, cmds 2, dropouts 0
+[15:30:56][info] accepted car.add (118 bytes)
+[15:30:56][info] reds: car 21: racing leg 0
+[15:30:56][info] car 21 race cmd 1: go, leg 1/1 at 38,1108 0.0 m/s, spline $/mod/ncm_pace/#leg_hill_abode_505_1229__ebunike_-1336_-713 (c3bb61aa70770963)
+[15:30:56][info] car 21 status: at 38,1108 0.0 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:30:56][info] accepted car.remove (76 bytes)
+[15:30:57][info] accepted car.add (119 bytes)
+[15:30:57][info] reds: car 22: racing leg 0
+[15:30:58][info] car 22 race cmd 1: go, leg 1/1 at 26,1061 0.0 m/s, spline $/mod/ncm_pace/#leg_hill_abode_505_1229__ebunike_-1336_-713 (c3bb61aa70770963)
+[15:30:58][info] car 22 status: at 26,1061 0.0 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:30:58][info] accepted car.remove (76 bytes)
+[15:30:58][info] accepted car.add (119 bytes)
+[15:30:58][info] reds: car 23: racing leg 0
+[15:30:58][info] car 23 race cmd 1: go, leg 1/1 at 26,1044 0.0 m/s, spline $/mod/ncm_pace/#leg_hill_abode_505_1229__ebunike_-1336_-713 (c3bb61aa70770963)
+[15:30:58][info] car 23 status: at 26,1044 0.0 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:30:58][info] car 19 status: at 35,1073 24.1 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:30:59][info] accepted car.add (119 bytes)
+[15:30:59][info] reds: car 24: racing leg 0
+[15:30:59][info] car 24 race cmd 1: go, leg 1/1 at 28,1029 0.0 m/s, spline $/mod/ncm_pace/#leg_hill_abode_505_1229__ebunike_-1336_-713 (c3bb61aa70770963)
+[15:30:59][info] car 24 status: at 28,1029 0.0 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:31:00][info] car 6 status: at 31,872 25.5 m/s, leg 1/1, point 1/2, cmds 2, dropouts 0
+[15:31:00][info] accepted car.remove (76 bytes)
+[15:31:00][info] accepted car.remove (76 bytes)
+[15:31:01][info] accepted car.remove (76 bytes)
+[15:31:03][info] accepted car.add (119 bytes)
+[15:31:03][info] reds: car 25: racing leg 0
+[15:31:03][info] car 25 race cmd 1: go, leg 1/1 at 24,934 0.0 m/s, spline $/mod/ncm_pace/#leg_hill_abode_505_1229__ebunike_-1336_-713 (c3bb61aa70770963)
+[15:31:03][info] car 25 status: at 24,934 0.0 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:31:03][info] car 19 status: at 38,946 17.4 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:31:04][info] accepted car.add (119 bytes)
+[15:31:04][info] accepted car.add (119 bytes)
+[15:31:04][info] reds: car 26: racing leg 0
+[15:31:04][info] reds: car 27: racing leg 0
+[15:31:04][info] car 26 race cmd 1: go, leg 1/1 at 29,911 0.0 m/s, spline $/mod/ncm_pace/#leg_hill_abode_505_1229__ebunike_-1336_-713 (c3bb61aa70770963)
+[15:31:04][info] car 26 status: at 29,911 0.0 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:31:04][info] car 27 race cmd 1: go, leg 1/1 at 26,927 0.0 m/s, spline $/mod/ncm_pace/#leg_hill_abode_505_1229__ebunike_-1336_-713 (c3bb61aa70770963)
+[15:31:04][info] car 27 status: at 26,927 0.0 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:31:04][info] accepted car.add (119 bytes)
+[15:31:04][info] reds: car 28: racing leg 0
+[15:31:04][info] car 28 race cmd 1: go, leg 1/1 at 27,920 0.0 m/s, spline $/mod/ncm_pace/#leg_hill_abode_505_1229__ebunike_-1336_-713 (c3bb61aa70770963)
+[15:31:04][info] car 28 status: at 27,920 0.0 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:31:05][info] car 6 status: at 30,822 3.4 m/s, leg 1/1, point 1/2, cmds 2, dropouts 0
+[15:31:05][info] accepted car.add (119 bytes)
+[15:31:05][info] reds: car 29: racing leg 0
+[15:31:05][info] car 29 race cmd 1: go, leg 1/1 at 29,895 0.0 m/s, spline $/mod/ncm_pace/#leg_hill_abode_505_1229__ebunike_-1336_-713 (c3bb61aa70770963)
+[15:31:05][info] car 29 status: at 29,895 0.0 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:31:08][info] car 25 status: at 37,935 7.1 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:31:08][info] car 19 status: at 73,908 7.6 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:31:09][info] car 26 status: at 29,910 0.0 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:31:09][info] car 27 status: at 34,923 2.7 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:31:09][info] car 28 status: at 33,907 15.2 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:31:10][info] car 6 status: at 9,804 0.7 m/s, leg 1/1, point 1/2, cmds 2, dropouts 0
+[15:31:10][info] car 29 status: at 28,873 24.7 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:31:13][info] car 25 status: at 41,840 14.2 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:31:13][info] car 19 status: at 43,822 3.4 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:31:14][info] car 26 status: at 9,801 12.7 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:31:14][info] car 27 status: at 65,833 9.6 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:31:14][info] car 28 status: at 51,827 0.0 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:31:15][info] car 6 status: at -27,798 10.3 m/s, leg 1/1, point 1/2, cmds 2, dropouts 0
+[15:31:15][info] car 29 status: at -5,848 6.0 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:31:18][info] car 25 status: at 52,843 4.8 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:31:18][info] car 6 OFF the road plan at -45,798: nearest plan point 50 m (index 209/497)
+[15:31:18][info] car 19 status: at 33,830 1.4 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:31:19][info] car 6 back on the road plan at -47,797: nearest plan point 50 m (index 263/497)
+[15:31:19][info] car 26 status: at -13,792 0.0 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:31:19][info] car 27 status: at 65,834 5.5 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:31:19][info] car 28 status: at 51,827 0.0 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:31:20][info] reds: car 28: racing leg 0
+[15:31:20][info] car 28 race cmd 2: stalled: fresh command, leg 1/1 at 51,827 0.0 m/s, spline $/mod/ncm_pace/#leg_hill_abode_505_1229__ebunike_-1336_-713 (c3bb61aa70770963)
+[15:31:20][info] car 6 status: at -49,797 0.9 m/s, leg 1/1, point 1/2, cmds 2, dropouts 0
+[15:31:20][info] car 29 status: at -1,850 0.0 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:31:22][info] accepted car.remove (76 bytes)
+[15:31:22][info] car 6 OFF the road plan at -46,792: nearest plan point 50 m (index 262/497)
+[15:31:22][info] reds: car 26: racing leg 0
+[15:31:22][info] car 26 race cmd 2: stalled: fresh command, leg 1/1 at -13,792 0.0 m/s, spline $/mod/ncm_pace/#leg_hill_abode_505_1229__ebunike_-1336_-713 (c3bb61aa70770963)
+[15:31:23][info] car 25 status: at 28,821 13.2 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:31:23][info] accepted car.remove (76 bytes)
+[15:31:23][info] accepted car.remove (76 bytes)
+[15:31:23][info] car 19 status: at 22,819 14.1 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:31:24][info] car 26 status: at -21,776 13.9 m/s, leg 1/1, point 1/2, cmds 2, dropouts 0
+[15:31:24][info] accepted car.add (116 bytes)
+[15:31:24][info] reds: car 30: racing leg 0
+[15:31:24][info] car 30 race cmd 1: go, leg 1/1 at -14,749 0.0 m/s, spline $/mod/ncm_pace/#leg_hill_abode_505_1229__ebunike_-1336_-713 (c3bb61aa70770963)
+[15:31:24][info] car 30 status: at -14,749 0.0 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:31:24][info] car 28 status: at 1,797 14.5 m/s, leg 1/1, point 1/2, cmds 2, dropouts 0
+[15:31:27][info] accepted car.add (119 bytes)
+[15:31:27][info] reds: car 31: racing leg 0
+[15:31:27][info] car 31 race cmd 1: go, leg 1/1 at 11,726 0.0 m/s, spline $/mod/ncm_pace/#leg_hill_abode_505_1229__ebunike_-1336_-713 (c3bb61aa70770963)
+[15:31:27][info] car 31 status: at 11,726 0.0 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:31:28][info] accepted car.add (119 bytes)
+[15:31:28][info] reds: car 32: racing leg 0
+[15:31:28][info] car 32 race cmd 1: go, leg 1/1 at 24,719 0.0 m/s, spline $/mod/ncm_pace/#leg_hill_abode_505_1229__ebunike_-1336_-713 (c3bb61aa70770963)
+[15:31:28][info] car 32 status: at 24,719 0.0 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:31:28][info] car 25 status: at -15,773 2.6 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:31:28][info] car 19 status: at -22,774 0.1 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:31:29][info] car 26 status: at 10,723 4.9 m/s, leg 1/1, point 1/2, cmds 2, dropouts 0
+[15:31:29][info] car 30 status: at -16,747 0.0 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:31:29][info] car 28 status: at -7,739 13.1 m/s, leg 1/1, point 1/2, cmds 2, dropouts 0
+[15:31:32][info] car 31 status: at 18,720 5.0 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:31:33][info] car 32 status: at 31,716 2.9 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:31:33][info] car 25 status: at -15,773 0.0 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:31:33][info] car 19 status: at -22,773 0.7 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:31:34][info] reds: car 19: racing leg 0
+[15:31:34][info] car 19 race cmd 2: stalled: fresh command, leg 1/1 at -22,772 0.7 m/s, spline $/mod/ncm_pace/#leg_hill_abode_505_1229__ebunike_-1336_-713 (c3bb61aa70770963)
+[15:31:34][info] car 26 status: at 13,721 0.2 m/s, leg 1/1, point 1/2, cmds 2, dropouts 0
+[15:31:34][info] reds: car 25: racing leg 0
+[15:31:34][info] car 25 race cmd 2: stalled: fresh command, leg 1/1 at -15,773 0.0 m/s, spline $/mod/ncm_pace/#leg_hill_abode_505_1229__ebunike_-1336_-713 (c3bb61aa70770963)
+[15:31:34][info] car 30 status: at -16,747 0.0 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:31:35][info] car 28 status: at 34,708 12.4 m/s, leg 1/1, point 1/2, cmds 2, dropouts 0
+[15:31:35][info] reds: car 30: racing leg 0
+[15:31:35][info] car 30 race cmd 2: stalled: fresh command, leg 1/1 at -16,747 0.0 m/s, spline $/mod/ncm_pace/#leg_hill_abode_505_1229__ebunike_-1336_-713 (c3bb61aa70770963)
+[15:31:36][info] reds: car 26: racing leg 0
+[15:31:36][info] car 26 race cmd 3: stalled: fresh command, leg 1/1 at 13,721 0.1 m/s, spline $/mod/ncm_pace/#leg_hill_abode_505_1229__ebunike_-1336_-713 (c3bb61aa70770963)
+[15:31:37][info] car 31 status: at 36,719 10.4 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:31:38][info] car 32 status: at 42,715 0.0 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:31:38][info] car 25 status: at 18,726 17.8 m/s, leg 1/1, point 1/2, cmds 2, dropouts 0
+[15:31:38][info] accepted car.remove (76 bytes)
+[15:31:38][info] car 19 status: at 5,734 14.1 m/s, leg 1/1, point 1/2, cmds 2, dropouts 0
+[15:31:39][info] accepted car.remove (76 bytes)
+[15:31:39][info] car 30 status: at -6,739 5.0 m/s, leg 1/1, point 1/2, cmds 2, dropouts 0
+[15:31:40][info] accepted car.remove (76 bytes)
+[15:31:40][info] accepted car.remove (76 bytes)
+[15:31:40][info] accepted car.remove (76 bytes)
+[15:31:40][info] accepted car.remove (76 bytes)
+[15:31:42][info] accepted car.remove (76 bytes)
+[15:31:42][info] accepted car.add (119 bytes)
+[15:31:42][info] reds: car 33: racing leg 0
+[15:31:42][info] car 33 race cmd 1: go, leg 1/1 at -57,727 0.0 m/s, spline $/mod/ncm_pace/#leg_hill_abode_505_1229__ebunike_-1336_-713 (c3bb61aa70770963)
+[15:31:42][info] car 33 status: at -57,727 0.0 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:31:45][info] accepted car.add (119 bytes)
+[15:31:45][info] reds: car 34: racing leg 0
+[15:31:45][info] car 34 race cmd 1: go, leg 1/1 at -78,777 0.0 m/s, spline $/mod/ncm_pace/#leg_hill_abode_505_1229__ebunike_-1336_-713 (c3bb61aa70770963)
+[15:31:45][info] car 34 status: at -78,777 0.0 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:31:45][info] accepted car.remove (76 bytes)
+[15:31:47][info] accepted car.remove (76 bytes)
+[15:31:49][info] accepted car.add (119 bytes)
+[15:31:49][info] reds: car 35: racing leg 0
+[15:31:49][info] car 35 race cmd 1: go, leg 1/1 at -154,835 0.0 m/s, spline $/mod/ncm_pace/#leg_hill_abode_505_1229__ebunike_-1336_-713 (c3bb61aa70770963)
+[15:31:49][info] car 35 status: at -154,835 0.0 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:31:50][info] accepted car.add (119 bytes)
+[15:31:50][info] reds: car 36: racing leg 0
+[15:31:50][info] car 36 race cmd 1: go, leg 1/1 at -178,847 0.0 m/s, spline $/mod/ncm_pace/#leg_hill_abode_505_1229__ebunike_-1336_-713 (c3bb61aa70770963)
+[15:31:50][info] car 36 status: at -178,847 0.0 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:31:51][info] accepted car.add (119 bytes)
+[15:31:51][info] reds: car 37: racing leg 0
+[15:31:51][info] car 37 race cmd 1: go, leg 1/1 at -190,851 0.0 m/s, spline $/mod/ncm_pace/#leg_hill_abode_505_1229__ebunike_-1336_-713 (c3bb61aa70770963)
+[15:31:51][info] car 37 status: at -190,851 0.0 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:31:51][info] accepted car.add (119 bytes)
+[15:31:51][info] reds: car 38: racing leg 0
+[15:31:51][info] car 38 race cmd 1: go, leg 1/1 at -200,851 0.0 m/s, spline $/mod/ncm_pace/#leg_hill_abode_505_1229__ebunike_-1336_-713 (c3bb61aa70770963)
+[15:31:51][info] car 38 status: at -200,851 0.0 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:31:52][info] accepted car.remove (76 bytes)
+[15:31:52][info] accepted car.add (119 bytes)
+[15:31:52][info] reds: car 39: racing leg 0
+[15:31:52][info] car 39 race cmd 1: go, leg 1/1 at -223,848 0.0 m/s, spline $/mod/ncm_pace/#leg_hill_abode_505_1229__ebunike_-1336_-713 (c3bb61aa70770963)
+[15:31:52][info] car 39 status: at -223,848 0.0 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:31:53][info] accepted car.add (119 bytes)
+[15:31:53][info] reds: car 40: racing leg 0
+[15:31:53][info] car 40 race cmd 1: go, leg 1/1 at -235,841 0.0 m/s, spline $/mod/ncm_pace/#leg_hill_abode_505_1229__ebunike_-1336_-713 (c3bb61aa70770963)
+[15:31:53][info] car 40 status: at -235,841 0.0 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:31:54][info] accepted car.remove (76 bytes)
+[15:31:54][info] accepted car.remove (76 bytes)
+[15:31:55][info] accepted car.remove (76 bytes)
+[15:31:56][info] accepted car.remove (76 bytes)
+[15:31:57][info] accepted car.remove (76 bytes)
+[15:31:58][info] accepted car.add (119 bytes)
+[15:31:58][info] accepted car.add (117 bytes)
+[15:31:58][info] reds: car 41: racing leg 0
+[15:31:58][info] reds: car 42: racing leg 0
+[15:31:58][info] car 41 race cmd 1: go, leg 1/1 at -320,819 0.0 m/s, spline $/mod/ncm_pace/#leg_hill_abode_505_1229__ebunike_-1336_-713 (c3bb61aa70770963)
+[15:31:58][info] car 41 status: at -320,819 0.0 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:31:58][info] car 42 race cmd 1: go, leg 1/1 at -326,823 0.0 m/s, spline $/mod/ncm_pace/#leg_hill_abode_505_1229__ebunike_-1336_-713 (c3bb61aa70770963)
+[15:31:58][info] car 42 status: at -326,823 0.0 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:31:59][info] reds: splineprobe [player -431,827] VANILLA cleaning machine (level 4, Corpo Plaza -1447,25): start=true (-1456,23) end=true (-1456,23) node=true (-1448,25) path=$/03_night_city/#c_city_center/corpo_plaza/corpo_plaza_openworld_prefabKKRD5RI/corpo_plaza_openworld_community_prefabMBEYQOY/#cct_cpz_roundabout
+[15:31:59][info] accepted car.add (119 bytes)
+[15:31:59][info] reds: car 43: racing leg 0
+[15:31:59][info] car 43 race cmd 1: go, leg 1/1 at -332,828 0.0 m/s, spline $/mod/ncm_pace/#leg_hill_abode_505_1229__ebunike_-1336_-713 (c3bb61aa70770963)
+[15:31:59][info] car 43 status: at -332,828 0.0 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:32:00][info] accepted car.add (119 bytes)
+[15:32:00][info] reds: car 44: racing leg 0
+[15:32:00][info] car 44 race cmd 1: go, leg 1/1 at -348,839 0.0 m/s, spline $/mod/ncm_pace/#leg_hill_abode_505_1229__ebunike_-1336_-713 (c3bb61aa70770963)
+[15:32:00][info] car 44 status: at -348,839 0.0 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:32:02][info] accepted car.remove (76 bytes)
+[15:32:02][info] accepted car.remove (76 bytes)
+[15:32:02][info] accepted car.remove (76 bytes)
+[15:32:03][info] accepted car.remove (76 bytes)
+[15:32:08][info] accepted car.add (119 bytes)
+[15:32:08][info] reds: car 45: racing leg 0
+[15:32:08][info] car 45 race cmd 1: go, leg 1/1 at -507,710 0.0 m/s, spline $/mod/ncm_pace/#leg_hill_abode_505_1229__ebunike_-1336_-713 (c3bb61aa70770963)
+[15:32:08][info] car 45 status: at -507,710 0.0 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:32:08][info] accepted car.add (119 bytes)
+[15:32:08][info] reds: car 46: racing leg 0
+[15:32:08][info] car 46 race cmd 1: go, leg 1/1 at -513,701 0.0 m/s, spline $/mod/ncm_pace/#leg_hill_abode_505_1229__ebunike_-1336_-713 (c3bb61aa70770963)
+[15:32:08][info] car 46 status: at -513,701 0.0 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:32:10][info] accepted car.remove (76 bytes)
+[15:32:10][info] accepted car.remove (76 bytes)
+[15:32:10][info] accepted car.add (119 bytes)
+[15:32:10][info] reds: car 47: racing leg 0
+[15:32:10][info] car 47 race cmd 1: go, leg 1/1 at -545,654 0.0 m/s, spline $/mod/ncm_pace/#leg_hill_abode_505_1229__ebunike_-1336_-713 (c3bb61aa70770963)
+[15:32:10][info] car 47 status: at -545,654 0.0 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:32:13][info] accepted car.remove (76 bytes)
+[15:32:15][info] accepted car.add (119 bytes)
+[15:32:15][info] reds: car 48: racing leg 0
+[15:32:15][info] car 48 race cmd 1: go, leg 1/1 at -600,575 0.0 m/s, spline $/mod/ncm_pace/#leg_hill_abode_505_1229__ebunike_-1336_-713 (c3bb61aa70770963)
+[15:32:15][info] car 48 status: at -600,575 0.0 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:32:16][info] accepted car.add (119 bytes)
+[15:32:16][info] reds: car 49: racing leg 0
+[15:32:16][info] car 49 race cmd 1: go, leg 1/1 at -608,563 0.0 m/s, spline $/mod/ncm_pace/#leg_hill_abode_505_1229__ebunike_-1336_-713 (c3bb61aa70770963)
+[15:32:16][info] car 49 status: at -608,563 0.0 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:32:16][info] accepted car.add (119 bytes)
+[15:32:16][info] reds: car 50: racing leg 0
+[15:32:16][info] car 50 race cmd 1: go, leg 1/1 at -614,555 0.0 m/s, spline $/mod/ncm_pace/#leg_hill_abode_505_1229__ebunike_-1336_-713 (c3bb61aa70770963)
+[15:32:16][info] car 50 status: at -614,555 0.0 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:32:17][info] accepted car.add (119 bytes)
+[15:32:17][info] reds: car 51: racing leg 0
+[15:32:17][info] accepted car.add (117 bytes)
+[15:32:17][info] car 51 race cmd 1: go, leg 1/1 at -622,544 0.0 m/s, spline $/mod/ncm_pace/#leg_hill_abode_505_1229__ebunike_-1336_-713 (c3bb61aa70770963)
+[15:32:17][info] car 51 status: at -622,544 0.0 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:32:17][info] reds: car 52: racing leg 0
+[15:32:17][info] car 52 race cmd 1: go, leg 1/1 at -629,534 0.0 m/s, spline $/mod/ncm_pace/#leg_hill_abode_505_1229__ebunike_-1336_-713 (c3bb61aa70770963)
+[15:32:17][info] car 52 status: at -629,534 0.0 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:32:18][info] accepted car.add (119 bytes)
+[15:32:18][info] reds: car 53: racing leg 0
+[15:32:18][info] car 53 race cmd 1: go, leg 1/1 at -639,519 0.0 m/s, spline $/mod/ncm_pace/#leg_hill_abode_505_1229__ebunike_-1336_-713 (c3bb61aa70770963)
+[15:32:18][info] car 53 status: at -639,519 0.0 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:32:20][info] accepted car.remove (76 bytes)
+[15:32:21][info] car 49 status: at -617,551 4.5 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:32:21][info] accepted car.remove (76 bytes)
+[15:32:21][info] car 50 status: at -622,544 5.0 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:32:21][info] accepted car.remove (76 bytes)
+[15:32:22][info] car 51 status: at -626,538 3.6 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:32:22][info] accepted car.remove (76 bytes)
+[15:32:22][info] car 52 status: at -632,526 3.2 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:32:23][info] car 53 status: at -646,516 3.0 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:32:23][info] accepted car.remove (76 bytes)
+[15:32:23][info] accepted car.add (119 bytes)
+[15:32:23][info] reds: car 54: racing leg 0
+[15:32:23][info] car 54 race cmd 1: go, leg 1/1 at -674,471 0.0 m/s, spline $/mod/ncm_pace/#leg_hill_abode_505_1229__ebunike_-1336_-713 (c3bb61aa70770963)
+[15:32:23][info] car 54 status: at -674,471 0.0 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:32:23][info] accepted car.remove (76 bytes)
+[15:32:25][info] accepted car.add (119 bytes)
+[15:32:25][info] reds: car 55: racing leg 0
+[15:32:25][info] car 55 race cmd 1: go, leg 1/1 at -690,447 0.0 m/s, spline $/mod/ncm_pace/#leg_hill_abode_505_1229__ebunike_-1336_-713 (c3bb61aa70770963)
+[15:32:25][info] car 55 status: at -690,447 0.0 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:32:26][info] accepted car.remove (76 bytes)
+[15:32:27][info] accepted car.add (119 bytes)
+[15:32:27][info] reds: car 56: racing leg 0
+[15:32:27][info] car 56 race cmd 1: go, leg 1/1 at -721,395 0.0 m/s, spline $/mod/ncm_pace/#leg_hill_abode_505_1229__ebunike_-1336_-713 (c3bb61aa70770963)
+[15:32:27][info] car 56 status: at -721,395 0.0 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:32:27][info] accepted car.remove (76 bytes)
+[15:32:28][info] accepted car.add (119 bytes)
+[15:32:28][info] reds: car 57: racing leg 0
+[15:32:28][info] car 57 race cmd 1: go, leg 1/1 at -716,348 0.0 m/s, spline $/mod/ncm_pace/#leg_hill_abode_505_1229__ebunike_-1336_-713 (c3bb61aa70770963)
+[15:32:28][info] car 57 status: at -716,348 0.0 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:32:29][info] accepted car.remove (76 bytes)
+[15:32:31][info] accepted car.remove (76 bytes)
+[15:32:32][info] accepted car.add (117 bytes)
+[15:32:32][info] reds: car 58: racing leg 0
+[15:32:32][info] car 58 race cmd 1: go, leg 1/1 at -698,274 0.0 m/s, spline $/mod/ncm_pace/#leg_hill_abode_505_1229__ebunike_-1336_-713 (c3bb61aa70770963)
+[15:32:32][info] car 58 status: at -698,274 0.0 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:32:32][info] accepted car.add (119 bytes)
+[15:32:32][info] reds: car 59: racing leg 0
+[15:32:32][info] car 59 race cmd 1: go, leg 1/1 at -695,259 0.0 m/s, spline $/mod/ncm_pace/#leg_hill_abode_505_1229__ebunike_-1336_-713 (c3bb61aa70770963)
+[15:32:32][info] car 59 status: at -695,259 0.0 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:32:33][info] accepted car.add (119 bytes)
+[15:32:33][info] reds: car 60: racing leg 0
+[15:32:33][info] car 60 race cmd 1: go, leg 1/1 at -690,241 0.0 m/s, spline $/mod/ncm_pace/#leg_hill_abode_505_1229__ebunike_-1336_-713 (c3bb61aa70770963)
+[15:32:33][info] car 60 status: at -690,241 0.0 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:32:34][info] accepted car.remove (76 bytes)
+[15:32:34][info] accepted car.add (119 bytes)
+[15:32:34][info] reds: car 61: racing leg 0
+[15:32:34][info] car 61 race cmd 1: go, leg 1/1 at -685,217 0.0 m/s, spline $/mod/ncm_pace/#leg_hill_abode_505_1229__ebunike_-1336_-713 (c3bb61aa70770963)
+[15:32:34][info] car 61 status: at -685,217 0.0 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:32:35][info] accepted car.add (119 bytes)
+[15:32:35][info] reds: car 62: racing leg 0
+[15:32:35][info] car 62 race cmd 1: go, leg 1/1 at -681,203 0.0 m/s, spline $/mod/ncm_pace/#leg_hill_abode_505_1229__ebunike_-1336_-713 (c3bb61aa70770963)
+[15:32:35][info] car 62 status: at -681,203 0.0 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:32:35][info] accepted car.remove (76 bytes)
+[15:32:36][info] accepted car.remove (76 bytes)
+[15:32:37][info] accepted car.remove (76 bytes)
+[15:32:37][info] accepted car.remove (76 bytes)
+[15:32:38][info] accepted car.add (119 bytes)
+[15:32:38][info] reds: car 63: racing leg 0
+[15:32:38][info] car 63 race cmd 1: go, leg 1/1 at -700,127 0.0 m/s, spline $/mod/ncm_pace/#leg_hill_abode_505_1229__ebunike_-1336_-713 (c3bb61aa70770963)
+[15:32:38][info] car 63 status: at -700,127 0.0 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:32:40][info] accepted car.remove (76 bytes)
+[15:32:51][warn] refused (119 bytes): car.add: the plan already holds 64 cars | {"from":1,"vehicleId":47244640262,"entity":"10433507","raceId":"pr-regional_c-1790883000","speed":56.6,"cmd":"car.add"}
+[15:32:51][info] reds: splineprobe [player -1012,-266] OURS hanford->stadium: start=true (-1281,-1107) end=true (-1323,-1736) node=true (-1281,-1107) path=$/mod/ncm_pace/#leg_hanford_overpass_-1281_-1107__stadium_-1326_-1656
+[15:32:51][warn] refused (86 bytes): car.set: no such car driving | {"entity":"10433507","raceId":"pr-regional_c-1790883000","speed":52.1,"cmd":"car.set"}
+[15:32:52][warn] refused (119 bytes): car.add: the plan already holds 64 cars | {"from":1,"vehicleId":42949672965,"entity":"10433609","raceId":"pr-regional_c-1790883000","speed":53.9,"cmd":"car.add"}
+[15:32:53][warn] refused (86 bytes): car.set: no such car driving | {"entity":"10433609","raceId":"pr-regional_c-1790883000","speed":51.7,"cmd":"car.set"}
+[15:32:53][warn] refused (119 bytes): car.add: the plan already holds 64 cars | {"from":1,"vehicleId":42949672969,"entity":"10433623","raceId":"pr-regional_c-1790883000","speed":54.6,"cmd":"car.add"}
+[15:32:53][warn] refused (86 bytes): car.set: no such car driving | {"entity":"10433623","raceId":"pr-regional_c-1790883000","speed":51.3,"cmd":"car.set"}
+[15:32:54][warn] refused (119 bytes): car.add: the plan already holds 64 cars | {"from":1,"vehicleId":38654705672,"entity":"10433626","raceId":"pr-regional_c-1790883000","speed":53.6,"cmd":"car.add"}
+[15:32:54][warn] refused (86 bytes): car.set: no such car driving | {"entity":"10433626","raceId":"pr-regional_c-1790883000","speed":50.9,"cmd":"car.set"}
+[15:33:02][warn] refused (119 bytes): car.add: the plan already holds 64 cars | {"from":1,"vehicleId":42949672964,"entity":"10433846","raceId":"pr-regional_c-1790883000","speed":50.2,"cmd":"car.add"}
+[15:33:02][warn] refused (86 bytes): car.set: no such car driving | {"entity":"10433846","raceId":"pr-regional_c-1790883000","speed":51.6,"cmd":"car.set"}
+[15:33:15][warn] refused (117 bytes): car.add: the plan already holds 64 cars | {"from":1,"vehicleId":42949672973,"entity":"10434159","raceId":"pr-regional_c-1790883000","speed":50,"cmd":"car.add"}
+[15:33:15][warn] refused (86 bytes): car.set: no such car driving | {"entity":"10434159","raceId":"pr-regional_c-1790883000","speed":51.2,"cmd":"car.set"}
+[15:33:17][warn] refused (119 bytes): car.add: the plan already holds 64 cars | {"from":1,"vehicleId":17179869191,"entity":"10434215","raceId":"pr-regional_c-1790883000","speed":49.9,"cmd":"car.add"}
+[15:33:18][warn] refused (86 bytes): car.set: no such car driving | {"entity":"10434215","raceId":"pr-regional_c-1790883000","speed":51.3,"cmd":"car.set"}
+[15:33:38][warn] refused (76 bytes): car.remove: no such car driving | {"entity":"10433507","raceId":"pr-regional_c-1790883000","cmd":"car.remove"}
+[15:33:41][warn] refused (119 bytes): car.add: the plan already holds 64 cars | {"from":1,"vehicleId":51539607558,"entity":"10434673","raceId":"pr-regional_c-1790883000","speed":56.6,"cmd":"car.add"}
+[15:33:41][warn] refused (86 bytes): car.set: no such car driving | {"entity":"10434673","raceId":"pr-regional_c-1790883000","speed":52.1,"cmd":"car.set"}
+[15:33:50][warn] refused (76 bytes): car.remove: no such car driving | {"entity":"10434673","raceId":"pr-regional_c-1790883000","cmd":"car.remove"}
+[15:33:51][warn] refused (76 bytes): car.remove: no such car driving | {"entity":"10434215","raceId":"pr-regional_c-1790883000","cmd":"car.remove"}
+[15:33:51][warn] refused (76 bytes): car.remove: no such car driving | {"entity":"10434159","raceId":"pr-regional_c-1790883000","cmd":"car.remove"}
+[15:33:51][warn] refused (76 bytes): car.remove: no such car driving | {"entity":"10433626","raceId":"pr-regional_c-1790883000","cmd":"car.remove"}
+[15:33:52][warn] refused (76 bytes): car.remove: no such car driving | {"entity":"10433846","raceId":"pr-regional_c-1790883000","cmd":"car.remove"}
+[15:33:52][warn] refused (76 bytes): car.remove: no such car driving | {"entity":"10433623","raceId":"pr-regional_c-1790883000","cmd":"car.remove"}
+[15:33:52][warn] refused (76 bytes): car.remove: no such car driving | {"entity":"10433609","raceId":"pr-regional_c-1790883000","cmd":"car.remove"}
+[15:34:00][info] reds: splineprobe [player -702,119] OURS hanford->stadium: start=false end=false node=false path=$/mod/ncm_pace/#leg_hanford_overpass_-1281_-1107__stadium_-1326_-1656
+[15:34:52][info] reds: splineprobe [player -797,1285] VANILLA cleaning machine (level 4, Corpo Plaza -1447,25): start=false end=false node=false path=$/03_night_city/#c_city_center/corpo_plaza/corpo_plaza_openworld_prefabKKRD5RI/corpo_plaza_openworld_community_prefabMBEYQOY/#cct_cpz_roundabout_cleaning_machine_spl
+[15:42:31][info] reds: area: null area 8 over -1106.00, 1853.00 (+/-140.00 m) for 214 s
+[15:44:30][info] accepted drive.start (609 bytes)
+[15:44:30][info] road speed plan ready: 1/1 legs, continuous profile
+[15:44:30][info] accepted car.add (117 bytes)
+[15:44:30][info] accepted car.add (117 bytes)
+[15:44:30][info] accepted car.add (117 bytes)
+[15:44:31][info] accepted car.add (117 bytes)
+[15:44:31][info] accepted car.add (116 bytes)
+[15:44:31][info] accepted car.add (117 bytes)
+[15:44:32][info] accepted car.add (116 bytes)
+[15:44:32][info] accepted car.add (116 bytes)
+[15:44:32][info] accepted car.add (116 bytes)
+[15:44:32][info] accepted car.add (116 bytes)
+[15:44:32][info] accepted car.add (116 bytes)
+[15:44:32][info] accepted car.add (116 bytes)
+[15:45:00][info] reds: car 0: racing leg 0
+[15:45:00][info] reds: car 1: racing leg 0
+[15:45:00][info] reds: car 2: racing leg 0
+[15:45:00][info] reds: car 3: racing leg 0
+[15:45:00][info] reds: car 4: racing leg 0
+[15:45:00][info] reds: car 5: racing leg 0
+[15:45:00][info] reds: car 6: racing leg 0
+[15:45:00][info] reds: car 7: racing leg 0
+[15:45:00][info] reds: car 8: racing leg 0
+[15:45:00][info] reds: car 9: racing leg 0
+[15:45:00][info] reds: car 10: racing leg 0
+[15:45:00][info] reds: car 11: racing leg 0
+[15:45:00][info] car 0 race cmd 1: go, leg 1/1 at -1116,1792 0.0 m/s, spline $/mod/ncm_pace/#leg_kabuki_bridge_-1106_1853__deep_dive_-2350_-2446 (048b17646f28b23f)
+[15:45:00][info] car 0 status: at -1116,1792 0.0 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:45:00][info] car 1 race cmd 1: go, leg 1/1 at -1124,1792 0.0 m/s, spline $/mod/ncm_pace/#leg_kabuki_bridge_-1106_1853__deep_dive_-2350_-2446 (048b17646f28b23f)
+[15:45:00][info] car 1 status: at -1124,1792 0.0 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:45:00][info] car 2 race cmd 1: go, leg 1/1 at -1116,1780 0.0 m/s, spline $/mod/ncm_pace/#leg_kabuki_bridge_-1106_1853__deep_dive_-2350_-2446 (048b17646f28b23f)
+[15:45:00][info] car 2 status: at -1116,1780 0.0 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:45:00][info] car 3 race cmd 1: go, leg 1/1 at -1126,1780 0.0 m/s, spline $/mod/ncm_pace/#leg_kabuki_bridge_-1106_1853__deep_dive_-2350_-2446 (048b17646f28b23f)
+[15:45:00][info] car 3 status: at -1126,1780 0.0 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:45:00][info] car 4 race cmd 1: go, leg 1/1 at -1115,1768 0.0 m/s, spline $/mod/ncm_pace/#leg_kabuki_bridge_-1106_1853__deep_dive_-2350_-2446 (048b17646f28b23f)
+[15:45:00][info] car 4 status: at -1115,1768 0.0 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:45:00][info] car 5 OFF the road plan at -1139,1761: nearest plan point 248 m (index 23/595)
+[15:45:00][info] car 5 race cmd 1: go, leg 1/1 at -1139,1761 0.0 m/s, spline $/mod/ncm_pace/#leg_kabuki_bridge_-1106_1853__deep_dive_-2350_-2446 (048b17646f28b23f)
+[15:45:00][info] car 5 status: at -1139,1761 0.0 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:45:00][info] car 6 race cmd 1: go, leg 1/1 at -1115,1756 0.0 m/s, spline $/mod/ncm_pace/#leg_kabuki_bridge_-1106_1853__deep_dive_-2350_-2446 (048b17646f28b23f)
+[15:45:00][info] car 6 status: at -1115,1756 0.0 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:45:00][info] car 7 race cmd 1: go, leg 1/1 at -1122,1755 0.0 m/s, spline $/mod/ncm_pace/#leg_kabuki_bridge_-1106_1853__deep_dive_-2350_-2446 (048b17646f28b23f)
+[15:45:00][info] car 7 status: at -1122,1755 0.0 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:45:00][info] car 8 race cmd 1: go, leg 1/1 at -1115,1744 0.0 m/s, spline $/mod/ncm_pace/#leg_kabuki_bridge_-1106_1853__deep_dive_-2350_-2446 (048b17646f28b23f)
+[15:45:00][info] car 8 status: at -1115,1744 0.0 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:45:00][info] car 9 race cmd 1: go, leg 1/1 at -1123,1744 0.0 m/s, spline $/mod/ncm_pace/#leg_kabuki_bridge_-1106_1853__deep_dive_-2350_-2446 (048b17646f28b23f)
+[15:45:00][info] car 9 status: at -1123,1744 0.0 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:45:00][info] car 10 race cmd 1: go, leg 1/1 at -1115,1732 0.0 m/s, spline $/mod/ncm_pace/#leg_kabuki_bridge_-1106_1853__deep_dive_-2350_-2446 (048b17646f28b23f)
+[15:45:00][info] car 10 status: at -1115,1732 0.0 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:45:00][info] car 11 race cmd 1: go, leg 1/1 at -1123,1732 0.0 m/s, spline $/mod/ncm_pace/#leg_kabuki_bridge_-1106_1853__deep_dive_-2350_-2446 (048b17646f28b23f)
+[15:45:00][info] car 11 status: at -1123,1732 0.0 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:45:03][info] reds: car 5: racing leg 0
+[15:45:03][info] car 5 BACK after 0.7 s at -1139,1761 (4 m from where it was last seen), point 1/2
+[15:45:03][info] car 5 race cmd 2: back: fresh command, leg 1/1 at -1139,1761 4.5 m/s, spline $/mod/ncm_pace/#leg_kabuki_bridge_-1106_1853__deep_dive_-2350_-2446 (048b17646f28b23f)
+[15:45:05][info] car 0 status: at -1152,1784 13.3 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:45:05][info] car 1 status: at -1156,1779 10.8 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:45:05][info] car 2 status: at -1117,1784 0.1 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:45:05][info] car 3 status: at -1155,1777 1.6 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:45:05][info] car 4 status: at -1165,1710 10.8 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:45:05][info] car 5 status: at -1140,1760 1.0 m/s, leg 1/1, point 1/2, cmds 2, dropouts 0
+[15:45:05][info] car 6 status: at -1119,1761 0.7 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:45:05][info] car 7 status: at -1122,1755 0.0 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:45:05][info] car 8 status: at -1197,1726 22.2 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:45:05][info] car 9 status: at -1197,1729 23.4 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:45:05][info] car 10 status: at -1189,1728 15.6 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:45:05][info] car 11 status: at -1195,1724 18.0 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:45:06][info] reds: car 7: racing leg 0
+[15:45:06][info] car 7 race cmd 2: stalled: fresh command, leg 1/1 at -1122,1755 0.0 m/s, spline $/mod/ncm_pace/#leg_kabuki_bridge_-1106_1853__deep_dive_-2350_-2446 (048b17646f28b23f)
+[15:45:06][info] reds: car 3: command ended success
+[15:45:07][info] accepted car.remove (76 bytes)
+[15:45:07][info] reds: car 2: racing leg 0
+[15:45:07][info] car 2 race cmd 2: stalled: fresh command, leg 1/1 at -1117,1784 0.0 m/s, spline $/mod/ncm_pace/#leg_kabuki_bridge_-1106_1853__deep_dive_-2350_-2446 (048b17646f28b23f)
+[15:45:10][info] car 0 status: at -1151,1753 14.1 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:45:10][info] car 1 status: at -1156,1764 9.6 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:45:10][info] car 2 status: at -1146,1801 16.2 m/s, leg 1/1, point 1/2, cmds 2, dropouts 0
+[15:45:10][info] car 4 status: at -1154,1716 12.2 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:45:10][info] car 5 back on the road plan at -1153,1738: nearest plan point 50 m (index 25/595)
+[15:45:10][info] car 5 status: at -1153,1738 4.9 m/s, leg 1/1, point 1/2, cmds 2, dropouts 0
+[15:45:10][info] car 6 status: at -1117,1758 1.1 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:45:10][info] car 7 status: at -1174,1717 0.8 m/s, leg 1/1, point 1/2, cmds 2, dropouts 0
+[15:45:10][info] car 8 status: at -1228,1665 25.5 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:45:10][info] car 9 status: at -1232,1648 27.5 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:45:10][info] car 10 status: at -1229,1695 14.7 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:45:10][info] car 11 status: at -1231,1677 24.7 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:45:10][info] accepted car.remove (76 bytes)
+[15:45:12][info] accepted car.remove (76 bytes)
+[15:45:13][info] accepted car.remove (76 bytes)
+[15:45:15][info] car 0 status: at -1208,1730 16.7 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:45:15][info] car 1 status: at -1158,1739 10.4 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:45:15][info] car 2 status: at -1155,1792 4.6 m/s, leg 1/1, point 1/2, cmds 2, dropouts 0
+[15:45:15][info] car 4 status: at -1220,1721 11.0 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:45:15][info] car 5 status: at -1167,1731 9.8 m/s, leg 1/1, point 1/2, cmds 2, dropouts 0
+[15:45:15][info] car 6 status: at -1118,1758 2.4 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:45:15][info] car 7 status: at -1187,1719 1.4 m/s, leg 1/1, point 1/2, cmds 2, dropouts 0
+[15:45:15][info] car 10 status: at -1231,1593 23.7 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:45:15][info] accepted car.remove (76 bytes)
+[15:45:20][info] car 0 status: at -1231,1657 20.0 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:45:20][info] car 1 status: at -1220,1728 13.8 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:45:20][info] car 2 status: at -1152,1739 10.9 m/s, leg 1/1, point 1/2, cmds 2, dropouts 0
+[15:45:20][info] car 4 status: at -1228,1703 9.6 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:45:20][info] car 5 status: at -1225,1709 7.7 m/s, leg 1/1, point 1/2, cmds 2, dropouts 0
+[15:45:20][info] car 6 status: at -1123,1747 4.6 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:45:20][info] car 7 status: at -1196,1719 8.0 m/s, leg 1/1, point 1/2, cmds 2, dropouts 0
+[15:45:25][info] car 0 status: at -1241,1547 25.1 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:45:25][info] car 1 status: at -1238,1644 20.3 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:45:25][info] car 2 status: at -1216,1729 13.7 m/s, leg 1/1, point 1/2, cmds 2, dropouts 0
+[15:45:25][info] car 4 status: at -1230,1627 19.0 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:45:25][info] car 5 status: at -1225,1672 4.5 m/s, leg 1/1, point 1/2, cmds 2, dropouts 0
+[15:45:25][info] car 6 status: at -1134,1739 17.8 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:45:25][info] car 7 status: at -1232,1708 8.9 m/s, leg 1/1, point 1/2, cmds 2, dropouts 0
+[15:45:25][info] accepted car.remove (76 bytes)
+[15:45:28][info] accepted car.remove (76 bytes)
+[15:45:30][info] car 0 status: at -1259,1422 22.7 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:45:30][info] car 1 status: at -1248,1530 24.5 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:45:30][info] car 2 status: at -1232,1646 18.6 m/s, leg 1/1, point 1/2, cmds 2, dropouts 0
+[15:45:30][info] car 4 status: at -1236,1518 22.6 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:45:30][info] car 7 status: at -1235,1636 17.7 m/s, leg 1/1, point 1/2, cmds 2, dropouts 0
+[15:45:35][info] car 0 status: at -1264,1290 28.4 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:45:35][info] car 1 status: at -1265,1403 25.7 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:45:35][info] car 2 status: at -1244,1535 22.0 m/s, leg 1/1, point 1/2, cmds 2, dropouts 0
+[15:45:35][info] car 4 status: at -1254,1400 24.1 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:45:35][info] car 7 status: at -1244,1526 24.5 m/s, leg 1/1, point 1/2, cmds 2, dropouts 0
+[15:45:40][info] accepted car.remove (76 bytes)
+[15:45:40][info] car 0 status: at -1277,1135 32.7 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:45:40][info] car 1 status: at -1273,1263 29.8 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:45:40][info] car 4 status: at -1261,1270 27.7 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:45:40][info] car 7 status: at -1261,1409 23.7 m/s, leg 1/1, point 1/2, cmds 2, dropouts 0
+[15:45:43][info] accepted car.remove (76 bytes)
+[15:45:45][info] car 0 status: at -1295,978 27.1 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:45:45][info] car 1 status: at -1281,1102 32.5 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:45:45][info] car 4 status: at -1271,1133 23.0 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:45:50][info] car 0 status: at -1401,946 23.4 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:45:50][info] car 1 status: at -1312,964 23.8 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:45:50][info] car 4 status: at -1277,1008 24.2 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:45:55][info] car 0 status: at -1534,960 27.7 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:45:55][info] car 1 status: at -1426,948 24.9 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:45:55][info] car 4 status: at -1352,937 16.9 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:46:00][info] car 0 status: at -1573,953 3.1 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:46:00][info] car 1 status: at -1559,962 23.2 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:46:00][info] car 4 status: at -1446,949 21.5 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:46:05][info] car 0 status: at -1566,908 15.5 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:46:05][info] car 1 status: at -1576,955 2.6 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:46:05][info] car 4 status: at -1558,961 14.3 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:46:05][info] accepted car.add (118 bytes)
+[15:46:05][info] reds: car 12: racing leg 0
+[15:46:05][info] car 12 race cmd 1: go, leg 1/1 at -1536,962 0.0 m/s, spline $/mod/ncm_pace/#leg_kabuki_bridge_-1106_1853__deep_dive_-2350_-2446 (048b17646f28b23f)
+[15:46:05][info] car 12 status: at -1536,962 0.0 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:46:06][info] accepted car.add (119 bytes)
+[15:46:06][info] accepted car.add (119 bytes)
+[15:46:06][info] reds: car 13: racing leg 0
+[15:46:06][info] reds: car 14: racing leg 0
+[15:46:06][info] car 13 race cmd 1: go, leg 1/1 at -1518,959 0.0 m/s, spline $/mod/ncm_pace/#leg_kabuki_bridge_-1106_1853__deep_dive_-2350_-2446 (048b17646f28b23f)
+[15:46:06][info] car 13 status: at -1518,959 0.0 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0
+[15:46:06][info] car 14 race cmd 1: go, leg 1/1 at -1547,963 0.0 m/s, spline $/mod/ncm_pace/#leg_kabuki_bridge_-1106_1853__deep_dive_-2350_-2446 (048b17646f28b23f)
+[15:46:06][info] car 14 status: at -1547,963 0.0 m/s, leg 1/1, point 1/2, cmds 1, dropouts 0

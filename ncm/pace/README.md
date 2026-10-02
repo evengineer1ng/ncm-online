@@ -3,11 +3,24 @@
 Drives a declared live Paddock race's NPC cars on the declaring player's client, uncapped (Paddock phase 5,
 [doc 44 §15](../../docs/ncm-online/44_THE_PADDOCK.md)).
 
-A live race can run on either of two backends. The **platform** backend is OPEN//77's own `vehicles.ai.followRoute`,
-which the server drives and which is capped at 55 m/s. The **Pace** backend is this plugin: the same native
-`AIVehicleDriveToPointAutonomousCommand`, issued by redscript on the client that simulates the cars, with no speed
-cap, and with gates timed at the game's own tick rate. `ncm_paddock`'s `liveBackend` tunable picks (`auto` uses Pace
-when the declarer's client reports it).
+A physical Paddock race uses the engine's `AIVehicleRacingCommand` on an ArchiveXL race spline. Street routes use
+one baked spline per ordered pair of race nodes. Pace 0.8.2 adds one closed spline per authored oval; the repeated
+oval marks count laps while one racing command stays on the loop. NCM racers use isolated TweakXL vehicle and RaceDrive
+profile clones: the profile disables AI speed-limit following and raises forward and turning acceleration factors to
+3.0 (vanilla Race profile: 2.0), without changing other game vehicles. Cars near a Pace player enter the physical bubble
+with a seated driver and return to the continuous model before they leave that player's streaming range. The server
+keeps result authority and physical/model provenance. An oval needs Pace 0.8.2 or later to become physical.
+
+Pace 0.8.3 adds the KB-238 native null guard for the inspected Cyberpunk 2.31 executable. The driver's movement
+caller can pass a failed vehicle-to-puppet cast to a predicate that dereferences it. At that exact caller only,
+an empty handle now returns false; valid handles use the original predicate. The executable timestamp, image size,
+and predicate/caller instruction bytes must match before the hook attaches. Other builds are left unpatched with
+an explicit error in the Pace log. This guards the demonstrated fault; why the movement path supplies the car
+remains under investigation. Live race acceptance is pending in MASTER_TEST section CR.
+
+The startup log must say `KB-238 guard ACTIVE`; `KB-238 guard prevented N null puppet read(s)` counts interceptions.
+The hook only increments an atomic counter on the movement thread; the game update writes at most one report per
+second. The change does not alter the bubble radii, seat timing, sim, driver records or Pace command lifecycle.
 
 | Piece | Where | Job |
 |---|---|---|
@@ -24,10 +37,8 @@ borrows only their vendored third-party headers (RED4ext.SDK, nlohmann/json) at 
 
 - **The server decides the result.** It times every gate itself from canonical positions. This plugin's gate
   reports are evidence: a physical result stands only when both agree within 1.5 s for every finisher.
-- **The DLL decides where each car aims next**, from the plan: a point along the line, moved on 40 m early so the
-  planner never brakes for an intermediate point, and 80 m past the finish so a car crosses the line.
-- **Redscript issues every command**, in a script frame, exactly as OPEN//77 issues its own. Native code never calls
-  script.
+- **The DLL chooses the current spline** and tracks each car's progress. Redscript sends the engine racing command
+  in a script frame; native code never calls script. The engine steers and chooses speed on the spline.
 
 ## Safety
 
@@ -47,3 +58,10 @@ borrows only their vendored third-party headers (RED4ext.SDK, nlohmann/json) at 
 `powershell -File tools\build-pace.ps1` builds the DLL, runs the state tests, checks the native declarations, compiles
 both scripts against the vanilla bundle and every installed script in a scratch cache, and writes
 `dist/ncm-pace-<version>.zip`.
+
+The spline archive is baked separately with `tools/bake-race-splines.py`. `tools/bake-oval-splines.py` emits the four
+marked nodes for the road router, joins the resulting road legs into closed loops, and writes both the three oval
+spline source lines and `ncm_paddock/server/oval_lines_data.lua`. The two city loops follow directed road lanes;
+NCX Octagon uses its authored ring because the exported lane graph has no route there. The full candidate archive
+contains 1,193 splines. `MASTER_TEST §CO` is the required in-game proof of the closed command and lap seams; no
+oval has passed it yet.

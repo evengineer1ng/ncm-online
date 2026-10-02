@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.21)
-project(ncm_pace VERSION 0.8.1 LANGUAGES CXX)
+project(ncm_pace VERSION 0.8.5 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -19,6 +19,7 @@ add_subdirectory("${DEPS_ROOT}/RED4ext.SDK" red4ext-sdk EXCLUDE_FROM_ALL)
 
 add_library(ncm_pace SHARED
     src/main.cpp
+    src/puppet_guard.cpp
     src/log.cpp
     src/state.cpp
     src/speed_profile.cpp
@@ -42,6 +43,9 @@ endif()
 
 include(CTest)
 if (BUILD_TESTING)
+    add_executable(ncm_pace_puppet_guard_tests tests/puppet_guard_tests.cpp)
+    target_include_directories(ncm_pace_puppet_guard_tests PRIVATE src)
+    add_test(NAME ncm_pace_puppet_guard COMMAND ncm_pace_puppet_guard_tests)
     add_executable(ncm_pace_state_tests tests/state_tests.cpp tests/spline_refs_stub.cpp src/state.cpp src/speed_profile.cpp src/road_graph.cpp)
     target_include_directories(ncm_pace_state_tests PRIVATE src "${DEPS_ROOT}/json")
     target_compile_definitions(ncm_pace_state_tests PRIVATE NCM_PACE_VERSION="${PROJECT_VERSION}" NOMINMAX)

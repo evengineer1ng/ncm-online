@@ -117,6 +117,7 @@ local function broadcast()
         local p = w and w.people[pid]
         if p and b.npcId then
             rows[#rows + 1] = { npcId = b.npcId, personId = pid, name = p.display, role = Talk.ROLE_LABEL[p.role] or p.role,
+                x = b.x, y = b.y, z = b.z,
                 org = PaddockWorld.orgName(b.orgId) }
         end
     end
@@ -146,7 +147,8 @@ local function spawnBody(p, org, site, stand, bucket)
         log("body %s (%s) at %s refused: %s", p.id, p.role, site.id, tostring(reason or id))
         return false
     end
-    bodies[p.id] = { npcId = id, siteId = site.id, orgId = org.id, bucket = bucket or 0, bornAt = U.now() }
+    bodies[p.id] = { npcId = id, siteId = site.id, orgId = org.id, bucket = bucket or 0, bornAt = U.now(),
+        x = stand.x, y = stand.y, z = (z or site.z) + 0.1 }
     stats.spawned = stats.spawned + 1
     if Open77.npcs.tasks and Open77.npcs.tasks.lookAt then
         pcall(Open77.npcs.tasks.lookAt, id, { type = "position", position = { x = site.x, y = site.y, z = site.z } })
@@ -199,6 +201,7 @@ function PaddockGarages.tick()
     -- retire bodies whose person left the shift or whose garage nobody is near
     local changed = false
     for pid, b in pairs(bodies) do
+      if b.source ~= "day" then                    -- day bodies (days.lua, L240) come and go by their own plan
         local keep = siteNear[b.siteId] == true
         if keep then
             local o = w.orgs[b.orgId]
@@ -207,6 +210,7 @@ function PaddockGarages.tick()
             if keep and p.role == "driver" and busy[o.seriesId] then keep = false end
         end
         if not keep then removeBody(pid, "left"); changed = true end
+      end
     end
     -- materialise
     local count = 0
@@ -250,6 +254,7 @@ function PaddockGarages.check(siteId, verdict, note)
         broadcast()
         PaddockGarages.ensure()
     end
+    if PaddockDays then pcall(PaddockDays.loadChecks) end
     return true
 end
 
@@ -297,8 +302,7 @@ function PaddockGarages.talk(pid, personId)
     if not p or not o then return false, "not_here" end
     local okP, positions = pcall(Open77.players.positions)
     local me = okP and type(positions) == "table" and positions[pid] or nil
-    local okN, npc = pcall(Open77.npcs.get, b.npcId)
-    local at = okN and type(npc) == "table" and npc.position or nil
+    local at = U.npcPos(b.npcId)
     if not me or not at then return false, "position_unknown" end
     local dx, dy = (me.x or 0) - (at.x or 0), (me.y or 0) - (at.y or 0)
     if math.sqrt(dx * dx + dy * dy) > PaddockSettings.get("talkRadiusM", 6) then return false, "too_far" end
@@ -312,13 +316,40 @@ function PaddockGarages.talk(pid, personId)
     else tags, tagSubject = PaddockViews.orgTags(o), o.name end
     local ctx = { person = p, org = o, seriesName = PaddockWorld.seriesName(o.seriesId), next = nextRaceFor(o, t),
         last = lastResultFor(o), tags = tags, tagSubject = tagSubject }
-    local line = Talk.line(ctx, Clock.eastern(t).dayIndex, met)
+    -- The voice (life.voice, owner 2026-09-30): this person's own voice, in this moment. Falls back to the old
+    -- paddock.talk line only if the voice engine is missing or fails.
+    local line
+    local okV, Voice = pcall(NcmCore.get, "life.voice")
+    if okV and Voice then
+        local e = Clock.eastern(t)
+        local Places = NcmCore.get("world.places")
+        local place = Places.get(b.siteId)
+        local cond = PaddockWorld.conditionsAt(t) or {}
+        local reading
+        local climate = PaddockDays and PaddockDays.climate and PaddockDays.climate()
+        if climate and place then reading = NcmCore.get("life.climate").reading(climate, place.district) end
+        local fame = tonumber(MySQL.scalar.await([[SELECT score FROM paddock_spotlight WHERE server_id = ?
+            AND subject_kind = 'driver' AND subject_id = ?]], { U.sid(), d.ncmDriverId })) or 0
+        local facts = Talk.facts(ctx)
+        local okS, out = pcall(Voice.say, {
+            seed = w.seed, person = p, tier = o.tier, year = w.paddockYear, metCount = met, dayIndex = e.dayIndex,
+            facts = facts, activity = b.activity or "work",
+            place = place and (place.name or Places.label(place):gsub("^an? ", "the ")) or nil,
+            district = place and place.district or nil, regime = reading and reading.regime or nil,
+            crisis = reading and reading.crisis or false, weather = cond.weather, hour = e.hour,
+            fame = fame, playerName = d.display,
+        })
+        if okS and out and out.text then line = { id = table.concat(out.lines or {}, ","), text = out.text }
+        else log("voice failed for %s: %s", p.id, tostring(out)) end
+    end
+    line = line or Talk.line(ctx, Clock.eastern(t).dayIndex, met)
     pcall(MySQL.update.await, [[INSERT INTO paddock_meeting (server_id, ncm_driver_id, person_id, first_at, last_at, met_count)
         VALUES (?, ?, ?, ?, ?, 1) ON DUPLICATE KEY UPDATE last_at = VALUES(last_at), met_count = met_count + 1]],
         { U.sid(), d.ncmDriverId, p.id, t, t })
     stats.talks = stats.talks + 1
     pcall(Open77.npcs.speak, b.npcId, "greeting", {})
     local title = ("%s · %s, %s"):format(p.display, Talk.ROLE_LABEL[p.role] or p.role, o.name)
+    if PaddockDays then pcall(PaddockDays.onTalk, d.ncmDriverId, b, p.id, t) end
     pcall(Open77.notifications.send, pid, { type = "info", title = title, message = line.text, icon = "NCM", durationMs = 9000 })
     return true, line
 end
@@ -345,7 +376,7 @@ RegisterNetEvent("ncm:paddock.bodies.request", function()
     local w = world()
     for personId, b in pairs(bodies) do
         local p = w and w.people[personId]
-        if p then rows[#rows + 1] = { npcId = b.npcId, personId = personId, name = p.display,
+        if p then rows[#rows + 1] = { npcId = b.npcId, personId = personId, name = p.display, x = b.x, y = b.y, z = b.z,
             role = Talk.ROLE_LABEL[p.role] or p.role, org = PaddockWorld.orgName(b.orgId) } end
     end
     TriggerClientEvent("ncm:paddock.bodies", pid, { rows = rows })

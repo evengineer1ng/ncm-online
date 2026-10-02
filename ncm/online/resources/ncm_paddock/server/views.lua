@@ -63,7 +63,8 @@ function PaddockViews.standings(_, args)
     for i, r in ipairs(rows) do
         if kind == "driver" then
             local p = world.people[r.id]
-            out[i] = P.standingRow(r, p and p.display or "?", p and PaddockWorld.orgName(p.orgId) or "free agent", driverTags(p))
+            out[i] = P.standingRow(r, p and p.display or "?", p and (p.orgId and PaddockWorld.orgName(p.orgId)
+                or (p.leagueId and "Independent") or "free agent") or "?", driverTags(p))
         else
             local o = world.orgs[r.id]
             out[i] = P.standingRow(r, o and o.name or "?", nil, o and orgTags(o) or {})
@@ -120,10 +121,12 @@ function PaddockViews.box(_, args)
     local rows = MySQL.query.await([[SELECT person_id, org_id, position, grid, state, finish_ms, gap_ms, points, dnf_reason
         FROM paddock_result WHERE server_id = ? AND race_id = ? ORDER BY position]], { sid, race.race_id }) or {}
     local out = {}
+    local detail = U.decode(race.detail_json) or {}
+    local quali = (type(detail.frozen) == "table" and type(detail.frozen.quali) == "table") and detail.frozen.quali or {}
     for i, r in ipairs(rows) do
         out[i] = P.boxRow({ position = tonumber(r.position), grid = tonumber(r.grid), personId = r.person_id, state = r.state,
             finishMs = tonumber(r.finish_ms), gapMs = tonumber(r.gap_ms), points = tonumber(r.points), dnfReason = r.dnf_reason },
-            PaddockWorld.personName(r.person_id), PaddockWorld.orgName(r.org_id))
+            PaddockWorld.personName(r.person_id), PaddockWorld.orgName(r.org_id), tonumber(quali[r.person_id]))
     end
     return { view = "box", raceId = race.race_id, series = PaddockWorld.seriesName(race.series_id),
         route = PaddockWorld.routeName(race.route_id), at = tonumber(race.window_opens_at), weather = race.weather,
@@ -200,7 +203,8 @@ function PaddockViews.profile(_, args)
     local p = world.people[args.id or ""]
     if not p then return { view = "profile", error = "unknown", rows = {} } end
     local e = p.evidence or {}
-    local head = P.personProfile(p, { orgName = p.orgId and PaddockWorld.orgName(p.orgId) or (p.state == "free_agent" and "free agent" or nil),
+    local head = P.personProfile(p, { orgName = p.orgId and PaddockWorld.orgName(p.orgId) or (p.state == "free_agent" and "free agent")
+            or (p.leagueId and "Independent") or nil,
         regionLabel = P.REGION_LABELS[p.region], ageBand = P.ageBand(World.age(world, p)),
         tags = p.role == "driver" and driverTags(p) or {}, wins = e.wins or 0, starts = e.starts or 0, podiums = e.podiums or 0 })
     local rows = {}
@@ -340,6 +344,7 @@ function PaddockViews.live(_, args)
     pick = pick or list[1]
     if not pick then return { view = "live", races = races, rows = {} } end
     local model = pick.model
+    local route = PaddockWorld.route(pick.routeId)
     local lr = PaddockLive.byRace[pick.raceId]
     local street = lr and lr.state == "running" and lr.goMs
     local tMs = street and ((Open77.time.unix() or 0) * 1000 - lr.goMs) or (t - pick.modelGoAt) * 1000
@@ -347,12 +352,32 @@ function PaddockViews.live(_, args)
     if street then
         -- real positions: where each car is on the line, and the gates it has timed
         local w = PaddockStore.world
+        -- each gate's distance along the line, in order: a car is between the last gate it timed and the next, which
+        -- is what keeps it on its own lap of an oval (L236, KB-223)
+        if not lr.gateD and lr.gates then
+            lr.gateD = { 0 }
+            for i = 2, #lr.gates do lr.gateD[i] = Racestate.project(model, lr.gates[i], lr.gateD[i - 1]) end
+        end
         for _, c in ipairs(lr.cars) do
             local okP, pos = pcall(Open77.vehicles.getPosition, c.vehicleId)
-            local d = (okP and type(pos) == "table") and Racestate.project(model, pos) or 0
             local tc = lr.timing and lr.timing.cars[c.personId]
+            local gd, nx = lr.gateD, tc and tc.next or 2
+            local lo = gd and gd[math.max(1, nx - 1)] and (gd[math.max(1, nx - 1)] - 25) or nil
+            local hi = gd and (gd[nx] and (gd[nx] + 25) or model.lengthM) or nil
+            local d = (okP and type(pos) == "table") and Racestate.project(model, pos, lo, hi) or (lo and math.max(0, lo + 25)) or 0
             local state = (tc and tc.done) and "finished" or (lr.out[c.personId] and "out" or "racing")
+            -- The timing gate sequence is the race authority for ovals. Distance projection can choose the wrong
+            -- copy of the repeated ring (especially near the start/finish line), so publish lap from crossed gates.
+            local ovalLap
+            if route and route.oval and tc then
+                local gatesPerLap = #route.oval.loop
+                if gatesPerLap > 0 then
+                    ovalLap = math.min(route.oval.laps, math.floor(math.max(0, (tc.next or 2) - 2) / gatesPerLap) + 1)
+                    if tc.done then ovalLap = route.oval.laps end
+                end
+            end
             rows[#rows + 1] = { id = c.personId, d = (tc and tc.done) and model.lengthM or d, state = state, finishMs = tc and tc.finishMs,
+                lap = ovalLap,
                 vid = c.vehicleId, physical = true }
         end
         table.sort(rows, function(a, b)
@@ -381,24 +406,42 @@ function PaddockViews.live(_, args)
                 local car = bub.cars[r.id]
                 if car then
                     local okP, pos = pcall(Open77.vehicles.getPosition, car.vid)
-                    if okP and type(pos) == "table" then r.d = Racestate.project(model, pos); r.physical = true; r.vid = car.vid end
+                    -- near its last known distance, so a line that passes the same place twice keeps the right pass
+                    local near = car.lastD or r.d or 0
+                    if okP and type(pos) == "table" then r.d = Racestate.project(model, pos, near - 300, near + 300); r.physical = true; r.vid = car.vid end
                 end
             end
         end
+    end
+    -- L250: a mixed grid's humans, where their players are on the line, in the same order
+    if PaddockHumans and PaddockHumans.mixed(pick) then
+        for _, h in ipairs(PaddockHumans.liveRows(pick, model, function(pos, lo, hi) return Racestate.project(model, pos, lo, hi) end)) do rows[#rows + 1] = h end
+        table.sort(rows, function(a, b)
+            if (a.state == "finished") ~= (b.state == "finished") then return a.state == "finished" end
+            if a.state == "finished" then return (a.finishMs or 0) < (b.finishMs or 0) end
+            return (a.d or 0) > (b.d or 0)
+        end)
+        for i, r in ipairs(rows) do r.pos = i end
     end
     local out = {}
     for i, r in ipairs(rows) do
         local p = PaddockStore.world.people[r.id]
         local o = PaddockStore.world.orgs[(p and p.orgId) or r.orgId or ""]
-        out[i] = { pos = r.pos, id = r.id, name = p and p.display or "?", org = o and o.name, colour = o and o.colour,
+        local ovalLaps = route and route.oval and route.oval.laps
+        local lap = r.lap
+        if ovalLaps and not lap then lap = math.min(ovalLaps, math.floor((r.d or 0) / math.max(1, model.lengthM / ovalLaps)) + 1) end
+        out[i] = { pos = r.pos, id = r.id, name = p and p.display or r.name or "?", org = o and o.name or (r.human and "Independent" or nil), colour = o and o.colour,
             pct = math.floor(math.min(1, math.max(0, (r.d or 0) / math.max(1, model.lengthM))) * 1000) / 10,
+            lap = lap,
             gap = r.state == "finished" and (r.gapMs and (r.gapMs == 0 and "winner" or ("+%.1fs"):format(r.gapMs / 1000)) or "finished")
                 or (r.state == "out" and "out") or (r.gapMs and (r.gapMs == 0 and "leader" or ("+%.1fs"):format(r.gapMs / 1000)) or ""),
-            state = r.state, physical = r.physical or nil, vid = r.vid }
+            state = r.state, physical = r.physical or nil, vid = r.vid, human = r.human or nil,
+            quali = pick.frozen and pick.frozen.quali and P.secs(tonumber(pick.frozen.quali[r.id])) or nil }
     end
     return { view = "live", races = races, raceId = pick.raceId, series = PaddockWorld.seriesName(pick.seriesId),
         route = PaddockWorld.routeName(pick.routeId), elapsed = math.max(0, math.floor(tMs / 1000)), lengthM = math.floor(model.lengthM),
-        street = street and true or nil, rows = out }
+        street = street and true or nil, rows = out,
+        grid = P.qualiSheet(pick.frozen, function(id) local p = PaddockStore.world.people[id]; return p and p.display or "?" end) }
 end
 
 --- TODAY: the landing page. What races next (with the live button), what just finished, the top headlines, and
@@ -444,9 +487,55 @@ local function phaseNow(t)
     return table.concat(on, " · ") .. " racing"
 end
 
+
+--- THE EXCHANGE (L249 step 5): the open board, your posts with their bids, your bids, and your stored parts (what you
+--- can post or offer). Names, never ids, for who posted; no hidden fields.
+function PaddockViews.exchange(pid)
+    local EX = NcmCore.get("economy.exchange_posts")
+    local d = PaddockPlayers.driver(pid)
+    local me = d and EX.principal("driver", d.ncmDriverId) or nil
+    local rows = {}
+    local posts = MySQL.query.await([[SELECT * FROM exchange_post WHERE server_id = ? AND state = 'open' ORDER BY created_at DESC LIMIT 60]], { U.sid() }) or {}
+    for _, r in ipairs(posts) do
+        local key = EX.principal(r.principal_kind, r.principal_id)
+        local part = r.asset_id and PaddockExchange.part(r.asset_id) or nil
+        local bids = PaddockExchange.bidsOn(r.post_id)
+        local row = { t = "post", id = r.post_id, kind = r.kind, by = PaddockExchange.nameOf(key),
+            who = r.principal_kind == "org" and "team" or (r.principal_kind == "person" and "racer" or "driver"),
+            item = part and part.name or nil, family = part and part.family or r.want_family, tier = part and part.tier or r.want_tier,
+            cash = tonumber(r.cash) or 0, revision = tonumber(r.revision) or 1, expiresAt = tonumber(r.expires_at) or 0,
+            bids = #bids, mine = (key == me) or nil, note = r.note }
+        if key == me then
+            local list = {}
+            for _, b in ipairs(bids) do
+                local bp = b.assetId and PaddockExchange.part(b.assetId) or nil
+                list[#list + 1] = { id = b.bidId, by = PaddockExchange.nameOf(b.principal), cash = b.cash, item = bp and bp.name or nil }
+            end
+            row.offers = list
+        end
+        rows[#rows + 1] = row
+    end
+    if me then
+        for _, r in ipairs(MySQL.query.await([[SELECT b.*, p.kind AS post_kind FROM exchange_bid b JOIN exchange_post p ON p.post_id = b.post_id
+            WHERE b.server_id = ? AND b.principal_kind = 'driver' AND b.principal_id = ? AND b.state = 'open' ORDER BY b.created_at DESC LIMIT 20]],
+            { U.sid(), d.ncmDriverId }) or {}) do
+            rows[#rows + 1] = { t = "mybid", id = r.bid_id, postId = r.post_id, cash = tonumber(r.cash) or 0, expiresAt = tonumber(r.expires_at) or 0 }
+        end
+        for _, r in ipairs(MySQL.query.await([[SELECT a.asset_id, d.family, d.tier, d.code, d.display_manufacturer, d.price FROM component_asset a
+            JOIN component_design d ON d.design_id = a.design_id LEFT JOIN exchange_reservation x ON x.asset_id = a.asset_id
+            WHERE a.server_id = ? AND a.ncm_driver_id = ? AND a.location_kind = 'storage' AND a.machine_asset_id IS NULL AND x.asset_id IS NULL
+            ORDER BY d.family LIMIT 40]], { U.sid(), d.ncmDriverId }) or {}) do
+            rows[#rows + 1] = { t = "part", id = r.asset_id, item = ("%s %s"):format(r.display_manufacturer or "", r.code or ""),
+                family = r.family, tier = r.tier, list = tonumber(r.price) or 0 }
+        end
+    end
+    return { view = "exchange", rows = rows, balance = d and PaddockWallet.balance(d.ncmDriverId) or 0, signedIn = me ~= nil,
+        families = NcmCore.get("parts.catalogue").FAMILIES, tiers = { "street", "sport", "premium" } }
+end
+
 PaddockViews.BUILDERS = { today = PaddockViews.today, live = PaddockViews.live, wire = PaddockViews.wire, standings = PaddockViews.standings, results = PaddockViews.results,
     box = PaddockViews.box, pace = PaddockViews.pace, directory = PaddockViews.directory, profile = PaddockViews.profile,
-    board = PaddockViews.board, myorg = PaddockViews.myorg }
+    board = PaddockViews.board, myorg = PaddockViews.myorg, exchange = PaddockViews.exchange }
 
 --- Build and send one view to one player.
 function PaddockViews.send(pid, req)

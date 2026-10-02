@@ -37,6 +37,7 @@ local base = { serverNow = 0, mono = 0 }
 local me = nil                   -- my entrant record from the view
 local lastMe = nil
 local markers = {}               -- name -> handle
+local nativeMarkers = {}         -- direct Open77 marker handles for the Paddock's ground grid ring
 local crossed = {}               -- gateIndex -> mono time of local detection (per session)
 local reported = {}              -- gateIndex -> mono time of last report
 local retries = {}               -- gateIndex -> retry count
@@ -80,17 +81,21 @@ end
 local function removeMarker(name)
     if markers[name] then pcall(function() call("open77_worldui", "remove", markers[name]) end) end
     markers[name] = nil
+    if nativeMarkers[name] then pcall(Open77.markers.remove, nativeMarkers[name]) end
+    nativeMarkers[name] = nil
+    markers[name .. "@"] = nil
 end
 
 local function ensureMarker(name, def)
-    local sig = def.x .. "," .. def.y .. "|" .. tostring(def.label or "") .. "|" .. tostring(def.color or "")
+    if nativeMarkers[name] then pcall(Open77.markers.remove, nativeMarkers[name]); nativeMarkers[name] = nil end
+    local sig = def.x .. "," .. def.y .. "|" .. tostring(def.label or "") .. "|" .. tostring(def.color or "") .. "|" .. tostring(def.shape or "")
     if markers[name] and markers[name .. "@"] == sig then return end
     removeMarker(name)
     local spec = {
         id = "ncm_" .. name,
         position = { x = def.x, y = def.y, z = def.z },
         radius = def.radius or 4.0, style = def.style or "objective", maxDistance = def.maxDistance or 250.0,
-        groundOffset = 0.25, color = def.color or "#00E5FF",
+        groundOffset = 0.08, color = def.color or "#00E5FF", shape = def.shape,
     }
     if def.label then spec.label = def.label; spec.description = def.description end
     if def.event then spec.key = def.key or "E"; spec.holdSeconds = def.holdSeconds or 0.5; spec.promptDistance = def.promptDistance or 6.0; spec.event = def.event end
@@ -101,6 +106,25 @@ local function ensureMarker(name, def)
     else
         log("marker %s failed: %s", name, tostring(err or (result and result.error)))
     end
+end
+
+-- The WorldUI POI wrapper also allocates a prompt even when no prompt is wanted. Use the native
+-- marker surface for the one essential alignment cue so POI/prompt allocation cannot hide the grid.
+local function ensureNativeRing(name, p)
+    local opts = { position = { x = p.x, y = p.y, z = (p.z or 0) + 0.12 }, shape = "ring", radius = 4.5,
+        maxDistance = 500.0, color = { r = 255, g = 218, b = 72, a = 240 } }
+    if nativeMarkers[name] then
+        local ok, updated = pcall(Open77.markers.update, nativeMarkers[name], opts)
+        if ok and updated then return true end
+        pcall(Open77.markers.remove, nativeMarkers[name]); nativeMarkers[name] = nil
+    end
+    local ok, handle, reason = pcall(Open77.markers.create, opts)
+    if ok and handle ~= nil then
+        nativeMarkers[name] = handle
+        return true
+    end
+    log("native grid ring failed: %s", tostring(ok and reason or handle))
+    return false
 end
 
 -- ---------------------------------------------------------------------------------------------
@@ -216,10 +240,56 @@ local function gpsTo(p, why)
     NcmNav.to({ x = p.x, y = p.y, z = p.z, name = p.name or p.kind }, why)
 end
 
+
+-- L250: a Paddock qualifying run is a STANDING start. The driver stops at the start line (under STAGE_MPS for
+-- STAGE_HOLD_S, within STAGE_M of it) and is STAGED; the crossing that follows is reported as staged, and the server
+-- starts no run from any other crossing.
+local STAGE_M, STAGE_MPS, STAGE_HOLD_S, UNSTAGE_M = 14, 1.0, 1.0, 35
+local stage = { staged = false, slowSince = nil, last = nil, lastAt = nil, speed = nil }
+local function stageUpdate(pos, start)
+    local nowM = Open77.time.monotonic()
+    if stage.last and stage.lastAt and nowM > stage.lastAt then
+        stage.speed = Routes.planarDistance(pos, stage.last) / (nowM - stage.lastAt)
+    end
+    stage.last, stage.lastAt = pos, nowM
+    if not start then stage.staged, stage.slowSince = false, nil return end
+    local d = Routes.planarDistance(pos, start)
+    if d > UNSTAGE_M then stage.staged, stage.slowSince = false, nil return end
+    if d <= STAGE_M and (stage.speed or 99) < STAGE_MPS then
+        stage.slowSince = stage.slowSince or nowM
+        if not stage.staged and nowM - stage.slowSince >= STAGE_HOLD_S then
+            stage.staged = true
+            banner("go", "STAGED", "go when ready -- the clock starts at the line", 2.5)
+        end
+    elseif (stage.speed or 0) >= STAGE_MPS then
+        stage.slowSince = nil
+    end
+end
+
+-- L250: an arrow to a point, relative to the way the car is moving (the last metre or more of travel)
+local heading = { at = nil, deg = nil }
+local atan2 = math.atan2 or math.atan
+local ARROWS = { "↑", "↗", "→", "↘", "↓", "↙", "←", "↖" }
+local function arrowTo(pos, target)
+    if not pos or not target then return "" end
+    if heading.at and Routes.planarDistance(pos, heading.at) >= 1.0 then
+        heading.deg = math.deg(atan2(pos.y - heading.at.y, pos.x - heading.at.x))
+        heading.at = pos
+    elseif not heading.at then
+        heading.at = pos
+    end
+    if not heading.deg then return "" end
+    local want = math.deg(atan2(target.y - pos.y, target.x - pos.x))
+    local rel = (heading.deg - want) % 360          -- clockwise from straight ahead
+    return ARROWS[(math.floor((rel + 22.5) / 45) % 8) + 1] .. " "
+end
+
 local function report(index)
     reported[index] = Open77.time.monotonic()
-    log("crossed gate %d -> reporting", index)
-    TriggerServerEvent("ncm:gate", view.sessionId, index)
+    -- L250: a standing-start qualifying run says whether the driver was staged at the line
+    local info = (view.standing and index == 1) and { staged = stage.staged == true } or nil
+    log("crossed gate %d -> reporting%s", index, info and (info.staged and " (staged)" or " (NOT staged)") or "")
+    TriggerServerEvent("ncm:gate", view.sessionId, index, info)
 end
 
 -- ---------------------------------------------------------------------------------------------
@@ -605,13 +675,18 @@ local function present()
             local gpsKey = view.sessionId .. ":" .. tostring(me.runs or 0) .. ":" .. tostring(nextIndex)
             if g and (onRun or runsLeft > 0) and gridGpsFor ~= gpsKey then gridGpsFor = gpsKey; gpsTo(g, "next gate " .. tostring(g.kind)) end
             local mid
-            if onRun then mid = ("run %d · gate %d/%d"):format(me.runs or 1, me.runProgress or 0, #view.gates)
+            if view.standing and onRun then stage.staged, stage.slowSince = false, nil end
+            if view.standing and not onRun and pos then stageUpdate(pos, start) end
+            if view.standing and not onRun and runsLeft > 0 then
+                local dStart = pos and start and Routes.planarDistance(pos, start) or nil
+                mid = stage.staged and "STAGED · go when ready" or ((dStart and dStart <= STAGE_M) and "STOP on the line to stage" or "standing start · stop on the line, then go")
+            elseif onRun then mid = ("run %d · gate %d/%d"):format(me.runs or 1, me.runProgress or 0, #view.gates)
             elseif runsLeft <= 0 then mid = "run complete · waiting for the window"
             elseif (view.maxRuns or 99) == 1 then mid = "one run · cross the start when ready"
             else mid = "no run · cross the start" end
             local gateName = g and (g.kind == "finish" and "finish" or (g.kind == "start" and "start line" or (g.name or "next gate"))) or ""
             local dim = (g and (onRun or runsLeft > 0)) and ("%s to the %s"):format(d and km(d) or "?", gateName) or ""
-            state.strip = { kind = "", eyebrow = string.upper(view.kind) .. " · best " .. best, big = Entry.countdown((view.closesAt or now) - now), mid = mid, dim = dim }
+            state.strip = { kind = "", eyebrow = (view.qualifying and "QUALIFYING" or string.upper(view.kind)) .. " · best " .. best, big = Entry.countdown((view.closesAt or now) - now), mid = mid, dim = dim }
         elseif phase == "complete" then
             if not (view.next and start) then removeMarker("gate") end
             local mine, rows = nil, {}
@@ -642,7 +717,7 @@ local function present()
         if not outNoticeUntil then outNoticeUntil = Open77.time.monotonic() + 8 end
         removeMarker("gate"); removeMarker("slot")
         if Open77.time.monotonic() < outNoticeUntil then
-            state.strip = me.state == "dns" and { kind = "grid", eyebrow = "DID NOT START", big = "DNS", mid = "you were not on your mark at T-30", dim = view.routeName or "" }
+            state.strip = me.state == "dns" and { kind = "grid", eyebrow = "DID NOT START", big = "DNS", mid = "you were away from the grid when the lights went green", dim = view.routeName or "" }
                 or { kind = "grid", eyebrow = "DNF", big = "OUT", mid = "classified by progress", dim = view.routeName or "" }
             hud(state)
         else
@@ -652,8 +727,28 @@ local function present()
     end
 
     if phase == "forming" or phase == "gridded" then
-        local slot = view.slots and view.slots[me.slot]
-        if slot then
+        local slot
+        for _, s in ipairs(view.slots or {}) do if s.driverId == me.driverId then slot = s break end end
+        slot = slot or (view.slots and view.slots[me.slot])
+        if slot and view.paddock then
+            -- L250: a mixed Paddock grid -- a beam on your slot from the moment the grid forms, the map routes to it,
+            -- and the strip carries an arrow and the distance; race control places you at T-20 if you are close
+            local d = pos and Routes.planarDistance(pos, slot) or nil
+            removeMarker("grid")
+            if markers.slot then removeMarker("slot") end
+            ensureNativeRing("slot", slot)
+            if gridGpsFor ~= view.sessionId .. ":slot" then gridGpsFor = view.sessionId .. ":slot"; gpsTo(slot, "grid slot P" .. tostring(slot.slot)) end
+            local field = view.fieldSize or n
+            local onMark = d and d <= 12.0
+            local placeIn = view.startsAt - now - 20
+            state.strip = { kind = "grid",
+                eyebrow = (me.state == "ready" or onMark) and ("ON YOUR MARK" .. sessionTag) or ("YOUR SLOT" .. sessionTag),
+                big = "P" .. tostring(slot.slot),
+                mid = (me.state == "ready" or onMark) and ("of %d · hold position"):format(field) or ("of %d · %s%s to your slot"):format(field, arrowTo(pos, slot), d and km(d) or "?"),
+                dim = (me.state == "ready" or onMark) and ((view.startsAt - now - 5) > 0 and ("small corrections are OK · lights in " .. Entry.countdown(view.startsAt - now - 5)) or "small corrections are OK · lights")
+                    or (placeIn > 0 and ("race control places you in " .. Entry.countdown(placeIn) .. " if you are within 20 m") or "reach the grid before green; DNS only if still away at the start") }
+            removeMarker("gate")
+        elseif slot then
             local d = pos and Routes.planarDistance(pos, slot) or nil
             -- Far from the SLOT is what matters: the venue's grid point can sit at the other end of a route.
             local grid = (d and d > 60) and slot or (view.grid or slot)
@@ -988,6 +1083,22 @@ RegisterCommand("ncm.debug", function()
     log("DEBUG %s", line)
     banner("go", "DEBUG · " .. phase .. (me and (" · " .. me.state) or ""), (g and ("next " .. tostring(g.kind) .. " " .. (d and math.floor(d) .. " m" or "")) or "no gate") .. " · gps " .. tostring(gpsTarget and gpsTarget.why or "-"), 6)
 end, false)
+
+local function snapToGrid()
+    if not NcmClientRaceActive or not view or (view.phase ~= "forming" and view.phase ~= "gridded") then
+        banner("warn", "NO ACTIVE GRID", "Grid snap is available while your race grid is forming.", 4)
+        return
+    end
+    TriggerServerEvent("ncm:grid.snap")
+end
+local snapBindingOk, snapBindingOrError, snapEffectiveBinding = pcall(
+    RegisterKeyMapping, "ncm.gridsnap", "NCM: snap to my exact race grid spot", "F7", snapToGrid)
+if snapBindingOk and snapBindingOrError == true then
+    log("grid snap key registered: %s (rebindable as NCM: snap to my exact race grid spot)", tostring(snapEffectiveBinding or "F7"))
+else
+    log("grid snap key registration failed: %s; use /ncm.gridsnap", tostring(snapBindingOk and snapEffectiveBinding or snapBindingOrError))
+end
+RegisterCommand("ncm.gridsnap", snapToGrid, false)
 
 -- The live race graph: F8 or /ncm.graph toggles it (P40; on by default).
 local function toggleGraph()

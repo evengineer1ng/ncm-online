@@ -29,9 +29,22 @@ local events, queue, replies, commands = {}, {}, {}, {}
 function AddEventHandler(name, fn) events[name] = fn end
 function RegisterNetEvent(name, fn) events[name] = fn end
 function RegisterCommand(name, fn) commands[name] = fn end
+-- server-to-server events between resources (L250: ncm_league <-> ncm_paddock): recorded, and delivered to a handler here
+EMITTED = {}
+function TriggerEvent(name, ...)
+    EMITTED[#EMITTED + 1] = { name = name, args = { ... } }
+    if events[name] then return events[name](...) end
+end
 function CreateThread(fn) queue[#queue + 1] = coroutine.create(fn) end
 function Wait(ms) coroutine.yield(ms) end
-function TriggerClientEvent(name, pid, body) replies[#replies + 1] = { name = name, pid = pid, body = body } end
+function TriggerClientEvent(name, pid, body)
+    replies[#replies + 1] = { name = name, pid = pid, body = body }
+    -- KB-238: a bubble car comes up empty; the client reports it settled after delayMs and the server seats its driver
+    if name == "ncm:paddock.bubble.car" and type(body) == "table" and body.op == "seat" then
+        SEAT_QUEUE[#SEAT_QUEUE + 1] = { pid = pid, body = body, at = Open77.time.unix() + (body.delayMs or 3000) / 1000 }
+    end
+    if PACE_HOOK then PACE_HOOK(name, pid, body) end
+end
 function print(s) logs[#logs + 1] = tostring(s) end
 function GetPlayerIdentifier(pid) return "user:" .. tostring(pid) end
 function GetPlayerName(pid) return "Player" .. tostring(pid) end
@@ -45,6 +58,7 @@ local POS, VEH, NPC, NOTES, aiHandlers = {}, {}, {}, {}, {}
 local nextEnt = 5000
 STUCK_FROM, STUCK_UNTIL_RESET = nil, false   -- cars from this grid index on stall; until a reset, or for good
 GHOSTS = {}
+SEAT_QUEUE = {}
 -- open77_remote_camera's server exports, as far as the probe uses them
 local CAMS, LEASES = {}, {}
 exports = { open77_remote_camera = {
@@ -59,7 +73,12 @@ exports = { open77_remote_camera = {
 } }
 local function vdist(a, b) local dx, dy = a.x - b.x, a.y - b.y return math.sqrt(dx * dx + dy * dy) end
 local function advance(v)
-    if v.route and v.t then v.dist = v.dist + (v.speed or 0) * (clock - v.t); v.t = clock end
+    if not (v.route and v.t) or clock <= v.t then return end           -- nothing moves before its go
+    -- the Pace double's stall rule (Pace 0.7.0): a stuck car gets a fresh racing command 6 s in and races on
+    if v.stall and v.stuckUntilReset and v.unstickAt and clock >= v.unstickAt then
+        v.dist = v.dist + 0; v.t = clock; v.stall = false; v.speed = v.paceSpeed; v.unstuck = true
+    end
+    v.dist = v.dist + (v.speed or 0) * (clock - v.t); v.t = clock
 end
 local function polyAt(pts, d)
     for i = 2, #pts do
@@ -91,7 +110,12 @@ Open77 = {
         ai = { tasks = 1 }, damage = { invulnerable = 2 },
         create = function(def) nextEnt = nextEnt + 1; NPC[nextEnt] = { position = def.position, record = def.record } return nextEnt end,
         remove = function(id) NPC[id] = nil return true end,
-        get = function(id) return NPC[id] end,
+        -- the real shape: a FLAT snapshot (x, y, z, bucket), as freeroam's bots read it -- never `.position` (KB-234)
+        get = function(id)
+            local n = NPC[id]
+            if not n then return nil end
+            return { x = n.position.x, y = n.position.y, z = n.position.z, bucket = 0, record = n.record }
+        end,
         speak = function() return true end,
         tasks = { lookAt = function() return true end },
     },
@@ -104,7 +128,7 @@ Open77 = {
                 stuckUntilReset = STUCK_UNTIL_RESET }
             return nextEnt
         end,
-        remove = function(id) VEH[id] = nil return true end,
+        remove = function(id) if VEH[id] and VEH[id].driver then REMOVED_WITH_DRIVER = (REMOVED_WITH_DRIVER or 0) + 1 end VEH[id] = nil return true end,
         getPosition = function(id)
             local v = VEH[id]
             if not v then return nil end
@@ -193,6 +217,7 @@ local DB = {
     ledger = {}, idem = {}, affiliation = {}, treasury = {}, tidem = {}, event = {}, news = {}, message = {}, push = {},
     contact = { ["driver-1"] = true, ["driver-2"] = true },
     live = {}, crossing = {}, meeting = {}, garageCheck = {},
+    climate = nil, climateEvent = {}, trajectory = {}, placeCheck = {},
 }
 local function ledgerTotal(d) local s = 0 for _, r in ipairs(DB.ledger) do if r.d == d then s = s + r.amount end end return s end
 local function ledgerAdd(d, kind, amount, idem)
@@ -226,11 +251,14 @@ local function exec(q, v)
         DB.org[r.org_id] = r
     elseif has(q, "INTO paddock_person") then
         local keys = { "server_id", "person_id", "role", "org_id", "seat", "first", "last", "display", "region", "gender", "birth_year",
-            "attrs_json", "personality_json", "principal_json", "morale", "state", "wage", "contract_ends", "evidence_json" }
+            "attrs_json", "personality_json", "principal_json", "morale", "state", "wage", "contract_ends", "evidence_json",
+            "league_id", "car_json", "cash" }
         local r = {}
         for i, k in ipairs(keys) do r[k] = v[i] end
         if r.org_id == "" then r.org_id = nil end
         if r.seat == "" then r.seat = nil end
+        if r.league_id == "" then r.league_id = nil end
+        if r.car_json == "" then r.car_json = nil end
         DB.person[r.person_id] = r
     elseif has(q, "INTO paddock_sponsor") then
         DB.sponsor[v[2]] = { sponsor_id = v[2], name = v[3], short = v[4], industry = v[5], tier = v[6], personality_json = v[7],
@@ -273,6 +301,14 @@ local function exec(q, v)
     elseif has(q, "INTO paddock_meeting") then
         local k = v[2] .. "|" .. v[3]
         if DB.meeting[k] then DB.meeting[k].met_count = DB.meeting[k].met_count + 1 else DB.meeting[k] = { met_count = 1 } end
+    elseif has(q, "INTO paddock_climate_event") then
+        DB.climateEvent[v[2] .. "|" .. v[3]] = { day_index = v[2], district = v[3], from_regime = v[4], to_regime = v[5] }
+    elseif has(q, "INTO paddock_climate") then
+        DB.climate = { day_index = v[2], season_id = v[3], state_json = v[4], facts_json = v[5] }
+    elseif has(q, "INTO paddock_trajectory") then
+        DB.trajectory[v[2]] = { bucket = v[3], profile_json = v[4] }
+    elseif has(q, "INTO paddock_place_check") then
+        DB.placeCheck[v[2]] = { place_id = v[2], verdict = v[3] }
     elseif has(q, "INTO paddock_garage_check") then
         DB.garageCheck[v[2]] = { site_id = v[2], verdict = v[3] }
     elseif has(q, "INTO paddock_result") then
@@ -338,7 +374,7 @@ MySQL = {
     update = { await = function(q, v) return exec(q, v) end },
     insert = { await = function(q, v) return exec(q, v) end },
     scalar = { await = function(q, v)
-        if has(q, "MAX(version) FROM schema_migrations") then return 52 end
+        if has(q, "MAX(version) FROM schema_migrations") then return 57 end
         if has(q, "FROM ncm_driver_binding") then return 2 end
         if has(q, "SUM(amount),0) FROM ledger") then return ledgerTotal(v[1]) end
         if has(q, "COUNT(*) FROM ledger WHERE idem_key") then return DB.idem[v[1]] and 1 or 0 end
@@ -360,6 +396,8 @@ MySQL = {
         if has(q, "FROM team_affiliation") then local a = activeAff(v[2]) return a and { circuit = a.circuit, role = a.role } or nil end
         if has(q, "FROM paddock_race WHERE server_id = ? AND race_id") then return DB.race[v[2]] end
         if has(q, "FROM ghost_lap") then return GHOSTS[v[2]] end
+        if has(q, "FROM paddock_climate") then return DB.climate end
+        if has(q, "FROM paddock_trajectory") then return DB.trajectory[v[2]] end
         return nil
     end },
     query = { await = function(q, v)
@@ -370,6 +408,8 @@ MySQL = {
         elseif has(q, "FROM paddock_sponsor") then for _, r in pairs(DB.sponsor) do out[#out + 1] = r end table.sort(out, function(a, b) return a.sponsor_id < b.sponsor_id end)
         elseif has(q, "FROM paddock_garage_check") then
             for _, r in pairs(DB.garageCheck) do out[#out + 1] = r end
+        elseif has(q, "FROM paddock_place_check") then
+            for _, r in pairs(DB.placeCheck) do out[#out + 1] = r end
         elseif has(q, "FROM weather_transition") then
             out = { { starts_at_utc = clock - 7200, weather = "sunny" }, { starts_at_utc = clock + 86400 * 3, weather = "rain" } }
         elseif has(q, "FROM paddock_result WHERE server_id = ? AND race_id") then
@@ -454,7 +494,7 @@ realPrint("paddock host harness")
 do
     local offenders = {}
     for _, f in ipairs({ "settings", "util", "store", "players", "stream", "wallet", "story", "world", "calibration", "races",
-        "billie", "life", "manager", "spotlight", "garages", "live", "probe", "bubble", "clock", "views", "requests", "admin", "main" }) do
+        "billie", "life", "manager", "spotlight", "garages", "days", "live", "humans", "probe", "bubble", "clock", "views", "requests", "admin", "main" }) do
         local text = assert(io.open(RES .. "ncm_paddock/server/" .. f .. ".lua")):read("a")
         text = text:gsub("%-%-[^\n]*", "")   -- code only: comments may name the resource they mirror
         for g in text:gmatch("(Ncm%u%a+)%.") do
@@ -483,6 +523,14 @@ check("170 organizations and their people exist (L236: ~3x)", #W.orgOrder == 170
 local persisted = 0
 for _ in pairs(DB.org) do persisted = persisted + 1 end
 check("every org was persisted", persisted == 170)
+-- L249: every league carries its owner-approved name
+do
+    local Names = NcmCore.get("paddock.names")
+    local named = 0
+    for id, s in pairs(W.series) do if s.name == Names.LEAGUES[id] then named = named + 1 end end
+    check(("every league has its approved name (%d of 15; street_a is %s)"):format(named, tostring(W.series.street_a and W.series.street_a.name)),
+        named == 15 and W.series.premier.name == "Hypercar Championship")
+end
 check("genesis wrote a founding story", next(DB.news) ~= nil)
 
 -- reload round-trip: the store reads back what it wrote
@@ -520,6 +568,39 @@ local pricingSec = os.clock() - t0
 check(("pricing one race takes under 1.5 s (%.2f s)"):format(pricingSec), pricingSec < 1.5)
 check(("no pricing slice exceeds 400k VM instructions (max %d)"):format(maxSlice), maxSlice < 400000)
 check("the race is on the board", race.state == "priced" and DB.race[premierId].state == "priced")
+-- L249: the Race Guide reads the Paddock's next events from GlobalState (ncm_league cannot call this VM)
+do
+    GlobalState = GlobalState or {}
+    run(function() PaddockRaces.publishGuide(clock + 100) end)
+    local rows = GlobalState.ncmPaddockGuide or {}
+    local premierRow
+    for _, r in ipairs(rows) do if r.raceId == premierId then premierRow = r end end
+    check(("the Race Guide gets the Paddock's next events (%d rows)"):format(#rows), #rows >= 1 and #rows <= 40
+        and premierRow and premierRow.seriesName == "Hypercar Championship" and premierRow.field == #race.frozen.grid
+        and premierRow.venue and premierRow.startsAt == race.opensAt)
+    -- L250 step 2: every frozen entrant has a qualifying time, in grid order, and the feed carries the sheet
+    local q, ordered, prev = race.frozen.quali or {}, true, 0
+    for _, pid in ipairs(race.frozen.grid) do
+        if not q[pid] or q[pid] < prev then ordered = false end
+        prev = q[pid] or math.huge
+    end
+    check("the frozen grid is in qualifying-time order, every entrant timed", ordered)
+    check("the Race Guide feed carries the qualifying sheet", premierRow and type(premierRow.quali) == "table"
+        and #premierRow.quali == #race.frozen.grid and premierRow.quali[1].quali and premierRow.quali[1].name ~= "?")
+end
+-- L249: the frozen field is who TURNED UP -- teams field their available drivers -- and every absence has a reason
+do
+    local absentN = 0
+    for _, n in pairs(race.frozen.absent or {}) do absentN = absentN + n end
+    check(("the premier field is who turned up (%d on the grid, %d not)"):format(#race.frozen.grid, absentN),
+        #race.frozen.grid >= 10 and #race.frozen.grid <= 16 and absentN >= 16)
+    local touched = NcmCore.get("paddock.world").growPools(W, 50)
+    check(("a world already at its pools grows nothing at boot (%d)"):format(#touched), #touched == 0)
+    for _, pid in ipairs(race.frozen.grid) do
+        local p = W.people[pid]
+        if not (p.evidence and p.evidence.lastStartAt == race.opensAt) then check("a frozen entrant is marked as having started", false) end
+    end
+end
 local lines, refused, open = 0, 0, 0
 for _, l in pairs(DB.line) do
     if l.race_id == premierId then
@@ -741,8 +822,189 @@ POS = {}
 for k in pairs(NPC) do NPC[k] = nil end
 PaddockGarages.bodies = PaddockGarages.bodies
 
+-- ---------------------------------------------------------------- the life sim (L240): climate, days, bodies, trajectory
+do
+    local Places = NcmCore.get("world.places")
+    local Sched = NcmCore.get("life.schedule")
+    local Clock_ = NcmCore.get("world.clock")
+    maxSlice = 0
+    run(function() PaddockDays.loadClimate(); PaddockDays.loadChecks() end)
+    check(("loading the climate fits the quota (max slice %d)"):format(maxSlice), maxSlice < 400000)
+    check("a first boot writes the climate's genesis", DB.climate and DB.climate.state_json and #DB.climate.state_json > 100)
+    local c = PaddockDays.climate()
+    local nd = 0
+    for _ in pairs(c.districts) do nd = nd + 1 end
+    check("every district has a climate (" .. nd .. ")", nd == #Places.DISTRICTS)
+
+    -- the live order: the first pass builds the day's index (and the regulars counts the planner's turns use)
+    POS = {}
+    maxSlice = 0
+    run(function() PaddockDays.tick() end)
+    check(("building the day's index fits the quota (max slice %d)"):format(maxSlice), maxSlice < 400000)
+    -- find someone whose day puts them at a place a player can stand near, and when
+    local who, whereP, when
+    for _, pid in ipairs(W.personOrder) do
+        local p = W.people[pid]
+        local o = p.orgId and W.orgs[p.orgId]
+        if p.state == "active" and o and o.lifecycle ~= "folded" and not o.humanManagerDriverId then
+            local plan
+            run(function() plan = PaddockDays.planFor(p, Sched.planDay(clock)) end)
+            for _, runX in ipairs(plan and plan.runs or {}) do
+                if runX.activity ~= "work" and Sched.BODILY[runX.activity] and runX.fromUtc > clock then
+                    who, whereP, when = p, Places.get(runX.placeId), runX.fromUtc
+                    break
+                end
+            end
+        end
+        if who then break end
+    end
+    check("someone's day takes them to a real place", who ~= nil and whereP ~= nil)
+    local savedClock2 = clock
+    clock = when + 60
+    POS = { [1] = { x = whereP.x + 3, y = whereP.y, z = whereP.z, bucket = 0 } }
+    maxSlice = 0
+    for _ = 1, 400 do
+        run(function() PaddockDays.tick() end)
+        if PaddockGarages.bodies[who.id] then break end
+    end
+    check(("a life pass fits the quota (max slice %d)"):format(maxSlice), maxSlice < 400000)
+    local b = PaddockGarages.bodies[who.id]
+    check("a player standing there meets them, off shift, at " .. Places.label(whereP), b and b.source == "day" and b.siteId == whereP.id)
+    local n = 0
+    for _, x in pairs(PaddockGarages.bodies) do if x.siteId == whereP.id then n = n + 1 end end
+    check("a place never holds more than four day bodies (" .. n .. ")", n <= 4)
+    -- the garage loop must not retire a day body
+    run(function() PaddockGarages.tick() end)
+    check("the garage pass leaves day bodies to their own plan", PaddockGarages.bodies[who.id] ~= nil)
+    -- talk works on a day body, and the trajectory and climate hear of it
+    -- player 2: the harness clock is rewound for this section, and player 1's talk throttle remembers the future
+    POS[2] = { x = NPC[b.npcId].position.x + 1, y = NPC[b.npcId].position.y, z = whereP.z, bucket = 0 }
+    NOTES = {}
+    fire("ncm:paddock.talk", 2, { personId = who.id })
+    check("talking to someone at " .. Places.label(whereP) .. " works like at a garage", #NOTES == 1)
+    check("and the Driver's hidden trajectory recorded it", DB.trajectory["driver-2"] ~= nil)
+    check("the trajectory never reaches a client", not (NOTES[1].message or ""):find("bucket", 1, true))
+    -- the Scanner reads them (scan.lua): the right person, plausible rows, nothing hidden; and nothing where nobody is
+    replies = {}
+    fire("ncm:life.scan", 2, { token = "t1", pos = NPC[b.npcId].position })
+    local sr
+    for _, r in ipairs(replies) do if r.name == "ncm:life.scan.result" and r.pid == 2 then sr = r.body end end
+    check("scanning them reads who they are and what they are doing", sr and sr.found == true and sr.name == who.display
+        and sr.doing and sr.at and sr.district and sr.token == "t1")
+    local leak = false
+    for k in pairs(sr or {}) do if k == "attrs" or k == "personality" or k == "needs" or k == "bucket" then leak = true end end
+    check("the scan carries no hidden stat", not leak)
+    replies = {}
+    clock = clock + 1
+    fire("ncm:life.scan", 2, { token = "t2", pos = { x = whereP.x + 40, y = whereP.y, z = whereP.z } })
+    local miss
+    for _, r in ipairs(replies) do if r.name == "ncm:life.scan.result" then miss = r.body end end
+    check("scanning a point where no Paddock person stands finds nobody", miss and miss.found == false)
+    -- when the plan moves them on, the body goes
+    local plan = PaddockDays.planFor(who, Sched.planDay(clock))
+    local runNow = Sched.at(plan, clock)
+    clock = runNow.toUtc + 60
+    local nextPlace = Sched.bodyAt(PaddockDays.planFor(who, Sched.planDay(clock)), clock)
+    run(function() PaddockDays.tick() end)
+    local after = PaddockGarages.bodies[who.id]
+    check("when their day moves on, so does the body", (nextPlace and nextPlace.id == whereP.id) or after == nil
+        or after.siteId ~= whereP.id)
+    POS = { [1] = { x = whereP.x + 5000, y = whereP.y, z = whereP.z, bucket = 0 } }
+    run(function() PaddockDays.tick() end)
+    local left = 0
+    for _, x in pairs(PaddockGarages.bodies) do if x.source == "day" then left = left + 1 end end
+    check("when the player leaves, the day bodies go", left == 0)
+
+    -- the climate steps once a day with the tallied facts, and not twice
+    PaddockDays.fact("Heywood", "street_race", 5)
+    PaddockDays.fact("Nowhere", "street_race", 5)
+    PaddockDays.fact("Heywood", "no_such_fact", 5)
+    local sceneBefore = c.districts.Heywood.axes.scene
+    clock = clock + 86400
+    maxSlice = 0
+    local stepped
+    run(function() stepped = PaddockDays.daily(clock) end)
+    check(("a climate step fits the quota (max slice %d)"):format(maxSlice), maxSlice < 400000)
+    check("the climate steps at the day change", stepped == true and PaddockDays.climate().day == Clock_.eastern(clock).dayIndex)
+    check("with the day's facts", #PaddockDays.climate().districts.Heywood.causes >= 1)
+    local again
+    run(function() again = PaddockDays.daily(clock) end)
+    check("and only once a day", again == false)
+    -- a place marked bad leaves every day
+    run(function() PaddockDays.check(whereP.id, "bad", "roof pin") end)
+    check("a place marked bad is recorded", DB.placeCheck[whereP.id] and DB.placeCheck[whereP.id].verdict == "bad")
+    local fresh
+    run(function() fresh = PaddockDays.planFor(who, Sched.planDay(clock)) end)
+    local uses = 0
+    for _, r in ipairs(fresh.runs) do if r.placeId == whereP.id then uses = uses + 1 end end
+    check("and nobody's new day goes there", uses == 0)
+    clock = savedClock2
+    POS = {}
+    for k in pairs(NPC) do NPC[k] = nil end
+    for pid, x in pairs(PaddockGarages.bodies) do if x.source == "day" then PaddockGarages.bodies[pid] = nil end end
+end
+
 -- ---------------------------------------------------------------- phase 5: live races, on schedule (L228)
 local Live = NcmCore.get("paddock.live")
+-- the client half of the seat handshake (KB-238): every pass, report the cars that have stood their delay
+do
+    local bubbleTick = PaddockBubble.tick
+    PaddockBubble.tick = function(...)
+        local due, keep = {}, {}
+        for _, q in ipairs(SEAT_QUEUE) do if clock >= q.at then due[#due + 1] = q else keep[#keep + 1] = q end end
+        SEAT_QUEUE = keep
+        for _, q in ipairs(due) do
+            source = q.pid
+            events["ncm:paddock.bubble.settled"]({ raceId = q.body.raceId, vehicleId = q.body.vehicleId })
+        end
+        return bubbleTick(...)
+    end
+end
+
+-- THE PACE DOUBLE (L246). Street runs are the host's NCM Pace driving the engine's racer on race splines; the server
+-- never drives them. Standing in for the host's Pace, this takes the drive plan the server sends, races every car
+-- along the route from the lights (through every checkpoint and on past the finish, as the splines' run-outs do),
+-- gives a stuck car a fresh command 6 s in (Pace's stall rule), and reports each gate the car crosses back to the
+-- server as Pace does -- timed from the car's own positions, so the server's corroboration is exercised for real.
+PACE_DOUBLE_SPEED = 24
+local paceRuns = {}
+PACE_HOOK = function(name, pid, body)
+    if name ~= "ncm:paddock.live.drive" or (body.part or 1) ~= 1 then return end
+    local lr = PaddockLive.byRace[body.raceId]
+    if not lr or not lr.path then return end
+    local go = lr.goMs / 1000
+    local ids = {}
+    for i, c in ipairs(lr.cars) do
+        ids[i] = c.personId
+        local v = VEH[c.vehicleId]
+        if v then
+            v.route = { v.pos }
+            for _, p in ipairs(lr.path.points) do v.route[#v.route + 1] = p end
+            v.paceSpeed = PACE_DOUBLE_SPEED - (i % 4) * 0.5
+            v.speed, v.t, v.dist, v.unstickAt = v.stall and 0 or v.paceSpeed, go, 0, go + 6
+        end
+    end
+    paceRuns[body.raceId] = { lr = lr, timing = Live.newTiming(lr.gates, ids), legs = body.legs }
+end
+PACE_TICK = function()
+    for raceId, run in pairs(paceRuns) do
+        local lr = run.lr
+        if lr.state ~= "running" then paceRuns[raceId] = nil
+        else
+            local tMs = clock * 1000 - lr.goMs
+            for _, c in ipairs(lr.cars) do
+                local pos = Open77.vehicles.getPosition(c.vehicleId)
+                if pos and tMs >= 0 then
+                    for _, g in ipairs(Live.observe(run.timing, c.personId, pos, tMs) or {}) do
+                        source = lr.pid
+                        events["ncm:paddock.live.gate"]({ raceId = raceId, vehicleId = c.vehicleId, gate = g,
+                            tMs = run.timing.cars[c.personId].times[g] })
+                    end
+                end
+            end
+        end
+    end
+end
 local liveDay = Clock.eastern(clock).dayIndex + 1
 -- a human ghost of a route: a gentle dog-leg from start to finish at 10 Hz
 local function ghostFor(route)
@@ -760,9 +1022,15 @@ local function ghostFor(route)
     GHOSTS[route.routeId] = { poses_json = NcmCore.get("vocabulary.json").encode(raw), format = 1 }
 end
 local function streetRace(series, minute)
-    local utc = Clock.utcAt(liveDay, 20 * 3600 + minute * 60)
+    local utc = Clock.utcAt(liveDay, 18 * 3600 + minute * 60)   -- L249: street nights open at 18:00
     clock = utc - 600
+    -- these are point-to-point street runs with a straight ghost: keep the owner's authored ovals (L236) out of the
+    -- draw, or a slot that lands on a roundabout gets a sprint's ghost
+    local ovals = NcmCore.get("data.ovals")
+    local authored = ovals.LIST
+    ovals.LIST = {}
     run(function() PaddockRaces.materialise(clock) end)
+    ovals.LIST = authored
     local race = PaddockRaces.byId[Season.raceId(series, utc)]
     ghostFor(PaddockWorld.route(race.routeId))
     return race
@@ -775,7 +1043,7 @@ local function runLive(race, lr0)
     local lr = PaddockLive.byRace[race.raceId]
     if not lr or lr.state ~= "staging" then return lr end
     clock = race.opensAt
-    for _ = 1, 8 do if race.state == "running" then break end run(function() PaddockRaces.tick(clock) end) end
+    for _ = 1, 80 do if race.state == "running" then break end run(function() PaddockRaces.tick(clock) end) end
     queue = {}
     run(function() PaddockLive.tick(clock) end)
     local steps = 0
@@ -785,6 +1053,7 @@ local function runLive(race, lr0)
         clock = clock + 0.25
         local q = queue; queue = {}
         for _, co in ipairs(q) do local ok, err = resumeMetered(co); assert(ok, err); if coroutine.status(co) ~= "dead" then queue[#queue + 1] = co end end
+        PACE_TICK()
         if steps % 40 == 0 then run(function() PaddockRaces.tick(math.floor(clock)) end) end
         if steps == 120 then run(function() lr.liveView = PaddockViews.live(1, { raceId = race.raceId }) end) end
         if steps == 121 then
@@ -801,7 +1070,7 @@ end
 local quiet = streetRace("street_a", 0)
 POS = { [1] = { x = 6000, y = -6000, z = 0, bucket = 0 } }          -- far from every route
 local lrq = runLive(quiet)
-check("a race nobody is near stays simulated: nothing spawns", lrq and lrq.state == "skipped" and next(VEH) == nil)
+check("a race nobody is near stays simulated: nothing spawns", (not lrq or lrq.state == "skipped") and next(VEH) == nil)
 
 -- players near a start are warned before the grid spawns (the native HUD banner), and a car never lands on a person
 do
@@ -813,7 +1082,10 @@ do
     run(function() PaddockLive.tick(clock) end)
     local banner
     for _, r in ipairs(replies) do if r.name == "ncm:paddock.live.warn" and r.pid == 1 then banner = r.body end end
-    check("a player near the start gets the race-start banner", banner and banner.title == "WARNING: IMPENDING RACE START" and banner.seconds >= 120)
+    check("a player near the start gets the race-start banner", banner and banner.title == "WARNING: IMPENDING RACE START" and banner.seconds >= 119)
+    -- it ends when the cars go -- the window's opening -- not 5 s later (cars left ~10 s before it cleared, 2026-10-01)
+    check(("the banner's countdown ends exactly at green (%s s for %d s)"):format(tostring(banner and banner.seconds), warnRace.opensAt - clock),
+        banner and math.abs(banner.seconds - (warnRace.opensAt - clock)) <= 1)
     -- the warning also raises the native traffic null area on that client: SP's trafficClearRadiusM around the start (L234)
     local area
     for _, r in ipairs(replies) do if r.name == "ncm:paddock.live.area" and r.pid == 1 then area = r.body end end
@@ -828,98 +1100,246 @@ do
     check("and the race's end lowers it", replies[1] and replies[1].name == "ncm:paddock.live.area" and replies[1].body.seconds == 0)
 end
 
--- a player at the start: it goes on the street by itself, no declaration; some cars get stuck and are rescued
-local liveRace = streetRace("street_a", 42)
-local liveRoute = PaddockWorld.route(liveRace.routeId)
--- stand ON the grid: pole's slot, which the grid must skip
+-- L247 (KB-238): A STREET RACE ON THE CONTINUOUS MODEL AND THE BUBBLE, with a driver in every physical car. The grid
+-- run kept twelve driven cars alive however far from the host they got, and the CTDs came as they crossed the edge of
+-- the host's streaming. Now: the server's line is the baked road (IDEA-787); a player with Pace at the start sees the
+-- grid come up 30 s before the lights; cars further than bubbleOutM from every player go back to the model -- the
+-- driver out first -- and come back in, driver seated, wherever a player meets them (IDEA-786); Pace races every one
+-- on the race spline of the leg it is on.
 do
-    local s1 = Live.gridSlots(liveRoute.start, liveRoute.finish, 1, NcmCore.get("data.grid_profiles").forRoot(liveRace.routeId))[1]
-    POS = { [1] = { x = s1.x + 1, y = s1.y, z = 10, bucket = 0 } }
-end
-STUCK_FROM, STUCK_UNTIL_RESET = 8, true          -- cars 9-12 stall until something puts them back on the road
-local lr = runLive(liveRace)
-STUCK_FROM = nil
-check("with a player at the start, the race goes on the street by itself", lr and lr.backend == "platform" and #lr.cars >= 8)
-check("no car was set down on the player standing on the grid", (function()
-    for _, c in ipairs(lr.cars) do
-        local v = VEH[c.vehicleId]
-        if v and v.pos and Live.dist(v.pos, POS[1]) <= 6 then return false end
+    local R = NcmCore.get("paddock.racestate")
+    local sr = streetRace("street_a", 42)
+    local route = PaddockWorld.route(sr.routeId)
+    POS = { [1] = { x = route.start.x + 20, y = route.start.y, z = 10, bucket = 0 } }
+    PaddockLive.paceClients[1] = { ok = true, version = "0.8.1" }
+    -- the bubble's Pace double: a car that joins drives the road line from where it was set down, from the lights
+    local bubblePace = { adds = {}, removes = 0, plans = {} }
+    local prevHook = PACE_HOOK
+    PACE_HOOK = function(name, pid, body)
+        if name == "ncm:paddock.bubble.plan" and body.raceId == sr.raceId then bubblePace.plans[#bubblePace.plans + 1] = body end
+        if name == "ncm:paddock.bubble.car" and body.raceId == sr.raceId then
+            if body.op == "remove" then bubblePace.removes = bubblePace.removes + 1 end
+            local v = VEH[body.vehicleId]
+            if body.op == "add" and v then
+                bubblePace.adds[#bubblePace.adds + 1] = body
+                local pts = PaddockLive.pathFor(sr.routeId).points
+                local k = Live.nearestIndex(pts, v.pos)
+                v.route = { v.pos }
+                for i = k + 1, #pts do v.route[#v.route + 1] = pts[i] end
+                v.speed, v.dist, v.t = PACE_DOUBLE_SPEED, 0, math.max(clock, sr.opensAt)
+            end
+        end
+        if prevHook then prevHook(name, pid, body) end
     end
-    return true end)())
-check(("the street run finished (%.0f s)"):format((lr.steps or 0) * 0.25), lr.state == "finished")
-check("LIVE follows the street race's real cars mid-race", lr.liveView and lr.liveView.street == true and #lr.liveView.rows == #lr.cars
-    and lr.liveView.rows[1].pct > 0)
-check("NCM Broadcast gets the street race's names, each with its car and a gap (L235)", lr.bcast and #lr.bcast.rows == #lr.cars
-    and lr.bcast.rows[1].vid ~= nil and (lr.bcast.rows[1].gap == "leader" or lr.bcast.rows[1].gap == "winner") and (lr.bcast.rows[2].gap or ""):match("^%+%d") ~= nil)
-check(("the timing loop fits the quota (max slice %d)"):format(maxSlice), maxSlice < 400000)
-local rescued = 0
-for _, c in ipairs(lr.cars) do if c.resets > 0 then rescued = rescued + 1 end end
-check(("stuck cars were put back on the road and kept racing (%d rescued)"):format(rescued), rescued >= 3)
-check("the verdict is physical: " .. tostring(lr.reason), lr.verdict == "physical" and DB.live[liveRace.raceId].verdict == "physical")
-local rows = {}
-for _, r in ipairs(DB.result) do if r.race_id == liveRace.raceId then rows[#rows + 1] = r end end
-table.sort(rows, function(a, b) return a.position < b.position end)
-local finished = 0
-for _, r in ipairs(rows) do if r.state == "finished" then finished = finished + 1 end end
-check(("every car finished, rescued ones included (%d of %d)"):format(finished, #rows), finished == #rows and #rows == #lr.cars)
-check("the physical classification replaced the sim's rows", DB.race[liveRace.raceId].provenance == "physical" and rows[1].gap_ms == 0)
-clock = math.floor(clock) + 10
-for _ = 1, 6 do if liveRace.state == "resolved" then break end run(function() PaddockRaces.tick(clock) end) end
-local box
-run(function() box = PaddockViews.box(1, { raceId = liveRace.raceId }) end)
-check("then the race resolves, and its box score says PHYSICAL", DB.race[liveRace.raceId].state == "resolved" and box.provenance == "physical")
-queue = {}
-for id in pairs(VEH) do VEH[id] = nil end
-
--- a player halfway along the route counts as watching
-local race2 = streetRace("street_b", 48)
-local r2 = PaddockWorld.route(race2.routeId)
-local path2 = PaddockLive.pathFor(race2.routeId)
-local mid = path2.points[math.floor(#path2.points / 2)]
-POS = { [1] = { x = mid.x + 40, y = mid.y, z = 10, bucket = 0 } }
-STUCK_FROM, STUCK_UNTIL_RESET = 2, false            -- ten cars are stuck for good
-local lr2 = runLive(race2)
-STUCK_FROM = nil
-check("a player halfway along the route is enough to put it on the street", lr2 and lr2.cars and #lr2.cars >= 8 and #lr2.watchers == 1)
-check("the run ends once the winner is home and the grace has passed", lr2.state == "finished" and lr2.closeMs ~= nil)
-check("too few finishers: the verdict falls back (" .. tostring(lr2.reason) .. ")", lr2.verdict == "fallback" and tostring(lr2.reason):find("only 2 of", 1, true) ~= nil)
-local notClassified = 0
-for _, why in pairs(lr2.out) do if why == "not_classified" then notClassified = notClassified + 1 end end
-check("cars still out there at the close are 'not classified', not written off early", notClassified >= 1)
-check("and the sealed sim result stands", (DB.race[race2.raceId].provenance or "simulated") == "simulated")
-queue = {}
-for id in pairs(VEH) do VEH[id] = nil end
-
--- the Pace backend (L234): a visible driver in every seat, and SP's launch profile in the drive plan
-do
-    local paceRace = streetRace("street_a", 84)
-    local pr = PaddockWorld.route(paceRace.routeId)
-    POS = { [1] = { x = pr.start.x + 60, y = pr.start.y, z = 10, bucket = 0 } }
-    PaddockLive.paceClients[1] = { ok = true, version = "0.3.0" }
-    clock = paceRace.opensAt - 70
+    REMOVED_WITH_DRIVER = 0
+    -- an older Pace drops the legs and drives the retired command (01:36): it brings no street car in
+    do
+        local old = streetRace("street_c", 12)
+        local oroute = PaddockWorld.route(old.routeId)
+        POS = { [1] = { x = oroute.start.x + 20, y = oroute.start.y, z = 10, bucket = 0 } }
+        PaddockLive.paceClients[1] = { ok = true, version = "0.8.0" }
+        clock = old.opensAt - 70
+        for _ = 1, 6 do run(function() PaddockRaces.tick(clock) end) end
+        clock = old.opensAt - 20
+        for _ = 1, 10 do clock = clock + 0.5; run(function() PaddockBubble.tick() end) end
+        local ob = PaddockBubble.byRace[old.raceId]
+        check("a player with Pace 0.8.0 brings no street car in (it would drive the retired command)", (not ob or next(ob.cars) == nil) and next(VEH) == nil)
+        PaddockRaces.byId[old.raceId] = nil          -- off the board: it must not run beside the race below
+        PaddockLive.paceClients[1] = { ok = true, version = "0.8.1" }
+        POS = { [1] = { x = route.start.x + 20, y = route.start.y, z = 10, bucket = 0 } }
+    end
+    clock = sr.opensAt - 70
     for _ = 1, 6 do run(function() PaddockRaces.tick(clock) end) end
     run(function() PaddockLive.tick(clock) end)
-    local plr = PaddockLive.byRace[paceRace.raceId]
-    check("a Pace race stages", plr and plr.state == "staging" and plr.backend == "pace")
-    local seated = 0
-    for _, c in ipairs(plr and plr.cars or {}) do if c.npcId and VEH[c.vehicleId] and VEH[c.vehicleId].driver == c.npcId then seated = seated + 1 end end
-    check(("every Pace car has a driver in the seat (%d of %d)"):format(seated, plr and #plr.cars or 0), plr and seated == #plr.cars and seated > 0)
-    clock = paceRace.opensAt
-    for _ = 1, 8 do if paceRace.state == "running" then break end run(function() PaddockRaces.tick(clock) end) end
+    check("a street route with a road line is never staged as a grid street run (L247)", PaddockLive.byRace[sr.raceId] == nil
+        and PaddockLive.onBubble(sr.routeId))
+    -- the pre-grid
     replies = {}
-    run(function() PaddockLive.tick(clock) end)
-    local drive
-    for _, r in ipairs(replies) do if r.name == "ncm:paddock.live.drive" then drive = r.body end end
-    check("the drive plan carries SP's launch profile", drive and drive.launch and drive.launch.graceS == 1.75 and drive.launch.relMax > 0
-        and drive.launch.minFrac >= 0.5)
+    clock = sr.opensAt - 20
+    -- KB-238: a car comes up EMPTY and Pace does not have it; its driver is seated only once the player's game has had
+    -- it for bubbleSeatDelayMs (past the engine's spawn physics cycle, where every crashing seat mount landed)
+    clock = clock + 0.5; run(function() PaddockBubble.tick() end)
+    do
+        local b0 = PaddockBubble.byRace[sr.raceId]
+        local up, empty = 0, 0
+        for _, car in pairs(b0 and b0.cars or {}) do
+            up = up + 1
+            if not car.seated and not car.npc and (VEH[car.vid].driver == nil) then empty = empty + 1 end
+        end
+        check(("cars come up empty, no driver yet and not Pace's (%d of %d, %d added)"):format(empty, up, #bubblePace.adds),
+            up >= 1 and empty == up and #bubblePace.adds == 0)
+        -- bubbleSeatDelayMs 0 (owner: no empty cars): seated on the next pass once the player's game has the car
+        clock = clock + 0.5; run(function() PaddockBubble.tick() end)
+        local seatedNext = 0
+        for _, car in pairs(b0.cars) do if car.seated and car.npc then seatedNext = seatedNext + 1 end end
+        check(("seated as soon as the player's game has them (%d of %d)"):format(seatedNext, up), seatedNext == up)
+    end
+    for _ = 1, 10 do clock = clock + 0.5; run(function() PaddockBubble.tick() end) end
+    local b = PaddockBubble.byRace[sr.raceId]
+    check(("every Pace add came after its car's driver was seated (%d adds)"):format(#bubblePace.adds), (function()
+        for _, a in ipairs(bubblePace.adds) do
+            local seatedCar = false
+            for _, car in pairs(b.cars) do if car.vid == a.vehicleId and car.seated and car.npc then seatedCar = true end end
+            if not seatedCar then return false end
+        end
+        return #bubblePace.adds >= 6 end)())
+    local pre, seated = 0, 0
+    for _, car in pairs(b and b.cars or {}) do
+        pre = pre + 1
+        if car.npc and VEH[car.vid] and VEH[car.vid].driver == car.npc then seated = seated + 1 end
+    end
+    check(("the street grid is up before the lights (%d cars at %d s out)"):format(pre, math.floor(sr.opensAt - clock)), pre >= 6 and sr.state ~= "running")
+    check(("every car on the grid has its driver in the seat (%d of %d)"):format(seated, pre), seated == pre)
+    check("no car was set down on the player", (function()
+        for _, car in pairs(b.cars) do if Live.dist(VEH[car.vid].pos, POS[1]) <= 6 then return false end end
+        return true end)())
+    -- L250: the grid is the lane-based bake (tools/bake-grids.py): every pre-grid car stands on its slot, on a lane
+    -- centreline, and no two closer than 3 m (01:36: twelve cars 14-77 m off the road on a slope; Hill Abode: eight
+    -- behind a mansion gate)
+    local profile = NcmCore.get("data.grid_profiles").forRoot(sr.routeId)
+    local baked, note = PaddockLive.gridSlots(route, 12, profile)
+    local onSlot, closest = 0, math.huge
+    local list = {}
+    for _, car in pairs(b.cars) do list[#list + 1] = VEH[car.vid].pos end
+    for _, pos in ipairs(list) do
+        for _, sl in ipairs(baked) do if Live.dist(pos, sl) <= 1.0 then onSlot = onSlot + 1 break end end
+    end
+    for i = 1, #list do for j = i + 1, #list do closest = math.min(closest, Live.dist(list[i], list[j])) end end
+    check(("the street grid is the baked lane grid (%s: %d of %d on their slots, closest two %.1f m)"):format(tostring(note), onSlot, pre, closest),
+        (note == "baked" or note == "short") and onSlot == pre and closest >= 3.0)
+    local plan = bubblePace.plans[1]
+    local nodesWant = 2 + #(route.intermediate or {})
+    local legs = PaddockLive.legsFor(route)
+    check(("Pace's plan is the route's nodes with a race spline per leg (%d points, %d legs)"):format(plan and #(plan.points or {}) or -1,
+        plan and #(plan.legs or {}) or -1),
+        plan and #plan.points == nodesWant and plan.legs and #plan.legs == nodesWant - 1 and plan.legs[1] == legs[1]
+        and math.abs(plan.points[1].x - route.start.x) < 0.02 and (plan.goInMs or 0) > 0)
+    check(("a car off the grid races the first leg (from %s)"):format(tostring(bubblePace.adds[1] and bubblePace.adds[1].from)),
+        bubblePace.adds[1] and bubblePace.adds[1].from == 1)
+    -- the lights: the model takes over the road line
+    clock = sr.opensAt
+    for _ = 1, 80 do if sr.state == "running" then break end run(function() PaddockRaces.tick(clock) end) end
+    check("the street race runs on its continuous model, on the road", sr.model ~= nil and sr.model.path.source == "road")
+    -- 4 s: the field is ~70 m in, still inside bubbleOutM (150 m, owner 2026-10-01) of a player at the start
+    for _ = 1, 8 do clock = clock + 0.5; run(function() PaddockBubble.tick() end) end
+    local moved = 0
+    for _, car in pairs(b.cars) do if (car.lastD or 0) > 30 then moved = moved + 1 end end
+    check(("the grid races off on the road (%d cars past 30 m)"):format(moved), moved >= 4)
+    -- the player goes away: every car goes back to the model, its driver out of the seat first
+    local away = PaddockBubble.stats.handedBack
+    POS = { [1] = { x = 6000, y = -6000, z = 0, bucket = 0 } }
+    for _ = 1, 4 do clock = clock + 0.5; run(function() PaddockBubble.tick() end) end
+    check(("beyond bubbleOutM every car is handed back (%d)"):format(PaddockBubble.stats.handedBack - away), next(b.cars) == nil
+        and PaddockBubble.stats.handedBack - away >= 6)
+    check(("never a car removed with its driver still seated (%d)"):format(REMOVED_WITH_DRIVER), REMOVED_WITH_DRIVER == 0)
+    check(("Pace was told of every car leaving (%d)"):format(bubblePace.removes), bubblePace.removes >= PaddockBubble.stats.handedBack - away)
+    check("nothing of the race is left on the road", next(VEH) == nil)
+    -- ...and meets the field again further down the road: the cars come back in ON the road, driver seated, each on
+    -- the leg it is in (IDEA-786: as many times a race as it takes)
+    local pts = sr.model.path.points
+    local tMs = (clock - sr.modelGoAt) * 1000
+    local leadD = 0
+    for _, id in ipairs(sr.model.order) do local p = R.carAt(sr.model, id, tMs); if p and p.d > leadD then leadD = p.d end end
+    local meetD = math.min(sr.model.lengthM * 0.8, leadD + 600)
+    local meet = Live.along(pts, meetD / sr.model.lengthM)
+    POS = { [1] = { x = meet.x + 10, y = meet.y, z = 10, bucket = 0 } }
+    local addsBefore, spawnedBefore = #bubblePace.adds, PaddockBubble.stats.spawned
+    for _ = 1, 400 do
+        clock = clock + 0.5
+        run(function() PaddockBubble.tick() end)
+        -- three in at once, each seated
+        local seatedNow = 0
+        for _, car in pairs(b.cars) do if car.seated then seatedNow = seatedNow + 1 end end
+        if seatedNow >= 3 then break end
+    end
+    local again, onRoad, seated2, legOk = 0, 0, 0, 0
+    -- the cars past their one-pass seat handshake (a car that came in this very pass is still being reported)
+    local fresh = 0
+    for _, car in pairs(b.cars) do
+        if car.seated then
+            again = again + 1
+            if Live.distToPath(pts, car.pos) < 3 then onRoad = onRoad + 1 end
+            if car.npc and VEH[car.vid] and VEH[car.vid].driver == car.npc then seated2 = seated2 + 1 end
+        elseif not car.npc and VEH[car.vid] and VEH[car.vid].driver == nil then
+            fresh = fresh + 1
+        end
+    end
+    check(("no car is past its handshake without a driver (%d waiting this pass)"):format(fresh), fresh + again == (function()
+        local n = 0 for _ in pairs(b.cars) do n = n + 1 end return n end)())
+    for i = addsBefore + 1, #bubblePace.adds do
+        local a = bubblePace.adds[i]
+        for _, car in pairs(b.cars) do
+            if car.vid == a.vehicleId then
+                -- `from` is the 0-based index of the node it heads for: the end of the leg its distance falls in
+                local nd, want = sr.model.path.nodeD, nil
+                for k = 2, #nd do if nd[k] > (car.spawnD or 0) then want = k break end end
+                if a.from == (want or #nd) - 1 then legOk = legOk + 1 end
+            end
+        end
+    end
+    check(("the field comes back in where the player meets it (%d cars)"):format(again), again >= 3)
+    check(("set down on the road line (%d of %d)"):format(onRoad, again), onRoad == again)
+    check(("with a driver in every seat (%d of %d)"):format(seated2, again), seated2 == again)
+    check(("each on the leg its distance falls in (%d of %d)"):format(legOk, again), legOk == again)
+    -- the stream line (KB-238): the player's game reports a car's state change; the server answers with the distance,
+    -- written in that player's own log
+    do
+        local anyCar
+        for _, car in pairs(b.cars) do if car.seated then anyCar = car break end end
+        replies = {}
+        source = 1
+        events["ncm:paddock.bubble.stream"]({ raceId = sr.raceId, vehicleId = anyCar.vid, state = "true|42|1|true" })
+        local line
+        for _, r in ipairs(replies) do if r.name == "ncm:paddock.bubble.streamline" and r.pid == 1 then line = r.body end end
+        local d = line and tonumber(line:match("at (%d+) m"))
+        check(("a stream change comes back as a STREAMLINE with its distance (%s)"):format(tostring(line)),
+            d ~= nil and math.abs(d - Live.dist(POS[1], Open77.vehicles.getPosition(anyCar.vid))) <= 1 and line:find("seated", 1, true) ~= nil)
+    end
+    -- its Pace player leaves while another player (no Pace) stays beside the cars: they go back all the same -- a car
+    -- is driven by one client, and kept it would sit at the edge of that client's streaming (KB-238)
+    local hostGone = PaddockBubble.stats.handedBack
+    POS = { [1] = { x = 6000, y = -6000, z = 0, bucket = 0 }, [2] = { x = meet.x + 10, y = meet.y, z = 10, bucket = 0 } }
+    for _ = 1, 4 do clock = clock + 0.5; run(function() PaddockBubble.tick() end) end
+    check(("cars whose Pace player left go back, whoever else is near (%d)"):format(PaddockBubble.stats.handedBack - hostGone),
+        next(b.cars) == nil and PaddockBubble.stats.handedBack - hostGone == again + fresh and REMOVED_WITH_DRIVER == 0)
+    -- away again, and the race finishes on the model with every anchor applied
+    POS = { [1] = { x = 6000, y = -6000, z = 0, bucket = 0 } }
+    local steps = 0
+    while sr.state == "running" and steps < 6000 do
+        steps = steps + 1
+        clock = clock + 0.5
+        run(function() PaddockBubble.tick() end)
+        if steps % 10 == 0 then run(function() PaddockRaces.tick(math.floor(clock)) end) end
+    end
+    for _ = 1, 6 do
+        if DB.race[sr.raceId].state == "resolved" then break end
+        clock = clock + 10
+        run(function() PaddockRaces.tick(math.floor(clock)) end)
+    end
+    check(("never a car removed with its driver still seated, all race (%d)"):format(REMOVED_WITH_DRIVER), REMOVED_WITH_DRIVER == 0)
+    check("the race resolved with the bubble's stretches in it: MIXED (" .. tostring(DB.race[sr.raceId].provenance) .. ")",
+        DB.race[sr.raceId].state == "resolved" and DB.race[sr.raceId].provenance == "mixed")
+    local rows = 0
+    for _, r in ipairs(DB.result) do if r.race_id == sr.raceId then rows = rows + 1 end end
+    check(("every car is classified (%d of %d)"):format(rows, #sr.frozen.grid), rows == #sr.frozen.grid)
+    check("nothing is left on the road", next(VEH) == nil)
+    PACE_HOOK = prevHook
     PaddockLive.paceClients[1] = nil
+    POS = {}
     queue = {}
-    if plr then plr.state = "cancelled" end
-    for id in pairs(VEH) do VEH[id] = nil end
 end
 
--- the physical bubble: nobody at the start, so the race runs on its model; a player halfway along the line sees the
--- field arrive, race past physically, and hand back to the model; the result is MIXED
+-- KB-242 (20:24): a player near the route's far end at staging stages nothing (there is no grid run); the race is the
+-- model's, and the bubble brings in only the cars that reach that player.
+do
+    local farRace = streetRace("street_b", 90)
+    local fr = PaddockWorld.route(farRace.routeId)
+    POS = { [1] = { x = fr.finish.x + 40, y = fr.finish.y, z = 10, bucket = 0 } }
+    local lrf = runLive(farRace)
+    check("a player at the far end, not the grid, never hosts a street run (KB-242)", (not lrf or lrf.state == "skipped") and next(VEH) == nil)
+    queue = {}
+end
+
 local race4 = streetRace("street_a", 126)
 POS = { [1] = { x = 6000, y = -6000, z = 0, bucket = 0 } }                 -- far away at staging: no street race
 clock = race4.opensAt - 70
@@ -927,12 +1347,15 @@ for _ = 1, 6 do run(function() PaddockRaces.tick(clock) end) end
 run(function() PaddockLive.tick(clock) end)
 check("with nobody near at staging, no street race is staged", not PaddockLive.byRace[race4.raceId] or PaddockLive.byRace[race4.raceId].state == "skipped")
 clock = race4.opensAt
-for _ = 1, 8 do if race4.state == "running" then break end run(function() PaddockRaces.tick(clock) end) end
-check("the race runs on its continuous model", race4.state == "running" and race4.model ~= nil)
+-- one overdue race starts per pass, earliest first; the harness's clock jumps leave a backlog (L249: regional races
+-- now share the evening with the streets)
+for _ = 1, 60 do if race4.state == "running" then break end run(function() PaddockRaces.tick(clock) end) end
+check("the race runs on its continuous model (" .. tostring(race4.state) .. ")", race4.state == "running" and race4.model ~= nil)
 local path4 = race4.model.path.points
 local stand = path4[math.floor(#path4 * 0.55)]
 POS = { [1] = { x = stand.x + 15, y = stand.y, z = 10, bucket = 0 } }        -- the player walks to the middle of the route
 local maxCars, steps4 = 0, 0
+local spawned4 = PaddockBubble.stats.spawned
 maxSlice = 0
 local simClose = race4.closesAt
 while race4.state == "running" and steps4 < 4000 do
@@ -945,18 +1368,100 @@ while race4.state == "running" and steps4 < 4000 do
     if steps4 % 10 == 0 then run(function() PaddockRaces.tick(math.floor(clock)) end) end
 end
 local bs = PaddockBubble.stats
-check(("the field became physical as it reached the player (%d spawned, at most %d at once)"):format(bs.spawned, maxCars), bs.spawned >= 6 and maxCars >= 1)
-check(("and handed back to the model as it drove away (%d handed back)"):format(bs.handedBack), bs.handedBack >= 6)
+-- L245/L247: a street race is the engine's racer on race splines, or nothing. A player without Pace brings no car in:
+-- the model runs the race and LIVE shows it.
+check(("without Pace near, a street race stays in the model: nothing spawns in the bubble (%d spawned)"):format(bs.spawned - spawned4), bs.spawned == spawned4 and maxCars == 0)
 check(("a bubble pass fits the quota (max slice %d)"):format(maxSlice), maxSlice < 400000)
-check("the race resolved, with the model's result and its anchors", DB.race[race4.raceId].state == "resolved" and DB.race[race4.raceId].provenance == "mixed")
+check("the race resolved on the model's own result", DB.race[race4.raceId].state == "resolved"
+    and (DB.race[race4.raceId].provenance or "simulated") == "simulated")
 local rows4 = 0
 for _, r in ipairs(DB.result) do if r.race_id == race4.raceId then rows4 = rows4 + 1 end end
 check("every car is classified", rows4 == #race4.frozen.grid)
-local detail4 = NcmCore.get("vocabulary.json").decode(DB.race[race4.raceId].detail_json or "{}") or {}
-local shared = 0
-for _, pct in pairs((detail4.live or {}).physicalPct or {}) do if pct > 0 then shared = shared + 1 end end
-check(("each car's physical share is recorded (%d cars drove part of it for real)"):format(shared), shared >= 6)
 check("nothing is left on the road", next(VEH) == nil)
+POS = {}
+
+-- an OVAL on the continuous model, the Pace plugin near (KB-223): never a grid street run; the field comes in at
+-- SP's formation laid along the ring, spaced; the line goes to that player's Pace once as a dynamic plan, and every
+-- car joins it with car.add -- no platform route for any of them
+GlobalState = GlobalState or {}            -- the platform's replicated state table (ncm_world reads what Paddock puts here)
+local race5 = streetRace("street_a", 168)
+race5.routeId = "oval_corpo_circle"
+local ring5 = PaddockWorld.route("oval_corpo_circle")
+POS = { [1] = { x = ring5.start.x - 15, y = ring5.start.y - 25, z = 8, bucket = 0 } }
+PaddockLive.paceClients[1] = { ok = true, version = "0.8.1" }
+clock = race5.opensAt - 70
+for _ = 1, 6 do run(function() PaddockRaces.tick(clock) end) end
+run(function() PaddockLive.tick(clock) end)
+check("an oval is never staged as a grid street run", PaddockLive.byRace[race5.raceId] == nil)
+-- the pre-grid (owner, 05:08): 30 s before the lights the frozen grid comes up on its slots, held by Pace
+replies = {}
+clock = race5.opensAt - 20
+run(function() PaddockBubble.tick() end)
+check("Pace 0.8.1 cannot bring in an oval car without closed-spline support", next(VEH) == nil)
+PaddockLive.paceClients[1] = { ok = true, version = "0.8.2" }
+for _ = 1, 8 do clock = clock + 0.5; run(function() PaddockBubble.tick() end) end
+local preCars, preHeld, closed5 = 0, false, false
+for _ in pairs(VEH) do preCars = preCars + 1 end
+for _, r in ipairs(replies) do
+    if r.name == "ncm:paddock.bubble.plan" and r.body.part == 1 then
+        preHeld = (r.body.goInMs or 0) > 0
+        closed5 = r.body.loopSpline == "$/mod/ncm_pace/#leg_oval_corpo_circle__loop" and r.body.legs == nil
+    end
+end
+check(("the grid is up before the lights (%d cars at %d s out)"):format(preCars, math.floor(race5.opensAt - clock)), preCars >= 6 and race5.state ~= "running")
+local pub5 = false
+for _, e in ipairs(GlobalState.ncmPaddockRaces or {}) do if e.id == race5.raceId and #(e.points or {}) >= 8 then pub5 = true end end
+check("the oval's ring is published for ncm_world to keep its own traffic out", pub5)
+check("and Pace holds it until they go (the plan's go is still ahead)", preHeld)
+check("the oval plan names its one closed race spline", closed5)
+-- Pace's marks still count lap progress; the closed spline steers the car.
+local planPts5, addFrom5 = 0, {}
+for _, r in ipairs(replies) do
+    if r.name == "ncm:paddock.bubble.plan" then planPts5 = planPts5 + #(r.body.points or {}) end
+    if r.name == "ncm:paddock.bubble.car" and r.body.op == "add" then addFrom5[#addFrom5 + 1] = r.body.from end
+end
+local expect5 = 1 + ring5.oval.laps * #ring5.oval.loop
+check(("Pace gets the marks lap after lap (%d points, expected %d)"):format(planPts5, expect5), planPts5 == expect5)
+check(("and a car off the grid starts for the second mark (from %s)"):format(tostring(addFrom5[1])), addFrom5[1] == 1)
+clock = race5.opensAt
+for _ = 1, 80 do if race5.state == "running" then break end run(function() PaddockRaces.tick(clock) end) end
+check("the oval runs on its continuous model, on the ring", race5.model ~= nil and race5.model.path.source == "ring")
+for _ = 1, 16 do clock = clock + 0.5; run(function() PaddockBubble.tick() end) end
+local plans5, adds5, routes5 = 0, 0, 0
+for _, r in ipairs(replies) do
+    if r.name == "ncm:paddock.bubble.plan" and r.body.part == 1 then plans5 = plans5 + 1 end
+    if r.name == "ncm:paddock.bubble.car" and r.body.op == "add" then adds5 = adds5 + 1 end
+end
+local cars5 = {}
+for _, v in pairs(VEH) do cars5[#cars5 + 1] = v; if v.route then routes5 = routes5 + 1 end end
+check(("the line went to the Pace player once (%d)"):format(plans5), plans5 == 1)
+-- the sim, modelled (owner, 05:53): after the lights each car holds ITS OWN sim pace, not one shared ceiling
+local setBy5, distinct5 = {}, {}
+for _, r in ipairs(replies) do
+    if r.name == "ncm:paddock.bubble.car" and r.body.op == "set" then setBy5[r.body.vehicleId] = r.body.speed end
+end
+local nSet5 = 0
+for _, v in pairs(setBy5) do nSet5 = nSet5 + 1; distinct5[v] = true end
+local nDistinct5 = 0
+for _ in pairs(distinct5) do nDistinct5 = nDistinct5 + 1 end
+check(("each car follows its own sim pace (%d cars set, %d different ceilings)"):format(nSet5, nDistinct5), nSet5 >= 6 and nDistinct5 >= 3)
+check(("every physical car joined Pace (%d cars, %d car.add)"):format(#cars5, adds5), #cars5 >= 6 and adds5 == #cars5)
+check(("and none was given a platform route (%d)"):format(routes5), routes5 == 0)
+local closest5 = math.huge
+for i = 1, #cars5 do for j = i + 1, #cars5 do
+    local a, b = cars5[i].pos, cars5[j].pos
+    closest5 = math.min(closest5, math.sqrt((a.x - b.x) ^ 2 + (a.y - b.y) ^ 2))
+end end
+check(("no two cars set down on each other (closest %.1f m, SP rows 12 m / columns 4 m)"):format(closest5), closest5 >= 7)
+local offLine5 = 0
+for _, v in ipairs(cars5) do
+    offLine5 = math.max(offLine5, NcmCore.get("paddock.live").distToPath(race5.model.path.points, v.pos))
+end
+check(("every car near the spline's road line, including the grid (%.1f m)"):format(offLine5), offLine5 <= 9)
+PaddockLive.paceClients[1] = nil
+POS = { [1] = { x = ring5.start.x + 5000, y = ring5.start.y, z = 8, bucket = 0 } }
+for _ = 1, 4 do clock = clock + 0.5; run(function() PaddockBubble.tick() end) end
+check("the oval's cars go back to the model when the player leaves", next(VEH) == nil)
 POS = {}
 
 -- the probe suite: a distance ladder of cars, each tried unasked, asked (requestAuthority) and with a camera lease
@@ -1003,6 +1508,67 @@ check("a signing is queued for the Cup boundary, not applied", #mine.pending == 
 clock = clock + 1
 fire("ncm:paddock.manager", 2, { action = "develop", args = { area = "aerodynamics", eddies = 3000 } })
 check("development spends treasury now", mine.cash == 15500)
+
+-- ---------------------------------------------------------------- L250: a mixed grid, NPCs and humans
+do
+    local Mixed = NcmCore.get("paddock.mixed")
+    run(function() PaddockRaces.materialise(clock) end)
+    local mr
+    for _, r in pairs(PaddockRaces.byId) do
+        local rt = PaddockWorld.route(r.routeId)
+        if r.tier == "street" and r.state == "scheduled" and not r.frozen and r.opensAt >= clock + 1500 and rt and not rt.oval
+            and (not mr or r.opensAt < mr.opensAt) then mr = r end
+    end
+    clock = mr.opensAt - 1200
+    check("a street race 20 min out is not frozen yet (entries are open)", mr.frozen == nil)
+    local D1, D2, D3 = "0a1b2c3d-4e5f-4061-8a7b-9c0d1e2f3a4b", "1b2c3d4e-5f60-4172-9b8c-0d1e2f3a4b5c", "2c3d4e5f-6071-4283-8c9d-1e2f3a4b5c6d"
+    EMITTED = {}
+    TriggerEvent("ncm:paddock.entry", { raceId = mr.raceId, driverId = D1, display = "Owner", state = "entered", qualiMs = 1000, enteredAt = clock })
+    TriggerEvent("ncm:paddock.entry", { raceId = mr.raceId, driverId = D2, display = "Late Joiner", state = "entered", enteredAt = clock })
+    TriggerEvent("ncm:paddock.entry", { raceId = mr.raceId, driverId = D3, display = "Changed Mind", state = "entered", enteredAt = clock })
+    TriggerEvent("ncm:paddock.entry", { raceId = mr.raceId, driverId = D3, display = "Changed Mind", state = "withdrawn", enteredAt = clock })
+    local npcAlone = #NcmCore.get("paddock.world").raceField(W, mr)
+    clock = mr.opensAt - 600
+    run(function() PaddockRaces.freeze(mr) end)
+    local K1, K2, K3 = Mixed.personKey(D1), Mixed.personKey(D2), Mixed.personKey(D3)
+    local g = mr.frozen.grid
+    check(("the field keeps its size: two humans took the places of the last two NPCs (%d on the grid, %d turned up)"):format(#g, npcAlone),
+        #g == npcAlone and mr.frozen.humans[K1] and mr.frozen.humans[K2] and not mr.frozen.humans[K3])
+    check("the grid is qualifying time: the fastest human is on pole, the unqualified one at the back", g[1] == K1 and g[#g] == K2
+        and mr.frozen.quali[K1] == 1000 and mr.frozen.quali[g[2]] ~= nil)
+    local sent
+    for _, e in ipairs(EMITTED) do if e.name == "ncm:paddock.grid" and e.args[1] == mr.raceId then sent = e.args[2] end end
+    check("the league is sent each human's slot on the lane grid", sent and sent.slots[D1] and sent.slots[D1].slot == 1
+        and sent.slots[D2].slot == #g and sent.fieldSize == #g and sent.greenAt == mr.opensAt and sent.slots[D1].yaw ~= nil)
+    TriggerEvent("ncm:paddock.entry", { raceId = mr.raceId, driverId = D3, display = "Too Late", state = "entered", enteredAt = clock })
+    check("an entry after the freeze is not on the grid", not mr.frozen.humans[K3] and #mr.frozen.grid == #g)
+    check("Billie will not write paper for a driver entered in that league", PaddockHumans.enteredInSeries(D1, mr.seriesId))
+    clock = mr.opensAt
+    run(function() PaddockRaces.run(mr, clock) end)
+    local simHumans = 0
+    for _, e in ipairs(mr.result.entrants) do if Mixed.isHuman(e.id) then simHumans = simHumans + 1 end end
+    check(("the sim races the NPCs only (%d entrants, no humans)"):format(#mr.result.entrants), simHumans == 0 and #mr.result.entrants == #g - 2)
+    clock = mr.closesAt + 1
+    check("the close waits for the humans' results", PaddockHumans.holds(mr, clock))
+    local winMs = mr.result.entrants[1].finishMs
+    TriggerEvent("ncm:paddock.human.result", mr.raceId, { { driverId = D1, state = "finished", finishMs = winMs - 1500, progressPct = 100 },
+        { driverId = D2, state = "dnf", progressPct = 40, dnfReason = "forfeit" } })
+    check("and closes once they are in", not PaddockHumans.holds(mr, clock))
+    EMITTED = {}
+    run(function() PaddockRaces.resolve(mr, clock) end)
+    local cls
+    for _, e in ipairs(EMITTED) do if e.name == "ncm:paddock.classified" and e.args[1] == mr.raceId then cls = e.args[2] end end
+    check(("the league hears the whole field's classification (owner P%s of %s)"):format(tostring(cls and cls.places[D1]), tostring(cls and cls.fieldSize)),
+        cls and cls.places[D1] == 1 and cls.fieldSize == #g and cls.places[D2] and cls.places[D2] > 1)
+    local own, npcWinner
+    for _, r in ipairs(DB.result) do
+        if r.race_id == mr.raceId and r.person_id == K1 then own = r end
+        if r.race_id == mr.raceId and r.position == 2 then npcWinner = r end
+    end
+    check("the result rows carry the human, first, with no Paddock purse", own and own.position == 1 and own.purse == 0 and own.state == "finished")
+    check("the NPC who would have won is second, and paid for second", npcWinner and not Mixed.isHuman(npcWinner.person_id) and (npcWinner.purse or 0) > 0)
+    check("the human is named in the Paddock as they entered", PaddockWorld.personName(K1) == "Owner" and mr.state == "resolved")
+end
 
 -- ---------------------------------------------------------------- time passes
 local function passFn(fn)

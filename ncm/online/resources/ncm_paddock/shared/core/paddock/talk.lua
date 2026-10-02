@@ -72,12 +72,14 @@ Core.define("paddock.talk", function(C)
             f.lastRoute, f.lastDriver = ctx.last.route, ctx.last.driver
             if ctx.last.state == "finished" then
                 f.lastPlace = ordinal(ctx.last.position)
+                f.lastResult = (ctx.last.position == 1 and "win") or ((ctx.last.position or 99) <= 3 and "podium") or "finish"
                 f.lastVerdict = (ctx.last.position == 1 and "Drinks were on us.")
                     or ((ctx.last.position or 99) <= 3 and "A podium's a podium.")
                     or "We'll take the points and the lesson."
                 f.lastCarNote = (ctx.last.position or 99) <= 3 and "in one piece" or "with a list"
             else
                 f.lastPlace = "out early"
+                f.lastResult = "dnf"
                 f.lastVerdict = "We don't talk about it."
                 f.lastCarNote = "in a bag"
             end

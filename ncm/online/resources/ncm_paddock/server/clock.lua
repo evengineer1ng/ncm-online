@@ -40,11 +40,11 @@ function PaddockClock.sync(force)
     if st.frozen or st.timeFrozen then pcall(Open77.environment.setTimeFrozen, false); did[#did + 1] = "unfrozen" end
     local drift = st.secondsOfDay and circular(e.secondsOfDay, tonumber(st.secondsOfDay) or 0) or nil
     if force or not drift or math.abs(drift) > set("clockToleranceSec", 120) then
-        local okT, res, why = pcall(Open77.environment.setTime, e.hour, e.min, e.sec)
-        did[#did + 1] = (okT and res ~= nil) and ("time %02d:%02d:%02d ET"):format(e.hour, e.min, e.sec) or ("time refused: " .. tostring(why or res))
+        local okT, res, why = pcall(Open77.environment.setTime, e.hour, e.min, math.floor(e.sec))
+        did[#did + 1] = (okT and res ~= nil) and ("time %02d:%02d:%02d ET"):format(e.hour, e.min, math.floor(e.sec)) or ("time refused: " .. tostring(why or res))
         PaddockClock.lastSet = U.now()
     end
-    if #did > 0 then log("%s%s", table.concat(did, ", "), drift and (" (drift was %d s)"):format(drift) or "") end
+    if #did > 0 then log("%s%s", table.concat(did, ", "), drift and (" (drift was %d s)"):format(math.floor(drift + 0.5)) or "") end
     return table.concat(did, ", ")
 end
 

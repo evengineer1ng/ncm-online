@@ -28,12 +28,14 @@ function PaddockStream.send(pid, channel, payload, listKey)
     if headBytes > PaddockStream.HEAD_WARN_BYTES then
         log("HEAD LARGE channel=%s player=%s bytes=%d -- move this into rows", channel, tostring(pid), headBytes)
     end
-    local packets, oversized = Chunks.partitionBytes(list, PaddockStream.PACKET_BUDGET_BYTES, PaddockStream.bytes)
+    seq = seq + 1
+    local id = ("%d:%d:%s"):format(PaddockUtil.now(), seq, tostring(pid))
+    -- the whole packet on the wire stays inside the budget, envelope included (KB-228)
+    local reserve = PaddockStream.bytes({ id = id, index = math.max(1, #list), items = {} }) - 2
+    local packets, oversized = Chunks.partitionBytes(list, PaddockStream.PACKET_BUDGET_BYTES, PaddockStream.bytes, reserve)
     for _, o in ipairs(oversized) do
         log("ROW OVERSIZED channel=%s player=%s row=%d bytes=%d", channel, tostring(pid), o.index, o.bytes)
     end
-    seq = seq + 1
-    local id = ("%d:%d:%s"):format(PaddockUtil.now(), seq, tostring(pid))
     TriggerClientEvent(channel .. ".stream.begin", pid, { id = id, head = head, parts = #packets, count = #list })
     for i, items in ipairs(packets) do
         TriggerClientEvent(channel .. ".stream.part", pid, { id = id, index = i, items = items })

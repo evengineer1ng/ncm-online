@@ -101,7 +101,8 @@ function NcmEconomy.settle(rec,results,reason,t)
     local e=rec.plan and rec.plan.e or {}; local econ=e.economy
     if NcmEconomy.isUnpaid(e) then return {} end   -- nothing to pay, and nothing failed (KB-186)
     local valid,why=Settle.validate(econ); if not valid then return nil,"economy:"..tostring(why) end
-    local field=#results; local tt=field<=1; local win=windowId(econ,t); local paying=rec.kind=="race"
+    -- L250: a mixed Paddock grid is classified against its whole field (NPCs too); its field bonus counts the humans
+    local field=tonumber(rec.mixedField) or #results; local tt=field<=1; local win=windowId(econ,t); local paying=rec.kind=="race"
     local tagInput={session={kind=rec.kind,timeTrial=tt,fieldSize=field,gatesTotal=#(rec.s.gates or {})},results={}}
     for i,r in ipairs(results) do
         local copy={}; for k,v in pairs(r) do copy[k]=v end
@@ -128,7 +129,7 @@ function NcmEconomy.settle(rec,results,reason,t)
             local paid=tonumber(MySQL.scalar.await([[SELECT COUNT(*) FROM ledger WHERE ncm_driver_id=? AND server_id=?
                 AND kind='event_completion' AND opportunity_id=?]],{r.driverId,sid(),opportunity})) or 0
             local qualified=(tagOut.drivers[i] and tagOut.drivers[i].qualified) or {}
-            local resolved,rwhy=Settle.resolve({economy=econ,fieldSize=field,result=r,tags=qualified,
+            local resolved,rwhy=Settle.resolve({economy=econ,fieldSize=field,fieldBonusCount=#results,result=r,tags=qualified,
                 repeatCompletion=paid>=(tonumber(econ.fullRateCompletions) or 1)})
             if not resolved then return nil,"resolve:"..tostring(rwhy) end
             local receipt={sessionId=rec.s.sessionId,eventId=rec.eventId,timeTrial=resolved.timeTrial,

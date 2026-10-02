@@ -22,7 +22,11 @@ Core.define("competition.guide", function(C)
     --- Practice (P48) is open for an event from its posting until qualifying forms — or, for a format with no
     --- qualifying, until the first session forms. `formsAt` is when the host forms that session (startsAt - formLead).
     function M.practiceWindow(e, formLeadSec)
-        local formsAt = (e.startsAt or 0) - (formLeadSec or 60)
+        -- a Paddock race's qualifying closes with its entries at T-11 (L250, paddock.mixed), not when the grid forms
+        if e.class == "paddock" and tonumber(e.entryClosesAt) then
+            return { opensAt = e.postedAt or 0, closesAt = e.entryClosesAt }
+        end
+        local formsAt = (e.startsAt or 0) - (e.practiceCloseLeadSec or formLeadSec or 60)
         return { opensAt = e.postedAt or 0, closesAt = formsAt }
     end
 
@@ -40,7 +44,9 @@ Core.define("competition.guide", function(C)
         opts = opts or {}
         local out = {}
         for i, e in ipairs(events) do
-            if e.state ~= "cancelled" and (opts.includeClosed or e.state ~= "closed") then
+            -- L249: a time trial called from Street Call is its caller's alone -- on nobody else's board
+            local private = e.timeTrial and e.calledBy ~= driverId
+            if not private and e.state ~= "cancelled" and (opts.includeClosed or e.state ~= "closed") then
                 local interested, entered = 0, 0
                 for _, en in pairs(e.entries or {}) do
                     if en.state == "interested" then interested = interested + 1

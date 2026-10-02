@@ -51,6 +51,7 @@ NcmPackStreet = {
             -- The accessible production-car championship: what a new driver can actually field.
             seriesId = "city_cup",
             name = "NCM City Cup",
+            paddockFold = true,   -- L249: becomes a Paddock league when guideFromPaddock is on
             tier = "street",
             rulesetId = "street_sprint_v0",
             cadence = { everyMinutes = 20, offsetMinutes = 0 },
@@ -81,9 +82,10 @@ NcmPackStreet = {
             -- One-make. The whole point is that the car is not a variable.
             seriesId = "maimai_cup",
             name = "MaiMai Cup",
+            paddockFold = true,   -- L249: becomes a Paddock league when guideFromPaddock is on
             tier = "street",
             rulesetId = "street_sprint_v0",
-            cadence = { everyMinutes = 30, offsetMinutes = 10 },
+            cadence = { everyMinutes = 30, offsetMinutes = 17 },   -- L238: offset was 10
             disciplineId = "street_sprint", formatId = "sprint", classId = "street_open", laps = 1,
             eligibility = { records = { "Vehicle.v_standard2_makigai_maimai" } },
             economy = economy(1, "maimai_cup_v1"),
@@ -106,9 +108,10 @@ NcmPackStreet = {
             -- end is excluded on purpose: prestige 5 is the Hypercar championship's field, not this one.
             seriesId = "night_city_gt",
             name = "Night City GT",
+            paddockFold = true,   -- L249: becomes a Paddock league when guideFromPaddock is on
             tier = "sanctioned",
             rulesetId = "street_sprint_v0",
-            cadence = { everyMinutes = 60, offsetMinutes = 25 },
+            cadence = { everyMinutes = 20, offsetMinutes = 16 },   -- L238: was 60
             disciplineId = "street_sprint", formatId = "sprint", classId = "street_open", laps = 1,
             eligibility = { classes = { "Sport", "Muscle" }, prestigeMin = 3, prestigeMax = 4 },
             economy = economy(10, "night_city_gt_v1"),
@@ -130,9 +133,10 @@ NcmPackStreet = {
             -- is also prestige 5 and the NCX car must never be enterable here.
             seriesId = "hypercar",
             name = "Hypercar Championship",
+            paddockFold = true,   -- L249: becomes a Paddock league when guideFromPaddock is on
             tier = "sanctioned",
             rulesetId = "street_sprint_v0",
-            cadence = { everyMinutes = 180, offsetMinutes = 40 },
+            cadence = { everyMinutes = 20, offsetMinutes = 16 },   -- L238: was 180
             disciplineId = "street_sprint", formatId = "sprint", classId = "street_open", laps = 1,
             eligibility = { classes = { "Sport" }, prestigeMin = 5 },
             economy = economy(100, "hypercar_v1"),
@@ -148,12 +152,61 @@ NcmPackStreet = {
             entryWindow = { opensMinutes = 15, closesMinutes = 1 },
         },
         {
+            -- L238: the entry-level championship: the Base Market's three cars (MaiMai, Galena, Hella) plus every
+            -- other road car at the same level (prestige 1-2, Nomad included), so a driver's first purchase always
+            -- has a race coming up and early Autofixer buys race it too. Formula and bikes stay out by class.
+            seriesId = "bedrock",
+            name = "Bedrock Championship",
+            paddockFold = true,   -- L249: becomes a Paddock league when guideFromPaddock is on
+            tier = "street",
+            rulesetId = "street_sprint_v0",
+            cadence = { everyMinutes = 20, offsetMinutes = 13 },
+            disciplineId = "street_sprint", formatId = "sprint", classId = "street_open", laps = 1,
+            eligibility = { classes = { "Muscle", "Sport", "Tech", "Nomad" }, prestigeMax = 2 },
+            economy = economy(1, "bedrock_v1"),
+            capacity = 16,
+            generator = { minM = 900, maxM = 3500, checkpoints = 2, checkpointShare = 0.5, share = 0.8 },
+            routes = {
+                { rootId = "root_tip_1035_3652__to__trench_2899_2711" },                        -- Ukulele
+                { rootId = "root_parque_del_mar_2326_1125__to__gold_niwaki_plaza_264_304" },    -- The Cut
+                { rootId = "root_hanford_overpass_1281_1107__to__stadium_1326_1656" },          -- Troll Pass
+                { rootId = "root_glenview_lofts_1489_964__to__corpo_plaza_1103_19" },           -- Overbridge Curve
+                { rootId = "root_gold_niwaki_plaza_264_304__to__parque_del_mar_2326_1125" },    -- Reverse Cut
+                { rootId = "root_central_highway_1110_342__to__pothole_1354_476" },             -- Hook
+            },
+            entryWindow = { opensMinutes = 15, closesMinutes = 1 },
+        },
+        {
+            -- L238: an open sprint every street car can enter, so no garage is ever more than a few minutes from a
+            -- race. Classes are named for the Street Drag reason: a bare `{}` would admit the NCX RB15. Bikes stay
+            -- in drag, not in a car sprint.
+            seriesId = "night_city_open",
+            name = "Night City Open",
+            paddockFold = true,   -- L249: becomes a Paddock league when guideFromPaddock is on
+            tier = "street",
+            rulesetId = "street_sprint_v0",
+            cadence = { everyMinutes = 20, offsetMinutes = 6 },
+            disciplineId = "street_sprint", formatId = "sprint", classId = "street_open", laps = 1,
+            eligibility = { classes = { "Muscle", "Sport", "Tech", "Nomad" } },
+            economy = economy(2, "night_city_open_v1"),
+            capacity = 20,
+            generator = { minM = 1500, maxM = 5500, checkpoints = 2, checkpointShare = 0.5, share = 0.75 },
+            routes = {
+                { rootId = "root_hill_abode_505_1229__to__downtown_2362_117" },                 -- Snake in the Grass
+                { rootId = "root_north_tunnel_1450_2467__to__japantown_crossway_373_0" },       -- Sewer
+                { rootId = "root_tip_1035_3652__to__trench_2899_2711" },                        -- Ukulele
+                { rootId = "root_hanford_overpass_1281_1107__to__stadium_1326_1656" },          -- Troll Pass
+                { rootId = "root_central_highway_1110_342__to__pothole_1354_476" },             -- Hook
+            },
+            entryWindow = { opensMinutes = 15, closesMinutes = 1 },
+        },
+        {
             -- Open drag, on the two roots whose own data says `recommendedMode = "drag"` (IDEA-104).
             seriesId = "street_drag",
             name = "Street Drag",
             tier = "street",
             rulesetId = "street_sprint_v0",
-            cadence = { everyMinutes = 30, offsetMinutes = 20 },
+            cadence = { everyMinutes = 30, offsetMinutes = 1 },    -- L238: offset was 20
             disciplineId = "drag", formatId = "sprint", classId = "street_open", laps = 1,
             -- "Open" means every street class, NOT literally everything: a bare `{}` admits the whole pool and
             -- the pool contains the RB15, so an open series would quietly let an NCX Formula car into a street

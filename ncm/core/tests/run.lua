@@ -44,6 +44,7 @@ Core.warm()
 
 -- Harness.
 local T = {}
+T.root = root            -- the core directory, for tests that read shipped data beside it
 local current = { name = "", failures = {} }
 
 local function fail(msg, level)

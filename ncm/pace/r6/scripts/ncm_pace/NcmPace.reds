@@ -188,7 +188,9 @@ public class NcmPaceSystem extends ScriptableSystem {
       race.reverseSpline = false;
       race.driveBackwards = false;
       race.rubberBandingBool = false;
-      race.secureTimeOut = 60.0;
+      // A closed oval spline stays in service for the whole race (up to 25 laps), so a 60 s timeout is too short.
+      // Pace releases it when the car leaves the bubble or the race ends, and refreshes a stalled command after 6 s.
+      race.secureTimeOut = 3600.0;
       race.needDriver = false;
       race.useKinematic = false;
       if agent.SendCommand(race) {

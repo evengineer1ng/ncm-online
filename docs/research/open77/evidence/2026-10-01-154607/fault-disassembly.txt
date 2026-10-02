@@ -1,0 +1,30 @@
+﻿
+C:\Program Files (x86)\Steam\steamapps\common\Cyberpunk 2077\bin\x64\Cyberpunk2077.exe:	file format coff-x86-64
+
+Disassembly of section .text:
+
+0000000141d86850 <ctlWaitForPropertyChange>:
+142543388: 40 53                       	pushq	%rbx
+14254338a: 48 83 ec 30                 	subq	$0x30, %rsp
+14254338e: 48 8b 01                    	movq	(%rcx), %rax
+142543391: 48 8b d9                    	movq	%rcx, %rbx
+142543394: 48 8b 90 c0 00 00 00        	movq	0xc0(%rax), %rdx
+14254339b: 48 8b 0a                    	movq	(%rdx), %rcx
+14254339e: 48 8b 15 83 c2 ee 00        	movq	0xeec283(%rip), %rdx    # 0x14342f628 <?m_pStreamMgr@IAkStreamMgr@AK@@1PEAV12@EA+0x8ed60>
+1425433a5: 48 8b 01                    	movq	(%rcx), %rax
+1425433a8: ff 50 08                    	callq	*0x8(%rax)
+1425433ab: 48 8b c8                    	movq	%rax, %rcx
+1425433ae: 48 8b 10                    	movq	(%rax), %rdx
+1425433b1: ff 92 00 02 00 00           	callq	*0x200(%rdx)
+1425433b7: 48 8b 50 40                 	movq	0x40(%rax), %rdx
+1425433bb: 48 89 54 24 20              	movq	%rdx, 0x20(%rsp)
+1425433c0: 48 8b 48 48                 	movq	0x48(%rax), %rcx
+1425433c4: 48 89 4c 24 28              	movq	%rcx, 0x28(%rsp)
+1425433c9: 48 85 c9                    	testq	%rcx, %rcx
+1425433cc: 74 08                       	je	0x1425433d6 <ctlWaitForPropertyChange+0x7bcb86>
+1425433ce: f0                          	lock
+1425433cf: ff 01                       	incl	(%rcx)
+1425433d1: 48 8b 54 24 20              	movq	0x20(%rsp), %rdx
+1425433d6: 48 3b 13                    	cmpq	(%rbx), %rdx
+1425433d9: 48 8d 4c 24 20              	leaq	0x20(%rsp), %rcx
+1425433de: 0f 94 c3                    	sete	%bl

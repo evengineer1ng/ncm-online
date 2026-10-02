@@ -58,6 +58,9 @@ Core.define("competition.race_builder", function(C)
     --- an hour out is not impromptu -- but 2 minutes is a legitimate "we are both already here" choice.
     M.WHEN_MINUTES = { 2, 5, 10, 20 }
     M.MIN_REMOTE_MINUTES = 5     -- below this, the start must be where the caller is standing
+    -- L249 (owner, 2026-10-01): a time trial is ON DEMAND here -- it is no longer what happens when a driver enters a
+    -- race alone. A called race is announced to everyone; a time trial is the caller alone, against the clock.
+    M.MODES = { { id = "race", label = "Race (announced to everyone)" }, { id = "time_trial", label = "Time trial (alone)" } }
     M.NEAR_START_M = 150
 
     --- The shortest race worth posting, in metres. A 40 m sprint between two adjacent points is not a race and
@@ -155,6 +158,7 @@ Core.define("competition.race_builder", function(C)
             finish = M.finishOptions(facts),
             class = M.classOptions(),
             when = M.whenOptions(),
+            mode = M.MODES,
             maxCheckpoints = M.MAX_CHECKPOINTS,
             minDistanceM = M.MIN_DISTANCE_M,
             hasPosition = hasPosition(facts),
@@ -188,6 +192,7 @@ Core.define("competition.race_builder", function(C)
             nodes = M.nodeOptions(facts),
             class = M.classOptions(),
             when = M.whenOptions(),
+            mode = M.MODES,
             maxCheckpoints = M.MAX_CHECKPOINTS,
             minDistanceM = M.MIN_DISTANCE_M,
             hasPosition = hasPosition(facts),
@@ -208,6 +213,7 @@ Core.define("competition.race_builder", function(C)
             finish = nodes,
             class = type(value.class) == "table" and value.class or {},
             when = type(value.when) == "table" and value.when or {},
+            mode = type(value.mode) == "table" and value.mode or M.MODES,
             maxCheckpoints = tonumber(value.maxCheckpoints) or M.MAX_CHECKPOINTS,
             minDistanceM = tonumber(value.minDistanceM) or M.MIN_DISTANCE_M,
             hasPosition = value.hasPosition == true,
@@ -225,6 +231,7 @@ Core.define("competition.race_builder", function(C)
             classId = classes[1] and classes[1].id or "street_open",
             minutes = 5,
             laps = 1,
+            mode = "race",
             creatorId = facts.creatorId,
             createdAt = posInt(facts.now),
         }
@@ -304,6 +311,11 @@ Core.define("competition.race_builder", function(C)
         -- laps only mean anything on a closed route; a point-to-point run of 3 laps is not representable
         if startId ~= tostring(form.finish) then laps = 1 end
 
+        local mode = (form.mode == nil or form.mode == "race") and "race" or tostring(form.mode)
+        local modeOk = false
+        for _, m in ipairs(M.MODES) do if m.id == mode then modeOk = true end end
+        if not modeOk then return nil, "invalid_mode" end
+
         return {
             start = startId,
             checkpoints = checkpoints,
@@ -311,6 +323,7 @@ Core.define("competition.race_builder", function(C)
             classId = classId,
             minutes = minutes,
             laps = laps,
+            mode = mode,
             creatorId = form.creatorId,
             createdAt = posInt(form.createdAt),
         }
@@ -407,6 +420,7 @@ Core.define("competition.race_builder", function(C)
             loop = f.start == f.finish,
             startsHere = f.start == M.START_HERE,
             minutes = f.minutes,
+            mode = f.mode or "race",       -- L249: "time_trial" = the caller alone, on demand
             creatorId = f.creatorId,
         }
     end

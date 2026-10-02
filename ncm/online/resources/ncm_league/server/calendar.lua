@@ -30,6 +30,12 @@ local settings = Open77.tunables.declare({
     -- platform's own tunables -- no second configuration file, no duplicated settings.
     environment = { value = "development", type = "string", apply = "live" },
     horizonMinutes = { value = 120, type = "integer", min = 30, max = 1440, unit = "min", apply = "live" },
+    -- L250: Paddock races are the only organized races shown to players. Legacy league series remain in
+    -- storage for standings/history, but are neither scheduled nor published as overworld events.
+    guideFromPaddock = { value = true, type = "boolean", apply = "live" },
+    -- L250: humans in Paddock races. On: the Paddock's next races are calendar events (class `paddock`) a driver can
+    -- QUALIFY for and enter (server/paddock_link.lua); their grids are mixed, NPCs and humans.
+    paddockEntries = { value = true, type = "boolean", apply = "live" },
     tickSeconds = { value = 10, type = "integer", min = 2, max = 60, unit = "s", apply = "live" },
     publishCount = { value = 3, type = "integer", min = 1, max = 10, apply = "live" },
     -- race control: sessions form when entries close (T-60 by the street pack's window)
@@ -260,8 +266,11 @@ publish = function(t, force)
         -- The soonest `publishCount`, and ALSO every race inside the ring lead: each one gets its own ring at its
         -- own venue (owner, 2026-09-28), and a client can only draw a ring for a race it has been told about.
         local inRingLead = (e.startsAt or 0) - t <= Entry.RING_LEAD_S and #list < Entry.RING_MAX
-        if e.state ~= "closed" and e.state ~= "cancelled" and (#list < (settings.publishCount or 3) or inRingLead) then
-            local n, interested = countEntries(e)
+        local n, interested = countEntries(e)
+        local hasDriverInterest = n > 0 or interested > 0
+        local selectedForVenue = hasDriverInterest and #list < Entry.RING_MAX
+        if e.class == "paddock" and e.state ~= "closed" and e.state ~= "cancelled" and
+            (#list < (settings.publishCount or 3) or inRingLead or selectedForVenue) then
             local seatsTaken = 0
             if e.class == "organized" and NcmOrganized and NcmOrganized.rosters[e.eventId] then
                 seatsTaken = Core.get("competition.teams").occupied(NcmOrganized.rosters[e.eventId])
@@ -288,7 +297,11 @@ publish = function(t, force)
     local signature = table.concat(sig, ",")
     -- serverNow lets clients run the countdown between publications; republish at least every tick.
     local snapshot = { next = list, serverNow = math.floor(t), signature = signature }
-    GlobalState.ncmCalendar = snapshot
+    -- A single unusually large route must not abort the event broadcast (or strand every venue ring).
+    -- Calendar consumers only need a bounded route summary; oval `via` is the four authored marks from
+    -- paddock.mixed, not one repeated checkpoint per lap.
+    local okState, stateErr = pcall(function() GlobalState.ncmCalendar = snapshot end)
+    if not okState then log("calendar state-bag publish refused; sending client snapshot directly: %s", tostring(stateErr)) end
     -- Production clients do not currently receive this GlobalState key (the live client logged it absent for
     -- its entire session while the server kept publishing it). Send the same small read model explicitly on
     -- every calendar tick. A late join therefore needs no request/replay path, and GlobalState remains a
@@ -318,7 +331,7 @@ local function sendPings(t)
     local players = Open77.players.all()
     for _, eid in ipairs(order) do
         local e = events[eid]
-        if e.state ~= "closed" and e.state ~= "cancelled" then
+        if e.class == "paddock" and e.state ~= "closed" and e.state ~= "cancelled" then
             for _, pid in ipairs(players) do
                 -- Owner, 2026-09-22: pings go ONLY to drivers who have asked for this event. Everyone else is
                 -- funnelled to the Race Guide, which is the one place races are browsed.
@@ -359,9 +372,16 @@ local function tick()
     local t = now()
     local horizon = (settings.horizonMinutes or 120) * 60
     local lists = {}
-    for _, s in ipairs(seriesList) do lists[#lists + 1] = Cal.materialize(s, t, horizon) end
+    -- L238/KB-211: every generated slot resolves a route, and seven series over a two-hour horizon is ~40 slots;
+    -- one slice for all of it exceeded the instruction quota and killed this thread on boot. Yield per series.
+    -- This is now a product rule, not an operator toggle: all legacy league series are retired from discovery.
+    local fold = true
+    for _, s in ipairs(seriesList) do
+        if not fold then lists[#lists + 1] = Cal.materialize(s, t, horizon) end
+        Wait(0)
+    end
     local merged = Cal.merge(lists)
-    local seen = {}
+    local seen, posted = {}, 0
     for _, slot in ipairs(merged) do
         seen[slot.eventId] = true
         if not events[slot.eventId] then
@@ -373,6 +393,8 @@ local function tick()
             events[slot.eventId] = slot
             order[#order + 1] = slot.eventId
             persistEvent(slot)
+            posted = posted + 1
+            if posted % 4 == 0 then Wait(0) end
             log("posted %s | %s · %s | start in %s | venue %s", slot.eventId, slot.seriesName, slot.routeName, Entry.countdown(slot.startsAt - t), slot.venue.name)
         end
     end
@@ -427,7 +449,8 @@ function NcmCalendar.start(series)
         local okLoad, states, entries = pcall(loadPersisted, t)
         local okOrg, nOrg = pcall(restoreOrganized, t)
         if okOrg then log("restored %d organized event(s)", nOrg or 0) else log("could not restore organized events: %s", tostring(nOrg)) end
-        tick()
+        local okTick, errTick = pcall(tick)
+        if not okTick then log("first tick error: %s", tostring(errTick)) end
         if okLoad then
             for eid, st in pairs(states) do
                 local e = events[eid]
@@ -475,6 +498,8 @@ local function enterPlayer(pid, eventId, opts)
         if e.invitation then tell(pid, "This one is by invitation — a team has to offer you a seat."); return end
         local driver = resolveDriver(pid)
         if not driver then tell(pid, "No NCM driver on this session."); return end
+        -- L249: a Street Call time trial is its caller's alone
+        if e.timeTrial and e.calledBy ~= driver.ncmDriverId then tell(pid, "That is someone's time trial."); return end
         -- KB-37: one session at a time. Holding entries on two events is what let a driver be classified DNS
         -- for a race that started while they were out on track in another.
         local busySid, busyEvent, busyKind = NcmRace and NcmRace.busySession and NcmRace.busySession(driver.ncmDriverId)
@@ -578,6 +603,10 @@ local function enterPlayer(pid, eventId, opts)
         -- record of what it had published, so the refresh never corrected it again.
         if NcmGuide and NcmGuide.refreshEntryBag then NcmGuide.refreshEntryBag(pid) end
         tell(pid, ("You're in: %s · %s. Start in %s. Entry -€$%d · balance €$%d."):format(e.seriesName, e.routeName, Entry.countdown(e.startsAt - now()), paid.fee, paid.balance))
+        if e.class == "paddock" and not (NcmPaddockLink and NcmPaddockLink.bests
+            and NcmPaddockLink.bests[e.eventId] and NcmPaddockLink.bests[e.eventId][driver.ncmDriverId]) then
+            tell(pid, "No qualifying time yet. You are entered; qualify here before T-11 to improve your grid place. If you do not qualify in time, you remain entered and start last.")
+        end
         if NcmComms then
             NcmComms.acknowledge(pid,"race.interest.registered")
             NcmComms.send(pid,{id="race.entry:"..e.eventId,category="confirmation",priority="actionable",
@@ -586,6 +615,8 @@ local function enterPlayer(pid, eventId, opts)
                 reference="driver",surface="toast",repeatPolicy={mode="once"}})
         end
         log("ENTERED player=%d driver=%s event=%s entry=%s dist=%.1fm%s", pid, driver.ncmDriverId, e.eventId, en.entryId, en.distanceM or -1, decision.upgraded and " (from interest)" or "")
+        -- L250: an entry at the line with no qualifying time is still an entry -- it starts at the back
+        if e.class == "paddock" and NcmPaddockLink then NcmPaddockLink.announce(e, driver.ncmDriverId, driver.display, "entered") end
         -- Navigation intent changes HERE, not at lights-out (owner QA 2026-09-23). The venue GPS has served
         -- its purpose the moment the driver is standing at the venue and entered; from now on the useful
         -- destination is the course. Doing it now is also what buys them time to notice a route line that has

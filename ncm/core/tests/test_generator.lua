@@ -60,7 +60,8 @@ return {
             T.ok(route ~= nil, "every scheduled route resolves: " .. tostring(rid))
             seen[rid] = true
             if route.generated then gen = gen + 1 end
-            if r.seriesId == "street_a" then
+            -- an oval night races the league's own district's roundabout, else any (L236): only its street routes must start at home
+            if r.seriesId == "street_a" and not route.oval then
                 watson = watson + 1
                 if route.start.region == "Watson" then watsonHome = watsonHome + 1 end
             end

@@ -9,12 +9,14 @@
 --   org    { id, tier, seriesId, name, short, colour, prestige, cash, car, facility, ownerId, managerId, engineerId,
 --            strategistId, sponsorIds, origin, lifecycle, humanManagerDriverId, foundedSeason, seasonsActive }
 --   person { id, role, orgId, seat, first, last, display, region, gender, birthYear, attrs, personality, principal,
---            morale, state, wage, contractEnds }
+--            morale, state, wage, contractEnds, leagueId (street pool membership), car (an independent's own car) }
 --   sponsor{ id, name, short, industry, tier, personality, orgId, perDay, endsSeason }
 local Core = NcmCore
 
 Core.define("paddock.world", function(C)
-    local M = { version = "0.1.0", GENESIS_VERSION = 2, FREE_AGENTS = 120 }   -- L236: ~3x cast
+    -- GENESIS 3 (L249): street leagues are pools of ~56 drivers (`person.leagueId`; independents race their own car),
+    -- sanctioned teams carry deeper rosters (Season.TIERS[tier].roster)
+    local M = { version = "0.2.0", GENESIS_VERSION = 3, FREE_AGENTS = 120 }   -- L236: ~3x cast
     local Hash = C.get("vocabulary.hash")
     local Names = C.get("paddock.names")
     local Attr = C.get("paddock.attributes")
@@ -77,7 +79,7 @@ Core.define("paddock.world", function(C)
         end
         world.people[id] = p
         world.personOrder[#world.personOrder + 1] = id
-        world._byOrg = nil
+        world._byOrg, world._byLeague = nil, nil
         return p
     end
 
@@ -126,11 +128,31 @@ Core.define("paddock.world", function(C)
                 local seat = (i <= spec.carsPerOrg) and ("race" .. i) or "reserve"
                 local d = M.newPerson(world, "driver", tier, { orgId = id, seat = seat })
                 d.contractEnds = world.seasonOrdinal + rng:int(0, 2)
+                if tier == "street" then d.leagueId = seriesId end
             end
         end
         local sponsors = opts.sponsors or (1 + (rng:chance(0.45) and 1 or 0))
         for _ = 1, sponsors do o.sponsorIds[#o.sponsorIds + 1] = M.newSponsor(world, tier, id).id end
         return o
+    end
+
+    --- An independent street racer in league `seriesId`: no team, their own car, racing for the purse (L249).
+    function M.newIndependent(world, seriesId, opts)
+        opts = opts or {}
+        local d = M.newPerson(world, "driver", "street", { seat = "pool", ageMean = opts.ageMean })
+        d.leagueId = seriesId
+        d.car = Car.roll(Hash.stream(world.seed, "indie-car", d.id), "street")
+        return d
+    end
+
+    --- A street league's pool: every active driver who is a member (team drivers and independents), in id order.
+    function M.leaguePool(world, seriesId)
+        if not world._byLeague then M.reindex(world) end
+        local out = {}
+        for _, p in ipairs(world._byLeague[seriesId] or {}) do
+            if p.role == "driver" and p.state == "active" and p.leagueId == seriesId then out[#out + 1] = p end
+        end
+        return out
     end
 
     --- An empty world shell. `seasonId` is the genesis season (competition.seasons id).
@@ -151,7 +173,7 @@ Core.define("paddock.world", function(C)
         local jobs = {}
         for idx, s in ipairs(Season.allSeries()) do
             world.series[s.id] = { id = s.id, tier = s.tier, division = s.division,
-                name = Names.leagueName(seed, s.tier, idx, world.takenSeriesNames) }
+                name = Names.leagueNameFor(s.id, seed, s.tier, idx, world.takenSeriesNames) }
         end
         for _, tier in ipairs(Season.TIER_ORDER) do
             local spec = Season.TIERS[tier]
@@ -159,6 +181,17 @@ Core.define("paddock.world", function(C)
             local perSeries = spec.orgs / #ids
             for _, sid in ipairs(ids) do
                 for _ = 1, perSeries do jobs[#jobs + 1] = { kind = "org", tier = tier, seriesId = sid } end
+            end
+        end
+        -- the rest of each street league's pool: independents (L249)
+        local Attendance = C.get("paddock.attendance")
+        local streetTeamDrivers = (Season.TIERS.street.orgs / Season.TIERS.street.divisions) * Season.TIERS.street.roster
+        for _, sid in ipairs(Season.seriesIds("street")) do
+            local left = Attendance.STREET_POOL - streetTeamDrivers
+            while left > 0 do
+                local n = math.min(10, left)
+                jobs[#jobs + 1] = { kind = "independents", seriesId = sid, n = n }
+                left = left - n
             end
         end
         local fa = M.FREE_AGENTS
@@ -174,6 +207,8 @@ Core.define("paddock.world", function(C)
             if not job then return false end
             if job.kind == "org" then
                 M.newOrg(world, job.tier, job.seriesId)
+            elseif job.kind == "independents" then
+                for i = 1, job.n do M.newIndependent(world, job.seriesId, { ageMean = (i % 3 == 0) and 30 or 22 }) end
             else
                 for i = 1, job.n do
                     -- free agents skew to the lower tiers and the extremes of age: rookies and veterans
@@ -202,7 +237,7 @@ Core.define("paddock.world", function(C)
     --- Build (or rebuild) the org -> people index. Hosts call this after any roster change; without it
     --- `drivers` scans every person, which a metered host cannot afford per request (KB-211).
     function M.reindex(world)
-        local by = {}
+        local by, league = {}, {}
         for _, pid in ipairs(world.personOrder) do
             local p = world.people[pid]
             if p.orgId then
@@ -210,12 +245,17 @@ Core.define("paddock.world", function(C)
                 if not list then list = {}; by[p.orgId] = list end
                 list[#list + 1] = p
             end
+            if p.leagueId then
+                local list = league[p.leagueId]
+                if not list then list = {}; league[p.leagueId] = list end
+                list[#list + 1] = p
+            end
         end
-        world._byOrg = by
+        world._byOrg, world._byLeague = by, league
         return by
     end
 
-    function M.invalidate(world) world._byOrg = nil end
+    function M.invalidate(world) world._byOrg, world._byLeague = nil, nil end
 
     --- People of an org (any role, any state), from the index.
     function M.members(world, orgId)
@@ -255,6 +295,69 @@ Core.define("paddock.world", function(C)
             end
         end
         return out
+    end
+
+    --- The field for one race (L249): a street league's pool turns up or not; a sanctioned team fields its available
+    --- drivers. `race` = { raceId, seriesId, tier, opensAt }. Returns entrants { { driver, org } } (org nil for an
+    --- independent) and `absent` { [personId] = reason }.
+    function M.raceField(world, race)
+        local Attendance = C.get("paddock.attendance")
+        local spec = Season.TIERS[race.tier]
+        local fieldSize = math.floor(spec.orgs / spec.divisions) * spec.carsPerOrg
+        if race.tier == "street" then
+            local came, absent = Attendance.streetField(world.seed, race.raceId, M.leaguePool(world, race.seriesId), fieldSize, race.opensAt)
+            local out = {}
+            for _, d in ipairs(came) do
+                local o = d.orgId and world.orgs[d.orgId]
+                out[#out + 1] = { driver = d, org = (o and o.lifecycle == "active") and o or nil }
+            end
+            return out, absent
+        end
+        local teams = {}
+        for _, o in ipairs(M.orgsInSeries(world, race.seriesId)) do teams[#teams + 1] = { org = o, drivers = M.drivers(world, o.id) } end
+        return Attendance.teamField(world.seed, race.raceId, teams, race.tier, spec.carsPerOrg, race.opensAt)
+    end
+
+    --- Grow an existing world to GENESIS 3's pools (L249), a little per call: street team drivers join their team's
+    --- league; each street league is topped up with independents to STREET_POOL; each sanctioned team with reserves to
+    --- its tier's roster. Returns the people created or changed this call, and whether work remains. Idempotent.
+    function M.growPools(world, budget)
+        local Attendance = C.get("paddock.attendance")
+        budget = budget or 20
+        local touched = {}
+        for _, pid in ipairs(world.personOrder) do
+            local p = world.people[pid]
+            if p.role == "driver" and p.state == "active" and not p.leagueId and p.orgId then
+                local o = world.orgs[p.orgId]
+                if o and o.tier == "street" then p.leagueId = o.seriesId; touched[#touched + 1] = p end
+            end
+        end
+        local counts = {}
+        for _, pid in ipairs(world.personOrder) do
+            local p = world.people[pid]
+            if p.role == "driver" and p.state == "active" and p.leagueId then counts[p.leagueId] = (counts[p.leagueId] or 0) + 1 end
+        end
+        for _, sid in ipairs(Season.seriesIds("street")) do
+            while (counts[sid] or 0) < Attendance.STREET_POOL and budget > 0 do
+                touched[#touched + 1] = M.newIndependent(world, sid)
+                counts[sid] = (counts[sid] or 0) + 1
+                budget = budget - 1
+            end
+        end
+        for _, oid in ipairs(world.orgOrder) do
+            local o = world.orgs[oid]
+            if o.lifecycle == "active" and o.tier ~= "street" and not o.humanManagerDriverId then
+                local have = #M.drivers(world, oid)
+                while have < Season.TIERS[o.tier].roster and budget > 0 do
+                    local d = M.newPerson(world, "driver", o.tier, { orgId = oid, seat = "reserve" })
+                    d.contractEnds = (world.seasonOrdinal or 0) + 1
+                    touched[#touched + 1] = d
+                    have, budget = have + 1, budget - 1
+                end
+            end
+        end
+        if #touched > 0 then M.reindex(world) end
+        return touched, budget <= 0
     end
 
     function M.freeAgents(world)

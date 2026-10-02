@@ -87,6 +87,12 @@ Core.define("paddock.live", function(C)
             local out, total = M.resample(pts, n or 48)
             if out and total and total > 200 then return { points = out, lengthM = total, source = "ghost" } end
         end
+        -- an oval: the ring itself, every lap (KB-223). A road line like a ghost's, so the continuous model can put a
+        -- bubble car ON the roundabout (L230) -- pole to pole the line would cut across the island
+        if route.oval then
+            local ring = C.get("data.ovals").ringLine(route.oval, route.oval.laps)
+            return { points = ring.points, lengthM = route.distanceM or ring.lengthM, source = "ring" }
+        end
         -- no ghost: the authored points themselves (start, any checkpoints, finish); the native planner finds the
         -- roads between them (L236: every generated route starts here, having never been driven by a human)
         local s, f = route.start, route.finish
@@ -200,6 +206,54 @@ Core.define("paddock.live", function(C)
         return out, { x = fx, y = fy }
     end
 
+    --- A street grid ON THE ROAD behind the start (L247): SP's formation -- setback, row spacing, column offset, pole on
+    --- the left, SP's slot yaw -- laid along `behind`, the road leading into the start (start first, running back), each
+    --- slot facing the way the road runs. gridSlots' straight line follows the start node's authored heading and left
+    --- the road wherever the road behind the start bends or climbs: at 01:36 (2026-10-01) twelve cars stood 14-77 m
+    --- off the road on a slope. A `behind` shorter than the field runs straight on from its last stretch (a dead end or a
+    --- gap at a junction); nil when it has no length at all.
+    function M.roadSlots(behind, n, profile)
+        profile = profile or {}
+        local rowM, backM, colM = profile.aiGridRowSpacingM or 12, profile.aiGridStartSetbackM or 12, profile.aiGridColOffsetM or 4
+        local shift = profile.gridLateralShiftM or 0
+        local yawOff = profile.startSlotHeadingOffsetDeg or profile.aiSlotHeadingOffsetDeg or M.SLOT_YAW_OFFSET
+        if type(behind) ~= "table" or #behind < 2 then return nil end
+        local cum = { 0 }
+        for i = 2, #behind do cum[i] = cum[i - 1] + dist(behind[i - 1], behind[i]) end
+        if cum[#behind] <= 0 then return nil end
+        local function at(d)
+            for i = 2, #behind do
+                if cum[i] >= d and cum[i] > cum[i - 1] then
+                    local a, b = behind[i - 1], behind[i]
+                    local u = (d - cum[i - 1]) / (cum[i] - cum[i - 1])
+                    return { x = a.x + (b.x - a.x) * u, y = a.y + (b.y - a.y) * u, z = (a.z or 0) + ((b.z or 0) - (a.z or 0)) * u },
+                        b.x - a.x, b.y - a.y
+                end
+            end
+            -- past the end: on along the last stretch with any length
+            local k = #behind
+            while k > 1 and cum[k] - cum[k - 1] < 0.5 do k = k - 1 end
+            local a, b = behind[k - 1], behind[k]
+            local len = math.max(1e-6, dist(a, b))
+            local over = d - cum[#behind]
+            local e = behind[#behind]
+            return { x = e.x + (b.x - a.x) / len * over, y = e.y + (b.y - a.y) / len * over, z = e.z or 0 }, b.x - a.x, b.y - a.y
+        end
+        local out = {}
+        for i = 1, n do
+            local row = math.ceil(i / 2) - 1
+            local col = (i % 2 == 0) and 1 or -1
+            local p, bx, by = at(backM + rowM * row)
+            local len = math.max(1e-6, math.sqrt(bx * bx + by * by))
+            local fx, fy = -bx / len, -by / len            -- `behind` runs backwards; the race runs the other way
+            local rx, ry = -fy, fx
+            local side = col * colM + shift
+            local heading = norm(math.deg(atan2(fy, fx)))
+            out[i] = { x = p.x + side * rx, y = p.y + side * ry, z = p.z, yaw = norm(heading + yawOff), row = row + 1, heading = heading }
+        end
+        return out
+    end
+
     local function clamp(v, lo, hi) return math.max(lo, math.min(hi, v)) end
 
     --- How SP gets its AI off the line and keeps it racing (ai_vehicles.lua buildDriveProfile/buildLaunchReleaseProfile,
@@ -226,15 +280,21 @@ Core.define("paddock.live", function(C)
 
     --- An oval's grid (L236): two abreast round the loop behind the line, in the driving direction, each car on the
     --- circle (inner and outer lane) and facing along it. A straight SP grid would run off a roundabout.
-    function M.ovalSlots(geom, n)
+    --- SP's formation (gridSlots, L232) with SP's own numbers -- setback, row spacing, column offset from the route's
+    --- grid profile, SP defaults 12 / 12 / 4 m; pole on the left; SP's slot yaw -- laid along the ring instead of a
+    --- straight line: a straight SP grid 72 m behind the line of a 155 m ring would stand 17 m off the road (KB-223).
+    function M.ovalSlots(geom, n, profile)
+        profile = profile or {}
+        local rowM, backM, colM = profile.aiGridRowSpacingM or 12, profile.aiGridStartSetbackM or 12, profile.aiGridColOffsetM or 4
         local out = {}
         n = math.min(n, geom.fieldMax or n)
         for i = 1, n do
-            local row = math.floor((i - 1) / 2)
-            local lane = (i % 2 == 1) and -1 or 1
-            local back = 10 + row * 9
+            local row = math.ceil(i / 2) - 1
+            local lane = (i % 2 == 0) and 1 or -1          -- SP: odd slots left, even right
+            local back = backM + row * rowM
             local a = geom.startAngle - geom.sign * back / geom.radius
-            local r = geom.radius + lane * 2.2
+            -- left of the driving direction is toward the centre on an anticlockwise ring
+            local r = geom.radius + lane * colM * geom.sign
             local tx, ty = -math.sin(a) * geom.sign, math.cos(a) * geom.sign
             out[i] = { x = geom.cx + r * math.cos(a), y = geom.cy + r * math.sin(a), z = geom.cz, yaw = M.yawFromDir(tx, ty),
                 row = row + 1, heading = math.deg(atan2(ty, tx)) }
@@ -268,12 +328,36 @@ Core.define("paddock.live", function(C)
         return best
     end
 
-    --- Where to put a stuck car back on the road: the path point just behind its nearest one, facing along the line.
+    --- Where to put a stuck car back on the road: on the line RESET_BACK_M behind the point of the line nearest it,
+    --- facing along the line (SP rule, L232). `index` is the leg it lands on (leg i runs from point i to i+1).
+    --- On the line, not at a vertex: a route's line is its authored points (L243, no ghosts), so a vertex can be the
+    --- start itself, and a stuck car 2 km in was sent back to the grid.
+    M.RESET_BACK_M = 20
     function M.resetPoint(points, pos)
-        local i = M.nearestIndex(points, pos)
-        i = math.max(1, math.min(#points - 1, i - 1))
-        local a, b = points[i], points[i + 1]
-        return { x = a.x, y = a.y, z = a.z or 0, yaw = M.yawFromDir(b.x - a.x, b.y - a.y), index = i }   -- SP rule (L232)
+        local bestI, bestU, bestD = 1, 0, math.huge
+        for i = 2, #points do
+            local a, b = points[i - 1], points[i]
+            local vx, vy = b.x - a.x, b.y - a.y
+            local len2 = vx * vx + vy * vy
+            local u = len2 > 0 and (((pos.x - a.x) * vx + (pos.y - a.y) * vy) / len2) or 0
+            if u < 0 then u = 0 elseif u > 1 then u = 1 end
+            local d = dist({ x = a.x + vx * u, y = a.y + vy * u }, pos)
+            if d < bestD then bestI, bestU, bestD = i - 1, u, d end
+        end
+        -- walk RESET_BACK_M back along the line from the projection, across vertices if need be
+        local i, back = bestI, M.RESET_BACK_M
+        local a, b = points[i], points[math.min(#points, i + 1)]
+        local along = dist(a, b) * bestU
+        while back > along and i > 1 do
+            back = back - along
+            i = i - 1
+            a, b = points[i], points[i + 1]
+            along = dist(a, b)
+        end
+        local len = math.max(1e-6, dist(a, b))
+        local u = math.max(0, along - back) / len
+        return { x = a.x + (b.x - a.x) * u, y = a.y + (b.y - a.y) * u, z = (a.z or 0) + ((b.z or 0) - (a.z or 0)) * u,
+            yaw = M.yawFromDir(b.x - a.x, b.y - a.y), index = i }
     end
 
     --- One car's speed ceiling for each leg of the path (leg i ends at point i+1), from its own sim splits.
@@ -293,13 +377,30 @@ Core.define("paddock.live", function(C)
             mps = mps or last or (cap * 0.8)
             segSpeed[s] = mps; last = mps
         end
+        -- A leg's speed is the sim's average over EVERY segment the leg spans (distance / summed time), not the segment
+        -- its midpoint falls in. On a dense line the two agree; on a route's authored points (L243: no ghosts) one leg can
+        -- be the whole race, and one held-up sim segment became a car's speed for 2.4 km. Leg distances are scaled from
+        -- the line onto the route's real length, which is what the segments divide.
+        local chord = 0
+        for i = 2, #points do chord = chord + dist(points[i - 1], points[i]) end
+        local scale = (chord > 0) and ((lengthM or chord) / chord) or 1
+        local function timeOver(a, b)
+            local t = 0
+            for s = math.max(1, math.floor(a / segLen) + 1), math.min(segments, math.floor(b / segLen) + 1) do
+                local lo, hi = math.max(a, (s - 1) * segLen), math.min(b, s * segLen)
+                if hi > lo then t = t + (hi - lo) / segSpeed[s] end
+            end
+            return t
+        end
         local out, acc = {}, 0
         for i = 2, #points do
-            local d = dist(points[i - 1], points[i])
-            local mid = acc + d / 2
-            acc = acc + d
-            local s = math.min(segments, math.max(1, math.floor(mid / segLen) + 1))
-            local v = segSpeed[s] * 1.08      -- a ceiling, not a target: the planner brakes for corners on its own
+            local d = dist(points[i - 1], points[i]) * scale
+            local a, b = acc, acc + d
+            acc = b
+            local t = timeOver(a, math.min(b, segLen * segments))
+            local s = math.min(segments, math.max(1, math.floor((a + b) / 2 / segLen) + 1))
+            local avg = (t > 0) and ((math.min(b, segLen * segments) - a) / t) or segSpeed[s]
+            local v = avg * 1.08      -- a ceiling, not a target: the planner brakes for corners on its own
             if v > cap then v = cap elseif v < M.MIN_MPS then v = M.MIN_MPS end
             out[i - 1] = math.floor(v * 10 + 0.5) / 10
         end

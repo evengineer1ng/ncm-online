@@ -37,14 +37,60 @@ end
 --- Load recent and upcoming races into memory (boot).
 function PaddockRaces.load()
     local t = U.now()
+    NcmCore.get("data.ovals").SCHEDULED = PaddockSettings.get("ovalsScheduled", true)
     local rows = MySQL.query.await([[SELECT * FROM paddock_race WHERE server_id = ? AND window_opens_at >= ?
         AND state IN ('scheduled','priced','running') ORDER BY window_opens_at]], { U.sid(), t - 6 * 3600 }) or {}
     for _, r in ipairs(rows) do PaddockRaces.byId[r.race_id] = rowToRace(r) end
-    log("loaded %d open races", #rows)
+    for _, race in pairs(PaddockRaces.byId) do
+        if race.frozen and (race.state == "scheduled" or race.state == "priced") and race.opensAt - t > NcmCore.get("paddock.mixed").FREEZE_LEAD_SEC then
+            race.frozen = nil
+            pcall(MySQL.update.await, "UPDATE paddock_race SET detail_json = '{}' WHERE server_id = ? AND race_id = ?", { U.sid(), race.raceId })
+            log("released legacy early grid for %s; entry remains open until T-1", race.raceId)
+        end
+    end
+    -- L254: retire checkpointed courses and restore deterministic oval slots from the earlier oval-off schedule.
+    -- Existing humans remain entered; route changes clear course-specific times so untimed entrants line up last.
+    local w = PaddockStore.world
+    local moved = 0
+    for _, race in pairs(PaddockRaces.byId) do
+        local route = PaddockWorld.route(race.routeId)
+        local badCourse = not route or (not route.oval and route.intermediate and #route.intermediate > 0)
+        local future = race.state == "scheduled" or race.state == "priced"
+        local desiredId = future and Season.routeFor(w.seed, race.seriesId, race.opensAt) or nil
+        local desired = desiredId and PaddockWorld.route(desiredId) or nil
+        local restoreOval = future and not badCourse and not (route and route.oval) and desired and desired.oval
+        if future and (badCourse or restoreOval) then
+            local routeId = desiredId
+            local replacement = routeId and PaddockWorld.route(routeId) or nil
+            if replacement and (replacement.oval or not (replacement.intermediate and #replacement.intermediate > 0)) then
+                local ok = U.transact({
+                    { query = "UPDATE paddock_race SET route_id = ?, detail_json = '{}', base_sec = NULL, base_source = NULL WHERE server_id = ? AND race_id = ? AND state IN ('scheduled','priced')",
+                      values = { routeId, U.sid(), race.raceId } },
+                    { query = "DELETE FROM paddock_quali WHERE server_id = ? AND race_id = ?", values = { U.sid(), race.raceId } },
+                    { query = "UPDATE paddock_entry SET quali_ms = NULL WHERE server_id = ? AND race_id = ?", values = { U.sid(), race.raceId } },
+                })
+                if ok then
+                    race.routeId, race.frozen, race.baseSec, race.baseSource = routeId, nil, nil, nil
+                    moved = moved + 1
+                    pcall(TriggerEvent, "ncm:paddock.routeChanged", race.raceId, routeId)
+                    log("rescheduled %s from %s course %s to %s %s (%.0fm)", race.raceId,
+                        badCourse and "checkpointed" or "valid", tostring(route and route.name or "unknown"),
+                        replacement.oval and "oval" or "point-to-point", routeId, replacement.distanceM or 0)
+                else
+                    log("could not replace broken course for %s", race.raceId)
+                end
+            else
+                log("no valid replacement course for %s; leaving it unpublished", race.raceId)
+            end
+        end
+    end
+    log("loaded %d open races; refreshed %d checkpointed/oval schedule slot(s)", #rows, moved)
 end
 
 --- Write rows for every race in the horizon that does not exist yet.
 function PaddockRaces.materialise(t)
+    -- L254: keep ovals on the calendar; only checkpointed routes are temporarily excluded.
+    NcmCore.get("data.ovals").SCHEDULED = PaddockSettings.get("ovalsScheduled", true)
     local w = PaddockStore.world
     local horizon = PaddockSettings.get("horizonMinutes", 120) * 60
     local st = {}
@@ -56,14 +102,19 @@ function PaddockRaces.materialise(t)
             if made % 6 == 0 then Wait(0) end        -- ~125 races a day (L236): route picks are metered too
             local cup = Season.cupOf(slot.utc)
             local seed = math.random(1, 2147483646)
-            local race = { raceId = id, seriesId = slot.seriesId, tier = slot.tier, seasonId = cup.seasonId,
-                cupId = cup.cupId, routeId = Season.routeFor(w.seed, slot.seriesId, slot.utc), opensAt = slot.utc,
-                state = "scheduled", seed = seed, commit = Hash.commit(seed, id), provenance = "simulated" }
-            PaddockRaces.byId[id] = race
-            st[#st + 1] = { query = [[INSERT IGNORE INTO paddock_race (server_id, race_id, series_id, tier, season_id, cup_id,
-                route_id, window_opens_at, state, seed, seed_commit) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'scheduled', ?, ?)]],
-                values = { U.sid(), id, race.seriesId, race.tier, race.seasonId, race.cupId, race.routeId, race.opensAt,
-                    seed, race.commit } }
+            local routeId = Season.routeFor(w.seed, slot.seriesId, slot.utc)
+            if not routeId then
+                log("no point-to-point route passes the distance filter for %s; slot skipped", id)
+            else
+                local race = { raceId = id, seriesId = slot.seriesId, tier = slot.tier, seasonId = cup.seasonId,
+                    cupId = cup.cupId, routeId = routeId, opensAt = slot.utc,
+                    state = "scheduled", seed = seed, commit = Hash.commit(seed, id), provenance = "simulated" }
+                PaddockRaces.byId[id] = race
+                st[#st + 1] = { query = [[INSERT IGNORE INTO paddock_race (server_id, race_id, series_id, tier, season_id, cup_id,
+                    route_id, window_opens_at, state, seed, seed_commit) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'scheduled', ?, ?)]],
+                    values = { U.sid(), id, race.seriesId, race.tier, race.seasonId, race.cupId, race.routeId, race.opensAt,
+                        seed, race.commit } }
+            end
         end
     end
     if #st > 0 then
@@ -74,7 +125,7 @@ function PaddockRaces.materialise(t)
 end
 
 --- The entrant list as the sim wants it, in GRID order.
-function PaddockRaces.buildField(race)
+function PaddockRaces.buildField(race, humanCount)
     local w = PaddockStore.world
     local field = {}
     local ids = race.frozen and race.frozen.grid or nil
@@ -87,18 +138,29 @@ function PaddockRaces.buildField(race)
             if p then list[#list + 1] = { driver = p, org = w.orgs[race.frozen.orgOf and race.frozen.orgOf[pid] or ""] or w.orgs[p.orgId or ""] } end
         end
     else
-        list = World.field(w, race.seriesId)
+        -- L249: who turned up -- a street league's pool, a sanctioned team's available drivers
+        local absent
+        list, absent = World.raceField(w, race)
+        race.absent = NcmCore.get("paddock.attendance").tally(absent)
+        -- L250: each entered human takes the place of the last NPC who turned up (the field size is attendance's)
+        local keep = NcmCore.get("paddock.mixed").npcPlaces(#list, humanCount or 0)
+        for i = #list, keep + 1, -1 do list[i] = nil end
+        -- a whole league's attendance, then qualifying: give the slice back in between (KB-211)
+        if coroutine.isyieldable() then Wait(0) end
     end
     local n = #list
     for _, e in ipairs(list) do
         local org = e.org or {}
+        -- an independent races their own car (L249)
         field[#field + 1] = { id = e.driver.id, orgId = org.id or (race.frozen and race.frozen.orgOf and race.frozen.orgOf[e.driver.id]),
-            attrs = e.driver.attrs, carPerf = Car.performance(org.car), morale = e.driver.morale,
+            attrs = e.driver.attrs, carPerf = Car.performance(org.car or e.driver.car), morale = e.driver.morale,
             form = Progression.form((e.driver.evidence or {}).recent or {}, n),
             humanManaged = org.humanManagerDriverId ~= nil }
     end
     if not ids then
-        field = Sim.qualify(field, Hash.stream(race.seed, "quali", race.raceId))
+        -- L250 step 2: with times, against the route's base -- shown, and set beside human qualifying times
+        local okS, _, _, base = pcall(PaddockRaces.setup, race)
+        field = Sim.qualify(field, Hash.stream(race.seed, "quali", race.raceId), okS and base or nil)
     end
     -- an oval grids only what its roundabout can hold (L236): the qualifying order decides who starts
     local route = PaddockWorld.route(race.routeId)
@@ -112,12 +174,31 @@ end
 --- Fix the field and grid (pricing time, or run time when Billie is off).
 function PaddockRaces.freeze(race)
     if race.frozen then return race.frozen end
-    local field = PaddockRaces.buildField(race)
-    local grid, orgOf = {}, {}
-    for i, e in ipairs(field) do grid[i] = e.id; orgOf[e.id] = e.orgId end
-    race.frozen = { grid = grid, orgOf = orgOf }
+    local humans = PaddockHumans and PaddockHumans.entered(race) or {}
+    local field = PaddockRaces.buildField(race, #humans)
+    local grid, orgOf, quali = {}, {}, {}
+    local w = PaddockStore.world
+    for i, e in ipairs(field) do
+        grid[i] = e.id; orgOf[e.id] = e.orgId
+        quali[e.id] = e.qualiMs
+        -- they turned up: a street racer is far less likely to make the next one (paddock.attendance RECENT_SEC)
+        local p = w.people[e.id]
+        if p then p.evidence = p.evidence or {}; p.evidence.lastStartAt = race.opensAt; PaddockStore.markPerson(p.id) end
+    end
+    race.frozen = { grid = grid, orgOf = orgOf, absent = race.absent, quali = quali }
+    -- L250: a mixed grid -- everyone by qualifying time, entered-but-unqualified humans at the back
+    if #humans > 0 then
+        local Mixed = NcmCore.get("paddock.mixed")
+        local npcs = {}
+        for i, e in ipairs(field) do npcs[i] = { id = e.id, qualiMs = e.qualiMs } end
+        local order, q = Mixed.gridOrder(npcs, humans)
+        race.frozen.grid, race.frozen.quali, race.frozen.humans = order, q, {}
+        for _, h in ipairs(humans) do race.frozen.humans[h.key] = { driverId = h.driverId, display = h.display } end
+        log("%s: mixed grid -- %d human(s) and %d NPC(s): %s", race.raceId, #humans, #field, table.concat(order, " "))
+    end
     pcall(MySQL.update.await, "UPDATE paddock_race SET detail_json = ? WHERE server_id = ? AND race_id = ?",
         { U.encode({ frozen = race.frozen }), U.sid(), race.raceId })
+    if race.frozen.humans then pcall(PaddockHumans.sendGrid, race) end
     return race.frozen
 end
 
@@ -254,6 +335,11 @@ function PaddockRaces.resolve(race, t)
     -- cars that drove physically in a player's bubble: the result is the model's, with their anchors (bubble.lua)
     if PaddockBubble then pcall(PaddockBubble.writeBack, race) end
     local entrants, simEvents = resultsOf(race)
+    -- L250: a mixed grid's humans, timed by the league, merged with the NPCs by time from the one green
+    if PaddockHumans and PaddockHumans.mixed(race) then
+        local okM, merged = pcall(PaddockHumans.merge, race, entrants)
+        if okM and merged then entrants = merged else log("%s: merge failed: %s", race.raceId, tostring(merged)) end
+    end
     local cond = race.cond or { roadWetness = race.roadWetness, light = race.light, weather = race.weather }
     local n = #entrants
     -- contacts from the sim's own events
@@ -275,6 +361,10 @@ function PaddockRaces.resolve(race, t)
             org.cash = (org.cash or 0) + res.purse
             PaddockStore.markOrg(org.id)
             if org.humanManagerDriverId then PaddockManager.book(org, "purse", res.purse, "purse:" .. race.raceId .. ":" .. res.id, race.raceId) end
+        elseif not org and p and (res.purse or 0) > 0 then
+            -- L249: an independent races for themselves -- the purse is theirs (person.cash), spent in the markets
+            p.cash = (tonumber(p.cash) or 0) + res.purse
+            PaddockStore.markPerson(p.id)
         end
     end
     -- the story
@@ -294,7 +384,7 @@ function PaddockRaces.resolve(race, t)
             night = cond.light == "night" and "after dark" or nil,
             fromGrid = (first.grid or 1) >= 4 and first.grid or nil,
             closeFinish = (second and second.gapMs and second.gapMs < 150) and "By a whisker" or nil,
-            oneTwo = (second and second.orgId == first.orgId and second.state == "finished") and "one-two" or nil,
+            oneTwo = (second and first.orgId and second.orgId == first.orgId and second.state == "finished") and "one-two" or nil,
             raceId = race.raceId,
         }
         local ents = { { "person", first.id }, { "org", first.orgId }, { "race", race.raceId } }
@@ -356,6 +446,18 @@ function PaddockRaces.resolve(race, t)
         end
     end
     PaddockStory.record(events)
+    -- the district's climate hears of it (L240): a street race grows the scene, crashes raise the heat
+    if PaddockDays then
+        local district = PaddockDays.raceDistrict(race)
+        if district then
+            PaddockDays.fact(district, race.tier == "street" and "street_race" or "sanctioned_race", 1)
+            local crashes = 0
+            for _, res in ipairs(entrants) do
+                if res.state == "dnf" and (res.dnfReason == "crash" or res.dnfReason == "contact") then crashes = crashes + 1 end
+            end
+            if crashes > 0 then PaddockDays.fact(district, "race_crash", crashes) end
+        end
+    end
     PaddockBillie.settle(race, byId)
     race.state = "resolved"
     pcall(MySQL.update.await, "UPDATE paddock_race SET state = 'resolved', resolved_at = ? WHERE server_id = ? AND race_id = ?",
@@ -366,12 +468,68 @@ end
 
 --- One scheduler pass over the races in memory. Bounded work per call: at most one run and one resolve, so a
 --- backlog after downtime drains across ticks instead of inside one metered handler.
+--- L249: the next Paddock events, for the Race Guide (ncm_league reads GlobalState.ncmPaddockGuide; it cannot call
+--- this VM). Bounded (16 rows), rebuilt at most every 10 s, and written only when something changed.
+local guideAt, guideSig = 0, nil
+local guideEventAt, guideEventSig = 0, nil
+function PaddockRaces.publishGuide(t)
+    if t - guideAt < 10 then return end
+    guideAt = t
+    local list = {}
+    for _, race in pairs(PaddockRaces.byId) do
+        if (race.state == "scheduled" or race.state == "priced" or race.state == "running") and race.opensAt >= t - 1800
+            and race.opensAt <= t + 3 * 3600 then
+            local route = PaddockWorld.route(race.routeId)
+            if route and (route.oval or not (route.intermediate and #route.intermediate > 0)) then
+                list[#list + 1] = race
+            end
+        end
+    end
+    table.sort(list, function(a, b) if a.opensAt ~= b.opensAt then return a.opensAt < b.opensAt end return a.raceId < b.raceId end)
+    local spec = NcmCore.get("paddock.season").TIERS
+    local out, sig = {}, {}
+    for i = 1, math.min(40, #list) do
+        local race = list[i]
+        local route = PaddockWorld.route(race.routeId)
+        local s = spec[race.tier] or {}
+        local field = race.frozen and #race.frozen.grid or math.floor((s.orgs or 12) / (s.divisions or 1)) * (s.carsPerOrg or 1)
+        local function pt(n) return n and { x = math.floor(n.x), y = math.floor(n.y), z = math.floor(n.z or 0), name = n.name } or nil end
+        out[#out + 1] = { raceId = race.raceId, seriesId = race.seriesId, seriesName = PaddockWorld.seriesName(race.seriesId),
+            tier = race.tier, routeId = race.routeId, routeName = PaddockWorld.routeName(race.routeId),
+            distanceM = route and math.floor(route.distanceM or 0) or nil, venue = route and pt(route.start), finish = route and pt(route.finish),
+            startsAt = race.opensAt, state = race.state, field = field, oval = route and route.oval and true or nil,
+            laps = route and route.oval and route.oval.laps or nil,
+            -- the qualifying sheet once the grid is frozen (L250 step 2): { name, quali seconds } in grid order
+            quali = race.frozen and NcmCore.get("paddock.projection").qualiSheet(race.frozen, function(id)
+                local p = PaddockStore.world.people[id]; return p and p.display or "?" end) or nil }
+        if race.frozen and race.frozen.humans then
+            local nh = 0
+            for _ in pairs(race.frozen.humans) do nh = nh + 1 end
+            out[#out].humans = nh
+        end
+            sig[#sig + 1] = race.raceId .. race.state .. field .. tostring(race.routeId)
+    end
+    local key = table.concat(sig, ",")
+    if key ~= guideSig then
+        guideSig = key
+        GlobalState.ncmPaddockGuide = out
+    end
+    -- L250: and as a server event, which is proven between resources (GlobalState read across resources is not):
+    -- on every change, and once a minute so a restarted ncm_league has it within a minute
+    if key ~= guideEventSig or t - guideEventAt >= 60 then
+        guideEventSig, guideEventAt = key, t
+        TriggerEvent("ncm:paddock.guide", out)
+    end
+end
+
 function PaddockRaces.tick(t)
+    pcall(PaddockRaces.publishGuide, t)
     local runNext, resolveNext, priceNext
     for _, race in pairs(PaddockRaces.byId) do
         -- a declared live race holds its close until the street run has a verdict (live.lua); Billie settles after
         if race.state == "running" and race.closesAt and t >= race.closesAt and not (PaddockLive and PaddockLive.holds(race.raceId))
-            and not (PaddockBubble and PaddockBubble.holds(race, t)) then
+            and not (PaddockBubble and PaddockBubble.holds(race, t))
+            and not (PaddockHumans and PaddockHumans.holds(race, t)) then
             if not resolveNext or race.closesAt < resolveNext.closesAt then resolveNext = race end
         elseif (race.state == "scheduled" or race.state == "priced") and t >= race.opensAt then
             if not runNext or race.opensAt < runNext.opensAt then runNext = race end

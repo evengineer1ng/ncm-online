@@ -139,19 +139,30 @@ if ($WhatIf) {
 }
 
 # --- 6. Swap, keeping the old tree ---------------------------------------------------------
+# Both trees carry the resources\ncm junction, and Move-Item must never see it: when PowerShell 5.1
+# cannot rename a directory (a scanner or indexer holding a freshly extracted file), it falls back to
+# copy-then-delete, which FOLLOWS the junction -- it copied the whole NCM source into the new tree as
+# real files and deleted the originals (2026-09-30, L239). So: unlink both junctions first, swap with
+# Directory.Move (a plain rename that throws instead of falling back), then recreate the junction.
+foreach ($tree in @($active, $cand)) {
+    $link = Join-Path $tree 'resources\ncm'
+    $li = Get-Item -LiteralPath $link -Force -ErrorAction SilentlyContinue
+    if ($li -and $li.LinkType -in @('Junction', 'SymbolicLink')) { cmd /c rmdir "$link" 2>$null | Out-Null }
+    if (Test-Path -LiteralPath $link) { throw "resources\ncm in $tree is not a junction; refusing to swap (inspect it by hand)" }
+}
 New-Item -ItemType Directory -Force -Path (Split-Path -Parent $backup) | Out-Null
 & $log "swapping (previous tree -> $backup)"
-Move-Item -LiteralPath $active -Destination $backup
-Move-Item -LiteralPath $cand   -Destination $active
-
-# The backup still carries a junction into the live NCM source. Leaving it there arms the exact trap
-# this script guards against: a later `rm -r` of an old backup could follow it into ncm\online\resources.
-# Unlink it -- the backup is a copy of the PLATFORM tree, and NCM code lives in git now anyway.
-$staleJunction = Join-Path $backup 'resources\ncm'
-if (Test-Path -LiteralPath $staleJunction) {
-    cmd /c rmdir "$staleJunction" 2>$null | Out-Null
-    & $log "unlinked the NCM junction inside the backup (so deleting it can never reach the source)"
+[System.IO.Directory]::Move($active, $backup)
+try {
+    [System.IO.Directory]::Move($cand, $active)
+} catch {
+    [System.IO.Directory]::Move($backup, $active)
+    cmd /c mklink /J "$(Join-Path $active 'resources\ncm')" "$target" | Out-Null
+    throw "swap failed ($($_.Exception.Message)); previous tree restored. Close whatever holds $cand and re-run."
 }
+$junction = Join-Path $active 'resources\ncm'
+cmd /c mklink /J "$junction" "$target" | Out-Null
+& $log "junction resources\ncm -> ncm\online\resources recreated; the backup carries none"
 
 & $log "DONE. Active version: $ExpectedVersion"
 & $log "Previous tree kept at: $backup"

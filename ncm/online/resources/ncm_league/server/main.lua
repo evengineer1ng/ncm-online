@@ -75,6 +75,7 @@ AddEventHandler("onResourceStart", function(name)
             end
             NcmCalendar.start(NcmPackStreet.series)
             NcmRace.start()
+            if NcmPaddockLink and NcmPaddockLink.start then NcmPaddockLink.start() end
             if NcmEconomy and NcmEconomy.recover then
                 local ok, why = pcall(NcmEconomy.recover)
                 if not ok then log("economy recovery failed: %s", tostring(why)) end

@@ -1,0 +1,204 @@
+# Generated from ncm/core/data/vehicle_pool.lua; isolated NCM Pace RaceDrive tune.
+# Keep one coherent AIVehicleRacingCommand on the authored continuous oval spline.
+Driving.NCM_Paddock_Race_Driving_inline1:
+  $base: Driving.Race_Driving_inline1
+  useSpeedLimit: false
+
+Driving.NCM_Paddock_Race_Driving_inline2:
+  $base: Driving.Race_Driving_inline2
+  forwardAccelFactor: 3.0
+  turningAccelFactor: 3.0
+
+Driving.NCM_Paddock_VisionParamsRace:
+  $base: Driving.VisionParamsRace
+  useSpeedLimit: false
+
+Driving.NCM_Paddock_Race_Driving:
+  $base: Driving.Race_Driving
+  inline1: Driving.NCM_Paddock_Race_Driving_inline1
+  inline2: Driving.NCM_Paddock_Race_Driving_inline2
+  vision: Driving.NCM_Paddock_VisionParamsRace
+Vehicle.ncm_racer_v_sport1_herrera_outlaw:
+  $base: Vehicle.v_sport1_herrera_outlaw
+  drivingParamsRace: Driving.NCM_Paddock_Race_Driving
+
+Vehicle.ncm_racer_v_sport1_herrera_riptide:
+  $base: Vehicle.v_sport1_herrera_riptide
+  drivingParamsRace: Driving.NCM_Paddock_Race_Driving
+
+Vehicle.ncm_racer_v_sport1_quadra_sport_r7:
+  $base: Vehicle.v_sport1_quadra_sport_r7
+  drivingParamsRace: Driving.NCM_Paddock_Race_Driving
+
+Vehicle.ncm_racer_v_sport1_quadra_turbo:
+  $base: Vehicle.v_sport1_quadra_turbo
+  drivingParamsRace: Driving.NCM_Paddock_Race_Driving
+
+Vehicle.ncm_racer_v_sport1_rayfield_aerondight:
+  $base: Vehicle.v_sport1_rayfield_aerondight
+  drivingParamsRace: Driving.NCM_Paddock_Race_Driving
+
+Vehicle.ncm_racer_v_sport1_rayfield_caliburn:
+  $base: Vehicle.v_sport1_rayfield_caliburn
+  drivingParamsRace: Driving.NCM_Paddock_Race_Driving
+
+Vehicle.ncm_racer_v_sport1_rb15_f1:
+  $base: Vehicle.v_sport1_rb15_f1
+  drivingParamsRace: Driving.NCM_Paddock_Race_Driving
+
+Vehicle.ncm_racer_v_sport1_rb15_f1_:
+  $base: Vehicle.v_sport1_rb15_f1_
+  drivingParamsRace: Driving.NCM_Paddock_Race_Driving
+
+Vehicle.ncm_racer_v_sport1_yaiba_semimaru:
+  $base: Vehicle.v_sport1_yaiba_semimaru
+  drivingParamsRace: Driving.NCM_Paddock_Race_Driving
+
+Vehicle.ncm_racer_v_sport2_mizutani_shion:
+  $base: Vehicle.v_sport2_mizutani_shion
+  drivingParamsRace: Driving.NCM_Paddock_Race_Driving
+
+Vehicle.ncm_racer_v_sport2_mizutani_shion_nomad:
+  $base: Vehicle.v_sport2_mizutani_shion_nomad
+  drivingParamsRace: Driving.NCM_Paddock_Race_Driving
+
+Vehicle.ncm_racer_v_sport2_mizutani_shion_targa:
+  $base: Vehicle.v_sport2_mizutani_shion_targa
+  drivingParamsRace: Driving.NCM_Paddock_Race_Driving
+
+Vehicle.ncm_racer_v_sport2_porsche_911turbo:
+  $base: Vehicle.v_sport2_porsche_911turbo
+  drivingParamsRace: Driving.NCM_Paddock_Race_Driving
+
+Vehicle.ncm_racer_v_sport2_porsche_911turbo_cabrio:
+  $base: Vehicle.v_sport2_porsche_911turbo_cabrio
+  drivingParamsRace: Driving.NCM_Paddock_Race_Driving
+
+Vehicle.ncm_racer_v_sport2_quadra_type66:
+  $base: Vehicle.v_sport2_quadra_type66
+  drivingParamsRace: Driving.NCM_Paddock_Race_Driving
+
+Vehicle.ncm_racer_v_sport2_quadra_type66_avenger:
+  $base: Vehicle.v_sport2_quadra_type66_avenger
+  drivingParamsRace: Driving.NCM_Paddock_Race_Driving
+
+Vehicle.ncm_racer_v_sport2_quadra_type66_nomad:
+  $base: Vehicle.v_sport2_quadra_type66_nomad
+  drivingParamsRace: Driving.NCM_Paddock_Race_Driving
+
+Vehicle.ncm_racer_v_sport2_villefort_alvarado:
+  $base: Vehicle.v_sport2_villefort_alvarado
+  drivingParamsRace: Driving.NCM_Paddock_Race_Driving
+
+Vehicle.ncm_racer_v_sport2_villefort_deleon:
+  $base: Vehicle.v_sport2_villefort_deleon
+  drivingParamsRace: Driving.NCM_Paddock_Race_Driving
+
+Vehicle.ncm_racer_v_sport2_villefort_deleon_sport:
+  $base: Vehicle.v_sport2_villefort_deleon_sport
+  drivingParamsRace: Driving.NCM_Paddock_Race_Driving
+
+Vehicle.ncm_racer_v_sportbike1_yaiba_kusanagi:
+  $base: Vehicle.v_sportbike1_yaiba_kusanagi
+  drivingParamsRace: Driving.NCM_Paddock_Race_Driving
+
+Vehicle.ncm_racer_v_sportbike1_yaiba_kusanagi_animal:
+  $base: Vehicle.v_sportbike1_yaiba_kusanagi_animal
+  drivingParamsRace: Driving.NCM_Paddock_Race_Driving
+
+Vehicle.ncm_racer_v_sportbike1_yaiba_kusanagi_tyger:
+  $base: Vehicle.v_sportbike1_yaiba_kusanagi_tyger
+  drivingParamsRace: Driving.NCM_Paddock_Race_Driving
+
+Vehicle.ncm_racer_v_sportbike1_yaiba_muramasa:
+  $base: Vehicle.v_sportbike1_yaiba_muramasa
+  drivingParamsRace: Driving.NCM_Paddock_Race_Driving
+
+Vehicle.ncm_racer_v_sportbike2_arch:
+  $base: Vehicle.v_sportbike2_arch
+  drivingParamsRace: Driving.NCM_Paddock_Race_Driving
+
+Vehicle.ncm_racer_v_sportbike3_brennan_apollo:
+  $base: Vehicle.v_sportbike3_brennan_apollo
+  drivingParamsRace: Driving.NCM_Paddock_Race_Driving
+
+Vehicle.ncm_racer_v_sportbike3_brennan_apollo_nomad:
+  $base: Vehicle.v_sportbike3_brennan_apollo_nomad
+  drivingParamsRace: Driving.NCM_Paddock_Race_Driving
+
+Vehicle.ncm_racer_v_sportbike3_brennan_apollo_sport:
+  $base: Vehicle.v_sportbike3_brennan_apollo_sport
+  drivingParamsRace: Driving.NCM_Paddock_Race_Driving
+
+Vehicle.ncm_racer_v_standard2_archer_bandit:
+  $base: Vehicle.v_standard2_archer_bandit
+  drivingParamsRace: Driving.NCM_Paddock_Race_Driving
+
+Vehicle.ncm_racer_v_standard2_archer_hella:
+  $base: Vehicle.v_standard2_archer_hella
+  drivingParamsRace: Driving.NCM_Paddock_Race_Driving
+
+Vehicle.ncm_racer_v_standard2_archer_quartz:
+  $base: Vehicle.v_standard2_archer_quartz
+  drivingParamsRace: Driving.NCM_Paddock_Race_Driving
+
+Vehicle.ncm_racer_v_standard2_chevalier_thrax:
+  $base: Vehicle.v_standard2_chevalier_thrax
+  drivingParamsRace: Driving.NCM_Paddock_Race_Driving
+
+Vehicle.ncm_racer_v_standard2_makigai_maimai:
+  $base: Vehicle.v_standard2_makigai_maimai
+  drivingParamsRace: Driving.NCM_Paddock_Race_Driving
+
+Vehicle.ncm_racer_v_standard2_mizutani_hozuki:
+  $base: Vehicle.v_standard2_mizutani_hozuki
+  drivingParamsRace: Driving.NCM_Paddock_Race_Driving
+
+Vehicle.ncm_racer_v_standard2_thorton_colby:
+  $base: Vehicle.v_standard2_thorton_colby
+  drivingParamsRace: Driving.NCM_Paddock_Race_Driving
+
+Vehicle.ncm_racer_v_standard2_thorton_galena:
+  $base: Vehicle.v_standard2_thorton_galena
+  drivingParamsRace: Driving.NCM_Paddock_Race_Driving
+
+Vehicle.ncm_racer_v_standard2_villefort_cortes:
+  $base: Vehicle.v_standard2_villefort_cortes
+  drivingParamsRace: Driving.NCM_Paddock_Race_Driving
+
+Vehicle.ncm_racer_v_standard25_mahir_supron:
+  $base: Vehicle.v_standard25_mahir_supron
+  drivingParamsRace: Driving.NCM_Paddock_Race_Driving
+
+Vehicle.ncm_racer_v_standard25_thorton_colby_pickup:
+  $base: Vehicle.v_standard25_thorton_colby_pickup
+  drivingParamsRace: Driving.NCM_Paddock_Race_Driving
+
+Vehicle.ncm_racer_v_standard25_thorton_merrimac:
+  $base: Vehicle.v_standard25_thorton_merrimac
+  drivingParamsRace: Driving.NCM_Paddock_Race_Driving
+
+Vehicle.ncm_racer_v_standard25_villefort_columbus:
+  $base: Vehicle.v_standard25_villefort_columbus
+  drivingParamsRace: Driving.NCM_Paddock_Race_Driving
+
+Vehicle.ncm_racer_v_standard3_chevalier_emperor:
+  $base: Vehicle.v_standard3_chevalier_emperor
+  drivingParamsRace: Driving.NCM_Paddock_Race_Driving
+
+Vehicle.ncm_racer_v_standard3_makigai_tanishi:
+  $base: Vehicle.v_standard3_makigai_tanishi
+  drivingParamsRace: Driving.NCM_Paddock_Race_Driving
+
+Vehicle.ncm_racer_v_standard3_militech_hellhound:
+  $base: Vehicle.v_standard3_militech_hellhound
+  drivingParamsRace: Driving.NCM_Paddock_Race_Driving
+
+Vehicle.ncm_racer_v_standard3_thorton_mackinaw:
+  $base: Vehicle.v_standard3_thorton_mackinaw
+  drivingParamsRace: Driving.NCM_Paddock_Race_Driving
+
+Vehicle.ncm_racer_v_utility4_chevalier_legatus:
+  $base: Vehicle.v_utility4_chevalier_legatus
+  drivingParamsRace: Driving.NCM_Paddock_Race_Driving
+

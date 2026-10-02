@@ -1,0 +1,69 @@
+﻿
+C:\Program Files (x86)\Steam\steamapps\common\Cyberpunk 2077\bin\x64\Cyberpunk2077.exe:	file format coff-x86-64
+
+Disassembly of section .text:
+
+000000014021b43c <ffxFsr2GetUpscaleRatioFromQualityMode>:
+1402e5ec0: 48 89 5c 24 08              	movq	%rbx, 0x8(%rsp)
+1402e5ec5: 57                          	pushq	%rdi
+1402e5ec6: 48 83 ec 30                 	subq	$0x30, %rsp
+1402e5eca: 48 8b d9                    	movq	%rcx, %rbx
+1402e5ecd: 48 8b fa                    	movq	%rdx, %rdi
+1402e5ed0: 48 8b 0a                    	movq	(%rdx), %rcx
+1402e5ed3: 48 85 c9                    	testq	%rcx, %rcx
+1402e5ed6: 0f 84 9f 00 00 00           	je	0x1402e5f7b <ffxFsr2GetUpscaleRatioFromQualityMode+0xcab3f>
+1402e5edc: 48 8b 41 30                 	movq	0x30(%rcx), %rax
+1402e5ee0: 48 85 c0                    	testq	%rax, %rax
+1402e5ee3: 0f 84 83 11 b7 01           	je	0x141e5706c <ctlWaitForPropertyChange+0xd081c>
+1402e5ee9: 48 8b 0d 80 c1 14 03        	movq	0x314c180(%rip), %rcx   # 0x143432070 <?m_pStreamMgr@IAkStreamMgr@AK@@1PEAV12@EA+0x917a8>
+1402e5ef0: 48 3b c8                    	cmpq	%rax, %rcx
+1402e5ef3: 74 0e                       	je	0x1402e5f03 <ffxFsr2GetUpscaleRatioFromQualityMode+0xcaac7>
+1402e5ef5: 48 8b 50 10                 	movq	0x10(%rax), %rdx
+1402e5ef9: 48 85 d2                    	testq	%rdx, %rdx
+1402e5efc: 74 7d                       	je	0x1402e5f7b <ffxFsr2GetUpscaleRatioFromQualityMode+0xcab3f>
+1402e5efe: 48 3b ca                    	cmpq	%rdx, %rcx
+1402e5f01: 75 61                       	jne	0x1402e5f64 <ffxFsr2GetUpscaleRatioFromQualityMode+0xcab28>
+1402e5f03: 48 8b 47 08                 	movq	0x8(%rdi), %rax
+1402e5f07: 48 8b 0f                    	movq	(%rdi), %rcx
+1402e5f0a: 48 89 4c 24 20              	movq	%rcx, 0x20(%rsp)
+1402e5f0f: 48 89 44 24 28              	movq	%rax, 0x28(%rsp)
+1402e5f14: 48 85 c0                    	testq	%rax, %rax
+1402e5f17: 74 0d                       	je	0x1402e5f26 <ffxFsr2GetUpscaleRatioFromQualityMode+0xcaaea>
+1402e5f19: f0                          	lock
+1402e5f1a: ff 00                       	incl	(%rax)
+1402e5f1c: 48 8b 44 24 28              	movq	0x28(%rsp), %rax
+1402e5f21: 48 8b 4c 24 20              	movq	0x20(%rsp), %rcx
+1402e5f26: 48 83 23 00                 	andq	$0x0, (%rbx)
+1402e5f2a: 48 8d 54 24 20              	leaq	0x20(%rsp), %rdx
+1402e5f2f: 48 83 63 08 00              	andq	$0x0, 0x8(%rbx)
+1402e5f34: 48 3b d3                    	cmpq	%rbx, %rdx
+1402e5f37: 74 13                       	je	0x1402e5f4c <ffxFsr2GetUpscaleRatioFromQualityMode+0xcab10>
+1402e5f39: 48 83 64 24 28 00           	andq	$0x0, 0x28(%rsp)
+1402e5f3f: 48 83 64 24 20 00           	andq	$0x0, 0x20(%rsp)
+1402e5f45: 48 89 43 08                 	movq	%rax, 0x8(%rbx)
+1402e5f49: 48 89 0b                    	movq	%rcx, (%rbx)
+1402e5f4c: 48 8d 4c 24 20              	leaq	0x20(%rsp), %rcx
+1402e5f51: e8 82 f0 e1 ff              	callq	0x140104fd8 <.text+0x103fd8>
+1402e5f56: 48 8b c3                    	movq	%rbx, %rax
+1402e5f59: 48 8b 5c 24 40              	movq	0x40(%rsp), %rbx
+1402e5f5e: 48 83 c4 30                 	addq	$0x30, %rsp
+1402e5f62: 5f                          	popq	%rdi
+1402e5f63: c3                          	retq
+1402e5f64: 48 8b 42 10                 	movq	0x10(%rdx), %rax
+1402e5f68: 48 85 c0                    	testq	%rax, %rax
+1402e5f6b: 74 0e                       	je	0x1402e5f7b <ffxFsr2GetUpscaleRatioFromQualityMode+0xcab3f>
+1402e5f6d: 48 3b c8                    	cmpq	%rax, %rcx
+1402e5f70: 74 91                       	je	0x1402e5f03 <ffxFsr2GetUpscaleRatioFromQualityMode+0xcaac7>
+1402e5f72: 48 8b 50 10                 	movq	0x10(%rax), %rdx
+1402e5f76: 48 85 d2                    	testq	%rdx, %rdx
+1402e5f79: 75 0b                       	jne	0x1402e5f86 <ffxFsr2GetUpscaleRatioFromQualityMode+0xcab4a>
+1402e5f7b: 48 83 23 00                 	andq	$0x0, (%rbx)
+1402e5f7f: 48 83 63 08 00              	andq	$0x0, 0x8(%rbx)
+1402e5f84: eb d0                       	jmp	0x1402e5f56 <ffxFsr2GetUpscaleRatioFromQualityMode+0xcab1a>
+1402e5f86: 48 3b ca                    	cmpq	%rdx, %rcx
+1402e5f89: 0f 84 74 ff ff ff           	je	0x1402e5f03 <ffxFsr2GetUpscaleRatioFromQualityMode+0xcaac7>
+1402e5f8f: 48 8b 42 10                 	movq	0x10(%rdx), %rax
+1402e5f93: 48 85 c0                    	testq	%rax, %rax
+1402e5f96: 74 e3                       	je	0x1402e5f7b <ffxFsr2GetUpscaleRatioFromQualityMode+0xcab3f>
+1402e5f98: 48 3b c8                    	cmpq	%rax, %rcx
+1402e5f9b: 0f 84 62 ff ff ff           	je	0x1402e5f03 <ffxFsr2GetUpscaleRatioFromQualityMode+0xcaac7>

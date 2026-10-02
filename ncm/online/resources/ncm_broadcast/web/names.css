@@ -1,0 +1,78 @@
+/* NCM race car names (KB-223): a plate over each Paddock car -- position chip, name, team. Deliberately not a player
+   card: no banner, no avatar, an amber chip, so a spectator can tell a Paddock driver from a player at a glance. */
+:root {
+  color-scheme: dark;
+  font-family: "Rajdhani", "Bahnschrift Condensed", Arial, sans-serif;
+  --amber: #ffb833;
+}
+
+* { box-sizing: border-box; }
+
+html,
+body,
+#names {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: transparent;
+  pointer-events: none;
+  user-select: none;
+}
+
+.plate {
+  position: absolute;
+  display: none;
+  align-items: stretch;
+  height: 46px;
+  min-width: 180px;
+  max-width: 320px;
+  transform: translate(-50%, -100%) scale(var(--plate-scale, 1));
+  transform-origin: 50% 100%;
+  opacity: var(--plate-opacity, 1);
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.85));
+}
+
+.plate.on { display: flex; }
+
+.plate__chip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 46px;
+  padding: 0 8px;
+  background: rgba(6, 6, 10, 0.86);
+  border-left: 4px solid var(--accent, var(--amber));
+  color: var(--accent, var(--amber));
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.plate__copy {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 0;
+  padding: 0 12px 0 8px;
+  background: rgba(6, 6, 10, 0.62);
+}
+
+.plate__name {
+  overflow: hidden;
+  color: #eef2f7;
+  font-size: 19px;
+  font-weight: 600;
+  line-height: 1.05;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.plate__team {
+  overflow: hidden;
+  color: #9ea8b6;
+  font-size: 13px;
+  line-height: 1.1;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}

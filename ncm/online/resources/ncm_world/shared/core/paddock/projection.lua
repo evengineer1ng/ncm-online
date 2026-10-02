@@ -57,10 +57,21 @@ Core.define("paddock.projection", function(C)
             winner = winnerName, winnerOrg = winnerOrg, commit = r.commit }
     end
 
-    function M.boxRow(res, driverName, orgName)
+    function M.boxRow(res, driverName, orgName, qualiMs)
         return { pos = res.position, grid = res.grid, driver = driverName, driverId = res.personId, org = orgName,
             time = res.state == "finished" and secs(res.finishMs) or nil, gap = M.gapText(res.gapMs),
-            state = res.state, note = res.dnfReason, points = res.points }
+            state = res.state, note = res.dnfReason, points = res.points, quali = secs(qualiMs) }
+    end
+
+    --- The qualifying sheet of a frozen grid (L250 step 2): grid order, each with their time in seconds (nil = no time).
+    function M.qualiSheet(frozen, nameOf)
+        local out = {}
+        if type(frozen) ~= "table" or type(frozen.grid) ~= "table" then return out end
+        local q = frozen.quali or {}
+        for i, id in ipairs(frozen.grid) do
+            out[i] = { grid = i, id = id, name = nameOf and nameOf(id) or id, quali = secs(tonumber(q[id])) }
+        end
+        return out
     end
 
     function M.directoryRow(kind, circuit, id, name, tier, role, org, tags)

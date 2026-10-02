@@ -22,23 +22,29 @@ NcmCore.define("vocabulary.chunks", function()
     -- `measure(row)` returns that row's encoded size. A row larger than the budget on its own cannot be split
     -- here -- it is returned as its own part AND reported in the second return value, so the caller can say so
     -- in the log instead of putting an oversized packet on a wire that drops it without a word.
-    function M.partitionBytes(list, budget, measure)
+    --- `reserve` (optional) is what the caller wraps around each part on the wire -- the `{"id":..,"index":..,
+    --- "items":}` envelope -- so the budget bounds the PACKET, not just its rows. The part's own brackets and the
+    --- comma between rows are counted here. Measuring rows alone let a full packet leave at budget + envelope:
+    --- the Race Guide's 6,145-byte packet 3 against a 6,144 budget (KB-228).
+    function M.partitionBytes(list, budget, measure, reserve)
         list = type(list) == "table" and list or {}
         budget = math.max(1, math.floor(tonumber(budget) or 1))
+        local capacity = math.max(1, budget - math.max(0, math.floor(tonumber(reserve) or 0)))
         local parts, oversized = {}, {}
-        local part, used = {}, 0
+        local part, used = {}, 2                             -- "[]"
         for i = 1, #list do
             -- An unmeasurable row is assumed to fill the budget: pessimism is the safe direction here, and
             -- callers signal "cannot encode this" with a non-positive size rather than a number we would trust.
             local measured = tonumber(measure and measure(list[i])) or -1
-            local bytes = measured > 0 and math.floor(measured) or budget
-            if bytes > budget then oversized[#oversized + 1] = { index = i, bytes = bytes } end
-            if #part > 0 and used + bytes > budget then
+            local bytes = measured > 0 and math.floor(measured) or capacity
+            if bytes + 2 > capacity then oversized[#oversized + 1] = { index = i, bytes = bytes } end
+            local comma = #part > 0 and 1 or 0
+            if #part > 0 and used + comma + bytes > capacity then
                 parts[#parts + 1] = part
-                part, used = {}, 0
+                part, used, comma = {}, 2, 0
             end
             part[#part + 1] = list[i]
-            used = used + bytes
+            used = used + comma + bytes
         end
         if #part > 0 then parts[#parts + 1] = part end
         return parts, oversized

@@ -36,7 +36,7 @@ corpus claiming migrations 001-007 while the schema was at 023.
 |---|---|---|
 | Organisations, team ownership, governance, grid slots | [14_TEAM_ORGANIZATIONS.md](14_TEAM_ORGANIZATIONS.md) | L92, L93; reaffirmed L123 |
 | Foundational primitives, contradictions, build sequencing | [24_FOUNDATION_RECONCILIATION.md](24_FOUNDATION_RECONCILIATION.md) | L123 |
-| NPC motorsport world: organizations, calendar, sim, WIRE, Billie's board, manager mode, garages, live races | [44_THE_PADDOCK.md](44_THE_PADDOCK.md) | L222, L224, L225, L226, L227 |
+| NPC motorsport world: organizations, calendar, sim, WIRE, Billie's board, manager mode, garages, live races | [44_THE_PADDOCK.md](44_THE_PADDOCK.md); [DECISION_RECORD.md](DECISION_RECORD.md) L248 for the oval spline candidate and its live gate | L222, L224-L227, L248 |
 | Environments, promotion discipline (Online vs Development) | [16_ENVIRONMENTS.md](16_ENVIRONMENTS.md) | L112, L121, L223 (Online frozen at Baseline 1) |
 | **Database schema** | CODE: `ncm/online/resources/ncm_league/server/schema/` | - |
 | Lap ghost replay | [39_GHOST_REPLAY.md](39_GHOST_REPLAY.md) | L166 |
@@ -61,7 +61,7 @@ corpus claiming migrations 001-007 while the schema was at 023.
 | Observation vocabulary and observation provenance | [DECISION_RECORD.md](DECISION_RECORD.md#l164---executed-owner-ruling---the-first-observation-vocabulary-is-accepted-the-estimator-is-not) plus [31_CAPABILITY_AUDIT.md](31_CAPABILITY_AUDIT.md) §9 | L164; §9 accepted as authority, rest of 31 stays PROPOSAL; MASTER_TEST §BH pending |
 | Ambient population and race-corridor clearing | [DECISION_RECORD.md](DECISION_RECORD.md#l177--provisional--ambient-population-is-built-in-two-layers-and-only-one-of-them-can-be-cleared-by-radius) plus CODE: `ncm/core/world/ambient.lua`, `ncm_world/server/ambient.lua` | L177 - PROVISIONAL, no live PASS; §BL owed. Supersedes the `BLOCKED` traffic row in [../research/open77/OPEN77_NCM_MATRIX.md](../research/open77/OPEN77_NCM_MATRIX.md) (`KB-164`) |
 | Estimation, envelopes and confidence | **NOBODY - explicitly unbuilt** | L164 refuses it pending its own reviewed proposal (`IDEA-337`, `IDEA-338`) |
-| Long-term PvE experience and personal/shared boundary | `DECISION_RECORD.md` L218-L223; [PvE simulation-stack vision](../research/open77/NCM_PVE_WORLD_VISION_AND_SIM_REVIEW.md) is PROPOSAL for architecture | Owner direction: individual adventures over shared Paddock/city sim; simulation-led stack performed by Night City through OPEN//77 and NCM's own native mods (L220); named physical NPC text dialogue with four primary intents and deeper choices. No Paddock runtime or physical dialogue system built. |
+| Long-term PvE experience and personal/shared boundary | `DECISION_RECORD.md` L218-L224, L237; [PvE simulation-stack vision](../research/open77/NCM_PVE_WORLD_VISION_AND_SIM_REVIEW.md) is PROPOSAL for architecture | Owner direction: individual adventures over shared Paddock/city sim; simulation-led stack performed by Night City through OPEN//77 and NCM's own native mods (L220); named physical NPC text dialogue with four primary intents and deeper choices. The Paddock is built on dev (doc 44); L237 rules emergent over authored and sets the life-sim build order M1-M6. No life-sim or physical dialogue system built yet. |
 
 ---
 
@@ -141,6 +141,7 @@ remains a SPEC artifact; current runtime behavior is the code and current econom
 - [38_FOUNDRY_VEHICLE_LINEAGE_ARCHITECTURE.md](38_FOUNDRY_VEHICLE_LINEAGE_ARCHITECTURE.md) - vehicle lineage and procedural Vehicle R&D architecture review - **PROPOSAL, do not implement from it**. The owner invariants are `L153`; `L155` governs the narrower Machine-keyed Parts boundary.
 - [42_PARTS_BEHAVIOR_AND_WEAR_EXPANSION.md](42_PARTS_BEHAVIOR_AND_WEAR_EXPANSION.md) - design-only Parts behaviour, tyre-compound, stress-aware Wear, warning-light and service architecture exploration; **PROPOSAL, no implementation authorised** (`IDEA-627`-`IDEA-634`, `KB-163`)
 - [NCM_PVE_WORLD_VISION_AND_SIM_REVIEW.md](../research/open77/NCM_PVE_WORLD_VISION_AND_SIM_REVIEW.md) - long-term PvE vision: five-layer simulation stack over Night City, three capability tiers incl. NCM native mods, and the five-engine review; owner direction is L218-L223, architecture and source-port map remain proposals (`IDEA-722`-`IDEA-734`)
+- [PACE_ROAD_PATH_PROBE.md](../research/open77/PACE_ROAD_PATH_PROBE.md) - **CURRENT** 2026-09-30 verified native traffic graph and dev road-speed candidate; race PASS pending (`KB-239`, `IDEA-783`-`IDEA-784`)
 - [CARRIER_NEXT_STEPS_AND_UPGRADE.md](CARRIER_NEXT_STEPS_AND_UPGRADE.md) - **the canonical Carrier build/publish/verify/rollback runbook**. Every in-place Carrier replacement follows it; do not hand-copy the DLL and do not accept a warm reconnect as proof.
 
 ## Ledgers - living records (6)
@@ -160,7 +161,9 @@ remains a SPEC artifact; current runtime behavior is the code and current econom
 - [05_DATA_MODEL.md](archive/05_DATA_MODEL.md) - superseded by **ncm/online/resources/ncm_league/server/schema/ - the CODE is the authority**
 - [wp/BATCH-1-CATCHUP.md](archive/wp/BATCH-1-CATCHUP.md) - superseded by **NOW.md - self-declared superseded 2026-09-21**
 
-## Historical - archived, evidence not architecture (22)
+## Historical - archived, evidence not architecture (23)
+
+- [SERVER_BASELINE_2026-10-02.md](archive/SERVER_BASELINE_2026-10-02.md) - read-only platform, required-mod, and NCM resource inventory of both running servers before the next platform update
 
 - [23_OPEN_QUESTIONS.md](archive/23_OPEN_QUESTIONS.md) - the Q1-Q70 question set, answered 2026-09-24 (L123)
 - [HANDOFF_2026-09-25.md](archive/HANDOFF_2026-09-25.md) - the cold-start handoff written 2026-09-24

@@ -554,9 +554,25 @@ int main()
         CHECK(back);
         CHECK(!s.apply(R"({"cmd":"car.remove","raceId":"bub","entity":"42"})", t0 + 1500ms));   // the old entity is gone
         CHECK(s.apply(R"({"cmd":"car.remove","raceId":"bub","entity":"77"})", t0 + 1500ms));
-        State o;                                                             // an oval's dynamic plan still needs none
-        CHECK(o.apply(R"({"cmd":"drive.start","raceId":"ring","dynamic":true,"goInMs":0,
-          "points":[{"x":0,"y":0},{"x":100,"y":0}],"gates":[{"x":0,"y":0,"dx":1,"dy":0},{"x":100,"y":0,"dx":1,"dy":0}],"cars":[]})", t0));
+    }
+    {   // 0.8.2: one closed spline holds through repeated oval marks and the lap seam.
+        State s;
+        CHECK(s.apply(R"({"cmd":"drive.start","raceId":"oval","dynamic":true,"goInMs":0,
+          "loopSpline":"$/mod/ncm_pace/#leg_oval_test__loop","advanceM":1,
+          "points":[{"x":0,"y":0},{"x":100,"y":0},{"x":100,"y":100},{"x":0,"y":100},
+                    {"x":0,"y":0},{"x":100,"y":0},{"x":100,"y":100},{"x":0,"y":100},{"x":0,"y":0}],
+          "gates":[{"x":0,"y":0,"dx":1,"dy":0},{"x":0,"y":0,"dx":1,"dy":0}],"cars":[]})", t0));
+        CHECK(s.apply(R"({"cmd":"car.add","raceId":"oval","entity":"42","vehicleId":7,"from":1,"speed":30})", t0));
+        auto f = split(s.step(0, 0, 0, 0, t0 + 1000ms));
+        CHECK(f[1] == "3" && s.spline(0) == ncm::pace::nodeRefHash("$/mod/ncm_pace/#leg_oval_test__loop"));
+        const std::string seq = f[0];
+        auto at = t0 + 1000ms;
+        for (const auto& p : std::vector<std::pair<double,double>>{{100,0},{100,100},{0,100},{0,0},
+                                                                   {100,0},{100,100},{0,100},{0,0}}) {
+            at += 100ms;
+            f = split(s.step(0, p.first, p.second, 0, at));
+            CHECK(f[0] == seq && f[1] == "3");
+        }
     }
 
     if (failures == 0) std::printf("pace state: all checks passed\n");

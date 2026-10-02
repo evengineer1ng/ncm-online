@@ -1295,10 +1295,10 @@ function scenarios.ambient()
     end
     assertf(#onTheLine > 0, "the fixture put something in the corridor's path")
 
-    -- 300 m to the side: past `ambientSightM` (220) so a despawn is unobserved, but well inside
-    -- `ambientRetireM` (420) so the ONLY rule that can remove these is the corridor. Standing further off
+    -- 260 m to the side: past `ambientSightM` (220) so a despawn is unobserved, but inside
+    -- `ambientRetireM` (300) so the ONLY rule that can remove these is the corridor. Standing further off
     -- would let the reclaim rule clear them and the assertion would prove nothing.
-    moveTo(1, { x = mid.x, y = mid.y + 300 })
+    moveTo(1, { x = mid.x, y = mid.y + 260 })
     run(30)
 
     local left = 0

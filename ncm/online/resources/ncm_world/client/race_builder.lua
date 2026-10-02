@@ -171,6 +171,10 @@ local function rowsModel()
     local f, rows = S.form, {}
     local function add(r) rows[#rows + 1] = r end
 
+    -- L249: a time trial is on demand here (alone, against the clock); a race is announced to everyone
+    if #(S.mode or {}) > 0 then
+        add { key = "mode", kind = "enum", target = "mode", label = "Type", value = labelFor(S.mode, f.mode or "race") or "Race" }
+    end
     add { key = "start", kind = "node", target = "start", label = "Start", value = nameOf(f.start) }
 
     for i, id in ipairs(f.checkpoints) do
@@ -200,7 +204,7 @@ local function rowsModel()
     add { key = "when", kind = "enum", target = "when", label = "Green flag",
           value = labelFor(S.when, f.minutes) or (("In %s min"):format(tostring(f.minutes))) }
 
-    add { key = "post", kind = "post", label = "", value = "POST THE RACE" }
+    add { key = "post", kind = "post", label = "", value = (f.mode == "time_trial") and "START THE TIME TRIAL" or "POST THE RACE" }
     add { key = "scrap", kind = "scrap", label = "", value = "Scrap" }
     return rows
 end
@@ -320,6 +324,7 @@ local function open(wire)
         nodes = nodes, byId = byId, startOpts = startOpts,
         class = type(wire.class) == "table" and wire.class or {},
         when = type(wire.when) == "table" and wire.when or {},
+        mode = type(wire.mode) == "table" and wire.mode or {},
         maxCheckpoints = tonumber(wire.maxCheckpoints) or Builder.MAX_CHECKPOINTS,
         minDistanceM = tonumber(wire.minDistanceM) or Builder.MIN_DISTANCE_M,
         hasPosition = wire.hasPosition == true,
@@ -440,6 +445,10 @@ local function nudgeEnum(row, delta)
         if #S.class == 0 then return end
         local cur = indexOf(S.class, S.form.classId) or 1
         S.form.classId = S.class[(((cur - 1 + delta) % #S.class) + 1)].id
+    elseif row.target == "mode" then
+        if #(S.mode or {}) == 0 then return end
+        local cur = indexOf(S.mode, S.form.mode or "race") or 1
+        S.form.mode = S.mode[(((cur - 1 + delta) % #S.mode) + 1)].id
     elseif row.target == "when" then
         if #S.when == 0 then return end
         local cur = indexOf(S.when, S.form.minutes) or 1
@@ -472,6 +481,7 @@ local function submit()
         classId = S.form.classId,
         minutes = S.form.minutes,
         laps = S.form.laps,
+        mode = S.form.mode or "race",
     })
 end
 

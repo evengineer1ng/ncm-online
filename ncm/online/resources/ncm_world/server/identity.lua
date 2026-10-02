@@ -36,7 +36,11 @@ local settings = Open77.tunables.declare({
     ambientSpawnPerTick = { value = 3, type = "integer", min = 0, max = 20, apply = "live" },
     ambientSpawnMinM = { value = 110, type = "integer", min = 40, max = 500, unit = "m", apply = "live" },
     ambientSpawnMaxM = { value = 240, type = "integer", min = 60, max = 600, unit = "m", apply = "live" },
-    ambientRetireM = { value = 420, type = "integer", min = 120, max = 2000, unit = "m", apply = "live" },
+    ambientRetireM = { value = 300, type = "integer", min = 120, max = 2000, unit = "m", apply = "live" },
+    -- KB-238: an ambient car's driver is seated once a client has held the car this long; 0 = as soon as a client has
+    -- it (3000 clears the engine's spawn physics cycle if crashes persist)
+    ambientSeatDelayMs = { value = 0, type = "integer", min = 0, max = 15000, unit = "ms", apply = "live" },
+    ambientSeatTimeoutMs = { value = 120000, type = "integer", min = 5000, max = 600000, unit = "ms", apply = "live" },
     -- The distance past which a despawn is assumed unobserved. Larger than the 180 m default NPC
     -- streaming radius on purpose: beyond it no client has the entity at all.
     ambientSightM = { value = 220, type = "integer", min = 100, max = 800, unit = "m", apply = "live" },

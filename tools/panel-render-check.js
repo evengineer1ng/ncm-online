@@ -436,7 +436,32 @@ fire("panel:trade", { state:"idle",balance:12500,rows:[
   {kind:"peer",playerId:22,driverId:"driver-b",display:"Mara",busy:false},
   {kind:"peer",playerId:33,driverId:"driver-c",display:"Vex",busy:true}
 ]});
+// L249 step 5: the idle Exchange opens on THE BOARD -- posted wants and offers from players and the Paddock's NPCs
+fire("panel:exchange.board", { view:"exchange", signedIn:true, balance:12500, families:["power_unit","tires"], tiers:["street","sport","premium"], rows:[
+  {t:"post",id:"post-a",kind:"offer",by:"Kabuki Midnight Racing",who:"team",item:"Thorton PWR-ST",family:"power_unit",tier:"street",cash:1100,revision:3,expiresAt:4102444800,bids:0},
+  {t:"post",id:"post-b",kind:"want",by:"You",who:"driver",family:"tires",tier:"sport",cash:1600,revision:1,expiresAt:4102444800,bids:1,mine:true,
+    offers:[{id:"bid-1",by:"Rina Kovac",cash:1500,item:"Makigai TIR-SP"}]},
+  {t:"part",id:"asset-1",item:"Makigai TIR-ST",family:"tires",tier:"street",list:600}
+]});
 let xt=tradeText();
+check("the idle Exchange opens on the posted board", /THE BOARD · 2 OPEN/.test(xt) && /FOR SALE/.test(xt) && /WANTED/.test(xt) && /Kabuki Midnight Racing/.test(xt), xt.slice(0, 400));
+check("the board offers to post a stored part and to ask for one", /POST FOR SALE/.test(xt) && /POST WANTED/.test(xt) && /Makigai TIR-ST/.test(xt), xt.slice(0, 600));
+const rowA=document.getElementById("tradeBody").querySelectorAll("button").find(c=>/Thorton PWR-ST/.test(dump(c).join(" ")));
+if(rowA)rowA.click();
+xt=tradeText();
+const bidBtn=document.getElementById("tradeBody").querySelectorAll("button").find(c=>dump(c).join(" ").trim()==="BID");
+emitted.length=0; if(bidBtn)bidBtn.click();
+check("bidding on an NPC's offer sends the post, its revision and the cash",
+  emitted.some(e=>e.name==="panel:paddock.exchange"&&e.data.action==="bid"&&e.data.args.postId==="post-a"&&e.data.args.revision===3&&e.data.args.cash===1100),
+  emitted.map(e=>e.name+":"+JSON.stringify(e.data||{})).join(","));
+const rowB=document.getElementById("tradeBody").querySelectorAll("button").find(c=>/WANTED/.test(dump(c).join(" "))&&/tires/.test(dump(c).join(" ")));
+if(rowB)rowB.click();
+xt=tradeText();
+check("your own post lists its bids with an accept control", /Rina Kovac/.test(xt) && /HOLD TO ACCEPT/.test(xt) && /WITHDRAW POST/.test(xt), xt.slice(0, 600));
+// the live two-Driver trade is one switch away
+const direct=document.getElementById("tradeBody").querySelectorAll("button").find(c=>/DIRECT TRADE/.test(dump(c).join(" ")));
+if(direct)direct.click();
+xt=tradeText();
 check("Exchange idle state lists online Drivers", /Mara/.test(xt) && /Vex/.test(xt),xt);
 check("a Driver already exchanging cannot be invited", document.getElementById("tradeBody").children.some(c=>/Vex/.test(dump(c).join(" "))&&c.disabled===true),xt);
 const mara=document.getElementById("tradeBody").children.find(c=>/Mara/.test(dump(c).join(" ")));

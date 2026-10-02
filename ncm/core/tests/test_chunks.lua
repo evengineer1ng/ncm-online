@@ -47,6 +47,25 @@ return {
     local packets=C.partitionBytes(rows,1000,function() return -1 end)
     T.eq(#packets,2)
   end,
+  -- KB-228. Rows were packed to the budget and then wrapped in { id, index, items }: a full packet left at
+  -- budget + envelope (the Race Guide's 6,145 bytes against 6,144). The budget bounds the whole wire packet.
+  the_whole_wire_packet_stays_inside_the_budget=function(T)
+    local C=T.Core.get("vocabulary.chunks");local J=T.Core.get("vocabulary.json")
+    local function bytes(v) return #J.encode(v) end
+    for _,size in ipairs({60,180,333,700,1400}) do
+      local rows={} for i=1,90 do rows[i]={ id="event-"..i, text=string.rep("x", size + (i*37)%50) } end
+      local id="1790791180:12:3"
+      local reserve=bytes({ id=id, index=#rows, items={} }) - 2
+      local packets=C.partitionBytes(rows,6*1024,bytes,reserve)
+      local total=0
+      for i,items in ipairs(packets) do
+        local wire=bytes({ id=id, index=i, items=items })
+        T.truthy(wire<=6*1024,("packet %d of %d-byte rows is %d bytes on the wire"):format(i,size,wire))
+        total=total+#items
+      end
+      T.eq(total,#rows,"every row still arrives")
+    end
+  end,
   missing_duplicate_and_foreign_parts_do_not_complete=function(T)
     local C=T.Core.get("vocabulary.chunks");local rx=C.receiver(2)
     T.falsy(C.accept(rx,3,{{}}));T.truthy(C.accept(rx,1,{{id=1}}));T.falsy(C.accept(rx,1,{{id=9}}))

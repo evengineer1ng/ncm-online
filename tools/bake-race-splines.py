@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Bake NCM Pace's race splines: one engine race spline per race leg, loaded by ArchiveXL (L246, IDEA-788).
+"""Bake NCM Pace's race splines: street legs and closed oval loops, loaded by ArchiveXL (L246, IDEA-790).
 
 The engine's racer (`AIVehicleRacingCommand`) drives a world spline (`splineRef: NodeRef`) -- the same thing vanilla
 street races drive (sq024's `worldRaceSplineNode`). Every Paddock race is a chain of authored nodes, so one spline per
@@ -8,6 +8,8 @@ those lines into `worldRaceSplineNode`s in open-world (Exterior level 6) sectors
 registration, then packs an archive with WolvenKit.
 
 Each spline's ref is  $/mod/ncm_pace/#leg_<fromNodeId>__<toNodeId>  (Pace hashes the same string at runtime).
+Oval input lines from tools/bake-oval-splines.py use from=oval_<id>, to=loop, looped=true. Combine those three
+lines with the street leg JSONL before baking the archive.
 
 Usage:
   python tools/bake-race-splines.py --legs legs.jsonl --template quest_sector.json [--out dist/ncm_pace_race_splines]
@@ -107,7 +109,7 @@ def main():
             handle += 1
             d["splineData"]["HandleId"] = str(handle)
             sp = d["splineData"]["Data"]
-            sp["looped"], sp["hasDirection"], sp["reversed"] = 0, 1, 0
+            sp["looped"], sp["hasDirection"], sp["reversed"] = int(leg.get("looped", False)), 1, 0
             sp["points"] = [{"$type": "SplinePoint", "automaticTangents": 1, "continuousTangents": 1, "id": 0,
                              "position": vec3(round(x - ox, 3), round(y - oy, 3), round(z - oz, 3)),
                              "rotation": {"$type": "Quaternion", "i": 0, "j": 0, "k": 0, "r": 1},
@@ -168,7 +170,7 @@ def main():
     shutil.rmtree(src)
     subprocess.run([WKIT, "pack", pack_root, "-o", a.out], check=True)
     with open(os.path.join(a.out, "ncm_pace_race_splines.archive.xl"), "w", encoding="utf-8", newline="\n") as f:
-        f.write("# NCM Pace race splines (L246, IDEA-788): one engine race spline per race leg, open-world (Exterior level 6).\n")
+        f.write("# NCM Pace race splines (L246, IDEA-790): street legs and closed oval loops, Exterior level 6.\n")
         f.write("streaming:\n  blocks:\n    - " + DEPOT + "\\race_splines.streamingblock\n")
     print("archive + .xl in", a.out)
 

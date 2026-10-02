@@ -55,7 +55,7 @@ Core.define("world.ambient", function(C)
         -- Placement.
         spawnMinM          = 110,   -- never closer to ANY player than this: nothing pops in where it is watched
         spawnMaxM          = 240,   -- and never further from the player it is being spawned for
-        retireM            = 420,   -- beyond every player by this much, reclaim the budget
+        retireM            = 300,   -- beyond every player by this much, reclaim the budget (L247: the bubble's edge)
         siteTries          = 6,     -- candidate bearings tried per spawn before giving up this tick
 
         -- Visibility. `sightM` is the distance at which we stop assuming a despawn is unobserved. It is
@@ -309,8 +309,12 @@ Core.define("world.ambient", function(C)
         --   * `watched == nil` does NOT block it, unlike in the corridor rule. A host whose projection
         --     read keeps failing would otherwise never reclaim anything and the budget would leak until
         --     no ambient life could be spawned at all -- and the entity is past `retireM` regardless.
+        --   * a CAR goes past `retireM` watched or not (L247, KB-238). Its driver is a seated NPC, and a car with a
+        --     seated driver that a client drops and re-creates at the edge of its streaming is what crashed the game
+        --     (2026-10-01 00:43, an ambient car). Paddock's bubble hands its cars back at the same distance; nothing
+        --     with a driver in it is kept alive out at the streaming edge. A ped keeps the promise.
         for _, j in ipairs(judged) do
-            if not removing[j.e.key] and j.d > s.retireM and j.e.watched ~= true then
+            if not removing[j.e.key] and j.d > s.retireM and (j.e.watched ~= true or j.e.kind == "vehicle") then
                 removing[j.e.key] = true
                 out.despawn[#out.despawn + 1] = { key = j.e.key, kind = j.e.kind, reason = "unattended" }
             end

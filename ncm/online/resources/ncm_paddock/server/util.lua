@@ -12,6 +12,18 @@ function PaddockUtil.logger(tag)
 end
 
 function PaddockUtil.now() return math.floor(Open77.time.unix()) end
+
+--- An NPC's canonical position, or nil. `Open77.npcs.get` returns a FLAT snapshot -- `x`, `y`, `z`, `bucket`,
+--- `health` -- as the platform's own freeroam bots read it (KB-234). Reading `snapshot.position` returned nil
+--- live, so Talk refused every body and the Scanner could never match one, while the harness's fake NPCs (which
+--- had `.position`) passed.
+function PaddockUtil.npcPos(npcId)
+    local ok, n = pcall(Open77.npcs.get, npcId)
+    if not ok or type(n) ~= "table" then return nil end
+    local x, y, z = tonumber(n.x), tonumber(n.y), tonumber(n.z)
+    if x and y then return { x = x, y = y, z = z or 0, bucket = tonumber(n.bucket) } end
+    return nil
+end
 function PaddockUtil.sid() return PaddockSettings.get("serverId", "ncm-dev") end
 
 local hostRng = function() return math.random() end

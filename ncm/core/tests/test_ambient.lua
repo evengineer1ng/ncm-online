@@ -84,9 +84,9 @@ end
 cases.an_unwatched_entity_in_the_corridor_is_despawned = function(T)
     local r = M.plan({
         now = 100,
-        -- 300 m away: past sightM, but well inside retireM, so this isolates the corridor rule from
+        -- 260 m away: past sightM, but inside retireM, so this isolates the corridor rule from
         -- the unattended one rather than letting both fire on the same entity.
-        players = { P(1, 200, 300) },
+        players = { P(1, 200, 260) },
         entities = { E("a", "vehicle", 200, 0, false) },
         corridors = { corridor() },
         settings = { spawnPerTick = 0 },
@@ -179,6 +179,18 @@ cases.reclaim_still_stops_for_a_client_that_is_rendering_it = function(T)
         settings = { spawnPerTick = 0 },
     })
     T.eq(#r.despawn, 0)
+end
+
+cases.a_car_past_retireM_goes_even_while_a_client_streams_it = function(T)
+    -- L247 (KB-238): a car's driver is a seated NPC, and a client dropping and re-creating it at the edge of its
+    -- streaming is what crashed the game. Past retireM it goes, watched or not -- the bubble's own rule.
+    local r = M.plan({
+        now = 100,
+        players = { P(1, 0, 0) },
+        entities = { E("far", "vehicle", 400, 0, true), E("near", "vehicle", 250, 0, true) },
+        settings = { spawnPerTick = 0 },
+    })
+    T.eq(#r.despawn, 1); T.eq(r.despawn[1].key, "far"); T.eq(r.despawn[1].reason, "unattended")
 end
 
 cases.reclaim_proceeds_when_the_projection_read_is_unavailable = function(T)

@@ -28,7 +28,7 @@ Core.define("paddock.calibration", function(C)
         if route and route.oval then return (tonumber(distanceM) or 2400) / (v * M.OVAL_SPEED_FACTOR) * character end
         return M.roadM(distanceM) / v * character
     end
-    M.OVAL_SPEED_FACTOR = 0.55
+    M.OVAL_SPEED_FACTOR = 1.20
 
     --- The road distance a route's crow-flies (or summed-leg) distance stands for (L236). A route's `distanceM` is
     --- planar; the road between two city nodes is longer, and relatively longer the shorter the hop (Troll Pass is

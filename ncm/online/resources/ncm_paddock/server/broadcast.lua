@@ -35,8 +35,15 @@ local function liveRows(race)
     local v = PaddockViews.live(nil, { raceId = race.raceId })
     if not v or v.raceId ~= race.raceId then return nil end
     local e = v.elapsed or 0
+    -- an oval counts the leader's laps (L236)
+    local route = PaddockWorld.route(race.routeId)
+    local laps = route and route.oval and route.oval.laps
+    local lap = ""
+    if laps and v.rows and v.rows[1] then
+        lap = (" · LAP %d/%d"):format(math.max(1, math.min(laps, tonumber(v.rows[1].lap) or 1)), laps)
+    end
     return { raceId = race.raceId, title = ("%s · %s"):format(v.series or "", v.route or ""),
-        sub = ("%s · %d:%02d"):format(v.street and "STREET RUN" or "LIVE", math.floor(e / 60), e % 60), rows = v.rows }
+        sub = ("%s%s · %d:%02d"):format(v.street and "STREET RUN" or "LIVE", lap, math.floor(e / 60), e % 60), rows = v.rows }
 end
 
 function PaddockBroadcast.tick()

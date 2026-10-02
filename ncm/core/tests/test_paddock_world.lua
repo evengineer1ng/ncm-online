@@ -57,7 +57,9 @@ return {
             if p.role == "driver" and p.state == "free_agent" then fa = fa + 1 end
             if p.role == "owner" then owners = owners + 1 end
         end
-        T.eq(drivers, 378, "contracted drivers"); T.eq(fa, 120, "free agents"); T.eq(owners, 170)
+        -- L249: street leagues are pools of 56 (24 team drivers + 32 independents each); sanctioned rosters 4/4/5
+        T.eq(drivers, 392 + 192 + 120 + 40, "active drivers"); T.eq(fa, 120, "free agents"); T.eq(owners, 170)
+        for _, sid in ipairs({ "street_a", "street_d", "street_g" }) do T.eq(#W.leaguePool(w, sid), 56, sid .. " pool") end
         T.eq(#W.field(w, "street_a"), 12); T.eq(#W.field(w, "premier"), 16); T.eq(#W.field(w, "regional_b"), 12); T.eq(#W.field(w, "pro_c"), 10)
         local seriesCount = 0
         for _ in pairs(w.series) do seriesCount = seriesCount + 1 end
@@ -111,13 +113,13 @@ return {
         T.eq(young.aggression, nil, "traits never grow on their own")
     end,
 
-    daily_rhythm_is_125_races_including_dst_days = function(T)
+    daily_rhythm_is_214_races_including_dst_days = function(T)   -- L249: wider windows (was 125)
         local Season = T.Core.get("paddock.season")
         local Clock = T.Core.get("world.clock")
         for _, date in ipairs({ { 2026, 9, 29 }, { 2026, 3, 8 }, { 2026, 11, 1 }, { 2027, 1, 12 } }) do
             local day = Clock.daysFromCivil(date[1], date[2], date[3])
             local races = Season.dayRhythm(day)
-            T.eq(#races, 125, "125 races on " .. table.concat(date, "-"))
+            T.eq(#races, 214, "214 races on " .. table.concat(date, "-"))
             local ids = {}
             for _, r in ipairs(races) do
                 local id = Season.raceId(r.seriesId, r.utc)
@@ -125,16 +127,21 @@ return {
             end
         end
         local day = Clock.daysFromCivil(2026, 9, 29)
-        local street, premier = 0, nil
-        for _, r in ipairs(Season.dayRhythm(day)) do
+        local street, premier, last, gap = 0, nil, nil, 0
+        local races = Season.dayRhythm(day)
+        table.sort(races, function(a, b) return a.utc < b.utc end)
+        for _, r in ipairs(races) do
             local h = Clock.eastern(r.utc).hour
+            if last then gap = math.max(gap, r.utc - last) end
+            last = r.utc
             if r.tier == "street" then
                 street = street + 1
-                T.ok(h >= 20 or h < 4, "street races at night, got " .. h)
+                T.ok(h >= 18 or h < 6, "street races at night, got " .. h)
             elseif r.tier == "premier" then premier = h
-            else T.ok(h >= 10 and h < 20, "sanctioned by day, got " .. h) end
+            else T.ok(h >= 6, "sanctioned from 06:00 to midnight, got " .. h) end
         end
-        T.eq(street, 80); T.eq(premier, 15)
+        T.eq(street, 120); T.eq(premier, 15)
+        T.ok(gap <= 15 * 60, "never more than 15 minutes without a race (" .. gap .. " s)")
     end,
 
     window_covers_days_without_duplicates = function(T)
@@ -142,7 +149,7 @@ return {
         local Clock = T.Core.get("world.clock")
         local from = Clock.utcAt(Clock.daysFromCivil(2026, 9, 29), 0)
         local list = Season.window(from, from + 3 * 86400)
-        T.eq(#list, 375, "three Eastern days, 125 each")
+        T.eq(#list, 642, "three Eastern days, 214 each")
         local seen = {}
         for _, r in ipairs(list) do
             local id = Season.raceId(r.seriesId, r.utc)

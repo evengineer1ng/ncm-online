@@ -4569,3 +4569,411 @@ The owner saw bright sun at 21:30 Eastern. The server alone cannot fix it: OPEN/
   - the free-agent sort (a rating inside the comparator, KB-214's shape).
   - The garage a player stands in now fills first, since spawns per pass are capped.
 - **Dev `ncm_paddock` serverId (KB-221):** it had been "ncm-dev" while ncm_league/ncm_world are "ncm-devbox". Dev's `tunables.json` now overrides it. The next dev boot finds no world under ncm-devbox and runs genesis v2: that is the regeneration. The old "ncm-dev" Paddock rows stay in the dev database, orphaned.
+
+## L237 - OWNER RULINGS / PVE LIFE SIM - emergent over authored; the life-sim build order M1-M6
+
+**Owner (2026-09-30):** "its time to build out from paddock and into life sim pve layer of cyberpunk, whats the plan for the vision? concrete please not abstract." A concrete plan was proposed (seven milestones, four questions). The owner answered:
+1. **NPC days:** "systems need to be as emergent as possible not authored."
+2. **The player's own home:** "home could be in the cards if we can figure out property ownership for players later but not necessarily right now."
+3. **First incident family, jobs or turf:** "both."
+4. **Cast depth (proposed: trim the 18 quest-graph contacts to about 12 with deep memory):** "not trimmed."
+
+**Meaning.**
+- **Emergent over authored.** This amends the wording of L218, L219 and L222 wherever it said "authored choices", "authored situation families" or "owner-authored lines". What gets authored moves from *situations* to *rules and vocabulary*:
+  - **Authored:** needs and their decay, utility curves, place kinds, verbs (deliver, claim, race, ask, press), templates whose every slot must resolve from facts (the `paddock.news` / `paddock.talk` truth rule), and each person's voice.
+  - **Not authored:** which situation happens, to whom, where or when. Incidents arise when sim state lines up: a team is short of a part before its race, a crew's route record falls, a principal's patience runs out.
+  - The four primary intents (L219) stay as doorways. The deeper choices behind them are generated from evidence, relationship and need state, and the server validates them before any text is rendered.
+  - L183's gate stands as a *voice* gate: a contact still speaks only once their voice is authored. What they talk about is emergent.
+- **Autonomous NPC days.** Paddock people get needs (first set: Money, Rest, Social, Drive) that pick their next block of the day by utility over real places, on the real clock (L231). There are no fixed timetables. Garage shifts (doc 44 §11) and races stay commitments inside that choice.
+- **Player property: deferred, not refused.** No player home, rent or upkeep in M1-M6. Property ownership is recorded as a future idea, pending a design for player-owned property.
+- **Jobs and turf land together** as one milestone (M4), both generated from sim state.
+- **Full cast.** All 18 quest-graph contacts are people with deep memory. Every Paddock person (about 1,300) has needs, a day and a lighter memory. Vanilla crowds remain atmosphere only.
+
+**Build order (dev only, L223):**
+- **M1, people have days:**
+  - `world.places`, a registry of every point of interest, extended from `tools/paddock-garages-port.py` over `references/world-pois` (derived facts only);
+  - `life.needs` and `life.schedule`;
+  - bodies at any place (not only garages), under the existing radius and cap.
+- **M2, native dialogue (IDEA-727):**
+  - a new `ncm-dialogue` required package (redscript) drives CDPR's choice UI from server-supplied choices, with a WebUI fallback;
+  - `life.conversation` replaces `paddock.talk`'s one-line notification.
+- **M3, minds and the player's story:**
+  - `life.mind`, ported from `prototypes/oracle_racing/racing_world.py`, with the Python kept as a parity oracle (L221.5);
+  - `life.tape`, the per-player adventure tape;
+  - knowledge paths: witness, public result, named intermediary, WIRE.
+- **M4, jobs and turf from sim state:**
+  - `life.jobs`: runs from real Paddock needs, confirmed physically by the server;
+  - `life.turf`: crews holding district route records from `course.generator`, each record with a holder, cause and expiry;
+  - wires `player.leads` (IDEA-625).
+- **M5, NPCs act on each other:** agendas over `paddock.principal`, `contracts` and `finance`, published to WIRE.
+- **M6, trajectory:** an earned handle and access gates derived from the player's evidence, with no visible archetype meter.
+
+**Boundary.** Direction and order only; nothing is built. Each milestone runs on the dev server under the quota canary. MASTER_TEST remains the 1.0 bar (L227). New ideas are `IDEA-764`-`IDEA-771`.
+
+## L238 - OWNER REQUEST + BUILT (DEV) / CALENDAR - about 10 races an hour for any car; the Bedrock Championship
+
+**Owner (2026-09-30):** "increase the number of player facing championships that are accessible 1. from base market vehicles (bedrock championship) 2. generally? cadence i want is more like races are quite frequent and i miss them as a result of having too many to get to as opposed to 'guess ill sit here for 15 minutes until it comes up'." Then: "aim for like 10 per hour", and for Bedrock: "not all pure base set ... base set plus others etc".
+
+**Built** (`ncm_league/server/packs/street.lua`, dev only; Online frozen, L223):
+- **Bedrock Championship** (new, street): every 20 min. Admits Muscle/Sport/Tech/Nomad at prestige ≤ 2: the Base Market's MaiMai, Galena and Hella plus 11 other entry-level cars. Generated routes 0.9-3.5 km.
+- **Night City Open** (new, street): every 20 min. Admits every street car class except bikes and Formula (36 cars). Economy scale 2.
+- **Cadences:**
+
+  | Series | Before | After |
+  |---|---|---|
+  | City Cup | 20 min | 20 min |
+  | MaiMai Cup | 30 min | 30 min |
+  | Night City GT | 60 min | 20 min |
+  | Hypercar | 180 min | 20 min |
+  | Street Drag | 30 min | 30 min |
+
+  Offsets were re-staggered so the series a car can enter interleave.
+- **Measured per car** over three hours with `competition.calendar` and `competition.eligibility`:
+
+  | Car | Races an hour | Longest wait | Before |
+  |---|---|---|---|
+  | MaiMai | 13 | 7 min | 7 an hour |
+  | Galena, Hella | 11 | 7 min | 5 an hour |
+  | GT-class Shion | 8 | 10 min | |
+  | Caliburn (hypercar) | 8 | 10 min | |
+  | Mackinaw (Nomad) | 8 | 13 min | |
+
+  The whole calendar goes from about 8 to 19 starts an hour.
+- **Duty cycle (KB-165):**
+  - Ambient-traffic corridors hold only for events with entrants (`world.ambient.isHeldClear`), so more slots do not clear more road.
+  - Start rings stay under `RING_MAX` 16: about 7 in any 20-minute lead.
+
+**Watch:** Hypercar pays at economy scale 100. After a day's first full-rate completion, its repeat floor is 5,000 a race, and there are now three races an hour instead of one every three hours. Retune if the money moves too fast.
+
+**Deployed to dev 2026-09-30 07:37 ET** after fixing `KB-224` (the first calendar tick exceeded the instruction quota with seven series). 38 events posted; all seven series are live. Not yet proven with a live race (MASTER_TEST remains the 1.0 bar, L227).
+
+## L239 - OWNER RULING / OPS - platform-only thaw of L223: both servers upgraded to OPEN//77 2.31.21+op77.120
+
+**Owner (2026-09-30):** "we need to update both dev server and online, platform devs said so." Then, after the empty-server check: "nobody has joined, run it". This is a bounded exception to `L223`: **the platform binaries only**. NCM code, required mods and data on Online remain Baseline 1, and the freeze otherwise stands.
+
+**Done (2026-09-30):**
+- **Dev** 17:44 UTC via `tools/o77-upgrade.ps1`: 725 files verified, load-list guard OK (44 resources), every NCM subsystem booted. Backup `tools/open77/backups/server-20260930T174455Z`.
+- **Online** 17:51 UTC via `tools/staging/upgrade-open77.sh` (run as `ubuntu`, not sudo): 724 files verified, freeroam sandbox closed, load-list guard OK (42 resources), access guard writable, `access.json` byte-identical to the backup (whitelist state unchanged: disabled, 2 identities). Every NCM subsystem booted, scheduler started with 5 series, no errors. Required-mods digest unchanged (`879af328...`). Backup `/opt/ncm/backups/server-20260930T175137Z`. Deployed with `upgrade-open77.sh`, never `deploy-staging.ps1`, so the working tree did not ride along.
+- **Found:** `upgrade-open77.sh` reached the box with CRLF line endings from the Windows checkout; it was normalised with `sed` on the box before running. Strip CR before any future upload.
+
+**New in the platform:** an optional resource `open77_prediction` (operator switches and telemetry for presentation-only prediction, including `carContact`). Nothing depends on it; neither server loads it, so clients keep their compiled defaults (all families on, 250 ms ceiling). Schema adds `handheldDischarges`, `handheldVehicleDamage` and `maximumAiVehiclesPerSimulator`, all with defaults. Whether to load `open77_prediction` and turn `carContact` off for racing is OPEN.
+
+**Incidents in the same session:** the dev swap moved the NCM source out of the repo (`KB-226`, recovered with nothing lost; `o77-upgrade.ps1` fixed). Joining Online failed on the dev-only Broadcast/Pace scripts in the game folder (`KB-227`, not caused by the upgrade; workaround applied).
+
+## L240 - OWNER DIRECTION + BUILT (DEV) / PVE LIFE SIM - M1 people have days; district climate; the player's hidden trajectory
+
+**Owner (2026-09-30):** "time for a true, deep pve build. we know the shape and methodology, look into our previous planning and the python engines (mine ... gpl except ftb2 ribbon os which is apache) and lets grow the life sim pve layer." Then: "oracle kingdom in particular seems relevant socially, like how the kingdom can be authoritarian and in crisis or something or authoritarian and thriving or xyz and in crisis and etc. we want deterministic noisy inputs that mould and shape a players final bucket. plus other ideas from there." And: the newer ForkUniverse is traced from `D:/dev/oracle-radio/forku.loom`.
+
+**Sources read (the owner's own engines; licensing confirmed by the owner):** Oracle Kingdom (`EraClassifier`, `ERA_DETECTION_RULES`/`ERA_MODIFIERS`, `MaterialState`, `StateCoherenceEngine`, crisis residues) and Oracle Court (`OracleIdentityProfile`: signals, evidence floor, THE_SILENT / THE_ERRATIC, dominant axis) in `prototypes/oracle_racing/`; Neikos (`PlayerTrajectory`, `compute_personal_quadrant`, `compute_outcome_band`, climate archetypes x region offsets); ForkUniverse, the NEWER copy at `oracle-radio/plugins/organs/forkuniverse` (namespaced seeded streams, batch == step, `compute_absence`, participant-named pressure threads) and `oradio_engine/evidence.py` (prediction -> resolution -> calibration). The ribbon-os tree on disk is a Godot device shell, not a sim. No Python runs beside the game (L221.5): mechanisms were reimplemented as pure `ncm/core` Lua.
+
+**Built (dev only, L223; commit follows the session):**
+- **`world.places`** (IDEA-764): 147 service points and street meets generated by `tools/life-places-port.py` (derived facts only, `--check` for drift), merged at runtime with the garages, fuel stations (pumps clustered) and Autofixers: 303 places. Each kind carries authored hours, `visibility` (Oracle Court LocationProfile) and `crowd`. Bars and clubs are left out: their only pins are quest interiors (IDEA-777).
+- **`life.climate`** (IDEA-772): six axes per district from **deterministic noisy inputs** -- canon character + the season's seeded **city climate** (uneasy calm, corporate boom, crackdown, gang summer, recession, scene revival) + per-district noise. Sim facts push the axes daily (Paddock street and sanctioned races by route region, crashes, folds, team cash flow, player talks); reversion, regime drift, coherence and dampening follow Oracle. **Reading = regime x condition** ("Corpo lockdown, thriving", "Gang rule, in crisis"); a regime holds two days before it changes; leaving a crisis scars the baseline for good. `pressures()` is what the climate asks of the people living in it.
+- **`life.needs` + `life.schedule`** (IDEA-765): Money, Rest, Social, Drive; nine verbs (sleep, home, eat, loiter, hang, errand, hustle, fuel, cruise) plus the commitments `work` (the org's garage shift) and `race` (a seated driver's own races). Every 30-minute block scores every verb at the person's regular places by urgency x gain, bent by personality, climate, hours, distance and lateness. No timetables: sleep is circadian first (a person's chronotype, street tier later), three meals at least three hours apart, a lockdown busts the street meets. Plans are pure and **lazy** (ForkUniverse): computed only for people a player could meet, cached per 04:00-to-04:00 day.
+- **Bodies at any place** (IDEA-766): `ncm_paddock/server/days.lua` materialises off-shift people at non-garage places within 120 m of a player, at most four per place, under the garages' shared cap, with Talk unchanged.
+- **`life.trajectory`** (IDEA-773): the player's **final bucket**, recognised rather than chosen. Signal weights carry deterministic noise per (seed, player, fact); saturating axes; evidence floor; ghost, wildcard, journeyman, then the dominant axis split by risk appetite into twelve named buckets; **outcome band = home district's regime x bucket** (Neikos). Fed so far by talks and nights at a street meet; `lifeRecord`/`lifeFact` exports wait for ncm_league (IDEA-778). **Never sent to a client.**
+- **Schema 053**: `paddock_climate`, `paddock_climate_event`, `paddock_trajectory`, `paddock_place_check`. Console: `ncm.life`, `ncm.life.district`, `ncm.life.near`, `ncm.life.who`, `ncm.life.place`, `ncm.life.player`, `ncm.life.fact`.
+
+**Verified.** Core: 21 new tests, identical under Lua 5.4 and LuaJIT (determinism, variety across seeds, canon surviving noise, idempotent steps, hold, scars, no pinning, sleep in each person's own night, commitments honoured, lockdown suppressing meets, trajectory floor/ghost/hold/band). Host harness: 327/327 on both runtimes, with the new life checks (quota per slice, day bodies, Talk, trajectory write, daily step once, bad place). `KB-230` (a 414k-instruction slice) was caught and fixed before any boot; max slice now 97k. **Dev boot 2026-09-30 14:26 ET:** migration 053 applied on MariaDB 10.11.14, `life sim up: 303 places`, climate genesis (city climate: a scene revival), every other subsystem up. Found on the way: `KB-228` (not this session's), `KB-229`.
+
+**Boundary.** Online untouched (L223). Nothing is done until §CI passes live (L69). M2 (native dialogue), M3 (minds; IDEA-779), M4 (jobs and turf), M5 and M6 remain as L237 ordered; the trajectory is M6's substrate, built early because the owner asked for it now.
+
+**Open.** (1) Climate tuning: impulse sizes, regime thresholds, the two-day hold and scar size are first guesses for a live pass to judge. (2) Whether regime changes become WIRE stories now (IDEA-780) or after M2. (3) The bucket names are internal vocabulary; which, if any, NPCs may say aloud belongs to M6.
+
+**Owner rulings in the first live session (2026-09-30, afternoon).** *"this should be a scanner / vision surface 100%"* and *"need vision, not console command upgrades"*: the life sim is read in play through the NCM Scanner, not through console commands. Built and PASSED live the same afternoon (§CI11): the Scanner reads a Paddock person -- name, role, team, what they are doing and where, until when, where they are usually found, and the district's climate reading -- from a server-matched body (`ncm_paddock/server/scan.lua`, `ncm:life.scan`); vanilla crowds read nothing and no hidden stat goes on the wire. Console commands stay a host tool (they answer in chat on the development server only). Also live and passed: a person's day putting a body at a real place (§CI3) and Talk to them (§CI4), after `KB-234` (NPC snapshots are flat) and `KB-235` (prompts anchored by position). Crowding rules (`KB-236`) are live.
+
+## L241 - OWNER DIRECTION / PADDOCK PHYSICAL AI - derive braking from engine road geometry
+
+**Owner (2026-09-30):** The physical Paddock field is too slow (83-98 km/h against a starter car capable of 135 km/h), monotonic and clumsy at bends and in traffic. Desired behavior: full pedal on open road followed by safe braking before bends. Braking zones must be **programmatic** across generated checkpoint routes, not hand-authored per route or inferred from straight checkpoint chords. Verify an engine-mod way for Pace to obtain the road path, then build the speed and braking fix. The owner's installed In-World Navigation mod provides an example of curvature-based coloring of a GPS line.
+
+**Investigation state:** `PACE_ROAD_PATH_PROBE.md` records the dev RTTI probe, installed traffic-graph resource paths, archive decoding and live native load. The game exposes directed lane geometry through three loadable traffic resources; Pace copied 279,906 road points and 51,338 continuous edges and found a 666-point route for the dev race. A curvature/braking speed candidate and longer routine command lifetime are installed on dev only. This is a **PROVISIONAL implementation choice**, not a race PASS: the native driver still owns steering, traffic and racer avoidance; actual pace, collisions and the earlier CTD need a controlled race. `KB-239`, `IDEA-783`-`IDEA-784` track this work; `KB-238` tracks the checkpointed-race CTD.
+
+## L242 - OWNER RULING / PADDOCK PHYSICAL AI - Pace 0.5 (road graph) is the canonical NPC race driver; steer along the plan; log and fix together
+
+**Owner (2026-09-30):** the first race on the road-graph Pace was "legitimate for the first time ever" and basically perfect until the first checkpoint (Graveyard Shift), where every car "crapped out in its own way". The old flat-ceiling Pace "was too brittle"; the road-graph Pace is the canonical way of NPC racing from here. The owner followed the field, staying near the back, so front runners got away naturally; cars may still have dropped out of the streamed world as the field spread. Owner overruled the instrument-first sequence (`L228`-`L236` reading, `feedback-instrument-before-theorising`) for this change: **add the logging and the fix in the same build**.
+
+**Built (Pace 0.5.1, dev only):** (1) with a road plan the native driver is sent `roadAimM` (300 m) ALONG the plan, re-aimed under `roadReaimM` (180 m), through every checkpoint -- not to the checkpoint, then the finish 1+ km off, which made the engine replan its own way at the checkpoint; the line takes over only on the plan's last stretch. (2) Each leg after the first is routed from where the previous leg's road ends, so the joint cannot snap to another lane and read as a hairpin. (3) A car the game stops reporting for 1.5 s logs `DROPOUT`; when it is reported again it logs `BACK` and gets a fresh command (a re-created vehicle object holds none). (4) Logging: per-car status every 5 s, point passes, off/on the road plan, the joint at every checkpoint, 400 command lines per car instead of 40 (40 ran out before the first checkpoint). **PROVISIONAL** until a checkpointed race passes. **Open:** grid races do not use the bubble's `car.add`/`car.remove` handover, so a car the engine destroys (rather than streams back) is not re-created; `IDEA-786`.
+
+## L243 - OWNER RULING / PADDOCK LIVE - ghosts are never the race system's road; only a player at the grid hosts a street run
+
+**Owner (2026-09-30):** "we cant rely on 'if someone has a ghost lap' there are huge numbers of combinations here. ghosts are not there as a crutch for the race system!!" Fix the 20:30 and 20:42 races, and the 20:24 race the owner was not near: "it needs to simulate well including the live races tab in paddock".
+
+**Ruling and what was built (dev):** (1) `PaddockLive.pathFor` never reads `ghost_lap`; a race's line is its authored points (or an oval's ring) and Pace finds the road (`L242`). (2) Only a player within `liveHostGridM` (250 m) of the grid hosts a street run; otherwise the race is the sim's and LIVE shows the sim (`KB-242`). (3) The host reports which cars reached its game; unseen cars leave the grid and the classification, and fewer than half calls the street run off at once. (4) The client plan path yields and no longer serialises in Lua (`KB-241`). (5) Core helpers made correct for sparse lines (`KB-244`). **Consequence, accepted:** the bubble only sets street cars down on a real road line, and the server has none without a ghost, so street races no longer go physical mid-route through the bubble; they go physical as a grid run at the start. A server-side road line from the cooked traffic graph is `IDEA-787`. **PROVISIONAL** until `MASTER_TEST §CK` passes.
+
+## L244 - OWNER DIRECTION / PADDOCK PHYSICAL AI - build on the engine's own racer, not the traffic driver
+
+**Owner (2026-09-30, 21:30):** "why arent you building from vanilla race?" -- and: an acceleration curve from the lights, more aggression in traffic ("nearly too respectful"), and driveScale as a speed lever ("its from carrier"); single-player NCM is not a reference ("it has same problems"); driveScale is not TweakDB.
+
+**Found:** every Pace version drives with `AIVehicleDriveToPointAutonomousCommand`, the traffic driver. The engine has a racer: `AIVehicleRacingCommand`, `AIDriveRacingCommandHandler`, `AIbehaviorDriveRacingTreeNodeDefinition`, and every vehicle record carries `drivingParamsGeneric` / `drivingParamsPanic` / **`drivingParamsRace`** plus a separate `vehDriveModelDataAI`. TweakDB holds `Driving.Race_Driving` (with `SteeringParamsForwardRace`, `VisionParamsRace`, `VehicleAITractionEstimationRace`) beside `Default_Driving` and `Panic_Driving`; the profiles carry `useSpeedLimit`, `speedLimitSafetyMargin`, `sideOverlap*` spacing and traction/accel factors. The Carrier's `driveScale` is a physics force-write hook scoped to the player's latched car.
+
+**Direction:** (1) Pace 0.5.3 dumps every property and method of the racing command family at startup (read-only); the next Pace binds to `AIVehicleRacingCommand` from that, with the race profile. (2) Racers get their own vehicle records (TweakXL clones, ambient traffic untouched) pointing at an NCM race profile (`IDEA-788`). (3) A racer drive-force lever is Pace's own, never the Carrier's (`feedback-new-features-new-mods`), designed against the Carrier's hook so the two never fight (`IDEA-789`). **OPEN** until the probe output is read.
+
+## L245 - OWNER RULING / PADDOCK PHYSICAL AI - race profile, or nothing
+
+**Owner (2026-09-30, 21:40):** "no fallbacks" -- "race profile, or nothing". Every street car the Paddock spawns is its racer record (`Vehicle.ncm_racer_<record>`, NCM Pace 0.6.0's TweakXL clone with `driving` and `drivingParamsGeneric` = `Driving.Race_Driving`). A racer the platform refuses means no street run; the race stays the sim's. There is no vanilla-record retry and no setting to turn it off.
+
+**Probe result (Pace 0.5.3, `race-rtti:`):** `AIVehicleRacingCommand` = `splineRef: NodeRef`, `secureTimeOut`, `reverseSpline`, `driveBackwards`, `startFromClosest`, and rubber banding (`rubberBandingBool`, `TargetRef`, `TargetForwardOffset`, `Min/MaxDistance`, `StopAndWait`, `TeleportToCatchUp`, `StayInFront`); no speed and no target point -- it drives a world spline. `AIVehicleOnSplineCommand` is the same plus `stopAtPathEnd`, `keepDistance*`, `forcedStartSpeed`. `AIVehicleToNodeCommand` takes a `nodeRef` with `useTraffic`, `speedInTraffic`, `forceGreenLights`, `ignoreNoAIDrivingLanes`. `AIVehicleAgent.SetDriveToPointAutonomousUpdate(AIDriveToPointAutonomousUpdate)` updates a running drive command in place. **Next (`IDEA-788`):** splines for routes, so the racing command itself can drive.
+
+## L246 - OWNER RULING + BUILT (DEV) / PADDOCK PHYSICAL AI - the engine's racer on baked race splines; the old methods are dead
+
+**Owner (2026-09-30, 21:50-22:00):** "we need to build on race driving asap"; "can we do it without rubber banding?"; the racer-record vanilla fallback is "horribly brittle. fix. and no fallbacks to previous methods they are dead"; "first priority is definitely the race command ... doesnt pace have 30000 plus lanes of geometry".
+
+**Found:** vanilla street races (sq024) drive `AIVehicleRacingCommand` on a `worldRaceSplineNode` (spline points, a per-distance `offsets` corridor, `speedChangeSections`) placed in a quest sector; quest params `closest`, `rubberBanding` with min/max distance, `secureTimeOut` 60. Every Paddock race is a chain of authored nodes (`course.generator`), so one spline per ordered node pair covers every race.
+
+**Built (Pace 0.7.0, dev):** `ncm/pace/tools/bake_legs.cpp` routes all 1,190 ordered pairs of the 35 race nodes over the game's lane graph (Pace's own router; none unroutable); `tools/bake-race-splines.py` writes them as `worldRaceSplineNode`s (6 m corridor each side, no speed cap) in 30 AlwaysLoaded sectors + a streaming block + an ArchiveXL `.xl`, packed with WolvenKit into `ncm_pace_race_splines.archive` (1.1 MB), shipped in the Pace package. The server names each leg's spline (`$/mod/ncm_pace/#leg_<from>__<to>`); Pace sends one `AIVehicleRacingCommand` per leg (startFromClosest, rubber banding OFF) and refuses a street plan without splines. No custom vehicle records: the racing command uses each vanilla record's own `drivingParamsRace`. Platform-AI street runs are retired: no Pace host = no street run. The server waits up to `livePaceReportGraceMs` (3 s) for Pace's gate reports before the verdict (`KB-247`). **Not yet proven in game:** that the engine resolves our refs (FNV-1a 64 of the path; logged with every command) and accepts our sectors. **Open:** ovals still use the old command until they get ring splines (`IDEA-790`); the unreachable platform-AI branches in `ncm_paddock/server/live.lua` are to be removed.
+
+## L247 - OWNER RULING + BUILT (DEV) / PADDOCK PHYSICAL AI - drivers stay in the cars; no driven car is kept at the streaming edge
+
+**Owner (2026-10-01, 01:00-01:15):** "im hesitant to say its not our code ... would rather look in the mirror"; "a driverless car is not a solution, come back with a solution that keeps drivers in cars"; on the proposal (bubble hand-off with drivers, road lines on the server): "yes absolutely start it".
+
+**Evidence (`KB-238`):** every CTD is `Cyberpunk2077.exe+0x2543394` (a failed vehicle-to-puppet cast) moments after Open77 moved an NCM AI car with a seated NPC driver out of observed physics; at 00:54 two Paddock cars streamed out and back in within 4 s and the game died 1.5 s later; at 00:43 it was an `ncm_world` ambient car. A client picks a car up anywhere between 186 and 573 m (`L229`), so a driven car kept alive beyond that is repeatedly dropped and re-created.
+
+**Ruled and built (dev, Pace 0.8.1):**
+- **A street race runs on the continuous model and the physical bubble, never as a grid run.** `PaddockLive.onBubble`: an oval, or a street route with a road line. The grid-run path in `ncm_paddock/server/live.lua` is no longer staged for them (its code is now unreachable; removal is `IDEA-791`).
+- **The server's line for a street route is the baked road** (`IDEA-787`): `tools/gen-road-lines.py` turns Pace's leg bake into `ncm_paddock/server/roadlines_data.lua` (server-only, 1,190 legs, ~3 MB); `PaddockLive.pathFor` joins a route's legs (`source = "road"`, `nodes` = the authored points, `nodeD` = how far along each one is). The model, LIVE, the watchers and the bubble stand on the road.
+- **Pre-grid** like an oval: a player with Pace within `bubbleInM` of the start sees the frozen grid on SP's slots 30 s before the lights, each car with its driver, held by Pace.
+- **Hand-off:** a car goes back to the model when nobody is within `bubbleOutM` (300 m) **or its own Pace player is** (a car is driven by one client); `remove` takes the driver out of the seat before the car. **Return:** within `bubbleInM` (250 m) of a player with Pace, set down on the road where the model says, driver seated, as often as it happens (`IDEA-786`). Without Pace near, nothing comes in (L245: the racer on splines, or nothing).
+- **Pace on the bubble:** the dynamic plan is the route's nodes with a race spline per leg (Pace 0.8.1 accepts `legs` on a dynamic plan); `car.add from` is the node at the end of the leg the car's distance falls in, so it races that leg's spline. A car the game re-creates under a new entity is handed to Pace (`car.entity`), keeps its leg and gets a fresh command.
+- **`ncm_world` ambient cars** retire past `ambientRetireM` (300 m, was 420) whether or not a client still streams them; peds keep the "only what nobody watches" promise.
+
+**Results** come from the model with every anchor (`mixed`, or `physical` if every car drove its whole line). **Not yet proven in game** (`MASTER_TEST §CN`).
+
+**L247 addendum (01:46):** the first live race on the bubble ran Pace 0.8.0 (`KB-250`), which dropped the legs and drove the retired command. Two rules follow. **A street car comes in only for a Pace that races splines on the bubble (0.8.1+)**; an older one brings nothing, said once in the server log. **The street grid stands on the road behind the start**, walked back over the lane graph per leg at bake time (`bake_legs --grids`), each slot at the road's own height; SP's straight grid only where under 20 m of road lies behind the start.
+
+## L248 - OWNER DIRECTION + BUILT LOCALLY / PADDOCK OVALS - bake a closed race spline and prove it on an oval
+
+**Owner (2026-10-01):** "youre gonna have to bake spline im pretty sure dont be lazy" and "we didnt touch ovals to prove race drive". The street racer's live movement is not evidence for an oval's seam or lap behavior.
+
+**Candidate built:** Pace 0.8.2 and its ArchiveXL archive have one closed `worldRaceSplineNode` per authored oval. Corpo Circle and Westbrook use the directed lane graph around their marked roundabouts; NCX Octagon, absent from that graph, uses its authored ring. The server's continuous model, grid and physical bubble use the same baked line. A dynamic oval plan supplies one `loopSpline` to Pace while its repeated authored marks count laps. Pace holds the racing command across marks rather than reissuing it each quarter lap. Clients below 0.8.2 cannot bring oval cars into the physical bubble; the race remains the model's. The package is local and ovals stay off the schedule.
+
+**Gate:** `MASTER_TEST §CO` must show in game that the engine follows a looped spline through multiple line crossings, the physical and model laps agree, cars survive bubble hand-off with seated drivers, and classification closes once. No oval live PASS exists yet. Build details and offline evidence are in `docs/research/open77/PACE_ROAD_PATH_PROBE.md`.
+
+**L247 addendum (2026-10-01 14:10) - no seat mount inside the engine's spawn physics cycle (`KB-238`).** Owner, after the 02:06 crash: "last time out another ctd". Evidence (three crashes with logs): each fault followed a driver's seat mount that landed inside the ~1.0-1.6 s window in which the engine first observes, then unobserves, a new car's physics -- a window every new car goes through. Ruled and built (dev): a car with a driver is created empty and its NPC is seated only after a client has held it for 3 s (`bubbleSeatDelayMs`, `ambientSeatDelayMs`); a bubble car is Pace's only once seated. Drivers stay in the cars; they arrive about 3 s after the car does.
+
+**L247 addendum (2026-10-01 14:40) - OWNER RULING: keep driven cars well inside streaming; no empty cars; one go time.** Owner: "keep the streamed cars closer dont gamble with a distance which we think is the correct one ... dont even go near the boundary ... try 100m and hand them back at 150m"; the seat delay is "a downgrade for drivers in cars". Built (dev): `bubbleInM` 100 (was 250), `bubbleOutM` 150 (was 300) -- a client takes an AI car somewhere past 131-186 m (L229, probe v2), so no driven car is brought in or kept near that; `bubbleSeatDelayMs` and `ambientSeatDelayMs` default 0 (driver seated as soon as the car is in the player's game; the handshake stays, 3000 is one setting away). Owner: cars "taking off for green light 10 sec before" the banner cleared -- the banner counted to the window's opening + the retired grid run's 5 s countdown, from a scheduler time taken seconds of database work earlier; it now counts to the opening (the cars' go) by the clock at send time.
+
+**L248 addendum (2026-10-01 14:40) - OWNER RULING: ovals back on the calendar with Pace 0.8.2.** Owner: "i want the pace.dll with ovals installed, and ovals back on the calendar. i will keep testing them as they come up." Done on dev: Pace 0.8.2 (`dist/ncm-pace-0.8.2.zip`; DLL `94051ea9...`, archive `db720a7f...`, `NcmPace.reds` `253a3d28...`) installed by hand in the game folder (0.8.1 copies kept in the session's tmp) and published to the dev store; `ovalsScheduled` default true (slots drawn from now on: street 15 %, regional 10 %, pro 5 %; slots already drawn keep their routes). Owner proves `MASTER_TEST §CO` as ovals come up. The 0.8.2 source in `ncm/pace` and `tools/bake-oval-splines.py` remain the other session's uncommitted work.
+
+## L249 - OWNER DIRECTION + BUILT (DEV, STEP 1) / PADDOCK - league driver pools; the Race Guide becomes Paddock; mixed grids; NPCs in the markets
+
+**Owner (2026-10-01, ~14:30):** "we need to expand the roster of each league beyond its 12 or so drivers ... virtually impossible that all 12/12 drivers from a league show up with 100% attendance to every race ... so each league needs 30-100 drivers in a pool, of which some are plucked per race". "paddock might actually now be able to sustain mixed npc/human grids, once we solve the ctds ... still allow no betting on other humans, or betting on other drivers in a league youre entered in." The Race Guide's human-only races "have ceased to exist (unless a race fills up with a full roster of human drivers, we map npcs to whatever empty spots) and time trial is no longer what happens when you enter a race alone" -- on demand under Street Call (F5). Sanctioned series keep Race Guide-style names; street series grittier; a championship table for every series. The life sim starts buying parts and trading them on the Exchange: "all markets need buyers", and a posting system where NPCs and players post what they want and offer trades.
+
+**Rulings on the approach (AskUserQuestion, same session):** street leagues are pools of independents, sanctioned leagues keep teams with deeper rosters; a human takes one attendee slot (field size unchanged); NPC parts and money are real assets and real ledger money (never minted, L222). Plan: `~/.claude/plans/lexical-twirling-bird.md` (phases 0-5).
+
+**Reverses, when step 3 lands:** L224.1 (the parallel circuit: NPC series never share a grid with humans) -- only after `KB-238` is closed. **Kept:** L172 (never a wager on another player), extended: no lines on human entrants, and no bets on a league you are entered in.
+
+**Step 1 built (dev):** `paddock.attendance` (new core module) and `World.raceField`/`leaguePool`/`newIndependent`/`growPools` (`paddock.world`, GENESIS 3).
+- Street: each of the seven leagues is a pool of 56 (24 team drivers + 32 independents with their own car, `person.leagueId`/`person.car`, schema 054). Each race, every member turns up or not; the field is the first 12 who do, keenest first.
+- Sanctioned: rosters 4 (regional), 4 (pro), 5 (premier) -- leagues of 48/40/40; each team fields its best available drivers in its race seats.
+- Turning up is deterministic for (world seed, race, person) -- reliability (a fixed trait from the seed), morale, and whether they raced in the last 3 h (street x0.35); every absence has a reason, tallied in the frozen field (`frozen.absent`).
+- `Hash.unit` mixes keys that differ only at the end badly (one race drew all 56 of a pool "no_show"); attendance uses a re-mixed draw (`attendance.draw`). The same weakness in the existing route/oval draws is recorded, not changed (it would re-draw scheduled races).
+- Existing worlds grow into the pools at boot (`growPools`, idempotent): dev grew to 56 per street league on 2026-10-01 14:55. Independents show as "Independent".
+- Tests: core 881/881 (new `test_paddock_attendance`), Paddock harness 344/344, both Luas; `ncm-test` all green.
+
+**L249 step 2 (2026-10-01 15:02) - OWNER RULINGS + BUILT (DEV).** Owner: names "approved"; "drag racing should stay, just make sure to only use the authored drag routes (i think there are just two, b line and hold your breath)"; windows "yes widen the windows".
+- **League names** (`paddock.names` `LEAGUES`, by series id): Hypercar Championship (premier); Night City GT, NCM City Cup, Night City Open (pro); Bedrock Championship, MaiMai Cup, Northside Trophy, Badlands Cup (regional); Kabuki Midnight, Charter Hill Run, Corpo Plaza Outlaws, Glen Blood Mile, Pacifica Wreckers, Night Market Rats, No Plates (street). An existing world takes them at boot (`paddock_series` now flushed when marked).
+- **Windows** (`Season.RHYTHM`): street 18:00-06:00, regional 06:00-24:00, pro 08:00-22:00, premier 15:00 -- 214 races a day (120/72/21/1), never more than 15 minutes without one (was ~125-129).
+- **Street Drag stays** a Race Guide series on its two authored drag roots only (B-Line `root_vista_del_drag...`, Hold Your Breath `root_deep_dive...`) -- unchanged, and not folded (the Paddock sim has no drag).
+- **Time trial on demand** from Street Call (F5): a Type row (Race / Time trial). A time trial is the caller alone, never announced, on nobody else's board, refused to anyone else at entry, unpaid like every Street Call.
+- **The fold, behind `guideFromPaddock` (ncm_league tunable, OFF):** the six sprint series are marked `paddockFold`; with the switch on the calendar stops scheduling them and the Race Guide lists the Paddock's next 16 events (published by `ncm_paddock` on `GlobalState.ncmPaddockGuide`, every 10 s on change). Entering a Paddock event is step 3 (mixed grids). The switch-on path in `guide.lua` is not yet exercised by a harness (the league stub's guide scenario fails on an unrelated clock-dependent assertion and is not in the gate).
+
+### L247 diagnostic addendum - 2026-10-01 15:46
+
+Owner requested diagnosis only. 2026-10-01 15:46 CTD: KB-238 same +0x2543394/read 0xC0 on Pace 0.8.2. Racer p00786 spawned at 87 m; settled after 0 ms; mounted 1.171 s after spawn; fault 684 ms after mount. Latest vphys is obs=1, not obs=0; last despawn 24 s earlier. Close bubble did not prevent recurrence. Spawn/mount overlap remains a hypothesis; exact faulting object unproven. Full evidence: ../research/open77/PACE_ROAD_PATH_PROBE.md, 15:46 addendum. Diagnosis only; no runtime changes.
+
+### L247 native trace correction - 2026-10-01
+
+Diagnosis only remains the owner's scope. Immediate KB-238 mechanism now identified: p00786 vehicle fails gamePuppet cast in its driver's movement path; unchecked null causes the CTD. Streaming/seat timing alone is not a root-cause diagnosis. Paddock math is not implicated by inspected code. KB-252/253 are separate lifecycle findings with unproven CTD connection. See PACE_ROAD_PATH_PROBE.md follow-up; no fixes made.
+
+
+### L247 addendum - 2026-10-01 16:05, owner-authorized KB-238 native guard
+
+Owner: implement a fix for the concrete finding, then test. Pace 0.8.3 guards the demonstrated failed vehicle-to-puppet cast at its exact native caller; empty handle returns false, original behavior for all other calls. Build/instruction-byte checks gate attachment. Dev game installed with rollback, no server restart, no public Online change. No simulation, bubble, seating or command-lifecycle edits. Offline checks pass; live acceptance is MASTER_TEST section CR, NOT RUN. KB-238 is mitigated in code, not closed; why the movement path supplies the vehicle is still open.
+
+**L249 steps 4-5 (2026-10-01) - BUILT (DEV): NPCs in the markets; the posted Exchange.** Owner: "ok do phase 4 and phase 5"; the board goes in the existing F6 EXCHANGE card ("exchange panel already exists in f6"), not a Paddock sub-tab.
+- **Step 4, NPC buyers (IDEA-730, schema 055).** Paddock teams and independents buy the SAME serialized parts and street cars players do, never minted: one guarded transaction claims the shelf row, moves the asset to the NPC (`component_asset`/`vehicle_asset.owner_principal_kind/id`), writes the transfer, and takes the money from `paddock_org.cash` / `paddock_person.cash` (new) into `npc_money` (new, append-only, idempotent) -- the money steps conditional on the claim. A team's `invest_dev` buys a real part first (`economy.npc_market`: a part develops its area by 1.15-1.45x its price); independents (purses now theirs) shop every 5 min and sometimes buy a car. Players keep first claim: nothing listed under 20 min, at most 2 NPC sales a market an hour. First live purchase on dev: independent p01203, a 500 part at Base Market, fitted.
+- **Step 5, the posted Exchange (schema 056).** Posts (`offer`: a stored part at an asking price; `want`: family + tier up to a price), bids (cash, or a part for a want), reservations (a part promised once; released on close; swept at boot -- the expiry recovery L194 named), and ONE-GATE settlement: parts move only from their expected owner and place, an `exchange_settlement` row is written only if every part landed and the payer can pay (primary key on the post: settles once), unlanded moves are put back, and every money/state step is conditional on the gate. Players' money moves under the `economy_balance_lock` protocol; NPC money in the same transaction after a store flush. NPC traders post surplus and wants, accept good bids (`npc_market` valuation), and bid on players' posts. UI: THE BOARD beside DIRECT TRADE in the F6 EXCHANGE card.
+- **Proof:** `tools/test-npc-sql.ps1` (generator `tools/npc-sql-gen.lua`) runs the real purchase and settlement statements against MariaDB inside a rolled-back transaction -- 18/18 (an NPC buys once and a rival racing for the same part pays nothing; a player buys an NPC's post with part, ledger, team cash and board all moving; an unaffordable bid moves nothing). Gate all green (panel render 291 incl. four board checks). Live use owed (`MASTER_TEST §CR`, `§CS`).
+
+## L250 - OWNER DIRECTION + BUILT (DEV, STEPS 1-2) / PADDOCK - fair start grids, qualifying, mixed NPC/human grids
+
+**Owner (2026-10-01, race-flaw list #1):** "main goal is number 1. and also getting our npc/human mixed grids and qual system up and running". Rulings (AskUserQuestion): human slot = guide (beam + HUD arrow), then auto-place at T-20 s; a qualifying run = a solo timed run of the whole route from a standing start (ovals: a flying lap); races post ~3 h ahead, qualify until T-10, unlimited runs, **setting a time enters you**, entered-but-unqualified start at the back; formations = lane-based automatic plus per-node overrides. Mixed grids will reverse `L224.1` (human-only Paddock exclusion) when step 4 is built; the betting bans stay. Plan: steps 1-4 (bake, NPC times, human entries/quali, mixed grids).
+
+- **Step 1, lane grids - BUILT (DEV).** `tools/bake-grids.py` lays every leg's grid on the game's own lane centrelines (a geometric tracker walks back along the race direction through junctions; parallel lanes become 1-4 columns; staggered rows 10 m, 8 m when short; never past the end of a lane; 3 m minimum separation). 1174 of 1190 legs solved, 108 short, 16 unsolved (`tools/grid-report.md`; overrides `IDEA-805`). Shipped as `ncm_paddock/server/grid_slots_data.lua`; core `course.grid_solver` (overrides by leg, then start node, then the bake) feeds `PaddockLive.gridSlots` for the street pre-grid; the old line/ring grids remain the fallback. Hill Abode now grids on the through road, not the driveway.
+- **Step 2, NPC qualifying times - BUILT (DEV).** `Sim.qualify(field, rng, baseSec)` keeps its scoring and order and gives each entrant `qualiMs` (base x (1 + (60 - score) x 0.25%), clamped 0.85-1.3); consistency already sets the run-to-run noise. The freeze stores `frozen.quali`; LIVE, the box score (GRID, QUALI columns) and `GlobalState.ncmPaddockGuide` (`quali` sheet) carry them.
+- **Proof:** core tests (grid solver incl. the shipped bake: no slots stacked < 2.5 m or > 160 m from the start; qualifying times ordered, deterministic, consistency narrows spread), Paddock harness 348/348 (the street pre-grid is the baked lane grid; the frozen grid is in time order; the feed carries the sheet), `ncm-test` all green. Live: `MASTER_TEST` §CT.
+- **Open:** steps 3 (schema 057 entries + qualifying runs) and 4 (mixed grids, auto-place, merged results); `guideFromPaddock` turns on only after a live mixed-race PASS.
+
+**L250 steps 3-4 (2026-10-01, evening) - OWNER DIRECTION + BUILT (DEV).** Owner: "lets tackle step 3 and step 4 in tandem, so i can do a qual run and then enter its race". **This reverses `L224.1` on dev** (humans now share Paddock grids) although `KB-238` is not yet closed (Pace 0.8.3 guard installed, live PASS owed); L249 had tied the reversal to KB-238 closing, and the owner's direction now overrides that sequencing. Online is untouched (`L223`).
+- **A Paddock race is a league event.** `ncm_league/server/paddock_link.lua` adopts each race on `GlobalState.ncmPaddockGuide` (now 3 h ahead, up to 40 rows; Paddock horizon 200 min) as a calendar event of class `paddock` (`paddock.mixed.eventFromRow`; schema 057 adds the class), so the Race Guide row, venue ring, ENTER RACE, grid, lights, gate timing and settlement are the league's own. A league named after a championship takes its economy and eligibility; street leagues use City Cup's. Tunable `paddockEntries` (on). **Ovals are not adopted yet** (their quali is a flying lap; not built).
+- **QUALIFY = entry.** QUALIFY (Race Guide card, or the venue card where PRACTICE becomes QUALIFY) opens the race's practice-engine session, routed to the start. A run starts only from a **standing start**: the client stages the driver (stopped within 14 m of the line for 1 s) and the gate-1 crossing carries `staged`; the server starts no run from any other crossing (nor from its telemetry stream). Unlimited runs, one race at a time (choosing another moves you), until **T-11**. The first time enters the driver through the league's ordinary entry (fee, machine, ledger); a faster one is re-sent. ENTER RACE at the ring without a time is allowed: back of the grid. WITHDRAW until T-11. Best times in `paddock_quali`.
+- **The freeze moves to T-10** (`billieLeadMinutes` 10, was 15), after entries close at T-11, so an entry is never late. Each entered human takes the place of the last NPC who turned up (field size stays attendance's); the grid is everyone by qualifying time, unqualified humans last (`paddock.mixed.gridOrder`); human ids in the Paddock are `h` + 15 hex of the driver id (`personKey`). Each human's slot on the lane grid goes to the league (`ncm:paddock.grid`, re-sent every 30 s until the lights); the bubble never spawns an NPC on a human's slot or within 7 m of a player.
+- **One green.** The league session forms at T-60 on the Paddock's slots (radius 4 m), green at the Paddock's `opensAt`; DNS deadline T-12 for this class (was T-30). The HUD shows a cylinder beam on your slot, GPS to it, and an arrow + distance in the strip. **At T-20** an entered driver at the venue (within 150 m) but off their mark is placed: out of the car, the EMPTY car moved onto the slot, back in (never `setTransform` on an occupied car). On foot or further away: told, not moved.
+- **One classification.** The league times its humans and sends them (`ncm:paddock.human.result`); the Paddock holds the race's close for them (up to 20 min past green), merges them with the NPCs by time from the green (`paddock.mixed.merge`), writes the result (provenance `mixed`, humans with no Paddock purse) and returns each human's place and the field size (`ncm:paddock.classified`). League settlement waits for that (up to 300 s, then settles the humans alone): placement and time-trial status against the whole field, field bonus counting humans only (`economy.settlement` `fieldBonusCount`). Standings and LIVE include humans (named as entered).
+- **Betting:** no lines on humans (they are never in Billie's field); `own_series` now also refuses a driver entered in that league.
+- **Live boot note (20:05):** the first dev boot adopted nothing in 5+ min -- the league read the Paddock's feed only from `GlobalState.ncmPaddockGuide`, a cross-resource server read never exercised live. The Paddock now also sends the feed as the server event `ncm:paddock.guide` (on change and every 60 s; server events between resources are proven), GlobalState kept as the fallback. After that restart 19 races were adopted within a minute. Which transport carried it is unlogged (the server console is not captured to a file). The feed's 40 rows reach ~1.5 h ahead, not 3 h: raise the cap if the owner wants to qualify further out.
+- **Proof:** core 892 (`test_paddock_mixed`), Paddock harness 361 (a mixed race end to end: entry, withdraw, late entry refused, freeze, slots, sim without humans, the hold, merge, classification, purses, names), new `tools/test-paddock-link.lua` 18 (adoption, QUALIFY, entry by time, slower/faster runs, slots, T-20 auto-place sequence, deferred settlement and its fallback), gate all green. Live: `MASTER_TEST` §CT3/§CT4.
+## L251 - PADDOCK RACES ARE THE ONLY PLAYER-FACING ORGANIZED RACES (2026-10-01)
+
+Owner direction: the legacy championships/series that exclude NPCs and lack Paddock qualifying are obsolete. Players should discover and enter only Paddock races, in both the overworld and Race Guide. Implemented locally: the calendar stops materializing all legacy series when `guideFromPaddock` is on (now default on), its public overworld snapshot includes only `class=paddock`, and Race Guide rows filter legacy events while always listing adopted Paddock feed rows. Existing legacy event/history data is retained. Live deployment and in-game confirmation remain owed; see IDEA-808.
+
+## L252 - PADDOCK QUALIFYING STARTS AT THE VENUE (2026-10-01)
+
+Owner direction: the Race Guide is for expressing interest, matching the legacy flow; it does not offer a Paddock QUALIFY action. The Guide may show race/qualifying status, but players begin qualifying only from the venue panel, where QUALIFY replaces PRACTICE. The Paddock event's venue ring must reach the client when a player expresses interest so arriving opens the venue WebUI. Implemented locally: removed the Guide QUALIFY action, made Guide action handling interest/withdraw only, made qualifying server requests require the matching validated venue ring, and prioritized interested/entered Paddock events in calendar ring publication. Live proof pending; IDEA-809 / KB-255.
+
+## L253 - ENTER WITHOUT A TIME IS AN ENTRY, NOT QUALIFYING (2026-10-01)
+
+Owner clarification: ENTER does not launch or count as a qualifying run. It records an entry; the driver can qualify separately at the venue through T-11. If still unqualified at the grid freeze, the driver remains entered and starts last. Local implementation labels the venue action "Enter without qualifying" when no best time exists and confirms the last-place fallback after entry. The existing `paddock.mixed.gridOrder` places untimed human entrants after timed entrants. Live proof pending; IDEA-810.
+
+## L254 - TEMPORARY POINT-TO-POINT PADDOCK SCHEDULE (2026-10-01)
+
+Owner request: remove checkpointed races from tonight's schedule and keep that restriction until spline support is fixed. Paddock schedule selection uses generated A-to-B routes with each tier's current distance filter and district start rule. **Owner clarification (2026-10-01): ovals remain desired**; preserve each tier's authored oval share and keep valid oval events in the Guide. Only non-oval routes with interim checkpoints are invalid. On Paddock boot, future scheduled/priced checkpointed events are rerouted, and deterministic oval slots omitted by the prior oval-off logic are restored; route-specific qualifying marks and frozen course data are cleared on route change, while entries remain so untimed drivers still line up last. Running/past races remain historical. IDEA-811/812.
+
+## L255 - ACTIONABLE PADDOCK GUIDE ROWS AND VENUE RINGS (2026-10-01)
+
+Owner report: a Pacifica Wreckers race was visible in the Guide, but interest returned “No such race in the Guide” and there was no ring about 20 minutes before the event. Guide rows can briefly precede league adoption and therefore have no backing calendar event; resolve/adopt the displayed Paddock row on action. The previous 16-event ring cap was below the calendar's potential 20-minute concurrency; raise it to the platform's 64-marker ceiling. Built locally, dev resource restart pending. IDEA-813.
+
+
+## L256 - PADDOCK OVAL CLASSIFICATION AND TIMING (2026-10-01)
+
+Owner report: the Guide labeled an oval as a street sprint and the timing tower stayed on lap 2 through the race. Paddock oval events carry discipline oval and authored lap count into both adopted and fallback Guide events. For physical oval timing, the tower lap comes from the live timing gate's next expected gate, grouped by the oval's gates per lap; simulated races derive lap from their model distance. Distance projection remains useful for ordering but does not decide the physical tower's lap. Local implementation; live proof pending. IDEA-814.
+
+## L257 - OVAL PHYSICAL RACE PACE (2026-10-01)
+
+Owner observed that an ordinary Hella could repeatedly overlap the scheduled oval field and requested about 1.5x more pace. The main physical race-plan ceilings now have a distinct `liveOvalRacePaceFactor` (1.5 by default), applied only to oval cars and still capped by `livePaceMaxMps`; Pace retains its corner braking. The existing `bubblePaceSpeedFactor` applies only to bubble traffic and did not speed the main race field. Street race speed plans are unchanged. Local implementation; restart and live pace/classification check pending. IDEA-815.
+
+## L258 - OVAL PACE MUST RISE AT ITS SOURCE (2026-10-01)
+
+Owner clarified the concern is the oval's starting pace, not merely a higher maximum. Inspection found `paddock.calibration.OVAL_SPEED_FACTOR = 0.55`: the stat-50 oval baseline was only 55% of its tier's city pace. The main physical plan inherits simulated splits from that baseline. Replace the temporary speed-ceiling multiplier with `OVAL_SPEED_FACTOR = 0.825`, a 1.5x increase in the baseline pace; retain the normal path/corner speed planning, so the actual gain remains geometry- and car-limited. Local; restart and observe pace/classification on an oval. This supersedes L257's implementation approach, while keeping its oval-only scope. IDEA-815.
+
+## L259 - OVAL SPEED CEILING HEADROOM (2026-10-01)
+
+Owner asked to also restore a 1.25x maximum. Add `liveOvalSpeedCeilingFactor = 1.25` to the physical oval race plan on top of its calibrated baseline, bounded by `livePaceMaxMps`; street races stay unchanged. Pace derives its minimum command speed from the same ceiling (`launch.minFrac`), so this also raises that command floor. Live validation pending. IDEA-816.
+
+## L260 - OVAL ENTRY VENUE AND CALENDAR SIZE (2026-10-01)
+
+Owner reported oval races visible in the Race Guide but without their venue entry ring. The server log showed repeated `state_value_too_large` failures at calendar publication: oval `via` repeated checkpoint markers across every lap. Keep only the oval's four authored marks in the small calendar read model, explicitly use authored mark 1 as the entry venue for Westbrook Short Ring and Corpo Circle, and let the client event broadcast proceed if a state-bag write is refused. Full lap checkpoints remain in race control. Live ring proof pending. IDEA-817.
+
+## L261 - ADOPT OVAL GUIDE ROWS AND RAISE THEIR PACE (2026-10-01)
+
+The 10:36 oval was visible as a fallback Race Guide row, but interest returned �No such race in the Guide� and no ring appeared. Inspection found `paddock.mixed.eventFromRow` still returned `nil, "oval"`; ovals could never become calendar events, so the fallback row was not actionable. Remove that guard and carry the oval discipline and authored lap count into adopted events. This follows the compact four-mark calendar payload from L260 and explicitly selects mark 1 for Westbrook Short Ring and Corpo Circle (L260). Owner also requested an oval-only baseline of 105% of tier city pace and a 1.5x physical-plan ceiling, bounded by `livePaceMaxMps`; street pace remains unchanged. Restart and live ring/pace checks pending. IDEA-817/818.
+
+## L262 - LAP-11 SIMULTANEOUS STOP ON CORPO CIRCLE (2026-10-01)
+
+Owner reports running beside the 10:36 race as a non-entrant; on lap 11, the remaining physical field stopped driving and parked simultaneously. The scheduled slot is identified in the 21:52 log as `pr-street_e-1790908560`, Pacifica Wreckers at Corpo Circle, 25 laps. Its per-race live log is unavailable: the captured process log ends at 22:30, before the 22:36 race, and the 22:31 server was launched without a persistent output capture. Code review found one common mechanism consistent with the observation: `PaddockLive.finish()` sends `ncm:paddock.live.end` to the watcher; the client answers with `drive.end`, which tells Pace to brake every car. `finish()` is reached when all are done, the hard deadline passes, or the leader's finish grace expires. This is a hypothesis about the common stop signal, not proof of which threshold fired. The current server's output is now captured in `tools/open77/server/restart-current.stdout.log`; correlate a subsequent oval stop with the logged winner/close time, deadline, gate progress, and final verdict before changing finish rules. IDEA-819.
+
+| L263 | 2026-10-01 | Corpo Circle oval races are 12 laps temporarily while the lap-11 field stop is investigated; other oval lap counts are unchanged. | OWNER DECISION |
+
+
+## L264 - PADDOCK FEED ADOPTION IS SYNCHRONOUS (2026-10-01)
+
+A Paddock race may reach the Race Guide only after it has a calendar event, because calendar publication is the source of the client venue ring. The feed handler now adopts rows immediately; the ten-second poll remains only as a recovery path. This fixes the P2P and oval lifecycle alike. IDEA-821 / KB-263.
+
+
+## L266 - OVAL PACE FLOOR AND CEILING (2026-10-02)
+
+Raise the oval-only baseline to 120% of tier city pace and the physical speed ceiling to 1.65x, still bounded by the absolute Pace maximum. Street pace remains as configured. IDEA-822 / KB-264.
+
+
+## L267 - PHYSICAL BUBBLE FINISH VS SIMULATED DNF (2026-10-02)
+
+Code review found that bubble handback anchors physical distance/time but acestate.finishAt derives finishing eligibility from original simulated knots. A physically completed bubble car whose sim had a DNF may therefore stay out while a later sim finisher wins. Record this as a code-path match to the owner's report; no race-specific log was available to prove it was the observed cause. IDEA-823 / KB-265.
+
+
+
+## L268 - PHYSICAL FINISH OVERRIDES SIMULATED DNF (2026-10-02)
+
+Bubble handback at the observed finish records an authoritative physical finish timestamp. paddock.racestate.finishAt prioritizes this timestamp, so standings and final results preserve a physically completed car as a finisher even if the simulated run was a DNF. Built and restarted dev at 00:15 ET; live classification proof remains pending. IDEA-823 / KB-265.
+
+
+
+## L269 - REFRESH PADDOCK ENTRY CLOSES FROM LIVE FEED (2026-10-02)
+
+Existing Paddock calendar events reconcile their entry deadline to startsAt minus 60 seconds whenever the schedule feed is adopted; if an obsolete cutoff left an event closed while it is still before the correct deadline, reopen it. Persist and republish the corrected event. Dev restarted 00:21 ET; live confirmation pending. IDEA-824 / KB-266.
+
+
+
+## L270 - PADDOCK GRID DEADLINE, OVAL HUMAN SLOTS, LIVE PROGRESS (2026-10-02)
+
+Paddock race sessions use their 12-second grid hold so T-20 auto-placement precedes DNS; form after the freeze handoff. PaddockHumans must calculate oval human slots using the same ring formation as NPCs. The league sends each human's monotonic gate progress to the Paddock live tower because spatial projection over repeated oval laps is ambiguous. Built locally; do not reload while the owner may be racing. IDEA-825 / KB-267.
+
+
+
+## L271 - CLIENT SLIPSTREAM REDUCES COASTING DRAG (2026-10-02)
+
+The local driver receives a temporary slipstream effect when a moving car is ahead in a narrow, direction-aligned wake. Compose it over the server-published handling levers by easing `dragScale` down by at most 18%; do not change `brakeScale` or persist the bonus into Machine setup. Detection uses the local car and nearby replicated vehicle snapshots; missed reads mean no new detection and the effect eases out. Built locally in `ncm_world/client/carrier_bridge.lua`; Development restarted 00:57 ET with `ncm_world`, `ncm_league`, and `ncm_paddock` started. Live effect validation remains owed. IDEA-826 / KB-268.
+
+
+## L272 - CORRECT THE INITIAL PLAYER PERMISSION HYPOTHESIS (2026-10-02)
+
+A prior draft diagnosis was wrong: the build-pinned cards confirm `Open77.players.all()` and `Open77.players.get()` require no permission, so the temporary `players.read` manifest edit was reverted. The live server log instead records `Network event payload is too complex` immediately after forming the 19-lap oval session. That session carried 1,446 gates because the oval root's `intermediate` already contained every lap, then `ovalCourse` repeated the whole list for every lap. Corrected by rebuilding the oval gate template from its four authored marks and applying the lap count only once. IDEA-827 / KB-269.
+
+
+## L273 - OVAL COURSE USES ONE AUTHORED LAP TEMPLATE (2026-10-02)
+
+For `route.oval`, `ncm_league` now passes only the marks after the start mark as the one-lap intermediate template, and passes the event's lap count once to `ovalCourse`. This preserves four crossings per lap while preventing the route's already lap-expanded metadata from multiplying the session gate list. The resulting session view fits the network event serializer instead of failing before it can reach the client. Built locally; the active race was not interrupted, so load the League resource at a safe point and verify grid placement, lights, HUD, and lap progression on the next oval. IDEA-827 / KB-269.
+## L274 - APPLY THE OVAL SPEED CEILING TO THE BUBBLE CONTROLLER (2026-10-02)
+
+Raised `liveOvalSpeedCeilingFactor` from 1.65 to 2.25 (within the existing 2.5 tuning bound) and applied the configured factor when the near-player bubble controller builds and refreshes an oval car's `followRoute` speed plan. This controller is used for nearby cars whether the player is spectating or entered in the race; its name describes the distance-based physical simulation window. Whole-race `live.lua` already applied the factor. Added per-car telemetry to report the requested target m/s with observed movement, so a high command with slow movement points to native route-following/cornering. Street plans and the existing 1.20 oval simulated baseline remain unchanged. Built locally; restart Paddock only after the active race, then compare target m/s and movement by section on Westbrook and Corpo Circle. IDEA-828 / KB-270.
+
+## L275 - PACE-DRIVEN OVALS USE THE SAME STRONG TARGET (`2026-10-02`)
+
+Follow-up to L274: traced `bubble.lua`'s alternate client-side Pace path. Its `paceCar` and `paceFollowSim` commands used `bubblePaceSpeedFactor = 1.5` irrespective of oval classification, so raising the server `followRoute` plan alone would not affect cars assigned to Pace. Oval Pace commands now use `liveOvalSpeedCeilingFactor` (2.25, with the existing Pace absolute cap); street Pace commands keep their prior factor. Telemetry reports the sent Pace speed or per-leg platform target. Built locally; pending safe Paddock reload and live section-by-section comparison. IDEA-828 / KB-270.
+
+## L276 - CORRECTION: OVAL SPEED CEILING DOES NOT CONTROL RACE SPLINE CARS (2026-10-02)
+
+The L274-L275 explanation was wrong. Ovals sent to Pace use `loopSpline`; `NcmPace.reds` selects mode 3, which issues `AIVehicleRacingCommand`. The probed RTTI for that command has no speed field. Although the 2.25 factor is included in the `car.add` payload, Pace stores it as `Car.speeds` and the mode-3 update returns before applying those speeds. The same applies to the client RaceDrive path, so no oval RaceDrive receives a target from this setting. It can affect mode-1 drive-to-point / server `followRoute`, but those are not the path exercised for oval splines. Revert or disregard 2.25 as an oval RaceDrive tuning result. The command's known pace input is the spawned vehicle record's `drivingParamsRace` profile plus the engine spline; the spline bake requests 100 m/s. Next: research and isolate an oval-only RaceDrive profile/record override, then compare commanded-mode evidence and observed speed before claiming a pace gain. No global race profile change without an isolation plan. L244/246 evidence, `NcmPace.reds`, `state.cpp`, `bubble.lua`, `bake-race-splines.py`.
+
+## L277 - GRID AUTO-PLACEMENT CAN BE LOST BEFORE DNS (2026-10-02)
+
+Paddock auto-place sets `rec.autoPlaced[driverId] = true` before its async placement runs, so an unavailable player position, being on foot, being outside 150 m, or a warp/transform failure gets no retry. Separately, `gridCheck` toggles a human from `ready` back to `entered` as soon as the measured player position leaves the 4 m slot radius; the Race kernel DNSes all `entered` entrants at T-12. Therefore an “ON YOUR MARK / Hold here” toast proves only that the player was inside the measured radius at that poll, not that placement succeeded or the mark state was retained through the deadline. No fresh server log was captured for this run, so the precise branch is unconfirmed. Fix retries and improve mark-loss feedback, then verify with a live grid. KB-271.
+
+## L278 - REQUESTED GRID SNAP FOR EVERY RACE GRID (2026-10-02)
+
+Added `/ncm.gridsnap`, bound to F7 by default and rebindable in the game's key settings. The client only requests the action; the League server resolves the caller's own driver and frozen slot, and permits the move only for their entered/ready entrant during a forming or gridded race, within 150 m, while seated in a vehicle. It moves that vehicle to the exact authoritative slot and logs the warp. This applies to every race session with a grid, including Paddock and non-Paddock races. Built locally; reload/restart and live proof pending. IDEA-831.
+
+## L279 - OVAL RACEDRIVE FOLLOWS A BADLY JOINED, ROUTE-BASED SPLINE (2026-10-02)
+
+The 2.25 ceiling does not affect oval RaceDrive (L276), but the earlier dismissal of spline geometry was also wrong. The game traffic graph used by the bake has 31,717 lane polygons, 251,770 outline vertices, and 59,849 directed connections. `road_graph.cpp` selects/routs through those lanes; `bake_legs.cpp` joins each authored oval checkpoint to its nearest road path; `bake-oval-splines.py` concatenates the four routed checkpoint-to-checkpoint legs; `bake-race-splines.py` turns that line into the loop spline sent to mode-3 RaceDrive. Rebuilding the current source data reproduced the checked-in `oval_lines_data.lua` byte-for-byte. The packaged spline has 51 points for Corpo Circle and 34 for Westbrook. In the actual points, after spline thinning, Corpo retains 165.9° and 128.2° kinks around a checkpoint join; Westbrook retains a 180° reversal across two 3.10 m segments. Those tiny-radius reversals are a direct and plausible reason RaceDrive brakes down; the separate `live.speedPlan` corner planner is not in this mode-3 path. The bake also writes a single speed section at `start=0,end=0,targetSpeed=100` (and `deprecatedDefaultSpeed=0`) into each oval node. Source/reflection establishes the fields and their values but not enough semantics to claim this means 100 m/s along the whole spline. Do not tune the unrelated ceiling or global Race profile again. Next: fix the road-leg endpoint joins for oval spline construction and inspect a vanilla race spline's speed section semantics; then read the newly baked sector data before any deployment. KB-273 / IDEA-832.
+
+## L280 - THE OVAL SPEED SECTION MATCHES VANILLA'S RACE SPLINE TEMPLATE (2026-10-02)
+
+Decoded the exact vanilla `quest_5aab979acf00452f.streamingsector` template used by `bake-race-splines.py`, and decoded the packaged oval sectors. The working vanilla `sq024_spl_city_race_spline` and every NCM oval both have exactly one `worldSpeedSplineNodeSpeedChangeSection { start=0, end=0, targetSpeed_M_P_S=100 }` and `deprecatedDefaultSpeed=0`; the vanilla spline has 116 control points. The oval's zero-to-zero section is therefore copied from the vanilla racing spline template, not evidence of a missing oval speed setting. It is a common engine asset pattern. This removes the speed-section hypothesis as the likely bug. No per-section braking speeds are baked; the geometry kink finding in L279 remains. Fix endpoint route geometry first, then compare against vanilla geometry and assess an oval-specific target only if a real speed constraint remains. IDEA-832 / KB-273.
+
+
+## L281 - ALL THREE OVAL SPLINES REBUILT FROM ROAD GEOMETRY (2026-10-02)
+
+Updated `tools/bake-oval-splines.py` to discard checkpoint approach/departure stubs for city rings, preserve directed road-graph sections, and smoothly bridge the short gaps. Rebuilt Corpo Circle (92 raw points, 974 m), Westbrook Short Ring (71 points, 435 m), and NCX Octagon (47 authored points, 475 m). Generated matching `ncm/online/resources/ncm_paddock/server/oval_lines_data.lua`, then rebuilt the full Pace spline archive from all 1,190 street legs plus the three oval paths: 1,193 splines / 253,755 control points / 30 sectors. WolvenKit converted and packed all sectors successfully. Local artifacts are in `dist/ncm_pace_race_splines_rebuilt`; not published or loaded by Warden yet. Static point inspection shows the old connector hairpins are gone; NCX remains the authored polar loop. Geometry rebuild only, no live pace result.
+
+
+## L282 - PRESERVE HUMAN OVAL PROGRESS THROUGH GATE MISSES AND REPEATED LAP GEOMETRY (2026-10-02)
+
+Root issue: the Paddock mixed live row used League gate progress when present, so a missed oval checkpoint could freeze a human's progress; if gate progress was absent it used an unrestricted nearest-point projection, which maps repeated oval coordinates to lap one. The row now combines monotonic League gate progress with the current player's physical position projected within a 300 m window around their last known race distance, and never moves the timing distance backward. Oval course gates now use 50 m capture, 100 m arm, and 40 m half-width so road-following drivers can register the authored markers. No formal tests run (not requested). Rebuilt/published NCM Pace 0.8.4 (SHA-256 `0145b63cf1b9e1842c3be79af487294f1a03e75054378464f20fe9fd92669b52`) with all three rebuilt splines, and restarted private dev. Manifest digest `0eff490242f7ca9f7de7d7d6929325f568c1f35eb2400c7a208c180bc78b7b4f`, 7 enabled packages, NCM Pace 0.8.4. Live player lap/position behavior remains to be confirmed in a race. IDEA-834 / KB-275.
+
+
+## L283 - F7 GRID SNAP REQUIRES THE SAME CAR TO BE RESEATED AND CONFIRMED (2026-10-02)
+
+Static trace verified `ncm_world/client/race.lua` registers `ncm.gridsnap` on F7 and provides `/ncm.gridsnap` fallback; `ncm_world` declares `input.actions`. The Open77 key mapping is rebindable and returns the effective key; NCM now logs registration success/failure and the effective binding. F7 is also used by Freeroam's race editor only while editor mode is active, where its callback is inert otherwise. The key mapping does not consume the game key, so a vanilla/mod binding may also react; the player can rebind from Pause > Settings > Key Bindings. Server trace confirms it uses the caller's own race slot and current seated vehicle ID, then exits, transforms, re-enters, and verifies that same vehicle before success. It refuses when not entered/ready, outside 150 m, or unable to confirm the seat. Restarted private dev after the resource change; current manifest digest `0eff490242f7ca9f7de7d7d6929325f568c1f35eb2400c7a208c180bc78b7b4f`, seven packages enabled. In-game F7 press, warp, and green-start proof cannot be established before the player connects. IDEA-831.
+
+
+## L284 - TEMPORARY STAGGERED OVAL SCHEDULE FOR LIVE TESTING (2026-10-02)
+
+For tonight's testing, retain the existing point-to-point rhythm and assign nine future, unentered street slots to oval routes, three each: Corpo Circle at 03:00, 03:54, 04:48 ET; Westbrook Short Ring at 03:18, 04:12, 05:06; and NCX Octagon at 03:36, 04:30, 05:24. These are database schedule edits for this night, not a permanent change to the schedule generator. Restarted the private dev server so Paddock's route cache reads them. Log confirms 33 open races loaded and the Race Guide calendar began publishing the live upcoming feed. Participation and venue-ring visibility remain to be confirmed. IDEA-835.
+
+## L285 - OVAL SPEED CEILING REACHES A COMMANDED DRIVE PATH; GRID WARP MUST VERIFY POSITION (2026-10-02)
+
+The 03:00 Corpo run logs Pace ceilings of 75.4-79.7 m/s, while cars advanced about 250-330 m per 10 s (25-33 m/s). Oval plans used mode-3 engine AIVehicleRacingCommand on loopSpline; that command has no speed input and Pace's ceiling was unused. Updated oval plans to retain their authored route points and use Pace's existing commanded-speed controller; street RaceDrive remains unchanged. Human auto-place now polls the same player position used by gridCheck after transform/reseat, marks placement successful only inside the frozen slot radius, and retries otherwise. No tests run (not requested); live pace and placement behavior remain unverified until the next race. IDEA-836 / KB-276 / KB-277.
+## L286 - OVALS KEEP CONTINUOUS RACEDRIVE; SPEED COMES FROM ISOLATED RACER TUNING (2026-10-02)
+
+Owner correction: do not replace oval RaceDrive with sequential point targets. The continuous closed spline is what makes an oval coherent. Reverted that proposal before deployment. NCM Pace 0.8.5 instead supplies isolated TweakXL clones for Paddock vehicles and their RaceDrive profile: disable AI speed-limit checks in the driving and vision profiles, and raise forward/turning acceleration factors from 2.0 to 3.0. `ncm_paddock` selects those clones; other vehicles keep their existing records/profile. Human auto-place verifies the post-warp player position against the same frozen slot radius used by grid readiness and retries if verification fails. Deployed to the private dev server and restarted at 03:30 ET; manifest reports NCM Pace 0.8.5 SHA-256 `3a75b08252bf08f19e1ea8f8f344ce686a20c7bfeadf80eeada418e9187511b9`. No tests run (not requested); live speed and placement are unverified.
+## L287 - TWEAKXL REQUIRED FOR THE ISOLATED OVAL PROFILE (2026-10-02)
+
+Final manifest inspection found the host game had only stale TweakXL log files, not the plugin, and the server did not require TweakXL; without it the YAML profile would not load. Added the official stable TweakXL 1.11.4 release to the private dev required-mod manifest. Its package includes the upstream MIT license files, and official docs list RED4ext 1.28.0+ as its requirement and CP2077 2.3 compatibility. Restarted private dev at 03:34 ET. The manifest now has eight enabled packages; loopback downloads for NCM Pace 0.8.5 and TweakXL 1.11.4 both matched the advertised byte counts and SHA-256. Players need the modstack update and a game restart before the YAML profile is active. Live race pace remains unverified.
+
+## L288 - GRID CORRECTIONS ARE ALLOWED UNTIL GREEN; SNAP ASSIST CHECKS CLEARANCE (2026-10-02)
+
+Owner reports violent human grid placement into another car, no visible ground grid ring, and DNS after a tiny correction. F7 and T-20 placement now require proximity within 20 m and refuse transforms when another network vehicle is within 6 m of the target; callers are told to drive into an occupied slot manually. Paddock grid presence uses a 12 m arrival radius and 30 m departure hysteresis so a checked-in entrant can make ordinary lineup corrections. Paddock DNS is no longer applied at grid close or at the start of the countdown; an entrant still away is DNS only when the lights reach green. The client draws a bright 4.5 m ground ring and explains that minor corrections are allowed. Restarted the private dev server at 04:05 ET; Paddock feed loaded. Live collision/ring/start verification pending. IDEA-837 / KB-278.
+
+## L289 - OVAL BUBBLE SPAWN AND ACTIVE HUMAN CLASSIFICATION (2026-10-02)
+
+The near-player physical cars are the Paddock field instantiated around a nearby player; they persist while the player stays close. The oval flag was missing at this actual bubble spawn call, so it selected stock vehicle records instead of the isolated NCM Pace RaceDrive clones. The bubble now passes the route's oval flag into ecordFor. Also corrected the canonical and all resource copies of the race session kernel: an entered driver remains eligible through countdown and DNS is decided at green; finishing honors inishHoldUntil. Paddock ovals get a 60-minute race limit and 20-minute finish window; moving human entrants extend the close point while still circulating. The Paddock slot ring now uses native marker APIs directly. Restarted private dev at 12:45 ET; server loaded 44 Lua resources and published generation 1. This remains live-unverified: the player must confirm marker visibility and lap/finish behavior. No tests run (not requested).
