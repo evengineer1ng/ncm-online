@@ -75,6 +75,7 @@ function PaddockLife.sign(driver, org, wage, seasons, t, fromOrg)
     local world = w()
     driver.orgId, driver.state, driver.seat = org.id, "active", "reserve"
     driver.wage = wage
+    driver.raceCarId = nil          -- L298: they race the new team's car (npc_cars.lua assigns or mints it)
     driver.contractEnds = world.seasonOrdinal + (seasons or 1)
     local e = driver.evidence or {}
     e.orgsDriven = (e.orgsDriven or 0) + 1
@@ -98,6 +99,7 @@ end
 --- Release a driver to the free-agent pool. Returns the tape event.
 function PaddockLife.release(driver, org, t, reason)
     driver.orgId, driver.seat, driver.state, driver.wage = nil, nil, "free_agent", 0
+    driver.raceCarId = nil          -- L298: the team's car stays with the team, free for the next driver
     World.invalidate(w())
     PaddockStore.markPerson(driver.id)
     pcall(MySQL.update.await, [[UPDATE paddock_contract SET ended_at = ?, end_reason = ? WHERE server_id = ? AND person_id = ?
@@ -210,6 +212,14 @@ function PaddockLife.daily(t)
             local lines = Finance.dayLines(world, o)
             local net = Finance.sum(lines)
             o.cash = (o.cash or 0) + net
+            -- L298 (KB-314): the wages the team paid reach its people -- they used to leave the team and arrive nowhere
+            for _, pid2 in ipairs(world.personOrder) do
+                local q = world.people[pid2]
+                if q.orgId == o.id and q.state == "active" and (q.wage or 0) > 0 then
+                    q.cash = (tonumber(q.cash) or 0) + q.wage
+                    PaddockStore.markPerson(q.id)
+                end
+            end
             if PaddockDays then PaddockDays.fact(PaddockDays.orgDistrict(o), "cash_k", net / 1000) end
             if o.humanManagerDriverId then
                 for _, l in ipairs(lines) do PaddockManager.book(o, l.kind, l.amount, l.kind .. ":" .. o.id .. ":" .. day, tostring(day)) end
@@ -332,21 +342,38 @@ local function ownerDecides(org, t, medians)
             d.contractEnds = world.seasonOrdinal + Contracts.lengthFor(owner and owner.principal, rng)
             PaddockStore.markPerson(d.id)
         elseif a.kind == "invest_dev" and a.area then
-            -- L249 step 4: a real part off a real shelf first (it develops the area by more than its price); what is
-            -- left of the budget goes on workshop hours as before. The part's money moved in its own transaction.
+            -- L298: development happens ON THE CARS. Real parts off real shelves first, fitted to the team's drivers'
+            -- cars (each must fit the model and beat what is installed); what is left of the budget is workshop hours,
+            -- a bounded tune on each car (`economy.npc_garage.TUNE_MAX`). The parts' money moved in their own transactions.
             local budget = a.cost or 0
-            if PaddockMarkets and not org.humanManagerDriverId then
-                local okB, part = pcall(PaddockMarkets.buyPart, "org", org.id, a.area, budget, t)
-                if okB and part then
-                    budget = math.max(0, budget - (part.price or 0))
-                    org.evidence = org.evidence or {}
-                    org.evidence.devSpendSeason = (org.evidence.devSpendSeason or 0) + (part.price or 0)
+            local drivers = World.drivers(world, org.id)
+            local spentParts = 0
+            if PaddockMarkets and PaddockCars and not org.humanManagerDriverId then
+                for _, d in ipairs(drivers) do
+                    if budget - spentParts <= 0 then break end
+                    local okB, spent = pcall(PaddockMarkets.tendArea, org.id, d, a.area, budget - spentParts, t)
+                    if okB and spent then spentParts = spentParts + spent end
                 end
             end
-            local _, gained, spent = Car.invest(org.car, a.area, budget)
-            org.cash = (org.cash or 0) - (spent or 0)
+            local Garage = NcmCore.get("economy.npc_garage")
+            local left, spentTune = math.max(0, budget - spentParts), 0
+            for _, d in ipairs(drivers) do
+                if PaddockCars and d.raceCarId then
+                    d.car = d.car or {}
+                    d.car.tune = d.car.tune or {}
+                    local cost = Car.stepCost(math.max(1, math.floor(tonumber(d.car[a.area]) or 1)))
+                    local room = Garage.TUNE_MAX - (tonumber(d.car.tune[a.area]) or 0)
+                    local add = math.min(room, (left / math.max(1, #drivers)) / cost)
+                    if add > 0.01 then
+                        d.car.tune[a.area] = (tonumber(d.car.tune[a.area]) or 0) + add
+                        spentTune = spentTune + math.floor(add * cost + 0.5)
+                        pcall(PaddockCars.derive, d)
+                    end
+                end
+            end
+            org.cash = (org.cash or 0) - spentTune
             org.evidence = org.evidence or {}
-            org.evidence.devSpendSeason = (org.evidence.devSpendSeason or 0) + (spent or 0)
+            org.evidence.devSpendSeason = (org.evidence.devSpendSeason or 0) + spentParts + spentTune
         elseif a.kind == "fire_manager" and org.managerId and not org.humanManagerDriverId then
             local old = world.people[org.managerId]
             if old then old.state = "retired"; old.orgId = nil; PaddockStore.markPerson(old.id) end
@@ -513,7 +540,15 @@ function PaddockLife.rollover(t)
                 o.evidence.seasonsWithoutFiring = 0
             end
             o.evidence.devSpendSeason = 0
+            -- L298: a car's wear is its parts' raced distance (npc_cars.lua); what a season takes away is the workshop's
+            -- setup work -- each driver's tune halves (the abstract team car still depreciates for the views)
             Car.depreciate(o.car, 0.25)
+            for _, d in ipairs(World.drivers(world, o.id)) do
+                if d.car and d.car.tune then
+                    for area, v in pairs(d.car.tune) do d.car.tune[area] = (tonumber(v) or 0) / 2 end
+                    if PaddockCars and d.raceCarId then pcall(PaddockCars.derive, d) end
+                end
+            end
             for _, e in ipairs(PaddockLife.fillSeats(o, t)) do events[#events + 1] = e end
             PaddockLife.reseat(o)
             PaddockStore.markOrg(oid)

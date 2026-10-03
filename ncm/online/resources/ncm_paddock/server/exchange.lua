@@ -64,7 +64,7 @@ end
 --- A part's facts: { assetId, owner (key), stored, family, tier, price, name }.
 function PaddockExchange.part(assetId)
     local r = MySQL.single.await([[SELECT a.asset_id, a.ncm_driver_id, a.owner_principal_kind, a.owner_principal_id, a.location_kind,
-        a.machine_asset_id, d.family, d.tier, d.price, d.code, d.display_manufacturer, d.subtitle
+        a.machine_asset_id, a.design_id, d.family, d.tier, d.price, d.effect, d.code, d.display_manufacturer, d.subtitle
         FROM component_asset a JOIN component_design d ON d.design_id = a.design_id WHERE a.asset_id = ? AND a.server_id = ?]],
         { tostring(assetId or ""), U.sid() })
     if not r then return nil end
@@ -73,6 +73,7 @@ function PaddockExchange.part(assetId)
     local stored = (r.ncm_driver_id and r.location_kind == "storage" and r.machine_asset_id == nil)
         or (not r.ncm_driver_id and r.location_kind == "npc_storage")
     return { assetId = r.asset_id, owner = owner, stored = stored and true or false, family = r.family, tier = r.tier,
+        designId = r.design_id, effect = tonumber(r.effect) or 1,   -- L298: fitment and upgrade checks on the NPC's car
         price = tonumber(r.price) or 0, name = ("%s %s"):format(r.display_manufacturer or "", r.code or "") }
 end
 
@@ -503,6 +504,70 @@ function PaddockExchange.trade(t)
             end
         end
         y()
+    end
+    -- 5. L298 (audit L297: 225 posts, zero settlements -- NPC offers and NPC wants never met, step 4 served players
+    --    only). NPC to NPC: a racer whose car a posted part fits and improves bids the ask; a stored part that matches
+    --    an NPC's want is offered to it. Step 3 settles both on the next pass.
+    local npcPosts = MySQL.query.await([[SELECT p.* FROM exchange_post p WHERE p.server_id = ? AND p.state = 'open' AND p.principal_kind <> 'driver'
+        AND NOT EXISTS (SELECT 1 FROM exchange_bid b WHERE b.post_id = p.post_id AND b.state = 'open')
+        ORDER BY p.created_at LIMIT 6]], { U.sid() }) or {}
+    for _, r in ipairs(npcPosts) do
+        if budget <= 0 then break end
+        local post = postRow(r)
+        if post.kind == "offer" then
+            local part = PaddockExchange.part(post.assetId)
+            if part and PaddockMarkets and PaddockMarkets.wouldFit then
+                for _, n in ipairs(npcs) do
+                    local kind, id = EX.split(n.key)
+                    if n.key ~= post.principal and cashOf(n.key) >= post.cash and PaddockMarkets.wouldFit(kind, id, part) then
+                        if PaddockExchange.bidFor(n.key, { postId = post.postId, revision = post.revision, cash = post.cash }, t) then
+                            stats.npcBids = stats.npcBids + 1; budget = budget - 1
+                        end
+                        break
+                    end
+                end
+            end
+        else
+            local sp = MySQL.single.await([[SELECT a.asset_id, a.owner_principal_kind, a.owner_principal_id, d.price FROM component_asset a
+                JOIN component_design d ON d.design_id = a.design_id LEFT JOIN exchange_reservation r ON r.asset_id = a.asset_id
+                WHERE a.server_id = ? AND a.location_kind = 'npc_storage' AND d.family = ? AND d.tier = ? AND r.asset_id IS NULL
+                  AND NOT (a.owner_principal_kind = ? AND a.owner_principal_id = ?) LIMIT 1]],
+                { U.sid(), post.family, post.tier, EX.split(post.principal) })
+            if sp then
+                local ask = math.max(NM.askFloor({ price = tonumber(sp.price) }, 50), math.floor(post.cash * 0.9))
+                if ask <= post.cash and PaddockExchange.bidFor(EX.principal(sp.owner_principal_kind, sp.owner_principal_id),
+                    { postId = post.postId, revision = post.revision, cash = ask, assetId = sp.asset_id }, t) then
+                    stats.npcBids = stats.npcBids + 1; budget = budget - 1
+                end
+            end
+        end
+        y()
+    end
+    -- 6. L298 SCRAP: a part that has sat unsold in an NPC's storage for `npcScrapAfterDays` leaves service -- scrapped
+    --    for a fraction of its list price (the sink beside the Exchange: parts circulate, they do not pile up)
+    local old = MySQL.query.await([[SELECT a.asset_id, a.owner_principal_kind, a.owner_principal_id, d.price FROM component_asset a
+        JOIN component_design d ON d.design_id = a.design_id LEFT JOIN exchange_reservation r ON r.asset_id = a.asset_id
+        WHERE a.server_id = ? AND a.location_kind = 'npc_storage' AND r.asset_id IS NULL AND COALESCE(a.acquired_at, a.created_at) < ?
+        LIMIT 4]], { U.sid(), t - set("npcScrapAfterDays", 3) * 86400 }) or {}
+    for _, r in ipairs(old) do
+        local value = math.floor((tonumber(r.price) or 0) * set("npcScrapShare", 0.15))
+        local tx = { { query = [[UPDATE component_asset SET location_kind = 'scrapped', lifecycle = 'scrapped' WHERE asset_id = ?
+            AND location_kind = 'npc_storage']], values = { r.asset_id } },
+            { query = [[INSERT IGNORE INTO component_asset_transfer (transfer_id, idem_key, server_id, asset_id, kind, amount, occurred_at,
+                from_principal, reason) VALUES (?, ?, ?, ?, 'scrap', ?, ?, ?, 'scrapped_unsold')]],
+              values = { ids.uuid4(rng), "npc_scrap:" .. U.sid() .. ":" .. r.asset_id, U.sid(), r.asset_id, value, t,
+                r.owner_principal_kind .. ":" .. r.owner_principal_id } } }
+        if PaddockMarkets and PaddockMarkets.moneyStatements then
+            for _, st in ipairs(PaddockMarkets.moneyStatements(r.owner_principal_kind, r.owner_principal_id, value, "scrap", r.asset_id, t,
+                "scrapped_unsold", nil)) do tx[#tx + 1] = st end
+        end
+        local okS = PaddockMarkets and PaddockMarkets.atomic(tx)
+        if okS then
+            local w = PaddockStore.world
+            local holder = r.owner_principal_kind == "org" and w.orgs[r.owner_principal_id] or w.people[r.owner_principal_id]
+            if holder then holder.cash = (tonumber(holder.cash) or 0) + value end
+            log("scrapped %s's unsold part %s for %d", r.owner_principal_id, r.asset_id:sub(1, 8), value)
+        end
     end
 end
 

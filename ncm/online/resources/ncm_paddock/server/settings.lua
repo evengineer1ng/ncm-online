@@ -26,6 +26,11 @@ local ok, settings = pcall(Open77.tunables.declare, {
     -- Calibration (doc 44 §7): a bucket replaces the declared baseline only past these minimums.
     calibMinN = { value = 8, type = "integer", min = 1, max = 1000, apply = "live" },
     calibMinDrivers = { value = 3, type = "integer", min = 1, max = 100, apply = "live" },
+    -- L296: each tier's street pace is learned from the physical field (off = the declared seeds only)
+    paceLearn = { value = true, type = "boolean", apply = "live" },
+    paceLearnMinM = { value = 2000, type = "integer", min = 300, max = 100000, apply = "live" },
+    -- L296: an entered human is routed to a provisional grid slot from this long before the start (the freeze then fixes it)
+    preGridLeadSec = { value = 900, type = "integer", min = 60, max = 10800, apply = "live" },
     -- Manager mode (doc 44 §10).
     managerFoundFee = { value = 5000, type = "integer", min = 0, max = 10000000, apply = "live" },
     managerFoundGrant = { value = 15000, type = "integer", min = 0, max = 10000000, apply = "live" },
@@ -123,6 +128,18 @@ local ok, settings = pcall(Open77.tunables.declare, {
     npcShoppersPerPass = { value = 4, type = "integer", min = 0, max = 50, apply = "live" },
     npcShopMinCash = { value = 800, type = "integer", min = 0, max = 1000000, apply = "live" },
     npcVehicleMinCash = { value = 9000, type = "integer", min = 0, max = 10000000, apply = "live" },
+    -- L298: NPC race cars are real cars (npc_cars.lua) and their racers come in Pace 0.8.9's performance variants
+    npcCarsEnabled = { value = true, type = "boolean", apply = "live" },
+    npcCarsPerPass = { value = 6, type = "integer", min = 1, max = 50, apply = "live" },
+    npcCarsPassSec = { value = 10, type = "integer", min = 2, max = 600, unit = "s", apply = "live" },
+    npcRacerVariants = { value = true, type = "boolean", apply = "live" },
+    npcShopIntervalSec = { value = 10800, type = "integer", min = 300, max = 604800, unit = "s", apply = "live" },
+    npcTeamCarBudget = { value = 6000, type = "integer", min = 0, max = 10000000, apply = "live" },
+    npcCarUpgradeMinCash = { value = 12000, type = "integer", min = 0, max = 10000000, apply = "live" },
+    npcTradeInShare = { value = 0.40, type = "number", min = 0, max = 1, apply = "live" },
+    npcUsedPriceShare = { value = 0.55, type = "number", min = 0.05, max = 1.5, apply = "live" },
+    npcScrapShare = { value = 0.15, type = "number", min = 0, max = 1, apply = "live" },
+    npcScrapAfterDays = { value = 3, type = "number", min = 0.1, max = 365, unit = "d", apply = "live" },
     -- L249 step 5: NPC traders on the posted Exchange (they post surplus and wants, take good bids, bid on players' posts)
     npcExchangeEnabled = { value = true, type = "boolean", apply = "live" },
     npcExchangeEverySec = { value = 180, type = "integer", min = 30, max = 7200, unit = "s", apply = "live" },

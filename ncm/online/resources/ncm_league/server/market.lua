@@ -357,6 +357,41 @@ function NcmMarket.start()
 end
 
 --- Every offering this market carries, stocked or not. This is the read model the panel draws.
+--- WHERE DID THEY GO (L298, IDEA-852; owner: "SOLD OUT · 0/4 · Last batch: 4 units · Majestic Auto Sport 2 · Omega
+--- Elite Racing 1 · Privateer 1"). The most recent production batch of a model at a market, by who holds each unit:
+--- a Paddock team by name, an independent or a player as "Privateer", the unsold as "on the shelf". The full chain
+--- (buyer, price, when, why) stays in the database -- `tools/npc-economy-audit.ps1` -- and only this summary is shown.
+--- Returns { units, by = { { name, n } } } or nil when the model has never been produced here.
+function NcmMarket.lastBatch(marketId, vehicleKey)
+    local ok, rows = pcall(MySQL.query.await, [[SELECT mi.state, mi.sold_to_principal, mi.sold_to_driver_id, o.name AS org_name, pp.org_id AS person_org,
+            po.name AS person_org_name
+        FROM market_inventory mi JOIN vehicle_asset a ON a.asset_id = mi.asset_id
+        LEFT JOIN paddock_org o ON o.server_id = a.server_id AND mi.sold_to_principal = CONCAT('org:', o.org_id)
+        LEFT JOIN paddock_person pp ON pp.server_id = a.server_id AND mi.sold_to_principal = CONCAT('person:', pp.person_id)
+        LEFT JOIN paddock_org po ON po.server_id = a.server_id AND po.org_id = pp.org_id
+        WHERE mi.market_id = ? AND a.server_id = ? AND a.vehicle_key = ?
+          AND a.allocation_id = (SELECT a2.allocation_id FROM market_inventory m2 JOIN vehicle_asset a2 ON a2.asset_id = m2.asset_id
+              WHERE m2.market_id = ? AND a2.server_id = ? AND a2.vehicle_key = ? AND a2.allocation_id IS NOT NULL
+              ORDER BY m2.listed_at DESC LIMIT 1)]],
+        { marketId, serverId(), vehicleKey, marketId, serverId(), vehicleKey })
+    if not ok or type(rows) ~= "table" or #rows == 0 then return nil end
+    local counts, order = {}, {}
+    local function add(name)
+        if not counts[name] then counts[name] = 0; order[#order + 1] = name end
+        counts[name] = counts[name] + 1
+    end
+    for _, r in ipairs(rows) do
+        if r.state == "available" then add("on the shelf")
+        elseif r.org_name then add(tostring(r.org_name))
+        elseif r.person_org_name then add(tostring(r.person_org_name))
+        else add("Privateer") end
+    end
+    local by = {}
+    for _, name in ipairs(order) do by[#by + 1] = { name = name, n = counts[name] } end
+    table.sort(by, function(x, y) if x.n ~= y.n then return x.n > y.n end return x.name < y.name end)
+    return { units = #rows, by = by }
+end
+
 function NcmMarket.offerings(marketId)
     local t = now()
     local out = {}
@@ -380,6 +415,7 @@ function NcmMarket.offerings(marketId)
             -- reading `Not rated`.
             local entry = Catalogue.byKey(line.vehicleKey)
             o.declaredTopSpeedKph = entry and Catalogue.declaredTopSpeedKph(entry) or nil
+            o.lastBatch = NcmMarket.lastBatch(marketId, line.vehicleKey)
             out[#out + 1] = o
         end
     end

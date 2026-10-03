@@ -23,6 +23,7 @@ local U = PaddockUtil
 local log = U.logger("bubble")
 local L = NcmCore.get("paddock.live")
 local R = NcmCore.get("paddock.racestate")
+local Incidents = NcmCore.get("competition.incidents")
 local Ovals = NcmCore.get("data.ovals")
 local Hash = NcmCore.get("vocabulary.hash")
 
@@ -274,8 +275,17 @@ local function paceCar(race, car, op, from)
     speed = math.min(set("livePaceMaxMps", 90), speed * paceSpeedFactor(race))
     speed = math.floor(speed * 10 + 0.5) / 10
     if op == "add" then car.sentSpeed = speed end
+    -- a staggered start (2026-10-02, twelve cars at once piled up): a grid car is released by row, front row first,
+    -- bubbleStartGapMs apart (0 = all at the lights); two cars a row
+    local releaseMs
+    if op == "add" and car.gridSlot and not (race.modelGoAt and nowMs() > race.modelGoAt * 1000) then
+        releaseMs = (math.ceil(car.gridSlot / 2) - 1) * set("bubbleStartGapMs", 500)
+    end
+    -- a car joining mid-race starts at its model speed (Pace 0.8.8 pre-roll; 0 = standing start)
+    local startMps = (op == "add" and not car.gridSlot and set("bubbleRollingRestream", true)) and car.startMps or nil
     TriggerClientEvent("ncm:paddock.bubble.car", car.pace, { raceId = race.raceId, op = op, vehicleId = car.vid,
-        from = from and math.max(1, from - 1) or nil, speed = speed })
+        from = from and math.max(1, from - 1) or nil, speed = speed, releaseMs = releaseMs,
+        startMps = startMps and math.floor(startMps * 10 + 0.5) / 10 or nil })
 end
 
 --- THE SIM, MODELLED (owner, 05:53: "the sim underneath it isn't being modelled"), WITHOUT ITS TRAFFIC (owner,
@@ -301,7 +311,9 @@ local function paceFollowSim(race, car, d, tMs)
     local v = math.floor(math.min(set("livePaceMaxMps", 90), mps * factor) * 10 + 0.5) / 10
     car.simPaceSent, car.sentSpeed = true, v
     TriggerClientEvent("ncm:paddock.bubble.car", car.pace, { raceId = race.raceId, op = "set", vehicleId = car.vid, speed = v })
-    log("%s: %s on its own clean sim pace: %.1f m/s (sim %.1f x %.2f)", race.raceId, car.id, v, mps, factor)
+    -- NOTE: Pace's racing command (mode 3, every street and oval car) has no speed input and ignores this value;
+    -- the racer's pace is the vehicle record's race profile (racers.yaml). Logged only as the sim's reference.
+    log("%s: %s sim reference pace %.1f m/s (sim %.1f x %.2f; not applied to the racing command)", race.raceId, car.id, v, mps, factor)
 end
 
 -- send a physical car along the line from path point `from`: the next WINDOW points AHEAD of it (a long line --
@@ -341,6 +353,9 @@ end
 
 local function remove(car, race)
     if race then paceCar(race, car, "remove") end
+    -- every way off the road leaves the model where the car really was (a live car is otherwise frozen)
+    local mc = race and race.model and race.model.cars[car.id]
+    if mc and mc.live then R.anchor(race.model, car.id, mc.live.t, mc.live.d) end
     byVehicle[car.vid] = nil
     pcall(Open77.vehicles.ai.removeDriver, car.vid)
     pcall(Open77.vehicles.remove, car.vid)
@@ -359,10 +374,12 @@ local function spawn(race, id, p, tMs, bucket, pid)
     z = grounded and z or (p.z or 0)
     local raceRoute = PaddockWorld.route(race.routeId)
     local ovalRace = raceRoute and raceRoute.oval ~= nil
-    -- Bubble cars are the ones physically beside the player. They must use the same oval-only
-    -- RaceDrive clone as staged cars; omitting the oval flag silently spawned vanilla profiles.
-    local record = PaddockLive.recordFor(w.orgs[(person and person.orgId) or ""], race.tier, ovalRace)
-    if ovalRace then log("%s: oval bubble %s spawning RaceDrive clone %s", race.raceId, id, record) end
+    -- Bubble cars are the ones physically beside the player: NCM Pace's racer clone, street and oval (KB-287).
+    -- L298: the car this NPC actually owns (its model, in the Pace variant its installed parts compose to); before
+    -- the car exists, the old team-hashed record
+    local record = PaddockLive.recordFor(w.orgs[(person and person.orgId) or ""], race.tier, ovalRace, person)
+    race.cloneLogged = race.cloneLogged or {}
+    if not race.cloneLogged[id] then race.cloneLogged[id] = true; log("%s: bubble %s spawning racer clone %s", race.raceId, id, record) end
     local okV, vid, why = pcall(Open77.vehicles.create, { record = record,
         position = { x = p.x, y = p.y, z = z + 0.8 }, yaw = p.yaw, bucket = bucket or 0 })
     if not okV or not vid then stats.refused = stats.refused + 1; log("%s: %s refused: %s", race.raceId, id, tostring(why or vid)) return nil end
@@ -378,6 +395,7 @@ local function spawn(race, id, p, tMs, bucket, pid)
         if not okS then pcall(Open77.vehicles.remove, vid); stats.refused = stats.refused + 1 return nil end
     end
     local car = { id = id, vid = vid, npc = npc, seated = not pace, spawnT = tMs, spawnD = p.d, lastD = p.d, bucket = bucket, yaw = p.yaw,
+        gridSlot = tonumber(p.slot),
         anchorPos = { x = p.x, y = p.y }, progressT = tMs, recoveries = 0, resets = 0, lastHelpT = -1e9, lastResetT = -1e9,
         -- no model before the lights (the pre-grid): the plan comes when the race opens (tick)
         plan = speedPlanFor(race, id) }
@@ -424,13 +442,51 @@ local function handBack(race, b, car, tMs, stopped, why)
     if okP and type(pos) == "table" then d = R.project(race.model, pos, (car.lastD or 0) - 150, (car.lastD or 0) + 150) end
     local physicalFinishMs = why == "finished" and tMs or nil
     if physicalFinishMs then d = math.max(d or 0, race.model.lengthM) end
-    R.anchor(race.model, car.id, tMs, d, stopped, physicalFinishMs)
-    R.markPhysical(race.model, car.id, car.spawnD or 0, d, car.spawnT, tMs)
+    -- the stretch first, so the anchor can carry the pace the car was measured driving (truth rules, racestate 0.2.0).
+    -- Measured from when the car was first UNDER WAY, not from the spawn: a set-down car stands while its driver is seated
+    -- (KB-238), and counting that halved every measured pace (every 15:45 hand-back logged the 0.50 floor).
+    R.markPhysical(race.model, car.id, car.movingD or car.spawnD or 0, d, car.movingT or car.spawnT, tMs)
+    local rate = R.observedRate(race.model, car.id, 600) or R.fieldRate(race.model)
+    -- L296: a car still racing (not wrecked, not stuck) adds its at-speed stretch to the race's physical pace
+    if not stopped and car.paceT and d and tMs > car.paceT and d - car.paceD >= 300 then
+        race.paceObs = race.paceObs or { m = 0, ms = 0 }
+        race.paceObs.m, race.paceObs.ms = race.paceObs.m + (d - car.paceD), race.paceObs.ms + (tMs - car.paceT)
+    end
+    R.anchor(race.model, car.id, tMs, d, stopped, physicalFinishMs, rate)
     remove(car, race)
     b.cars[car.id] = nil
     if stopped then stats.stopped = stats.stopped + 1 else stats.handedBack = stats.handedBack + 1 end
-    log("%s: %s handed back at %.0f m (%s)", race.raceId, car.id, d, why)
+    log("%s: %s handed back at %.0f m (%s)%s", race.raceId, car.id, d, why, rate and (" at %.2fx its sim pace"):format(rate) or "")
     if car.pace then PaddockBubble.streamline(car.pace, "%s %s handed back (%s)", race.raceId, car.id, why) end
+end
+
+--- NPC incidents (owner, 2026-10-02: "npcs ... should be handed out penalties as well"). A physical car's vehicle health
+--- is read every pass; a drop is scored by the SAME scorer and ledger as a human's (`competition.incidents` damage
+--- bands, escalation, one incident per crash episode), and the seconds go on the car in the model -- the provisional
+--- order and the classification both carry them. Health is normalised to the car's own best reading; the damage a car
+--- arrives with is never charged; a destroyed car is out (persevere), not penalised.
+local function npcIncident(race, car, id, pos, tMs)
+    local okH, hp = pcall(Open77.vehicles.getHealth, car.vid)
+    if not okH or type(hp) ~= "number" or hp <= 0 then return end
+    car.maxHp = math.max(car.maxHp or 0, hp)
+    local cur = { health = hp / car.maxHp }
+    local prev = car.hpSnap
+    car.hpSnap = cur
+    -- L298: the damage this car took is a repair bill at the race's close (races.lua resolve)
+    race.carDamage = race.carDamage or {}
+    local dmg = race.carDamage[id] or { frac = 0 }
+    dmg.frac = math.max(dmg.frac, 1 - cur.health)
+    race.carDamage[id] = dmg
+    if not prev or (prev.health - cur.health) < 0.002 then return end
+    local rec = Incidents.damage(prev, cur, car.lastSpeed or 0, pos, tMs / 1000)
+    if not rec then return end
+    race.npcLedger = race.npcLedger or Incidents.Ledger.new()
+    local got = race.npcLedger:add(id, rec, { baseSec = set("incidentBaseSec", 2) })
+    if got and (got.seconds or 0) > 0 then
+        R.penalize(race.model, id, math.floor(got.seconds * 1000 + 0.5))
+        log("%s: NPC INCIDENT %s band=%d +%.1fs (health %.0f%% -> %.0f%%) total=%.1fs (#%d)", race.raceId, id, got.band, got.seconds,
+            prev.health * 100, cur.health * 100, race.npcLedger:sum(id), race.npcLedger:count(id))
+    end
 end
 
 -- keep a stuck physical car racing; anchor it as out only after liveRetireSec
@@ -442,7 +498,11 @@ local function persevere(race, b, car, pos, tMs)
     -- wrecks were moved 10 m BACK every 20 s for minutes. A car the engine has destroyed is out of the race.
     if car.pace then
         local okH, health = pcall(Open77.vehicles.getHealth, car.vid)
-        if okH and type(health) == "number" and health <= 0 then return handBack(race, b, car, tMs, true, "wrecked") end
+        if okH and type(health) == "number" and health <= 0 then
+            race.carDamage = race.carDamage or {}
+            race.carDamage[car.id] = { frac = 1, wrecked = true }      -- L298: a wreck is a repair bill and a tow
+            return handBack(race, b, car, tMs, true, "wrecked")
+        end
         return
     end
     -- never on the grid (a car there is at 0 m, and "10 m back" put every stuck car on the one start point, on top of
@@ -522,6 +582,41 @@ function PaddockBubble.publishCorridors(now, players)
     end
 end
 
+-- KB-286: a player pulling away from the field. 2026-10-02 13:46: the owner was ahead; model cars were set down
+-- 219-248 m behind them and handed back 1-3 s later at 300 m, over and over. A car is not set down where the gap to
+-- the player is OPENING faster than the car's own model pace by `bubbleRecedeMarginMps`; a car the player is catching,
+-- or one catching the player, still comes in. Velocity is each player's movement between passes.
+local playerSeen = {}       -- pid -> { x, y, ms, v = { x, y } }
+local function updateVelocities(players, now)
+    for pid, pp in pairs(players) do
+        local key = tostring(pid)
+        local prev = playerSeen[key]
+        local v = prev and prev.v or nil
+        if prev and type(pp.x) == "number" then
+            local dt = (now - prev.ms) / 1000
+            if dt >= 0.2 and dt <= 5 then v = { x = (pp.x - prev.x) / dt, y = (pp.y - prev.y) / dt }
+            elseif dt > 5 then v = nil end
+        end
+        if type(pp.x) == "number" then playerSeen[key] = { x = pp.x, y = pp.y, ms = now, v = v } end
+    end
+    for key in pairs(playerSeen) do
+        if players[key] == nil and players[tonumber(key)] == nil then playerSeen[key] = nil end
+    end
+end
+
+--- How fast the player is moving directly away from point p, and whether that outruns the car there.
+local function recedingFrom(ppid, pp, p)
+    local seen = playerSeen[tostring(ppid)]
+    local v = seen and seen.v
+    if not v then return false end
+    local dx, dy = pp.x - p.x, pp.y - p.y
+    local dist = math.sqrt(dx * dx + dy * dy)
+    if dist < 1 then return false end
+    local away = (v.x * dx + v.y * dy) / dist
+    local carMps = tonumber(p.speed) or 0
+    return away > carMps + set("bubbleRecedeMarginMps", 2), away, carMps
+end
+
 --- One bubble pass over every running race. Bounded: at most `bubbleSpawnsPerPass` new cars per pass.
 function PaddockBubble.tick()
     if not set("bubbleEnabled", true) or set("liveMode", "watched") == "off" then return end
@@ -529,6 +624,7 @@ function PaddockBubble.tick()
     players = (okP and type(players) == "table") and players or {}
     local inM, outM = set("bubbleInM", 250), set("bubbleOutM", 300)
     local now = nowMs()
+    updateVelocities(players, now)
     pcall(PaddockBubble.publishCorridors, now, players)
     -- a car its Pace player's game never reported (never streamed in there, or the player left): it goes, still empty
     for raceId, b in pairs(PaddockBubble.byRace) do
@@ -599,6 +695,15 @@ function PaddockBubble.tick()
         if race.state == "running" and race.model and not street and (src == "ghost" or src == "ring" or src == "road") then
             local b = state(race.raceId)
             local tMs = now - race.modelGoAt * 1000
+            -- KB-318 (owner, 2026-10-03: restreams "too obvious and damaging to race integrity especially during oval"): a
+            -- ring is about as wide as the bubble, so every lap the far side crossed bubbleOutM and its cars went out and came
+            -- back in. On an oval the bubble covers the whole ring: a player at the venue keeps the whole field physical.
+            local raceIn, raceOut = inM, outM
+            local rroute = PaddockWorld.route(race.routeId)
+            if rroute and rroute.oval and tonumber(rroute.oval.radius) then
+                local reach = 2 * rroute.oval.radius + set("bubbleOvalMarginM", 80)
+                raceIn, raceOut = math.floor(math.max(inM, reach)), math.floor(math.max(outM, reach + 50))
+            end
             -- instrumentation (KB-223): every 10 s, each physical car -- where it is, how far it moved, its window
             local report = tMs - (b.reportedMs or -1e9) >= 10000
             if report and next(b.cars) then b.reportedMs = tMs end
@@ -615,6 +720,29 @@ function PaddockBubble.tick()
                         car.plan = speedPlanFor(race, id)
                     end
                     local d, gap = R.project(race.model, pos, (car.lastD or 0) - 150, (car.lastD or 0) + 150)
+                    -- the street is the truth for a car on it (racestate truth rules): its place, and its incidents
+                    if car.lastT and tMs > car.lastT then car.lastSpeed = math.abs(d - (car.lastD or d)) / ((tMs - car.lastT) / 1000) end
+                    if not car.movingT and (car.lastSpeed or 0) > 5 then car.movingT, car.movingD = car.lastT or tMs, car.lastD or d end
+                    -- L296: the stretch the tier's pace is learned from -- a car restreamed mid-race counts only once at
+                    -- speed (its launch is the restream's cost, not the street's pace); a grid car from under way
+                    if not car.paceT and car.movingT and not car.expect then car.paceT, car.paceD = car.lastT or tMs, car.lastD or d end
+                    local ex = car.expect
+                    if ex and ((car.lastSpeed or 0) >= 0.85 * ex.v or tMs - ex.t0 > 20000) then
+                        -- placed at d0 + lead; with no standstill it would be at d0 + lead + v*dt: the shortfall is the cost
+                        local loss = (ex.d0 + ex.lead + ex.v * (tMs - ex.t0) / 1000) - d
+                        if loss > -100 and loss < 600 then
+                            race.restreamLossM = race.restreamLossM and (0.7 * race.restreamLossM + 0.3 * loss) or loss
+                            log("%s: %s restream: at speed after %.1f s, cost %.0f m (led by %.0f m); race average now %.0f m", race.raceId, id,
+                                (tMs - ex.t0) / 1000, loss, ex.lead, race.restreamLossM)
+                        end
+                        car.expect = nil
+                    end
+                    car.lastT = tMs
+                    -- KB-318: while a restreamed car is still launching (set down ahead by the learned lead, not yet at
+                    -- 85 % of its pace) the model keeps its race position -- nobody gains places on a car that has not
+                    -- got going yet; from its first moment at speed the street is the truth again
+                    if not car.expect then R.observe(race.model, id, tMs, d) end
+                    pcall(npcIncident, race, car, id, pos, tMs)
                     if L.dist(car.anchorPos, pos) > L.PROGRESS_M then car.anchorPos = { x = pos.x, y = pos.y }; car.progressT = tMs end
                     if report then
                         local laps = race.model.path.source == "ring" and PaddockWorld.route(race.routeId).oval.laps or nil
@@ -643,10 +771,10 @@ function PaddockBubble.tick()
                     local hp = car.pace and (players[car.pace] or players[tostring(car.pace)])
                     if hp then hostD = L.dist(hp, pos) end
                     if d >= race.model.lengthM then handBack(race, b, car, tMs, false, "finished")
-                    elseif nearest > outM then handBack(race, b, car, tMs, false, ("nobody within %d m: nearest player %.0f m"):format(outM, nearest))
-                    elseif car.pace and hostD > outM then
+                    elseif nearest > raceOut then handBack(race, b, car, tMs, false, ("nobody within %d m: nearest player %.0f m"):format(raceOut, nearest))
+                    elseif car.pace and hostD > raceOut then
                         handBack(race, b, car, tMs, false, ("its Pace player %d is %s m away (over %d)"):format(car.pace,
-                            hostD < math.huge and ("%.0f"):format(hostD) or "gone", outM))
+                            hostD < math.huge and ("%.0f"):format(hostD) or "gone", raceOut))
                     else persevere(race, b, car, pos, tMs) end
                 end
             end
@@ -656,7 +784,7 @@ function PaddockBubble.tick()
                 -- brings its cars in. The platform AI that drives an oval's cars without Pace is not that.
                 local eligible = (src == "road" and paceForStreet(tonumber(ppid)))
                     or (src == "ring" and paceForOval(tonumber(ppid))) or (src ~= "road" and src ~= "ring")
-                local near = eligible and R.near(race.model, tMs, pp, inM) or {}
+                local near = eligible and R.near(race.model, tMs, pp, raceIn) or {}
                 for _, id in ipairs(near) do
                     if not b.cars[id] and spawns < cap then
                         local p = R.carAt(race.model, id, tMs)
@@ -665,8 +793,43 @@ function PaddockBubble.tick()
                             -- FORMATION_MS a car comes in at its GRID SLOT (SP's formation; round the ring on an oval)
                             local slot = formationSlot(race, id, tMs, p)
                             if slot then p = slot end
+                            -- SEAMLESS RESTREAM (owner, 2026-10-02: restreamed drivers "spawn in at standstill and take
+                            -- seconds to get up to speed", so a driver who fell back made up places). A mid-race car is set
+                            -- down AHEAD of its model position by what a restream measurably costs in this race (seat,
+                            -- command, launch: race.restreamLossM, learned below), so it is where it should be once at speed.
+                            -- The lead shrinks to keep the car out of a player's sight (bubbleRestreamClearM).
+                            local trueD, trueSpeed = p.d, p.speed
+                            if not slot and p.d and p.d > 5 then
+                                local lead = math.max(0, math.min(set("bubbleRestreamMaxLeadM", 220), race.restreamLossM or set("bubbleRestreamLeadM", 90)))
+                                local clearM = set("bubbleRestreamClearM", 150)
+                                while lead > 0 do
+                                    local q = R.pointAt(race.model, math.min(race.model.lengthM - 5, p.d + lead))
+                                    local nearP = math.huge
+                                    for _, pp2 in pairs(players) do nearP = math.min(nearP, L.dist(pp2, q)) end
+                                    if nearP >= clearM then
+                                        q.d, q.speed, q.state = math.min(race.model.lengthM - 5, p.d + lead), p.speed, p.state
+                                        p = q
+                                        break
+                                    end
+                                    lead = lead - 30
+                                end
+                                p.restreamLead = math.max(0, lead)
+                            end
+                            p.trueD, p.trueSpeed = trueD, trueSpeed
                             -- never set a car down on another: wait a pass for the model to string the field out
                             local clash
+                            -- KB-286: nor where this player is driving away from it faster than it can follow
+                            if not slot then
+                                local receding, away, carMps = recedingFrom(ppid, pp, p)
+                                if receding then
+                                    clash = "receding"
+                                    b.recedes = (b.recedes or 0) + 1
+                                    if b.recedes % 20 == 1 then
+                                        log("%s: %s not set down: player %s is pulling away from it at %.1f m/s, the car's pace is %.1f m/s (%d skips)",
+                                            race.raceId, id, tostring(ppid), away, carMps, b.recedes)
+                                    end
+                                end
+                            end
                             for _, other in pairs(b.cars) do
                                 if other.pos and L.dist(other.pos, p) < SPAWN_CLEAR_M then clash = other.id break end
                             end
@@ -676,7 +839,9 @@ function PaddockBubble.tick()
                                     if L.dist(pp2, p) < SPAWN_CLEAR_M then clash = "player " .. tostring(ppid2) break end
                                 end
                             end
-                            if clash then
+                            if clash == "receding" then
+                                -- skipped above, logged there
+                            elseif clash then
                                 b.clashes = (b.clashes or 0) + 1
                                 if b.clashes % 20 == 1 then log("%s: %s held back: within %d m of %s (%d holds)", race.raceId, id, SPAWN_CLEAR_M, clash, b.clashes) end
                             else
@@ -684,6 +849,10 @@ function PaddockBubble.tick()
                                 log("%s: %s coming in %.0f m from a player at %.0f, %.0f%s", race.raceId, id, L.dist(pp, p), pp.x or 0, pp.y or 0,
                                     slot and (" (grid slot " .. slot.slot .. ")") or "")
                                 local car = spawn(race, id, p, tMs, pp.bucket, tonumber(ppid))
+                                if car and not slot and p.trueD and (p.trueSpeed or 0) > 3 then
+                                    car.expect = { d0 = p.trueD, t0 = tMs, v = p.trueSpeed, lead = p.restreamLead or 0 }
+                                    car.startMps = p.trueSpeed
+                                end
                                 if car then car.pos = { x = p.x, y = p.y }; b.cars[id] = car; b.touched = true; spawns = spawns + 1 end
                                 if car and car.pace then
                                     PaddockBubble.streamline(car.pace, "%s %s set down as vehicle %s, %.0f m from player %s", race.raceId, id,
@@ -731,7 +900,10 @@ function PaddockBubble.writeBack(race)
     local b = PaddockBubble.byRace[race.raceId]
     if not b or not b.touched or not race.model then return false end
     for id, car in pairs(b.cars) do R.anchor(race.model, id, nowMs() - race.modelGoAt * 1000, car.lastD, false); remove(car, race); b.cars[id] = nil end
-    local entrants = R.result(race.model)
+    -- the flag: only the cars home by then are finishers; the rest are classified by how far they got
+    local cutoff = race.flagAt and race.modelGoAt and math.floor((race.flagAt - race.modelGoAt) * 1000) or nil
+    local entrants = R.result(race.model, cutoff)
+    race.modelEntrants = entrants          -- raw finishes and penalties, for the classification ceremony (humans.lua)
     local all = true
     for _, e in ipairs(entrants) do if (e.physicalShare or 0) < 0.95 then all = false end end
     local shares = {}
@@ -739,6 +911,8 @@ function PaddockBubble.writeBack(race)
     local ok, err = PaddockLive.writeResult(race, entrants, all and "physical" or "mixed", "bubble", { mode = "bubble", physicalPct = shares })
     if not ok then log("%s: write-back FAILED: %s", race.raceId, tostring(err)) return false end
     log("%s: result written from the model (%s)", race.raceId, all and "physical" or "mixed")
+    -- L296: what the street measured, into the sim's base pace for the next race of this tier
+    if race.paceObs then pcall(PaddockCalibration.learnPhysical, race, race.paceObs.m, race.paceObs.ms) end
     return true
 end
 

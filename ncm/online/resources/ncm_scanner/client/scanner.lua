@@ -441,6 +441,48 @@ local function registerChromeKeys()
 end
 registerChromeKeys()
 
+-- THE PAD (owner, 2026-10-03: "scanner should be lb hold keeps scanner activated until release, and dpad up down should
+-- cycle the quickhacks while lb held scanner. when ready to upload quickhacks, click square on ps pad or x on xbox
+-- controller"). LB did nothing for them while driving, so the pad is read here through OPEN//77 (XInput: padX is the
+-- PlayStation Square) and the hold goes to NCM Vision (0.4.0), which lapses it 600 ms after the last refresh -- a
+-- stopped resource or a dropped socket cannot leave the world green. Upload on the pad is a CLICK: it starts the
+-- upload, and the server's own rules (range, lock, cooldown) end or refuse it.
+local PAD_POLL_MS, PAD_REFRESH_MS = 33, 200
+local pad = { lb = false, up = false, down = false, square = false, refreshed = 0, reported = false }
+local function padDown(control)
+    local ok, down, why = pcall(Open77.input.isDown, control)
+    if not ok then return false, tostring(down) end
+    return down == true, why
+end
+CreateThread(function()
+    Wait(3000)
+    while true do
+        local lb, why = padDown("padLeftShoulder")
+        if not pad.reported then
+            pad.reported = true
+            log("pad: LB read %s (%s)", lb and "down" or "up", tostring(why or "ok"))
+        end
+        if lb ~= pad.lb then
+            pad.lb = lb
+            send({ cmd = "hold", on = lb })
+            pad.refreshed = now()
+            log("pad: LB %s -- scanner hold %s", lb and "down" or "up", lb and "on" or "off")
+            if not lb then pad.up, pad.down, pad.square = false, false, false end
+        elseif lb and now() - pad.refreshed >= PAD_REFRESH_MS then
+            send({ cmd = "hold", on = true })
+            pad.refreshed = now()
+        end
+        if lb then
+            local up, down, square = padDown("padUp"), padDown("padDown"), padDown("padX")
+            if up and not pad.up then cycle(-1) end
+            if down and not pad.down then cycle(1) end
+            if square and not pad.square then uploadPressed() end
+            pad.up, pad.down, pad.square = up, down, square
+        end
+        Wait(PAD_POLL_MS)
+    end
+end)
+
 RegisterNetEvent("ncm:chrome.state", function(s)
     if type(s) ~= "table" then return end
     if s.slotted ~= nil or s.error then chrome.slotted = s.slotted end

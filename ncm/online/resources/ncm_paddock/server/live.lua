@@ -248,7 +248,16 @@ end
 
 -- -------------------------------------------------------------------------------------------------------- stage
 
-local function recordFor(org, tier, oval)
+local function recordFor(org, tier, oval, person)
+    -- L298: a racer with a real car races it -- its own model, in the Pace performance variant its parts compose to
+    -- (`npcRacerVariants` waits for the Pace build that carries the variant clones)
+    if person and person.raceCarId and PaddockCars then
+        local okC, c = pcall(PaddockCars.load, person.raceCarId)
+        if okC and c and c.record then
+            local variant = PaddockSettings.get("npcRacerVariants", true) and (c.variant or 0) or 0
+            return NcmCore.get("economy.npc_garage").racerRecord(c.record, variant, oval)
+        end
+    end
     local band = (Season.TIERS[tier] or {}).band or {}
     local list = {}
     for _, class in ipairs(band.classes or { "Sport" }) do
@@ -258,9 +267,13 @@ local function recordFor(org, tier, oval)
     end
     if #list == 0 then list = { "Vehicle.v_sport2_quadra_type66" } end
     local record = Hash.pick(list, "livecar", org and org.id or "none")
-    -- Ovals only: NCM Pace ships isolated TweakXL racer clones with its higher RaceDrive profile.
-    if oval then return (record:gsub("^Vehicle%.", "Vehicle.ncm_racer_")) end
-    return record
+    -- Every Paddock racer, street and oval, is NCM Pace's TweakXL racer clone (racers.yaml). The vanilla
+    -- `Driving.Race_Driving` has `useSpeedLimit = true` (Pace's TweakDB dump, 2026-10-01), so the engine's racer
+    -- held every street car to the lane's speed limit: 14-18 m/s measured on 2026-10-02 (KB-287) while the owner won
+    -- easily. The clone turns the limit off (driving and vision) and raises forward/turning acceleration. Every
+    -- record in data.vehicle_pool has a clone (tools/gen-pace-racers.py). `oval` is kept for callers; it no longer
+    -- changes the record.
+    return (record:gsub("^Vehicle%.", oval and "Vehicle.ncm_racer_oval_" or "Vehicle.ncm_racer_"))
 end
 
 local DRIVER_RECORDS = { m = { "Character.WorkerMale", "Character.YoungsterMale", "Character.AsianMale" },

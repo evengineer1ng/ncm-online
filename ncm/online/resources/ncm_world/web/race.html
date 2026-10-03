@@ -77,6 +77,21 @@
     #board td.time { font-family: var(--mono); font-size: 26px; text-align: right; }
     #board td.gap { font-family: var(--mono); font-size: 22px; color: var(--dim); text-align: right; }
     #board tr.me td { color: var(--warn); }
+    /* The classification ceremony (owner, 2026-10-02): the board as they crossed the line, then a visible shuffle into
+       the classified order with penalties -- green outline moved up, red moved down. Rows are positioned, so the
+       shuffle is a slide, not a redraw. */
+    #ceremony { position: relative; }
+    #ceremony .crow { position: absolute; left: 0; right: 0; height: 40px; display: flex; align-items: center; gap: 14px;
+      padding: 0 12px; border: 2px solid transparent; border-radius: 8px; box-sizing: border-box;
+      transition: top 1.4s cubic-bezier(.65,0,.35,1), border-color .4s ease .9s, background-color .4s ease .9s; }
+    #ceremony .crow .pos { font: 800 28px/1 var(--mono); color: var(--accent); width: 64px; }
+    #ceremony .crow .name { flex: 1; font-size: 26px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    #ceremony .crow .time { font: 600 22px/1 var(--mono); width: 150px; text-align: right; }
+    #ceremony .crow .pen { font: 600 18px/1 var(--mono); width: 110px; text-align: right; color: var(--dim); }
+    #ceremony .crow.me .name, #ceremony .crow.me .pos { color: var(--warn); }
+    #ceremony.settled .crow.up { border-color: #3BE28A; background: rgba(59,226,138,0.10); }
+    #ceremony.settled .crow.down { border-color: #FF4D5E; background: rgba(255,77,94,0.10); }
+    #ceremony.settled .crow .pen.has { color: #FF4D5E; }
     #board tr.me td.pos { color: var(--warn); }
 
     /* Driver's instrument cluster. Bottom LEFT, small and quiet: it must not touch the vanilla speedometer
@@ -181,7 +196,7 @@
   </div>
   <div id="banner" class="hidden"></div>
   <div id="ghost" class="hidden"><span class="lbl" id="ghostLabel"></span><span class="who" id="ghostWho"></span><span class="time" id="ghostTime"></span><span class="delta na" id="ghostDelta">--</span><span class="warn hidden" id="ghostWarn"></span></div>
-  <div id="board" class="hidden"><div class="title"><span id="boardIcon"></span><span id="boardTitle"></span></div><table><tbody id="rows"></tbody></table></div>
+  <div id="board" class="hidden"><div class="title"><span id="boardIcon"></span><span id="boardTitle"></span></div><table><tbody id="rows"></tbody></table><div id="ceremony"></div></div>
   <div id="inputs" class="hidden">
     <div id="wearLamps" class="hidden" aria-label="Component condition warnings"></div>
     <div class="wheel" id="inWheel"><svg viewBox="-24 -24 48 48" width="40" height="40" aria-hidden="true"><g id="inWheelG"><circle r="20" fill="none" stroke="currentColor" stroke-width="3.2"/><line x1="-19.5" y1="-3" x2="19.5" y2="-3" stroke="currentColor" stroke-width="2.8"/><line x1="0" y1="-3" x2="0" y2="19.5" stroke="currentColor" stroke-width="2.8"/><circle r="3.2" fill="currentColor"/></g></svg></div>
@@ -256,8 +271,46 @@
         } else {
           strip.classList.add("hidden");
         }
-        // Board
-        if (s.board && Array.isArray(s.board.rows) && s.board.rows.length) {
+        // The classification ceremony: as they crossed, then the shuffle with penalties
+        if (s.board && Array.isArray(s.board.ceremony) && s.board.ceremony.length) {
+          const key = "C" + JSON.stringify(s.board.ceremony);
+          if (key !== boardKey) {
+            boardKey = key;
+            setGlyph(document.getElementById("boardIcon"), "completed");
+            text(boardTitle, (s.board.title || "RESULT") + " · AS THEY CROSSED THE LINE");
+            rows.innerHTML = "";
+            const cer = document.getElementById("ceremony");
+            cer.className = ""; cer.innerHTML = "";
+            const H = 44;
+            cer.style.height = (s.board.ceremony.length * H) + "px";
+            const els = [];
+            for (const r of s.board.ceremony) {
+              const row = document.createElement("div");
+              row.className = "crow" + (r.me ? " me" : "") + (r.moved > 0 ? " up" : (r.moved < 0 ? " down" : ""));
+              row.style.top = ((r.rawPos - 1) * H) + "px";
+              const pos = document.createElement("span"); pos.className = "pos"; pos.textContent = "P" + r.rawPos;
+              const name = document.createElement("span"); name.className = "name"; name.textContent = r.name || "?";
+              const time = document.createElement("span"); time.className = "time"; time.textContent = r.rawTime || "";
+              const pen = document.createElement("span"); pen.className = "pen"; pen.textContent = "";
+              row.append(pos, name, time, pen); cer.append(row); els.push([row, r, pos, time, pen]);
+            }
+            const mine = key;
+            setTimeout(() => {
+              if (boardKey !== mine) return;
+              text(boardTitle, (s.board.title || "RESULT") + " · CLASSIFIED, PENALTIES APPLIED");
+              cer.className = "settled";
+              for (const [row, r, pos, time, pen] of els) {
+                row.style.top = ((r.pos - 1) * H) + "px";
+                pos.textContent = "P" + r.pos;
+                time.textContent = r.finalTime || r.rawTime || "";
+                if (r.pen) { pen.textContent = r.pen; pen.classList.add("has"); }
+              }
+            }, 3000);
+          }
+          board.classList.remove("hidden");
+        } else if (s.board && Array.isArray(s.board.rows) && s.board.rows.length) {
+          const cer = document.getElementById("ceremony");
+          if (cer.innerHTML) { cer.innerHTML = ""; cer.style.height = "0px"; }
           const key = JSON.stringify(s.board);
           if (key !== boardKey) {
             boardKey = key;

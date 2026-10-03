@@ -69,6 +69,7 @@ end
 local function setPref(key, on) pcall(Open77.kvp.set, "broadcast." .. key, on and "1" or "0") end
 
 local namesOn = pref("names", true)
+local namesDown          -- assigned with the names section below
 local towerOn = pref("tower", false)
 
 local function toast(msg)
@@ -110,17 +111,26 @@ RegisterNetEvent("ncm:session", function(sessionId, view)
 end)
 
 -- ------------------------------------------------------------------------------------------------------ names
--- KB-223: the plugin's own projection piled every plate in one spot on screen. Names now use the platform's proven
--- path, the one player cards use: an `Open77.anchors` anchor on each car, projected natively every frame to a
--- transparent page (web/names.html), which draws the plate. Lua sends only what the plates say, when it changes.
--- OFF (2026-09-30 02:48, KB-223): the first live use crashed the owner's game to desktop 0.13 s after the page and
--- its anchors came up, while the grid's cars were still spawning and having drivers seated. Suspected: an anchor on a
--- car entity the platform replaced mid-spawn. Stays off until anchors wait for a settled car and are tested alone.
-local ANCHOR_NAMES = false
-local NAME_LIFT = { x = 0.0, y = 0.0, z = 1.9 }
-local namesPage, namesReady, namesIdleSince = nil, false, nil
-local anchorOf = {}        -- vehicleId -> { id, entity, seen }
-local lastPlates = nil
+-- A plate over each Paddock car near you: position, name, team. It is an `Open77.anchors` anchor on the car's engine
+-- entity with `render = "card"`, so the platform projects AND draws it in the frame it presents -- it rides on the
+-- car and follows the camera, which the plugin's own plates (KB-223, piled in one screen spot) never did. No WebUI
+-- page is involved.
+--
+-- KB-223 history: the first anchor attempt (2026-09-30 02:48) crashed the owner's game 0.13 s after its page and
+-- anchors came up, while the grid's cars were still spawning and having drivers seated; the suspect was an anchor on
+-- a car entity the platform replaced mid-spawn. So a car gets its plate only after its entity has stayed the same
+-- for SETTLE_MS, a changed entity drops the plate and starts the wait again, and `/ncm.names` turns plates off.
+-- SUBTLE (owner, 2026-10-02: "they obscure the car too much especially when a gaggle of them are together"): one
+-- short line ("P3 VARGAS") well above the roof; none on a car right beside you (you can see who it is) or beyond
+-- PLATE_FAR_M; at most MAX_PLATES, nearest first; and when plates overlap on screen only the nearest car's stays.
+local NAME_LIFT = { x = 0.0, y = 0.0, z = 2.7 }
+local SETTLE_MS = 3000
+local MAX_PLATES = 8                           -- visible at once (declutter picks the nearest)
+local ANCHOR_CAP = 20                          -- anchors held (the platform allows 32 per resource)
+local PLATE_NEAR_M, PLATE_FAR_M = 7, 120
+local anchorOf = {}        -- vehicleId -> { id, entity, sig }
+local seenEntity = {}      -- vehicleId -> { entity, since }
+local cardsRefused = nil   -- the platform's reason, once, if this build cannot draw native cards
 
 local function vehicleEntity(vid)
     local ok, snap = pcall(Open77.vehicles.get, vid)
@@ -128,63 +138,126 @@ local function vehicleEntity(vid)
     return e ~= nil and tostring(e) or nil
 end
 
+local function dropAnchor(vid)
+    local a = anchorOf[vid]
+    if a then pcall(Open77.anchors.remove, a.id) end
+    anchorOf[vid] = nil
+end
+
 local function dropAnchors()
-    for vid, a in pairs(anchorOf) do pcall(Open77.anchors.remove, a.id); anchorOf[vid] = nil end
+    for vid in pairs(anchorOf) do dropAnchor(vid) end
+    seenEntity = {}
 end
 
-local function namesUp()
-    if namesPage then return namesReady end
-    local page, why = WebUI.create({ entry = "web/names.html", layer = "hud", width = 1920, height = 1080,
-        fps = 60, zIndex = 630, transparent = true, visible = true })
-    if not page then log("race names page failed: %s", tostring(why)) return false end
-    namesPage, namesReady, lastPlates = page, false, nil
-    page:on("ncm-names:ready", function() namesReady = true end)
-    return false
+namesDown = dropAnchors
+
+local ACCENT = { [0] = "#FFB833", [1] = "#FFD24D", [2] = "#73E68C", [3] = "#80808C" }
+
+local function surname(name)
+    local last = tostring(name or ""):match("(%S+)%s*$") or tostring(name or "")
+    return string.upper(last)
 end
 
-local function namesDown()
-    dropAnchors()
-    if namesPage then pcall(function() namesPage:destroy() end) end
-    namesPage, namesReady, lastPlates = nil, false, nil
+local function presentation(r)
+    local accent = (r.state == "finished" and 2) or (r.state == "out" and 3) or (tonumber(r.pos) == 1 and 1) or 0
+    local label = ("P%s %s"):format(tostring(r.pos or "?"), surname(r.name))
+    return { label = label, color = "#E6EBEF", accent = ACCENT[accent], showDistance = false },
+        label .. "|" .. accent
 end
 
---- rows = the Paddock rows near us that carry a vehicle id. Keeps one anchor per car and sends the plates' text.
+--- rows = the Paddock rows near us that carry a vehicle id. One settled anchor per car.
 local function showNames(rows, now)
-    if #rows == 0 then
-        -- keep the page a little while (between feeds), then give the surface back
-        namesIdleSince = namesIdleSince or now
-        if namesPage and now - namesIdleSince > 10000 then namesDown() end
-        if namesReady and lastPlates ~= "" then namesPage:send("ncm-names:plates", { plates = {} }); lastPlates = "" end
-        dropAnchors()
-        return
-    end
-    namesIdleSince = nil
-    if not namesUp() then return end
-    local plates, keys, live = {}, {}, {}
+    if cardsRefused then return end
+    local live = {}
     for _, r in ipairs(rows) do
-        local a = anchorOf[r.vid]
-        if not a then
-            local entity = vehicleEntity(r.vid)
-            if entity then
-                local id, why = Open77.anchors.create({ tag = "ncm.name." .. tostring(r.vid), entity = entity, offset = NAME_LIFT,
-                    maxDistance = 250, page = namesPage })
-                if id then a = { id = tostring(id), entity = entity }; anchorOf[r.vid] = a
-                else log("anchor for vehicle %s refused: %s", tostring(r.vid), tostring(why)) end
+        local vid = r.vid
+        local entity = vehicleEntity(vid)
+        if entity then
+            live[vid] = true
+            local seen = seenEntity[vid]
+            if not seen or seen.entity ~= entity then
+                -- a new car, or the platform replaced its entity: wait for it to settle before anchoring anything
+                seenEntity[vid] = { entity = entity, since = now }
+                dropAnchor(vid)
+            elseif now - seen.since >= SETTLE_MS then
+                local pres, sig = presentation(r)
+                local a = anchorOf[vid]
+                if not a then
+                    local id, why = Open77.anchors.create({ tag = "ncm.name." .. tostring(vid), entity = entity, offset = NAME_LIFT,
+                        maxDistance = PLATE_FAR_M, render = "card", visible = true, presentation = pres })
+                    if id then
+                        anchorOf[vid] = { id = id, entity = entity, sig = sig, shown = true }
+                    else
+                        local reason = tostring(why)
+                        if reason:find("render", 1, true) or reason == "anchors_backend_unavailable" then
+                            cardsRefused = reason
+                            log("race names off: this client cannot draw native anchored cards (%s)", reason)
+                            dropAnchors()
+                            return
+                        end
+                        log("anchor for vehicle %s refused: %s", tostring(vid), reason)
+                    end
+                elseif a.sig ~= sig then
+                    pcall(Open77.anchors.update, a.id, { presentation = pres })
+                    a.sig = sig
+                end
             end
         end
-        if a then
-            live[r.vid] = true
-            local accent = (r.state == "finished" and 2) or (r.state == "out" and 3) or (tonumber(r.pos) == 1 and 1) or 0
-            plates[#plates + 1] = { anchor = a.id, title = tostring(r.name or ""), sub = tostring(r.org or ""), chip = "P" .. tostring(r.pos or "?"), accent = accent }
-            keys[#keys + 1] = a.id .. ":" .. plates[#plates].chip .. ":" .. accent
+    end
+    for vid in pairs(anchorOf) do if not live[vid] then dropAnchor(vid) end end
+    for vid in pairs(seenEntity) do if not live[vid] then seenEntity[vid] = nil end end
+end
+
+--- Screen-space declutter, several times a second: from the platform's own per-frame projection (`anchors.frame`),
+--- hide a plate that is too close to you, or that overlaps a nearer car's plate on screen. Only visibility changes are
+--- sent, so a steady scene costs nothing.
+local function declutter()
+    if not next(anchorOf) or type(Open77.anchors.frame) ~= "function" then return end
+    local ok, frame = pcall(Open77.anchors.frame)
+    if not ok or type(frame) ~= "table" then return end
+    local byId = {}
+    for _, a in ipairs(frame) do byId[tostring(a.id)] = a end
+    local items = {}
+    for vid, a in pairs(anchorOf) do
+        local f = byId[tostring(a.id)]
+        if f and f.projected ~= false and f.onScreen ~= false then
+            local sc = type(f.screen) == "table" and f.screen or f
+            if type(sc.x) == "number" and type(sc.y) == "number" then
+                items[#items + 1] = { vid = vid, a = a, x = sc.x, y = sc.y, d = tonumber(f.distance) or 1e9 }
+            end
         end
     end
-    for vid, a in pairs(anchorOf) do
-        if not live[vid] then pcall(Open77.anchors.remove, a.id); anchorOf[vid] = nil end
+    table.sort(items, function(p, q) return p.d < q.d end)
+    -- normalised or pixel coordinates: size the overlap box to whichever the platform reports
+    local norm = true
+    for _, it in ipairs(items) do if math.abs(it.x) > 2 or math.abs(it.y) > 2 then norm = false break end end
+    local W, H = norm and 0.09 or 170, norm and 0.04 or 44
+    local kept, want = {}, {}
+    for _, it in ipairs(items) do
+        local show = it.d >= PLATE_NEAR_M and #kept < MAX_PLATES
+        if show then
+            for _, k in ipairs(kept) do
+                if math.abs(k.x - it.x) < W and math.abs(k.y - it.y) < H then show = false break end
+            end
+        end
+        if show then kept[#kept + 1] = it end
+        want[it.vid] = show
     end
-    local sig = table.concat(keys, "|")
-    if sig ~= lastPlates then namesPage:send("ncm-names:plates", { plates = plates }); lastPlates = sig end
+    for vid, a in pairs(anchorOf) do
+        local show = want[vid] or false
+        if a.shown ~= show then
+            pcall(Open77.anchors.update, a.id, { visible = show })
+            a.shown = show
+        end
+    end
 end
+
+CreateThread(function()
+    while true do
+        if namesOn then pcall(declutter) end
+        Wait(150)
+    end
+end)
 
 local function myPlayerId()
     local ok, v = pcall(Open77.players.localId)
@@ -247,9 +320,25 @@ local function paddockTower(m)
     for i, r in ipairs(m.rows or {}) do
         if i > 24 then break end
         local flag = (r.state == "finished" and "fin") or (r.state == "out" and "out") or (r.physical and "phys") or ""
-        rows[#rows + 1] = { pos = tostring(r.pos or i), name = tostring(r.name or "?"), gap = tostring(r.gap or ""), flag = flag }
+        -- the order is provisional and already includes penalties: say so on the row that carries them
+        local gap = tostring(r.gap or "")
+        if r.pen then gap = (gap ~= "" and (gap .. " ") or "") .. tostring(r.pen) end
+        rows[#rows + 1] = { pos = tostring(r.pos or i), name = tostring(r.name or "?"), gap = gap, flag = flag }
     end
     return { cmd = "tower", ttl = 3, title = tostring(m.title or "PADDOCK"):upper(), sub = tostring(m.sub or ""), rows = rows }
+end
+
+--- My session's Paddock race, when it is a mixed grid and its field is fresh: the whole field, me marked.
+local function mixedTower(v, pid, now)
+    local p = v and v.paddockRaceId and paddock[v.paddockRaceId]
+    if not p or now - p.at > 4000 then return nil end
+    local myDriver
+    for _, en in ipairs(v.entrants or {}) do if tonumber(en.playerId) == pid then myDriver = en.driverId end end
+    local msg = paddockTower(p.m)
+    for i, r in ipairs(p.m.rows or {}) do
+        if msg.rows[i] and myDriver and r.driverId == myDriver then msg.rows[i].flag = "me" end
+    end
+    return msg
 end
 
 local towerShown = false
@@ -270,18 +359,20 @@ CreateThread(function()
         end
         table.sort(fresh, function(a, b) return (tonumber(a.d) or 1e9) < (tonumber(b.d) or 1e9) end)
         -- names need no plugin: anchors and a page are the platform's own (KB-223)
-        if namesOn and ANCHOR_NAMES then
+        if namesOn then
             local rows = {}
             for _, m in ipairs(fresh) do
                 for _, r in ipairs(m.rows or {}) do
-                    if r.vid and #rows < 32 then rows[#rows + 1] = r end     -- 32 anchors per resource
+                    if r.vid and not r.human and #rows < ANCHOR_CAP then rows[#rows + 1] = r end
                 end
             end
-            showNames(rows, now)
+            local ok, err = pcall(showNames, rows, now)
+            if not ok then log("names: %s", tostring(err)) end
         end
         if ready and towerOn then
             local v = mySession()
-            local msg = v and sessionTower(v, myPlayerId()) or (fresh[1] and paddockTower(fresh[1])) or nil
+            local pid = myPlayerId()
+            local msg = (v and mixedTower(v, pid, now)) or (v and sessionTower(v, pid)) or (fresh[1] and paddockTower(fresh[1])) or nil
             if msg then send(msg); towerShown = true
             elseif towerShown then send({ cmd = "tower", rows = {} }); towerShown = false end
         end

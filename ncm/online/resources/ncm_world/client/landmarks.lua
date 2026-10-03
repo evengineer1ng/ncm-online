@@ -15,12 +15,15 @@
 -- **Single source.** Names and coordinates come from `data.nodes`, the same canonical module the routes and
 -- race messaging read. No second dataset, no hand-copied coordinates -- a node added there appears here.
 --
--- Deliberately NOT routable and never tracked: these are landmarks, not destinations. `client/nav.lua` owns
--- the one blip that is allowed to steer the GPS, and two systems fighting over the route selection is the
--- exact failure this release is fixing.
+-- Not routable, and never tracked by THIS file. Since 2026-10-02 `client/nav.lua` (the one owner of the GPS
+-- selection) tracks a landmark itself when its target IS that node: the owner's report is that selecting one of
+-- these pins on the map always routes, while NCM's custom waypoint often does not -- and nav's custom waypoint,
+-- dropped on exactly Tip's coordinates, is what Tip's pin disappeared under during a race (KB-289).
+-- `NcmLandmarks.find` / `NcmLandmarks.reset` are nav's only way in.
 local SPRITE = "fast_travel"     -- the platform's own sprite for a named place worth travelling to
 
 local handles = {}
+local byHandle = {}   -- handle -> node (for NcmLandmarks.find / reset)
 local shown = false
 local wanted = true   -- the player's /ncm.nodes choice; a world rebuild must not undo it
 
@@ -85,7 +88,18 @@ end
 local function remove()
     for _, h in ipairs(handles) do pcall(Open77.blips.remove, h) end
     handles = {}
+    byHandle = {}
     shown = false
+end
+
+local function pinOpts(n)
+    return {
+        position = { x = n.x, y = n.y, z = n.z or 0 },
+        sprite = SPRITE,
+        title = tostring(n.name or n.id),
+        description = ("NCM location%s. Set a waypoint here to drive to it."):format(
+            n.region and (" in " .. tostring(n.region)) or ""),
+    }
 end
 
 local function create()
@@ -97,15 +111,10 @@ local function create()
         -- `waypointable` is the node's own statement that it is a place a driver can be sent to. A node that
         -- is not waypointable is route geometry, not a landmark, and drawing it would be noise.
         if n.waypointable and type(n.x) == "number" then
-            local ok, id, reason = pcall(Open77.blips.create, {
-                position = { x = n.x, y = n.y, z = n.z or 0 },
-                sprite = SPRITE,
-                title = tostring(n.name or n.id),
-                description = ("NCM location%s. Set a waypoint here to drive to it."):format(
-                    n.region and (" in " .. tostring(n.region)) or ""),
-            })
+            local ok, id, reason = pcall(Open77.blips.create, pinOpts(n))
             if ok and id ~= nil then
                 handles[#handles + 1] = id
+                byHandle[id] = n
                 made = made + 1
             else
                 failed = failed or tostring((not ok) and id or reason)
@@ -119,6 +128,33 @@ local function create()
         -- A build without blip creation simply has no landmarks; it is not worth a retry loop.
         log("no landmarks created (%s)", tostring(failed or "nothing waypointable"))
     end
+end
+
+--- For nav: the landmark pin standing on point p (within `radius` m, default 15), or nil -- hidden, not built
+--- yet, or not a node. Returns handle, node.
+NcmLandmarks = {}
+function NcmLandmarks.find(p, radius)
+    if not (shown and type(p) == "table" and type(p.x) == "number") then return nil end
+    local r2, best, bestN, bestD = (radius or 15) ^ 2, nil, nil, nil
+    for h, n in pairs(byHandle) do
+        local dx, dy = n.x - p.x, n.y - p.y
+        local d = dx * dx + dy * dy
+        if d <= r2 and (not bestD or d < bestD) then best, bestN, bestD = h, n, d end
+    end
+    return best, bestN
+end
+
+--- For nav: drop the GPS selection from a landmark it tracked. The API has no untrack, so the one pin is removed
+--- and made again (a fresh pin is not selected). Returns the new handle.
+function NcmLandmarks.reset(handle)
+    local n = byHandle[handle]
+    if not n then return nil end
+    pcall(Open77.blips.remove, handle)
+    byHandle[handle] = nil
+    for i, h in ipairs(handles) do if h == handle then table.remove(handles, i) break end end
+    local ok, id = pcall(Open77.blips.create, pinOpts(n))
+    if ok and id ~= nil then handles[#handles + 1] = id; byHandle[id] = n; return id end
+    return nil
 end
 
 -- Creation waits for the player's real world (KB-203 gate above); a rebuild replaces rather than stacks.

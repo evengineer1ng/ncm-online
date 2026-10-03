@@ -24,9 +24,11 @@ auto_start true
 -- players.stats.apply: `Open77.players.setRegen` for passive health regeneration (`server/vitals.lua`,
 --   KB-180). Health is a server ledger whose regen is 0 until a resource sets it; without this permission
 --   damage never heals.
+-- world.markers: the Paddock grid's native ground ring (`Open77.markers`, client/race.lua). Added 2026-10-02: the
+--   ring had never drawn -- every create was refused `permission_denied:world.markers`, ten times a second.
 -- world.prevention: the console-only `ncm.wanted` probe for IDEA-677 (`Open77.players.setWanted`). Declared
 --   so a live test cannot fail on a missing permission; the card lists none, the client plugin checks this one.
-permissions { "database.access", "network.events", "state.write", "world.vehicles", "ui.vanilla.map", "ui.nameplates", "input.actions", "map.control", "players.teleport", "world.props", "world.npcs", "vehicles.read", "world.query", "world.environment", "world.population", "players.stats.apply", "world.prevention", "players.hacking.define", "players.hacking.read", "players.hacking.activate", "players.hacking.cancel", "players.cyberware.define", "players.cyberware.read", "players.cyberware.manage", "combat.scope.control", "combat.config", "player.travel", "screen.effects" }
+permissions { "database.access", "network.events", "state.write", "world.vehicles", "ui.vanilla.map", "ui.nameplates", "input.actions", "map.control", "players.teleport", "world.props", "world.npcs", "vehicles.read", "world.query", "world.environment", "world.population", "players.stats.apply", "world.prevention", "players.hacking.define", "players.hacking.read", "players.hacking.activate", "players.hacking.cancel", "players.cyberware.define", "players.cyberware.read", "players.cyberware.manage", "combat.scope.control", "combat.config", "player.travel", "screen.effects", "world.markers" }
 
 -- Race HUD (M3.2): light tree, banner and race strip as our own WebUI page.
 web_ui_page "web/race.html"
@@ -112,6 +114,7 @@ shared_script "shared/core/economy/markets.lua"
 shared_script "shared/core/economy/production.lua"
 shared_script "shared/core/economy/supply_profiles.lua"
 shared_script "shared/core/economy/npc_market.lua"
+shared_script "shared/core/economy/npc_garage.lua"
 shared_script "shared/core/economy/exchange_posts.lua"
 shared_script "shared/core/economy/settlement.lua"
 shared_script "shared/core/economy/fuel.lua"

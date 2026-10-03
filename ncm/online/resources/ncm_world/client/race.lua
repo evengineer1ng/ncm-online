@@ -38,6 +38,7 @@ local me = nil                   -- my entrant record from the view
 local lastMe = nil
 local markers = {}               -- name -> handle
 local nativeMarkers = {}         -- direct Open77 marker handles for the Paddock's ground grid ring
+local preGrid = nil              -- L296: { at, p } the provisional grid slot of the race this driver is entered in
 local crossed = {}               -- gateIndex -> mono time of local detection (per session)
 local reported = {}              -- gateIndex -> mono time of last report
 local retries = {}               -- gateIndex -> retry count
@@ -46,6 +47,9 @@ local notMine = nil
 local prevPos = nil
 local origin = nil               -- where we sat when the lights started (start rule: moved 30 m from here)
 local targetedViews = {}         -- sessionId -> entrant-targeted read model (KB-79 primary handoff)
+local targetedPractice = {}      -- eventId -> entrant-targeted practice/qualifying view (2026-10-02)
+local paddockField = {}          -- paddock raceId -> { at = mono, m = the Paddock's live rows } (mixed grids)
+local gpsTarget = nil            -- the point the race HUD is currently routing to (read by /ncm.gps)
 
 local function serverNow() return base.serverNow + (Open77.time.monotonic() - base.mono) end
 NcmClientServerNow = serverNow   -- the synced server clock, shared with client/telemetry.lua
@@ -110,7 +114,9 @@ end
 
 -- The WorldUI POI wrapper also allocates a prompt even when no prompt is wanted. Use the native
 -- marker surface for the one essential alignment cue so POI/prompt allocation cannot hide the grid.
+local ringRefused = nil          -- a permission refusal is permanent for this resource generation: say it once
 local function ensureNativeRing(name, p)
+    if ringRefused then return false end
     local opts = { position = { x = p.x, y = p.y, z = (p.z or 0) + 0.12 }, shape = "ring", radius = 4.5,
         maxDistance = 500.0, color = { r = 255, g = 218, b = 72, a = 240 } }
     if nativeMarkers[name] then
@@ -123,7 +129,9 @@ local function ensureNativeRing(name, p)
         nativeMarkers[name] = handle
         return true
     end
-    log("native grid ring failed: %s", tostring(ok and reason or handle))
+    local why = tostring(ok and reason or handle)
+    log("native grid ring failed: %s", why)
+    if why:find("permission_denied", 1, true) then ringRefused = why end
     return false
 end
 
@@ -216,11 +224,11 @@ end
 
 -- GPS to a point without the player touching chat. NCM sets the waypoint and stops there (L70) -- it never
 -- opens the player's map to force the engine's route calculation.
-local gpsTarget = nil            -- the point the race HUD is currently routing to (read by /ncm.gps)
+-- (gpsTarget is declared with the session state above: clearAll() reads it and sits above this line.)
 -- KB-22 (owner 2026-09-21): the results board and the result banner share ONE lifetime. The board used to
 -- dismiss itself after BOARD_SEC while the big "RESULT - P1" strip stayed up for tens of seconds. After the
 -- window the strip keeps only what is still useful (where to go next) and disappears when there is nothing next.
-local BOARD_SEC = 15             -- results board + result banner; then the strip is forward-looking only
+local BOARD_SEC = 20             -- results board + result banner (and the 3 s ceremony shuffle); then forward-looking only
 local boardSince = {}            -- sessionId -> monotonic time the result was first shown
 local function boardOn(sessionId)
     boardSince[sessionId] = boardSince[sessionId] or Open77.time.monotonic()
@@ -626,9 +634,49 @@ RegisterCommand("ncm.wsprobe", function(_, args)
     page:send("race:wsprobe", { url = url })
 end, false)
 
+-- A Paddock race is one field of NPCs and humans; the league session holds only its humans. The Paddock's live
+-- rows (`ncm:broadcast.paddock`, sent to every entrant of a mixed race) are the whole field. Returns my place, the
+-- field size and the rows, or nil when there is no fresh feed for this session's race.
+local FIELD_FRESH_S = 5
+local function mixedField(v, myDriverId)
+    local f = v and v.paddockRaceId and paddockField[v.paddockRaceId]
+    if not f or Open77.time.monotonic() - f.at > FIELD_FRESH_S or type(f.m.rows) ~= "table" or #f.m.rows == 0 then return nil end
+    local mine
+    for _, r in ipairs(f.m.rows) do if myDriverId and r.driverId == myDriverId then mine = tonumber(r.pos) end end
+    return mine, #f.m.rows, f.m.rows
+end
+
+--- L296: before the session forms -- your provisional slot, routed and ringed, with the time to the grid.
+local function presentPreGrid(instr)
+    local p = preGrid and preGrid.p
+    -- KB-320: before a session exists the client's clock base is 0 (pickView's "none" view), and "grid sets in" read
+    -- ~30 million minutes. The pre-grid carries the server's time; count from it.
+    local nowS = tonumber(p and p.serverNow) and (p.serverNow + (Open77.time.monotonic() - preGrid.at)) or serverNow()
+    if not p or Open77.time.monotonic() - preGrid.at > 20 or (tonumber(p.startsAt) or 0) <= nowS then return false end
+    local pos = localPosition()
+    local d = pos and Routes.planarDistance(pos, p) or nil
+    ensureNativeRing("slot", p)
+    if gridGpsFor ~= "pre:" .. p.eventId then gridGpsFor = "pre:" .. p.eventId; gpsTo(p, "grid slot P" .. tostring(p.slot) .. " (provisional)") end
+    local onMark = d and d <= 12.0
+    local formsIn = (tonumber(p.formsAt) or p.startsAt) - nowS
+    hud({ instrument = instr, banner = currentBanner(), strip = { kind = "grid",
+        eyebrow = "NEXT RACE · " .. tostring(p.routeName or ""),
+        big = "P" .. tostring(p.slot),
+        mid = onMark and ("of ~%d · you're on your slot"):format(tonumber(p.fieldSize) or 0)
+            or ("of ~%d · %s%s to your slot"):format(tonumber(p.fieldSize) or 0, arrowTo(pos, p), d and km(d) or "?"),
+        dim = ("grid sets in %s · provisional until then%s"):format(Entry.countdown(math.max(0, formsIn)),
+            p.qualified and "" or " · unqualified: the back of the grid") } })
+    NcmClientRaceActive = false
+    return true
+end
+
 local function present()
     local instr = instrumentState()
-    if not view or view.phase == "none" or not me then clearAll(instr); return end
+    if not view or view.phase == "none" or not me then
+        if presentPreGrid(instr) then return end
+        clearAll(instr); return
+    end
+    if preGrid and view.paddockRaceId and preGrid.p.paddockRaceId == view.paddockRaceId then preGrid = nil end
     NcmClientRaceActive = true
     NcmClientRacePhase = tostring(view.phase)
     local pos = localPosition()
@@ -732,7 +780,7 @@ local function present()
         slot = slot or (view.slots and view.slots[me.slot])
         if slot and view.paddock then
             -- L250: a mixed Paddock grid -- a beam on your slot from the moment the grid forms, the map routes to it,
-            -- and the strip carries an arrow and the distance; race control places you at T-20 if you are close
+            -- and the strip carries an arrow and the distance. L296: nobody is placed for you -- drive onto it.
             local d = pos and Routes.planarDistance(pos, slot) or nil
             removeMarker("grid")
             if markers.slot then removeMarker("slot") end
@@ -740,13 +788,13 @@ local function present()
             if gridGpsFor ~= view.sessionId .. ":slot" then gridGpsFor = view.sessionId .. ":slot"; gpsTo(slot, "grid slot P" .. tostring(slot.slot)) end
             local field = view.fieldSize or n
             local onMark = d and d <= 12.0
-            local placeIn = view.startsAt - now - 20
+            local lightsIn = view.startsAt - now - 5
             state.strip = { kind = "grid",
                 eyebrow = (me.state == "ready" or onMark) and ("ON YOUR MARK" .. sessionTag) or ("YOUR SLOT" .. sessionTag),
                 big = "P" .. tostring(slot.slot),
                 mid = (me.state == "ready" or onMark) and ("of %d · hold position"):format(field) or ("of %d · %s%s to your slot"):format(field, arrowTo(pos, slot), d and km(d) or "?"),
-                dim = (me.state == "ready" or onMark) and ((view.startsAt - now - 5) > 0 and ("small corrections are OK · lights in " .. Entry.countdown(view.startsAt - now - 5)) or "small corrections are OK · lights")
-                    or (placeIn > 0 and ("race control places you in " .. Entry.countdown(placeIn) .. " if you are within 20 m") or "reach the grid before green; DNS only if still away at the start") }
+                dim = (me.state == "ready" or onMark) and (lightsIn > 0 and ("small corrections are OK · lights in " .. Entry.countdown(lightsIn)) or "small corrections are OK · lights")
+                    or (lightsIn > 0 and ("lights in " .. Entry.countdown(lightsIn) .. " · on your slot by green or DNS") or "on your slot by green or DNS") }
             removeMarker("gate")
         elseif slot then
             local d = pos and Routes.planarDistance(pos, slot) or nil
@@ -799,7 +847,9 @@ local function present()
         local nextIndex = (me.progress or 0) + 1
         local g = view.gates[nextIndex]
         if me.state == "finished" then
-            state.strip = { kind = "done", eyebrow = "FINISHED", big = fmt(me.totalSec), mid = "waiting for the field", dim = Entry.countdown((view.firstFinishAt or now) + (view.finishWindowSec or 60) - now) }
+            -- a mixed race closes at the Paddock's flag (leader home + a window per metre); everyone sees the same clock
+            local closeAt = view.flagAt or ((view.firstFinishAt or now) + (view.finishWindowSec or 60))
+            state.strip = { kind = "done", eyebrow = "FINISHED", big = fmt(me.totalSec), mid = "the race closes at the flag", dim = "flag in " .. Entry.countdown(closeAt - now) }
             removeMarker("gate")
         elseif me.state == "dnf" then
             state.strip = { kind = "grid", eyebrow = "DNF", big = "OUT", mid = "classified by progress", dim = "" }
@@ -819,7 +869,8 @@ local function present()
             local d = pos and Routes.planarDistance(pos, g) or nil
             local elapsed = view.greenAt and (now - view.greenAt) or 0
             local formation = view.start == "rolling" and not view.rollingGreenAt
-            local solo = #(view.entrants or {}) <= 1
+            -- A mixed Paddock grid is never a time trial, however few humans are in it.
+            local solo = #(view.entrants or {}) <= 1 and not view.paddock and (view.fieldSize or 0) <= 1
             -- Live running order: finished by time, then racers by progress, then by distance to the next gate.
             local order = {}
             for _, en in ipairs(view.entrants) do
@@ -836,6 +887,11 @@ local function present()
             end)
             local myPos = 0
             for i, en in ipairs(order) do if en.driverId == me.driverId then myPos = i end end
+            local fieldPos, fieldN = mixedField(view, me.driverId)
+            local ofN = #order
+            if view.paddock then
+                if fieldPos then myPos, ofN = fieldPos, fieldN else ofN = view.fieldSize or ofN end
+            end
             local inc = (me.incidentSec or 0) > 0 and (" · +%.0fs inc"):format(me.incidentSec) or ""
             if formation then
                 state.strip = { kind = "grid", eyebrow = "FORMATION · " .. (view.routeName or "") .. sessionTag, big = ("P%d"):format(me.slot or myPos), mid = ("hold your place · under %d km/h"):format(view.paceKph or 80), dim = ("%s to the green flag · the leader starts the race"):format(d and km(d) or "?") }
@@ -847,7 +903,10 @@ local function present()
                                 big = Entry.countdown(elapsed), mid = ("gate %d/%d%s"):format(me.progress or 0, #view.gates, inc),
                                 dim = ("%s to %s"):format(d and km(d) or "?", g.name or g.kind) }
             else
-            state.strip = { kind = "", eyebrow = "RACING · " .. (view.routeName or "") .. sessionTag, big = ("P%d"):format(myPos), mid = ("of %d · %s · gate %d/%d%s"):format(#order, Entry.countdown(elapsed), me.progress or 0, #view.gates, inc), dim = ("%s to %s"):format(d and km(d) or "?", g.name or g.kind) }
+            -- the leader is home: the countdown to the flag replaces the distance line (owner, 2026-10-02)
+            local dimLine = ("%s to %s"):format(d and km(d) or "?", g.name or g.kind)
+            if view.flagAt then dimLine = ("LEADER HOME · flag in %s · %s"):format(Entry.countdown(view.flagAt - now), d and km(d) or "?") end
+            state.strip = { kind = "", eyebrow = "RACING · " .. (view.routeName or "") .. sessionTag, big = myPos > 0 and ("P%d"):format(myPos) or "P–", mid = ("of %d · %s · gate %d/%d%s"):format(ofN, Entry.countdown(elapsed), me.progress or 0, #view.gates, inc), dim = dimLine }
             end
         end
     elseif phase == "complete" then
@@ -863,20 +922,44 @@ local function present()
                 me = r.driverId == me.driverId,
             }
         end
-        if mine then
+        if mine and view.provisional then
+            -- the Paddock is still classifying the whole field (the flag): no position yet, never a provisional P1
+            local closeAt = view.flagAt
+            state.strip = { kind = "done", eyebrow = "FINISHED · CLASSIFYING" .. sessionTag,
+                big = mine.state == "finished" and fmt(mine.totalSec) or string.upper(tostring(mine.state)),
+                mid = "the result comes when the field is classified",
+                dim = closeAt and ("flag in " .. Entry.countdown(closeAt - now)) or "waiting for the field" }
+        elseif mine then
             local nxt = view.next and (("next: %s %s in %s"):format(view.next.kind, view.next.kind == "race" and tostring(view.next.ordinal or "") or "", Entry.countdown((view.next.at or now) - now))) or ""
             -- L67/IDEA-001: a field of one is a time trial, so the banner never claims a position.
-            local solo = (n <= 1)
-            if boardOn(view.sessionId) then
+            local solo = (n <= 1) and not view.paddock and (view.fieldSize or 0) <= 1
+            local fieldN = view.paddock and (view.fieldSize or n) or n
+            -- the result's own display window starts when the RESULT arrives, not when the session first completed
+            if boardOn(view.sessionId .. (view.board and ":classified" or "")) then
                 local myTime = mine.state == "finished" and fmt(mine.correctedSec or mine.totalSec) or string.upper(mine.state)
                 state.strip = solo
                     -- solo: the time is the hero value, because there is no position to show
                     and { kind = "done", eyebrow = "TIME TRIAL · " .. (view.routeName or "") .. sessionTag,
                           big = myTime, mid = "", dim = nxt }
                     or  { kind = "done", eyebrow = "RESULT · " .. (view.routeName or "") .. sessionTag,
-                          big = ("P%d"):format(mine.position), mid = ("of %d · %s"):format(n, myTime), dim = nxt }
+                          big = ("P%d"):format(mine.position), mid = ("of %d · %s"):format(fieldN, myTime), dim = nxt }
                 state.board = { title = ("%s · %s · %s"):format(view.seriesName or "NCM", view.routeName or "",
-                    solo and "time trial" or ("%d entrant(s)"):format(n)), rows = rows }
+                    solo and "time trial" or ("%d entrant(s)"):format(fieldN)), rows = rows }
+                -- a mixed race classified by the Paddock: the ceremony -- the whole field as it crossed, then the
+                -- shuffle into the result with every penalty (owner, 2026-10-02)
+                if type(view.board) == "table" and #view.board > 0 then
+                    local cer = {}
+                    for _, b in ipairs(view.board) do
+                        local finished = b.state == "finished"
+                        cer[#cer + 1] = { pos = b.pos, rawPos = b.rawPos or b.pos, moved = b.moved or 0, name = tostring(b.name or "?"),
+                            rawTime = finished and b.rawMs and fmt(b.rawMs / 1000) or string.upper(tostring(b.reason == "flagged" and "flagged" or b.state)),
+                            finalTime = finished and b.finalMs and fmt(b.finalMs / 1000) or nil,
+                            pen = b.penMs and ("+%.0fs"):format(b.penMs / 1000) or nil,
+                            me = (b.driverId ~= nil and b.driverId == me.driverId) or nil }
+                    end
+                    state.board.title = ("%s · %s"):format(view.seriesName or "NCM", view.routeName or "")
+                    state.board.ceremony = cer
+                end
             elseif nxt ~= "" then
                 state.strip = { kind = "done", eyebrow = "NEXT" .. sessionTag, big = "", mid = nxt, dim = "" }
             end
@@ -957,6 +1040,14 @@ local function pickView()
             end
         end
     end
+    local pkeys = {}
+    for k, pv in pairs(targetedPractice) do if type(pv) == "table" and pv.phase == "open" then pkeys[#pkeys + 1] = k end end
+    table.sort(pkeys)
+    for _, k in ipairs(pkeys) do
+        for _, en in ipairs(targetedPractice[k].entrants or {}) do
+            if (pid and tonumber(en.playerId) == pid) or (id and en.driverId == id) then return targetedPractice[k] end
+        end
+    end
     local pr = GlobalState and GlobalState.ncmPractice or nil
     if type(pr) == "table" and id then
         local keys = {}
@@ -973,6 +1064,35 @@ local function pickView()
     -- until spectating is designed.
     return { phase = "none", serverNow = serverNow or (GlobalState and GlobalState.ncmPractice and GlobalState.ncmPractice.serverNow) or 0 }
 end
+
+RegisterNetEvent("ncm:practice", function(eventId, practiceView)
+    eventId = tostring(eventId or "")
+    if eventId == "" then return end
+    local had = targetedPractice[eventId] ~= nil
+    targetedPractice[eventId] = type(practiceView) == "table" and practiceView or nil
+    if not had and targetedPractice[eventId] then
+        log("targeted practice %s received phase=%s qualifying=%s", eventId, tostring(practiceView.phase), tostring(practiceView.qualifying))
+    elseif had and not targetedPractice[eventId] then
+        log("targeted practice %s retired", eventId)
+    end
+end)
+
+-- L296 PRE-GRID (owner, 2026-10-02: "we need to point player to their grid spot as early as we can, we are leaving it
+-- to last second"): an entered driver's provisional slot, re-sent every few seconds from T-15 min (or entry) until the
+-- session forms at T-50 and the exact slot takes over.
+RegisterNetEvent("ncm:race.pregrid", function(p)
+    if type(p) == "table" and p.eventId and p.x then
+        if not preGrid or preGrid.p.eventId ~= p.eventId then log("pre-grid %s: P%s of %s provisional", tostring(p.eventId), tostring(p.slot), tostring(p.fieldSize)) end
+        preGrid = { at = Open77.time.monotonic(), p = p }
+    elseif type(p) == "table" and p.eventId and preGrid and preGrid.p.eventId == p.eventId then
+        preGrid = nil
+    end
+end)
+
+-- The Paddock's live field for a mixed race this driver is entered in (also the tower's feed in ncm_broadcast).
+RegisterNetEvent("ncm:broadcast.paddock", function(m)
+    if type(m) == "table" and m.raceId then paddockField[m.raceId] = { at = Open77.time.monotonic(), m = m } end
+end)
 
 RegisterNetEvent("ncm:session", function(sessionId, sessionView)
     sessionId = tostring(sessionId or "")

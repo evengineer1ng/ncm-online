@@ -302,7 +302,7 @@ local function bubbleAdd(m)
         end
         if not hash then log("bubble car %s never streamed here; Pace cannot drive it", tostring(m.vehicleId)) return end
         bubbleEntity[m.vehicleId] = hash
-        paceSend({ cmd = "car.add", raceId = m.raceId, entity = hash, vehicleId = m.vehicleId, from = m.from, speed = m.speed })
+        paceSend({ cmd = "car.add", raceId = m.raceId, entity = hash, vehicleId = m.vehicleId, from = m.from, speed = m.speed, releaseMs = m.releaseMs, startMps = m.startMps })
         -- KB-238 / Pace 0.8.1: the game can re-create a car under a NEW engine entity (streamed out and back in). Pace
         -- then drove nothing -- it held the old one. Watch it while it is ours, and hand Pace the new one (`car.entity`):
         -- the same car keeps its leg and gets a fresh racing command.

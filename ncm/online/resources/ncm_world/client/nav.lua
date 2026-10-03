@@ -34,6 +34,13 @@ NcmNav = {}
 
 local target = nil          -- { x, y, z, name, why } -- what we are pointing at
 local blipId = nil          -- the routable blip's handle, when the platform gave us one
+-- KB-289 (2026-10-02): when the target IS an NCM node, nav tracks that node's own map pin (client/landmarks.lua)
+-- instead of dropping a custom waypoint on top of it. Owner: selecting a pin like Kabuki on the map "routes
+-- perfectly"; the custom waypoint "often fails to route my gps"; and during the Tip race the Tip pin vanished
+-- under nav's white custom waypoint at the same coordinates. The custom waypoint stays for points that have no
+-- pin (grid slots, mid-route gates). `/ncm.gps.custom` forces the old recipe for comparison.
+local poiId = nil           -- the landmark pin nav is tracking, when the target is a node
+local forceCustom = false
 local blipKey = nil         -- position signature of the blip as it currently stands
 local trackedSeated = nil   -- inVehicle() when tracking last started; a change means re-track
 local verifyAt = 0
@@ -57,11 +64,17 @@ end
 --- Select our blip as the vanilla GPS destination. Re-issued after every update and whenever the seat
 --- context changes, which is the whole point of the module.
 local function track(why)
-    if not blipId then return false end
+    -- a landmark pin the landmark layer rebuilt (world reload) has a new handle: find it again by position
+    if poiId and target and NcmLandmarks then
+        local h = NcmLandmarks.find(target)
+        if h and h ~= poiId then poiId = h end
+    end
+    local id = poiId or blipId
+    if not id then return false end
     -- `blips.track` returns TWO values, `(ok, changedOrReason)`, exactly as the platform's race client reads
     -- them -- so the pcall status is a third. Folding the first two together reads a false `ok` as "no change"
     -- and reports a failed selection as a success.
-    local called, ok, changedOrReason = pcall(Open77.blips.track, blipId)
+    local called, ok, changedOrReason = pcall(Open77.blips.track, id)
     trackedSeated = inVehicle()
     verifyAt = mono() + ((called and ok) and VERIFY_OK_S or VERIFY_FAIL_S)
     if not called then
@@ -73,9 +86,15 @@ local function track(why)
         return false
     end
     if changedOrReason == true then
-        log("gps destination selected (%s) seated=%s", tostring(why), tostring(trackedSeated))
+        log("gps destination selected (%s) seated=%s via %s", tostring(why), tostring(trackedSeated), poiId and "node pin" or "custom waypoint")
     end
     return true
+end
+
+--- Let go of a landmark pin nav was tracking (its selection is dropped by remaking the pin).
+local function releasePoi()
+    if poiId and NcmLandmarks then NcmLandmarks.reset(poiId) end
+    poiId = nil
 end
 
 --- What we shipped before: clear then set, which routes immediately but snapshots whatever context the
@@ -94,6 +113,19 @@ function NcmNav.to(p, why)
     if type(p) ~= "table" or type(p.x) ~= "number" then return false end
     local key = ("%.1f|%.1f|%.1f"):format(p.x, p.y, p.z or 0)
     target = { x = p.x, y = p.y, z = p.z or 0, name = p.name, why = why }
+    -- the target is an NCM node with its own pin: track that pin, and take our custom waypoint off the map
+    local pin, node = nil, nil
+    if not forceCustom and NcmLandmarks then pin, node = NcmLandmarks.find(p) end
+    if pin then
+        if blipId then pcall(Open77.blips.remove, blipId); blipId = nil end
+        if pin ~= poiId then
+            poiId, blipKey = pin, key
+            log("target %s (%s) at %.0f %.0f -- tracking its map pin", tostring(node and node.name or p.name), tostring(why), p.x, p.y)
+            track("node pin")
+        end
+        return true
+    end
+    if poiId then releasePoi() end
     if fellBack then
         if key ~= blipKey then blipKey = key; CreateThread(function() fallbackWaypoint(p, why) end) end
         return true
@@ -138,6 +170,7 @@ end
 --- Stop navigating. Removes our blip and releases the vanilla waypoint, so nothing of ours is left on a map
 --- after a race ends or the driver leaves a session.
 function NcmNav.clear()
+    releasePoi()
     if blipId then pcall(Open77.blips.remove, blipId) end
     blipId, blipKey, target, trackedSeated = nil, nil, nil, nil
     verifyAt = 0
@@ -150,6 +183,7 @@ end
 function NcmNav.release(why)
     if not blipId and not target then return false end
     log("released (%s)%s", tostring(why), target and (" -- was " .. tostring(target.name or "?")) or "")
+    releasePoi()
     if blipId then pcall(Open77.blips.remove, blipId) end
     blipId, blipKey, target, trackedSeated = nil, nil, nil, nil
     verifyAt = 0
@@ -175,7 +209,7 @@ end
 CreateThread(function()
     while true do
         Wait(500)
-        if target and blipId and not fellBack then
+        if target and (blipId or poiId) and not fellBack then
             local seated = inVehicle()
             if seated ~= trackedSeated then
                 track(seated and "got in" or "got out")
@@ -185,6 +219,20 @@ CreateThread(function()
         end
     end
 end)
+
+-- Compare the two recipes live: `/ncm.gps.custom` routes node targets with the custom waypoint again; run it again
+-- to go back to the node's own pin.
+RegisterCommand("ncm.gps.custom", function()
+    forceCustom = not forceCustom
+    local t = target
+    if t then
+        releasePoi()
+        if blipId then pcall(Open77.blips.remove, blipId); blipId = nil end
+        blipKey = nil
+        NcmNav.to(t, t.why)
+    end
+    log("node targets now use %s", forceCustom and "the custom waypoint" or "their own map pin")
+end, false)
 
 AddEventHandler("onClientResourceStop", function(name)
     if name == GetCurrentResourceName() then NcmNav.clear() end

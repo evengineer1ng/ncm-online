@@ -153,7 +153,8 @@ function PaddockRaces.buildField(race, humanCount)
         local org = e.org or {}
         -- an independent races their own car (L249)
         field[#field + 1] = { id = e.driver.id, orgId = org.id or (race.frozen and race.frozen.orgOf and race.frozen.orgOf[e.driver.id]),
-            attrs = e.driver.attrs, carPerf = Car.performance(org.car or e.driver.car), morale = e.driver.morale,
+            -- L298: the car this driver races (derived from its parts) when they have one; else the team's abstract car
+            attrs = e.driver.attrs, carPerf = Car.performance((e.driver.raceCarId and e.driver.car) or org.car or e.driver.car), morale = e.driver.morale,
             form = Progression.form((e.driver.evidence or {}).recent or {}, n),
             humanManaged = org.humanManagerDriverId ~= nil }
     end
@@ -352,20 +353,55 @@ function PaddockRaces.resolve(race, t)
         end
     end
     local byId = {}
+    -- L298: the money of the race, ledgered -- entry fees out, purses in, crash repairs out -- for the team that runs
+    -- the car or the independent who owns it (`npc_money`; the balances are the Paddock's, flushed by the store)
+    local Garage = NcmCore.get("economy.npc_garage")
+    local ledger, raced, half = {}, {}, {}
+    local function book(kind, id, amount, what, reason, ref)
+        if amount == 0 then return end
+        ledger[#ledger + 1] = { query = [[INSERT IGNORE INTO npc_money (entry_id, server_id, principal_kind, principal_id, amount, kind, ref,
+            idem_key, created_at, reason) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULLIF(?, ''))]],
+            values = { U.uuid(), U.sid(), kind, id, amount, what, ref, ("%s:%s:%s"):format(what, race.raceId, ref), t, reason or "" } }
+    end
+    local fee = Garage.entryFee(race.tier)
     for _, res in ipairs(entrants) do
         byId[res.id] = res
         local p = w.people[res.id]
         if p then applyEvidence(p, res, n, cond, contacts) end
         local org = w.orgs[res.orgId or ""]
-        if org and (res.purse or 0) > 0 then
-            org.cash = (org.cash or 0) + res.purse
+        if p and org then
+            org.cash = (org.cash or 0) + (res.purse or 0) - fee
             PaddockStore.markOrg(org.id)
-            if org.humanManagerDriverId then PaddockManager.book(org, "purse", res.purse, "purse:" .. race.raceId .. ":" .. res.id, race.raceId) end
-        elseif not org and p and (res.purse or 0) > 0 then
-            -- L249: an independent races for themselves -- the purse is theirs (person.cash), spent in the markets
-            p.cash = (tonumber(p.cash) or 0) + res.purse
+            book("org", org.id, -fee, "entry_fee", "race_entry", res.id)
+            book("org", org.id, res.purse or 0, "purse", "race_result", res.id)
+            if org.humanManagerDriverId and (res.purse or 0) > 0 then PaddockManager.book(org, "purse", res.purse, "purse:" .. race.raceId .. ":" .. res.id, race.raceId) end
+        elseif p then
+            -- L249: an independent races for themselves -- the purse is theirs (person.cash), and so is the entry fee
+            p.cash = (tonumber(p.cash) or 0) + (res.purse or 0) - fee
             PaddockStore.markPerson(p.id)
+            book("person", p.id, -fee, "entry_fee", "race_entry", p.id)
+            book("person", p.id, res.purse or 0, "purse", "race_result", p.id)
         end
+        if p and p.raceCarId then
+            if res.state == "finished" then raced[#raced + 1] = p.id else half[#half + 1] = p.id end
+            -- a crash in a player's bubble is a repair bill (bubble.lua records the damage a physical car took)
+            local dmg = race.carDamage and race.carDamage[p.id]
+            if dmg and PaddockCars then
+                local c = PaddockCars.load(p.raceCarId)
+                local cost = Garage.repairCost(c and c.value or 10000, dmg.frac, dmg.wrecked)
+                if cost > 0 then
+                    if org then org.cash = (org.cash or 0) - cost; PaddockStore.markOrg(org.id); book("org", org.id, -cost, "repair", dmg.wrecked and "wreck" or "crash_damage", p.id)
+                    else p.cash = (tonumber(p.cash) or 0) - cost; PaddockStore.markPerson(p.id); book("person", p.id, -cost, "repair", dmg.wrecked and "wreck" or "crash_damage", p.id) end
+                end
+            end
+        end
+    end
+    if #ledger > 0 then pcall(U.transact, ledger) end
+    -- the race's distance onto every car that ran it: the odometer and every installed part's wear clock
+    if PaddockCars then
+        local lengthM = (race.model and race.model.lengthM) or (PaddockWorld.route(race.routeId) or {}).distanceM or 3000
+        pcall(PaddockCars.raced, raced, lengthM)
+        pcall(PaddockCars.raced, half, lengthM / 2)
     end
     -- the story
     local seriesName = PaddockWorld.seriesName(race.seriesId)
@@ -522,13 +558,40 @@ function PaddockRaces.publishGuide(t)
     end
 end
 
+--- THE FLAG (owner, 2026-10-02): when the first car of the whole field -- model, bubble or human -- is home, the rest
+--- have `paddock.mixed.finishWindowSec(length)`; the race closes then, whoever is still out. Replaces closing at the
+--- sim's slowest finisher + 30 s and waiting for every physical car (a 4-minute wait after the owner's finish at 16:02).
+local Mixed = NcmCore.get("paddock.mixed")
+local RS = NcmCore.get("paddock.racestate")
+local function flagCheck(race, t)
+    if race.state ~= "running" or race.flagAt or not race.model or t < race.opensAt then return end
+    local lead
+    local leadMs = RS.leaderFinishAt(race.model)
+    if leadMs and race.modelGoAt and race.modelGoAt + leadMs / 1000 <= t then lead = race.modelGoAt + leadMs / 1000 end
+    local h = PaddockHumans and PaddockHumans.firstFinishAt and PaddockHumans.firstFinishAt(race)
+    if h and (not lead or h < lead) then lead = h end
+    if not lead then return end
+    local window = Mixed.finishWindowSec(race.model.lengthM)
+    race.flagAt = math.floor(lead + window + 0.5)
+    -- whichever comes first: everyone home (the existing close, still held while cars are on the road), or the flag
+    race.closesAt = math.min(race.closesAt or race.flagAt, race.flagAt)
+    TriggerEvent("ncm:paddock.flag", race.raceId, race.flagAt)
+    log("%s: leader home at %d; FLAG in %d s (%.0f m x %.3f s/m) at %d", race.raceId, math.floor(lead), window,
+        race.model.lengthM, Mixed.FLAG_SEC_PER_M, race.flagAt)
+end
+PaddockRaces.flagCheck = flagCheck
+
 function PaddockRaces.tick(t)
     pcall(PaddockRaces.publishGuide, t)
     local runNext, resolveNext, priceNext
     for _, race in pairs(PaddockRaces.byId) do
+        pcall(flagCheck, race, t)
         -- a declared live race holds its close until the street run has a verdict (live.lua); Billie settles after
+        -- at the flag nothing else holds a race open but a human result still on its way (a few seconds: the league
+        -- closes its session at the same flag)
+        local flagged = race.flagAt and t >= race.flagAt
         if race.state == "running" and race.closesAt and t >= race.closesAt and not (PaddockLive and PaddockLive.holds(race.raceId))
-            and not (PaddockBubble and PaddockBubble.holds(race, t))
+            and (flagged or not (PaddockBubble and PaddockBubble.holds(race, t)))
             and not (PaddockHumans and PaddockHumans.holds(race, t)) then
             if not resolveNext or race.closesAt < resolveNext.closesAt then resolveNext = race end
         elseif (race.state == "scheduled" or race.state == "priced") and t >= race.opensAt then

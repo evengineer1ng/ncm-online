@@ -49,17 +49,19 @@ local function personRow(sid, p)
     return {
         query = [[INSERT INTO paddock_person (server_id, person_id, role, org_id, seat, first, last, display, region, gender,
             birth_year, attrs_json, personality_json, principal_json, morale, state, wage, contract_ends, evidence_json,
-            league_id, car_json, cash)
-            VALUES (?, ?, ?, NULLIF(?, ''), NULLIF(?, ''), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULLIF(?, ''), NULLIF(?, ''), ?)
+            league_id, car_json, cash, race_car_id, last_shop_at)
+            VALUES (?, ?, ?, NULLIF(?, ''), NULLIF(?, ''), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULLIF(?, ''), NULLIF(?, ''), ?,
+                NULLIF(?, ''), NULLIF(?, 0))
             ON DUPLICATE KEY UPDATE role = VALUES(role), org_id = VALUES(org_id), seat = VALUES(seat),
                 attrs_json = VALUES(attrs_json), principal_json = VALUES(principal_json), morale = VALUES(morale),
                 state = VALUES(state), wage = VALUES(wage), contract_ends = VALUES(contract_ends),
                 evidence_json = VALUES(evidence_json), league_id = VALUES(league_id), car_json = VALUES(car_json),
-                cash = VALUES(cash)]],
+                cash = VALUES(cash), race_car_id = VALUES(race_car_id), last_shop_at = VALUES(last_shop_at)]],
         values = { sid, p.id, p.role, p.orgId or "", p.seat or "", p.first, p.last, p.display, p.region, p.gender,
             p.birthYear, U.encode(p.attrs) or "null", U.encode(p.personality) or "null", U.encode(p.principal) or "null",
             p.morale or 50, p.state or "active", math.floor(p.wage or 0), p.contractEnds or 0, U.encode(p.evidence or {}) or "{}",
-            p.leagueId or "", p.car and (U.encode(p.car) or "") or "", math.floor(tonumber(p.cash) or 0) },
+            p.leagueId or "", p.car and (U.encode(p.car) or "") or "", math.floor(tonumber(p.cash) or 0),
+            p.raceCarId or "", math.floor(tonumber(p.lastShopAt) or 0) },   -- L298: the car they race; when they last shopped
     }
 end
 
@@ -84,7 +86,8 @@ local function metaRow(sid, w)
         -- host refuses (it did, at the first genesis on dev). Sentinels travel instead and NULLIF restores the NULL.
         values = { sid, w.seed, w.genesisVersion, w.genesisSeasonId, w.seasonId, w.seasonOrdinal or 0, w.paddockYear,
             w.dayIndexApplied or -1, w.cupId or "", U.encode({ nextPerson = w.nextPerson, nextOrg = w.nextOrg,
-                nextSponsor = w.nextSponsor, recentTemplates = w.recentTemplates }) or "{}", w.createdAt or U.now() },
+                nextSponsor = w.nextSponsor, recentTemplates = w.recentTemplates, paceLearned = w.paceLearned }) or "{}",
+            w.createdAt or U.now() },
     }
 end
 
@@ -143,6 +146,7 @@ function PaddockStore.load()
     w.dayIndexApplied, w.cupId, w.createdAt = num(m.day_index_applied), m.cup_id, num(m.created_at)
     w.nextPerson, w.nextOrg, w.nextSponsor = num(counters.nextPerson, 0), num(counters.nextOrg, 0), num(counters.nextSponsor, 0)
     w.recentTemplates = counters.recentTemplates or {}
+    w.paceLearned = type(counters.paceLearned) == "table" and counters.paceLearned or nil   -- L296: measured tier pace
     for _, r in ipairs(MySQL.query.await("SELECT * FROM paddock_series WHERE server_id = ?", { sid }) or {}) do
         w.series[r.series_id] = { id = r.series_id, tier = r.tier, division = num(r.division, 1), name = r.name }
         w.takenSeriesNames[r.name] = true
@@ -178,6 +182,7 @@ function PaddockStore.load()
             evidence = U.decode(r.evidence_json) or {},
             leagueId = r.league_id, car = r.car_json and U.decode(r.car_json) or nil,     -- L249 pools
             cash = num(r.cash, 0),                                                          -- L249 step 4
+            raceCarId = r.race_car_id, lastShopAt = num(r.last_shop_at),                    -- L298
         }
         w.people[p.id] = p
         w.personOrder[#w.personOrder + 1] = p.id

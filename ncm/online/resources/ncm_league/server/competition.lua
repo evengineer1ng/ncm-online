@@ -90,8 +90,10 @@ function NcmCompetition.rulesFor(e)
     -- Rolling start (Batch 2): the event says so (`rolling` on the post), else the ruleset, else lap disciplines roll by default (P41)
     local d = Discipline.byId(e.disciplineId or "street_sprint")
     local start = e.startType or (rs.start) or ((d and d.adapter == "laps") and "rolling" or "standing")
+    -- L296: a mixed Paddock grid starts standing, ovals included -- its NPCs launch from the grid at the lights
+    if e.class == "paddock" then start = "standing" end
     rules.start = start
-    -- L250: a mixed Paddock grid is placed at T-20 (paddock_link), so its DNS deadline is later than T-30
+    -- L250/L296: a mixed Paddock grid's DNS deadline is later than T-30 (the slot is known from T-60 only)
     if e.class == "paddock" then rules.gridHoldBeforeSec = NcmCore.get("paddock.mixed").GRID_HOLD_SEC end
     if start == "rolling" then
         rules.formationM = tonumber(e.formationM) or (rs.formationM) or 300

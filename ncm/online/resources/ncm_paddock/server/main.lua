@@ -79,7 +79,8 @@ CreateThread(function()
     Wait(0)
     PaddockDays.start()
     PaddockBubble.start()
-    PaddockMarkets.start()          -- L249 step 4: independents shop on a cadence
+    PaddockCars.start()             -- L298: every racer owns a real car (minted a few a pass)
+    PaddockMarkets.start()          -- L249 step 4 / L298: racers and teams shop for their cars, with a reason
     PaddockExchange.start()         -- L249 step 5: NPC traders on the board; expiry recovery at boot
     PaddockClock.start()
     Wait(0)

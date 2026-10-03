@@ -75,5 +75,40 @@ end
 function PaddockCalibration.baseFor(seed, route, tier, cond)
     local human = PaddockCalibration.buckets[key(route.routeId, tier, cond.bucket or "dry:day")]
     if human then human.cond = cond end
-    return Cal.basePace(seed, route, tier, cond, human, PaddockSettings.get("calibMinN", 8), PaddockSettings.get("calibMinDrivers", 3))
+    -- L296: a street route is timed over the road line it actually runs (the baked line), at the tier's MEASURED pace
+    if not route.oval and PaddockLive and PaddockLive.pathFor then
+        local okP, path = pcall(PaddockLive.pathFor, route.routeId)
+        if okP and path and path.source == "road" and (path.lengthM or 0) > 0 then
+            route = setmetatable({ lineM = path.lengthM }, { __index = route })
+        end
+    end
+    local w = PaddockStore.world
+    local learned = w and w.paceLearned or nil
+    return Cal.basePace(seed, route, tier, cond, human, PaddockSettings.get("calibMinN", 8), PaddockSettings.get("calibMinDrivers", 3),
+        PaddockSettings.get("paceLearn", true) and learned or nil)
+end
+
+--- L296: one race's physical pace, learned into its tier (persisted in paddock_world.counters_json). `metres`/`ms` are
+--- the race's pooled physical stretches at racing speed; under `paceLearnMinM` of road says too little.
+function PaddockCalibration.learnPhysical(race, metres, ms)
+    local w = PaddockStore.world
+    if not w or not race or not race.tier or not metres or not ms or ms <= 0 then return end
+    local route = PaddockWorld.route(race.routeId)
+    if route and route.oval then return end
+    if metres < PaddockSettings.get("paceLearnMinM", 2000) then
+        log("%s: physical pace %.1f m/s over %.0f m -- too little road to learn from", race.raceId, metres / ms * 1000, metres)
+        return
+    end
+    local sample = metres / ms * 1000
+    w.paceLearned = w.paceLearned or {}
+    local prev = w.paceLearned[race.tier]
+    local nextV, ok = Cal.learn(prev or Cal.TIER_SPEED[race.tier], sample)
+    if not ok then
+        log("%s: physical pace %.1f m/s over %.0f m refused (outside %d-%d)", race.raceId, sample, metres, Cal.LEARN_MIN_MPS, Cal.LEARN_MAX_MPS)
+        return
+    end
+    w.paceLearned[race.tier] = math.floor(nextV * 100 + 0.5) / 100
+    PaddockStore.markMeta()
+    log("%s: physical pace %.1f m/s over %.0f m; %s tier speed %.2f -> %.2f m/s", race.raceId, sample, metres, race.tier,
+        prev or Cal.TIER_SPEED[race.tier], w.paceLearned[race.tier])
 end

@@ -63,8 +63,15 @@ function PaddockViews.standings(_, args)
     for i, r in ipairs(rows) do
         if kind == "driver" then
             local p = world.people[r.id]
+            if not p and PaddockHumans and NcmCore.get("paddock.mixed").isHuman(r.id) then
+                -- a human from a mixed grid (L250): named as entered, their own team or a privateer
+                local who = PaddockHumans.identity(r.id)
+                out[i] = P.standingRow(r, who and who.display or PaddockWorld.personName(r.id), PaddockHumans.teamOf(who and who.driverId), {})
+                out[i].human = true
+            else
             out[i] = P.standingRow(r, p and p.display or "?", p and (p.orgId and PaddockWorld.orgName(p.orgId)
                 or (p.leagueId and "Independent") or "free agent") or "?", driverTags(p))
+            end
         else
             local o = world.orgs[r.id]
             out[i] = P.standingRow(r, o and o.name or "?", nil, o and orgTags(o) or {})
@@ -413,8 +420,20 @@ function PaddockViews.live(_, args)
             end
         end
     end
-    -- L250: a mixed grid's humans, where their players are on the line, in the same order
-    if PaddockHumans and PaddockHumans.mixed(pick) then
+    -- L250: a mixed grid's humans, where their players are on the line -- ONE order for the whole field, the race as it
+    -- stands on the road WITHOUT penalties (owner, 2026-10-02; penalties are shown at the classification ceremony):
+    -- finishers by their crossing, racers by distance at one reference pace for everyone.
+    if PaddockHumans and PaddockHumans.mixed(pick) and not street then
+        for _, h in ipairs(PaddockHumans.liveRows(pick, model, function(pos, lo, hi) return Racestate.project(model, pos, lo, hi) end)) do rows[#rows + 1] = h end
+        local ref = Racestate.refSpeed(model, tMs, rows)
+        for _, r in ipairs(rows) do r.projMs = Racestate.provisionalMs(model, r, tMs, ref) end
+        Racestate.sortProvisional(rows)
+        local lead = rows[1] and rows[1].projMs
+        for i, r in ipairs(rows) do
+            r.pos = i
+            r.gapMs = (r.projMs and lead) and math.max(0, math.floor(r.projMs - lead + 0.5)) or nil
+        end
+    elseif PaddockHumans and PaddockHumans.mixed(pick) then
         for _, h in ipairs(PaddockHumans.liveRows(pick, model, function(pos, lo, hi) return Racestate.project(model, pos, lo, hi) end)) do rows[#rows + 1] = h end
         table.sort(rows, function(a, b)
             if (a.state == "finished") ~= (b.state == "finished") then return a.state == "finished" end
@@ -430,15 +449,15 @@ function PaddockViews.live(_, args)
         local ovalLaps = route and route.oval and route.oval.laps
         local lap = r.lap
         if ovalLaps and not lap then lap = math.min(ovalLaps, math.floor((r.d or 0) / math.max(1, model.lengthM / ovalLaps)) + 1) end
-        out[i] = { pos = r.pos, id = r.id, name = p and p.display or r.name or "?", org = o and o.name or (r.human and "Independent" or nil), colour = o and o.colour,
+        out[i] = { pos = r.pos, id = r.id, name = p and p.display or r.name or "?", org = o and o.name or (r.human and PaddockHumans.teamOf(r.driverId) or nil), colour = o and o.colour,
             pct = math.floor(math.min(1, math.max(0, (r.d or 0) / math.max(1, model.lengthM))) * 1000) / 10,
             lap = lap,
             gap = r.state == "finished" and (r.gapMs and (r.gapMs == 0 and "winner" or ("+%.1fs"):format(r.gapMs / 1000)) or "finished")
                 or (r.state == "out" and "out") or (r.gapMs and (r.gapMs == 0 and "leader" or ("+%.1fs"):format(r.gapMs / 1000)) or ""),
-            state = r.state, physical = r.physical or nil, vid = r.vid, human = r.human or nil,
+            state = r.state, physical = r.physical or nil, vid = r.vid, human = r.human or nil, driverId = r.driverId,
             quali = pick.frozen and pick.frozen.quali and P.secs(tonumber(pick.frozen.quali[r.id])) or nil }
     end
-    return { view = "live", races = races, raceId = pick.raceId, series = PaddockWorld.seriesName(pick.seriesId),
+    return { view = "live", races = races, raceId = pick.raceId, series = PaddockWorld.seriesName(pick.seriesId), flagAt = pick.flagAt,
         route = PaddockWorld.routeName(pick.routeId), elapsed = math.max(0, math.floor(tMs / 1000)), lengthM = math.floor(model.lengthM),
         street = street and true or nil, rows = out,
         grid = P.qualiSheet(pick.frozen, function(id) local p = PaddockStore.world.people[id]; return p and p.display or "?" end) }

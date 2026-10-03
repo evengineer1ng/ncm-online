@@ -11,7 +11,7 @@
 --   the hand-over  entries and best times go to the Paddock (`ncm:paddock.entry`); it freezes the field at T-10 with
 --                  the humans in it, grids everyone by qualifying time and sends each human's slot back
 --                  (`ncm:paddock.grid`). The session forms on THOSE slots: one grid, one green (race.opensAt).
---   auto-place     at T-20 an entered human at the venue but not on their mark is put there in their own car.
+--   pre-grid       L296: from T-15 min each entered human is routed to a provisional slot; nobody is placed for them.
 --   the result     the league times its humans; the Paddock merges them with its NPCs (`ncm:paddock.human.result`) and
 --                  answers with the whole field's classification (`ncm:paddock.classified`); settlement waits for it, so a
 --                  human is paid for P4 of 12, not P1 of 1.
@@ -80,10 +80,14 @@ AddEventHandler("ncm:paddock.routeChanged", function(raceId, routeId)
     e.routeId, e.routeName, e.distanceM = route.routeId, route.name, route.distanceM
     e.venue, e.finish = route.oval and route.oval.entry or route.start, route.finish
     e.via = route.oval and route.oval.loop or route.intermediate
+    -- L296: a slot the Paddock turns into an oval races as one -- its discipline and laps, not the street sprint's
+    -- (this logged "point-to-point" and kept a one-lap sprint whatever the new course was)
+    e.disciplineId = route.oval and "oval" or "street_sprint"
+    e.laps = route.oval and (route.oval.laps or 1) or 1
     NcmPaddockLink.bests[e.eventId] = {}
     if NcmCalendar.publishNow then NcmCalendar.publishNow() end
     if NcmGuide and NcmGuide.pushAll then NcmGuide.pushAll() end
-    log("course updated for %s to point-to-point %s", e.eventId, route.routeId)
+    log("course updated for %s to %s %s", e.eventId, route.oval and ("oval (" .. e.laps .. " laps)") or "point-to-point", route.routeId)
 end)
 
 -- ------------------------------------------------------------------------------------------------ adoption
@@ -260,7 +264,7 @@ function NcmPaddockLink.qualify(pid, eventId)
         return nil, "not_at_venue"
     end
     local t = now()
-    if t >= e.entryClosesAt then tell(pid, "Qualifying has closed for that one (it closes at T-11)."); return nil, "closed" end
+    if t >= e.entryClosesAt then tell(pid, "Qualifying has closed for that one (it closes a minute before the start)."); return nil, "closed" end
     local busy, busyEvent, busyKind = NcmRace.busySession(driver.ncmDriverId)
     if busy and busyKind ~= "practice" then tell(pid, "You're out in a session. Finish it or retire first."); return nil, "busy" end
     -- one qualifying session at a time: picking another race moves you to it
@@ -333,109 +337,51 @@ function NcmPaddockLink.publishProgress(rec, t)
     local rows = {}
     for driverId, r in pairs(rec.s.entrants or {}) do
         if r.state == "racing" or r.state == "finished" or r.state == "dnf" then
-            rows[#rows + 1] = { driverId = driverId, progressPct = r.state == "finished" and 100 or (100 * (tonumber(r.progress) or 0) / total) }
+            rows[#rows + 1] = { driverId = driverId, progressPct = r.state == "finished" and 100 or (100 * (tonumber(r.progress) or 0) / total),
+                incidentSec = (tonumber(r.incidentSec) or 0) + (tonumber(r.penaltySec) or 0),
+                finishedAt = r.state == "finished" and r.finishAt or nil }
         end
     end
     if #rows > 0 then TriggerEvent("ncm:paddock.human.progress", rec.plan.e.paddockRaceId, rows) end
 end
 
--- ------------------------------------------------------------------------------------------------ auto-place
-local function placeOne(rec, sl, pid)
-    local okP, p = pcall(Open77.players.get, pid)
-    local pos = okP and type(p) == "table" and p.position or nil
-    if not pos then return false, "position_unavailable" end
-    local d = Routes.planarDistance(pos, sl)
-    if d <= (sl.radiusM or 4) then return true, "already_on_mark" end
-    if d > 20 then
-        tell(pid, ("Race control: you are %d m from P%d. Drive closer; grid assist only moves a nearby car."):format(math.floor(d), sl.slot))
-        log("auto-place skipped session=%s player=%d: %.0f m from slot %d", rec.s.sessionId:sub(1, 8), pid, d, sl.slot)
-        return false, "outside_auto_place_range"
+-- ------------------------------------------------------------------------------------------------ the pre-grid
+-- L296 (owner, 2026-10-02): "point player to their grid spot as early as we can, we are leaving it to last second";
+-- the old T-20 auto-place ("race control places you ... if you are within 20 m") is gone -- "thats not true anymore nor
+-- should it be". Before the session forms, the Paddock sends a PROVISIONAL slot for each entered human (from T-15 min, `preGridLeadSec`);
+-- the league relays each driver theirs every few seconds, until the session forms and the exact slot takes over.
+AddEventHandler("ncm:paddock.pregrid", function(raceId, msg)
+    local e = eventOf(raceId)
+    if not e or type(msg) ~= "table" then return end
+    if e.paddockPreGrid == nil then
+        local n = 0
+        for _ in pairs(msg.slots or {}) do n = n + 1 end
+        log("pre-grid for %s: %d human slot(s), ~%d cars", e.eventId, n, tonumber(msg.fieldSize) or 0)
     end
-    local okS, seat = pcall(Open77.vehicles.getPlayerSeat, pid)
-    local vid = okS and type(seat) == "table" and tonumber(seat.vehicleId) or nil
-    if not vid then
-        tell(pid, "Race control: get in your car and drive to your grid ring. You remain entered until the lights go green.")
-        log("auto-place skipped session=%s player=%d: on foot %.0f m from slot %d", rec.s.sessionId:sub(1, 8), pid, d, sl.slot)
-        return false, "on_foot"
-    end
-    local okAll, allVehicles = pcall(Open77.vehicles.all)
-    if not okAll or type(allVehicles) ~= "table" then
-        tell(pid, "Race control: I cannot confirm your grid spot is clear. Drive into place instead.")
-        return false, "clearance_unavailable"
-    end
-    for _, other in pairs(allVehicles) do
-        local otherId = tonumber(type(other) == "table" and (other.id or other.vehicleId) or nil)
-        local otherPos = type(other) == "table" and (other.position or other) or nil
-        if otherId and otherId ~= vid and type(otherPos) == "table" and Routes.planarDistance(otherPos, sl) < 6 then
-            tell(pid, "Race control: your grid ring is occupied. Move into place manually; your car will not be placed into another.")
-            log("auto-place refused session=%s player=%d slot=%d: vehicle=%d within 6m", rec.s.sessionId:sub(1, 8), pid, sl.slot, otherId)
-            return false, "slot_occupied"
-        end
-    end
-    toast(pid, { type = "warning", title = "RACE CONTROL", message = "Placing you on your slot · P" .. sl.slot, icon = "NCM", durationMs = 5000 })
-    -- never move an occupied car (open77_admin: the solver throws it): out, move the empty car, back in
-    local okO, out, whyO = pcall(Open77.vehicles.forcePlayerOutOfVehicle, pid, vid)
-    for _ = 1, 30 do
-        Wait(100)
-        local okS2, s2 = pcall(Open77.vehicles.getPlayerSeat, pid)
-        if not (okS2 and type(s2) == "table" and s2.vehicleId) then break end
-    end
-    local okT, moved, whyT = pcall(Open77.vehicles.setTransform, vid, { position = { x = sl.x, y = sl.y, z = (sl.z or pos.z or 0) + 0.6 }, yaw = sl.yaw or sl.heading or 0 })
-    Wait(400)
-    local okW, warped, whyW = pcall(Open77.vehicles.warpPlayerIntoVehicle, pid, vid, "driver", { moveBucket = true })
-    local placedDistance
-    if okT and moved == true and okW and warped == true then
-        -- API success only means the transform/seat calls returned true. Verify the actual player position that
-        -- gridCheck uses; auto-place previously marked success without this and could still DNS the entrant.
-        for _ = 1, 10 do
-            Wait(100)
-            local okV, verified = pcall(Open77.players.get, pid)
-            local actual = okV and type(verified) == "table" and verified.position or nil
-            if actual then
-                placedDistance = Routes.planarDistance(actual, sl)
-                if placedDistance <= (sl.radiusM or 4) then break end
-            end
-        end
-    end
-    local verified = placedDistance ~= nil and placedDistance <= (sl.radiusM or 4)
-    log("AUTO-PLACE session=%s player=%d vehicle=%d slot=%d from %.0f m: out=%s/%s move=%s/%s in=%s/%s verified=%s distance=%s",
-        rec.s.sessionId:sub(1, 8), pid, vid, sl.slot, d, tostring(okO), tostring(out or whyO), tostring(okT), tostring(moved or whyT),
-        tostring(okW), tostring(warped or whyW), tostring(verified), placedDistance and ("%.1f m"):format(placedDistance) or "unavailable")
-    if not verified and okT and moved == true and okW and warped == true then return false, "position_unverified" end
-    return verified, (not okT or not moved) and "transform_failed" or ((not okW or not warped) and "warp_failed" or (verified and "placed" or "position_unverified"))
-end
+    e.paddockPreGrid = msg
+end)
 
---- At T-20 (paddock.mixed.AUTO_PLACE_SEC): offer a nearby placement assist; refuse if the slot is occupied.
-function NcmPaddockLink.autoPlace(rec, t)
-    if rec.kind ~= "race" or not rec.paddock then return end
-    local s = rec.s
-    if s.phase ~= "forming" and s.phase ~= "gridded" then return end
-    if t < s.startsAt - Mixed.AUTO_PLACE_SEC then return end
-    rec.autoPlaced = rec.autoPlaced or {}
-    rec.autoPlaceNextAt = rec.autoPlaceNextAt or {}
-    rec.autoPlacing = rec.autoPlacing or {}
-    for _, sl in ipairs(rec.slots or {}) do
-        local r = s.entrants[sl.driverId]
-        local pid = rec.playerOf[sl.driverId]
-        local id = sl.driverId
-        if r and r.state == "entered" and pid and not rec.autoPlaced[id] and not rec.autoPlacing[id]
-            and t >= (rec.autoPlaceNextAt[id] or 0) then
-            rec.autoPlacing[id] = true
-            CreateThread(function()
-                local ok, placed, why = pcall(placeOne, rec, sl, pid)
-                rec.autoPlacing[id] = nil
-                if ok and placed then
-                    rec.autoPlaced[id] = true
-                else
-                    rec.autoPlaceNextAt[id] = (Open77.time.unix() or t) + 2
-                    if not ok then log("auto-place error session=%s player=%d slot=%d: %s", s.sessionId:sub(1, 8), pid, sl.slot, tostring(placed))
-                    elseif why == "transform_failed" or why == "warp_failed" or why == "position_unverified" then
-                        log("auto-place will retry session=%s player=%d slot=%d: %s", s.sessionId:sub(1, 8), pid, sl.slot, tostring(why))
-                    end
-                end
-            end)
+local lastPreGridAt = {}
+--- Relay each entered driver their provisional slot (race.lua's tick, for events whose session has not formed).
+--- `pmap` = { [driverId] = playerId }.
+function NcmPaddockLink.pushPreGrid(e, pmap, t)
+    local g = e and e.paddockPreGrid
+    if type(g) ~= "table" or type(g.slots) ~= "table" or t >= (e.startsAt or 0) then return 0 end
+    if t - (lastPreGridAt[e.eventId] or 0) < 3 then return 0 end
+    lastPreGridAt[e.eventId] = t
+    local sent = 0
+    for driverId, sl in pairs(g.slots) do
+        local en = e.entries and e.entries[driverId]
+        local pid = pmap[driverId]
+        if pid and en and en.state ~= "withdrawn" and en.state ~= "interested" then
+            TriggerClientEvent("ncm:race.pregrid", pid, { eventId = e.eventId, paddockRaceId = e.paddockRaceId,
+                routeName = e.routeName, slot = sl.slot, fieldSize = tonumber(g.fieldSize), qualified = sl.qualified and true or false,
+                x = sl.x, y = sl.y, z = sl.z, startsAt = e.startsAt, formsAt = (e.startsAt or 0) - (Mixed.FREEZE_LEAD_SEC - 10),
+                serverNow = math.floor(t) })   -- KB-320: the client has no synced clock before a session exists
+            sent = sent + 1
         end
     end
+    return sent
 end
 
 -- ------------------------------------------------------------------------------------------------ the result
@@ -449,8 +395,12 @@ function NcmPaddockLink.awaitClassification(rec, results, reason, t, completeFn)
     local gates = #(rec.s.gates or {})
     for _, r in ipairs(results) do
         local sec = r.correctedSec or r.totalSec
+        -- raw = as they crossed (from the green), for the ceremony; finishMs stays the corrected time that classifies
+        local rawMs = (r.state == "finished" and r.finishAt and rec.s.greenAt) and math.floor((r.finishAt - rec.s.greenAt) * 1000 + 0.5) or nil
+        local finMs = (r.state == "finished" and sec) and math.floor(sec * 1000 + 0.5) or nil
         rows[#rows + 1] = { driverId = r.driverId, display = r.display, state = r.state,
-            finishMs = (r.state == "finished" and sec) and math.floor(sec * 1000 + 0.5) or nil,
+            rawFinishMs = rawMs, penaltyMs = (rawMs and finMs) and math.max(0, finMs - rawMs) or nil,
+            finishMs = finMs,
             progressPct = math.floor(100 * (r.progress or 0) / math.max(1, r.gatesTotal or gates)), dnfReason = r.dnfReason }
     end
     rec.results, rec.completeReason, rec.provisional = results, reason, true
@@ -474,6 +424,14 @@ function NcmPaddockLink.awaitClassification(rec, results, reason, t, completeFn)
     end)
 end
 
+-- The Paddock flagged the race (its leader is home): close the session at the same moment, and show the countdown.
+AddEventHandler("ncm:paddock.flag", function(raceId, at)
+    local e = eventOf(raceId)
+    if not e or type(at) ~= "number" then return end
+    local n = NcmRace.flagEvent(e.eventId, at)
+    log("FLAG %s at %d (%d session(s))", e.eventId, at, n)
+end)
+
 AddEventHandler("ncm:paddock.classified", function(raceId, msg)
     local w = waiting[raceId]
     if not w or type(msg) ~= "table" then return end
@@ -486,6 +444,7 @@ AddEventHandler("ncm:paddock.classified", function(raceId, msg)
     table.sort(w.results, function(a, b) return (a.position or 99) < (b.position or 99) end)
     w.rec.classified = true
     w.rec.mixedField = tonumber(msg.fieldSize)
+    w.rec.paddockBoard = type(msg.board) == "table" and msg.board or nil
     log("RESULT %s classified by the Paddock: field %s", w.rec.eventId, tostring(msg.fieldSize))
     w.completeFn(w.rec, w.results, w.reason, now())
 end)

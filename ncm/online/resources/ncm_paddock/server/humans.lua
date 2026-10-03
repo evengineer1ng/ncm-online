@@ -12,7 +12,7 @@
 --   resolve                   the NPC classification and the humans' merged by time (paddock.mixed.merge) and written
 --                             as the race's result; ncm:paddock.classified (here -> league) carries each human's place
 --                             and the field size, which is what the league pays them on
-PaddockHumans = { byRace = {}, results = {}, names = {} }
+PaddockHumans = { byRace = {}, results = {}, names = {}, penaltyMs = {}, finishedAt = {} }   -- penaltyMs: raceId -> key -> live incident ms
 
 local U = PaddockUtil
 local log = U.logger("humans")
@@ -24,6 +24,27 @@ local liveDistance = {} -- raceId -> person key -> monotonic, physically project
 local function entriesOf(raceId)
     PaddockHumans.byRace[raceId] = PaddockHumans.byRace[raceId] or {}
     return PaddockHumans.byRace[raceId]
+end
+
+--- A human's name and driver id by their Paddock key, for views that outlive the in-memory entries (season standings,
+--- results): the last name they entered under. Cached; a miss is cached too so a view never queries per row twice.
+local identities = {}
+function PaddockHumans.identity(key)
+    if type(key) ~= "string" then return nil end
+    local hit = identities[key]
+    if hit then return hit.display and hit or nil end
+    local ok, rows = pcall(MySQL.query.await, [[SELECT display, ncm_driver_id FROM paddock_entry WHERE server_id = ? AND person_key = ?
+        ORDER BY entered_at DESC LIMIT 1]], { U.sid(), key })
+    local r = ok and type(rows) == "table" and rows[1] or nil
+    identities[key] = { display = r and r.display or PaddockHumans.names[key], driverId = r and r.ncm_driver_id or nil }
+    if identities[key].display then PaddockHumans.names[key] = PaddockHumans.names[key] or identities[key].display end
+    return identities[key].display and identities[key] or nil
+end
+
+--- A human's team label: the team they manage, else "Privateer" (owner, 2026-10-02).
+function PaddockHumans.teamOf(driverId)
+    local o = driverId and PaddockWorld.orgManagedBy(driverId)
+    return o and o.name or "Privateer"
 end
 
 --- Boot: the entries and results of the races still in memory.
@@ -125,10 +146,68 @@ function PaddockHumans.sendGrid(race)
     return true
 end
 
-local lastSend = 0
+--- L296 PRE-GRID: before the freeze, each entered human's PROVISIONAL slot, so the league can route them to the grid
+--- minutes early instead of at T-50. The field's size is the guide's estimate and the NPCs' qualifying is not run yet,
+--- so every human is put at the BACK (timed humans by time, then the untimed in entry order): the frozen grid can only
+--- move a human forward from there -- a few rows up the same lane, never somewhere else.
+function PaddockHumans.preGrid(race)
+    local humans = PaddockHumans.entered(race)
+    if #humans == 0 then return nil end
+    local route = PaddockWorld.route(race.routeId)
+    if not route then return nil end
+    local s = NcmCore.get("paddock.season").TIERS[race.tier] or {}
+    local n = math.floor((s.orgs or 12) / (s.divisions or 1)) * (s.carsPerOrg or 1)
+    if route.oval and route.oval.fieldMax then n = math.min(n, route.oval.fieldMax) end
+    n = math.max(n, #humans)
+    table.sort(humans, function(a, b)
+        local ta, tb = tonumber(a.qualiMs), tonumber(b.qualiMs)
+        if (ta ~= nil) ~= (tb ~= nil) then return ta ~= nil end
+        if ta and tb and ta ~= tb then return ta < tb end
+        if (a.enteredAt or 0) ~= (b.enteredAt or 0) then return (a.enteredAt or 0) < (b.enteredAt or 0) end
+        return a.key < b.key
+    end)
+    local profile = NcmCore.get("data.grid_profiles").forRoot(race.routeId)
+    local slots
+    if route.oval then
+        local path = PaddockLive.pathFor(race.routeId)
+        slots = (path and path.ovalBehind and L.roadSlots(path.ovalBehind, n, profile)) or L.ovalSlots(route.oval, n, profile)
+    else
+        slots = PaddockLive.gridSlots(route, n, profile)
+    end
+    if not slots then return nil end
+    local out = {}
+    for i, h in ipairs(humans) do
+        local k = n - #humans + i
+        local sl = slots[k]
+        if sl then
+            out[h.driverId] = { slot = k, x = sl.x, y = sl.y, z = sl.z or (route.start and route.start.z) or (route.oval and route.oval.entry.z),
+                heading = sl.heading, yaw = sl.yaw, qualified = tonumber(h.qualiMs) ~= nil }
+        end
+    end
+    return out, n
+end
+
+local lastSend, lastPre = 0, 0
 function PaddockHumans.tick(t)
     local sendGrid = t - lastSend >= 30
     if sendGrid then lastSend = t end
+    -- L296: the pre-grid every 10 s, from preGridLeadSec before the start until the freeze
+    local sendPre = t - lastPre >= 10
+    if sendPre then lastPre = t end
+    if sendPre then
+        local lead = PaddockSettings.get("preGridLeadSec", 900)
+        for _, race in pairs(PaddockRaces.byId) do
+            if (race.state == "scheduled" or race.state == "priced") and not race.frozen and race.opensAt > t
+                and race.opensAt - t <= lead and PaddockHumans.byRace[race.raceId] then
+                local okP, slots, n = pcall(PaddockHumans.preGrid, race)
+                if okP and slots then
+                    TriggerEvent("ncm:paddock.pregrid", race.raceId, { slots = slots, fieldSize = n, greenAt = race.opensAt, provisional = true })
+                elseif not okP then
+                    log("%s: pre-grid failed: %s", race.raceId, tostring(slots))
+                end
+            end
+        end
+    end
     for _, race in pairs(PaddockRaces.byId) do
         if (race.state == "scheduled" or race.state == "priced") and race.opensAt > t
             and race.opensAt - t <= Mixed.FREEZE_LEAD_SEC and not race.frozen then
@@ -149,7 +228,12 @@ AddEventHandler("ncm:paddock.human.result", function(raceId, rows)
         if type(r) == "table" and type(r.driverId) == "string" then
             local key = Mixed.personKey(r.driverId)
             local state = ({ finished = "finished", dnf = "dnf", dns = "dns", dsq = "dsq" })[tostring(r.state)] or "dns"
-            PaddockHumans.results[raceId][key] = { state = state, finishMs = tonumber(r.finishMs),
+            if state == "finished" and race and race.opensAt and tonumber(r.rawFinishMs) then
+                PaddockHumans.finishedAt[raceId] = PaddockHumans.finishedAt[raceId] or {}
+                PaddockHumans.finishedAt[raceId][key] = PaddockHumans.finishedAt[raceId][key] or (race.opensAt + tonumber(r.rawFinishMs) / 1000)
+            end
+            PaddockHumans.results[raceId][key] = { rawFinishMs = tonumber(r.rawFinishMs), penaltyMs = tonumber(r.penaltyMs),
+                state = state, finishMs = tonumber(r.finishMs),
                 progressFrac = math.max(0, math.min(1, (tonumber(r.progressPct) or 0) / 100)), dnfReason = r.dnfReason, driverId = r.driverId }
             pcall(MySQL.update.await, [[UPDATE paddock_entry SET result_state = ?, finish_ms = NULLIF(?, -1), progress_pct = ?
                 WHERE server_id = ? AND race_id = ? AND ncm_driver_id = ?]],
@@ -167,6 +251,12 @@ AddEventHandler("ncm:paddock.human.progress", function(raceId, rows)
     for _, r in ipairs(rows) do
         if type(r) == "table" and type(r.driverId) == "string" then
             local key = Mixed.personKey(r.driverId)
+            if (tonumber(r.progressPct) or 0) >= 100 then
+                PaddockHumans.finishedAt[raceId] = PaddockHumans.finishedAt[raceId] or {}
+                PaddockHumans.finishedAt[raceId][key] = PaddockHumans.finishedAt[raceId][key] or (tonumber(r.finishedAt) or U.now())
+            end
+            PaddockHumans.penaltyMs[raceId] = PaddockHumans.penaltyMs[raceId] or {}
+            PaddockHumans.penaltyMs[raceId][key] = math.floor((tonumber(r.incidentSec) or 0) * 1000 + 0.5)
             local reported = math.max(0, math.min(1, (tonumber(r.progressPct) or 0) / 100))
             -- A delayed or duplicated League update must not put a human back on an earlier lap.
             target[key] = math.max(target[key] or 0, reported)
@@ -174,14 +264,25 @@ AddEventHandler("ncm:paddock.human.progress", function(raceId, rows)
     end
 end)
 
---- A mixed race's close waits for its humans' results (or HUMAN_RESULT_WAIT_SEC past the green).
+--- A mixed race's close waits for its humans' results (or HUMAN_RESULT_WAIT_SEC past the green). Once the race is
+--- flagged the league closes its session at the same moment, so the wait is a few seconds for the result to arrive.
 function PaddockHumans.holds(race, t)
     if not PaddockHumans.mixed(race) then return false end
     local res = PaddockHumans.results[race.raceId] or {}
     for key in pairs(race.frozen.humans) do
-        if not res[key] then return t < race.opensAt + Mixed.HUMAN_RESULT_WAIT_SEC end
+        if not res[key] then
+            if race.flagAt then return t < race.flagAt + 20 end
+            return t < race.opensAt + Mixed.HUMAN_RESULT_WAIT_SEC
+        end
     end
     return false
+end
+
+--- The first moment a human of this race was home (unix), or nil -- one of the candidates for the leader (the flag).
+function PaddockHumans.firstFinishAt(race)
+    local best
+    for _, at in pairs(PaddockHumans.finishedAt[race.raceId] or {}) do if not best or at < best then best = at end end
+    return best
 end
 
 --- The merged classification, written as the race's result. Returns the merged entrants (or nil when not mixed).
@@ -194,11 +295,24 @@ function PaddockHumans.merge(race, entrants)
     for key in pairs(race.frozen.humans) do
         local r = res[key] or { state = "dns" }
         humans[#humans + 1] = { key = key, state = r.state, finishMs = r.finishMs, progressFrac = r.progressFrac,
-            grid = gridOf[key], dnfReason = r.dnfReason or (res[key] == nil and "no_result" or nil) }
+            grid = gridOf[key], dnfReason = r.dnfReason or (res[key] == nil and "no_result" or nil),
+            rawFinishMs = r.rawFinishMs, penaltyMs = r.penaltyMs }
     end
     table.sort(humans, function(a, b) return a.key < b.key end)
+    -- the model's own rows carry what the stored ones do not: raw crossing, penalties, how far a flagged car got
+    local fromModel = {}
+    for _, e in ipairs(race.modelEntrants or {}) do fromModel[e.id] = e end
     local npc = {}
-    for _, e in ipairs(entrants or {}) do if not Mixed.isHuman(e.id) then npc[#npc + 1] = e end end
+    for _, e in ipairs(entrants or {}) do
+        if not Mixed.isHuman(e.id) then
+            local m = fromModel[e.id]
+            if m then
+                e.rawFinishMs, e.penaltyMs = m.rawFinishMs, m.penaltyMs
+                if m.dnfReason == "flagged" and race.model then e.progressFrac = (m.reachedM or 0) / math.max(1, race.model.lengthM); e.dnfReason = "flagged" end
+            end
+            npc[#npc + 1] = e
+        end
+    end
     local merged = Mixed.merge(npc, humans)
     local ok, err = PaddockLive.writeResult(race, merged, "mixed", "mixed_grid", { mode = "mixed_grid", humans = #humans })
     if not ok then log("%s: merged result NOT written: %s", race.raceId, tostring(err)) return nil end
@@ -208,7 +322,17 @@ function PaddockHumans.merge(race, entrants)
         local h = race.frozen.humans[key]
         if h then byDriver[h.driverId] = pos end
     end
-    TriggerEvent("ncm:paddock.classified", race.raceId, { places = byDriver, fieldSize = n })
+    -- the ceremony: the board as they crossed, then as classified with penalties (owner, 2026-10-02)
+    local board = {}
+    for i, row in ipairs(Mixed.ceremony(merged)) do
+        local h = race.frozen.humans[row.id]
+        local p = not h and PaddockStore.world.people[row.id] or nil
+        board[i] = { pos = row.pos, rawPos = row.rawPos, moved = row.moved, name = h and h.display or (p and p.display) or "?",
+            human = h and true or nil, driverId = h and h.driverId or nil, state = row.state,
+            rawMs = row.rawMs, finalMs = row.finalMs, penMs = (row.penaltyMs or 0) > 0 and row.penaltyMs or nil, reason = row.dnfReason }
+    end
+    table.sort(board, function(a, b) return a.pos < b.pos end)
+    TriggerEvent("ncm:paddock.classified", race.raceId, { places = byDriver, fieldSize = n, board = board })
     log("%s: mixed classification written, %d human(s) in a field of %d", race.raceId, #humans, n)
     return merged
 end
@@ -225,7 +349,19 @@ function PaddockHumans.enteredInSeries(driverId, seriesId)
     return n > 0
 end
 
-local function pidFor(driverId)
+local pidFor
+--- The connected player ids of a mixed race's humans (the broadcast sends them the whole field wherever they are).
+function PaddockHumans.playerIds(race)
+    local out = {}
+    if not PaddockHumans.mixed(race) then return out end
+    for _, h in pairs(race.frozen.humans) do
+        local pid = pidFor(h.driverId)
+        if pid then out[#out + 1] = tonumber(pid) end
+    end
+    return out
+end
+
+pidFor = function(driverId)
     local pid = PaddockPlayers.pidOf(driverId)
     if pid then return pid end
     local okA, all = pcall(Open77.players.all)
@@ -248,7 +384,11 @@ function PaddockHumans.liveRows(race, model, project)
         local distances = liveDistance[race.raceId]
         if r and r.state == "finished" then d = model.lengthM
         else
-            local frac = liveProgress[race.raceId] and liveProgress[race.raceId][key]
+            -- Gate progress is a FLOOR only on an oval (laps, L282). On a point-to-point the gates are the start and the
+            -- finish, so "1 of 2" -- crossing the start -- read as half the race, and the monotonic distance kept the
+            -- owner at mid-race from the lights: always P1 on the tower (2026-10-02). There the street position rules.
+            local frac = PaddockWorld.route(race.routeId) and PaddockWorld.route(race.routeId).oval
+                and liveProgress[race.raceId] and liveProgress[race.raceId][key] or nil
             local prior = distances[key] or ((frac or 0) * model.lengthM)
             -- Bound the physical projection around this human's last known distance. Oval coordinates repeat
             -- every lap; an unrestricted nearest-point query always prefers lap one. A 300 m window covers
@@ -260,7 +400,9 @@ function PaddockHumans.liveRows(race, model, project)
             d = math.max(prior, (frac or 0) * model.lengthM, physical or 0)
             distances[key] = math.min(model.lengthM, d)
         end
-        out[#out + 1] = { id = key, d = d, human = true, name = h.display,
+        -- a finished human's time from the league is already corrected (penalties in it); a racing one carries them
+        local pen = (not r) and (PaddockHumans.penaltyMs[race.raceId] or {})[key] or 0
+        out[#out + 1] = { id = key, d = d, human = true, name = h.display, driverId = h.driverId, penaltyMs = pen,
             state = r and (r.state == "finished" and "finished" or "out") or "racing", finishMs = r and r.finishMs or nil }
     end
     return out

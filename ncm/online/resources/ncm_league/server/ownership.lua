@@ -236,10 +236,13 @@ function NcmOwnership.manufacture(record, opts)
     local insertQuery = "INSERT INTO vehicle_asset (asset_id, server_id, ncm_driver_id, vehicle_key, record, class, " ..
         "acquired_via, acquired_at, allocation_id, allocation_slot, paint_primary, paint_secondary, " ..
         "origin, manufacturer_key, production_ordinal, maker_ordinal, model_ordinal, produced_at) " ..
-        "VALUES (?, ?, NULL, ?, ?, ?, NULL, ?, ?, NULLIF(?, ''), ?, ?, ?, NULLIF(?, ''), " ..
+        "VALUES (?, ?, NULL, ?, ?, ?, NULL, ?, ?, NULLIF(?, 0), ?, ?, ?, NULLIF(?, ''), " ..
         "NULLIF(?, 0), NULLIF(?, 0), NULLIF(?, 0), ?)"
+    -- KB-311: `allocation_slot` is an INT. Its sentinel is 0, never '': under STRICT_TRANS_TABLES `NULLIF(3, '')` is
+    -- "Truncated incorrect DECIMAL value" (SQL 1292) inside an INSERT, and it failed every car's birth transaction from
+    -- 2026-09-26 -- no vehicle was manufactured anywhere after that (proved against dev MariaDB, rolled back).
     local insertValues = { assetId, serverId(), vehicleKey, record, primaryClass, producedAt,
-        opts.allocationId or "production", opts.allocationSlot or "", paintPrimary, paintSecondary,
+        opts.allocationId or "production", tonumber(opts.allocationSlot) or 0, paintPrimary, paintSecondary,
         origin, ord and ord.manufacturerKey or "",
         ord and ord.global or 0, ord and ord.maker or 0, ord and ord.model or 0, producedAt }
     local ok, err = pcall(function()

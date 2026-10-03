@@ -75,7 +75,10 @@ function PaddockWorld.person(id) local w = PaddockStore.world return w and w.peo
 function PaddockWorld.org(id) local w = PaddockStore.world return w and w.orgs[id] end
 function PaddockWorld.personName(id)
     -- L250: a human on a mixed grid is known by the name they entered under
-    if PaddockHumans and NcmCore.get("paddock.mixed").isHuman(id) then return PaddockHumans.names[id] or "?" end
+    if PaddockHumans and NcmCore.get("paddock.mixed").isHuman(id) then
+        local who = PaddockHumans.names[id] and { display = PaddockHumans.names[id] } or PaddockHumans.identity(id)
+        return who and who.display or "?"
+    end
     local p = PaddockWorld.person(id) return p and p.display or "?"
 end
 -- an entrant with no team is an independent street racer (L249)

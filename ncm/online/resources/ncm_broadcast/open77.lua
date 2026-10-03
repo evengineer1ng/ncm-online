@@ -5,13 +5,13 @@
 --     with usernames.
 --
 -- A resource of its own (owner rule: new features, new mods) and so a WebUI budget of its own: two surfaces, the
--- hidden 16x16 loopback page to the plugin (the L129 pattern, for the tower) and, only while Paddock cars are near,
--- web/names.html -- the car names, placed by `Open77.anchors` (0.1.1, KB-223: the plugin's own plates piled up in one
--- spot). `kMaximumWebSurfaces` is eight PER RESOURCE (open77_media: "a resource may hold eight").
+-- hidden 16x16 loopback page to the plugin (the L129 pattern, for the tower). Car names (0.1.3) are native anchored
+-- cards (`Open77.anchors`, render = "card") on each car's entity: no page (KB-223: the plugin's own plates piled up in
+-- one spot; web/names.html is kept but unused). `kMaximumWebSurfaces` is eight PER RESOURCE.
 --
 -- vehicles.read: `Open77.vehicles.get(id).entity`, what an anchor is attached to.
 resource "ncm_broadcast"
-version "0.1.2"
+version "0.1.3"
 auto_start true
 
 permissions { "network.events", "vehicles.read" }

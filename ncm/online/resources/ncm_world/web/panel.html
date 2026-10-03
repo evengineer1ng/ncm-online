@@ -1820,7 +1820,11 @@
           // offering is an apparently broken market.
           stock.textContent=o.soldOut?("SOLD OUT · 0 / "+Number(o.ceiling||0)):("AVAILABLE "+Number(o.available||0)+" / "+Number(o.ceiling||0));
           const price=document.createElement("div");price.className="price";price.textContent=eddies(o.price);
-          card.append(source,maker,name,meta,stock,price);
+          card.append(source,maker,name,meta,stock);
+          // Where did they go (L298): the last batch by who holds each unit -- teams by name, privateers, the shelf.
+          if(o.lastBatch&&Array.isArray(o.lastBatch.by)&&o.lastBatch.units>0){const prov=document.createElement("div");prov.className="sub provenance";
+            prov.textContent="Last batch: "+Number(o.lastBatch.units)+(Number(o.lastBatch.units)===1?" unit":" units")+o.lastBatch.by.map(b=>" · "+String(b.name)+" "+Number(b.n)).join("");card.append(prov);}
+          card.append(price);
           if(fitmentOverlay&&fit){const badge=document.createElement("div");badge.className="fit-badge";badge.textContent=fit.compatible?"✓ FITS":"⊘ DOES NOT FIT";card.append(badge);}
           card.addEventListener("click",()=>selectOffering(o));
           marketGrid.append(card);

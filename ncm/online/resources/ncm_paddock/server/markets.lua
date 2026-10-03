@@ -1,12 +1,15 @@
 -- ncm_paddock / server / markets -- NPCs in the markets (L249 step 4, IDEA-730; owner: "all markets need buyers").
 --
--- Paddock teams and independent racers buy the SAME serialized parts and machines players do, from the same shelves,
--- and pay real money for them:
+-- L298 (audit L297): every Paddock racer owns a real car (npc_cars.lua), and a purchase is a step in looking after it:
 --
---   * a team that decides to develop an area (life.lua `invest_dev`) first buys a real part of a family that serves
---     it and fits it; the part's price develops the area by more than workshop hours would (`economy.npc_market`);
---   * an independent street racer (no team) shops on a cadence with their own money (`person.cash`: purses in), for
---     parts for their own car, and now and then a better car.
+--   * a racer's turn comes round every `npcShopIntervalSec` (persisted: a restart no longer sends the same
+--     independents back to the shelves, KB-312); the car's GOALS decide what they do, most pressing first
+--     (`economy.npc_garage.goals`): service a worn part, replace a worn-out one, or upgrade the weakest area;
+--   * a part is bought only if it FITS the car's model (the catalogue's fitment contract, the player rule) and is a
+--     strict upgrade over what is installed -- never a downgrade, never the same part again;
+--   * it is installed on that car as a new configuration revision; the part it replaces goes to storage;
+--   * an independent pays with their own money; a team driver's car is paid for by the team (teams now spend, KB-315);
+--   * the money row and the transfer carry the reason and the goal.
 --
 -- Every purchase is ONE guarded transaction, the shape of the player purchase in ncm_league (components.lua,
 -- market.lua): claim the shelf row only while it is still available; move the asset to the NPC; write the transfer;
@@ -21,6 +24,7 @@ PaddockMarkets = { stats = { parts = 0, vehicles = 0, refused = 0, lost = 0 } }
 local U = PaddockUtil
 local log = U.logger("markets")
 local NM = NcmCore.get("economy.npc_market")
+local Garage = NcmCore.get("economy.npc_garage")
 local Car = NcmCore.get("paddock.car")
 local Hash = NcmCore.get("vocabulary.hash")
 local ids = NcmCore.get("vocabulary.ids")
@@ -65,31 +69,10 @@ local function moneyTable(pr) return pr.kind == "org" and "paddock_org" or "padd
 local function moneyKey(pr) return pr.kind == "org" and "org_id" or "person_id" end
 local function mark(pr) if pr.kind == "org" then PaddockStore.markOrg(pr.id) else PaddockStore.markPerson(pr.id) end end
 
---- Parts on the shelves for the families serving `area`, at most `budget`.
-local function offers(area, budget)
-    local fams = NM.AREA_FAMILIES[area] or {}
-    if #fams == 0 then return {} end
-    local marks = {}
-    for i = 1, #fams do marks[i] = "?" end
-    local vals = { U.sid() }
-    for _, f in ipairs(fams) do vals[#vals + 1] = f end
-    vals[#vals + 1] = math.floor(budget)
-    local rows = MySQL.query.await(([[SELECT mi.market_id, mi.asset_id, mi.price, mi.listed_at, d.family, d.tier, d.design_id
-        FROM component_market_inventory mi JOIN component_asset a ON a.asset_id = mi.asset_id
-        JOIN component_design d ON d.design_id = a.design_id
-        WHERE mi.state = 'available' AND a.server_id = ? AND d.family IN (%s) AND mi.price <= ?
-        ORDER BY mi.listed_at LIMIT 40]]):format(table.concat(marks, ",")), vals) or {}
-    local out = {}
-    for _, r in ipairs(rows) do
-        out[#out + 1] = { marketId = r.market_id, assetId = r.asset_id, price = tonumber(r.price), listedAt = tonumber(r.listed_at),
-            family = r.family, tier = r.tier, designId = r.design_id }
-    end
-    return out
-end
-
 --- The statements of one NPC part purchase (exposed for tools/npc-sql-gen.lua, which runs them against MariaDB
---- inside a rolled-back transaction).
-function PaddockMarkets.partPurchaseTx(pr, o, t)
+--- inside a rolled-back transaction). L298: the part goes to the buyer's STORAGE here and is installed on their car
+--- in its own transaction (`PaddockCars.install`); the money row and the transfer carry the reason and the goal.
+function PaddockMarkets.partPurchaseTx(pr, o, t, reason, goal)
     local key = NM.principal(pr.kind, pr.id)
     local idem = ("npc_part:%s:%s"):format(U.sid(), o.assetId)
     local guard = [[mi.market_id = ? AND mi.asset_id = ? AND mi.state = 'sold' AND mi.sold_to_principal = ? AND mi.sold_at = ?]]
@@ -99,24 +82,25 @@ function PaddockMarkets.partPurchaseTx(pr, o, t)
         { query = [[UPDATE component_market_inventory SET state = 'sold', sold_at = ?, sold_to_principal = ?
             WHERE market_id = ? AND asset_id = ? AND state = 'available']], values = { t, key, o.marketId, o.assetId } },
         { query = [[UPDATE component_asset a JOIN component_market_inventory mi ON mi.asset_id = a.asset_id
-            SET a.owner_principal_kind = ?, a.owner_principal_id = ?, a.location_kind = 'npc_fitted', a.machine_asset_id = NULL,
+            SET a.owner_principal_kind = ?, a.owner_principal_id = ?, a.location_kind = 'npc_storage', a.machine_asset_id = NULL,
                 a.acquired_via = 'purchase', a.acquired_at = ?
             WHERE a.ncm_driver_id IS NULL AND ]] .. guard, values = with({ pr.kind, pr.id, t }) },
-        { query = [[INSERT IGNORE INTO component_asset_transfer (transfer_id, idem_key, server_id, asset_id, kind, market_id, amount, occurred_at)
-            SELECT ?, ?, ?, mi.asset_id, 'npc_purchase', mi.market_id, mi.price, ? FROM component_market_inventory mi WHERE ]] .. guard,
-          values = with({ ids.uuid4(rng), idem, U.sid(), t }) },
+        { query = [[INSERT IGNORE INTO component_asset_transfer (transfer_id, idem_key, server_id, asset_id, kind, market_id, amount, occurred_at,
+            to_principal, reason)
+            SELECT ?, ?, ?, mi.asset_id, 'npc_purchase', mi.market_id, mi.price, ?, ?, ? FROM component_market_inventory mi WHERE ]] .. guard,
+          values = with({ ids.uuid4(rng), idem, U.sid(), t, key, reason or "" }) },
         { query = ([[UPDATE %s p JOIN component_market_inventory mi ON ]] .. guard .. [[ SET p.cash = p.cash - mi.price
             WHERE p.server_id = ? AND p.%s = ?]]):format(moneyTable(pr), moneyKey(pr)), values = { o.marketId, o.assetId, key, t, U.sid(), pr.id } },
-        { query = [[INSERT IGNORE INTO npc_money (entry_id, server_id, principal_kind, principal_id, amount, kind, ref, idem_key, created_at)
-            SELECT ?, ?, ?, ?, -mi.price, 'part_purchase', mi.asset_id, ?, ? FROM component_market_inventory mi WHERE ]] .. guard,
-          values = with({ ids.uuid4(rng), U.sid(), pr.kind, pr.id, idem, t }) },
+        { query = [[INSERT IGNORE INTO npc_money (entry_id, server_id, principal_kind, principal_id, amount, kind, ref, idem_key, created_at, reason, goal)
+            SELECT ?, ?, ?, ?, -mi.price, 'part_purchase', mi.asset_id, ?, ?, NULLIF(?, ''), NULLIF(?, '') FROM component_market_inventory mi WHERE ]] .. guard,
+          values = with({ ids.uuid4(rng), U.sid(), pr.kind, pr.id, idem, t, reason or "", goal or "" }) },
     }
     return tx
 end
 
 --- The guarded purchase of one shelf part by an NPC. Returns the offer on success, nil and a reason otherwise.
-local function purchasePart(pr, o, t)
-    local tx = PaddockMarkets.partPurchaseTx(pr, o, t)
+local function purchasePart(pr, o, t, reason, goal)
+    local tx = PaddockMarkets.partPurchaseTx(pr, o, t, reason, goal)
     -- ONE transaction (never U.transact, which chunks): the claim and the money move together or not at all
     local ok, err = PaddockMarkets.atomic(tx)
     if not ok then return nil, "transaction_failed: " .. tostring(err) end
@@ -127,87 +111,161 @@ local function purchasePart(pr, o, t)
     return o
 end
 
---- A part an NPC fits makes its old one of that family surplus (into storage: the Exchange can sell it, step 5).
-local function retireDisplaced(pr, newPart)
-    local rows = MySQL.query.await([[SELECT a.asset_id, d.family, d.tier FROM component_asset a JOIN component_design d ON d.design_id = a.design_id
-        WHERE a.server_id = ? AND a.owner_principal_kind = ? AND a.owner_principal_id = ? AND a.location_kind = 'npc_fitted' AND d.family = ?]],
-        { U.sid(), pr.kind, pr.id, newPart.family }) or {}
-    local fitted = {}
-    for _, r in ipairs(rows) do fitted[#fitted + 1] = { assetId = r.asset_id, family = r.family, tier = r.tier } end
-    local old = NM.displaced(fitted, newPart)
-    if old then
-        MySQL.update.await("UPDATE component_asset SET location_kind = 'npc_storage' WHERE asset_id = ? AND owner_principal_id = ?", { old.assetId, pr.id })
+--- One money movement of an NPC outside a market purchase (a service, a fee, a purse, a scrap value), ledgered.
+function PaddockMarkets.moneyStatements(kind, id, amount, what, ref, t, reason, goal)
+    local tbl = kind == "org" and "paddock_org" or "paddock_person"
+    local col = kind == "org" and "org_id" or "person_id"
+    return {
+        { query = ("UPDATE %s SET cash = cash + ? WHERE server_id = ? AND %s = ?"):format(tbl, col), values = { amount, U.sid(), id } },
+        { query = [[INSERT IGNORE INTO npc_money (entry_id, server_id, principal_kind, principal_id, amount, kind, ref, idem_key, created_at, reason, goal)
+            VALUES (?, ?, ?, ?, ?, ?, NULLIF(?, ''), ?, ?, NULLIF(?, ''), NULLIF(?, ''))]],
+          values = { ids.uuid4(rng), U.sid(), kind, id, amount, what, ref or "", ("%s:%s:%s:%s:%d"):format(what, kind, id, tostring(ref or ""), t), t,
+            reason or "", goal or "" } },
+    }
+end
+
+-- --------------------------------------------------------------------------------------------- one car, one goal
+
+--- The shelf parts of `family` that fit `vehicleKey`, cost at most `budget`, and beat `installedEffect`.
+local function upgradeOffers(families, vehicleKey, budget, installedEffect, tierAllowed, t)
+    local marks, vals = {}, { U.sid() }
+    for i, f in ipairs(families) do marks[i] = "?"; vals[#vals + 1] = f end
+    vals[#vals + 1] = math.floor(budget)
+    vals[#vals + 1] = t - set("npcExclusivitySec", 1200)
+    local rows = MySQL.query.await(([[SELECT mi.market_id, mi.asset_id, mi.price, mi.listed_at, d.family, d.tier, d.design_id, d.effect
+        FROM component_market_inventory mi JOIN component_asset a ON a.asset_id = mi.asset_id
+        JOIN component_design d ON d.design_id = a.design_id
+        WHERE mi.state = 'available' AND a.server_id = ? AND d.family IN (%s) AND mi.price <= ? AND mi.listed_at <= ?
+        ORDER BY d.effect DESC, mi.price, mi.listed_at LIMIT 60]]):format(table.concat(marks, ",")), vals) or {}
+    local out = {}
+    for _, r in ipairs(rows) do
+        local o = { marketId = r.market_id, assetId = r.asset_id, price = tonumber(r.price), listedAt = tonumber(r.listed_at),
+            family = r.family, tier = r.tier, designId = r.design_id, effect = tonumber(r.effect) or 1 }
+        if (not tierAllowed or tierAllowed[o.tier]) and Garage.fits(o.designId, vehicleKey)
+            and Garage.isUpgrade(installedEffect[o.family] or 1, o) and marketAllows(o.marketId, t) then
+            out[#out + 1] = o
+        end
     end
-    return old
+    return out
 end
 
---- An NPC fits a part it already owns (one it got on the Exchange) when it serves their car: the part goes from storage
---- to fitted, its area develops by `devValue`, and the part it displaces goes to storage. Returns levels gained, or nil.
-function PaddockMarkets.fitOwned(kind, id, part)
-    local pr = principalOf(kind, id)
-    if not pr or not pr.car or not part then return nil end
-    local area = NM.FAMILY_AREA[part.family or ""]
-    local allowed = NM.TIER_PARTS[pr.tier] or NM.TIER_PARTS.street
-    if not area or not allowed[part.tier or ""] then return nil end
-    MySQL.update.await([[UPDATE component_asset SET location_kind = 'npc_fitted' WHERE asset_id = ? AND owner_principal_kind = ?
-        AND owner_principal_id = ? AND location_kind = 'npc_storage']], { part.assetId, kind, id })
-    local _, gained = Car.invest(pr.car, area, NM.devValue(part.price, part.tier))
-    mark(pr)
-    retireDisplaced(pr, { assetId = part.assetId, family = part.family, tier = part.tier })
-    return gained or 0
-end
-
---- An NPC buys and fits a part for `area`, spending at most `budget`. Returns the part bought (with `devValue`) or
---- nil and a reason. The development the part brings is applied to the NPC's car here.
-function PaddockMarkets.buyPart(kind, id, area, budget, t)
-    if not set("npcMarketsEnabled", true) then return nil, "disabled" end
-    local pr = principalOf(kind, id)
-    if not pr or not pr.car then return nil, "no_principal" end
+--- Buy and install one part for a car, for a goal. Returns the part or nil, why.
+local function buyFor(pr, p, c, families, budget, reason, goal, t)
+    local installedEffect = {}
+    for _, part in ipairs(c.parts) do
+        local eff = (tonumber(part.effect) or 1) * (tonumber(part.wear) or 1)
+        installedEffect[part.family] = math.min(installedEffect[part.family] or math.huge, eff)
+    end
     budget = math.min(math.floor(budget or 0), cashOf(pr))
     if budget <= 0 then return nil, "no_money" end
-    local list = offers(area, budget)
-    local candidates = {}
-    for _, o in ipairs(list) do if marketAllows(o.marketId, t) then candidates[#candidates + 1] = o end end
-    local o = NM.choose(candidates, area, budget, pr.tier, t, set("npcExclusivitySec", 1200))
+    local list = upgradeOffers(families, c.vehicleKey, budget, installedEffect, NM.TIER_PARTS[pr.tier] or NM.TIER_PARTS.street, t)
+    local o = list[1]
     if not o then return nil, "nothing_suitable" end
-    local bought, why = purchasePart(pr, o, t)
+    local bought, why = purchasePart(pr, o, t, reason, goal)
     if not bought then PaddockMarkets.stats.refused = PaddockMarkets.stats.refused + 1 return nil, why end
     local _, m = marketAllows(o.marketId, t)
     m.n = m.n + 1
     PaddockMarkets.stats.parts = PaddockMarkets.stats.parts + 1
-    bought.devValue = NM.devValue(o.price, o.tier)
-    local _, gained = Car.invest(pr.car, area, bought.devValue)
-    if pr.kind == "person" then PaddockStore.markPerson(pr.id) end
-    local old = retireDisplaced(pr, o)
-    log("%s %s bought %s %s (%s) at %s for %d: %s +%d level(s)%s", pr.kind, pr.id, o.tier, o.family, o.assetId, o.marketId,
-        o.price, area, gained or 0, old and (", old " .. old.tier .. " part to storage") or "")
-    return bought
+    local old = PaddockCars.install(c, { assetId = o.assetId, designId = o.designId, family = o.family }, pr.kind, pr.id, t)
+    local before = p.car and p.car[NM.FAMILY_AREA[o.family] or ""] or 0
+    local car = PaddockCars.derive(p, PaddockCars.load(c.assetId))
+    log("%s %s (%s) bought %s %s %s at %s for %d (%s: %s) -> installed on %s %s; %s %.1f -> %.1f%s", pr.kind, pr.id, p.id, o.tier, o.family,
+        o.assetId:sub(1, 8), o.marketId, o.price, reason, goal or "", c.vehicleKey, c.assetId:sub(1, 8), NM.FAMILY_AREA[o.family] or "?",
+        before, car and car[NM.FAMILY_AREA[o.family] or ""] or 0, old and (", old part " .. old:sub(1, 8) .. " to storage") or "")
+    return o
 end
 
--- -------------------------------------------------------------------------------------------------------- vehicles
+--- Service a worn part on a car. Returns true or nil, why.
+local function service(pr, p, c, goal, t)
+    local part
+    for _, x in ipairs(c.parts) do if x.assetId == goal.assetId then part = x end end
+    if not part or not goal.quote then return nil, "no_quote" end
+    if cashOf(pr) < goal.quote.cost then return nil, "no_money" end
+    local tx = { PaddockCars.serviceStatements(part, goal.quote, pr.kind, pr.id, t) }
+    for _, st in ipairs(PaddockMarkets.moneyStatements(pr.kind, pr.id, -goal.quote.cost, "service", part.assetId, t, Garage.REASON.SERVICE,
+        part.family .. ":" .. tostring(goal.quote.conditionId))) do tx[#tx + 1] = st end
+    local ok, err = PaddockMarkets.atomic(tx)
+    if not ok then return nil, "service_failed: " .. tostring(err) end
+    pr.obj.cash = cashOf(pr) - goal.quote.cost
+    mark(pr)
+    PaddockCars.invalidate(c.assetId)
+    PaddockCars.derive(p, PaddockCars.load(c.assetId))
+    PaddockCars.stats.serviced = PaddockCars.stats.serviced + 1
+    log("%s %s (%s) serviced %s %s on %s for %d (%s)", pr.kind, pr.id, p.id, part.family, part.assetId:sub(1, 8), c.vehicleKey,
+        goal.quote.cost, goal.quote.conditionId)
+    return true
+end
 
---- An independent buys a street car off a vehicle market (Muscle / Sport / Tech, prestige 2 or less -- the street
---- band). Their racing car is levels (`paddock.car`); a better machine lifts every area toward its prestige. The
---- machine is theirs: `vehicle_asset.owner_principal` ('person', id), `ncm_driver_id` stays NULL.
-function PaddockMarkets.buyVehicle(personId, budget, t)
+-- ------------------------------------------------------------------------------------------------ a better car
+local Production = NcmCore.get("economy.production")
+local Vehicles = NcmCore.get("data.vehicle_catalogue")
+local Season = NcmCore.get("paddock.season")
+
+--- The old car leaves: traded in to the market that sells its model (listed USED, its owner the market's again, for
+--- the next buyer -- player or NPC), or scrapped when no market sells it. Returns the trade-in value paid to the owner.
+local function tradeIn(pr, old, t)
+    local line
+    for _, l in ipairs(Production.LINES) do if l.vehicleKey == old.vehicleKey then line = l break end end
+    local tx = {
+        { query = [[UPDATE component_asset SET owner_principal_kind = NULL, owner_principal_id = NULL WHERE machine_asset_id = ?
+            AND location_kind = 'installed']], values = { old.assetId } },
+    }
+    local value, how
+    if line then
+        value = math.floor((tonumber(line.price) or old.value) * set("npcTradeInShare", 0.40))
+        how = "traded_in"
+        tx[#tx + 1] = { query = [[UPDATE vehicle_asset SET owner_principal_kind = NULL, owner_principal_id = NULL WHERE asset_id = ?]], values = { old.assetId } }
+        tx[#tx + 1] = { query = [[INSERT INTO market_inventory (market_id, asset_id, price, state, listed_at) VALUES (?, ?, ?, 'available', ?)
+            ON DUPLICATE KEY UPDATE price = VALUES(price), state = 'available', listed_at = VALUES(listed_at), sold_at = NULL,
+            sold_to_driver_id = NULL, sold_to_principal = NULL]],
+            values = { line.marketId, old.assetId, math.floor((tonumber(line.price) or old.value) * set("npcUsedPriceShare", 0.55)), t } }
+    else
+        value = math.floor(old.value * set("npcScrapShare", 0.15))
+        how = "scrapped"
+        tx[#tx + 1] = { query = [[UPDATE vehicle_asset SET lifecycle = 'scrapped', lifecycle_at = ?, lifecycle_cause = 'npc_replaced' WHERE asset_id = ?]],
+            values = { t, old.assetId } }
+    end
+    tx[#tx + 1] = { query = [[INSERT IGNORE INTO vehicle_asset_transfer (transfer_id, idem_key, server_id, asset_id, from_driver_id, to_driver_id, kind,
+        market_id, amount, occurred_at, from_principal, reason) VALUES (?, ?, ?, ?, NULL, NULL, ?, ?, ?, ?, ?, 'replace_car')]],
+        values = { ids.uuid4(rng), ("npc_%s:%s:%s:%d"):format(how, U.sid(), old.assetId, t), U.sid(), old.assetId, how,
+            line and line.marketId or "", value, t, NM.principal(pr.kind, pr.id) } }
+    for _, st in ipairs(PaddockMarkets.moneyStatements(pr.kind, pr.id, value, how, old.assetId, t, Garage.REASON.CAR, old.vehicleKey)) do tx[#tx + 1] = st end
+    local ok, err = PaddockMarkets.atomic(tx)
+    if not ok then log("trade-in of %s FAILED: %s", old.assetId:sub(1, 8), tostring(err)) return 0 end
+    pr.obj.cash = cashOf(pr) + value
+    mark(pr)
+    PaddockCars.invalidate(old.assetId)
+    log("%s %s's old %s %s %s for %d%s", pr.kind, pr.id, old.vehicleKey, old.assetId:sub(1, 8), how, value,
+        line and (" (listed used at " .. line.marketId .. ")") or "")
+    return value
+end
+
+--- A better car off a market shelf: a model of the racer's band of higher class than the one they race, affordable,
+--- listed long enough for players to have had first claim. The aftermarket parts move across where they fit; the old
+--- car is traded in. Returns the new car or nil, why.
+function PaddockMarkets.replaceCar(pr, p, c, budget, t)
     if not set("npcMarketsEnabled", true) then return nil, "disabled" end
-    local pr = principalOf("person", personId)
-    if not pr or not pr.car then return nil, "no_principal" end
+    local tier = (p.orgId and PaddockStore.world.orgs[p.orgId] and PaddockStore.world.orgs[p.orgId].tier) or "street"
+    local band = (Season.TIERS[tier] or {}).band or {}
+    if c.prestige >= (band.prestigeMax or 5) then return nil, "already_top_of_band" end
     budget = math.min(math.floor(budget or 0), cashOf(pr))
     if budget <= 0 then return nil, "no_money" end
-    local Catalogue = NcmCore.get("data.vehicle_catalogue")
-    local band = { Muscle = true, Sport = true, Tech = true }
-    local rows = MySQL.query.await([[SELECT mi.market_id, mi.asset_id, mi.price, mi.listed_at, a.vehicle_key
-        FROM market_inventory mi JOIN vehicle_asset a ON a.asset_id = mi.asset_id
-        WHERE mi.state = 'available' AND a.server_id = ? AND mi.price <= ? AND mi.listed_at <= ?
-        ORDER BY mi.price DESC, mi.listed_at LIMIT 30]], { U.sid(), budget, t - set("npcExclusivitySec", 1200) }) or {}
+    local classes = {}
+    for _, cl in ipairs(band.classes or {}) do classes[cl] = true end
+    local rows = MySQL.query.await([[SELECT mi.market_id, mi.asset_id, mi.price, a.vehicle_key, a.record FROM market_inventory mi
+        JOIN vehicle_asset a ON a.asset_id = mi.asset_id
+        WHERE mi.state = 'available' AND a.server_id = ? AND a.ncm_driver_id IS NULL AND a.owner_principal_id IS NULL
+          AND mi.price <= ? AND mi.listed_at <= ? ORDER BY mi.price DESC LIMIT 40]],
+        { U.sid(), budget, t - set("npcExclusivitySec", 1200) }) or {}
     local pick, entry
     for _, r in ipairs(rows) do
-        local e = r.vehicle_key and Catalogue.byKey(r.vehicle_key)
-        if e and band[e.category or ""] and (tonumber(e.prestige) or 9) <= 2 and marketAllows(r.market_id, t) then pick, entry = r, e break end
+        local e = Vehicles.byKey(r.vehicle_key)
+        local pres = e and tonumber(e.prestige) or 0
+        if e and classes[e.category or ""] and pres > c.prestige and pres <= (band.prestigeMax or 5) and pres >= (band.prestigeMin or 0)
+            and marketAllows(r.market_id, t) then pick, entry = r, e break end
     end
     if not pick then return nil, "nothing_suitable" end
-    local key = NM.principal("person", personId)
+    local key = NM.principal(pr.kind, pr.id)
     local idem = ("npc_vehicle:%s:%s"):format(U.sid(), pick.asset_id)
     local guard = [[mi.market_id = ? AND mi.asset_id = ? AND mi.state = 'sold' AND mi.sold_to_principal = ? AND mi.sold_at = ?]]
     local gv = { pick.market_id, pick.asset_id, key, t }
@@ -216,35 +274,132 @@ function PaddockMarkets.buyVehicle(personId, budget, t)
         { query = [[UPDATE market_inventory SET state = 'sold', sold_at = ?, sold_to_principal = ?
             WHERE market_id = ? AND asset_id = ? AND state = 'available']], values = { t, key, pick.market_id, pick.asset_id } },
         { query = [[UPDATE vehicle_asset a JOIN market_inventory mi ON mi.asset_id = a.asset_id
-            SET a.owner_principal_kind = 'person', a.owner_principal_id = ?, a.acquired_via = 'purchase', a.acquired_at = ?
-            WHERE a.ncm_driver_id IS NULL AND ]] .. guard, values = with({ personId, t }) },
-        { query = [[INSERT IGNORE INTO vehicle_asset_transfer (transfer_id, idem_key, server_id, asset_id, from_driver_id, to_driver_id, kind, market_id, amount, occurred_at)
-            SELECT ?, ?, ?, mi.asset_id, NULL, NULL, 'npc_purchase', mi.market_id, mi.price, ? FROM market_inventory mi WHERE ]] .. guard,
-          values = with({ ids.uuid4(rng), idem, U.sid(), t }) },
-        { query = [[UPDATE paddock_person p JOIN market_inventory mi ON ]] .. guard .. [[ SET p.cash = p.cash - mi.price
-            WHERE p.server_id = ? AND p.person_id = ?]], values = { pick.market_id, pick.asset_id, key, t, U.sid(), personId } },
-        { query = [[INSERT IGNORE INTO npc_money (entry_id, server_id, principal_kind, principal_id, amount, kind, ref, idem_key, created_at)
-            SELECT ?, ?, 'person', ?, -mi.price, 'vehicle_purchase', mi.asset_id, ?, ? FROM market_inventory mi WHERE ]] .. guard,
-          values = with({ ids.uuid4(rng), U.sid(), personId, idem, t }) },
+            SET a.owner_principal_kind = ?, a.owner_principal_id = ?, a.acquired_via = 'purchase', a.acquired_at = ?
+            WHERE a.ncm_driver_id IS NULL AND ]] .. guard, values = with({ pr.kind, pr.id, t }) },
+        { query = [[UPDATE component_asset a JOIN market_inventory mi ON mi.asset_id = a.machine_asset_id
+            SET a.owner_principal_kind = ?, a.owner_principal_id = ? WHERE a.ncm_driver_id IS NULL AND ]] .. guard, values = with({ pr.kind, pr.id }) },
+        { query = [[INSERT IGNORE INTO vehicle_asset_transfer (transfer_id, idem_key, server_id, asset_id, from_driver_id, to_driver_id, kind, market_id,
+            amount, occurred_at, to_principal, reason)
+            SELECT ?, ?, ?, mi.asset_id, NULL, NULL, 'npc_purchase', mi.market_id, mi.price, ?, ?, 'replace_car' FROM market_inventory mi WHERE ]] .. guard,
+          values = with({ ids.uuid4(rng), idem, U.sid(), t, key }) },
+        { query = ([[UPDATE %s p JOIN market_inventory mi ON ]] .. guard .. [[ SET p.cash = p.cash - mi.price
+            WHERE p.server_id = ? AND p.%s = ?]]):format(moneyTable(pr), moneyKey(pr)), values = { pick.market_id, pick.asset_id, key, t, U.sid(), pr.id } },
+        { query = [[INSERT IGNORE INTO npc_money (entry_id, server_id, principal_kind, principal_id, amount, kind, ref, idem_key, created_at, reason, goal)
+            SELECT ?, ?, ?, ?, -mi.price, 'vehicle_purchase', mi.asset_id, ?, ?, 'replace_car', ? FROM market_inventory mi WHERE ]] .. guard,
+          values = with({ ids.uuid4(rng), U.sid(), pr.kind, pr.id, idem, t, ("%s -> %s"):format(c.vehicleKey, pick.vehicle_key) }) },
     }
     local ok, err = PaddockMarkets.atomic(tx)
     if not ok then return nil, "transaction_failed: " .. tostring(err) end
     local owner = MySQL.scalar.await("SELECT owner_principal_id FROM vehicle_asset WHERE asset_id = ?", { pick.asset_id })
-    if owner ~= personId then PaddockMarkets.stats.lost = PaddockMarkets.stats.lost + 1 return nil, "taken" end
+    if owner ~= pr.id then PaddockMarkets.stats.lost = PaddockMarkets.stats.lost + 1 return nil, "taken" end
+    pr.obj.cash = cashOf(pr) - (tonumber(pick.price) or 0)
+    mark(pr)
     local _, m = marketAllows(pick.market_id, t)
     m.n = m.n + 1
-    pr.obj.cash = cashOf(pr) - (tonumber(pick.price) or 0)
-    local floor = math.min(Car.MAX_LEVEL, 2 + (tonumber(entry.prestige) or 1))
-    for _, a in ipairs(Car.AREAS) do if (pr.car[a] or 1) < floor then pr.car[a] = floor end end
-    pr.obj.evidence = pr.obj.evidence or {}
-    pr.obj.evidence.vehicleAssetId = pick.asset_id
-    PaddockStore.markPerson(personId)
     PaddockMarkets.stats.vehicles = PaddockMarkets.stats.vehicles + 1
-    log("person %s bought a %s (%s) at %s for %d", personId, tostring(entry.displayName or pick.vehicle_key), pick.asset_id, pick.market_id, pick.price)
+    -- the new car is the one they race; the old one's aftermarket parts come across where they fit
+    local newCar = PaddockCars.load(pick.asset_id)
+    if newCar then
+        for _, part in ipairs(c.parts) do
+            if part.tier ~= "factory" then
+                if Garage.fits(part.designId, newCar.vehicleKey) then
+                    PaddockCars.install(newCar, part, pr.kind, pr.id, t)
+                    newCar = PaddockCars.load(pick.asset_id)
+                else
+                    MySQL.update.await([[UPDATE component_asset SET location_kind = 'npc_storage', machine_asset_id = NULL WHERE asset_id = ?]], { part.assetId })
+                end
+            end
+        end
+    end
+    p.raceCarId = pick.asset_id
+    PaddockStore.markPerson(p.id)
+    tradeIn(pr, c, t)
+    PaddockCars.derive(p, PaddockCars.load(pick.asset_id))
+    log("%s %s (%s) bought a %s (%s) at %s for %d to replace their %s", pr.kind, pr.id, p.id, tostring(entry.displayName or pick.vehicle_key),
+        pick.asset_id:sub(1, 8), pick.market_id, pick.price, c.vehicleKey)
     return pick
 end
 
--- ---------------------------------------------------------------------------------------------------- independents
+--- One racer's car gets one action, the most pressing affordable goal first. `budget` caps a purchase.
+function PaddockMarkets.tend(pr, p, budget, t)
+    local c = PaddockCars.ensure(p, t)
+    if not c then return nil, "no_car" end
+    local car = PaddockCars.derive(p, c) or p.car
+    -- a racer flush enough looks at a better car first (an independent at `npcCarUpgradeMinCash`; a team when a car
+    -- costs it a small share of its cash) -- the worn parts of the old one go with it
+    local carBudget = pr.kind == "person" and (cashOf(pr) >= set("npcCarUpgradeMinCash", 12000) and math.floor(cashOf(pr) * 0.7) or 0)
+        or math.floor(cashOf(pr) * 0.04)
+    if carBudget > 0 then
+        local okR, newCar = pcall(PaddockMarkets.replaceCar, pr, p, c, carBudget, t)
+        if okR and newCar then return Garage.REASON.CAR end
+    end
+    for _, goal in ipairs(Garage.goals(c.parts, car)) do
+        if goal.kind == Garage.REASON.SERVICE then
+            if service(pr, p, c, goal, t) then return goal.kind end
+        elseif goal.kind == Garage.REASON.REPLACE then
+            if buyFor(pr, p, c, { goal.family }, budget, goal.kind, goal.family .. " worn out", t) then return goal.kind end
+        elseif goal.kind == Garage.REASON.UPGRADE then
+            for _, need in ipairs(NM.neediest(car)) do
+                if buyFor(pr, p, c, NM.AREA_FAMILIES[need.area] or {}, budget, goal.kind, need.area .. " at " .. tostring(need.level), t) then
+                    return goal.kind
+                end
+            end
+        end
+    end
+    return nil, "nothing_to_do"
+end
+
+--- A team's development decision for one area (life.lua `invest_dev`): a fitting upgrade for that area on one of its
+--- drivers' cars. Returns what it spent.
+function PaddockMarkets.tendArea(orgId, p, area, budget, t)
+    local pr = principalOf("org", orgId)
+    if not pr then return 0 end
+    local c = PaddockCars.ensure(p, t)
+    if not c then return 0 end
+    local before = cashOf(pr)
+    buyFor(pr, p, c, NM.AREA_FAMILIES[area] or {}, budget, Garage.REASON.UPGRADE, "team development: " .. area, t)
+    return math.max(0, before - cashOf(pr))
+end
+
+--- Would this part go onto one of (kind, id)'s racers' cars -- does it fit the model and improve on what is installed?
+--- (the Exchange asks before an NPC bids: an NPC buys what it can use, not what is cheap)
+function PaddockMarkets.wouldFit(kind, id, part)
+    if not part or not part.designId then return false end
+    local w = PaddockStore.world
+    for _, pid in ipairs(w.personOrder) do
+        local p = w.people[pid]
+        if p.raceCarId and ((kind == "person" and p.id == id) or (kind == "org" and p.orgId == id)) then
+            local c = PaddockCars.load(p.raceCarId)
+            local installed = 1
+            for _, x in ipairs(c and c.parts or {}) do if x.family == part.family then installed = (x.effect or 1) * (x.wear or 1) end end
+            if c and Garage.fits(part.designId, c.vehicleKey) and Garage.isUpgrade(installed, part) then return true end
+        end
+    end
+    return false
+end
+
+--- A part an NPC got on the Exchange goes onto the first of their racers' cars it fits and improves.
+function PaddockMarkets.fitOwned(kind, id, part)
+    if not part or not part.assetId then return nil end
+    local w = PaddockStore.world
+    for _, pid in ipairs(w.personOrder) do
+        local p = w.people[pid]
+        local ok = p.raceCarId and ((kind == "person" and p.id == id) or (kind == "org" and p.orgId == id))
+        if ok then
+            local c = PaddockCars.load(p.raceCarId)
+            local installed = 1
+            for _, x in ipairs(c and c.parts or {}) do if x.family == part.family then installed = (x.effect or 1) * (x.wear or 1) end end
+            if c and Garage.fits(part.designId, c.vehicleKey) and Garage.isUpgrade(installed, part) then
+                PaddockCars.install(c, { assetId = part.assetId, designId = part.designId, family = part.family }, kind, id, U.now())
+                PaddockCars.derive(p, PaddockCars.load(c.assetId))
+                return p.id
+            end
+        end
+    end
+    return nil
+end
+
+-- ------------------------------------------------------------------------------------------------- the cadence
 
 --- Seed an independent's purse once (they arrive with a little money of their own).
 local function seedCash(p)
@@ -257,34 +412,46 @@ local function seedCash(p)
 end
 PaddockMarkets.seedCash = seedCash
 
-local shopCursor = 0
---- A shopping pass: a few independents with money look for a part for their weakest area.
-function PaddockMarkets.shop(t)
-    if not set("npcMarketsEnabled", true) then return end
+--- Racers whose turn it is: they last shopped at least `npcShopIntervalSec` ago (persisted -- a restart no longer
+--- sends the same independents back to the shelves, KB-312), oldest first.
+local function due(t)
     local w = PaddockStore.world
-    local indies = {}
+    local list = {}
+    local gap = set("npcShopIntervalSec", 3 * 3600)
     for _, pid in ipairs(w.personOrder) do
         local p = w.people[pid]
-        if p.role == "driver" and p.state == "active" and p.leagueId and not p.orgId and p.car then indies[#indies + 1] = p end
-    end
-    if #indies == 0 then return end
-    local y = U.yielder(4)
-    for _ = 1, math.min(#indies, set("npcShoppersPerPass", 4)) do
-        shopCursor = shopCursor % #indies + 1
-        local p = indies[shopCursor]
-        seedCash(p)
-        local cash = tonumber(p.cash) or 0
-        local car = nil
-        -- a flush independent in a tired car looks at cars first
-        if cash >= set("npcVehicleMinCash", 9000) and Car.performance(p.car) < 45 then
-            car = PaddockMarkets.buyVehicle(p.id, math.floor(cash * 0.8), t)
+        if p.role == "driver" and p.state == "active" and p.raceCarId and (p.orgId or p.leagueId)
+            and t - (tonumber(p.lastShopAt) or 0) >= gap then
+            list[#list + 1] = p
         end
-        cash = tonumber(p.cash) or 0
-        if not car and cash >= set("npcShopMinCash", 800) then
-            for _, need in ipairs(NM.neediest(p.car)) do
-                local got = PaddockMarkets.buyPart("person", p.id, need.area, math.floor(cash * 0.6), t)
-                if got then break end
-            end
+    end
+    table.sort(list, function(a, b)
+        if (a.lastShopAt or 0) ~= (b.lastShopAt or 0) then return (a.lastShopAt or 0) < (b.lastShopAt or 0) end
+        return a.id < b.id
+    end)
+    return list
+end
+
+--- A shopping pass: a few racers whose turn it is look after their car -- an independent with their own money, a team
+--- driver's car with the team's (L298: teams now spend through the shelves, KB-315).
+function PaddockMarkets.shop(t)
+    if not set("npcMarketsEnabled", true) then return end
+    local list = due(t)
+    local y = U.yielder(2)
+    for i = 1, math.min(#list, set("npcShoppersPerPass", 4)) do
+        local p = list[i]
+        local kind, id = PaddockCars.ownerOf(p)
+        local pr = principalOf(kind, id)
+        if pr then
+            if kind == "person" then seedCash(p) end
+            local cash = cashOf(pr)
+            -- an independent spends at most 60 % of what they have; a team a share of its cash per car, capped
+            local budget = kind == "person" and math.floor(cash * 0.6)
+                or math.min(set("npcTeamCarBudget", 6000), math.floor(cash * 0.05))
+            local okT, did, why = pcall(PaddockMarkets.tend, pr, p, budget, t)
+            if not okT then log("tend %s FAILED: %s", p.id, tostring(did)) end
+            p.lastShopAt = t
+            PaddockStore.markPerson(p.id)
         end
         y()
     end

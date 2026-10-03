@@ -22,6 +22,7 @@ local Discipline = Core.get("competition.discipline")
 local Teams = Core.get("competition.teams")
 local Mixed = Core.get("paddock.mixed")
 local ids = Core.get("vocabulary.ids")
+local Json = Core.get("vocabulary.json")
 
 local function log(fmt, ...)
     print(("[ncm_league/race] " .. fmt):format(...))
@@ -167,6 +168,9 @@ local function publish(rec, t)
     v.seriesName = rec.seriesName
     v.slots = rec.slots
     v.results = rec.results
+    -- a mixed race waiting for the Paddock's whole-field classification: these results are the humans alone (P1 of 1);
+    -- the client must not present them as the result (owner, 2026-10-02: "always say p1 regardless of my actual finish")
+    v.provisional = rec.provisional or nil
     v.completeReason = rec.completeReason
     v.kind = rec.kind
     v.ordinal = rec.spec and rec.spec.ordinal or 1
@@ -178,9 +182,21 @@ local function publish(rec, t)
     v.grid = rec.gridPoint
     v.paddock = rec.paddock or nil                 -- L250: a mixed Paddock grid (beam + arrow to the slot)
     v.fieldSize = rec.mixedField or rec.paddockField or nil
+    v.board = rec.paddockBoard or nil              -- the classification ceremony (a mixed race, once classified)
+    -- The Paddock race this session races in: clients join it to the Paddock's live field (NPCs + humans), which
+    -- is the only place the whole mixed grid exists. Without it the HUD and tower saw a field of one (2026-10-02).
+    v.paddockRaceId = rec.paddock and rec.plan and rec.plan.e and rec.plan.e.paddockRaceId or nil
     v.next = rec.nextSpec and { kind = rec.nextSpec.kind, ordinal = rec.nextSpec.ordinal, gridFrom = rec.nextSpec.gridFrom, n = rec.nextSpec.n, at = rec.nextAt } or nil
     sessionViews[rec.s.sessionId] = v
     republishSessions(t)
+    -- One size line per phase: a targeted view that is too large is dropped without a word (KB-59), and an oval's
+    -- gates grow with its laps. If a driver reports no HUD, this line says whether the view was the suspect.
+    if rec.sizeLoggedFor ~= v.phase then
+        rec.sizeLoggedFor = v.phase
+        local ok, encoded = pcall(Json.encode, v)
+        log("session=%s view phase=%s bytes=%s gates=%d entrants=%d", tostring(rec.s.sessionId), tostring(v.phase),
+            ok and tostring(#encoded) or ("unencodable: " .. tostring(encoded)), #(v.gates or {}), #(v.entrants or {}))
+    end
     publishToEntrants(rec, v)
 end
 
@@ -193,13 +209,34 @@ end
 -- Views are pruned against the live `sessions` table, so a retired session drops out on the next publish without
 -- anyone having to remember to remove it. A completed session keeps its view until its rec is retired, which is
 -- what holds the result board up during the result hold.
+-- KB-317 (2026-10-02 23:29, an oval of 49 gates): the platform REFUSES an oversized state-bag write by throwing
+-- ("state_value_too_large"), and the throw aborted `publish` before `publishToEntrants` -- the targeted view every
+-- client actually races from (KB-79) was never sent, the owner's HUD never left the pre-grid, and they were DNS'd
+-- "absent" on their own grid. The bag is a fallback; it may never cost the targeted send. Too large: a slim copy
+-- (no gates, results or board -- the parts that grow with laps and fields) goes instead.
+local slimWarned = {}
+local function slim(v)
+    local s = {}
+    for k, x in pairs(v) do if k ~= "gates" and k ~= "results" and k ~= "board" and k ~= "slots" then s[k] = x end end
+    s.slim = true
+    return s
+end
 republishSessions = function(t)
     local out = {}
     for sid, v in pairs(sessionViews) do
         if sessions[sid] then out[sid] = v else sessionViews[sid] = nil end
     end
     out.serverNow = math.floor(t or now())
-    GlobalState.ncmSessions = out
+    local ok, err = pcall(function() GlobalState.ncmSessions = out end)
+    if ok then return end
+    local small = { serverNow = out.serverNow }
+    for sid, v in pairs(out) do if sid ~= "serverNow" then small[sid] = slim(v) end end
+    local ok2, err2 = pcall(function() GlobalState.ncmSessions = small end)
+    local key = tostring(err)
+    if not slimWarned[key] then
+        slimWarned[key] = true
+        log("session state bag refused the full views (%s); slim views %s", key, ok2 and "published" or ("refused too: " .. tostring(err2)))
+    end
 end
 
 local function clearPublication()
@@ -212,7 +249,12 @@ local function republishPractice(t)
     local out = {}
     for eid, v in pairs(practiceViews) do out[eid] = v end
     out.serverNow = math.floor(t)
-    GlobalState.ncmPractice = out
+    -- KB-317: a refused bag write must not cost the targeted send that follows
+    local ok, err = pcall(function() GlobalState.ncmPractice = out end)
+    if not ok and not slimWarned["practice:" .. tostring(err)] then
+        slimWarned["practice:" .. tostring(err)] = true
+        log("practice state bag refused (%s); the targeted views still go out", tostring(err))
+    end
 end
 
 publishPractice = function(rec, t)
@@ -239,6 +281,18 @@ publishPractice = function(rec, t)
     v.lengthM = rec.course and rec.course.lengthM or nil
     practiceViews[rec.eventId] = v
     republishPractice(t)
+    -- 2026-10-02: QUALIFY opened on the server and the client never showed it -- the practice view reached clients
+    -- only through GlobalState, the transport the race HUD already had to stop depending on (KB-79). Send it to its
+    -- entrants directly, as the race session does; a driver who moved to another race is told to drop it.
+    local sent = {}
+    for driverId, playerId in pairs(rec.playerOf or {}) do
+        playerId = tonumber(playerId)
+        if playerId and playerId > 0 and not sent[playerId] then
+            sent[playerId] = true
+            local gone = (rec.left and rec.left[driverId]) or (rec.s.entrants[driverId] and rec.s.entrants[driverId].state == "left")
+            TriggerClientEvent("ncm:practice", playerId, rec.eventId, gone and false or v)
+        end
+    end
 end
 
 -- ---------------------------------------------------------------------------------------------
@@ -920,6 +974,16 @@ local function tick()
             pickups[eid] = pickups[eid] or { dropoff = nil, dispatched = {} }
         end
     end
+    -- L296 pre-grid: an entered driver is routed to their provisional slot until the session forms
+    if NcmPaddockLink and NcmPaddockLink.pushPreGrid then
+        local pmap
+        for eid, e in pairs(NcmCalendar.events or {}) do
+            if e.class == "paddock" and e.paddockPreGrid and not byEvent[eid] and e.startsAt > t then
+                pmap = pmap or playersByDriver()
+                pcall(NcmPaddockLink.pushPreGrid, e, pmap, t)
+            end
+        end
+    end
     -- Form the first session of events about to start.
     for eid, e in pairs(NcmCalendar.events or {}) do
         local formLead = e.class == "paddock" and (Mixed.FREEZE_LEAD_SEC - 10) or setting("raceFormAtSec", 60)
@@ -934,7 +998,6 @@ local function tick()
     for sid, rec in pairs(sessions) do
         local s = rec.s
         if s.phase ~= "complete" then
-            if rec.paddock and NcmPaddockLink then pcall(NcmPaddockLink.autoPlace, rec, t) end
             gridCheck(rec, t)
             if s.phase == "running" or s.phase == "finishing" or s.phase == "open" then
                 local pmap = playersByDriver()
@@ -992,8 +1055,15 @@ local function tick()
             publish(rec, t)
         elseif rec.nextSpec then
             if t >= rec.nextAt then toForm[#toForm + 1] = { sid = sid, rec = rec } else publish(rec, t) end
-        elseif rec.doneAt and t - rec.doneAt > setting("raceResultHoldSec", 30) then
+        elseif rec.provisional then
+            -- waiting for the Paddock's whole-field classification: keep the entrants' view live (the flag countdown).
+            -- 2026-10-02: nothing published a completed session, so the HUD froze on "flag in 0:00" for a minute and
+            -- the classified result never reached it before the session retired.
+            publish(rec, t)
+        elseif rec.doneAt and t - rec.doneAt > setting("raceResultHoldSec", 45) then
             toRetire[#toRetire + 1] = { sid = sid, rec = rec }
+        elseif rec.doneAt then
+            publish(rec, t)                -- the result and its ceremony, for the whole hold
         end
     end
     for _, x in ipairs(toRetire) do
@@ -1009,6 +1079,15 @@ local function tick()
         local nextRec = formSession(x.rec.plan, x.rec.nextSpec, t, t + setting("raceFormAtSec", 60))
         if not nextRec then retirePlan(x.rec.plan, "no_entrants"); clearPublication() end
     end
+end
+
+--- The Paddock's flag for a mixed race (paddock_link): the event's race session closes at `at`, whoever is out.
+function NcmRace.flagEvent(eventId, at)
+    local n = 0
+    for _, rec in pairs(sessions) do
+        if rec.eventId == eventId and rec.kind == "race" and rec.kernel and rec.kernel.flag and rec.kernel.flag(rec.s, at) then n = n + 1 end
+    end
+    return n
 end
 
 function NcmRace.hasSession(eventId)
@@ -1592,6 +1671,10 @@ function NcmRace.practiceComplete(rec, results, reason, t)
     sessions[rec.s.sessionId] = nil
     practiceViews[rec.eventId] = nil
     republishPractice(t)
+    for _, pid in pairs(rec.playerOf or {}) do
+        pid = tonumber(pid)
+        if pid and pid > 0 then TriggerClientEvent("ncm:practice", pid, rec.eventId, false) end
+    end
 end
 
 --- { [eventId] = { [driverId] = bestSec } } from the live practices (the Guide's "my practice best").

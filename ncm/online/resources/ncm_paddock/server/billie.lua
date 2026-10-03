@@ -30,7 +30,8 @@ end
 
 local pricing = {}
 
---- Price a race: freeze its field, simulate it N times on pricing streams, write versioned lines.
+--- Price a race: build its likely field, simulate it N times on pricing streams, write versioned lines. (The field is
+--- frozen later, at T-1 with entries -- PaddockHumans.tick.)
 function PaddockBillie.price(race)
     if race.state ~= "scheduled" or pricing[race.raceId] then return end
     if not PaddockSettings.get("billieEnabled", true) then
