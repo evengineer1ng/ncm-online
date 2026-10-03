@@ -3,7 +3,12 @@
 > **STATUS: LEDGER** - living session memory, rewritten at the end of every working session.
 > Authority map: [INDEX.md](INDEX.md).
 
-**LATEST 2026-10-02 (23:00 ET) - THE AUDIT'S SEVEN DOORS (L298) AND L296 LOADED ON DEV; PACE 0.8.9; GATE ALL GREEN.**
+**LATEST 2026-10-03 (08:15 UTC) - NCM ONLINE IS ON BASELINE 2: DEV'S CODE AND ITS 8-MOD STACK (L299).**
+- Deployed: backup `/opt/ncm/backups/pre-carrier-prod-20261003T080827Z`; resources at `fb23f35` (tag `online-baseline-2`); 8 required mods, digest `7b070f25...` (identical to dev); migrations 043-058; Paddock GENESIS (Online's own world). First boot clean: no ERR, production minting (KB-311 live), NPC cars minting, 24 races scheduled. All 8 blobs verified over HTTPS. Details and rollback: OPS_STAGING "Online Baseline 2".
+- Testers who join need the 8 mods (the launcher installs them; Pace and Broadcast are new to them).
+- **THE ONE NEXT ACTION:** the owner joins NCM Online (the launcher installs the new mods) and races once: a street race and an oval (§CT19-§CT21 on Online), then `tools/npc-economy-audit.ps1`-style checks against Online's world after a day.
+
+**EARLIER 2026-10-02 (23:00 ET) - THE AUDIT'S SEVEN DOORS (L298) AND L296 LOADED ON DEV; PACE 0.8.9; GATE ALL GREEN.**
 - Loaded: Pace 0.8.9 published to dev and hand-installed (record `%LOCALAPPDATA%/NCM/dev-mods/20261002-225613`); dev restarted twice (logs `tools/open77/server/l298-restart-20261002.stdout.log`, `l298b-restart-20261002.stdout.log`): schema 058 applied, required mods 8 digest `ce4db77a...`, no errors; the L298 tunables declared (`npcRacerVariants` on). `tools/test-npc-sql.ps1` against MariaDB: 22/22 (mint with 11 factory parts, install, NPC service, purchase, Exchange). NPC cars minting ~6 per 10 s (36 at 22:59, all assigned).
 - Built in L298: production fix (KB-311), NPC race cars as real 11-part cars with derived levels and Pace performance variants (KB-313), persisted/strict shopping (KB-312), wages/purses/fees/repairs ledgered (KB-314-316), goals with reasons, wear/service/scrap/trade-in sinks, NPC-to-NPC Exchange, "Last batch" provenance. Also loaded: L296 (pre-grid, ovals, street pace from the road).
 - 23:59 ET: dev restarted (log `tools/open77/server/l299-restart-20261003.stdout.log`, 0 errors) with KB-317 fixed -- the oval session view was lost to a refused state-bag write and the owner DNS'd "absent" on their own grid.

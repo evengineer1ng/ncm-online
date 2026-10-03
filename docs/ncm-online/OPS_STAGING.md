@@ -176,6 +176,24 @@ Post-upgrade health, in one line each: `migrations: N applied` → `ownership le
 `ncm_world started v…` → `class ceilings published` → `scheduler started: 5 series`. If the series line is
 missing, NCM did not start.
 
+## Required mods (state as of 2026-10-03 08:12 UTC) -- ONLINE BASELINE 2 (L299)
+
+The Baseline 1 freeze is over (L299). Online runs dev's code at `fb23f35` (tag `online-baseline-2`) and dev's mod stack:
+**8 required**, digest `7b070f256f80234de8565ec5f9b2f2b6949b7eb06ee5ee7e6f7710ddc578d833` (identical to dev's):
+ncm-carrier 0.1.30, ncm-rig-bridge 0.1.7, ncm-vision 0.4.0, ncm-clock 0.1.0, ncm-broadcast 0.1.0, ncm-pace 0.9.2,
+archivexl 1.27.1, tweakxl 1.11.4. The four NCM packages were imported with `publish-carrier.py /opt/ncm/server --zip
+/tmp/<zip> --id <id> --import-blob --enable`; ArchiveXL and TweakXL were declared from the blobs already in the store
+(copied to `/tmp/<id>-<ver>.zip`). All eight downloaded back over the public HTTPS endpoint with matching hashes. The
+consent note names all eight. New resources `ncm_paddock`, `ncm_broadcast` (`check-load-list.py`: 44 resources OK).
+Migrations 043-058 applied on boot. The Paddock ran GENESIS (170 orgs, 1544 people, 252 sponsors, 15 series): Online's
+world is its own, not dev's. First boot: no ERR, production minting (`minted=2/2`, KB-311 proved live), NPC cars
+minting, 24 races scheduled. Instance at boot: 2 vCPU, 3.8 GB (2.8 GB free), Open77.Server ~26 % CPU while minting.
+
+**Pre-change backup:** `/opt/ncm/backups/pre-carrier-prod-20261003T080827Z` (`ncm.sql.gz` 92 tables,
+`operator-state.tar.gz`, `resources-ncm.tar.gz`). **Rollback:** stop `ncm-server`; restore `resources-ncm.tar.gz` into
+`/opt/ncm/resources/`; restore the database from `ncm.sql.gz` (migrations 043-058 add tables/columns -- the dump is the
+only clean way back); restore `server.jsonc` from `operator-state.tar.gz` (the 3-mod declaration); start.
+
 ## Required mods (state as of 2026-09-29 15:45 UTC)
 
 **Declared on Online:** `ncm-carrier` 0.1.30, `ncm-rig-bridge` 0.1.7, **`ncm-vision` 0.3.0** (sha256
