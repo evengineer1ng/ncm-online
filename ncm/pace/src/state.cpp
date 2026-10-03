@@ -292,6 +292,10 @@ bool State::apply(const std::string& text, Clock::time_point now)
         car.target = static_cast<size_t>(std::max<int64_t>(1, std::min<int64_t>(from, static_cast<int64_t>(points_.size()) - 1)));
         car.speeds.assign(1, static_cast<float>(std::max(5.0, j.value("speed", 25.0))));
         car.nextGate = gates_.size();                     // mid-race: no Pace gate counts for it (see step)
+        // 0.8.6: a staggered start (2026-10-02: twelve cars launched at once piled up on lap 1): held until its row's turn
+        car.releaseMs = std::max<int64_t>(0, std::min<int64_t>(15000, j.value("releaseMs", static_cast<int64_t>(0))));
+        // 0.8.8: a seamless restream -- a car set down mid-race rolls off at its model speed instead of standing
+        car.startMps = std::max(0.0, std::min(90.0, j.value("startMps", 0.0)));
         car.dynamic = true;
         cars_.push_back(car);
         push(nlohmann::json{{"ack", {{"what", "car.add"}, {"detail", "car " + std::to_string(cars_.size() - 1) + " vehicle " +
@@ -580,8 +584,8 @@ std::string State::step(int index, double x, double y, double z, Clock::time_poi
     double roadOff = -1;
     if (!active_ || c.finished) {
         mode = 2;
-    } else if (tMs < 0) {
-        mode = 0;
+    } else if (tMs < c.releaseMs) {
+        mode = 0;                                         // before the go, or before its row's release
     } else {
         mode = 1;
         const size_t leg = c.target >= 1 ? c.target - 1 : 0;
@@ -730,10 +734,38 @@ std::string State::step(int index, double x, double y, double z, Clock::time_poi
     if (mode == 1 && !legHashes_.empty()) {
         const size_t leg = std::min(c.target >= 1 ? c.target - 1 : 0, legHashes_.size() - 1);
         if (c.mode == 3 && tMs - c.prevMs >= 0) c.slowMs = c.speed < 2.0 ? c.slowMs + std::max<int64_t>(0, tMs - c.prevMs) : 0;
+        // 0.8.8 PRE-ROLL (RETIRED in 0.9.0, KB-318): the engine ignores forcedStartSpeed on a freshly set-down car -- 0.8.8
+        // logged "pre-roll at 30.9 m/s" and the car at 3.4 m/s after it -- and the racer command that followed it was
+        // often dead, so the car stood until the 6 s stall rule (about 10 s lost, 200-580 m a restream).
+        if (false && c.startMps > 1.0 && c.prerollUntil < 0 && c.mode != 3) {
+            c.prerollUntil = tMs + 1200;
+            c.leg = leg;
+            c.mode = 4;
+            c.cmdMs = tMs;
+            c.seq++;
+            char line[300]{};
+            std::snprintf(line, sizeof(line), "car %d pre-roll at %.1f m/s on leg %zu/%zu, spline %s", index, c.startMps, leg + 1,
+                legHashes_.size(), legNames_[leg].c_str());
+            if (logQueue_.size() < 2000) logQueue_.emplace_back(line);
+            char spd[32]{};
+            std::snprintf(spd, sizeof(spd), "%.2f", c.startMps);
+            return std::to_string(c.seq) + "|4|" + std::to_string(c.leg) + "|" + spd + "|0|0|0|0|0|0";
+        }
+        if (c.mode == 4 && tMs < c.prerollUntil) {
+            char spd[32]{};
+            std::snprintf(spd, sizeof(spd), "%.2f", c.startMps);
+            return std::to_string(c.seq) + "|4|" + std::to_string(c.leg) + "|" + spd + "|0|0|0|0|0|0";
+        }
+        // 0.9.0 THE LAUNCH WATCH (KB-318): a car joining mid-race (startMps > 0) is watched for its first 12 s. A racer
+        // command sent before the driver's AI is ready is lost and the car stands; under 2 m/s for 1.2 s after its
+        // command it gets a fresh one, up to 6 times -- a dead launch costs about a second, not the stall rule's ten.
+        if (c.startMps > 1.0 && c.launchUntil < 0) c.launchUntil = tMs + 12000;
         const char* why = nullptr;
-        if (c.mode != 3) why = "go";
+        if (c.mode == 4) why = "pre-roll done: racer";
+        else if (c.mode != 3) why = "go";
         else if (leg != c.leg) why = "next leg";
         else if (reacquired) why = "back: fresh command";
+        else if (tMs < c.launchUntil && c.launchKicks < 6 && c.slowMs >= 1200 && tMs - c.cmdMs >= 1200) { why = "launch: fresh command"; c.launchKicks++; }
         else if (c.slowMs >= 6000 && tMs - c.cmdMs >= 6000) why = "stalled: fresh command";
         if (why) {
             c.leg = leg;

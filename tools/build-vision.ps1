@@ -52,8 +52,14 @@ if (-not $SkipScriptCheck) {
     if (Test-Path $scratch) { Remove-Item -Recurse -Force $scratch }
     New-Item -ItemType Directory -Force (Join-Path $scratch "scripts\ncm_vision"), (Join-Path $scratch "cache") | Out-Null
     Get-ChildItem (Join-Path $game "r6\scripts") -Directory |
-        Where-Object { $_.Name -ne "ncm_vision" } |
+        Where-Object { $_.Name -ne "ncm_vision" -and $_.Name -ne "ncm_pace_diag" } |
         ForEach-Object { Copy-Item -Recurse $_.FullName (Join-Path $scratch "scripts") }
+    # RED4ext plugins load their own script folders too (TweakXL's ScriptableTweak, which Pace's installed
+    # NcmPaceScales.reds uses): compile against them as the game does, or another mod's script fails this check.
+    Get-ChildItem (Join-Path $game "red4ext\plugins") -Directory | Where-Object { $_.Name -ne "ncm_vision" } | ForEach-Object {
+        $ps = Join-Path $_.FullName "Scripts"
+        if (Test-Path $ps) { Copy-Item -Recurse $ps (Join-Path $scratch ("scripts\plugin_" + $_.Name)) }
+    }
     Copy-Item (Join-Path $scripts "*.reds") (Join-Path $scratch "scripts\ncm_vision")
     Copy-Item (Join-Path $game "r6\cache\final.redscripts") (Join-Path $scratch "cache")
     $out = & (Join-Path $game "engine\tools\scc.exe") -compile (Join-Path $scratch "scripts") -customCacheDir (Join-Path $scratch "cache") 2>&1

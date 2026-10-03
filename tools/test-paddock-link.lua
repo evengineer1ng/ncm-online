@@ -1,7 +1,7 @@
 -- Host-adapter regression for ncm_league's half of mixed Paddock grids (L250 steps 3-4; server/paddock_link.lua).
 -- The real file against platform and league doubles: a Paddock race adopted as a calendar event, QUALIFY, a qualifying
--- run that enters the driver and tells the Paddock, the Paddock's slots becoming the session's, the T-20 auto-place
--- (out, move the empty car, back in), and settlement waiting for the Paddock's whole-field classification.
+-- run that enters the driver and tells the Paddock, the Paddock's slots becoming the session's, the pre-grid relay (L296:
+-- provisional slots from T-15 min; the T-20 auto-place is gone), and settlement waiting for the whole-field classification.
 local root = (arg and arg[1]) or "."
 local passed = 0
 local function check(label, ok)
@@ -22,7 +22,11 @@ function AddEventHandler(name, fn) events[name] = fn end
 function RegisterNetEvent(name, fn) events[name] = fn end
 function RegisterCommand() end
 function TriggerEvent(name, ...) emitted[#emitted + 1] = { name = name, args = { ... } } end
-function TriggerClientEvent(name, pid, body) if name == "ncm:guide.route" then routed[#routed + 1] = body end end
+pregrids = {}
+function TriggerClientEvent(name, pid, body)
+    if name == "ncm:guide.route" then routed[#routed + 1] = body end
+    if name == "ncm:race.pregrid" then pregrids[#pregrids + 1] = { pid = pid, body = body } end
+end
 local THREADS = {}
 function CreateThread(fn) THREADS[#THREADS + 1] = fn end
 local function drain() local q = THREADS; THREADS = {}; for _, fn in ipairs(q) do fn() end end
@@ -33,6 +37,7 @@ local logs = {}
 function print(s) logs[#logs + 1] = tostring(s) end
 local POS = { [1] = { x = 0, y = 0, z = 0 } }
 local SEAT = { [1] = { vehicleId = 77 } }
+CARPOS, OTHERS = {}, {}
 Open77 = {
     time = { unix = function() return clock end },
     chat = { send = function(pid, m) chats[#chats + 1] = m end },
@@ -41,8 +46,13 @@ Open77 = {
     vehicles = {
         getPlayerSeat = function(pid) return SEAT[pid] end,
         forcePlayerOutOfVehicle = function(pid, vid) calls[#calls + 1] = "out:" .. vid; SEAT[pid] = nil; return true end,
-        setTransform = function(vid, tr) calls[#calls + 1] = ("move:%d:%.0f,%.0f"):format(vid, tr.position.x, tr.position.y); return true end,
-        warpPlayerIntoVehicle = function(pid, vid, seat) calls[#calls + 1] = "in:" .. vid .. ":" .. seat; SEAT[pid] = { vehicleId = vid }; return true end,
+        setTransform = function(vid, tr) calls[#calls + 1] = ("move:%d:%.0f,%.0f"):format(vid, tr.position.x, tr.position.y)
+            CARPOS[vid] = { x = tr.position.x, y = tr.position.y, z = tr.position.z }; return true end,
+        -- the player ends up where their car is (L285: placement is verified against the player's real position)
+        warpPlayerIntoVehicle = function(pid, vid, seat) calls[#calls + 1] = "in:" .. vid .. ":" .. seat; SEAT[pid] = { vehicleId = vid }
+            if CARPOS[vid] then POS[pid] = CARPOS[vid] end; return true end,
+        -- L288: grid assist refuses a slot another network vehicle stands on
+        all = function() return OTHERS end,
     },
 }
 GlobalState = {}
@@ -79,7 +89,8 @@ NcmCompetition = {
     economyFor = function(e) return e.economy end,
 }
 NcmEconomy = { checkIn = function(req) checkIns[#checkIns + 1] = req return { fee = req.economy.entryFee, balance = 900 } end }
-NcmGuide = { refreshEntryBag = function() end, pushAll = function() end }
+-- L252: QUALIFY starts only inside the race's venue ring; the harness driver stands in whichever ring is asked about
+NcmGuide = { refreshEntryBag = function() end, pushAll = function() end, venueAt = function() return NcmGuideVenue end }
 NcmPackStreet = { series = {
     { seriesId = "city_cup", name = "NCM City Cup", economy = { id = "city_cup_v1", entryFee = 50 } },
     { seriesId = "street_drag", name = "Street Drag", economy = { id = "drag", entryFee = 10 } },
@@ -99,15 +110,20 @@ GlobalState.ncmPaddockGuide = {
 }
 local n = NcmPaddockLink.adoptAll(clock)
 local e = NcmCalendar.events["paddock:pr-street_a-1"]
-check(("open Paddock races become calendar events; an oval and one inside T-11 do not (%d adopted)"):format(n),
-    n == 2 and e and e.class == "paddock" and e.entryClosesAt == startsAt - 660 and not NcmCalendar.events["paddock:pr-oval-3"]
-    and not NcmCalendar.events["paddock:pr-soon-4"])
+-- L261: ovals are adopted; L269 + owner 2026-10-02: entries close at T-1, so a race five minutes out is still open
+local ovalE = NcmCalendar.events["paddock:pr-oval-3"]
+check(("open Paddock races become calendar events, ovals and a race 5 min out included (%d adopted)"):format(n),
+    n == 4 and e and e.class == "paddock" and e.entryClosesAt == startsAt - 60 and ovalE and ovalE.disciplineId == "oval"
+    and NcmCalendar.events["paddock:pr-soon-4"] ~= nil)
 local pro = NcmCalendar.events["paddock:pr-pro_b-2"]
 check("a league named after a championship takes its economy; a street league the fallback (City Cup's)",
     pro.seriesId == "city_cup" and pro.economy.id == "city_cup_v1" and e.seriesId == "paddock_street_a" and e.economy.id == "city_cup_v1")
 check("adoption is idempotent", NcmPaddockLink.adoptAll(clock) == 0)
 
 -- ---------------------------------------------------------------- QUALIFY and a run
+NcmGuideVenue = nil
+check("QUALIFY away from the venue ring is refused (L252)", select(2, NcmPaddockLink.qualify(1, e.eventId)) == "not_at_venue")
+NcmGuideVenue = e.eventId
 NcmPaddockLink.qualify(1, e.eventId)
 check("QUALIFY opens the race's qualifying session and routes the driver to its start", joined[1] == e.eventId and routed[1] and routed[1].name == e.venue.name)
 local rec = { eventId = e.eventId, paddockQuali = true }
@@ -133,23 +149,20 @@ local slots, field = NcmPaddockLink.slotsFor(e, { { driverId = DRIVER.ncmDriverI
 check("the session's slots are the Paddock's; an entrant it never gridded gets none", #slots == 1 and slots[1].slot == 3
     and slots[1].x == 10 and slots[1].radiusM == 4 and field == 12)
 
--- ---------------------------------------------------------------- T-20 auto-place
-POS[1] = { x = 60, y = 20, z = 1 }
-local session = { kind = "race", paddock = true, slots = slots, playerOf = { [DRIVER.ncmDriverId] = 1 },
-    s = { sessionId = "s-1234567890", phase = "forming", startsAt = startsAt, entrants = { [DRIVER.ncmDriverId] = { state = "entered" } } } }
-NcmPaddockLink.autoPlace(session, startsAt - 25); drain()
-check("nobody is moved before T-20", #calls == 0)
-NcmPaddockLink.autoPlace(session, startsAt - 20); drain()
-check(("at T-20 an entered driver 50 m off their mark is placed: out, the EMPTY car moved, back in (%s)"):format(table.concat(calls, " ")),
-    calls[1] == "out:77" and calls[2] == "move:77:10,20" and calls[3] == "in:77:driver")
-calls = {}
-NcmPaddockLink.autoPlace(session, startsAt - 19); drain()
-check("once only", #calls == 0)
-local far = { kind = "race", paddock = true, slots = slots, playerOf = { [DRIVER.ncmDriverId] = 1 },
-    s = { sessionId = "s-far", phase = "forming", startsAt = startsAt, entrants = { [DRIVER.ncmDriverId] = { state = "entered" } } } }
-POS[1] = { x = 900, y = 20, z = 1 }
-NcmPaddockLink.autoPlace(far, startsAt - 20); drain()
-check("a driver away from the venue is told, not teleported", #calls == 0)
+-- ---------------------------------------------------------------- the pre-grid (L296; no auto-place)
+check("the T-20 auto-place is gone (owner, 2026-10-02: \"nor should it be\")", NcmPaddockLink.autoPlace == nil)
+events["ncm:paddock.pregrid"]("pr-street_a-1", { fieldSize = 12, provisional = true,
+    slots = { [DRIVER.ncmDriverId] = { slot = 12, x = 40, y = 20, z = 1, qualified = true },
+              ["ffffffff-0000-4000-8000-000000000000"] = { slot = 11, x = 44, y = 20, z = 1 } } })
+pregrids = {}
+local sentN = NcmPaddockLink.pushPreGrid(e, { [DRIVER.ncmDriverId] = 1 }, startsAt - 600)
+check("before the session forms, an entered driver is sent their provisional slot (and only an entered one)",
+    sentN == 1 and pregrids[1] and pregrids[1].pid == 1 and pregrids[1].body.slot == 12 and pregrids[1].body.x == 40
+    and pregrids[1].body.paddockRaceId == "pr-street_a-1" and pregrids[1].body.formsAt == startsAt - 50 and pregrids[1].body.qualified == true
+    and pregrids[1].body.serverNow == startsAt - 600)   -- KB-320: the client counts from the server's clock
+check("re-sent every few seconds, not every tick", NcmPaddockLink.pushPreGrid(e, { [DRIVER.ncmDriverId] = 1 }, startsAt - 599) == 0
+    and NcmPaddockLink.pushPreGrid(e, { [DRIVER.ncmDriverId] = 1 }, startsAt - 596) == 1)
+check("never after the start", NcmPaddockLink.pushPreGrid(e, { [DRIVER.ncmDriverId] = 1 }, startsAt + 1) == 0)
 
 -- ---------------------------------------------------------------- the result waits for the whole field
 local completed

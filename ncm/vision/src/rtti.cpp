@@ -44,6 +44,12 @@ void report(RED4ext::IScriptable*, RED4ext::CStackFrame* stack, bool* out, int64
     if (out) *out = true;
 }
 
+void padHold(RED4ext::IScriptable*, RED4ext::CStackFrame* stack, bool* out, int64_t)
+{
+    stack->code++;
+    if (out) *out = state().padHeld();
+}
+
 void note(RED4ext::IScriptable*, RED4ext::CStackFrame* stack, bool* out, int64_t)
 {
     RED4ext::CString text;
@@ -72,6 +78,7 @@ void postRegister()
         {{"Bool", "active"}, {"Uint64", "entity"}, {"Uint64", "record"}, {"Int32", "kind"}, {"Float", "distance"},
          {"Float", "x"}, {"Float", "y"}, {"Float", "z"}});
     add("NcmScanner_Log", reinterpret_cast<RED4ext::ScriptingFunction_t<void*>>(&note), "Bool", {{"String", "text"}});
+    add("NcmScanner_PadHold", reinterpret_cast<RED4ext::ScriptingFunction_t<void*>>(&padHold), "Bool", {});
     VISION_INFO("redscript natives registered");
 }
 }

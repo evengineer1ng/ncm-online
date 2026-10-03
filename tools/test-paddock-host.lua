@@ -568,6 +568,9 @@ local pricingSec = os.clock() - t0
 check(("pricing one race takes under 1.5 s (%.2f s)"):format(pricingSec), pricingSec < 1.5)
 check(("no pricing slice exceeds 400k VM instructions (max %d)"):format(maxSlice), maxSlice < 400000)
 check("the race is on the board", race.state == "priced" and DB.race[premierId].state == "priced")
+-- The field freezes at T-1 with entries (L269; owner 2026-10-02), not when Billie prices: freeze it here as T-1 would
+run(function() PaddockRaces.freeze(race) end)
+check("the freeze grids the field", race.frozen ~= nil and #race.frozen.grid > 0)
 -- L249: the Race Guide reads the Paddock's next events from GlobalState (ncm_league cannot call this VM)
 do
     GlobalState = GlobalState or {}
@@ -665,6 +668,26 @@ check("and is not in RESULTS", not leaked)
 local lineClosed = true
 for _, l in pairs(DB.line) do if l.race_id == premierId and l.state == "open" then lineClosed = false end end
 check("the board closed when the window opened", lineClosed)
+
+-- THE FLAG (2026-10-02): once the leader is home the race is flagged a window per metre later, the league is told,
+-- and the close never moves later than it was
+do
+    local before = race.closesAt
+    local RS = NcmCore.get("paddock.racestate")
+    local leadMs = RS.leaderFinishAt(race.model)
+    local flagEvents = {}
+    local realTrigger = TriggerEvent
+    TriggerEvent = function(name, ...) if name == "ncm:paddock.flag" then flagEvents[#flagEvents + 1] = { ... } end return realTrigger(name, ...) end
+    PaddockRaces.flagCheck(race, race.modelGoAt + leadMs / 1000 - 1)
+    check("no flag before the leader is home", race.flagAt == nil)
+    PaddockRaces.flagCheck(race, race.modelGoAt + leadMs / 1000 + 1)
+    TriggerEvent = realTrigger
+    local window = NcmCore.get("paddock.mixed").finishWindowSec(race.model.lengthM)
+    check(("the flag is the leader's crossing + %d s, and the league hears it"):format(window), race.flagAt
+        and math.abs(race.flagAt - (race.modelGoAt + leadMs / 1000 + window)) <= 1
+        and #flagEvents == 1 and flagEvents[1][1] == premierId and flagEvents[1][2] == race.flagAt)
+    check("the close never moves later", race.closesAt <= before and race.closesAt <= race.flagAt)
+end
 
 -- the window closes: public, settled
 clock = race.closesAt + 1
@@ -1113,12 +1136,13 @@ do
     POS = { [1] = { x = route.start.x + 20, y = route.start.y, z = 10, bucket = 0 } }
     PaddockLive.paceClients[1] = { ok = true, version = "0.8.1" }
     -- the bubble's Pace double: a car that joins drives the road line from where it was set down, from the lights
-    local bubblePace = { adds = {}, removes = 0, plans = {} }
+    local bubblePace = { adds = {}, removes = 0, plans = {}, held = {} }   -- held: vehicles Pace was given and not yet taken back
     local prevHook = PACE_HOOK
     PACE_HOOK = function(name, pid, body)
         if name == "ncm:paddock.bubble.plan" and body.raceId == sr.raceId then bubblePace.plans[#bubblePace.plans + 1] = body end
         if name == "ncm:paddock.bubble.car" and body.raceId == sr.raceId then
-            if body.op == "remove" then bubblePace.removes = bubblePace.removes + 1 end
+            if body.op == "remove" then bubblePace.removes = bubblePace.removes + 1; bubblePace.held[body.vehicleId] = nil end
+            if body.op == "add" then bubblePace.held[body.vehicleId] = true end
             local v = VEH[body.vehicleId]
             if body.op == "add" and v then
                 bubblePace.adds[#bubblePace.adds + 1] = body
@@ -1232,7 +1256,11 @@ do
     check(("beyond bubbleOutM every car is handed back (%d)"):format(PaddockBubble.stats.handedBack - away), next(b.cars) == nil
         and PaddockBubble.stats.handedBack - away >= 6)
     check(("never a car removed with its driver still seated (%d)"):format(REMOVED_WITH_DRIVER), REMOVED_WITH_DRIVER == 0)
-    check(("Pace was told of every car leaving (%d)"):format(bubblePace.removes), bubblePace.removes >= PaddockBubble.stats.handedBack - away)
+    -- every car Pace was given is taken back (a car handed back before Pace ever had it is owed no remove: L296's
+    -- slower street seed moved the harness timing enough to hand one back while its driver was still being seated)
+    local stillHeld = 0
+    for _ in pairs(bubblePace.held) do stillHeld = stillHeld + 1 end
+    check(("Pace was told of every car leaving (%d removes, %d still held)"):format(bubblePace.removes, stillHeld), stillHeld == 0 and bubblePace.removes > 0)
     check("nothing of the race is left on the road", next(VEH) == nil)
     -- ...and meets the field again further down the road: the cars come back in ON the road, driver seated, each on
     -- the leg it is in (IDEA-786: as many times a race as it takes)

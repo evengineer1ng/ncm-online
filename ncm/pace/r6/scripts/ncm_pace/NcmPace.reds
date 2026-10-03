@@ -178,6 +178,30 @@ public class NcmPaceSystem extends ScriptableSystem {
       vehicle.ForceBrakesUntilStoppedOrFor(4.0);
       return;
     }
+    if mode == 4 {
+      // 0.8.8 PRE-ROLL (a seamless restream): a car set down mid-race starts rolling at its model speed on this leg's
+      // race spline; Pace hands it to the racer (mode 3) after a moment.
+      this.Release(i, vehicle, agent);
+      let roll: ref<AIVehicleOnSplineCommand> = new AIVehicleOnSplineCommand();
+      roll.splineRef = NcmPace_Spline(i);
+      roll.startFromClosest = true;
+      roll.reverseSpline = false;
+      roll.driveBackwards = false;
+      roll.forcedStartSpeed = StringToFloat(f[3]);
+      roll.stopAtPathEnd = false;
+      roll.secureTimeOut = 10.0;
+      roll.needDriver = false;
+      roll.useKinematic = false;
+      if agent.SendCommand(roll) {
+        this.m_commands[i] = roll;
+        this.m_ended[i] = false;
+        this.m_vehicles[i] = vehicle;
+        NcmPace_Log("car " + ToString(i) + ": pre-roll at " + f[3] + " m/s on leg " + f[2]);
+      } else {
+        NcmPace_Log("car " + ToString(i) + ": pre-roll refused on leg " + f[2]);
+      }
+      return;
+    }
     if mode == 3 {
       // 0.7.0 (L246): the engine's own racer on this leg's race spline -- the vehicle's drivingParamsRace profile, no
       // rubber banding, joining the spline wherever the car is. Whatever it held before is released first.

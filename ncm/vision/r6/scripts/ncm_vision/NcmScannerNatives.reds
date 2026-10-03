@@ -9,3 +9,5 @@ public static native func NcmScanner_Reticle() -> String
 public static native func NcmScanner_Panel() -> String
 public static native func NcmScanner_Report(active: Bool, entity: Uint64, record: Uint64, kind: Int32, distance: Float, x: Float, y: Float, z: Float) -> Bool
 public static native func NcmScanner_Log(text: String) -> Bool
+// 0.4.0: the pad's LB scanner hold, as the ncm_scanner resource reads it (lapses 600 ms after its last refresh)
+public static native func NcmScanner_PadHold() -> Bool

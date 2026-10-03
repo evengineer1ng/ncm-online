@@ -1,5 +1,6 @@
 // The parts of the scanner that can be wrong without a game running: the reticle wire redscript splits on '|',
 // the record key that must match `TDBID.ToNumber`, and the rules that clear a reticle nobody is feeding.
+#include <chrono>
 #include "state.hpp"
 
 #include <cstdio>
@@ -22,6 +23,21 @@ int main()
     const auto t0 = State::Clock::now();
 
     // CRC32-B check value, and the TweakDBID identity layout (hash | length << 32).
+    {   // 0.4.0: the pad's LB scanner hold, refreshed by the ncm_scanner resource, lapses without a refresh
+        using namespace std::chrono_literals;
+        State s;
+        CHECK(!s.padHeld(t0));
+        CHECK(s.apply(R"({"cmd":"hold","on":true})", t0));
+        CHECK(s.padHeld(t0 + 200ms));
+        CHECK(!s.padHeld(t0 + 700ms));                                       // no refresh: the world does not stay green
+        CHECK(s.apply(R"({"cmd":"hold","on":true})", t0 + 700ms));
+        CHECK(s.padHeld(t0 + 900ms));
+        CHECK(s.apply(R"({"cmd":"hold","on":false})", t0 + 950ms));
+        CHECK(!s.padHeld(t0 + 960ms));                                       // released
+        CHECK(s.apply(R"({"cmd":"hold","on":true})", t0 + 1s));
+        s.disconnect();
+        CHECK(!s.padHeld(t0 + 1s));                                          // a dropped socket drops the hold
+    }
     CHECK(ncm::vision::crc32("123456789") == 0xCBF43926u);
     CHECK(ncm::vision::recordKey("123456789") == (0xCBF43926ull | (9ull << 32)));
 

@@ -82,12 +82,24 @@ bool State::apply(const std::string& message, Clock::time_point now)
         ++revision_;
         return true;
     }
+    if (cmd == "hold") {
+        padHold_ = m.value("on", false);
+        padHoldAt_ = now;
+        return true;
+    }
     return cmd == "ping";
+}
+
+bool State::padHeld(Clock::time_point now)
+{
+    std::lock_guard lock(mutex_);
+    return padHold_ && now - padHoldAt_ < std::chrono::milliseconds(kPadHoldMs);
 }
 
 void State::disconnect()
 {
     std::lock_guard lock(mutex_);
+    padHold_ = false;
     haveFrame_ = false;
     state_ = 0;
     progress_ = 0.0f;

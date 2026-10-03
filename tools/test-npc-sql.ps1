@@ -44,10 +44,11 @@ try {
     foreach ($line in $rows) { $p = "$line".Split("`t"); if ($p.Count -ge 2) { $got[$p[0]] = $p[1] } }
     $driver = $f[3]
     $expect = [ordered]@{
-        "A.sold_to" = "org:o_t"; "A.owner" = "org:o_t:npc_fitted"; "A.cash_t" = "49000"; "A.cash_u" = "50000"; "A.money_rows" = "1"
+        "A.sold_to" = "org:o_t"; "A.owner" = "org:o_t:npc_storage"; "A.cash_t" = "49000"; "A.cash_u" = "50000"; "A.money_rows" = "1"
         "B.owner" = "${driver}:-:storage"; "B.ledger" = "3800"; "B.cash_t" = "50200"; "B.post" = "filled"; "B.bid" = "accepted"
         "B.reservations" = "0"; "B.settled" = "1"
         "C.owner" = "-:o_u:npc_storage"; "C.ledger" = "3800"; "C.cash_u" = "50000"; "C.post" = "open"; "C.settled" = "0"
+        "D.factory_parts" = "11"; "D.installed" = "1"; "D.old_stored" = "npc_storage"; "D.service" = "org:o_t:350"
         "after.rollback" = "0"
     }
     $bad = 0

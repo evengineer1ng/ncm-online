@@ -30,6 +30,8 @@ Open77 = { notifications = { send = function() end } }
 function CreateThread() end
 function Wait() end
 dofile(RES .. "wallet.lua")
+PaddockLive = nil
+dofile(RES .. "npc_cars.lua")
 dofile(RES .. "markets.lua")
 dofile(RES .. "exchange.lua")
 
@@ -108,6 +110,29 @@ check("C.ledger", ("SELECT COALESCE(SUM(amount),0) FROM ledger WHERE server_id=%
 check("C.cash_u", ("SELECT cash FROM paddock_org WHERE server_id=%s AND org_id='o_u'"):format(lit(SID)))
 check("C.post", "SELECT state FROM exchange_post WHERE post_id='tst-post-c'")
 check("C.settled", ("SELECT COUNT(*) FROM exchange_settlement WHERE server_id=%s AND post_id='tst-post-c'"):format(lit(SID)))
+
+-- D. L298: an NPC's real car -- minted with its eleven factory parts, a part installed on it as a new configuration
+--    revision (the replaced factory part to storage), and a service row by an NPC principal
+local G = NcmCore.get("economy.npc_garage")
+local model = G.startingModel({ classes = { "Muscle", "Sport", "Tech" }, prestigeMax = 2 }, 7, "org", "o_t")
+local mint, carId = PaddockCars.mintStatements(model, "org", "o_t", T)
+for _, st in ipairs(mint) do emit(render(st)) end
+check("D.factory_parts", ("SELECT COUNT(*) FROM component_asset WHERE machine_asset_id=%s AND location_kind='installed' AND owner_principal_id='o_t'"):format(lit(carId)))
+check("D.config_items", ("SELECT COUNT(*) FROM machine_configuration_item i JOIN machine_configuration_current c ON c.configuration_id=i.configuration_id WHERE c.machine_asset_id=%s"):format(lit(carId)))
+-- install tst-a1 (team o_t bought it in A) on the car: the statements PaddockCars.install sends, against the rows the mint made
+emit(("SET @cfg := (SELECT configuration_id FROM machine_configuration_current WHERE machine_asset_id=%s);"):format(lit(carId)))
+emit(("SET @fam := (SELECT d.family FROM component_asset a JOIN component_design d ON d.design_id=a.design_id WHERE a.asset_id='tst-a1');"))
+emit(("SET @old := (SELECT i.component_asset_id FROM machine_configuration_item i JOIN component_asset a ON a.asset_id=i.component_asset_id JOIN component_design d ON d.design_id=a.design_id WHERE i.configuration_id=@cfg AND d.family=@fam LIMIT 1);"))
+emit(("INSERT INTO machine_configuration (configuration_id, machine_asset_id, revision, created_at) VALUES ('tst-cfg-2', %s, 2, %d);"):format(lit(carId), T))
+emit("INSERT INTO machine_configuration_item (configuration_id, interface_id, component_asset_id) SELECT 'tst-cfg-2', i.interface_id, IF(i.component_asset_id=@old, 'tst-a1', i.component_asset_id) FROM machine_configuration_item i WHERE i.configuration_id=@cfg;")
+emit(("UPDATE machine_configuration_current SET configuration_id='tst-cfg-2' WHERE machine_asset_id=%s;"):format(lit(carId)))
+emit(("UPDATE component_asset SET location_kind='installed', machine_asset_id=%s WHERE asset_id='tst-a1' AND owner_principal_kind='org' AND owner_principal_id='o_t';"):format(lit(carId)))
+emit("UPDATE component_asset SET location_kind='npc_storage', machine_asset_id=NULL WHERE asset_id=@old;")
+check("D.installed", ("SELECT COUNT(*) FROM machine_configuration_item i JOIN machine_configuration_current c ON c.configuration_id=i.configuration_id WHERE c.machine_asset_id=%s AND i.component_asset_id='tst-a1'"):format(lit(carId)))
+check("D.old_stored", "SELECT location_kind FROM component_asset WHERE asset_id=@old")
+local svc = PaddockCars.serviceStatements({ assetId = "tst-a1", exposure_m = 1000 }, { conditionId = "tst", reliefM = 500, cost = 350, workmanship = {} }, "org", "o_t", T)
+emit(render(svc))
+check("D.service", "SELECT CONCAT(by_principal_kind,':',by_principal_id,':',amount) FROM component_service WHERE component_asset_id='tst-a1'")
 
 emit("ROLLBACK;")
 check("after.rollback", ("SELECT COUNT(*) FROM paddock_org WHERE server_id=%s"):format(lit(SID)))

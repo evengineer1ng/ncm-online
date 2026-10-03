@@ -42,6 +42,20 @@ public class NcmVisionTick extends DelayCallback {
   }
 }
 
+// 0.4.0: the pad's scanner hold, polled ten times a second while a player is attached (the ncm_scanner resource reads
+// LB through OPEN//77 -- owner, 2026-10-03: LB did nothing for them while driving).
+public class NcmVisionPadTick extends DelayCallback {
+  public let system: wref<NcmVisionSystem>;
+  public let generation: Int32;
+
+  public func Call() -> Void {
+    let system: ref<NcmVisionSystem> = this.system;
+    if IsDefined(system) {
+      system.PadTick(this.generation);
+    }
+  }
+}
+
 public class NcmVisionSystem extends ScriptableSystem {
   private let m_player: wref<PlayerPuppet>;
   private let m_listener: ref<NcmVisionListener>;
@@ -53,6 +67,8 @@ public class NcmVisionSystem extends ScriptableSystem {
   private let m_on: Bool;
   // Bumped on every on/off edge and detach, so a tick scheduled before the edge dies on its next call.
   private let m_generation: Int32;
+  private let m_padHeld: Bool;
+  private let m_padGeneration: Int32;
 
   private func OnPlayerAttach(request: ref<PlayerAttachRequest>) -> Void {
     let player: ref<PlayerPuppet> = request.owner as PlayerPuppet;
@@ -66,6 +82,31 @@ public class NcmVisionSystem extends ScriptableSystem {
     this.m_listener.m_system = this;
     player.RegisterInputListener(this.m_listener, n"VisionHold");
     player.RegisterInputListener(this.m_listener, n"VisionToggle");
+    this.m_padGeneration += 1;
+    this.SchedulePad();
+  }
+
+  private func SchedulePad() -> Void {
+    let player: ref<PlayerPuppet> = this.m_player;
+    if !IsDefined(player) {
+      return;
+    }
+    let tick: ref<NcmVisionPadTick> = new NcmVisionPadTick();
+    tick.system = this;
+    tick.generation = this.m_padGeneration;
+    GameInstance.GetDelaySystem(player.GetGame()).DelayCallback(tick, 0.1, false);
+  }
+
+  public func PadTick(generation: Int32) -> Void {
+    if generation != this.m_padGeneration || !IsDefined(this.m_player) {
+      return;
+    }
+    let held: Bool = NcmScanner_PadHold();
+    if NotEquals(held, this.m_padHeld) {
+      this.m_padHeld = held;
+      this.SetHeld(held);
+    }
+    this.SchedulePad();
   }
 
   private func OnPlayerDetach(request: ref<PlayerDetachRequest>) -> Void {
@@ -74,6 +115,8 @@ public class NcmVisionSystem extends ScriptableSystem {
 
   // Drop the render and the listeners together, so a detach or a re-attach never leaves the world green.
   private func Release() -> Void {
+    this.m_padGeneration += 1;
+    this.m_padHeld = false;
     this.m_held = false;
     this.m_toggled = false;
     this.Refresh();

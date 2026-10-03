@@ -185,6 +185,17 @@ int main()
         CHECK(!s.apply(R"({"cmd":"wat"})", t0) && s.refusal().find("unknown cmd") != std::string::npos);
         CHECK(!s.apply("not json", t0) && s.refusal() == "not a JSON object");
     }
+    {   // 0.8.6: a staggered start -- a grid car is held past the go until its row's release
+        State s;
+        CHECK(s.apply(R"({"cmd":"drive.start","raceId":"pr-stag","dynamic":true,"goInMs":0,"launch":{"rampFloorMps":40},
+          "points":[{"x":0,"y":0},{"x":100,"y":0},{"x":200,"y":0}],
+          "gates":[{"x":0,"y":0,"dx":1,"dy":0},{"x":200,"y":0,"dx":1,"dy":0}],"cars":[]})", t0));
+        CHECK(s.apply(R"({"cmd":"car.add","raceId":"pr-stag","entity":"51","from":1,"speed":30,"releaseMs":1500})", t0));
+        CHECK(s.apply(R"({"cmd":"car.add","raceId":"pr-stag","entity":"52","from":1,"speed":30})", t0));
+        CHECK(split(s.step(0, 0, 0, 0, t0 + 1000ms))[1] == "0");     // row 2: still held a second after the go
+        CHECK(split(s.step(1, 0, 0, 0, t0 + 1000ms))[1] == "1");     // the front row is away
+        CHECK(split(s.step(0, 0, 0, 0, t0 + 1600ms))[1] == "1");     // and row 2 goes on its turn
+    }
     {   // a plan: held before the lights, then driven, gates timed, target advanced ahead, stop at the end
         State s;
         CHECK(!s.apply(R"({"cmd":"drive.start","dynamic":true,"points":[],"gates":[],"cars":[]})", t0));
@@ -528,6 +539,33 @@ int main()
         CHECK(logged);
     }
 
+    {   // 0.9.0 (KB-318): a car joining at speed goes straight to the racer, and a dead launch is re-commanded within
+        // about a second (up to six times in its first 12 s) instead of waiting for the 6 s stall rule
+        State s;
+        CHECK(s.apply(R"({"cmd":"drive.start","raceId":"roll","dynamic":true,"goInMs":0,
+          "legs":["$/mod/ncm_pace/#leg_a__b","$/mod/ncm_pace/#leg_b__c"],
+          "points":[{"x":0,"y":0,"z":0},{"x":500,"y":0,"z":0},{"x":900,"y":0,"z":0}],
+          "gates":[{"x":0,"y":0,"dx":1,"dy":0},{"x":900,"y":0,"dx":1,"dy":0}],"cars":[]})", t0));
+        CHECK(s.apply(R"({"cmd":"car.add","raceId":"roll","entity":"42","from":2,"speed":30,"startMps":28.5})", t0 + 1000ms));
+        auto f = split(s.step(0, 600, 0, 0, t0 + 1100ms));
+        CHECK(f[1] == "3" && f[2] == "1");                                   // the racer at once, on leg 2
+        const std::string first = f[0];
+        auto at = t0 + 1100ms;
+        for (int k = 0; k < 8; ++k) { at += 100ms; f = split(s.step(0, 600, 0, 0, at)); }   // 0.8 s standing: not yet
+        CHECK(f[0] == first);
+        for (int k = 0; k < 6; ++k) { at += 100ms; f = split(s.step(0, 600, 0, 0, at)); }   // 1.4 s standing: kicked
+        CHECK(f[0] != first && f[1] == "3");
+        bool kicked = false;
+        for (const auto& line : s.drainLog()) if (line.find("launch: fresh command") != std::string::npos) kicked = true;
+        CHECK(kicked);
+        // once moving, no more kicks
+        const std::string second = f[0];
+        int x = 600;
+        for (int k = 0; k < 30; ++k) { at += 100ms; x += 3; f = split(s.step(0, x, 0, 0, at)); }
+        CHECK(f[0] == second);
+        CHECK(s.apply(R"({"cmd":"car.add","raceId":"roll","entity":"43","from":2,"speed":30})", t0 + 2500ms));
+        CHECK(split(s.step(1, 600, 0, 0, t0 + 2600ms))[1] == "3");            // a standing car goes straight to the racer
+    }
     {   // 0.8.1 (L247): the bubble's street race. A dynamic plan on the route's nodes with a race spline per leg; a car
         // that joins at `from` races the leg ending there; the same car under a new entity keeps its leg and is
         // re-commanded at once.

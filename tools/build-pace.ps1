@@ -55,6 +55,12 @@ if (-not $SkipScriptCheck) {
     Get-ChildItem (Join-Path $game "r6\scripts") -Directory |
         Where-Object { $_.Name -ne "ncm_pace" -and $_.Name -ne "ncm_pace_diag" } |   # the diag is dev-only and needs Codeware
         ForEach-Object { Copy-Item -Recurse $_.FullName (Join-Path $scratch "scripts") }
+    # RED4ext plugins load their own script folders too (TweakXL's ScriptableTweak / TweakDBManager, which
+    # NcmPaceScales.reds uses): compile against them as the game does, except Pace's own.
+    Get-ChildItem (Join-Path $game "red4ext\plugins") -Directory | Where-Object { $_.Name -ne "ncm_pace" } | ForEach-Object {
+        $ps = Join-Path $_.FullName "Scripts"
+        if (Test-Path $ps) { Copy-Item -Recurse $ps (Join-Path $scratch ("scripts\plugin_" + $_.Name)) }
+    }
     Copy-Item (Join-Path $scripts "*.reds") (Join-Path $scratch "scripts\ncm_pace")
     Copy-Item (Join-Path $game "r6\cache\final.redscripts") (Join-Path $scratch "cache")
     $out = & (Join-Path $game "engine\tools\scc.exe") -compile (Join-Path $scratch "scripts") -customCacheDir (Join-Path $scratch "cache") 2>&1

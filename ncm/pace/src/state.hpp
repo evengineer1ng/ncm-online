@@ -101,6 +101,11 @@ struct Car {
     uint32_t renewals = 0;
     uint32_t logged = 0;
     bool dynamic = false;           // joined mid-race (car.add): ended only by car.remove, never by a gate
+    int64_t releaseMs = 0;          // 0.8.6: held on the grid until this long after the go (a staggered start, by row)
+    double startMps = 0;            // 0.8.8: a car joining mid-race starts rolling at this speed (spline pre-roll)
+    int64_t prerollUntil = -1;      // 0.8.8: race clock until which the pre-roll command holds (0.9.0: unused, see launch)
+    int64_t launchUntil = -1;       // 0.9.0: a car joining mid-race is watched until this race clock for a dead launch
+    uint32_t launchKicks = 0;       // 0.9.0: fresh racer commands sent to get it going
     bool reacquire = false;         // 0.8.1: its entity was swapped (car.entity): a fresh command on the next step
     // the wrong-way guard (0.4.6): its motion over >= 300 ms windows, how long it has gone against the ring
     bool haveMotion = false;

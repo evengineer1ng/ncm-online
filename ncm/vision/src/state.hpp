@@ -69,6 +69,11 @@ public:
 
     // "revision|state|progress|title|detail"; an empty text field is sent as "~".
     std::string reticle(Clock::time_point now = Clock::now());
+    // The pad's scanner hold (owner, 2026-10-03: "lb hold keeps scanner activated until release"). The ncm_scanner
+    // resource reads LB and refreshes the hold every ~200 ms; without a refresh for kPadHoldMs it lapses, so a dropped
+    // socket or a stopped resource can never leave the world green.
+    static constexpr int kPadHoldMs = 600;
+    bool padHeld(Clock::time_point now = Clock::now());
     // "revision|selected|rows|infoTitle|infoSub|info": rows are "state`label`right" joined by '^', info rows are
     // "key`value" joined by '^'; selected is -1 for none; an empty field is "~". Redscript reads it right after
     // reticle() on the same tick, so the stale rule has already run.
@@ -97,6 +102,8 @@ private:
     std::string infoSub_;
     std::vector<InfoRow> info_;
     Clock::time_point lastFrame_{};
+    bool padHold_ = false;
+    Clock::time_point padHoldAt_{};
     bool haveFrame_ = false;
     bool staleCleared_ = false;
     Target target_{};
