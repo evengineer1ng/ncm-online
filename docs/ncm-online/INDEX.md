@@ -85,7 +85,7 @@ remains a SPEC artifact; current runtime behavior is the code and current econom
 
 ---
 
-## Current (17)
+## Current (18)
 
 - [01_ARCHITECTURE.md](01_ARCHITECTURE.md) - overall system shape - SEE CONFLICT C-1 in INDEX.md
 - [02_ROADMAP.md](02_ROADMAP.md) - milestone vocabulary (M0-M12) ONLY; current sequencing is 24
@@ -105,6 +105,7 @@ remains a SPEC artifact; current runtime behavior is the code and current econom
 - [OPS_STAGING.md](OPS_STAGING.md) - day-to-day operation of NCM Online
 - [CARRIER_NEXT_STEPS_AND_UPGRADE.md](CARRIER_NEXT_STEPS_AND_UPGRADE.md) - bounded Carrier follow-up and exact in-place Production package upgrade
 - [wp/QA_INSTRUMENTATION.md](wp/QA_INSTRUMENTATION.md) - mapping the QA corpus to instrumentation
+- [wp/NPC_ECONOMY_AUDIT.md](wp/NPC_ECONOMY_AUDIT.md) - the NPC economy's actual state, measured on dev (L297); re-run with `tools/npc-economy-audit.ps1`
 
 ## Spec - owner intent, not authorised (12)
 
