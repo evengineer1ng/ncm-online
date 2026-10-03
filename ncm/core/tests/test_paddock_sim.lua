@@ -146,4 +146,29 @@ return {
         T.ok(wb < 100, "a wet human median has the rain backed out")
         T.ok(Cal.basePace(1, route, "premier", DRY) < Cal.basePace(1, route, "street", DRY), "premier is faster")
     end,
+
+    -- L296 (owner, 2026-10-02: "qualify and sim results are too fast, we have data now on average pace lets use it")
+    calibration_times_the_real_road_at_the_measured_pace = function(T)
+        local Cal = T.Core.get("paddock.calibration")
+        -- two routes with the same planar distance but different roads: the planar estimate timed them alike, so the
+        -- one with more road raced at an impossible average (the sim ran 22.7-40.7 m/s along the real lines)
+        local short = { routeId = "r", distanceM = 1500, lineM = 2400 }
+        local long = { routeId = "r", distanceM = 1500, lineM = 4000 }
+        local a, b = Cal.baseline(1, "r", 1500, "street", short), Cal.baseline(1, "r", 1500, "street", long)
+        T.ok(math.abs((2400 / a) - (4000 / b)) < 0.01, "one average speed along either road")
+        local v = 2400 / a
+        T.ok(v > 27 and v < 31, "street pace about the measured 29 m/s: " .. v)
+        -- a learned tier speed replaces the seed
+        local fast = Cal.baseline(1, "r", 1500, "street", short, { street = 33 })
+        T.ok(math.abs(2400 / fast - 33 * (v / 29)) < 0.01, "the learned speed times the road")
+        -- an oval is unchanged by the street's numbers (the owner's 35-40 m/s ruling)
+        local oval = { routeId = "o", distanceM = 6000, oval = { laps = 10 } }
+        T.eq(Cal.baseline(1, "o", 6000, "street", oval, { street = 20 }), Cal.baseline(1, "o", 6000, "street", oval))
+        -- learning: an EWMA step, refusing nonsense
+        local n1, ok1 = Cal.learn(29, 34)
+        T.ok(ok1 and math.abs(n1 - 30) < 1e-9, "a fifth of the way toward the sample")
+        local n2, ok2 = Cal.learn(29, 4)
+        T.ok(not ok2 and n2 == 29, "a crawl (crashes, a stuck field) is refused")
+        T.eq((Cal.learn(nil, 30)), 30)
+    end,
 }

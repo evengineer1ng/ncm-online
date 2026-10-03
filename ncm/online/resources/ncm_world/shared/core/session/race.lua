@@ -117,9 +117,24 @@ Core.define("session.race", function(C)
     function M.mark(s, driverId, atMark)
         local r = s.entrants[driverId]
         if not r then return false, "unknown_entrant" end
+        -- DNS is decided at green (L288/L289; owner 2026-10-02: one rule for every race). A driver who reaches their
+        -- mark during the lights starts: they join the racers the countdown already released. Leaving the mark in the
+        -- countdown changes nothing -- small corrections are allowed until green.
+        if s.phase == "countdown" then
+            if atMark and r.state == "entered" then r.atMark = true; r.state = "racing" end
+            return true
+        end
         if s.phase ~= "forming" and s.phase ~= "gridded" then return false, "not_forming" end
         r.atMark = atMark and true or false
         if r.state == "entered" or r.state == "ready" then r.state = r.atMark and "ready" or "entered" end
+        return true
+    end
+
+    --- The race's flag (a mixed Paddock race: the Paddock decides it from the first car of the WHOLE field home). At
+    --- `at` the session completes; whoever has not finished is classified by progress. Earlier calls are replaced.
+    function M.flag(s, at)
+        if type(at) ~= "number" or s.phase == "complete" then return false end
+        s.flagAt = at
         return true
     end
 
@@ -408,7 +423,6 @@ Core.define("session.race", function(C)
             end
             if now >= s.startsAt then
                 -- DNS is decided at green, never when the grid closes or the light sequence begins.
-                -- This gives entered drivers the full start window to make a correction or reach the grid.
                 dnsAbsent()
                 local starters = 0
                 for _, r in pairs(s.entrants) do if r.state == "racing" then starters = starters + 1 end end
@@ -436,6 +450,12 @@ Core.define("session.race", function(C)
             end
         end
 
+        -- the flag (a mixed race): it closes the race whoever is still out, and it is the only window that applies
+        if s.flagAt and (s.phase == "running" or s.phase == "finishing") and now >= s.flagAt then
+            complete(s, now, events, "flag")
+            return events
+        end
+
         if s.phase == "running" then
             if s.firstFinishAt then
                 s.phase = "finishing"
@@ -455,7 +475,7 @@ Core.define("session.race", function(C)
         if s.phase == "finishing" then
             if activeCount(s) == 0 then
                 complete(s, now, events, "all_classified")
-            elseif now >= math.max(s.firstFinishAt + R.finishWindowSec, s.finishHoldUntil or 0) then
+            elseif not s.flagAt and now >= math.max(s.firstFinishAt + R.finishWindowSec, s.finishHoldUntil or 0) then
                 complete(s, now, events, "finish_window")
             end
         end
@@ -480,7 +500,7 @@ Core.define("session.race", function(C)
             sessionId = s.sessionId, eventId = s.eventId, phase = s.phase, startsAt = s.startsAt,
             greenAt = s.greenAt, lightsShown = s.lightsShown, firstFinishAt = s.firstFinishAt,
             finishWindowSec = s.rules.finishWindowSec, gridHoldBeforeSec = s.rules.gridHoldBeforeSec,
-            originalStartsAt = s.originalStartsAt, hold = s.hold, kind = "race",
+            originalStartsAt = s.originalStartsAt, hold = s.hold, kind = "race", flagAt = s.flagAt,
             start = s.rules.start, rollingGreenAt = s.rollingGreenAt, rollingLeader = s.rollingLeader, paceKph = s.rules.paceKph,
             gates = g, entrants = entrants,
         }

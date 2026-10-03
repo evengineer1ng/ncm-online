@@ -145,15 +145,27 @@ Core.define("paddock.season", function(C)
 
     --- Temporary point-to-point-only schedule while checkpointed splines are unavailable (L253).
     --- Keep each tier's normal minimum/maximum distance filter and district start rule; generated routes need no named root.
+    --- L296 (owner, 2026-10-02: "why arent there any ovals on the calendar? they should be semi regular"): the oval
+    --- night is back. L253's temporary point-to-point-only schedule had dropped L236's oval branch, so `ovalShare` and
+    --- the `ovalsScheduled` tunable (L254) did nothing. A share of each tier's slots races an authored roundabout --
+    --- the league's own district's first, else any -- whenever `data.ovals.SCHEDULED` is on.
     function M.routeFor(seed, seriesId, utc)
         local tier = M.tierOfSeries(seriesId)
         local spec = M.TIERS[tier]
+        local region = M.regionOf(seriesId)
+        local k = math.floor(utc / 60)
+        local ovals = C.get("data.ovals")
+        if ovals.SCHEDULED and (spec.ovalShare or 0) > 0 and #ovals.LIST > 0
+            and Hash.unit(seed, "route-oval", seriesId, k) < spec.ovalShare then
+            local list = region and ovals.ids(region) or {}
+            if #list == 0 then list = ovals.ids() end
+            if #list > 0 then return list[1 + Hash.fnv1a32(Hash.key(seed, "oval", seriesId, k)) % #list] end
+        end
         local opts = {}
         for key, value in pairs(spec.gen or {}) do opts[key] = value end
-        opts.startRegion = M.regionOf(seriesId)
+        opts.startRegion = region
         opts.checkpoints = 0
         opts.checkpointShare = 0
-        local k = math.floor(utc / 60)
         return C.get("course.generator").pick(opts, seed, "paddock", seriesId, k)
     end
     --- Season and Cup for an instant: { seasonId, cup (1..13), cupId, startUtc, endUtc, cupStartUtc, cupEndUtc }.

@@ -149,9 +149,13 @@ return {
         T.eq(s.phase, "countdown", "3 of 4 = 75%: released")
         local dns = 0
         for _, x in ipairs(e) do if x.type == "dns" then dns = dns + 1 end end
-        T.eq(dns, 1, "the absent driver is DNS at release")
+        T.eq(dns, 0, "release is not green: nobody is DNS yet")
         T.ok(s.startsAt >= 1002 + 5, "lights run their full count from release")
         T.eq(s.hold, nil)
+        e = Race.step(s, s.startsAt)
+        dns = 0
+        for _, x in ipairs(e) do if x.type == "dns" then dns = dns + 1 end end
+        T.eq(dns, 1, "the absent driver is DNS at green"); T.eq(s.entrants.d.state, "dns")
     end,
 
     hold_deadline_releases_whoever_is_there = function(T)
@@ -164,7 +168,8 @@ return {
         T.eq(s.phase, "gridded")
         Race.step(s, 1030); T.eq(s.phase, "gridded", "still holding before the deadline")
         Race.step(s, 1056); T.eq(s.phase, "countdown", "deadline - countdown: go with who is there")
-        T.eq(s.entrants.b.state, "dns")
+        T.eq(s.entrants.b.state, "entered", "still time to reach the mark")
+        Race.step(s, s.startsAt); T.eq(s.entrants.b.state, "dns", "DNS at green")
         local view = Race.publicView(s)
         T.eq(view.originalStartsAt, 1000)
     end,
@@ -175,7 +180,8 @@ return {
         local s = Race.new({ sessionId = "n", startsAt = 1000, gates = g, entrants = { { driverId = "a", slot = 1 }, { driverId = "b", slot = 2 } } })
         Race.mark(s, "a", true)
         local e = Race.step(s, 970)
-        T.eq(e[1].type, "dns", "unchanged: absent at the grid check is DNS immediately")
-        Race.step(s, 995); T.eq(s.phase, "countdown")
+        T.eq(e[1].type, "phase", "the grid check marks nobody DNS (one rule for every race, 2026-10-02)")
+        Race.step(s, 995); T.eq(s.phase, "countdown", "a street race does not hold")
+        Race.step(s, 1000); T.eq(s.entrants.b.state, "dns", "absent at green is DNS")
     end,
 }

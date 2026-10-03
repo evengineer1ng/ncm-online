@@ -38,23 +38,28 @@ return {
         T.eq(places.hA, 2); T.eq(places.hC, 6); T.eq(places.p1, nil); T.eq(n, 6)
     end,
 
-    a_paddock_race_becomes_a_calendar_event_that_closes_at_t_minus_11 = function(T)
+    a_paddock_race_becomes_a_calendar_event_that_closes_at_t_minus_1 = function(T)
+        -- entries and qualifying close at T-1 with the freeze (L269; owner 2026-10-02: late entry until T-1)
         local X = T.Core.get("paddock.mixed")
         local route = { name = "Snake", distanceM = 3000, start = { id = "n1", x = 1, y = 2, z = 3, name = "Hill Abode" },
             finish = { id = "n2", x = 9, y = 9, z = 0, name = "Downtown" } }
         local row = { raceId = "pr-street_a-100000", seriesId = "street_a", seriesName = "Kabuki Midnight", tier = "street",
             routeId = "gen:x", startsAt = 100000, field = 12 }
         local e = X.eventFromRow(row, route, 100000 - 3600, nil, { id = "fallback" })
-        T.eq(e.eventId, "paddock:pr-street_a-100000"); T.eq(e.class, "paddock"); T.eq(e.entryClosesAt, 100000 - 660)
+        T.eq(e.eventId, "paddock:pr-street_a-100000"); T.eq(e.class, "paddock"); T.eq(e.entryClosesAt, 100000 - 60)
         T.eq(e.seriesId, "paddock_street_a"); T.eq(e.economy.id, "fallback"); T.eq(e.venue.name, "Hill Abode")
-        T.eq(e.practiceCloseLeadSec, 660); T.eq(e.state, "entry_open")
+        T.eq(e.practiceCloseLeadSec, 60); T.eq(e.state, "entry_open")
         local G = T.Core.get("competition.guide")
-        T.ok(G.practiceOpen(e, 100000 - 700, 60), "qualifying is open at T-11:40")
-        T.falsy(G.practiceOpen(e, 100000 - 600, 60), "and closed at T-10")
+        T.ok(G.practiceOpen(e, 100000 - 600, 60), "qualifying is still open at T-10")
+        T.falsy(G.practiceOpen(e, 100000 - 30, 60), "and closed inside T-1")
         local packed = X.eventFromRow(row, route, 100000 - 3600, { seriesId = "city_cup", economy = { id = "city" } })
         T.eq(packed.seriesId, "city_cup"); T.eq(packed.economy.id, "city")
-        T.eq(select(2, X.eventFromRow({ raceId = "o", startsAt = 100000, oval = true }, route, 0)), "oval")
-        T.eq(select(2, X.eventFromRow(row, route, 100000 - 600)), "entries_closed")
+        local oval = X.eventFromRow({ raceId = "o", startsAt = 100000, oval = true }, route, 0)
+        T.ok(oval and oval.disciplineId == "oval", "an oval row is adopted as an oval event (L261)")
+        T.eq(oval.startType, "standing", "a mixed oval starts standing beside its NPCs, not rolling (L296)")
+        T.eq(e.startType, "standing")
+        T.ok(X.eventFromRow(row, route, 100000 - 600), "a late entrant can still find it at T-10")
+        T.eq(select(2, X.eventFromRow(row, route, 100000 - 30)), "entries_closed")
     end,
 
     the_field_bonus_counts_the_humans_but_the_place_is_the_whole_fields = function(T)
@@ -67,5 +72,21 @@ return {
         local byKind = {}
         for _, l in ipairs(r.lines) do byKind[l.kind] = l.amount end
         T.eq(byKind.event_placement, 150); T.eq(byKind.event_field_bonus, 50)
+    end,
+
+    the_ceremony_shows_the_road_then_the_penalties = function(T)
+        local X = T.Core.get("paddock.mixed")
+        -- the human crossed first by 3 s but carries 10 s; an NPC carries 2 s
+        local npc = { { id = "p1", state = "finished", finishMs = 105000, rawFinishMs = 103000, penaltyMs = 2000 },
+                      { id = "p2", state = "finished", finishMs = 108000, rawFinishMs = 108000, penaltyMs = 0 } }
+        local humans = { { key = "h0123456789abcde", state = "finished", finishMs = 110000, rawFinishMs = 100000, penaltyMs = 10000 } }
+        local merged = X.merge(npc, humans)
+        local rows = X.ceremony(merged)
+        local by = {}
+        for _, r in ipairs(rows) do by[r.id] = r end
+        T.eq(by.h0123456789abcde.rawPos, 1, "first on the road"); T.eq(by.h0123456789abcde.pos, 3, "third with penalties")
+        T.eq(by.h0123456789abcde.moved, -2, "down two")
+        T.eq(by.p1.rawPos, 2); T.eq(by.p1.pos, 1); T.eq(by.p1.moved, 1, "up one")
+        T.eq(by.p2.moved, 1)
     end,
 }

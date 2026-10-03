@@ -75,6 +75,31 @@ return {
         T.eq(watsonHome, watson, "the Watson league starts in Watson")
     end,
 
+    -- L296 (owner, 2026-10-02: "why arent there any ovals on the calendar? they should be semi regular")
+    ovals_are_on_the_calendar_semi_regularly = function(T)
+        local Season = T.Core.get("paddock.season")
+        local Ovals = T.Core.get("data.ovals")
+        local Clock = T.Core.get("world.clock")
+        local was = Ovals.SCHEDULED
+        local function count(on)
+            Ovals.SCHEDULED = on
+            local ovals, total = 0, 0
+            for d = 0, 6 do
+                for _, r in ipairs(Season.dayRhythm(Clock.daysFromCivil(2026, 10, 1 + d))) do
+                    total = total + 1
+                    if Ovals.isOval(Season.routeFor(4242, r.seriesId, r.utc)) then ovals = ovals + 1 end
+                end
+            end
+            return ovals, total
+        end
+        local on, total = count(true)
+        local off = count(false)
+        Ovals.SCHEDULED = was
+        T.ok(on >= total * 0.05 and on <= total * 0.2, ("a week has ovals, a minority (%d of %d)"):format(on, total))
+        T.ok(on / 7 >= 6, ("every day has several (%.1f a day)"):format(on / 7))
+        T.eq(off, 0, "switched off (ovalsScheduled = false), none")
+    end,
+
     multiplayer_series_race_generated_routes = function(T)
         local Cal = T.Core.get("competition.calendar")
         local Routes = T.Core.get("course.routes")

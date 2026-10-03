@@ -13,11 +13,23 @@
 -- start at the observed moment. A crash that cost 20 s is still 20 s down at the flag; a car that drove faster than its
 -- sim keeps the gain. Stretches the car drove physically are recorded, so the result can say which parts were real.
 --
+-- TRUTH RULES (owner, 2026-10-02: "audit the race lifecycle for truth about who is winning"):
+--   * A car driven physically in someone's bubble is LIVE: where it is comes only from the street (`observe`), and it
+--     finishes only by crossing the line physically. The model never finishes a car that is still on the road in a
+--     player's mirror.
+--   * A car handed back continues at the pace it was MEASURED driving (`anchor` rate), not at its sim pace: a sim
+--     faster than the street made every hand-back a teleport up the order.
+--   * Penalties are part of the RESULT: every car carries `penaltyMs`, applied at classification. The running order
+--     is the race as it stands on the road, WITHOUT penalties (owner, 2026-10-02: "reflect the current race state
+--     without penalties, then at the end ... a visible shuffle of order based on penalties").
+--   * The flag: once the leader crosses, the rest have a window (`paddock.mixed.finishWindowSec`); `result(model,
+--     cutoff)` classifies only the cars home by the flag, the others by how far they got.
+--
 -- Pure: no host calls. Times are ms since the race's go; distances are metres along the line from the start line.
 local Core = NcmCore
 
 Core.define("paddock.racestate", function(C)
-    local M = { version = "0.1.0" }
+    local M = { version = "0.2.0" }
 
     local function dist(a, b)
         local dx, dy = (a.x or 0) - (b.x or 0), (a.y or 0) - (b.y or 0)
@@ -59,7 +71,8 @@ Core.define("paddock.racestate", function(C)
                     knots[#knots + 1] = stopAt
                 end
             end
-            local car = { id = e.id, orgId = e.orgId, grid = e.grid, knots = knots, dnf = stopAt ~= nil, anchors = {}, physical = {} }
+            local car = { id = e.id, orgId = e.orgId, grid = e.grid, knots = knots, dnf = stopAt ~= nil, anchors = {}, physical = {},
+                penaltyMs = 0 }
             model.cars[e.id] = car
             model.order[#model.order + 1] = e.id
         end
@@ -102,12 +115,13 @@ Core.define("paddock.racestate", function(C)
     function M.distanceAt(model, id, t)
         local car = model.cars[id]
         if not car then return nil end
+        if car.live then return car.live.d end
         local a = anchorAt(car, t)
         if not a then return origD(car, t) end
         if a.stopped then return a.d end
         local base = origT(car, a.d)
         if not base then return a.d end
-        return origD(car, base + (t - a.t))
+        return origD(car, base + (t - a.t) * (a.rate or 1))
     end
 
     --- Speed of car `id` at time t in m/s (0 when stopped or finished).
@@ -126,7 +140,7 @@ Core.define("paddock.racestate", function(C)
             if a.stopped then return nil end
             local base, target = origT(car, a.d), origT(car, d)
             if not base or not target then return nil end
-            return a.t + (target - base)
+            return a.t + (target - base) / (a.rate or 1)
         end
         return origT(car, d)
     end
@@ -137,13 +151,87 @@ Core.define("paddock.racestate", function(C)
         if not car then return nil end
         -- A live bubble crossing the finish is authoritative even if the sim had retired this car.
         if car.physicalFinishMs then return car.physicalFinishMs end
+        -- a car on the road in someone's bubble finishes only by crossing the line there
+        if car.live then return nil end
         local a = anchorAt(car, math.huge)
         local finishT = origT(car, model.lengthM)
         if not a then return finishT end
         if a.stopped or not finishT then return nil end
         local base = origT(car, a.d)
         if not base then return nil end
-        return a.t + (finishT - base)
+        return a.t + (finishT - base) / (a.rate or 1)
+    end
+
+    --- When car `id` is expected to cross the line from where it is at time t, in ms since the go, WITHOUT penalties;
+    --- nil when it is out. A live car is projected from its observed position at its measured pace (else its sim pace).
+    function M.expectedFinishAt(model, id, t)
+        local car = model.cars[id]
+        if not car then return nil end
+        if car.physicalFinishMs then return car.physicalFinishMs end
+        if car.live then
+            local finishT, base = origT(car, model.lengthM), origT(car, car.live.d)
+            if not finishT then return nil end                       -- the sim has it retiring: no projection
+            base = base or finishT
+            return math.max(t, car.live.t) + math.max(0, finishT - base) / (car.live.rate or 1)
+        end
+        return M.finishAt(model, id)
+    end
+
+    --- Projected classification time: expected finish plus every penalty the car carries. nil when it is out.
+    function M.projectedMs(model, id, t)
+        local f = M.expectedFinishAt(model, id, t)
+        local car = model.cars[id]
+        return f and (f + (car and car.penaltyMs or 0)) or nil
+    end
+
+    --- A penalty on car `id` (an NPC incident, race control): it moves the provisional order and the result alike.
+    function M.penalize(model, id, ms)
+        local car = model.cars[id]
+        if not car or not ms or ms <= 0 then return false end
+        car.penaltyMs = (car.penaltyMs or 0) + ms
+        return true
+    end
+
+    --- Car `id` is on the road in a player's bubble, really at distance d at time t. `rate` = its pace against its own
+    --- sim (measured), used to project its finish.
+    function M.observe(model, id, t, d, rate)
+        local car = model.cars[id]
+        if not car then return false end
+        car.live = { t = t, d = d, rate = rate or (car.live and car.live.rate) or nil }
+        return true
+    end
+
+    --- The whole field's measured pace against its sims, pooled over every physical stretch of at least minM metres
+    --- (default 150): the fallback for a car seen too briefly to measure on its own. nil without any; clamped like it.
+    function M.fieldRate(model, minM)
+        local simMs, realMs = 0, 0
+        for _, id in ipairs(model.order) do
+            local car = model.cars[id]
+            for _, sp in ipairs(car.physical) do
+                local a, b = origT(car, sp.from), origT(car, sp.to)
+                if a and b and sp.tTo and sp.tFrom and sp.tTo > sp.tFrom and (sp.to - sp.from) >= (minM or 150) then
+                    simMs, realMs = simMs + (b - a), realMs + (sp.tTo - sp.tFrom)
+                end
+            end
+        end
+        if realMs <= 0 or simMs <= 0 then return nil end
+        return math.max(0.5, math.min(1.5, simMs / realMs))
+    end
+
+    --- How fast car `id` drove physically against its own sim: sim time over the physical stretches / real time.
+    --- nil without a usable stretch (under minM metres in all). Clamped to [0.5, 1.5].
+    function M.observedRate(model, id, minM)
+        local car = model.cars[id]
+        if not car then return nil end
+        local simMs, realMs, metres = 0, 0, 0
+        for _, sp in ipairs(car.physical) do
+            local a, b = origT(car, sp.from), origT(car, sp.to)
+            if a and b and sp.tTo and sp.tFrom and sp.tTo > sp.tFrom then
+                simMs, realMs, metres = simMs + (b - a), realMs + (sp.tTo - sp.tFrom), metres + (sp.to - sp.from)
+            end
+        end
+        if metres < (minM or 300) or realMs <= 0 or simMs <= 0 then return nil end
+        return math.max(0.5, math.min(1.5, simMs / realMs))
     end
 
     --- A point on the line at distance d: { x, y, z, yaw }. Past the finish it continues straight on.
@@ -176,6 +264,7 @@ Core.define("paddock.racestate", function(C)
         p.d, p.speed = d, M.speedAt(model, id, t)
         local fin = M.finishAt(model, id)
         if fin and t >= fin then p.state = "finished"
+        elseif model.cars[id].live then p.state = "racing"
         elseif not fin and p.speed <= 0.01 and t > 0 then p.state = "out"
         else p.state = "racing" end
         return p
@@ -213,10 +302,11 @@ Core.define("paddock.racestate", function(C)
 
     --- A physical observation: car `id` was really at distance d at time t. From t on it runs from d at its own pace.
     --- `stopped = true` records a car that is physically out (it stays where it is).
-    function M.anchor(model, id, t, d, stopped, physicalFinishMs)
+    function M.anchor(model, id, t, d, stopped, physicalFinishMs, rate)
         local car = model.cars[id]
         if not car then return false end
-        car.anchors[#car.anchors + 1] = { t = t, d = d, stopped = stopped or nil }
+        car.live = nil                                   -- back in the model: no longer on anyone's road
+        car.anchors[#car.anchors + 1] = { t = t, d = d, stopped = stopped or nil, rate = rate }
         if physicalFinishMs then
             car.physicalFinishMs = math.min(car.physicalFinishMs or physicalFinishMs, physicalFinishMs)
         end
@@ -258,45 +348,94 @@ Core.define("paddock.racestate", function(C)
 
     --- The running order at time t: rows { id, orgId, pos, d, gapMs, state }, leader first. Finished cars rank by their
     --- finish time; racing cars by distance; cars out by how far they got.
-    function M.standings(model, t)
+    function M.standings(model, t, refMps)
         local rows = {}
         for _, id in ipairs(model.order) do
             local car = model.cars[id]
             local p = M.carAt(model, id, t)
             local fin = M.finishAt(model, id)
-            rows[#rows + 1] = { id = id, orgId = car.orgId, grid = car.grid, d = p and p.d or 0, state = p and p.state or "out",
-                finishMs = (fin and t >= fin) and fin or nil }
+            local state = p and p.state or "out"
+            rows[#rows + 1] = { id = id, orgId = car.orgId, grid = car.grid, d = p and p.d or 0, state = state,
+                finishMs = (fin and t >= fin) and fin or nil, penaltyMs = car.penaltyMs or 0, live = car.live and true or nil }
         end
-        local rank = { finished = 1, racing = 2, out = 3 }
-        table.sort(rows, function(a, b)
-            if rank[a.state] ~= rank[b.state] then return rank[a.state] < rank[b.state] end
-            if a.state == "finished" then return a.finishMs < b.finishMs end
-            if a.d ~= b.d then return a.d > b.d end
-            return (a.grid or 99) < (b.grid or 99)
-        end)
+        local ref = refMps or M.refSpeed(model, t, rows)
+        for _, r in ipairs(rows) do r.projMs = M.provisionalMs(model, r, t, ref) end
+        M.sortProvisional(rows)
         local leader = rows[1]
         for i, r in ipairs(rows) do
             r.pos = i
-            if r.state == "finished" and leader.state == "finished" then r.gapMs = r.finishMs - leader.finishMs
-            elseif r.state == "racing" and leader and r ~= leader then
-                -- how long ago the leader passed the spot this car is at now
-                local lt = M.timeAt(model, leader.id, r.d)
-                r.gapMs = lt and math.max(0, math.floor(t - lt + 0.5)) or nil
-            elseif r == leader then
-                r.gapMs = 0
-            end
+            r.gapMs = (r.projMs and leader and leader.projMs) and math.max(0, math.floor(r.projMs - leader.projMs + 0.5)) or nil
         end
         return rows
     end
 
+    --- The field's reference pace at time t (m/s): the mean average speed of the cars still racing, from the go. ONE
+    --- pace for everyone, so the provisional order never reorders cars on the road by guessed pace -- a car behind you is
+    --- behind you -- while a penalty moves a car by real seconds and a finisher compares fairly with cars still out.
+    function M.refSpeed(model, t, rows)
+        local sum, n = 0, 0
+        if t > 10000 then
+            for _, r in ipairs(rows or {}) do
+                if r.state == "racing" and (r.d or 0) > 0 then sum, n = sum + r.d / (t / 1000), n + 1 end
+            end
+        end
+        local v = n > 0 and sum / n or nil
+        if not v then
+            local best
+            for _, id in ipairs(model.order) do
+                local f = M.finishAt(model, id)
+                if f and (not best or f < best) then best = f end
+            end
+            v = best and model.lengthM / (best / 1000) or 30
+        end
+        return math.max(8, math.min(90, v))
+    end
+
+    --- A row's provisional classification time (ms since the go, penalties included): a finisher's finish; a car
+    --- racing, now plus its remaining distance at the reference pace; nil for a car out. Works for any row with
+    --- { state, d, finishMs?, penaltyMs? } -- a human's too.
+    function M.provisionalMs(model, r, t, refMps, withPenalties)
+        local pen = withPenalties and (r.penaltyMs or 0) or 0
+        if r.state == "finished" and r.finishMs then return r.finishMs + pen end
+        if r.state ~= "racing" then return nil end
+        local left = math.max(0, model.lengthM - (r.d or 0))
+        return t + left / math.max(1, refMps) * 1000 + pen
+    end
+
+    --- The provisional order, used for model rows and mixed (human) rows alike: everyone with a projected classification
+    --- time by it (finished or not -- a finisher carrying penalties can be behind a car still running), then cars out
+    --- by how far they got. Rows: { projMs?, d, grid? }.
+    function M.sortProvisional(rows)
+        table.sort(rows, function(a, b)
+            if (a.projMs ~= nil) ~= (b.projMs ~= nil) then return a.projMs ~= nil end
+            if a.projMs and b.projMs and a.projMs ~= b.projMs then return a.projMs < b.projMs end
+            if (a.d or 0) ~= (b.d or 0) then return (a.d or 0) > (b.d or 0) end
+            return (a.grid or 99) < (b.grid or 99)
+        end)
+        return rows
+    end
+
+    --- When the first car crossed (or will cross) the line, raw, in ms since the go; nil when nobody does.
+    function M.leaderFinishAt(model)
+        local best
+        for _, id in ipairs(model.order) do
+            local f = M.finishAt(model, id)
+            if f and (not best or f < best) then best = f end
+        end
+        return best
+    end
+
     --- The classification in `paddock.sim`'s entrant shape, from the model with every anchor applied. Each entrant
-    --- also carries `physicalShare`.
-    function M.result(model)
+    --- also carries `physicalShare`. `cutoffMs` (the flag, ms since the go): only cars home by then are finishers; the
+    --- rest are classified behind them by how far they had got at the flag (`dnfReason = "flagged"`).
+    function M.result(model, cutoffMs)
         local finishers, outs = {}, {}
         for _, id in ipairs(model.order) do
             local car = model.cars[id]
             local fin = M.finishAt(model, id)
-            if fin then finishers[#finishers + 1] = { id = id, car = car, t = fin }
+            if fin and (not cutoffMs or fin <= cutoffMs) then finishers[#finishers + 1] = { id = id, car = car, t = fin + (car.penaltyMs or 0), raw = fin }
+            elseif fin then
+                outs[#outs + 1] = { id = id, car = car, reached = M.distanceAt(model, id, cutoffMs) or 0, flagged = true }
             else
                 local a = anchorAt(car, math.huge)
                 local reached = a and a.d or car.knots[#car.knots].d
@@ -308,11 +447,13 @@ Core.define("paddock.racestate", function(C)
         local out, leader = {}, finishers[1] and finishers[1].t or 0
         for i, f in ipairs(finishers) do
             out[#out + 1] = { id = f.id, orgId = f.car.orgId, position = i, grid = f.car.grid, state = "finished",
-                finishMs = math.floor(f.t + 0.5), gapMs = math.floor(f.t - leader + 0.5), physicalShare = M.physicalShare(model, f.id) }
+                finishMs = math.floor(f.t + 0.5), gapMs = math.floor(f.t - leader + 0.5), physicalShare = M.physicalShare(model, f.id),
+                penaltyMs = (f.car.penaltyMs or 0) > 0 and f.car.penaltyMs or nil, rawFinishMs = math.floor(f.raw + 0.5) }
         end
         for _, o in ipairs(outs) do
             out[#out + 1] = { id = o.id, orgId = o.car.orgId, position = #out + 1, grid = o.car.grid, state = "dnf",
-                dnfReason = (#o.car.anchors > 0 and o.car.anchors[#o.car.anchors].stopped) and "stopped" or "retired",
+                dnfReason = o.flagged and "flagged" or ((#o.car.anchors > 0 and o.car.anchors[#o.car.anchors].stopped) and "stopped" or "retired"),
+                reachedM = math.floor(o.reached or 0),
                 physicalShare = M.physicalShare(model, o.id) }
         end
         return out

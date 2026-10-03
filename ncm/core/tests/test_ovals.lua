@@ -64,10 +64,11 @@ return {
         T.ok(slots[1].y < 2000 and slots[3].y < slots[1].y, "the grid runs back round the loop behind the line (clockwise of it)")
         T.falsy(T.Core.get("course.generator").decode("oval_test_ring"), "never a generated route")
         for _, n in ipairs(T.Core.get("course.generator").pool()) do T.ok(n.id ~= r.start.id, "the line is not a generator node") end
-        -- the sim sees an oval at roundabout speed
+        -- the sim races an oval fast (L257-L259; owner 2026-10-02: ~35-40 m/s average is the target)
         local Cal = T.Core.get("paddock.calibration")
         local base = Cal.baseline(1, r.routeId, r.distanceM, "street", r)
-        T.ok(base > 120 and base < 170, "about 2.3 km at roundabout pace takes a couple of minutes: " .. base)
+        local mps = r.distanceM / base
+        T.ok(mps >= 35 and mps <= 40, ("about 2.3 km at 35-40 m/s: %.1f s, %.1f m/s"):format(base, mps))
         -- tidy up for other suites
         for i, d in ipairs(O.LIST) do if d.id == "test_ring" then table.remove(O.LIST, i) end end
     end,

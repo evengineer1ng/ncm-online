@@ -14,7 +14,10 @@ Core.define("paddock.finance", function(C)
     local Season = C.get("paddock.season")
 
     -- Total purse per race by tier, shared by finishing position.
-    M.PURSE = { street = 190, regional = 420, pro = 4300, premier = 21000 }
+    -- L298: purses an independent can live on (street: about €$200 a car on average, the winner €$528), paid for
+    -- by entry fees (`economy.npc_garage.ENTRY_FEE`). Before, a street race paid €$190 in all and independents
+    -- raced at a loss on their one-time seed money (audit L297, KB-316).
+    M.PURSE = { street = 2400, regional = 4800, pro = 9000, premier = 24000 }
     M.SHARES = { 0.22, 0.16, 0.12, 0.10, 0.08, 0.07, 0.06, 0.05, 0.04, 0.03, 0.025, 0.02, 0.015, 0.01, 0.0075, 0.005 }
 
     --- Prize money for each classified position in a race of `fieldSize`. Returns a list indexed by position.

@@ -17,11 +17,21 @@ Core.define("paddock.mixed", function(C)
 
     M.ENTRY_CLOSE_LEAD_SEC = 60         -- entries and qualifying close at T-1 ...
     M.FREEZE_LEAD_SEC = 60              -- ... then the Paddock freezes the field and grid
-    M.GRID_HOLD_SEC = 5                 -- switch to the visible light countdown five seconds before the scheduled green
-    M.AUTO_PLACE_SEC = 20               -- entered humans not on their slot are put there at T-20
-    M.AUTO_PLACE_RANGE_M = 150          -- ... when they are at the venue
+    M.GRID_HOLD_SEC = 12                -- a mixed grid's DNS deadline (L296: no auto-place -- a human drives onto the slot,
+                                        -- routed to it from T-15 min by the pre-grid)
     M.CLASSIFY_WAIT_SEC = 300           -- the league waits this long for the Paddock's classification, then settles alone
     M.HUMAN_RESULT_WAIT_SEC = 1200      -- the Paddock holds a mixed race's close this long past green for human results
+    -- THE FLAG (owner, 2026-10-02: "a certain amount of seconds per meter of time added to end of race after leader
+    -- crosses the line, showing the timer counting down"). When the first car crosses the line, everyone else has this
+    -- long; whoever is not home then is classified by how far they got. One rule for NPCs and humans.
+    -- (0.03 s/m gave 173 s on a 5.75 km race: "way too long", owner 2026-10-02)
+    M.FLAG_SEC_PER_M = 0.012            -- 2.5 km -> 30 s, 5.75 km -> 69 s
+    M.FLAG_MIN_SEC, M.FLAG_MAX_SEC = 30, 90
+
+    --- Seconds from the leader's crossing to the flag, for a race of lengthM metres.
+    function M.finishWindowSec(lengthM)
+        return math.floor(math.max(M.FLAG_MIN_SEC, math.min(M.FLAG_MAX_SEC, (tonumber(lengthM) or 0) * M.FLAG_SEC_PER_M)) + 0.5)
+    end
 
     function M.personKey(driverId)
         local hex = tostring(driverId or ""):gsub("[^%w]", "")
@@ -76,7 +86,8 @@ Core.define("paddock.mixed", function(C)
         end
         for _, h in ipairs(humans or {}) do
             all[#all + 1] = { id = h.key, orgId = "", human = true, state = h.state or "dns", finishMs = h.finishMs,
-                grid = h.grid, dnfReason = h.dnfReason, progressFrac = h.progressFrac or 0, _npcRank = math.huge }
+                grid = h.grid, dnfReason = h.dnfReason, progressFrac = h.progressFrac or 0, _npcRank = math.huge,
+                rawFinishMs = h.rawFinishMs, penaltyMs = h.penaltyMs }
         end
         table.sort(all, function(a, b)
             local ra, rb = RANK[a.state] or 5, RANK[b.state] or 5
@@ -85,8 +96,9 @@ Core.define("paddock.mixed", function(C)
             if a.state == "dnf" then
                 -- the sim orders its own retirements (just under a whole course each, in its order); a human
                 -- retirement goes by how far they got
-                local fa = a.human and (a.progressFrac or 0) or (1 - (a._npcRank / 1000))
-                local fb = b.human and (b.progressFrac or 0) or (1 - (b._npcRank / 1000))
+                -- (a car flagged with the race still on: how far it got, like a human -- `progressFrac` from the model)
+                local fa = (a.human or a.progressFrac) and (a.progressFrac or 0) or (1 - (a._npcRank / 1000))
+                local fb = (b.human or b.progressFrac) and (b.progressFrac or 0) or (1 - (b._npcRank / 1000))
                 if fa ~= fb then return fa > fb end
             end
             if a._npcRank ~= b._npcRank then return a._npcRank < b._npcRank end
@@ -99,6 +111,28 @@ Core.define("paddock.mixed", function(C)
             e._npcRank = nil
         end
         return all
+    end
+
+    --- The classification ceremony (owner, 2026-10-02: "the full leaderboard pops up as of race finish, and then a
+    --- visible shuffle of order based on penalties, green ... moved up and red ... moved down"). From a merged
+    --- classification whose rows carry `rawFinishMs` (as they crossed) and `penaltyMs`: every row with `rawPos` (the
+    --- order on the road at the flag) and `pos` (the result), `moved` = rawPos - pos (positive = up).
+    function M.ceremony(merged)
+        local rows = {}
+        for _, e in ipairs(merged or {}) do
+            rows[#rows + 1] = { id = e.id, pos = e.position, state = e.state, human = e.human or M.isHuman(e.id) or nil,
+                finalMs = e.state == "finished" and e.finishMs or nil, penaltyMs = e.penaltyMs or 0,
+                rawMs = e.state == "finished" and (e.rawFinishMs or e.finishMs) or nil, dnfReason = e.dnfReason }
+        end
+        local road = {}
+        for i, r in ipairs(rows) do road[i] = r end
+        table.sort(road, function(a, b)
+            if (a.rawMs ~= nil) ~= (b.rawMs ~= nil) then return a.rawMs ~= nil end
+            if a.rawMs and b.rawMs and a.rawMs ~= b.rawMs then return a.rawMs < b.rawMs end
+            return a.pos < b.pos
+        end)
+        for i, r in ipairs(road) do r.rawPos = i; r.moved = i - r.pos end
+        return rows
     end
 
     --- { [key] = position } for the humans of a merged classification, and its field size.
@@ -135,6 +169,10 @@ Core.define("paddock.mixed", function(C)
             disciplineId = row.oval and "oval" or "street_sprint", formatId = "sprint", classId = "street_open",
             laps = row.oval and (tonumber(row.laps) or (route.oval and route.oval.laps) or 1) or 1,
             economy = (pack and pack.economy) or economy, standing = true,
+            -- L296: a mixed grid starts STANDING, oval or street -- its NPCs launch from the grid at the lights (Pace,
+            -- staggered by row), so a human may not be held to a formation lap beside them. (L79's rolling start is
+            -- for the human-only oval events; the laps discipline would otherwise default a Paddock oval to rolling.)
+            startType = "standing",
         }
     end
 

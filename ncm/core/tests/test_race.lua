@@ -281,13 +281,18 @@ return {
         T.eq(Race.report(s, { driverId = "d1", gateIndex = 1, now = 900, position = at(GATES[1]) }).reason, "not_started")
     end,
 
-    absent_at_grid_is_dns_and_the_others_race = function(T)
+    absent_at_grid_is_dns_at_green_and_the_others_race = function(T)
+        -- one rule for every race (owner, 2026-10-02): an absent driver is DNS when the lights go out, not before
         local Race = T.Core.get("session.race")
         local s = session(T)
         Race.mark(s, "d1", true)
         local e = Race.step(s, 970)
-        T.eq(types(e), "dns,phase"); T.eq(e[1].driverId, "d2"); T.eq(s.entrants.d2.state, "dns")
-        Race.step(s, 995); Race.step(s, 1000); T.eq(s.phase, "running")
+        T.eq(types(e), "phase", "the grid closing marks nobody DNS"); T.eq(s.entrants.d2.state, "entered")
+        Race.step(s, 995); T.eq(s.entrants.d2.state, "entered", "nor does the start of the lights")
+        e = Race.step(s, 1000); T.eq(s.phase, "running")
+        local dns
+        for _, x in ipairs(e) do if x.type == "dns" then dns = x end end
+        T.ok(dns and dns.driverId == "d2", "DNS at green"); T.eq(s.entrants.d2.state, "dns")
         Race.report(s, { driverId = "d1", gateIndex = 1, now = 1001, position = at(GATES[1]) })
         Race.report(s, { driverId = "d1", gateIndex = 2, now = 1100, position = at(GATES[2]) })
         e = Race.step(s, 1101)
@@ -296,12 +301,28 @@ return {
         T.eq(res[1].driverId, "d1"); T.eq(res[2].state, "dns"); T.eq(res[2].dnfReason, "absent")
     end,
 
-    nobody_at_grid_completes_with_no_starters = function(T)
+    nobody_at_grid_completes_with_no_starters_at_green = function(T)
         local Race = T.Core.get("session.race")
         local s = session(T)
         Race.step(s, 970)
-        local e = Race.step(s, 995)
-        T.eq(s.phase, "complete"); T.eq(e[#e - 1].reason, "no_starters")
+        Race.step(s, 995); T.eq(s.phase, "countdown", "entered drivers may still reach their marks during the lights")
+        local e = Race.step(s, 1000)
+        T.eq(s.phase, "complete")
+        local why
+        for _, x in ipairs(e) do if x.reason == "no_starters" then why = x.reason end end
+        T.eq(why, "no_starters")
+    end,
+
+    reaching_the_mark_during_the_lights_starts_the_race = function(T)
+        local Race = T.Core.get("session.race")
+        local s = session(T)
+        Race.mark(s, "d1", true)
+        Race.step(s, 970); Race.step(s, 995); T.eq(s.phase, "countdown")
+        T.ok(Race.mark(s, "d2", true), "a mark during the countdown is accepted")
+        T.eq(s.entrants.d2.state, "racing")
+        T.ok(Race.mark(s, "d1", false), "leaving the mark in the lights is a correction, not a withdrawal")
+        T.eq(s.entrants.d1.state, "racing")
+        Race.step(s, 1000); T.eq(s.phase, "running"); T.eq(s.entrants.d2.state, "racing", "not DNS: on the mark before green")
     end,
 
     disconnect_mid_race_is_dnf_race_continues = function(T)
@@ -407,5 +428,22 @@ return {
         T.eq(d2.z, 5); T.eq(math.floor(d2.heading + 0.5), 90)
         local last = Grid.slotPosition(gate, 20)
         T.ok(math.abs(last.x - d2.x) > 5, "clear of the slot columns")
+    end,
+
+    the_flag_closes_a_mixed_session_whoever_is_still_out = function(T)
+        local Race = T.Core.get("session.race")
+        local s = session(T)
+        Race.mark(s, "d1", true); Race.mark(s, "d2", true)
+        Race.step(s, 970); Race.step(s, 995); Race.step(s, 1000)
+        Race.report(s, { driverId = "d1", gateIndex = 1, now = 1001, position = at(GATES[1]) })
+        Race.report(s, { driverId = "d2", gateIndex = 1, now = 1001, position = at(GATES[1]) })
+        T.ok(Race.flag(s, 1200), "the Paddock sets the flag")
+        Race.step(s, 1199); T.eq(s.phase, "running", "not before the flag")
+        T.eq(Race.publicView(s).flagAt, 1200, "clients see the flag")
+        local e = Race.step(s, 1200)
+        T.eq(s.phase, "complete")
+        local why
+        for _, x in ipairs(e) do if x.type == "phase" and x.reason then why = x.reason end end
+        T.eq(why, "flag"); T.eq(s.entrants.d1.state, "dnf"); T.eq(s.entrants.d1.dnfReason, "flag")
     end,
 }

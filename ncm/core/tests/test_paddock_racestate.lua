@@ -127,4 +127,83 @@ return {
         M.markPhysical(model, id, 1000, 2400, 1, 2)
         T.ok(math.abs(M.physicalShare(model, id) - 0.5) < 0.001, "0-2400 of 4800 is half")
     end,
+
+    -- TRUTH RULES (owner, 2026-10-02: a car in the mirror was shown finished; P1 at the line, P3 at classification)
+    a_car_on_the_road_finishes_only_on_the_road = function(T)
+        local M, model, r = race(T)
+        local w = r.entrants[1]
+        local t = math.floor(w.finishMs * 0.5)
+        M.observe(model, w.id, t, 1200)                      -- physically well behind where its sim has it
+        local late = w.finishMs + 1000
+        T.eq(M.carAt(model, w.id, late).state, "racing", "the sim's finish time passes: still racing, it is on the road")
+        T.eq(M.finishAt(model, w.id), nil, "no finish until it crosses the line")
+        T.ok(math.abs(M.distanceAt(model, w.id, late) - 1200) < 0.5, "where it is comes from the street")
+        M.anchor(model, w.id, late, model.lengthM, false, late)
+        T.eq(M.finishAt(model, w.id), late, "a physical crossing is its finish")
+    end,
+
+    a_handed_back_car_keeps_its_measured_pace = function(T)
+        local M, model, r = race(T)
+        local id = r.entrants[2].id
+        local t0 = 20000
+        local d0 = M.distanceAt(model, id, t0)
+        local t1 = t0 + 60000
+        local d1 = d0 + 900                                   -- 900 m in 60 s on the street: slower than its sim
+        M.markPhysical(model, id, d0, d1, t0, t1)
+        local rate = M.observedRate(model, id)
+        T.ok(rate and rate < 1, "it drove slower than its sim (rate " .. tostring(rate) .. ")")
+        local plain = M.new(model.path, r.entrants, r.segments)
+        M.anchor(plain, id, t1, d1)
+        M.anchor(model, id, t1, d1, false, nil, rate)
+        T.ok(M.finishAt(model, id) > M.finishAt(plain, id) + 1000, "the model does not teleport it at sim pace after the hand-back")
+    end,
+
+    penalties_are_in_the_result_not_the_running_order = function(T)
+        local M, model, r = race(T)
+        local a, b = r.entrants[1], r.entrants[2]
+        local gap = b.finishMs - a.finishMs
+        M.penalize(model, a.id, gap + 5000)                  -- more than its winning margin
+        local res = M.result(model)
+        T.eq(res[1].id, b.id, "the penalty decides the classification")
+        local mine
+        for _, e in ipairs(res) do if e.id == a.id then mine = e end end
+        T.eq(mine.penaltyMs, gap + 5000); T.eq(mine.rawFinishMs, a.finishMs)
+        -- on the road it crossed first: the running order is the race as it stands (owner, 2026-10-02), penalties
+        -- come at the classification ceremony
+        local rows = M.standings(model, a.finishMs + 1)
+        local pa, pb
+        for _, row in ipairs(rows) do if row.id == a.id then pa = row.pos elseif row.id == b.id then pb = row.pos end end
+        T.ok(pa < pb, "ahead of b on the road at its finish line (" .. tostring(pa) .. " vs " .. tostring(pb) .. ")")
+        T.eq(rows[1].penaltyMs, gap + 5000, "the running order still carries the penalty for the ceremony")
+    end,
+
+    the_provisional_order_never_reorders_the_road_without_penalties = function(T)
+        local M, model, r = race(T)
+        local t = math.floor(r.entrants[1].finishMs * 0.4)
+        local rows = M.standings(model, t)
+        for i = 2, #rows do
+            if rows[i].state == "racing" and rows[i - 1].state == "racing" then T.ok(rows[i].d <= rows[i - 1].d + 0.01, "road order") end
+        end
+    end,
+
+    the_flag_classifies_only_the_cars_home = function(T)
+        local M, model, r = race(T)
+        local lead = M.leaderFinishAt(model)
+        T.eq(lead, r.entrants[1].finishMs, "the leader is the first car across")
+        local X = T.Core.get("paddock.mixed")
+        T.eq(X.finishWindowSec(5750), 69); T.eq(X.finishWindowSec(500), 30); T.eq(X.finishWindowSec(20000), 90)
+        local cutoff = lead + 3000
+        local res = M.result(model, cutoff)
+        local home, flagged = 0, 0
+        for _, e in ipairs(res) do
+            if e.state == "finished" then home = home + 1; T.ok(e.rawFinishMs <= cutoff, "home by the flag")
+            elseif e.dnfReason == "flagged" then flagged = flagged + 1 end
+        end
+        T.ok(home >= 1 and flagged >= 1, ("some home (%d), the rest flagged (%d)"):format(home, flagged))
+        for i = 2, #res do
+            if res[i].dnfReason == "flagged" and res[i - 1].dnfReason == "flagged" then
+                T.ok(res[i].reachedM <= res[i - 1].reachedM, "flagged cars by how far they got")
+            end
+        end
+    end,
 }

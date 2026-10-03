@@ -70,6 +70,7 @@ return {
     "economy/production.lua",
     "economy/supply_profiles.lua",
     "economy/npc_market.lua",
+    "economy/npc_garage.lua",
     "economy/exchange_posts.lua",
     "economy/settlement.lua",
     "economy/fuel.lua",
