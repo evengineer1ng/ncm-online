@@ -39,6 +39,9 @@ local function toast(pid, ok, title, msg)
     pcall(Open77.notifications.send, pid, { type = ok and "success" or "error", title = title, message = msg, icon = "NCM", durationMs = 7000 })
 end
 local function short(id) return tostring(id or "-"):sub(-6) end
+-- KB-358: CHAR(36) columns come back as GUID values, not strings -- compare ids as lowercase text
+local function sameId(a, b) return a ~= nil and b ~= nil and tostring(a):lower() == tostring(b):lower() end
+
 
 local subscribed = {}   -- pid -> machine asset the driver's client asked about (and is bound to)
 local lastMachine = {}  -- pid -> the Machine the bench works on (last driven, or chosen)
@@ -150,7 +153,7 @@ local function benchMachine(pid, driverId)
     local id = lastMachine[pid]
     if id then
         local m = machineRow(id)
-        if m and m.ncm_driver_id == driverId then return id end
+        if m and sameId(m.ncm_driver_id, driverId) then return id end
     end
     local list = machinesOf(driverId)
     if #list == 1 then lastMachine[pid] = list[1].asset_id; return list[1].asset_id end
@@ -300,7 +303,7 @@ function NcmEngineering.install(pid, ref, mountId, facing, onMachine)
     local machineId = benchMachine(pid, driverId)
     if onMachine then   -- the pad names the Machine (panel Parts)
         local row = machineRow(onMachine)
-        if not row or row.ncm_driver_id ~= driverId then return nil, "that Machine is not yours" end
+        if not row or not sameId(row.ncm_driver_id, driverId) then return nil, "that Machine is not yours" end
         machineId = onMachine
         lastMachine[pid] = onMachine
     end
@@ -587,7 +590,14 @@ end)
 local function devGrant()
     local okS, v = pcall(function() return NcmIdentity and NcmIdentity.settings and NcmIdentity.settings.devGrant end)
     local spec = tostring(okS and v or "")
-    if spec == "" or not isDev() then return end
+    if spec == "" then return end
+    -- the identity (server id, environment) is published by ncm_league a little after start: wait for it
+    for _ = 1, 60 do
+        local ok, id = pcall(function() return GlobalState.ncmIdentity end)
+        if ok and type(id) == "table" and id.serverId then break end
+        Wait(1000)
+    end
+    if not isDev() then return end
     local driverId, machineId, key, mountId, facing = spec:match("^([^|]+)|([^|]+)|([^|]+)|([^|]+)|([^|]+)$")
     if not driverId then log("DEV GRANT ignored: bad spec %s", spec); return end
     local d
@@ -597,7 +607,11 @@ local function devGrant()
         { serverId(), driverId, d.designId })
     if (tonumber(have) or 0) > 0 then log("DEV GRANT: driver ..%s already holds %s -- nothing to do", short(driverId), d.code); return end
     local m = machineRow(machineId)
-    if not m or m.ncm_driver_id ~= driverId then log("DEV GRANT ignored: Machine ..%s is not driver ..%s's", short(machineId), short(driverId)); return end
+    if not m or not sameId(m.ncm_driver_id, driverId) then
+        log("DEV GRANT ignored: Machine ..%s is not driver ..%s's (server %s, row %s, owner %s)", short(machineId), short(driverId), tostring(serverId()),
+            tostring(m ~= nil), tostring(m and m.ncm_driver_id))
+        return
+    end
     -- the same two operations the pad performs, as that driver (pid 0: no player is connected at resource start)
     local saved = driverOf
     driverOf = function() return driverId end
