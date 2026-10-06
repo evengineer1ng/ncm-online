@@ -118,6 +118,9 @@ end
 
 --- The eligibility spec for an event, or an empty (open) spec.
 function NcmCompetition.eligibilityFor(e)
+    -- L303: a Paddock spec series (the MaiMai Cup) is one make, for humans exactly as for NPCs
+    local spec = e and e.class == "paddock" and NcmCore.get("paddock.season").specFor(e.paddockSeriesId)
+    if spec then return { records = { spec.record } } end
     local s = e and e.seriesId and seriesById(e.seriesId) or nil
     return (s and s.eligibility) or {}
 end

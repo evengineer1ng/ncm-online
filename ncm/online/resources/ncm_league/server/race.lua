@@ -610,6 +610,13 @@ local function complete(rec, results, reason, t)
     end
     if NcmTelemetry and NcmTelemetry.flush then pcall(NcmTelemetry.flush, rec, true) end
     if rec.kind == "race" then
+        -- Racing Week's live signal (L302): one race run, and every finisher who kept it clean
+        TriggerEvent("ncm:week:fact", "race", 1)
+        local clean = 0
+        for _, r in ipairs(results) do
+            if r.state == "finished" and (tonumber(r.incidentSec) or 0) == 0 then clean = clean + 1 end
+        end
+        if clean > 0 then TriggerEvent("ncm:week:fact", "clean_race", clean) end
         if NcmRecords and NcmRecords.refresh then pcall(NcmRecords.refresh) end
         if NcmProgression and NcmProgression.apply then pcall(NcmProgression.apply, rec, results, t) end
     end
@@ -726,11 +733,37 @@ end
 -- ---------------------------------------------------------------------------------------------
 -- Event handling
 -- ---------------------------------------------------------------------------------------------
+-- L305 (owner, 2026-10-04): the wrong machine is warned BEFORE the green, while there is still time to switch -- two
+-- races on Online ended `wrong_machine` with the driver learning it from the result. The rule after green is unchanged.
+local function carName(driverId, assetId)
+    for _, a in ipairs((NcmOwnership and NcmOwnership.list and NcmOwnership.list(driverId)) or {}) do
+        -- the garage name carries the gearbox (L306): two Galenas are told apart
+        if a.assetId == assetId then return a.displayName or (tostring(a.record or "?"):gsub("^Vehicle%.", "")) end
+    end
+    return "another car"
+end
+
+local function warnMachine(rec, phase)
+    for driverId, pid in pairs(rec.playerOf or {}) do
+        local sl = rec.slotOf and rec.slotOf[driverId]
+        local entered = sl and sl.enteredAsset
+        local seated = pid and NcmRace.seatedAsset and NcmRace.seatedAsset(pid)
+        if entered and seated and entered ~= seated then
+            local want, have = carName(driverId, entered), carName(driverId, seated)
+            log("session=%s WRONG MACHINE WARNING (%s) driver=%s entered=%s seated=%s", rec.s.sessionId, phase, driverId:sub(1, 8),
+                entered:sub(1, 8), seated:sub(1, 8))
+            tell(pid, ("You entered this race in the %s, but you're in the %s. Switch before the green or you won't start."):format(want, have))
+            toast(pid, { type = "warning", title = "WRONG MACHINE", message = ("Entered: %s · You're in: %s"):format(want, have), icon = "RC", durationMs = 9000 })
+        end
+    end
+end
+
 local function handle(rec, events, t)
     local s = rec.s
     for _, e in ipairs(events) do
         if e.type == "phase" then
             log("session=%s phase -> %s%s", s.sessionId, e.phase, e.reason and (" (" .. e.reason .. ")") or "")
+            if rec.kind == "race" and (e.phase == "gridded" or e.phase == "countdown") then pcall(warnMachine, rec, e.phase) end
             pcall(function() MySQL.update.await("UPDATE session SET state = ? WHERE session_id = ?", { e.phase == "open" and "running" or e.phase, s.sessionId }) end)
             if e.phase == "gridded" and not (s.rules and s.rules.hold) then
                 for id, pid in pairs(rec.playerOf) do
@@ -796,8 +829,16 @@ local function handle(rec, events, t)
             local mult = 2 ^ ((e.band or 1) - 1)
             log("session=%s INCIDENT driver=%s kind=%s band=%s +%.1fs other=%s total=%.1fs (#%d)", s.sessionId, e.driverId, tostring(e.kind), tostring(e.band), e.seconds or 0, tostring(e.other), e.incidentSec or 0, e.count or 0)
             local pid = rec.playerOf[e.driverId]
+            -- Racing Week's live signal (L302): the city counts what racing did, whoever did it
+            if e.kind == "person" then TriggerEvent("ncm:week:fact", "civilian_contact", 1)
+            elseif e.kind == "car" and (e.band or 1) >= 3 then TriggerEvent("ncm:week:fact", "wreck", 1) end
+            if e.kind == "speed" then
+                tell(pid, ("Speeding: +%.0f s on your time (Day 1 rules: the organisers mean it). Total +%.1f s."):format(e.seconds or 0, e.incidentSec or 0))
+                toast(pid, { type = "error", title = ("SPEEDING · +%.0f s"):format(e.seconds or 0), message = ("over the advertised limit · total +%.1f s"):format(e.incidentSec or 0), icon = "RC", durationMs = 5000 })
+            else
             tell(pid, ("Incident x%d (%s): +%.1f s on your time. Total +%.1f s."):format(mult, tostring(e.kind), e.seconds or 0, e.incidentSec or 0))
             toast(pid, { type = "error", title = ("INCIDENT x%d · +%.1f s"):format(mult, e.seconds or 0), message = ("%s contact · total +%.1f s"):format(tostring(e.kind), e.incidentSec or 0), icon = "NCM", durationMs = 5000 })
+            end
             pcall(function()
                 -- IDEA-236: a machine's biography needs what it was INVOLVED in, not only what it finished.
                 -- Both sides are attributed where known: contact is a fact about two machines.
@@ -1259,6 +1300,45 @@ function NcmRace.incident(rec, driverId, inc, t)
     if events then handle(rec, events, t) end
     return events
 end
+
+-- ---------------------------------------------------------------------------------------------
+-- Racing Week's advertised speed limits in a race (L301, L302; doc 45 §M-§N). ncm_world measures the excess every
+-- second (the lane under the car, the organisers' sign) and passes the organisers' current rule (week.curve's step):
+--   "penalty"  time, as a self-attributed incident of kind 'speed' (schema 059), in 5 s steps, capped
+--   "warning"  race control warns
+--   "police"   nothing here -- police only (ncm_world's wanted level)
+-- Lives below `handle` on purpose (KB-81a).
+-- ---------------------------------------------------------------------------------------------
+local SpeedLimits = Core.get("world.speed_limits")
+local speedState = {}            -- sessionId -> driverId -> world.speed_limits state
+
+AddEventHandler("ncm:speed:excess", function(driverId, pid, excess, rule, t)
+    if type(driverId) ~= "string" or type(excess) ~= "number" or excess <= 0 then return end
+    local sid = NcmRace.busySession(driverId)
+    local rec = sid and sessions[sid]
+    if not rec or rec.kind ~= "race" or not rec.s then return end
+    if rec.s.phase ~= "running" and rec.s.phase ~= "finishing" then return end
+    local en = rec.s.entrants and rec.s.entrants[driverId]
+    if not en or en.state ~= "racing" then return end
+    for other in pairs(speedState) do if not sessions[other] then speedState[other] = nil end end
+    speedState[sid] = speedState[sid] or {}
+    local st = speedState[sid][driverId]
+    if not st then st = SpeedLimits.newState(); SpeedLimits.raceStart(st); speedState[sid][driverId] = st end
+    st.raceExcess = st.raceExcess + excess
+    local due = SpeedLimits.raceDue(st, tostring(rule or "police"))
+    if not due then return end
+    t = tonumber(t) or now()
+    if due.penaltyS then
+        log("session=%s SPEEDING driver=%s +%ds (race total %ds, excess %.0f m*s, rule %s)", sid, driverId, due.penaltyS,
+            due.totalS, st.raceExcess, tostring(rule))
+        NcmRace.incident(rec, driverId, { kind = "speed", band = 1, seconds = due.penaltyS }, t)
+    elseif due.warning then
+        local p = rec.playerOf and rec.playerOf[driverId] or pid
+        log("session=%s SPEED WARNING #%d driver=%s (excess %.0f m*s, rule %s)", sid, due.warning, driverId, st.raceExcess, tostring(rule))
+        tell(p, "Race control: you are well over the advertised limit. Ease off -- please.")
+        toast(p, { type = "warning", title = ("RACE CONTROL · WARNING %d"):format(due.warning), message = "over the advertised limit", icon = "RC", durationMs = 5000 })
+    end
+end)
 
 --- End one event's live session(s) and its plan now (host kit: scenario stop/restart). Returns the count.
 function NcmRace.abortEvent(eventId, reason)

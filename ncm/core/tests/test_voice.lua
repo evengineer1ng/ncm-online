@@ -16,6 +16,7 @@ local KNOWN_TAGS = {
 local KNOWN_SLOTS = {
     name = 1, role = 1, org = 1, series = 1, route = 1, when = 1, lastRoute = 1, lastPlace = 1, lastDriver = 1,
     tagLabel = 1, tagSubject = 1, place = 1, district = 1, player = 1, addr = 1, good = 1, bad = 1, swear = 1,
+    champion = 1, championSeries = 1, championRun = 1,   -- L303: the hall of champions
 }
 
 local function people(T, n)
@@ -55,6 +56,23 @@ return {
             for slot in e.text:gmatch("{(%w+)}") do T.ok(KNOWN_SLOTS[slot], "known slot {" .. slot .. "} in " .. e.id) end
             T.falsy(e.text:find("^%s*$"), "no empty line " .. e.id)
         end
+    end,
+
+    a_past_champion_can_be_named_only_with_the_facts = function(T)
+        local Bank = T.Core.get("life.voice_bank")
+        local lines = Bank.move("topic_champion")
+        T.ok(#lines >= 12, "a deep enough pool")
+        local Voice = T.Core.get("life.voice")
+        local named = 0
+        for day = 1, 40 do
+            local ctx = ctxFor(people(T, 1)[1], { dayIndex = day })
+            ctx.facts.champion, ctx.facts.championSeries, ctx.facts.championRun = "Raquel Mora", "Badlands Cup", "3"
+            local out = Voice.say(ctx)
+            if out.text:find("Raquel Mora", 1, true) then named = named + 1; T.ok(out.text:find("{", 1, true) == nil) end
+        end
+        T.ok(named > 0, "some conversations name the champion")
+        local plain = Voice.say(ctxFor(people(T, 1)[1], { dayIndex = 5 }))
+        T.falsy(plain.text:find("champion", 1, true) and plain.text:find("Racing Week", 1, true), "no hall, no legend")
     end,
 
     the_board_is_billies_word_not_everyones = function(T)

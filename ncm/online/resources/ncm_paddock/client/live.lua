@@ -90,6 +90,21 @@ local function bringUp()
     end
     surface = page
     pcall(function() page:hide() end)
+    -- KB-329 (two games on one PC, the KB-147 class): each game's Pace listens on its own port (38640, 38641 ...).
+    -- A second game's page loads from the FIRST port, the other game's Pace never answers it, and the page waits
+    -- forever -- so the second game had no Pace and the bubble never gave it cars. A page that has not handshaken in
+    -- 8 s moves on to the next port.
+    local tried = page
+    CreateThread(function()
+        Wait(8000)
+        if surface == tried and not ready then
+            log("Pace page on %s never answered in 8 s (another game's Pace?); trying the next port", url())
+            tearDown()
+            portIndex = (portIndex + 1) % PORT_SPAN
+            attempts = attempts + 1
+            if attempts == PORT_SPAN then report(false) end
+        end
+    end)
     page:on("ncm:pace.ready", function()
         ready, attempts = true, 0
         send({ cmd = "hello" })

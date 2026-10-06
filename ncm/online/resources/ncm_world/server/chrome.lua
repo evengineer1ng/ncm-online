@@ -106,6 +106,8 @@ local function humanDriver(vid)
 end
 
 local function record(fields)
+    -- Racing Week's live signal (L302): a hack that landed is something the city saw racing do
+    if fields.outcome == "impact" and NcmWeek then NcmWeek.fact("chrome_impact", 1) end
     local ok, err = pcall(function()
         MySQL.insert.await([[INSERT INTO chrome_event (event_id, server_id, attacker_driver_id, target_driver_id,
             hack, outcome, route, target_vehicle_id, target_record, catastrophic, detail, occurred_at)

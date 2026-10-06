@@ -331,6 +331,9 @@ function PaddockGarages.talk(pid, personId)
         local fame = tonumber(MySQL.scalar.await([[SELECT score FROM paddock_spotlight WHERE server_id = ?
             AND subject_kind = 'driver' AND subject_id = ?]], { U.sid(), d.ncmDriverId })) or 0
         local facts = Talk.facts(ctx)
+        -- L303: the hall of champions -- a name from a past Racing Week, sometimes
+        local legend = PaddockWeek and PaddockWeek.pastChampion(p.id .. ":" .. e.dayIndex)
+        if legend then for k, v in pairs(legend) do facts[k] = v end end
         local okS, out = pcall(Voice.say, {
             seed = w.seed, person = p, tier = o.tier, year = w.paddockYear, metCount = met, dayIndex = e.dayIndex,
             facts = facts, activity = b.activity or "work",

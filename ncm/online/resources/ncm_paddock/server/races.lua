@@ -40,8 +40,10 @@ function PaddockRaces.load()
     NcmCore.get("data.ovals").SCHEDULED = PaddockSettings.get("ovalsScheduled", true)
     local rows = MySQL.query.await([[SELECT * FROM paddock_race WHERE server_id = ? AND window_opens_at >= ?
         AND state IN ('scheduled','priced','running') ORDER BY window_opens_at]], { U.sid(), t - 6 * 3600 }) or {}
-    for _, r in ipairs(rows) do PaddockRaces.byId[r.race_id] = rowToRace(r) end
+    local y = U.yielder(20)                     -- KB-336: every open race costs work at boot; never one slice for all
+    for _, r in ipairs(rows) do PaddockRaces.byId[r.race_id] = rowToRace(r); y() end
     for _, race in pairs(PaddockRaces.byId) do
+        y()
         if race.frozen and (race.state == "scheduled" or race.state == "priced") and race.opensAt - t > NcmCore.get("paddock.mixed").FREEZE_LEAD_SEC then
             race.frozen = nil
             pcall(MySQL.update.await, "UPDATE paddock_race SET detail_json = '{}' WHERE server_id = ? AND race_id = ?", { U.sid(), race.raceId })
@@ -53,6 +55,7 @@ function PaddockRaces.load()
     local w = PaddockStore.world
     local moved = 0
     for _, race in pairs(PaddockRaces.byId) do
+        y()
         local route = PaddockWorld.route(race.routeId)
         local badCourse = not route or (not route.oval and route.intermediate and #route.intermediate > 0)
         local future = race.state == "scheduled" or race.state == "priced"
@@ -95,7 +98,7 @@ function PaddockRaces.materialise(t)
     local horizon = PaddockSettings.get("horizonMinutes", 120) * 60
     local st = {}
     local made = 0
-    for _, slot in ipairs(Season.window(t, t + horizon)) do
+    for _, slot in ipairs(Season.window(t, t + horizon, PaddockWeek and PaddockWeek.rhythm and PaddockWeek.rhythm())) do
         local id = Season.raceId(slot.seriesId, slot.utc)
         if not PaddockRaces.byId[id] then
             made = made + 1
@@ -140,7 +143,7 @@ function PaddockRaces.buildField(race, humanCount)
     else
         -- L249: who turned up -- a street league's pool, a sanctioned team's available drivers
         local absent
-        list, absent = World.raceField(w, race)
+        list, absent = World.raceField(w, race, PaddockWeek and PaddockWeek.pull and PaddockWeek.pull(race))   -- doc 47: Moody's lure, per driver
         race.absent = NcmCore.get("paddock.attendance").tally(absent)
         -- L250: each entered human takes the place of the last NPC who turned up (the field size is attendance's)
         local keep = NcmCore.get("paddock.mixed").npcPlaces(#list, humanCount or 0)
@@ -154,8 +157,11 @@ function PaddockRaces.buildField(race, humanCount)
         -- an independent races their own car (L249)
         field[#field + 1] = { id = e.driver.id, orgId = org.id or (race.frozen and race.frozen.orgOf and race.frozen.orgOf[e.driver.id]),
             -- L298: the car this driver races (derived from its parts) when they have one; else the team's abstract car
-            attrs = e.driver.attrs, carPerf = Car.performance((e.driver.raceCarId and e.driver.car) or org.car or e.driver.car), morale = e.driver.morale,
+            -- L303: a spec series gives every entrant the organisers' identical car
+            attrs = e.driver.attrs, carPerf = Car.performance(Season.specFor(race.seriesId) and Season.specCar(race.tier)
+                or (e.driver.raceCarId and e.driver.car) or org.car or e.driver.car), morale = e.driver.morale,
             form = Progression.form((e.driver.evidence or {}).recent or {}, n),
+            lureRisk = PaddockWeek and PaddockWeek.risk and PaddockWeek.risk(race, e.driver, e.org) or 1,
             humanManaged = org.humanManagerDriverId ~= nil }
     end
     if not ids then
@@ -211,6 +217,30 @@ function PaddockRaces.setup(race)
     return cond, route, base, source
 end
 
+--- How many cars a race lost to crashes: a simulated crash or contact, and (owner/L305) a PHYSICAL car that was
+--- wrecked or took half its damage and did not finish -- a bubble crash used to read as "retired" or "stopped", so the
+--- races humans were in never counted.
+PaddockRaces.CRASH_DAMAGE = 0.5
+function PaddockRaces.crashCount(race, entrants)
+    local n = 0
+    for _, res in ipairs(entrants or {}) do
+        if res.state == "dnf" then
+            local dmg = race and race.carDamage and race.carDamage[res.id]
+            if res.dnfReason == "crash" or res.dnfReason == "contact"
+                or (dmg and (dmg.wrecked or (tonumber(dmg.frac) or 0) >= PaddockRaces.CRASH_DAMAGE)) then n = n + 1 end
+        end
+    end
+    return n
+end
+
+--- The length the flag window is measured on: the route's baked road line, else the calibration's road estimate.
+function PaddockRaces.flagLength(route)
+    route = route or {}
+    if tonumber(route.lineM) and route.lineM > 0 then return route.lineM end
+    if route.oval then return tonumber(route.distanceM) or 2400 end
+    return NcmCore.get("paddock.calibration").roadM(route.distanceM)
+end
+
 --- Run the sim at the window's opening. Results are stored; the race stays `running` (hidden) until it closes.
 function PaddockRaces.run(race, t)
     PaddockRaces.freeze(race)
@@ -223,13 +253,17 @@ function PaddockRaces.run(race, t)
     end
     local cond, route, base, source = PaddockRaces.setup(race)
     local r = Sim.simulate(field, route, cond, Hash.stream(race.seed, race.raceId), { baseSec = base, tier = race.tier })
+    -- the leader pulls the ladder up (owner, 2026-10-04): a simulated race is flagged exactly like one on the road
+    local flagged = NcmCore.get("paddock.mixed").flagEntrants(r.entrants, PaddockRaces.flagLength(route))
+    if flagged > 0 then log("%s: %d car(s) flagged -- not home %d s after the leader", race.raceId, flagged,
+        NcmCore.get("paddock.mixed").finishWindowSec(PaddockRaces.flagLength(route))) end
     Wait(0)                                           -- the sim and the result's encode each want a slice of their own
-    local purse = Finance.purse(race.tier, #field)
+    local purse = PaddockUtil.crazePurse(Finance.purse(race.tier, #field), race.tier)   -- L303: the craze; doc 47: Moody
     local lastMs = 0
     local st = {}
     local splits = {}
     for _, e in ipairs(r.entrants) do
-        e.points = Season.pointsFor(e.position, e.state)
+        e.points = Season.pointsAt(e.position, e.state, race.seriesId, race.opensAt)   -- L303: finales count double
         e.purse = (e.state == "finished") and (purse[e.position] or 0) or 0
         if e.finishMs and e.finishMs > lastMs then lastMs = e.finishMs end
         splits[e.id] = e.splits
@@ -364,10 +398,14 @@ function PaddockRaces.resolve(race, t)
             values = { U.uuid(), U.sid(), kind, id, amount, what, ref, ("%s:%s:%s"):format(what, race.raceId, ref), t, reason or "" } }
     end
     local fee = Garage.entryFee(race.tier)
+    -- doc 47: everyone in a race with a crash saw it; a lured purse pulls them less for about a day
+    local crashed = false
+    for _, res in ipairs(entrants) do if res.dnfReason == "crash" or res.dnfReason == "contact" then crashed = true end end
     for _, res in ipairs(entrants) do
         byId[res.id] = res
         local p = w.people[res.id]
         if p then applyEvidence(p, res, n, cond, contacts) end
+        if p and crashed then p.evidence.lastCrashSeenAt = race.opensAt end
         local org = w.orgs[res.orgId or ""]
         if p and org then
             org.cash = (org.cash or 0) + (res.purse or 0) - fee
@@ -384,6 +422,17 @@ function PaddockRaces.resolve(race, t)
         end
         if p and p.raceCarId then
             if res.state == "finished" then raced[#raced + 1] = p.id else half[#half + 1] = p.id end
+            -- L305: RUNNING COSTS -- every start burns tyres, fuel and consumables, a share of the car's value, paid by
+            -- whoever runs the car. The pressure that keeps idle millions moving and makes a fast car cost something.
+            local share = PaddockSettings.get("npcRunningShare", 0.005)
+            if share > 0 and PaddockCars then
+                local okC, rc = pcall(PaddockCars.load, p.raceCarId)
+                local running = (okC and rc and rc.value) and math.floor(rc.value * share + 0.5) or 0
+                if running > 0 then
+                    if org then org.cash = (org.cash or 0) - running; PaddockStore.markOrg(org.id); book("org", org.id, -running, "running", "race_start", p.id)
+                    else p.cash = (tonumber(p.cash) or 0) - running; PaddockStore.markPerson(p.id); book("person", p.id, -running, "running", "race_start", p.id) end
+                end
+            end
             -- a crash in a player's bubble is a repair bill (bubble.lua records the damage a physical car took)
             local dmg = race.carDamage and race.carDamage[p.id]
             if dmg and PaddockCars then
@@ -488,11 +537,16 @@ function PaddockRaces.resolve(race, t)
         if district then
             PaddockDays.fact(district, race.tier == "street" and "street_race" or "sanctioned_race", 1)
             local crashes = 0
-            for _, res in ipairs(entrants) do
-                if res.state == "dnf" and (res.dnfReason == "crash" or res.dnfReason == "contact") then crashes = crashes + 1 end
-            end
+            crashes = PaddockRaces.crashCount(race, entrants)
             if crashes > 0 then PaddockDays.fact(district, "race_crash", crashes) end
         end
+    end
+    -- Racing Week's live signal (L302): every Paddock race counts, its crashes against the expected cost
+    do
+        local crashes = 0
+        crashes = PaddockRaces.crashCount(race, entrants)
+        TriggerEvent("ncm:week:fact", "race", 1)
+        if crashes > 0 then TriggerEvent("ncm:week:fact", "race_crash", crashes) end
     end
     PaddockBillie.settle(race, byId)
     race.state = "resolved"

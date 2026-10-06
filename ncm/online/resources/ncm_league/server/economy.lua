@@ -154,6 +154,26 @@ function NcmEconomy.settle(rec,results,reason,t)
                         line.label,"payout:"..rec.s.sessionId..":"..r.driverId..":"..suffix,rec.eventId or "",rec.s.sessionId or "",e.seriesId or "",
                         (line.kind=="event_completion" and opportunity) or ""}}
             end
+            -- Racing Week's craze (L303): while the money is unusually high, a race pays more. One auditable line on top
+            -- of the positive payout, never a change to Economy v1's resolver; the run's wallet dies at the collapse anyway.
+            do
+                local okW,wk=pcall(function() return GlobalState.ncmWeek end)
+                local m=okW and type(wk)=="table" and tonumber(wk.money) or 1
+                local earned=0
+                for _,line in ipairs(resolved.lines) do if (line.amount or 0)>0 then earned=earned+line.amount end end
+                local bonus=math.floor(earned*(m-1))
+                if m>1 and bonus>0 then
+                    local label=("Racing Week craze x%.2f"):format(m)
+                    receipt.lines[#receipt.lines+1]={kind="craze_bonus",label=label,amount=bonus}
+                    receipt.gross=(receipt.gross or 0)+bonus; receipt.net=(receipt.net or 0)+bonus
+                    resolved.gross=resolved.gross+bonus; resolved.net=resolved.net+bonus
+                    tx[#tx+1]={query=[[INSERT IGNORE INTO ledger
+                        (ncm_driver_id,server_id,kind,amount,currency,ref,note,idem_key,event_id,session_id,series_id,opportunity_id)
+                        VALUES (?,?,'craze_bonus',?,'eddies',?,?,?,NULLIF(?,''),NULLIF(?,''),NULLIF(?,''),NULL)]],
+                        values={r.driverId,sid(),bonus,("week:run%s:h%s"):format(tostring(wk.run),tostring(wk.hours)),label,
+                            "payout:"..rec.s.sessionId..":"..r.driverId..":craze",rec.eventId or "",rec.s.sessionId or "",e.seriesId or ""}}
+                end
+            end
             tx[#tx+1]={query=[[INSERT IGNORE INTO session_settlement
                 (session_id,ncm_driver_id,economy_id,economy_version,time_trial,gross,entry_fee,net,receipt_json,tags_json,settled_at)
                 VALUES (?,?,?,?,?,?,?,?,?,?,?)]],values={rec.s.sessionId,r.driverId,econ.id or e.seriesId,econ.version or 1,

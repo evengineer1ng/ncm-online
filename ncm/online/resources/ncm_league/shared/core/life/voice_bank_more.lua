@@ -16,6 +16,8 @@ Core.define("life.voice_bank_more", function()
         "topic_next", "topic_last_win", "topic_last_podium", "topic_last_finish", "topic_last_dnf", "topic_tag",
         "topic_series", "topic_role_driver", "topic_role_engineer", "topic_role_strategist", "topic_role_manager",
         "topic_role_owner",
+        -- L303: the hall of champions. Names from past Racing Weeks the city somehow still carries.
+        "topic_champion",
     }
     M.MOVES = {}
 
@@ -427,6 +429,28 @@ Core.define("life.voice_bank_more", function()
         "[plain calm] It's a slow build. I'm patient.",
         "[street edgy] Every month I say it's the last month. Every month I pay.",
         "[tech] I own it but I still turn wrenches when nobody's looking.",
+    }
+
+    -- L303 (owner, 2026-10-03): "there was ultimately a name to remember at shut down ... those names get etched into the
+    -- fabric of the lore ... like how johnny silverhand ... is still an icon 50 years later". Slots come only from
+    -- racing_week_champion, past runs only. Nobody explains how they remember.
+    M.MOVES.topic_champion = {
+        "{champion} took the {championSeries}. Racing Week {championRun}. People still say the name.",
+        "You know who won the {championSeries}, Week {championRun}? {champion}. Look it up.",
+        "[street] {champion}, choom. {championSeries}, Week {championRun}. Legend.",
+        "[street] Kids still paint {champion} on their doors. {championSeries} champ. Week {championRun}.",
+        "[street warm] Every time I'm on the grid I think about {champion} winning the {championSeries}. Week {championRun}.",
+        "[street edgy] Everybody wants to be {champion}. Nobody wants to do what {champion} did to win the {championSeries}.",
+        "[plain] {champion} won the {championSeries}, back in Racing Week {championRun}. You don't forget that.",
+        "[plain old] I was there when {champion} took the {championSeries}. Week {championRun}. Never seen a crowd like it.",
+        "[plain dry] Everyone claims they saw {champion} win the {championSeries}. Half of them are lying.",
+        "[tech] Funny thing about {champion}. {championSeries}, Week {championRun}. Nobody's matched those lines since.",
+        "[tech] I still pull up {champion}'s laps from the {championSeries}. Week {championRun}. Clean data.",
+        "[corp] {championSeries} champion, Week {championRun}: {champion}. Sponsors still ask about them.",
+        "[corp cold] {champion}. {championSeries}. A brand nobody owns, which is a pity.",
+        "[cocky] {champion}? {championSeries} champ, sure. I'd have had them.",
+        "[humble] I'll never be {champion}. {championSeries}, Week {championRun}. Some names are just bigger.",
+        "[joker] Week {championRun}, {champion} wins the {championSeries}, and I win a parking fine. Same night.",
     }
 
     return M

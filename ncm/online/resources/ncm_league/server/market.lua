@@ -7,6 +7,7 @@ local Supply = NcmCore.get("economy.supply_profiles")
 local Json = NcmCore.get("vocabulary.json")
 local Chunks = NcmCore.get("vocabulary.chunks")
 local Catalogue = NcmCore.get("data.vehicle_catalogue")
+local Gearbox = NcmCore.get("machine.gearbox")
 local ids = NcmCore.get("vocabulary.ids")
 local hostRng = function() return math.random() end
 local function now() return math.floor(Open77.time.unix()) end
@@ -43,11 +44,12 @@ function NcmMarket.seed()
         local entry = Catalogue.byKey(stock.vehicleKey)
         local record = entry and entry.runtimeRecords[1]
         if not record then return nil, "stock_record_missing:" .. stock.vehicleKey end
+        local gk, gs, gsrc, gat = NcmGearbox.columns(NcmGearbox.birth(stock.assetId, stock.vehicleKey))
         MySQL.insert.await([[INSERT IGNORE INTO vehicle_asset
             (asset_id, server_id, ncm_driver_id, vehicle_key, record, class, acquired_via, acquired_at,
-             allocation_id, allocation_slot)
-            VALUES (?, ?, NULL, ?, ?, ?, NULL, ?, 'alpha_launch', ?)]],
-            { stock.assetId, serverId(), stock.vehicleKey, record, entry.category, t, stock.slot })
+             allocation_id, allocation_slot, gearbox_kind, gearbox_spec, gearbox_source, gearbox_at)
+            VALUES (?, ?, NULL, ?, ?, ?, NULL, ?, 'alpha_launch', ?, ?, ?, ?, ?)]],
+            { stock.assetId, serverId(), stock.vehicleKey, record, entry.category, t, stock.slot, gk, gs, gsrc, gat })
         MySQL.insert.await([[INSERT IGNORE INTO market_inventory
             (market_id, asset_id, price, state, listed_at) VALUES (?, ?, ?, 'available', ?)]],
             { Markets.BASE_ID, stock.assetId, stock.price, t })
@@ -86,7 +88,7 @@ end
 --- The asset ids a buyer may actually act on, oldest listing first. The offering is what the player sees;
 --- an assetId is still what they buy (L99), so the card hands the purchase an exact individual.
 local function availableAssets(marketId, vehicleKey, limit)
-    return MySQL.query.await([[SELECT mi.asset_id, mi.price
+    return MySQL.query.await([[SELECT mi.asset_id, mi.price, a.gearbox_kind, a.gearbox_spec, a.gearbox_source
         FROM market_inventory mi JOIN vehicle_asset a ON a.asset_id = mi.asset_id
         WHERE mi.market_id = ? AND mi.state = 'available'
           AND a.server_id = ? AND a.vehicle_key = ? AND a.ncm_driver_id IS NULL
@@ -405,10 +407,6 @@ function NcmMarket.offerings(marketId)
         local o = Production.offering({ line = line, available = availableCount(marketId, line.vehicleKey),
                                         now = t, schedule = schedule })
         if o then
-            o.assetIds = {}
-            for _, row in ipairs(availableAssets(marketId, line.vehicleKey)) do
-                o.assetIds[#o.assetIds + 1] = row.asset_id
-            end
             -- The declared top speed, for the first of the six reserved buyer metrics. AUTHORED, not
             -- measured (`L157`) -- the panel labels it so, because section 5 of the capability audit shows
             -- the rated figure and the observed one disagree in a known direction. nil leaves the slot
@@ -416,7 +414,44 @@ function NcmMarket.offerings(marketId)
             local entry = Catalogue.byKey(line.vehicleKey)
             o.declaredTopSpeedKph = entry and Catalogue.declaredTopSpeedKph(entry) or nil
             o.lastBatch = NcmMarket.lastBatch(marketId, line.vehicleKey)
-            out[#out + 1] = o
+            -- L306: ONE OFFERING PER GEARBOX. An automatic Galena and a 6-speed manual Galena are two different
+            -- cars on the shelf: same machine-index entry, separate stock, separate name. Every box in the model's
+            -- factory mix is listed, stocked or not (an offering at 0/N stays an offering).
+            local bySpec, order = {}, {}
+            for _, m in ipairs(Gearbox.mix(line.vehicleKey, entry and entry.category)) do
+                bySpec[m[1]] = {}; order[#order + 1] = m[1]
+            end
+            for _, row in ipairs(availableAssets(marketId, line.vehicleKey, 48)) do
+                local gb = NcmGearbox.remember(row.asset_id, row) or Gearbox.preGearbox()
+                if not bySpec[gb.spec] then bySpec[gb.spec] = {}; order[#order + 1] = gb.spec end
+                local ids_ = bySpec[gb.spec]
+                if #ids_ < 12 then ids_[#ids_ + 1] = row.asset_id end
+            end
+            local counts = {}
+            for _, r in ipairs(MySQL.query.await([[SELECT COALESCE(a.gearbox_spec, 'a') spec, COUNT(*) n
+                FROM market_inventory mi JOIN vehicle_asset a ON a.asset_id = mi.asset_id
+                WHERE mi.market_id = ? AND mi.state = 'available'
+                  AND a.server_id = ? AND a.vehicle_key = ? AND a.ncm_driver_id IS NULL GROUP BY spec]],
+                { marketId, serverId(), line.vehicleKey }) or {}) do counts[r.spec] = tonumber(r.n) or 0 end
+            local manualOpen = NcmGearbox.manualSales()
+            for _, specId in ipairs(order) do
+                local spec = Gearbox.spec(specId) or Gearbox.SPECS.a
+                local gb = { kind = spec.kind, spec = spec.id }
+                local each = {}
+                for k, v in pairs(o) do each[k] = v end
+                each.gearbox = spec.id
+                each.gearboxKind = spec.kind
+                each.gearboxLine = Gearbox.describe(gb)
+                each.gearboxTopKph = Gearbox.topKph(spec, o.declaredTopSpeedKph)
+                each.displayName = Gearbox.label(o.displayName, gb)
+                each.assetIds = bySpec[specId]
+                each.available = counts[specId] or 0
+                each.soldOut = each.available <= 0
+                -- a manual is listed before the NCM Gearbox can drive one, and says so instead of selling
+                each.purchasable = spec.kind ~= Gearbox.MANUAL or manualOpen
+                if not each.purchasable then each.purchaseNote = "Manual -- arriving with NCM Gearbox" end
+                out[#out + 1] = each
+            end
         end
     end
     return out
@@ -580,6 +615,8 @@ function NcmMarket.purchase(pid, marketId, assetId)
     local d = driver(pid)
     if not d then return nil, "no_driver" end
     if type(assetId) ~= "string" or assetId == "" then return nil, "market_unknown" end
+    -- L306: no manual changes hands before the NCM Gearbox can drive it
+    if Gearbox.isManual(NcmGearbox.of(assetId)) and not NcmGearbox.manualSales() then return nil, "manual_arriving" end
     -- **Knowledge and access are asked here; everything else stays inside the transaction.** The single
     -- statement below is the authority on visible / available / affordable precisely so those three cannot be
     -- read, then change, then acted on. Knowledge has no such race -- it is a durable per-Driver fact -- so it
@@ -631,7 +668,7 @@ function NcmMarket.purchase(pid, marketId, assetId)
     -- announced as "Vehicle". Ask the asset what it is.
     local key = MySQL.scalar.await("SELECT vehicle_key FROM vehicle_asset WHERE asset_id=?", { assetId })
     local entry = key and Catalogue.byKey(key) or nil
-    return true, entry and entry.displayName or "Vehicle"
+    return true, Gearbox.label(entry and entry.displayName or "Vehicle", NcmGearbox.of(assetId))
 end
 
 RegisterNetEvent("ncm:market", function() NcmMarket.push(tonumber(source) or 0) end)

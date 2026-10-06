@@ -28,6 +28,7 @@ local Vehicles = NcmCore.get("data.vehicle_catalogue")
 local Season = NcmCore.get("paddock.season")
 local Wear = NcmCore.get("parts.wear")
 local ids = NcmCore.get("vocabulary.ids")
+local Gearbox = NcmCore.get("machine.gearbox")
 local function set(k, d) return PaddockSettings.get(k, d) end
 local function rng() return math.random() end
 
@@ -123,11 +124,14 @@ function PaddockCars.invalidate(assetId) if assetId then PaddockCars.cache[asset
 local function mintStatements(model, kind, id, t)
     local assetId = ids.uuid4(rng)
     local entry = Vehicles.byKey(model.vehicleKey)
+    -- L306: an NPC's car is born with a factory gearbox too (it drives the model record until AI can drive a clone)
+    local gb = Gearbox.factoryRoll(assetId, model.vehicleKey, entry and entry.category)
     local tx = {
         { query = [[INSERT INTO vehicle_asset (asset_id, server_id, ncm_driver_id, vehicle_key, record, class, acquired_via, acquired_at,
-            origin, produced_at, owner_principal_kind, owner_principal_id)
-            VALUES (?, ?, NULL, ?, ?, ?, 'grant', ?, 'paddock_genesis', ?, ?, ?)]],
-          values = { assetId, U.sid(), model.vehicleKey, model.record, (entry and entry.category) or "Sport", t, t, kind, id } },
+            origin, produced_at, owner_principal_kind, owner_principal_id, gearbox_kind, gearbox_spec, gearbox_source, gearbox_at)
+            VALUES (?, ?, NULL, ?, ?, ?, 'grant', ?, 'paddock_genesis', ?, ?, ?, ?, ?, ?, ?)]],
+          values = { assetId, U.sid(), model.vehicleKey, model.record, (entry and entry.category) or "Sport", t, t, kind, id,
+                     gb.kind, gb.spec, gb.source, t } },
         { query = [[INSERT IGNORE INTO vehicle_asset_transfer (transfer_id, idem_key, server_id, asset_id, from_driver_id, to_driver_id, kind,
             market_id, amount, occurred_at, to_principal, reason) VALUES (?, ?, ?, ?, NULL, NULL, 'paddock_genesis', NULL, 0, ?, ?, ?)]],
           values = { ids.uuid4(rng), "paddock_genesis:" .. U.sid() .. ":" .. assetId, U.sid(), assetId, t, kind .. ":" .. id, G.REASON.FIRST_CAR } },

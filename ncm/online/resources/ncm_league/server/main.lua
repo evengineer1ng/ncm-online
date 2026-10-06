@@ -66,6 +66,11 @@ AddEventHandler("onResourceStart", function(name)
                 -- Production starts only after the seed, so a first-ever boot establishes the bootstrap
                 -- shelf before the first tick measures it. Starting them the other way round would have the
                 -- first tick see an empty market and manufacture stock the seed was about to insert.
+                -- L306: unsold stock from before schema 063 gets its factory gearbox before anything can sell it
+                if marketOk and NcmGearbox and NcmGearbox.backfillShelf then
+                    local okG, errG = pcall(NcmGearbox.backfillShelf)
+                    if not okG then log("gearbox shelf stamp FAILED: %s", tostring(errG)) end
+                end
                 if marketOk and NcmMarket.start then NcmMarket.start() end
             end
             if NcmComponents and NcmComponents.seed then

@@ -25,7 +25,9 @@ Core.define("vocabulary.json", function(C)
         elseif tv == "number" then
             if v ~= v or v == math.huge or v == -math.huge then out[#out + 1] = "null"
             elseif math.floor(v) == v and math.abs(v) < 1e15 then out[#out + 1] = string.format("%d", v)
-            else out[#out + 1] = string.format("%.6g", v) end
+            -- KB-360: %.6g kept six significant digits -- a Deep position (~6.4e6 m from the Earth's centre) to the nearest
+            -- ~10 km, a fractional Unix time to tens of seconds. %.14g round-trips both (mm at planet scale).
+            else out[#out + 1] = string.format("%.14g", v) end
         elseif tv == "string" then
             out[#out + 1] = '"' .. v:gsub('[%c"\\]', function(c) return escapes[c] or string.format("\\u%04x", c:byte()) end) .. '"'
         elseif tv == "table" then

@@ -298,3 +298,8 @@ Departures from the text above, all recorded in L226: every tier grids by a qual
 **The live-race contract.** A live race is declared, never automatic. It runs in the race's own window, after the sim has sealed its result. The server's own gate times decide it. `physical` needs every classified finisher to cross every timing gate in order, at least half the field (and two cars) to finish, and, on the Pace backend, the plugin's times to agree within 1.5 s. Otherwise it is `fallback`, the sim's result stands, and `paddock_live.reason` says why. The close waits for the verdict; Billie settles once, after it.
 
 **Departures:** sightings were not built (L227); a live grid's cars are catalogue cars by tier band, not org liveries (IDEA-745); talk is one notification line until native dialogue (IDEA-727); every extracted site starts in the rental pool and leaves it only when marked bad (the research note wanted an in-engine check first, which is IDEA-750).
+
+## 20. Note (L305, 2026-10-04): the flag in simulated races; the human pace anchor
+
+- **Simulated races are flagged like live ones.** After `Sim.simulate`, `paddock.mixed.flagEntrants(entrants, PaddockRaces.flagLength(route))` turns every car not home within `finishWindowSec` of the leader into `dnf/flagged`: no points, no purse, classified behind the finishers. Billie's pricing simulates the same rule.
+- **The base pace is anchored on human Paddock laps.** `PaddockCalibration.humanPaddock` takes finished human results, backs out the human's car (`paddock.calibration.normaliseMs`), and takes each tier's median m/s as the stat-50 base. Attributes, car and fitted parts still spread the field via `paddock.sim`. Priority: `humanLearned` > `paceLearned` > seeds.

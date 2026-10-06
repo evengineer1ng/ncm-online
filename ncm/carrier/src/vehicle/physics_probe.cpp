@@ -1,4 +1,7 @@
 #include "vehicle/physics_probe.hpp"
+#include "vehicle/gearbox_levers.hpp"
+#include "vehicle/thrust_levers.hpp"
+#include "vehicle/seam_levers.hpp"
 
 #include "log.hpp"
 
@@ -582,6 +585,472 @@ bool coastingConfidently(uint64_t nowMs) noexcept
 // Below this there is no meaningful governor and the arithmetic stops being trustworthy.
 constexpr float kMinGovernedMps = 3.0f;
 
+// ---------------------------------------------------------------------------------------------------
+// THE MANUAL'S GEAR (L306 phase 3, owner ruling 2026-10-04: NCM Gearbox drives through these levers)
+// ---------------------------------------------------------------------------------------------------
+//
+// A manual car's engine sees one long native gear; the gear the driver selected lives in NCM Gearbox, which publishes
+// that gear's share of the drive and its rev ceiling into per-process shared memory every frame (gearbox_levers.hpp).
+// Here they multiply into the levers this hook already applies: the drive share into `driveScale` (neutral and the
+// shift cut are 0), the ceiling into the governor as a sharp limiter. **Downward only, as everything here is:** a
+// gear can take drive away and cap speed; it can never add either. A stale or absent publish (no Gearbox, an
+// automatic, out of the car) is exactly the old behaviour. Opened lazily; retried every 2 s while absent.
+HANDLE g_gearboxMapping = nullptr;
+const ncm::gearbox_levers::Block* g_gearbox = nullptr;
+std::atomic<uint64_t> g_gearboxRetryAtMs{0};
+std::atomic<uint32_t> g_gearboxApplied{0};
+
+bool gearboxLevers(uint64_t nowMs, float& drive, float& ceiling) noexcept
+{
+    drive = 1.0f; ceiling = 0.0f;
+    if (!g_gearbox) {
+        if (nowMs < g_gearboxRetryAtMs.load(std::memory_order_relaxed)) return false;
+        g_gearboxRetryAtMs.store(nowMs + 2000, std::memory_order_relaxed);
+        wchar_t name[96];
+        ncm::gearbox_levers::name(name, 96, GetCurrentProcessId());
+        HANDLE h = OpenFileMappingW(FILE_MAP_READ, FALSE, name);
+        if (!h) return false;
+        void* view = MapViewOfFile(h, FILE_MAP_READ, 0, 0, sizeof(ncm::gearbox_levers::Block));
+        if (!view) { CloseHandle(h); return false; }
+        const auto* b = static_cast<const ncm::gearbox_levers::Block*>(view);
+        if (b->magic != ncm::gearbox_levers::kMagic || b->version != ncm::gearbox_levers::kVersion) {
+            UnmapViewOfFile(view); CloseHandle(h); return false;
+        }
+        g_gearboxMapping = h;
+        g_gearbox = b;
+        NCM_INFO("gearbox: NCM Gearbox levers found -- a manual's selected gear now scales drive and caps speed");
+    }
+    const uint64_t at = g_gearbox->stampMs;
+    if (at == 0 || nowMs < at || nowMs - at > ncm::gearbox_levers::kStaleMs) return false;
+    const float d = g_gearbox->driveMul, c = g_gearbox->ceilingMps;
+    if (!(d >= 0.0f && d <= 1.0f)) return false;              // not a value we trust: ignore the publish entirely
+    drive = d;
+    ceiling = (c > kMinGovernedMps) ? c : 0.0f;
+    return true;
+}
+
+/// The gear's limiter: full drive to 97 % of the ceiling, none at it -- a rev limiter, not a governor's long taper.
+float gearLimitAt(float speedMps, float ceiling) noexcept
+{
+    if (!(ceiling > 0.0f)) return 1.0f;
+    if (speedMps >= ceiling) return 0.0f;
+    const float start = ceiling * 0.97f;
+    if (speedMps <= start) return 1.0f;
+    return (ceiling - speedMps) / (ceiling - start);
+}
+
+// ---------------------------------------------------------------------------------------------------
+// THE LIFT LEVER (L316 F0, owner ruling 2026-10-04: dev-only experiments on the flight ladder)
+// ---------------------------------------------------------------------------------------------------
+//
+// **The one lever that ADDS force, and the explicit exception to "downward only".** NCM Thrust publishes a
+// thrust-to-weight ratio and a burn (thrust_levers.hpp); here, at the bound body's gravity entry, the entry is
+// rewritten to `gravZ * (1 - twr)`. Gravity's Z is -m*g*dt (§AU4: 1100 kg x 9.81 / 60 Hz = 180 N.s observed 182), so
+// the ratio is exact with no knowledge of mass or step: 0 is untouched, 1 is weightless, 2 is a 1 g net climb.
+//
+// The same gates as every write: the positively bound, seated car only (KB-146), the session kill switch, SEH. A
+// stale publish ends a burn on the next frame. The burn is timed in PHYSICS time (dt from the gravity entry itself),
+// and each one is measured -- start and peak vertical speed, the integrated rise to the apex -- against the rise the
+// ratio predicts, so a hop is a measurement and not an anecdote. No I/O here; the reporter turns it into a line.
+bool readDeep(const void* body, float* outForceXyz, float* outMass, uintptr_t* outBackPtr) noexcept;
+bool readVelocity(const void* body, float* outXyz) noexcept;
+bool writeForceXYZ(void* body, float fx, float fy, float fz) noexcept;
+
+HANDLE g_thrustMapping = nullptr;
+const ncm::thrust_levers::Block* g_thrust = nullptr;
+std::atomic<uint64_t> g_liftSupersededUntilMs{0};    // L324: GetTickCount64() until which installed components own lift
+std::atomic<uint32_t> g_liftSupersededPresses{0};
+std::atomic<uint64_t> g_thrustRetryAtMs{0};
+std::atomic<bool> g_thrustFoundPending{false};
+
+bool thrustLever(uint64_t nowMs, float& twr, uint32_t& burnMs, uint32_t& burnSeq, bool& holding) noexcept
+{
+    if (!g_thrust) {
+        if (nowMs < g_thrustRetryAtMs.load(std::memory_order_relaxed)) return false;
+        g_thrustRetryAtMs.store(nowMs + 2000, std::memory_order_relaxed);
+        wchar_t name[96];
+        ncm::thrust_levers::name(name, 96, GetCurrentProcessId());
+        HANDLE h = OpenFileMappingW(FILE_MAP_READ, FALSE, name);
+        if (!h) return false;
+        void* view = MapViewOfFile(h, FILE_MAP_READ, 0, 0, sizeof(ncm::thrust_levers::Block));
+        if (!view) { CloseHandle(h); return false; }
+        const auto* b = static_cast<const ncm::thrust_levers::Block*>(view);
+        if (b->magic != ncm::thrust_levers::kMagic || b->version != ncm::thrust_levers::kVersion) {
+            UnmapViewOfFile(view); CloseHandle(h); return false;
+        }
+        g_thrustMapping = h;
+        g_thrust = b;
+        g_thrustFoundPending.store(true, std::memory_order_release);
+    }
+    const uint64_t at = g_thrust->stampMs;   // GetTickCount64() on both sides: one clock, no epoch to reconcile
+    if (at == 0 || nowMs < at || nowMs - at > ncm::thrust_levers::kStaleMs) return false;
+    const float r = g_thrust->twr;
+    if (!(r >= 0.0f && r <= ncm::thrust_levers::kMaxTwr)) return false;   // not a value we trust
+    twr = r;
+    burnMs = g_thrust->burnMs > ncm::thrust_levers::kMaxBurnMs ? ncm::thrust_levers::kMaxBurnMs : g_thrust->burnMs;
+    burnSeq = g_thrust->burnSeq;
+    holding = g_thrust->holding != 0;
+    return true;
+}
+
+enum class ThrustPhase { Idle, Burning, Coasting };
+
+struct ThrustState {
+    bool seqKnown = false;
+    uint32_t lastSeq = 0;
+    ThrustPhase phase = ThrustPhase::Idle;
+    bool hold = false;
+    uint32_t burnNo = 0;
+    float twr = 0.0f;
+    float remainingS = 0.0f;
+    float mass = 0.0f;
+    uint32_t frames = 0;
+    float burnS = 0.0f;
+    double impulse = 0.0;     // N.s added over the burn (beyond gravity's own)
+    float vz0 = 0.0f, peakVz = 0.0f;
+    double rise = 0.0, maxRise = 0.0;
+    float coastS = 0.0f;
+    uint32_t faults = 0;
+    const char* why = "";
+};
+
+struct ThrustResult {
+    uint32_t burnNo, frames, faults;
+    float twr, burnS, mass, vz0, peakVz, maxRise, predVz, predRise;
+    bool hold;
+    const char* why;
+};
+
+std::mutex g_thrustMutex;
+ThrustState g_thrustState;
+// KB-337: a queue, not one slot -- two presses inside one reporter second used to overwrite each other's line.
+constexpr uint32_t kThrustResults = 16;
+ThrustResult g_thrustResults[kThrustResults]{};
+uint32_t g_thrustResultCount = 0;          // guarded by g_thrustMutex
+uint32_t g_thrustResultsDropped = 0;       // guarded: more than kThrustResults in one second
+uint32_t g_thrustRefusals = 0;             // guarded: frames a burn was asked for with no bound car, for the reporter
+constexpr float kG = 9.81f;
+
+void finishThrust(ThrustState& s, const char* why) noexcept
+{
+    const float a = (s.twr - 1.0f) * kG;
+    const float predVz = a > 0.0f ? a * s.burnS : 0.0f;
+    const float predRise = a > 0.0f ? 0.5f * a * s.burnS * s.burnS + predVz * predVz / (2.0f * kG) : 0.0f;
+    if (g_thrustResultCount < kThrustResults)
+        g_thrustResults[g_thrustResultCount++] = {s.burnNo, s.frames, s.faults, s.twr, s.burnS, s.mass, s.vz0, s.peakVz,
+                                                  static_cast<float>(s.maxRise), predVz, predRise, s.hold, why};
+    else
+        ++g_thrustResultsDropped;
+    s.phase = ThrustPhase::Idle;
+}
+
+/// Called on every gravity entry of the tracked body, before the diagnostics gate. Costs one stale check when
+/// NCM Thrust is absent or idle.
+void thrustAtGravity(void* body, const float* force, bool authorised) noexcept
+{
+    float twr = 0.0f; uint32_t burnMs = 0, seq = 0; bool holding = false;
+    const bool fresh = thrustLever(GetTickCount64(), twr, burnMs, seq, holding);
+    std::unique_lock<std::mutex> lock(g_thrustMutex, std::try_to_lock);
+    if (!lock.owns_lock()) return;
+    ThrustState& s = g_thrustState;
+    if (!fresh && s.phase == ThrustPhase::Idle) return;
+
+    const bool newPress = fresh && s.seqKnown && seq != s.lastSeq;
+    if (fresh && !s.seqKnown) { s.seqKnown = true; s.lastSeq = seq; }   // presses before Carrier saw the block never fire
+    if (newPress) s.lastSeq = seq;
+    // L324: a Machine whose installed components own its propulsion (a fresh wrench lease said so) ignores the legacy
+    // lift lever entirely -- one owner for the car's thrust. Presses are consumed above, so none fires later.
+    if (GetTickCount64() < g_liftSupersededUntilMs.load(std::memory_order_relaxed)) {
+        if (s.phase != ThrustPhase::Idle) finishThrust(s, "superseded by installed components");
+        if (newPress) g_liftSupersededPresses.fetch_add(1, std::memory_order_relaxed);
+        return;
+    }
+    const bool startHold = fresh && holding && s.phase != ThrustPhase::Burning;
+    const bool canWrite = authorised && g_writesEnabled.load(std::memory_order_relaxed);
+
+    if (newPress || startHold) {
+        if (s.phase != ThrustPhase::Idle) finishThrust(s, "interrupted by the next burn");
+        if (!canWrite) { ++g_thrustRefusals; return; }
+        float deep[3]; uintptr_t back = 0;
+        s = ThrustState{s.seqKnown, s.lastSeq};
+        s.burnNo = seq;
+        s.phase = ThrustPhase::Burning;
+        s.hold = startHold && !newPress;
+        s.twr = twr;
+        s.remainingS = static_cast<float>(burnMs) / 1000.0f;
+        if (!readDeep(body, deep, &s.mass, &back)) s.mass = 0.0f;
+        float v[3];
+        if (readVelocity(body, v)) { s.vz0 = v[2]; s.peakVz = v[2]; }
+    }
+    if (s.phase == ThrustPhase::Idle) return;
+
+    // dt from the gravity entry itself (-m*g*dt); a frame at 60 Hz if the mass is not one we believe.
+    float dt = 1.0f / 60.0f;
+    if (s.mass > 100.0f) {
+        const float d = -force[2] / (s.mass * kG);
+        if (d > 0.001f && d < 0.1f) dt = d;
+    }
+
+    if (s.phase == ThrustPhase::Burning) {
+        const bool keepGoing = fresh && canWrite && (s.hold ? holding : s.remainingS > 0.0f);
+        if (!keepGoing) {
+            s.phase = ThrustPhase::Coasting;
+            s.why = !fresh ? "lever went stale" : !canWrite ? "car unbound or writes disabled" : "burn complete";
+        } else if (writeForceXYZ(body, force[0], force[1], force[2] * (1.0f - s.twr))) {
+            s.frames++;
+            s.burnS += dt;
+            s.remainingS -= dt;
+            s.impulse += -static_cast<double>(force[2]) * s.twr;
+            g_writes.fetch_add(1, std::memory_order_relaxed);
+        } else {
+            s.faults++;
+            g_writeFaults.fetch_add(1, std::memory_order_relaxed);
+            g_writesEnabled.store(false, std::memory_order_relaxed);
+            s.phase = ThrustPhase::Coasting;
+            s.why = "write fault: writes disabled for the session";
+        }
+    }
+
+    float v[3];
+    if (readVelocity(body, v)) {
+        if (v[2] > s.peakVz) s.peakVz = v[2];
+        s.rise += static_cast<double>(v[2] - s.vz0) * dt;
+        if (s.rise > s.maxRise) s.maxRise = s.rise;
+        if (s.phase == ThrustPhase::Coasting) {
+            s.coastS += dt;
+            const bool falling = v[2] < s.vz0 - 0.2f && s.rise < s.maxRise;
+            if (falling || s.coastS > 8.0f) finishThrust(s, s.why);
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------------------------------
+// THE WRENCH (L324): installed components as a force on the bound Machine
+// ---------------------------------------------------------------------------------------------------
+//
+// NCM's engineering layer (core `engineering.installation`, `ncm_world/client/engineering.lua`) decides what an
+// installed propulsor or impulse actuator does; it sends the result here as WORLD-space Newtons. This interprets
+// none of it. At the bound body's gravity entry -- the channel F0 and the seam kick already proved -- it adds F * dt to
+// the accumulator, with dt recovered from the gravity entry itself (-m g dt), so the impulse is exact at any step
+// rate and the body's own mass decides the acceleration. A pulse is timed here in physics time, like a burn.
+//
+// Force at the centre of mass only: torque from an off-centre mount is NOT applied (no torque channel is known on
+// 2.31). That expression loss is stated in the client's telemetry. Same gates as every write: bound + seated body,
+// session kill switch, SEH. A stale lease (> ttl) applies nothing.
+bool readForce(const void* body, float* outForceXyz) noexcept;
+
+constexpr float kMaxWrenchN = 150000.0f;
+constexpr int kMaxWrenchTtlMs = 300;
+constexpr int kMaxPulseMs = 1000;
+
+struct WrenchState {
+    float sus[3] = {0, 0, 0};
+    uint64_t susExpireMs = 0;
+    bool pulsePending = false, pulseActive = false;
+    uint32_t lastPulseSeq = 0;
+    bool pulseSeqKnown = false;
+    float pf[3] = {0, 0, 0}, pendingF[3] = {0, 0, 0};
+    float pulseRemainingS = 0, pendingS = 0;
+    float mass = 0;
+    uint64_t massAtMs = 0;
+    // for the reporter
+    uint32_t frames = 0, pulsesStarted = 0, pulsesDropped = 0, refusedUnbound = 0, faults = 0;
+    double impulse[3] = {0, 0, 0};
+    double activeS = 0;
+    float lastSus[3] = {0, 0, 0};
+};
+std::mutex g_wrenchMutex;
+WrenchState g_wrench;
+std::atomic<uint32_t> g_wrenchRefusedAsset{0};
+std::atomic<bool> g_wrenchFirstPending{false};
+std::atomic<bool> g_wrenchSeen{false};
+
+void clearWrench() noexcept
+{
+    std::lock_guard<std::mutex> lock(g_wrenchMutex);
+    g_wrench.susExpireMs = 0;
+    g_wrench.pulsePending = g_wrench.pulseActive = false;
+    g_liftSupersededUntilMs.store(0, std::memory_order_relaxed);
+}
+
+void wrenchAtGravity(void* body, const float* force, bool authorised) noexcept
+{
+    std::unique_lock<std::mutex> lock(g_wrenchMutex, std::try_to_lock);
+    if (!lock.owns_lock()) return;
+    WrenchState& w = g_wrench;
+    const uint64_t now = GetTickCount64();
+    if (w.pulsePending) {
+        w.pulsePending = false;
+        w.pulseActive = true;
+        for (int i = 0; i < 3; ++i) w.pf[i] = w.pendingF[i];
+        w.pulseRemainingS = w.pendingS;
+        w.pulsesStarted++;
+    }
+    const bool sus = now < w.susExpireMs && (w.sus[0] != 0.0f || w.sus[1] != 0.0f || w.sus[2] != 0.0f);
+    if (!sus && !w.pulseActive) return;
+    if (!(authorised && g_writesEnabled.load(std::memory_order_relaxed))) {
+        w.refusedUnbound++;
+        if (w.pulseActive) { w.pulseActive = false; w.pulsesDropped++; }
+        return;
+    }
+    if (now >= w.massAtMs) {
+        float deep[3]; uintptr_t back = 0; float m = 0.0f;
+        if (readDeep(body, deep, &m, &back) && m > 100.0f) w.mass = m;
+        w.massAtMs = now + 500;
+    }
+    float dt = 1.0f / 60.0f;
+    if (w.mass > 100.0f) {
+        const float d = -force[2] / (w.mass * kG);
+        if (d > 0.0005f && d < 0.1f) dt = d;
+    }
+    float add[3] = {0, 0, 0};
+    if (sus) for (int i = 0; i < 3; ++i) add[i] += w.sus[i] * dt;
+    if (w.pulseActive) {
+        const float a = dt < w.pulseRemainingS ? dt : w.pulseRemainingS;
+        for (int i = 0; i < 3; ++i) add[i] += w.pf[i] * a;
+        w.pulseRemainingS -= a;
+        if (w.pulseRemainingS <= 0.0f) w.pulseActive = false;
+    }
+    float cur[3];
+    if (!readForce(body, cur)) { cur[0] = force[0]; cur[1] = force[1]; cur[2] = force[2]; }
+    if (writeForceXYZ(body, cur[0] + add[0], cur[1] + add[1], cur[2] + add[2])) {
+        w.frames++;
+        w.activeS += dt;
+        for (int i = 0; i < 3; ++i) w.impulse[i] += add[i];
+        g_writes.fetch_add(1, std::memory_order_relaxed);
+    } else {
+        w.faults++;
+        g_writeFaults.fetch_add(1, std::memory_order_relaxed);
+        g_writesEnabled.store(false, std::memory_order_relaxed);
+    }
+}
+
+// ---------------------------------------------------------------------------------------------------
+// THE SEAM'S VELOCITY KICK (L317 SEAM-1c)
+// ---------------------------------------------------------------------------------------------------
+//
+// The server's move (`setTransform`) keeps the car and its driver but erases the velocity (§SG4). NCM Snowglobe
+// publishes ONE kick (seam_levers.hpp) once the lease is back; here, at the bound car's next gravity entry, the
+// accumulator gets m * dv added -- an impulse through the channel F0 proved -- and two gravity entries later the
+// velocity is read back, so the kick is a measurement. Same gates as every write. Re-reads the accumulator so a
+// thrust write earlier in the same entry is kept, not overwritten.
+bool readForce(const void* body, float* outForceXyz) noexcept;
+
+HANDLE g_seamMapping = nullptr;
+const ncm::seam_levers::Block* g_seam = nullptr;
+std::atomic<uint64_t> g_seamRetryAtMs{0};
+std::atomic<bool> g_seamFoundPending{false};
+
+struct SeamResult {
+    uint32_t seq;
+    float target[3], dv[3], mass, vBefore[3], vAfter[3];
+    uint32_t heldMs;
+    bool applied;
+    const char* why;
+};
+std::mutex g_seamMutex;
+bool g_seamSeqKnown = false;          // guarded by g_seamMutex
+uint32_t g_seamLastSeq = 0;
+bool g_seamHolding = false;           // a target waiting for the car to be bound again
+SeamResult g_seamHeld{};
+uint64_t g_seamReceivedMs = 0;
+SeamResult g_seamPending{};           // an applied kick waiting for its after-velocity
+int g_seamFramesSince = -1;           // -1 = nothing pending
+SeamResult g_seamResult{};
+bool g_seamResultReady = false;
+
+float clampDv(float d) noexcept
+{
+    if (!(d == d)) return 0.0f;
+    return d < -ncm::seam_levers::kMaxDv ? -ncm::seam_levers::kMaxDv : (d > ncm::seam_levers::kMaxDv ? ncm::seam_levers::kMaxDv : d);
+}
+
+void seamAtGravity(void* body, bool authorised) noexcept
+{
+    const uint64_t now = GetTickCount64();
+    if (!g_seam) {
+        if (now < g_seamRetryAtMs.load(std::memory_order_relaxed)) return;
+        g_seamRetryAtMs.store(now + 2000, std::memory_order_relaxed);
+        wchar_t name[96];
+        ncm::seam_levers::name(name, 96, GetCurrentProcessId());
+        HANDLE h = OpenFileMappingW(FILE_MAP_READ, FALSE, name);
+        if (!h) return;
+        void* view = MapViewOfFile(h, FILE_MAP_READ, 0, 0, sizeof(ncm::seam_levers::Block));
+        if (!view) { CloseHandle(h); return; }
+        const auto* b = static_cast<const ncm::seam_levers::Block*>(view);
+        if (b->magic != ncm::seam_levers::kMagic || b->version != ncm::seam_levers::kVersion) {
+            UnmapViewOfFile(view); CloseHandle(h); return;
+        }
+        g_seamMapping = h;
+        g_seam = b;
+        g_seamFoundPending.store(true, std::memory_order_release);
+    }
+    std::unique_lock<std::mutex> lock(g_seamMutex, std::try_to_lock);
+    if (!lock.owns_lock()) return;
+
+    // an applied kick: read the velocity back two gravity entries later
+    if (g_seamFramesSince >= 0 && ++g_seamFramesSince >= 2) {
+        float v[3];
+        if (readVelocity(body, v)) for (int i = 0; i < 3; ++i) g_seamPending.vAfter[i] = v[i];
+        g_seamResult = g_seamPending;
+        g_seamResultReady = true;
+        g_seamFramesSince = -1;
+    }
+
+    // a new request: hold its target until the car is bound again (the lease is back)
+    const uint32_t seq = g_seam->kickSeq;
+    if (!g_seamSeqKnown) { g_seamSeqKnown = true; g_seamLastSeq = seq; }
+    if (seq != g_seamLastSeq) {
+        g_seamLastSeq = seq;
+        const uint64_t at = g_seam->stampMs;
+        if (at != 0 && now >= at && now - at <= ncm::seam_levers::kHoldMs) {
+            if (g_seamHolding) {
+                g_seamHeld.why = "superseded by a newer target";
+                g_seamResult = g_seamHeld; g_seamResultReady = true;
+            }
+            g_seamHeld = SeamResult{};
+            g_seamHeld.seq = seq;
+            for (int i = 0; i < 3; ++i) g_seamHeld.target[i] = g_seam->target[i];
+            g_seamHolding = true;
+            g_seamReceivedMs = at;
+        }
+    }
+    if (!g_seamHolding) return;
+    if (now - g_seamReceivedMs > ncm::seam_levers::kHoldMs) {
+        g_seamHeld.heldMs = static_cast<uint32_t>(now - g_seamReceivedMs);
+        g_seamHeld.why = "not applied: the car was not bound again within the hold";
+        g_seamResult = g_seamHeld; g_seamResultReady = true;
+        g_seamHolding = false;
+        return;
+    }
+    if (!authorised || !g_writesEnabled.load(std::memory_order_relaxed)) return;   // still waiting for the binding
+
+    SeamResult r = g_seamHeld;
+    g_seamHolding = false;
+    r.heldMs = static_cast<uint32_t>(now - g_seamReceivedMs);
+    float v[3] = {0, 0, 0}, deep[3], cur[3];
+    uintptr_t back = 0;
+    readVelocity(body, v);
+    for (int i = 0; i < 3; ++i) { r.vBefore[i] = v[i]; r.dv[i] = clampDv(r.target[i] - v[i]); }
+    if (!readDeep(body, deep, &r.mass, &back) || !(r.mass > 100.0f) || !readForce(body, cur)) {
+        r.why = "not applied: mass or force unreadable";
+        g_seamResult = r; g_seamResultReady = true;
+        return;
+    }
+    if (writeForceXYZ(body, cur[0] + r.mass * r.dv[0], cur[1] + r.mass * r.dv[1], cur[2] + r.mass * r.dv[2])) {
+        g_writes.fetch_add(1, std::memory_order_relaxed);
+        r.applied = true;
+        r.why = "applied";
+        g_seamPending = r;
+        g_seamFramesSince = 0;
+    } else {
+        g_writeFaults.fetch_add(1, std::memory_order_relaxed);
+        g_writesEnabled.store(false, std::memory_order_relaxed);
+        r.why = "write fault: writes disabled for the session";
+        g_seamResult = r; g_seamResultReady = true;
+    }
+}
+
 /// The fraction of drive authority left at this speed. 1.0 well below the target, 0.0 at or past it.
 float governorAt(float speedMps) noexcept
 {
@@ -952,6 +1421,13 @@ void observe(void* body) noexcept
                                         std::memory_order_relaxed);
             }
 
+            // The lift lever (L316 F0) acts on the gravity entry, so it is served before the diagnostics gate below.
+            if (kind == Kind::Gravity) {
+                thrustAtGravity(body, force, handlingAuthorised);
+                wrenchAtGravity(body, force, handlingAuthorised);
+                seamAtGravity(body, handlingAuthorised);
+            }
+
             // With diagnostics off, only horizontal and wheel entries matter -- the two the writes touch.
             if (!diagnostics && kind != Kind::Horizontal && kind != Kind::Wheel) return;
 
@@ -1114,7 +1590,18 @@ void observe(void* body) noexcept
                         // With no direction to decompose against, the March code scaled the whole
                         // horizontal vector and so does this. It is the conservative choice: at a true
                         // standstill there is no lateral component to protect.
-                        const float kCreep = g_driveScale.load(std::memory_order_relaxed);
+                        float gbDrive = 1.0f, gbCeiling = 0.0f;
+                        const bool gbStill = gearboxLevers(monotonicMs(), gbDrive, gbCeiling);
+                        // a manual in neutral (or mid-shift) does not creep away from a standstill either --
+                        // but ONLY while the throttle may be pressed (0.1.32, owner QA 2026-10-04: "some weird
+                        // rotation of car at neutral"). This branch scales the WHOLE horizontal vector, so
+                        // neutral's 0 also erased the tyres' static hold: a stopped car in N had no grip at all
+                        // and pivoted on anything. Off the throttle the force here is the tyres holding the car,
+                        // not drive, so the gear leaves it alone. Fails closed: unread inputs keep the old cut.
+                        const bool throttleOff = g_inputsOk.load(std::memory_order_relaxed) &&
+                                                 std::fabs(g_inThrottle.load(std::memory_order_relaxed)) <= 0.02f;
+                        const float gearShare = (gbStill && !throttleOff) ? gbDrive : 1.0f;
+                        const float kCreep = g_driveScale.load(std::memory_order_relaxed) * gearShare;
                         if (handlingAuthorised && g_writesEnabled.load(std::memory_order_relaxed) &&
                             std::fabs(kCreep - kGripScaleInert) > kGripScaleEpsilon) {
                             if (writeForceXY(body, force[0] * kCreep, force[1] * kCreep)) {
@@ -1148,7 +1635,9 @@ void observe(void* body) noexcept
                     // alternating per-second signs, so the sign is a measured discriminator and not an
                     // assumption.
                     const float k = g_gripScale.load(std::memory_order_relaxed);
-                    const float kDrive = g_driveScale.load(std::memory_order_relaxed);
+                    float gbDrive = 1.0f, gbCeiling = 0.0f;
+                    const bool gb = gearboxLevers(monotonicMs(), gbDrive, gbCeiling);
+                    const float kDrive = g_driveScale.load(std::memory_order_relaxed) * (gb ? gbDrive : 1.0f);
                     const float kBrake = g_brakeScale.load(std::memory_order_relaxed);
                     const bool wantGrip  = std::fabs(k - kGripScaleInert) > kGripScaleEpsilon;
                     const bool wantDrive = std::fabs(kDrive - kGripScaleInert) > kGripScaleEpsilon;
@@ -1158,7 +1647,12 @@ void observe(void* body) noexcept
                     // The governor is computed from the speed we already decomposed against, so it costs
                     // one square root that was going to happen anyway.
                     const float speedNow = std::sqrt(speedSq);
-                    const float governor = governorAt(speedNow);
+                    float governor = governorAt(speedNow);
+                    if (gb && gbCeiling > 0.0f) {
+                        const float limit = gearLimitAt(speedNow, gbCeiling);
+                        if (limit < governor) governor = limit;
+                    }
+                    if (gb) g_gearboxApplied.fetch_add(1, std::memory_order_relaxed);
                     // **A governor at full authority is not a reason to write.** It only becomes one when
                     // it is actually withholding something, or the write path would engage on every frame
                     // of every governed car for no change at all.
@@ -1705,8 +2199,90 @@ void reportClassification(double speed)
     }
 }
 
+/// The lift lever's report: found, refused, and one measured line per burn (predicted beside measured).
+void reportThrust()
+{
+    if (g_thrustFoundPending.exchange(false, std::memory_order_acq_rel))
+        NCM_INFO("thrust: NCM Thrust lift lever found -- a burn lifts the bound, seated car by its thrust-to-weight ratio");
+    ThrustResult results[kThrustResults];
+    uint32_t count = 0, dropped = 0, refusals = 0;
+    {
+        std::lock_guard<std::mutex> lock(g_thrustMutex);
+        count = g_thrustResultCount;
+        for (uint32_t i = 0; i < count; ++i) results[i] = g_thrustResults[i];
+        g_thrustResultCount = 0;
+        dropped = g_thrustResultsDropped;
+        g_thrustResultsDropped = 0;
+        refusals = g_thrustRefusals;
+        g_thrustRefusals = 0;
+    }
+    if (refusals)
+        NCM_WARN("thrust: burn requested but NOT applied (%u frame(s)): no bound NCM car is seated, or writes are disabled",
+                 refusals);
+    if (dropped) NCM_WARN("thrust: %u burn result(s) dropped this second (more than %u)", dropped, kThrustResults);
+    for (uint32_t i = 0; i < count; ++i) {
+        const ThrustResult& r = results[i];
+        const float ratio = r.predRise > 0.001f ? r.maxRise / r.predRise : 0.0f;
+        NCM_INFO("thrust: burn #%u%s twr=%.2f %u frame(s) %.3f s mass=%.0f kg | vz %+.2f -> peak %+.2f m/s (pred dv %.2f) | "
+                 "rise %.3f m (pred %.3f, x%.2f) | faults=%u | ended: %s",
+                 r.burnNo, r.hold ? " (hold)" : "", r.twr, r.frames, r.burnS, r.mass, r.vz0, r.peakVz, r.predVz,
+                 r.maxRise, r.predRise, ratio, r.faults, r.why);
+    }
+}
+
+/// The wrench's report (L324): one line a second while installed components pushed, measured, not requested.
+void reportWrench()
+{
+    if (g_wrenchFirstPending.exchange(false, std::memory_order_acq_rel))
+        NCM_INFO("wrench: installed components now drive the bound Machine (world force at the centre of mass; legacy lift parked while they do)");
+    WrenchState snap;
+    {
+        std::lock_guard<std::mutex> lock(g_wrenchMutex);
+        snap = g_wrench;
+        g_wrench.frames = g_wrench.pulsesStarted = g_wrench.pulsesDropped = g_wrench.refusedUnbound = g_wrench.faults = 0;
+        g_wrench.impulse[0] = g_wrench.impulse[1] = g_wrench.impulse[2] = 0.0;
+        g_wrench.activeS = 0.0;
+    }
+    const uint32_t refusedAsset = g_wrenchRefusedAsset.exchange(0, std::memory_order_relaxed);
+    const uint32_t parked = g_liftSupersededPresses.exchange(0, std::memory_order_relaxed);
+    if (refusedAsset) NCM_WARN("wrench: %u message(s) REFUSED -- assetId is not the bound Machine", refusedAsset);
+    if (snap.refusedUnbound) NCM_WARN("wrench: %u frame(s) not applied -- no bound, seated car, or writes disabled", snap.refusedUnbound);
+    if (parked) NCM_INFO("wrench: %u NCM Thrust press(es) ignored -- this Machine's installed components own its lift", parked);
+    if (snap.frames == 0 && snap.pulsesStarted == 0) return;
+    const double t = snap.activeS > 1e-6 ? snap.activeS : 1.0;
+    const double imp = std::sqrt(snap.impulse[0] * snap.impulse[0] + snap.impulse[1] * snap.impulse[1] + snap.impulse[2] * snap.impulse[2]);
+    NCM_INFO("wrench: %u frame(s) %.3f s mass=%.0f kg | impulse (%.0f, %.0f, %.0f) N s = mean (%.0f, %.0f, %.0f) N = %.2f m/s^2 | "
+             "lease (%.0f, %.0f, %.0f) N | pulses %u started, %u dropped | faults=%u",
+             snap.frames, snap.activeS, snap.mass, snap.impulse[0], snap.impulse[1], snap.impulse[2],
+             snap.impulse[0] / t, snap.impulse[1] / t, snap.impulse[2] / t,
+             snap.mass > 100.0f ? imp / t / snap.mass : 0.0,
+             snap.lastSus[0], snap.lastSus[1], snap.lastSus[2], snap.pulsesStarted, snap.pulsesDropped, snap.faults);
+}
+
+/// The seam kick's report: found, and one measured line per kick (asked for, velocity before, velocity two entries after).
+void reportSeam()
+{
+    if (g_seamFoundPending.exchange(false, std::memory_order_acq_rel))
+        NCM_INFO("seam: NCM Snowglobe seam lever found -- a target velocity is restored once the car is bound again (m*dv, held up to 8 s)");
+    SeamResult r{};
+    bool ready = false;
+    {
+        std::lock_guard<std::mutex> lock(g_seamMutex);
+        ready = g_seamResultReady;
+        if (ready) { r = g_seamResult; g_seamResultReady = false; }
+    }
+    if (!ready) return;
+    NCM_INFO("seam: target #%u %s after %u ms held | target (%.2f, %.2f, %.2f) m/s | v at the bind (%.2f, %.2f, %.2f) "
+             "-> dv (%.2f, %.2f, %.2f), mass %.0f kg -> after (%.2f, %.2f, %.2f)",
+             r.seq, r.why, r.heldMs, r.target[0], r.target[1], r.target[2], r.vBefore[0], r.vBefore[1], r.vBefore[2],
+             r.dv[0], r.dv[1], r.dv[2], r.mass, r.vAfter[0], r.vAfter[1], r.vAfter[2]);
+}
+
 void reportOnce()
 {
+    reportThrust();
+    reportWrench();
+    reportSeam();
     // ------------------------------------------------------------------------------------- `KB-146`
     // The physics thread may bind, lose or expire a binding at any moment, and it cannot log: the detour
     // does no I/O by construction. It raises a flag; this is where that becomes a sentence.
@@ -2292,8 +2868,49 @@ void applyHandling(const std::string& assetId, const std::string& vehicleId,
     }
 }
 
+bool applyWrench(const std::string& assetId, double fx, double fy, double fz, int ttlMs, bool supersedeLift,
+                 bool hasPulse, uint32_t pulseSeq, double px, double py, double pz, int pulseMs) noexcept
+{
+    {
+        std::lock_guard<std::mutex> guard(g_bindingMetaMutex);
+        if (assetId.empty() || assetId != g_bindingAssetId) {
+            g_wrenchRefusedAsset.fetch_add(1, std::memory_order_relaxed);
+            return false;
+        }
+    }
+    auto clampVec = [](double x, double y, double z, float* out) {
+        if (!(x == x) || !(y == y) || !(z == z)) { out[0] = out[1] = out[2] = 0.0f; return; }
+        const double m = std::sqrt(x * x + y * y + z * z);
+        const double k = m > kMaxWrenchN ? kMaxWrenchN / m : 1.0;
+        out[0] = static_cast<float>(x * k); out[1] = static_cast<float>(y * k); out[2] = static_cast<float>(z * k);
+    };
+    const uint64_t now = GetTickCount64();
+    const int ttl = ttlMs < 0 ? 0 : (ttlMs > kMaxWrenchTtlMs ? kMaxWrenchTtlMs : ttlMs);
+    {
+        std::lock_guard<std::mutex> lock(g_wrenchMutex);
+        WrenchState& w = g_wrench;
+        clampVec(fx, fy, fz, w.sus);
+        for (int i = 0; i < 3; ++i) w.lastSus[i] = w.sus[i];
+        w.susExpireMs = now + static_cast<uint64_t>(ttl);
+        if (hasPulse) {
+            const bool fresh = !w.pulseSeqKnown || pulseSeq != w.lastPulseSeq;
+            w.pulseSeqKnown = true;
+            w.lastPulseSeq = pulseSeq;
+            if (fresh && pulseMs > 0) {
+                clampVec(px, py, pz, w.pendingF);
+                w.pendingS = static_cast<float>(pulseMs > kMaxPulseMs ? kMaxPulseMs : pulseMs) / 1000.0f;
+                w.pulsePending = true;
+            }
+        }
+    }
+    if (supersedeLift) g_liftSupersededUntilMs.store(now + 600, std::memory_order_relaxed);
+    if (!g_wrenchSeen.exchange(true, std::memory_order_relaxed)) g_wrenchFirstPending.store(true, std::memory_order_release);
+    return true;
+}
+
 void clearHandling(bool releaseBenchConfig) noexcept
 {
+    clearWrench();
     const bool wasArmed = g_expectedEngineEntity.exchange(0, std::memory_order_acq_rel) != 0;
 
     // Disarm identity first: once `g_expectedEngineEntity` is zero the physics thread cannot authorise a

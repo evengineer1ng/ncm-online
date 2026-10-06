@@ -374,7 +374,7 @@ MySQL = {
     update = { await = function(q, v) return exec(q, v) end },
     insert = { await = function(q, v) return exec(q, v) end },
     scalar = { await = function(q, v)
-        if has(q, "MAX(version) FROM schema_migrations") then return 57 end
+        if has(q, "MAX(version) FROM schema_migrations") then return 64 end
         if has(q, "FROM ncm_driver_binding") then return 2 end
         if has(q, "SUM(amount),0) FROM ledger") then return ledgerTotal(v[1]) end
         if has(q, "COUNT(*) FROM ledger WHERE idem_key") then return DB.idem[v[1]] and 1 or 0 end

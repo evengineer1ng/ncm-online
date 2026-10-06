@@ -356,6 +356,7 @@ local function standingSomewhere(pid, reason)
 end
 
 local restoring = {}   -- playerId -> true while the client is being moved to its saved spot (KB-207)
+local lastSample = {}  -- playerId -> { z, t }: the previous save sample, for the airborne rule (KB-339)
 
 local function saveLocation(pid, driverId, reason)
     if not (driverId and MySQL and MySQL.isReady()) then return end
@@ -377,6 +378,19 @@ local function saveLocation(pid, driverId, reason)
     local ok, p = pcall(Open77.players.get, pid)
     if not ok or type(p) ~= "table" or not p.position then return end
     local here = { x = p.position.x, y = p.position.y, z = p.position.z }
+    -- KB-339: a car in flight under `maxZ` is not standing anywhere. Judged against the previous sample, and for
+    -- the disconnect save too (leaving at altitude must keep the last grounded spot, not the sky).
+    local prevSample = lastSample[pid]
+    lastSample[pid] = { z = here.z, t = nowS() }
+    local flying, vz = Location.airborne(prevSample, here, nowS())
+    if flying then
+        if saveRefused[pid] ~= "airborne" then
+            saveRefused[pid] = "airborne"
+            log("location: not saving %.1f,%.1f,%.1f for driver=%s -- airborne (%.1f m/s vertical since the last sample)",
+                here.x, here.y, here.z, tostring(driverId):sub(1, 8), vz)
+        end
+        return
+    end
     local sane, badly = Location.valid(here)
     if not sane then
         -- A fall reaches here as a legitimate-looking reading (KB-113: z = -906 was stored and replayed).
@@ -408,6 +422,11 @@ end
 --- looks exactly like a working one, which is the lesson of KB-72 and KB-76.
 local function decideLocation(pid, driverId)
     if not (driverId and MySQL and MySQL.isReady()) then return nil end
+    -- L329: the driver may canonically be in NCM Deep or at another host's place; then Night City is not where they are
+    if NcmCanonical and NcmCanonical.claimJoin and NcmCanonical.claimJoin(pid, driverId) then
+        log("location: driver=%s is canonically away from Night City's surface -- no surface restore", tostring(driverId):sub(1, 8))
+        return nil
+    end
     local ok, row = pcall(function()
         return MySQL.single.await(
             "SELECT x, y, z, heading, bucket, in_vehicle, saved_at FROM driver_location " ..
@@ -420,8 +439,11 @@ local function decideLocation(pid, driverId)
     end
     local saved = { x = row.x, y = row.y, z = row.z, heading = row.heading, bucket = row.bucket,
                     inVehicle = tonumber(row.in_vehicle) == 1, savedAt = tonumber(row.saved_at) }
+    -- L330: the Racing Week is a temporal loop -- a position from before this run began is not where the driver wakes
+    local okW, wk = pcall(function() return NcmWeek and NcmWeek.read and NcmWeek.read() end)
+    local runStart = okW and type(wk) == "table" and wk.clock and wk.clock.startUtc or nil
     local should, why = Location.shouldRestore(saved, math.floor(Open77.time.unix()),
-        { connectedAt = connectedAtUnix[pid] })
+        { connectedAt = connectedAtUnix[pid], runStartUtc = runStart })
     if not should then
         log("location: NOT restoring driver=%s (%s) -- default spawn", tostring(driverId):sub(1, 8), tostring(why))
         return nil
@@ -853,6 +875,104 @@ RegisterCommand("ncm.tp", function(source, args)
             target.x, target.y, target.z, describe(ok), reason ~= nil and (" reason=" .. describe(reason)) or "")
     end)
 end, false)
+
+-- L316 S0 (doc 51 §S0): the altitude expedition. Dev only; nothing here changes the world for anyone else.
+-- Server console: ncm.lift <playerId> <metres> -- straight up from where the player stands (or sits: teleport
+-- dismounts, KB-12, so this probes the world ON FOOT; the in-car climb is NCM Thrust's hold mode).
+RegisterCommand("ncm.lift", function(source, args)
+    if (tonumber(source) or 0) ~= 0 then return end
+    local pid, metres = tonumber(args and args[1]), tonumber(args and args[2])
+    if not pid or not metres then log("usage: ncm.lift <playerId> <metres>"); return end
+    CreateThread(function()
+        local p = Open77.players.get(pid)
+        if not (p and p.position) then log("ncm.lift: player %d has no position", pid); return end
+        local target = { x = p.position.x, y = p.position.y, z = p.position.z + metres }
+        local ok, reason = Open77.players.teleport(pid, target, { fade = false, dismount = true })
+        log("ncm.lift player=%d +%.0f m -> z=%.1f (from %.1f) : ok=%s%s", pid, metres, target.z, p.position.z,
+            describe(ok), reason ~= nil and (" reason=" .. describe(reason)) or "")
+    end)
+end, false)
+
+-- L317 SEAM-1b (doc 51 §6): the move from the side that owns it. A client teleport of a network vehicle is a
+-- `motion_jump` to OPEN//77 and the server revokes the car (§SG2: three J moves, three `serverrevoke` in the same
+-- millisecond, the car snapped back with no speed). `Open77.vehicles.setTransform` is the server's own move -- a teleport
+-- PLUS a lease revoke PLUS an epoch bump, and it clears the electrical flags (open77_admin, freeroam race) -- so this
+-- moves the seated car by `dz`, puts the flags back, and samples the platform's own snapshot for 8 s: does the car
+-- stay where it was sent, is the speed kept, does the lease come back to the driver, is the driver still seated.
+-- Server console: ncm.seam <playerId> <dz metres>   (dev only; refuses a target below 300 m)
+local function seamVehicle(pid)
+    local okS, seat = pcall(Open77.vehicles.getPlayerSeat, pid)
+    return okS and type(seat) == "table" and tonumber(seat.vehicleId or seat.vehicle or seat.id) or nil, seat
+end
+
+--- The server move itself, shared by `ncm.seam` and the automatic doorway. `vz` is the measured climb, for the log.
+local function seamMove(pid, vid, dz, why, vz)
+    local okB, b = pcall(Open77.vehicles.get, vid)
+    if not okB or type(b) ~= "table" then log("ncm.seam: vehicle %d has no snapshot", vid); return false end
+    local target = { x = b.x, y = b.y, z = b.z + dz }
+    if target.z < 300 then log("ncm.seam: refused, target z=%.1f is below 300 m", target.z); return false end
+    local yaw = tonumber(b.yaw or b.heading) or 0
+    log("SEAM-1b move (%s): vehicle=%d from %.1f,%.1f,%.1f to z=%.1f | speed %.2f%s owner=%s epoch=%s flags=%s yaw=%s",
+        why, vid, b.x, b.y, b.z, target.z, tonumber(b.speed) or -1, vz and (" climbing %.1f m/s"):format(vz) or "",
+        tostring(b.physicsOwner), tostring(b.authorityEpoch), tostring(b.flags), tostring(yaw))
+    local okT, moved, mwhy = pcall(Open77.vehicles.setTransform, vid, { position = target, yaw = yaw })
+    log("SEAM-1b setTransform -> %s %s", tostring(okT and moved), tostring(okT and mwhy or moved))
+    if b.flags ~= nil then
+        local okF, fl, fwhy = pcall(Open77.vehicles.update, vid, { flags = b.flags })
+        log("SEAM-1b flags restored -> %s %s", tostring(okF and fl), tostring(okF and fwhy or fl))
+    end
+    CreateThread(function()
+        local t0 = GetGameTimer()
+        for _, at in ipairs({ 100, 300, 1000, 2000, 4000, 8000 }) do
+            Wait(math.max(0, at - (GetGameTimer() - t0)))
+            local okA, a = pcall(Open77.vehicles.get, vid)
+            if okA and type(a) == "table" then
+                local seated = false
+                for _, o in ipairs(a.occupants or {}) do if tonumber(o.playerId) == pid then seated = true end end
+                log("  +%4d ms: z=%.1f (%+.1f from the target) speed=%.2f owner=%s epoch=%s motionAgeMs=%s seated=%s",
+                    at, a.z, a.z - target.z, tonumber(a.speed) or -1, tostring(a.physicsOwner), tostring(a.authorityEpoch),
+                    tostring(a.motionAgeMs), tostring(seated))
+            end
+        end
+    end)
+    return true
+end
+
+RegisterCommand("ncm.seam", function(source, args)
+    if (tonumber(source) or 0) ~= 0 then return end
+    local pid, dz = tonumber(args and args[1]), tonumber(args and args[2])
+    if not pid or not dz then log("usage: ncm.seam <playerId> <dz metres>"); return end
+    CreateThread(function()
+        local vid, seat = seamVehicle(pid)
+        if not vid then log("ncm.seam: player %d is not seated (%s)", pid, tostring(seat)); return end
+        seamMove(pid, vid, dz, "console")
+    end)
+end, false)
+
+-- (`ncm.seamauto` was removed 2026-10-05: the automatic doorway is `server/snowglobe.lua`, on by itself in development.)
+
+-- `/ncm.altlog` on a client sends its own position once a second; logged here beside the position the SERVER holds
+-- for that player, so the gap between them is the replication answer at that altitude. At most 2 lines a second.
+local altlogAt = {}
+RegisterNetEvent("ncm:altlog", function(x, y, z, speed, inCar, weather)
+    local pid = tonumber(source) or 0
+    if pid <= 0 then return end
+    local now = nowS()
+    if altlogAt[pid] and now - altlogAt[pid] < 0.5 then return end
+    altlogAt[pid] = now
+    x, y, z = tonumber(x), tonumber(y), tonumber(z)
+    if not (x and y and z) then return end
+    local p = Open77.players.get(pid)
+    local sp = p and p.position
+    if sp then
+        local dx, dy, dz = x - sp.x, y - sp.y, z - sp.z
+        log("altlog player=%d client z=%.1f server z=%.1f | gap %.1f m (dz %+.1f) | %s %.1f m/s", pid, z, sp.z,
+            math.sqrt(dx * dx + dy * dy + dz * dz), dz, inCar and "in car" or "on foot", tonumber(speed) or -1)
+    else
+        log("altlog player=%d client z=%.1f | server holds no position | %s", pid, z, inCar and "in car" or "on foot")
+    end
+    if type(weather) == "string" and weather ~= "" then log("altlog player=%d weather: %s", pid, weather:sub(1, 400)) end
+end)
 
 RegisterCommand("ncm.return", function(source, args)
     if (tonumber(source) or 0) ~= 0 then return end

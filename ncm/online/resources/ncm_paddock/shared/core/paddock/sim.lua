@@ -85,7 +85,8 @@ Core.define("paddock.sim", function(C)
     end
 
     --- Simulate one race.
-    ---   field  { { id, orgId, attrs, carPerf, form (-1..1), morale } } in GRID order
+    ---   field  { { id, orgId, attrs, carPerf, form (-1..1), morale, lureRisk? } } in GRID order (lureRisk: x on the
+    ---          entrant's hazard when a lured purse caught them -- week.moody.pull, doc 47)
     ---   course { distanceM, laps }
     ---   cond   world.conditions.at(...) result (roadWetness, light, family)
     ---   rng    a vocabulary.hash stream; the only randomness
@@ -108,7 +109,7 @@ Core.define("paddock.sim", function(C)
             local a = e.attrs or {}
             local perf = M.performance(a, e.carPerf, e.form)
             local mult = 1 - (perf - 50) / 50 * M.PACE_SPREAD
-            local risk = M.riskFactor(a)
+            local risk = M.riskFactor(a) * (tonumber(e.lureRisk) or 1)
             cars[i] = {
                 id = e.id, orgId = e.orgId, attrs = a, grid = i,
                 seg = baseSeg * mult * M.conditionFactor(a, cond),

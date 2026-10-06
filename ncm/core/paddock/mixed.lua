@@ -33,6 +33,38 @@ Core.define("paddock.mixed", function(C)
         return math.floor(math.max(M.FLAG_MIN_SEC, math.min(M.FLAG_MAX_SEC, (tonumber(lengthM) or 0) * M.FLAG_SEC_PER_M)) + 0.5)
     end
 
+    --- THE FLAG IN A SIMULATED RACE (owner, 2026-10-04: "they have to earn the result same as me ... make our simulated
+    --- races behave more like how on track races are going"). The same rule `paddock.racestate.result` applies to a
+    --- physical or mixed race: when the leader is home, the rest have `finishWindowSec(lengthM)`; whoever is not home by
+    --- then is a DNF `flagged`, behind every finisher (in the order they would have arrived), ahead of the race's
+    --- retirements. Mutates and re-sorts `entrants` (paddock.sim's shape); returns how many were flagged.
+    function M.flagEntrants(entrants, lengthM)
+        local leader
+        for _, e in ipairs(entrants or {}) do
+            if e.state == "finished" and e.finishMs and (not leader or e.finishMs < leader) then leader = e.finishMs end
+        end
+        if not leader then return 0 end
+        local cutoff = leader + M.finishWindowSec(lengthM) * 1000
+        local fin, flagged, out = {}, {}, {}
+        for _, e in ipairs(entrants) do
+            if e.state == "finished" and e.finishMs and e.finishMs > cutoff then
+                e.state, e.dnfReason, e.flaggedMs = "dnf", "flagged", e.finishMs
+                e.finishMs, e.gapMs = nil, nil
+                flagged[#flagged + 1] = e
+            elseif e.state == "finished" then fin[#fin + 1] = e
+            else out[#out + 1] = e end
+        end
+        if #flagged == 0 then return 0 end
+        table.sort(fin, function(a, b) return a.finishMs < b.finishMs end)
+        table.sort(flagged, function(a, b) return a.flaggedMs < b.flaggedMs end)
+        table.sort(out, function(a, b) return (a.position or 99) < (b.position or 99) end)
+        local i = 0
+        for _, list in ipairs({ fin, flagged, out }) do
+            for _, e in ipairs(list) do i = i + 1; entrants[i] = e; e.position = i end
+        end
+        return #flagged
+    end
+
     function M.personKey(driverId)
         local hex = tostring(driverId or ""):gsub("[^%w]", "")
         return "h" .. hex:sub(1, 15)

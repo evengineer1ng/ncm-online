@@ -1,0 +1,8 @@
+{
+  "enabled": true,
+  "fireKey": "H",
+  "fireButton": "Y",
+  "twr": 3.0,
+  "burnMs": 200,
+  "holdMode": false
+}

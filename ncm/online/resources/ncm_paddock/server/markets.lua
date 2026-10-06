@@ -89,7 +89,7 @@ function PaddockMarkets.partPurchaseTx(pr, o, t, reason, goal)
             to_principal, reason)
             SELECT ?, ?, ?, mi.asset_id, 'npc_purchase', mi.market_id, mi.price, ?, ?, ? FROM component_market_inventory mi WHERE ]] .. guard,
           values = with({ ids.uuid4(rng), idem, U.sid(), t, key, reason or "" }) },
-        { query = ([[UPDATE %s p JOIN component_market_inventory mi ON ]] .. guard .. [[ SET p.cash = p.cash - mi.price
+        { query = ([[UPDATE %s p JOIN component_market_inventory mi ON ]] .. guard .. [[ SET p.cash = p.cash - CAST(mi.price AS SIGNED)
             WHERE p.server_id = ? AND p.%s = ?]]):format(moneyTable(pr), moneyKey(pr)), values = { o.marketId, o.assetId, key, t, U.sid(), pr.id } },
         { query = [[INSERT IGNORE INTO npc_money (entry_id, server_id, principal_kind, principal_id, amount, kind, ref, idem_key, created_at, reason, goal)
             SELECT ?, ?, ?, ?, -mi.price, 'part_purchase', mi.asset_id, ?, ?, NULLIF(?, ''), NULLIF(?, '') FROM component_market_inventory mi WHERE ]] .. guard,
@@ -100,6 +100,21 @@ end
 
 --- The guarded purchase of one shelf part by an NPC. Returns the offer on success, nil and a reason otherwise.
 local function purchasePart(pr, o, t, reason, goal)
+    -- KB-328: the SQL below checks the DATABASE's cash, but `seedCash` (and every purse) credits memory and only marks
+    -- the person for the next flush -- so a newly seeded independent bought against an unsaved balance, `cash - price`
+    -- went below zero in unsigned arithmetic, and MariaDB raised SQL 1690. Save first (as the Exchange's settle does),
+    -- then compare: any difference left is real drift, and the database wins.
+    PaddockStore.flush()
+    if coroutine.isyieldable() then Wait(0) end
+    local okC, dbCash = pcall(MySQL.scalar.await, ("SELECT cash FROM %s WHERE server_id = ? AND %s = ?"):format(moneyTable(pr), moneyKey(pr)),
+        { U.sid(), pr.id })
+    dbCash = okC and tonumber(dbCash) or nil
+    if dbCash and dbCash ~= cashOf(pr) then
+        log("cash drift %s %s: memory %d, database %d -- memory follows the database", pr.kind, pr.id, cashOf(pr), dbCash)
+        pr.obj.cash = dbCash
+        mark(pr)
+    end
+    if dbCash and dbCash < (tonumber(o.price) or 0) then return nil, "unaffordable" end
     local tx = PaddockMarkets.partPurchaseTx(pr, o, t, reason, goal)
     -- ONE transaction (never U.transact, which chunks): the claim and the money move together or not at all
     local ok, err = PaddockMarkets.atomic(tx)
@@ -282,7 +297,7 @@ function PaddockMarkets.replaceCar(pr, p, c, budget, t)
             amount, occurred_at, to_principal, reason)
             SELECT ?, ?, ?, mi.asset_id, NULL, NULL, 'npc_purchase', mi.market_id, mi.price, ?, ?, 'replace_car' FROM market_inventory mi WHERE ]] .. guard,
           values = with({ ids.uuid4(rng), idem, U.sid(), t, key }) },
-        { query = ([[UPDATE %s p JOIN market_inventory mi ON ]] .. guard .. [[ SET p.cash = p.cash - mi.price
+        { query = ([[UPDATE %s p JOIN market_inventory mi ON ]] .. guard .. [[ SET p.cash = p.cash - CAST(mi.price AS SIGNED)
             WHERE p.server_id = ? AND p.%s = ?]]):format(moneyTable(pr), moneyKey(pr)), values = { pick.market_id, pick.asset_id, key, t, U.sid(), pr.id } },
         { query = [[INSERT IGNORE INTO npc_money (entry_id, server_id, principal_kind, principal_id, amount, kind, ref, idem_key, created_at, reason, goal)
             SELECT ?, ?, ?, ?, -mi.price, 'vehicle_purchase', mi.asset_id, ?, ?, 'replace_car', ? FROM market_inventory mi WHERE ]] .. guard,
@@ -320,6 +335,20 @@ function PaddockMarkets.replaceCar(pr, p, c, budget, t)
     return pick
 end
 
+--- L305: what a team can put into a car. It was 4 % of cash -- EUR$1.5 k for a street team, 5.5 k regional, 22 k pro,
+--- against 16-50 k cars -- and no team bought one in a day on Online with EUR$49.6 M banked. Now: cash above a runway of
+--- `npcTeamRunwayDays` days of the team's wage bill, capped at `npcTeamCarShare` of cash.
+function PaddockMarkets.teamCarBudget(pr)
+    local cash = cashOf(pr)
+    local wages = 0
+    for _, pid in ipairs(PaddockStore.world.personOrder) do
+        local q = PaddockStore.world.people[pid]
+        if q.orgId == pr.id and q.state == "active" then wages = wages + (tonumber(q.wage) or 0) end
+    end
+    local spendable = cash - wages * set("npcTeamRunwayDays", 14)
+    return math.max(0, math.floor(math.min(spendable, cash * set("npcTeamCarShare", 0.5))))
+end
+
 --- One racer's car gets one action, the most pressing affordable goal first. `budget` caps a purchase.
 function PaddockMarkets.tend(pr, p, budget, t)
     local c = PaddockCars.ensure(p, t)
@@ -328,7 +357,7 @@ function PaddockMarkets.tend(pr, p, budget, t)
     -- a racer flush enough looks at a better car first (an independent at `npcCarUpgradeMinCash`; a team when a car
     -- costs it a small share of its cash) -- the worn parts of the old one go with it
     local carBudget = pr.kind == "person" and (cashOf(pr) >= set("npcCarUpgradeMinCash", 12000) and math.floor(cashOf(pr) * 0.7) or 0)
-        or math.floor(cashOf(pr) * 0.04)
+        or PaddockMarkets.teamCarBudget(pr)
     if carBudget > 0 then
         local okR, newCar = pcall(PaddockMarkets.replaceCar, pr, p, c, carBudget, t)
         if okR and newCar then return Garage.REASON.CAR end

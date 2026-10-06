@@ -40,6 +40,7 @@ Core.define("life.trajectory", function(C)
         street_race      = { street = 4, risk = 1 },
         meet_visit       = { street = 1, social = 1 },
         police_escape    = { street = 3, risk = 4 },
+        speeding         = { street = 2, risk = 2 },          -- L301: over the Day's advertised limit, once per episode
         part_fitted      = { wrench = 3 },
         design_research  = { wrench = 4 },
         car_scanned      = { wrench = 1 },

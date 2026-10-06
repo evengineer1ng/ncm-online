@@ -130,6 +130,13 @@ void applyHandling(const std::string& assetId, const std::string& vehicleId,
 /// suppressed while the socket remains connected. Socket loss passes true and returns ownership.
 void clearHandling(bool releaseBenchConfig = true) noexcept;
 
+/// `L324`: installed components as a force on the bound Machine (world N, a lease of `ttlMs`), plus an optional pulse
+/// (a new `pulseSeq` starts one: world N for `pulseMs` of physics time). Refused unless `assetId` is the Machine the
+/// handling binding names; applied only at the positively bound, seated body's gravity entry, under the same gates
+/// as every write. `supersedeLift` parks NCM Thrust's legacy lift lever while fresh. Returns false when refused.
+bool applyWrench(const std::string& assetId, double fx, double fy, double fz, int ttlMs, bool supersedeLift,
+                 bool hasPulse, uint32_t pulseSeq, double px, double py, double pz, int pulseMs) noexcept;
+
 /// One line, in the spirit of MtClutchDiag: everything the probe currently knows, cheap to call.
 std::string status();
 

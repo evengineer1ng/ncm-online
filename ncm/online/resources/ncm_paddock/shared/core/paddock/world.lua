@@ -299,13 +299,13 @@ Core.define("paddock.world", function(C)
 
     --- The field for one race (L249): a street league's pool turns up or not; a sanctioned team fields its available
     --- drivers. `race` = { raceId, seriesId, tier, opensAt }. Returns entrants { { driver, org } } (org nil for an
-    --- independent) and `absent` { [personId] = reason }.
-    function M.raceField(world, race)
+    --- independent) and `absent` { [personId] = reason }. `pull` (optional): Moody's lure, per person (doc 47).
+    function M.raceField(world, race, pull)
         local Attendance = C.get("paddock.attendance")
         local spec = Season.TIERS[race.tier]
         local fieldSize = math.floor(spec.orgs / spec.divisions) * spec.carsPerOrg
         if race.tier == "street" then
-            local came, absent = Attendance.streetField(world.seed, race.raceId, M.leaguePool(world, race.seriesId), fieldSize, race.opensAt)
+            local came, absent = Attendance.streetField(world.seed, race.raceId, M.leaguePool(world, race.seriesId), fieldSize, race.opensAt, pull)
             local out = {}
             for _, d in ipairs(came) do
                 local o = d.orgId and world.orgs[d.orgId]
@@ -315,7 +315,7 @@ Core.define("paddock.world", function(C)
         end
         local teams = {}
         for _, o in ipairs(M.orgsInSeries(world, race.seriesId)) do teams[#teams + 1] = { org = o, drivers = M.drivers(world, o.id) } end
-        return Attendance.teamField(world.seed, race.raceId, teams, race.tier, spec.carsPerOrg, race.opensAt)
+        return Attendance.teamField(world.seed, race.raceId, teams, race.tier, spec.carsPerOrg, race.opensAt, pull)
     end
 
     --- Grow an existing world to GENESIS 3's pools (L249), a little per call: street team drivers join their team's

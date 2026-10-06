@@ -66,6 +66,16 @@ if ($luac -and (Test-Path $resRoot)) {
     }
     Write-Host ("=== luac -p over {0} resource file(s): {1} bad" -f $n, $bad)
     if ($bad -ne 0) { $overall = 1 }
+    # KB-346: a handler-less `RegisterNetEvent("x")` compiles but FAILS client activation on this OPEN//77 build
+    # (the API card calls the handler optional; the runtime does not), and a failed client script refuses every join.
+    $bare = 0
+    foreach ($f in Get-ChildItem $resRoot -Recurse -Filter *.lua) {
+        if ($f.FullName -match '\\shared\\core\\') { continue }
+        $hits = Select-String -Path $f.FullName -Pattern 'RegisterNetEvent\(\s*"[^"]*"\s*\)' -AllMatches
+        foreach ($h in $hits) { $bare++; Write-Host ("  BARE RegisterNetEvent {0}:{1}" -f $f.FullName, $h.LineNumber) }
+    }
+    Write-Host ("=== handler-less RegisterNetEvent: {0}" -f $bare)
+    if ($bare -ne 0) { $overall = 1 }
 } else {
     Write-Host '=== luac not found: resource syntax gate skipped'
     if (-not $AllowMissing) { $overall = 1 }

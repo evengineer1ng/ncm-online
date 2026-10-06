@@ -16,7 +16,8 @@ correctly installed DLLs never load. After installing, this tool removes exactly
 folders from that list (never anything else: `ncm_radial` stays out by owner ruling, and third-party single-player
 mods are left as the launcher set them). The original config.ini is kept with the record, and `--uninstall` restores it.
 
-Usage:  python tools/dev-hand-install-mods.py [--dry-run] [--only ncm-pace,...]
+Usage:  python tools/dev-hand-install-mods.py [--dry-run] [--only ncm-pace,...] [--extra-zip dist/x.zip ...]
+        (--extra-zip: a package not yet declared by the dev server -- a spike -- installed and recorded the same way)
         python tools/dev-hand-install-mods.py --uninstall [<timestamp>]   (latest when omitted)
 """
 import argparse
@@ -58,10 +59,13 @@ def install(args):
     root = os.path.join(STORE, stamp)
     record = {"stamp": stamp, "game": GAME, "files": []}
     only = set(args.only.split(",")) if args.only else None
-    for pkg in packages():
-        if only and pkg.get("id") not in only:
-            continue
-        z = zipfile.ZipFile(blob_for(pkg))
+    sources = [(pkg, blob_for(pkg)) for pkg in packages() if not (only and pkg.get("id") not in only)]
+    for extra in args.extra_zip or []:
+        if not os.path.exists(extra):
+            sys.exit("missing --extra-zip " + extra)
+        sources.append(({"id": os.path.splitext(os.path.basename(extra))[0]}, extra))
+    for pkg, blob in sources:
+        z = zipfile.ZipFile(blob)
         for info in z.infolist():
             name = info.filename.replace("\\", "/")
             if name.endswith("/"):
@@ -145,6 +149,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--only")
+    ap.add_argument("--extra-zip", action="append")
     ap.add_argument("--uninstall", nargs="?", const="latest")
     args = ap.parse_args()
     if args.uninstall:

@@ -89,4 +89,24 @@ return {
         T.eq(by.p1.rawPos, 2); T.eq(by.p1.pos, 1); T.eq(by.p1.moved, 1, "up one")
         T.eq(by.p2.moved, 1)
     end,
+
+    a_simulated_race_flags_whoever_is_not_home = function(T)
+        local M = T.Core.get("paddock.mixed")
+        -- 2,500 m: the window is 30 s
+        local e = {
+            { id = "a", state = "finished", finishMs = 100000, position = 1 },
+            { id = "b", state = "finished", finishMs = 125000, position = 2 },
+            { id = "c", state = "finished", finishMs = 131000, position = 3 },
+            { id = "d", state = "finished", finishMs = 160000, position = 4 },
+            { id = "x", state = "dnf", dnfReason = "crash", position = 5 },
+        }
+        T.eq(M.flagEntrants(e, 2500), 2)
+        T.eq(e[1].id, "a"); T.eq(e[2].id, "b"); T.eq(e[2].state, "finished")
+        T.eq(e[3].id, "c"); T.eq(e[3].state, "dnf"); T.eq(e[3].dnfReason, "flagged"); T.eq(e[3].finishMs, nil)
+        T.eq(e[4].id, "d"); T.eq(e[4].position, 4)
+        T.eq(e[5].id, "x"); T.eq(e[5].position, 5, "retirements stay behind the flagged")
+        local none = { { id = "a", state = "finished", finishMs = 1000, position = 1 } }
+        T.eq(M.flagEntrants(none, 2500), 0)
+        T.eq(M.flagEntrants({ { id = "x", state = "dnf", position = 1 } }, 2500), 0, "no leader, no flag")
+    end,
 }

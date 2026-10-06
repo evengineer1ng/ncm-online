@@ -3,6 +3,16 @@ local ASSET_A = "10000000-0000-4000-8000-000000000001"
 local ASSET_B = "10000000-0000-4000-8000-000000000002"
 
 return {
+    -- L330: the Racing Week is a temporal loop: last run's position is not restored
+    a_position_from_a_previous_racing_week_is_not_restored = function(T)
+        local L = T.Core.get("world.location")
+        local p = { x = 100, y = -200, z = 12, savedAt = 900 }
+        T.ok((L.shouldRestore(p, 1000, { runStartUtc = 800 })), "saved during this run: restored")
+        local ok, why = L.shouldRestore(p, 1000, { runStartUtc = 950 })
+        T.falsy(ok, "saved before this run began: the loop rewound it")
+        T.eq(why, "previous_racing_week", "and says why")
+    end,
+
     -- ---------------------------------------------------------------- location
     a_recent_position_is_restored = function(T)
         local L = T.Core.get("world.location")
@@ -182,5 +192,18 @@ return {
         T.eq(two.secondary.b, 255)
         -- a corrupt stored value must not produce a black car
         T.eq(V.paintFor("makigai_maimai", ASSET_A, { primary = "rubbish" }).source, "factory")
+    end,
+
+    a_car_in_flight_is_not_standing_anywhere = function(T)
+        -- KB-339: the owner's Hella climbing at ~90 m/s was saved at 652 m (under maxZ) and the next join dropped
+        -- the player 650 m on foot.
+        local L = T.Core.get("world.location")
+        local climbing, vz = L.airborne({ z = 300, t = 100 }, { z = 652 }, 120)
+        T.ok(climbing, "a 352 m climb in 20 s is flight")
+        T.ok(math.abs(vz - 17.6) < 0.01, "and says how fast")
+        T.ok(L.airborne({ z = 652, t = 100 }, { z = 20 }, 120), "a fall is not standing either")
+        T.ok(not L.airborne({ z = 10, t = 100 }, { z = 50 }, 120), "a steep road (2 m/s vertical) still saves")
+        T.ok(not L.airborne(nil, { z = 652 }, 120), "no previous sample is not evidence of flight")
+        T.ok(not L.airborne({ z = 10, t = 120 }, { z = 652 }, 120), "nor is no elapsed time")
     end,
 }

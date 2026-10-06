@@ -7,6 +7,7 @@ local Handling=NcmCore.get("parts.handling")
 local Wear=NcmCore.get("parts.wear")
 local Markets=NcmCore.get("economy.markets")
 local Json=NcmCore.get("vocabulary.json")
+local Install=NcmCore.get("engineering.installation")   -- add-ons (a propulsor on a mount) fit by mount + facing
 local ids=NcmCore.get("vocabulary.ids")
 local hostRng=function() return math.random() end
 local function now() return math.floor(Open77.time.unix()) end
@@ -315,8 +316,30 @@ function NcmComponents.inventory(pid)
     local machines=MySQL.query.await([[SELECT asset_id,vehicle_key,record,production_ordinal,maker_ordinal,model_ordinal,odometer_m
       FROM vehicle_asset WHERE server_id=? AND ncm_driver_id=? ORDER BY acquired_at,asset_id]],{serverId(),d.ncmDriverId}) or {}
     for _,m in ipairs(machines) do m.fitment={};for _,p in ipairs(parts) do m.fitment[p.asset_id]=Cat.resolve({supportedVehicles=p.supportedVehicles},m.vehicle_key) end end
+    -- the pad's engineering bench: where each add-on can go on each Machine (only the fits that mate), and on
+    -- DEVELOPMENT the designs that can be fabricated (the one acquisition shortcut; Online buys them)
+    for _,p in ipairs(parts) do
+        if Install.isAddOnFamily(p.family) then
+            p.addOn=true
+            local design=Install.design(p.design_id)
+            p.mounts={}
+            for _,m in ipairs(machines) do
+                local list={}
+                if design then for _,o in ipairs(Install.options(design,m.vehicle_key)) do if o.ok then list[#list+1]={mountId=o.mountId,facing=o.facing} end end end
+                p.mounts[m.asset_id]=list
+            end
+        end
+    end
+    local fabricable=nil
+    local okId,ident=pcall(function() return GlobalState.ncmIdentity end)
+    local dev=true
+    if okId and type(ident)=="table" then dev=tostring(ident.environment or "development")=="development" end
+    if dev then
+        fabricable={}
+        for _,x in ipairs(Install.DESIGNS) do fabricable[#fabricable+1]={key=x.code:lower():gsub("^%w+%-",""),code=x.code,name=x.name,family=x.family} end
+    end
     local balance=tonumber(MySQL.scalar.await("SELECT COALESCE(SUM(amount),0) FROM ledger WHERE ncm_driver_id=? AND server_id=?",{d.ncmDriverId,serverId()})) or 0
-    return {partsEnabled=enabled(),parts=parts,machines=machines,balance=balance,serverNow=now()}
+    return {partsEnabled=enabled(),parts=parts,machines=machines,balance=balance,serverNow=now(),fabricable=fabricable}
 end
 -- IDEA-595: serialized Parts are per-asset rows that only ever accumulate, so this list grows without bound by
 -- design. Bounded through `NcmStream` rather than waiting for the deploy on which it stops arriving.

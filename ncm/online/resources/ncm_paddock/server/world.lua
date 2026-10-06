@@ -46,11 +46,23 @@ function PaddockWorld.boot()
             PaddockStore.flush()
             log("league pools grown (L249): %d people joined or created; %d people now", grown, #w.personOrder)
         end
+        -- W-1 (L303): the world that exists is history's cast; record its seed once so every reconstruction replays it
+        pcall(MySQL.update.await, "INSERT IGNORE INTO racing_week_genesis (server_id, seed, recorded_at) VALUES (?, ?, ?)",
+            { U.sid(), w.seed, U.now() })
         PaddockWorld.ready = true
         return w
     end
     local season = Seasons.atUtc(U.now()).id
-    local seed = math.random(1, 2147483646)
+    -- W-1 (L303): a reconstruction is born from the historical seed -- the same cast, the same Day 1 -- never a new one
+    local okH, hist = pcall(MySQL.scalar.await, "SELECT seed FROM racing_week_genesis WHERE server_id = ?", { U.sid() })
+    local seed = okH and tonumber(hist) or nil
+    if seed then log("GENESIS from the historical seed (commit %s)", NcmCore.get("vocabulary.hash").commit(seed))
+    else
+        seed = math.random(1, 2147483646)
+        pcall(MySQL.update.await, "INSERT IGNORE INTO racing_week_genesis (server_id, seed, recorded_at) VALUES (?, ?, ?)",
+            { U.sid(), seed, U.now() })
+        log("GENESIS from a NEW seed (no history yet); recorded as the historical seed")
+    end
     log("GENESIS begins season=%s", season)
     local b = World.newBuilder(seed, season)
     while b.step() do Wait(0) end

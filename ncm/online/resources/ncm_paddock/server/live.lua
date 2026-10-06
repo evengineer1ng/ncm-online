@@ -248,7 +248,10 @@ end
 
 -- -------------------------------------------------------------------------------------------------------- stage
 
-local function recordFor(org, tier, oval, person)
+local function recordFor(org, tier, oval, person, seriesId)
+    -- L303: a spec series races the organisers' car, whatever the driver owns (the MaiMai Cup is MaiMais)
+    local spec = seriesId and Season.specFor(seriesId)
+    if spec then return NcmCore.get("economy.npc_garage").racerRecord(spec.record, 0, oval) end
     -- L298: a racer with a real car races it -- its own model, in the Pace performance variant its parts compose to
     -- (`npcRacerVariants` waits for the Pace build that carries the variant clones)
     if person and person.raceCarId and PaddockCars then
@@ -373,7 +376,7 @@ local function stage(race, host, t)
         local org = w.orgs[e.orgId or ""]
         -- The vanilla record: the race profile is every vehicle record's own `drivingParamsRace`, which the engine's racing
         -- command uses (L246). No custom records -- nothing the platform could refuse.
-        local record = recordFor(org, race.tier, route.oval ~= nil)
+        local record = recordFor(org, race.tier, route.oval ~= nil, nil, race.seriesId)
         local okV, vid, reason = pcall(Open77.vehicles.create, { record = record,
             position = { x = s.x, y = s.y, z = (s.z or 0) + 0.6 }, yaw = s.yaw, bucket = lr.bucket })
         if not okV or not vid then
@@ -595,11 +598,11 @@ end
 --- Replace a race's sealed sim rows with a classification the street produced (the whole street run, or the model
 --- with the bubble's anchors). provenance: physical | mixed. Before the close only, so Billie settles once, after this.
 function PaddockLive.writeResult(race, entrants, provenance, backend, detailExtra)
-    local purse = Finance.purse(race.tier, #entrants)
+    local purse = PaddockUtil.crazePurse(Finance.purse(race.tier, #entrants), race.tier)   -- L303: the craze; doc 47: Moody
     local st = { { query = "DELETE FROM paddock_result WHERE server_id = ? AND race_id = ?", values = { U.sid(), race.raceId } } }
     local splits = {}
     for _, e in ipairs(entrants) do
-        e.points = Season.pointsFor(e.position, e.state)
+        e.points = Season.pointsAt(e.position, e.state, race.seriesId, race.opensAt)   -- L303: finales count double
         -- a human's pay is the league's (Economy v1, by the same place); the Paddock's purse is its NPCs'
         e.purse = (e.state == "finished" and not e.human) and (purse[e.position] or 0) or 0
         splits[e.id] = e.splits

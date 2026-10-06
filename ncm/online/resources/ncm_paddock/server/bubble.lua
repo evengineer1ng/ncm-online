@@ -377,7 +377,7 @@ local function spawn(race, id, p, tMs, bucket, pid)
     -- Bubble cars are the ones physically beside the player: NCM Pace's racer clone, street and oval (KB-287).
     -- L298: the car this NPC actually owns (its model, in the Pace variant its installed parts compose to); before
     -- the car exists, the old team-hashed record
-    local record = PaddockLive.recordFor(w.orgs[(person and person.orgId) or ""], race.tier, ovalRace, person)
+    local record = PaddockLive.recordFor(w.orgs[(person and person.orgId) or ""], race.tier, ovalRace, person, race.seriesId)
     race.cloneLogged = race.cloneLogged or {}
     if not race.cloneLogged[id] then race.cloneLogged[id] = true; log("%s: bubble %s spawning racer clone %s", race.raceId, id, record) end
     local okV, vid, why = pcall(Open77.vehicles.create, { record = record,

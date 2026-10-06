@@ -253,6 +253,7 @@ Core.define("life.voice", function(C)
         if facts.tagLabel then topics[#topics + 1] = "topic_tag" end
         topics[#topics + 1] = "topic_role_" .. (p.role or "driver")
         if facts.series then topics[#topics + 1] = "topic_series" end
+        if facts.champion and facts.championSeries and facts.championRun then topics[#topics + 1] = "topic_champion" end   -- L303
 
         -- What they are doing now is the most salient thing about the moment, so it leads when there is one; the
         -- weather and the district compete for the next slot; the hour is the least interesting and comes last.

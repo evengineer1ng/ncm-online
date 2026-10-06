@@ -7,7 +7,7 @@
 local U = PaddockUtil
 local log = U.logger("main")
 
-local SCHEMA_REQUIRED = 57             -- 057: humans in Paddock races (L250 steps 3-4)
+local SCHEMA_REQUIRED = 64             -- 064: Racing Week's recorded timeline and Moody (L310); 063 the gearbox (L306)
 
 local function schemaReady()
     local ok, v = pcall(MySQL.scalar.await, "SELECT MAX(version) FROM schema_migrations")
@@ -44,6 +44,7 @@ local function prune(t)
 end
 
 local function tick()
+    if PaddockWeek and PaddockWeek.collapsing then return end   -- L303: the world is being archived
     local t = U.now()
     PaddockRaces.materialise(t)
     PaddockRaces.tick(t)
@@ -67,10 +68,27 @@ CreateThread(function()
         Wait(10000)
     end
     while not PaddockSettings.get("paddockEnabled", true) do Wait(30000) end
+    -- KB-324: without the tunables every setting is its literal default -- including serverId, which then boots a
+    -- DIFFERENT (stale) world. Refuse rather than run the wrong Night City.
+    if not PaddockSettings.proxy then
+        log("BOOT REFUSED: the tunables declaration failed, so serverId would fall back to '%s' and wake the wrong world. Fix settings.lua.",
+            tostring(PaddockSettings.get("serverId", "ncm-dev")))
+        return
+    end
     serverIdCheck()
+    PaddockWeek.install()           -- L303: before the world boots, so its Cup is the Racing Week run
     if not PaddockWorld.boot() then log("BOOT FAILED: no world") return end
+    -- KB-336 (2026-10-04 19:01): the world tail, the calibration and the races loader shared ONE slice and the boot
+    -- thread died on the instruction quota between `loaded world` and `loaded N open races` -- no Paddock, no races,
+    -- all evening. Each step gets its own slice, and says which step it is, so a recurrence names itself.
+    Wait(0)
+    log("boot: calibration")
     PaddockCalibration.load()
+    Wait(0)
+    log("boot: races")
     PaddockRaces.load()
+    Wait(0)
+    log("boot: humans")
     PaddockHumans.load()
     Wait(0)                                  -- each boot step gets its own slice of the instruction quota (KB-211)
     PaddockLive.boot()
@@ -85,6 +103,7 @@ CreateThread(function()
     PaddockClock.start()
     Wait(0)
     PaddockBroadcast.start()
+    PaddockRacers.start()           -- every racer on the map (owner, 2026-10-04)
     lastCalibration = U.now() - 3500     -- first recompute a minute after boot, not inside it
     log("the Paddock is running (season %s)", PaddockStore.world.seasonId)
     while true do

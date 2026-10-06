@@ -48,8 +48,10 @@ function PaddockBillie.price(race)
     local n = PaddockSettings.get("billieMcSims", 400)
     local per = PaddockSettings.get("billieSimsPerYield", 4)
     local pricingSeed = Hash.seed("billie", race.raceId, race.commit)     -- public inputs only
+    local flagM = PaddockRaces.flagLength(route)
     for k = 1, n do
         local r = Sim.simulate(field, route, cond, Hash.stream(pricingSeed, k), { baseSec = base, light = true, tier = race.tier })
+        NcmCore.get("paddock.mixed").flagEntrants(r.entrants, flagM)         -- priced on the race's own rule (the flag)
         local finished = {}
         for _, e in ipairs(r.entrants) do if e.state == "finished" then finished[e.id] = true end end
         pricer.add(r.order, finished)

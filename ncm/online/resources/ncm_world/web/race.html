@@ -107,6 +107,16 @@
        cluster rather than two panels that happen to be near each other. Deliberately small and low-contrast:
        it is glanceable confirmation of what the hands and feet are doing, never something to look AT while
        driving. Three inputs only -- steering, throttle, brake. */
+    /* Racing Week's advertised limit (L301): a road sign under the cluster, in free roam and in races. The number is
+       the Day's sign (the game's posted lane speed x the Day); red with the overage when over it. */
+    #limit { position: absolute; left: 44px; bottom: 86px; display: flex; align-items: center; gap: 10px; }
+    #limit .sign { width: 54px; height: 54px; border-radius: 50%; background: #f4f4f0; border: 6px solid var(--red); box-sizing: border-box;
+      display: flex; align-items: center; justify-content: center; font: 800 21px/1 var(--mono); color: #111; }
+    #limit .meta { display: flex; flex-direction: column; gap: 3px; padding: 6px 10px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; }
+    #limit .day { font: 700 10px/1.2 var(--mono); letter-spacing: 0.14em; color: var(--dim); text-transform: uppercase; white-space: nowrap; }
+    #limit .over { font: 700 15px/1.1 var(--mono); color: var(--dim); }
+    #limit.is-over .sign { box-shadow: 0 0 16px var(--red-glow); }
+    #limit.is-over .over { color: var(--red); }
     #inputs { position: absolute; left: 44px; bottom: 252px; padding: 8px 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; min-width: 152px; box-sizing: border-box; display: flex; align-items: flex-end; gap: 12px; }
     #inputs .wheel { color: var(--dim); flex: 0 0 auto; }
     /* 80ms is just over one 20 Hz sample, so motion is continuous without lagging behind the hands. */
@@ -210,6 +220,7 @@
     </div>
     <div class="tyre na" id="inTyre"><div class="col"><div class="win"></div><div class="ndl" id="inTyreNdl"></div></div><b>TYRE</b><em class="state" id="inTyreState">UNKNOWN</em><em id="inTyrePct">--</em></div>
   </div>
+  <div id="limit" class="hidden"><div class="sign" id="limitKph">--</div><div class="meta"><div class="day" id="limitDay"></div><div class="over" id="limitOver">KM/H</div></div></div>
   <div id="instr" class="hidden"><div class="who" id="instrWho"></div><div class="odo" id="instrOdo"></div><div class="odo" id="instrFuel"><small>FUEL</small>--</div></div>
   <div id="graph" class="hidden"><span class="flag" id="graphFlag"></span><div class="line"></div><div id="dots"></div><span class="lbl">START</span></div>
   <script src="glyphs.js"></script>
@@ -481,6 +492,18 @@
         const warnings=v&&Array.isArray(v.warnings)?v.warnings:[];wearLamps.innerHTML="";
         for(const w of warnings){const lamp=document.createElement("span");lamp.className="wear-lamp "+(w.status==="critical"?"critical":"attention");lamp.textContent=wearShort[w.system]||"!";lamp.title=String(w.label||w.system||"Service required");lamp.setAttribute("aria-label",lamp.title);wearLamps.append(lamp);}
         wearLamps.classList.toggle("hidden",warnings.length===0);
+      });
+      // L301: the Day's advertised limit. `false` = off-road / not driving: the sign goes away.
+      const limitBox=document.getElementById("limit"),limitKph=document.getElementById("limitKph"),limitDay=document.getElementById("limitDay"),limitOver=document.getElementById("limitOver");
+      // The official chapter, never the city's mood (L302): the sign is the organisers' voice.
+      Open77.on("race:limit", (v) => {
+        if(!v||typeof v.kph!=="number"){limitBox.classList.add("hidden");return;}
+        limitBox.classList.remove("hidden");
+        limitKph.textContent=String(Math.round(v.kph));
+        limitDay.textContent=(v.day?("DAY "+v.day):"")+(v.chapter?(" · "+v.chapter):"");
+        const over=typeof v.over==="number"&&v.over>0?Math.round(v.over):0;
+        limitOver.textContent=over>0?("+"+over+" KM/H"):"KM/H";
+        limitBox.classList.toggle("is-over",over>0);
       });
       Open77.on("race:fuel", (v) => {
         const pct=v&&typeof v.pct==="number"?Math.max(0,Math.min(100,Math.round(v.pct))):null;

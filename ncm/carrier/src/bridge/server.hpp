@@ -65,6 +65,23 @@ struct Handling {
     bool hasTopSpeed = false; double topSpeedKph = 0.0;
 };
 
+/// `L324`: installed components as a force on the bound Machine. World-space Newtons, held for `ttlMs` (a lease the
+/// client refreshes), plus at most one PULSE per message (a new `pulseSeq` starts one, timed in physics time).
+/// `supersedeLift` = this Machine's propulsion belongs to its installed components: NCM Thrust's legacy lift lever is
+/// ignored while the lease is fresh. Same identity rule as Handling: refused unless `assetId` is the bound Machine.
+struct Wrench {
+    int version = 1;
+    std::string assetId;
+    std::string vehicleId;
+    double fx = 0, fy = 0, fz = 0;
+    int ttlMs = 0;
+    bool supersedeLift = false;
+    bool hasPulse = false;
+    uint32_t pulseSeq = 0;
+    double px = 0, py = 0, pz = 0;
+    int pulseMs = 0;
+};
+
 /// One telemetry frame, the shape `driver.feedback.frame` produces. **A channel that could not be read is
 /// ABSENT, not zero** (`IDEA-361`) -- so every field is optional and `has*` means what it says.
 struct Frame {
@@ -105,6 +122,7 @@ public:
     /// `L152`: the driver's fitted parts, as live force scales. A v2 bound setup is also a short lease;
     /// the sender must heartbeat the complete identity and levers while the binding remains authoritative.
     void onHandling(std::function<void(const Handling&)> fn) { onHandling_ = std::move(fn); }
+    void onWrench(std::function<void(const Wrench&)> fn) { onWrench_ = std::move(fn); }
     void onFrame(std::function<void(const Frame&)> fn) { onFrame_ = std::move(fn); }
     void onDisconnect(std::function<void()> fn) { onDisconnect_ = std::move(fn); }
 
@@ -135,6 +153,7 @@ private:
     std::function<void(const std::vector<std::string>&)> onArchDump_;
     std::function<void(const std::vector<std::string>&)> onGearDump_;
     std::function<void(const Handling&)> onHandling_;
+    std::function<void(const Wrench&)> onWrench_;
     std::function<void(const Frame&)> onFrame_;
     std::function<void()> onDisconnect_;
     std::function<void()> onConnect_;

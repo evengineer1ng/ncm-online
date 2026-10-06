@@ -5061,3 +5061,1391 @@ Owner, after a point-to-point mixed race (North Oak Ramp 2 to Tip, 13:45, 11 NPC
 **Owner:** "time to get it on ncm online, the dev server up to date code copied over, modstack included. can you take stock of whats going over first? make any commits and pushes we may need ... lets be safe" (after "i think restream is in a better state").
 
 **Ruled:** L223's Baseline 1 freeze ends. Online takes dev's code and dev's required mods. **Stock taken (03:30 ET):** Online runs `online-baseline-1` (7c79745, 2026-09-29) with 3 required mods (ncm-carrier 0.1.30, ncm-rig-bridge 0.1.7, ncm-vision 0.3.0; digest `879af328...`). Going over: 50 commits + the L291-L298 work (committed 2026-10-03 on `checkpoint/pre-op77-upgrade-2026-10-02`, fast-forwarded to `main`); two resources new to Online (`ncm_paddock`, `ncm_broadcast`); 16 schema migrations 043-058 (none drops, truncates or deletes); required mods 3 -> 8 (adds ncm-clock 0.1.0, ncm-broadcast 0.1.0, archivexl 1.27.1, tweakxl 1.11.4, ncm-pace 0.9.2; ncm-vision 0.3.0 -> 0.4.0). **Deployed 2026-10-03 08:12 UTC** on the owner's "yes go ahead with all that": backup, instance check, code, load-list guard, 8 mods, restart, verification (OPS_STAGING "Online Baseline 2"); tag `online-baseline-2`.
+
+## L300 - OWNER DIRECTION (SPEC, NOT RULED) / RACING WEEK - THE THREE-DAY RECONSTRUCTION; AUDIT AND PROPOSAL 45 WRITTEN (2026-10-03)
+
+**Owner:** "need your thoughts and suggestions for a majoras mask, the outer wilds progression system ... for dev server with intention for public later", with the full Racing Week spec: Night City Racing Week, advertised as seven days, lasting three (Day 1 Love / Day 2 Conflict / Day 3 Disgust), replayed by a Kimiko braindance reconstruction on one shared server clock (24 real hours = 24 game hours, ~72 h a run). It adds global procedural conditions with provenance, a run-scoped player character, Day × player reactions, an end-of-run ceremony and archive (Ribbon OS later), and selective meta-progression. **"Do not begin large implementation until the investigation above is returned."**
+
+**Captured as SPEC:** the owner's hard rules, preserved as §0 of [45_RACING_WEEK.md](45_RACING_WEEK.md). **Returned:** doc 45 (PROPOSAL), sections A-K. Its headline finding: the Paddock already holds about 70% of the machinery (the real-time Eastern clock and idempotent daily step, seeded climate rolls with provenance, a hidden multi-axis trajectory, Spotlight, the tagged voice bank and its truth rule, and the Machine Index knowledge/possession split). Gaps: the trajectory is fed only by talk and meet visits, there is no server-side police signal, and nothing is run-scoped.
+
+**Owed rulings (W-1 to W-7 in doc 45):** whether the NPC Paddock replays from a fixed historical seed (recommended) or persists; the 06:00 ET Day boundary; licence persistence; the meta model (D-4 hybrid: Index knowledge + N anchors witnessed-configuration + team identity, no meta-money); condition grants to present drivers only; the public Online rollout; and condition cadence.
+
+**Nothing implemented; no production behaviour changed.** Ideas IDEA-857 to IDEA-874.
+
+## L301 - OWNER RULINGS + BUILT ON DEV / RACING WEEK - ADVERTISED SPEED LIMITS BY DAY; THE POPULATION PROBE (2026-10-03)
+
+**Owner:** "six experiments? lets do it ... i was thinking we do advertised speed limits for racing for everyone including npcs that modulate ... day 1: low speed limit, event organizers thought this would be friendly ... day 2: ok we will raise the speed limit ... day 3: ok we have had enough of racing, back to sane driving limits, but the racers who actually are still racing ... are pushing harder than ever over the way low speed limit. police response can be proportional to how far over the speed limit you go." The owner also described NPC compliance on one personality axis, moved by others' actions, and an "i quit" / "built different" arc. **Rulings (asked):** scope = probes + build v1 now (NPC compliance after its probe); race cost is **Day-dependent** (Day 1 time penalties, Day 2 warnings, Day 3 police only).
+
+**Built on dev (doc 45 §M):** the derived Day (`week.clock`, rung 0 of doc 45 §K; W-2's 06:00 boundary is a setting, not a ruling); posted limits from the game's 19,432 vehicle lanes; the Day's sign on the HUD; proportional NCPD wanted capped per Day (1 / 2 / 5); Day-1 speeding incidents (schema 059) and Day-2 warnings in league race sessions; a `speeding` trajectory signal. Also built: the dev-only population probe `prototypes/ncm_dev_probe` (E1-E5; junction from `tools/o77-server.ps1`, explicit `server.jsonc` entry, outside `ncm/*` so it cannot reach Online). Dev restarted (log `tools/open77/server/l306-restart-20261003.stdout.log`): migration 059 applied, `lane index ready: 19432 lanes, 86075 points ... 3.2 s`, `WEEK run=1 day=1`, probe ready (crowd pool 626), no script errors. Gate ALL GREEN. **No live PASS** (MASTER_TEST §RW1-§RW8). Online untouched.
+
+**Not done:** E7 (NPC margin semantics) needs a Pace publish with the game closed; it gates v2 only and waits for the owner. W-1/W-3/W-4 are still unruled.
+
+## L302 - OWNER DIRECTION + BUILT ON DEV / RACING WEEK - A CONTINUOUS 72-HOUR CURVE: HISTORY'S CARRIER, THIS RUN'S LIVE SIGNAL (2026-10-03)
+
+**Owner (direction, pasted):** "static Day 1 / Day 2 / Day 3 states are now too coarse ... underneath them should be a continuous 72-hour social-pressure curve ... don't make midnight magical ... give it a baseline trajectory, then let Racing Week itself perturb it ... the social simulation consumes outcomes regardless of who produced them ... both still end." Then: "yes lets build the curve layer."
+
+**Ruled (provisional, coder-proposed and accepted with "yes"):** the deviation is bounded by a band, ±0.12 on opening day widening to ±0.30, which reconciles the live signal with doc 45 rule 1 (Day 1's identity is fixed). Institutions step (announced limits and race rules, latched once per run, fired early by a worse-than-history week) while the city drifts. The HUD shows official chapters (OPENING DAY / RACING CONTINUES / FINAL DAY), never the city's mood.
+
+**Supersedes in L301:** the per-Day limit table and per-Day police caps. The limit and race rule now come from the curve's announced step, and the police cap and bar from tolerance. L301's Day-dependent race cost survives as the steps' rules (opening: penalty, we_hear_you: warning, then police).
+
+**Built on dev (doc 45 §N):** `core/week/curve.lua` (+ tests, both runtimes); `week.clock` run hours / phase / secondsRemaining / pinned hour; `ncm_world/server/week.lua`; schema 060; fact feeds from league incidents (civilian contact, wrecks), completed races (clean finishers), Paddock races (crashes against the measured 0.50 expected), chrome impacts and speeding excess. Gate ALL GREEN. Dev restarted, log `tools/open77/server/l307-restart-20261003.stdout.log`: migration 060, `RUN 1 opened at hour 16.39`, `ANNOUNCE opening`. **No live PASS.**
+
+## L303 - OWNER RULINGS + BUILT ON DEV / RACING WEEK - W-1..W-4 RULED; CHAMPIONS AT HOUR 72; THE COLLAPSE (DRY-RUN); THE MONEY CRAZE (2026-10-03)
+
+**Owner:** "w1: accepted. to combat the issue of contracts going dormant we schedule the championship aggressively around the winners being crowned hour 72 so it matters ... for player ceremony we show the winners of the timeframe at the reset at various levels ... badlands cup maimai cup (we have gotta police npc cars into being maimai only etc for races that specify a specific car) , night city premier , gt ... there was ultimately a name to remember at shut down. and those names get etched into the fabric of the lore ... decisions you make day 1 as far as who to drive for or with can materially shape your championship run end to end: w2. noon est. w3. agreed w4 yes lets go with that, build approved." Mid-build: "the in lore reason for spike in racing is money is unusally high, people are thinking its a gold mine, but its more flash craze for racing."
+
+**Ruled:**
+- **W-1:** the Paddock replays from the fixed historical seed every run. To keep contracts and seasons meaning something, the championship is the run, crowned at hour 72 with finales, and the names go into a permanent hall of champions.
+- **W-2:** the run boundary is **12:00 ET** (supersedes L301's 06:00 default).
+- **W-3:** licence tier and rating persist; SR halves toward neutral at each reset.
+- **W-4:** the hybrid. Knowledge persists. Anchors: 1, plus a 2nd after finishing a Day-3 race, plus a 3rd after a Premier start, saved as witnessed; `anchor_if_won` yes; no meta-money and no bank; a capped team stipend; team identity persists. W-6 (the founding anchor) is taken as part of "build approved": every existing garage keeps its most-raced car at the first collapse.
+- **Lore:** Racing Week's money spike is a flash craze.
+
+**Built on dev (doc 45 §O, §P):**
+- the Cup = the run;
+- finales with double points;
+- the crown, NPC or human, and the hall of champions (schema 061);
+- MaiMai spec enforcement for NPCs (physical and sim) and humans;
+- `topic_champion` voices;
+- the money carrier on the curve, scaling NPC purses and adding a human craze bonus;
+- noon ET in the shared week config;
+- `week.collapse` rules plus the league orchestrator (dry-run default);
+- the Paddock archive + restart into the historical seed (schema 062);
+- the countdown / freeze / glitch / KIMIKO ending.
+
+Gate ALL GREEN (new tests: racing_week_cup, week_collapse, champion voice, `tools/test-server-sandbox.lua`). Dev boot `tools/open77/server/l310-restart-20261003.stdout.log`: run 1 = 2026-10-03 12:00 -> 10-06 12:00 ET, Cup `2026-S4-RW001`, collapse `dryrun`. **No live PASS; the collapse has never executed live.**
+
+**Defect caused and contained this session (KB-324):** a bad tunable `apply` value made ncm_paddock's declaration fail, its serverId fell back to the stale default `ncm-dev`, and boot l308 ran that old world for about 2 minutes. The real world was untouched. Fixed, the boot now refuses on a failed declaration, and the gate refuses bad `apply` values.
+
+## L304 - OWNER REQUEST + BUILT ON DEV / PADDOCK - EVERY RACER ON THE MAP; NPC PURCHASES FIXED (2026-10-04)
+
+**Owner:** "fix the npc attempts to buy parts. also, lets make custom racer icons to show based on where npcs or humans are from races, visible in map. including your own race / minimap and ambient races as they happen."
+
+**Built (dev):**
+- `ncm_paddock/server/racers.lua` sends every running Paddock race's cars to all clients every `racerIconsEverySec` (2 s); setting `racerIcons`. Simulated, bubble, street and mixed races alike, read through the live view's own computation (now `PaddockViews.rowsFor`, extracted so the map and the live view cannot disagree), each car placed with `paddock.racestate.pointAt`.
+- `ncm_paddock/client/racers.lua` draws one vanilla map pin per car with a declared SVG icon (`icons/racer_*.svg`, paths only): NPCs by tier (street orange, regional cyan, pro violet, premier gold), other humans white, **everyone in your own race green and larger**, your own car not drawn. Fullscreen-map title: the driver; description: place and series. Capped at 120 pins, your race first. A pin the world reload killed is recreated on the next update; an icon refusal falls back to the native sprite and is logged.
+- KB-328 fixed (save before the purchase checks the database); KB-323 mitigated.
+
+Boot `tools/open77/server/l316-restart-20261004.stdout.log`: `racer icons: 1 race(s), 12 car(s) on the map`; purchases complete with no SQL 1690. **No live PASS**: whether the pins show on the minimap (vanilla `vendor` sprite + SVG) and under what icon budget is for the owner to see (MASTER_TEST §RW16).
+
+
+## L305 - OWNER RULINGS + BUILT ON DEV / PADDOCK - EARNED RESULTS, NATURAL PACE, A LIVING NPC ECONOMY (2026-10-04)
+
+**From:** Online's night of data (`wp/ONLINE_NIGHT_2026-10-04.md`, IDEA-916..922).
+
+**Owner:**
+- "no. they have to earn the result same as me. i like that our street racing game has a leader pulls the ladder up behind them feel, make our simulated races behave more like how on track races are going."
+- Calibration: "keep it natural, the result of how fast npc field should vary based on driver quality aka paddock stats and attributes + car speed + what parts they have fitted compared to what youre bringing, not a universal 'faster or slower'". Source: "my laps now".
+- "dont necessarily decide to universally slow them, im on basic machinery, make the economy alive (this means money sinks and pressures for npcs so they need to use exchange, parts are moving and success is fluid) so im not exactly expected to win, this is desirable".
+- Yes to physical crash facts, a learned crash rate, and a wrong-machine warning before the green. Push the dev purchase fixes to Online.
+
+**Ruled (LOCKED):**
+1. **The flag applies to simulated races too.** `paddock.mixed.flagEntrants`: a car not home within `finishWindowSec(line)` of the leader is `dnf/flagged`, with no points and no purse, classified behind the finishers. This is the rule human races already had. It is applied in `PaddockRaces.run` and in Billie's pricing. IDEA-916 is dropped.
+2. **Pace is natural, anchored on the human.**
+   - Human Paddock laps are normalised to a stat-50 driver in a stat-50 car (`paddock.calibration.normaliseMs`: the human's own car performance is backed out).
+   - Each tier's median speed becomes the base (`humanLearned`, which beats `paceLearned`, which beats the seeds).
+   - NPCs then differ only by attributes, car and fitted parts (`paddock.sim`). Physical NPCs are not slowed.
+   - Settings: `calibrationHumanPaddock`, `calibrationMinHumanSamples` (3), `calibHumanDays` (30).
+3. **Physical crashes are facts:** `PaddockRaces.crashCount` counts crash/contact DNFs, wrecked cars, or damage >= 0.5. The curve's expected rate is learned per server (`NcmWeek.expected`, trailing 7 days, >= 50 races, clamped 0.2-2.0, fallback 0.5).
+4. **Wrong machine before the green:** at the race session's `gridded` and `countdown` phases, a seated car that is not the entered one gets a tell and a toast. The DSQ after the green is unchanged.
+5. **A living NPC economy.**
+   - Teams budget for cars as cash minus `npcTeamRunwayDays` (14) of wages, capped at `npcTeamCarShare` (0.5) of cash. This replaces 4 % of cash.
+   - Every start costs `npcRunningShare` (0.5 %) of the car's value, booked as `running`.
+   - Displaced cars are traded in to the used market (L298).
+6. **Online gets KB-328/KB-323's hunks only.** This is a minimal hotfix of `markets.lua` and `exchange.lua` against tag `online-baseline-2`. Dev's `markets.lua` calls L303's `crazePurse`, which is absent on Online. It deploys **only on the owner's yes.**
+
+**Dev evidence (boot `tools/open77/server/l317-restart-20261004.stdout.log`, 06:00 ET):**
+- Calibration: `human Paddock laps: 10 of 14 usable; regional 5 lap(s) median 21.2 m/s; street 5 lap(s) median 22.5 m/s` (the seeds and learned values were ~29 m/s).
+- Expected crash rate 0.49 over 720 races.
+- 7 team cars bought in the first 11 minutes (€$28-52k each, trade-ins €$4.8-11.2k).
+- Running costs are booked.
+- Since the KB-328 fix (02:08): 61 purchases, 0 SQL 1690, 0 drift, 1 Exchange settlement and 0 failures.
+- No simulated race had resolved under the flag by 06:12, so the flag is **unobserved**.
+
+**No live PASS** (MASTER_TEST §RW17-§RW20).
+
+**Watch:**
+- The first car-buying pass was a burst of pent-up demand. Check that it settles, and that no team drains below its runway.
+- Check whether the flag DNFs too much of a simulated field (Online's human races classified 53 %).
+
+## L306 - OWNER RULINGS + PHASE 0/1 BUILT (NOT DEPLOYED) / NCM GEARBOX - OUR OWN MANUAL TRANSMISSION, PER MACHINE (2026-10-04)
+
+**Owner:**
+- "So I want a manual transmission mod. There's the one that we know about, which is not technically my mod to serve and distribute ... let's make manual from the ground up. Our own manual implementation. With the serial numbers of the cars, we assign manual or automatic ... Maybe you have two Galenas, one each. They both drive differently."
+- "We fuck with the gearbox, number of gears ... you got an eight-speed, a six-speed, a five-speed ... untapped potential outside of the usual envelope ... introducing emergent math to it."
+- Galena automatic and Galena manual are "two different Galenas", with "one machine index entry but two configs of same car", visible at every player-facing purchase.
+
+**Ruled (AskUserQuestion):**
+1. **Native audio first.** No limiter-only v0. The engine's own gear and sound must match the box, so we hold the native gear ourselves.
+2. **Automatics are untouched.** A manual's edge is gearing trade-offs only: pickup coverage against top speed and overdrive.
+3. **Cars already owned stay automatic** (`pre_gearbox`). This covers drivers, teams and independents. Shelf stock and every new car are rolled from the model's factory mix.
+
+**Design (LOCKED):**
+- The gearbox is fixed at manufacture on the asset (`vehicle_asset.gearbox_*`, schema 063), like colour (L111).
+- A manual spec is its own TweakDB record: `<model record>_ncm_gbx_<spec>`, a clone with its own 4–8-gear array.
+- NCM Gearbox is **our own package**, separate from Carrier and Rig Bridge, written clean-room.
+- **L25 is amended for manual cars only.** A manual needs NCM Gearbox to drive as one, so the package becomes a required mod of any world that sells manuals. Automatics still need nothing.
+- **Manual sales are gated** (`ncm_gearbox_manual_sales`, default false) until phase 3. Manual stock is listed as "MANUAL — ARRIVING" and refused at purchase.
+- Manual spawning is behind `ncm_gearbox_spawn_clones` (default false). With it off, a manual asset spawns its model record and logs that it did.
+
+**Built (gate ALL GREEN; dev NOT restarted, because the owner was connected; nothing on Online):**
+- Core `machine.gearbox` with tests, and the catalogue resolving clone records to their machine.
+- Migration 063 with the owned → `pre_gearbox` backfill.
+- `NcmGearbox` in ncm_league: birth, `of`, the boot-time shelf stamp, and the `ncm.gearbox` console report.
+- Gearbox stamps at all four mint points: starter stock, grant (a clone record names the spec), manufacture, and Paddock NPC cars. Paddock requires schema 63.
+- Market offerings split per gearbox, with a GEARBOX line and an arriving state in the panel.
+- The purchase announcement and the garage name the gearbox, and so does the wrong-machine warning.
+- The owned-car call spawns the clone behind the switch.
+- **Phase 0:**
+  - `tools/gen-gearbox-records.lua` with its parity gate;
+  - the `ncm/gearbox` 0.0.1 DLL, which builds clone engine data and gears at runtime and dumps the model chain;
+  - `ncm/gearbox/pack.py`;
+  - `--extra-zip` on the dev hand-install script;
+  - research note `docs/research/open77/GEARBOX_SPIKE.md`.
+
+**Not done:** S1–S6 have not run in-game; the DLL has never loaded. The hold-gear hook, clutch, neutral, HUD and input are phase 3.
+
+**No live PASS** (MASTER_TEST §GB1–§GB8).
+
+## L307 - OWNER DIRECTION (SPEC, NOT RULED) / NCM OBSERVER - THE GHOST THAT WATCHES THE RACE (2026-10-04)
+
+**Owner direction (verbatim in doc 46 §0):** NCM Observer is a specialised OPEN//77 client, beginning as `ncmtester2`, that witnesses NCM without taking part. It is a presence without a person. It travels to any race, makes it physical through the bubble, and becomes a camera: racer-relative modes, plus roadside cameras generated from lane geometry and curated yes/no, owned by the road. A deterministic director picks shots from NCM's own signals. Radio OS reports from Observer with eyewitness and broadcast-desk truth. OBS composites the program, and it streams back onto OPEN//77 televisions. It is a development instrument (riding with NPCs) before it is television.
+
+**Captured, not authorised:** [46_NCM_OBSERVER.md](46_NCM_OBSERVER.md) (SPEC) and IDEA-928 to IDEA-941. IDEA-023 is unblocked by the platform and absorbed. Nothing was built.
+
+**Found while capturing (evidence, doc 46 §2-§3):**
+- The bubble already counts every connected client (`Open77.players.positions`; 100 m in / 150 m out, L247), so §0's central trick needs no new mechanism. The open question is excluding Observer from everything *except* the bubble and `watched`.
+- Cars materialise 100 m from the observer, so a long roadside shot will see them pop in (G4).
+- `open77_media` screens are http(s) CEF pages. Live video there depends on codecs that stock CEF often lacks (G6).
+- A second local client has known WebUI and Carrier problems (KB-4, KB-147), which Observer may not need at all (G1).
+
+**OPEN for the owner:**
+- O-1: may Radio OS (Python) run beside the game as a read-only narrator, given L221.5?
+- O-2: one `observer` role predicate keyed on the binding key?
+- O-3: the outward stream's service, key and publicity.
+- O-4: Observer ships as its own package.
+
+**Suggested first step (doc 46 §5, PROPOSAL):** connect `ncmtester2` through the launcher on dev and `ncm.tp` it to a running race far from the owner (G1 + G2), with no code.
+
+**No live PASS.**
+
+**L307 addendum (2026-10-04) - OWNER RULINGS on O-1 to O-4:**
+1. **O-1 RULED: commentary is deterministic, never an LLM. Observer needs no Python.**
+   - Radio OS is a loose guide, not a dependency.
+   - Lines come from facts through seeded templates, the same way `life.voice` gives Paddock people their voices.
+   - There is an **optional bridge out** for higher-end voice playback, a sink for finished lines. Observer runs completely without it.
+   - L221.5 therefore stands untouched.
+2. **O-2:** the owner asked for a recommendation. The coder recommends **yes, one predicate**, reshaped by ruling 4 (doc 46 §4).
+   - The observer is a **mode a connection enters**, recorded server-side per connection.
+   - It is linked to the owner's driver binding, never inferred from a name or an account.
+3. **O-3 OPEN:** the owner is undecided. Note for the decision: in-game TVs need a reachable http(s) stream, but not a public platform; a self-hosted relay would do.
+4. **O-4 RULED: Observer is a client MODE, not an account and not a privileged tester.**
+   - A player must never become an observer by accident.
+   - In the end every player may have their own Observer, and it **runs only when they ask for it**.
+   - The owner will use theirs to make the Racing Week broadcast, and to build Observer itself.
+   - Packaging stays separate per the standing rule.
+
+## L308 - OWNER GO ("lets build it") + BUILT, NOT DEPLOYED / NCM OBSERVER - SLICES 1-2: THE MODE, THE EXCLUSION, THE DIRECTOR, THE LENS (2026-10-04)
+
+**Owner:** "lets build it". This authorises doc 46 §5 slices 1-2. O-2 (one predicate) was taken as recommended. Slices 3-5 (lane cameras, curation, commentary, OBS/TV loop) are not built.
+
+**Platform facts used (OPEN//77 cards, answering for .78; dev is .102):**
+- The cameras guide has a spectator recipe ("Move the ghost to the target"). The world streams around the BODY, not the lens, and `camera.activate` refuses past 250 m.
+- Visibility and collision are separate levers. `players.setVisible(false)` hides the body and its nameplate; `players.setGhosted(true, { autoClear = false })` makes it non-solid. An invisible player stays in every roster, so the Paddock bubble still counts it.
+- Client `travel.setNoclip` and `travel.teleport` let the ghost hop; server `players.teleport` settles streaming for long jumps.
+- `character.frame{vehicleId}` gives a car's local position and its own axes.
+- There is no net-event veto: `CancelEvent` covers cancellable events only.
+
+**Built (gate ALL GREEN; dev NOT restarted):**
+- **`ncm_observer`, its own resource.**
+  - **Kill switch and gate:** `observerEnabled`. `observerAllow` lists the user ids that may ask from their own client; it is empty by default, so only the console can turn the mode on.
+  - **Entering is a two-step handshake:** an explicit request (console `ncm.observer on <pid>`, or `/ncm.observe on` from an allowed account) *arms* the connection for 20 s; the client then confirms it is on foot. The mode lives on the connection: a disconnect ends it, and a reconnect is an ordinary player again.
+  - **In mode:** invisible, ghosted, noclip, and listed in `GlobalState.ncmObservers`.
+  - **Leaving** restores the body and teleports it back to where it entered.
+- **The exclusion is one predicate at three choke points.**
+  - The lookups: ncm_league `resolveDriver` (55 callers), ncm_paddock `PaddockPlayers.driver`, ncm_world `NcmIdentity.get` (27 callers). Each returns no driver for an observer.
+  - Every handler built on them already treats an unbound player as unable to act, so a new feature is excluded by default rather than by another patch.
+  - The bubble reads `players.positions` and deliberately does not ask.
+- **Core `observer.director`** (11 tests, Lua 5.4 + LuaJIT):
+  - target specs (`race`, `racer`, `pos n` / `p6`, `leader`, `battle`, `auto`) resolved deterministically from the racer snapshot;
+  - battles as the closest consecutive pairs;
+  - the auto director (holds at least 12 s, cuts to a battle clearly closer, moves on after 45 s);
+  - eight racer-relative shots (chase, far, drone, onboard, orbit, side, front, low);
+  - quaternion basis (no yaw convention assumed: `garage.lua` and `carrier_bridge.lua` disagree);
+  - the leapfrog rule for the body.
+- **ncm_paddock `racers.lua`:** each car also carries `d` / `g` / `v` (distance, gap, the physical vehicle id), and the snapshot is raised server-side as `ncm:paddock:racers:server`.
+- **The client lens:**
+  - one scripted camera moved every frame from `character.frame`, falling back to the replicated transform, then to the model point (drone);
+  - the body hops ahead with `travel.teleport` and asks the server for a settling jump when more than 240 m away;
+  - `/ncm.cam <shot>|next|clean` (`hud.setCinematic`);
+  - every 10 s a status line to the server log: source, camera, hops, jumps, refusals, and the target's gear, rpm, throttle and speed. That last part is the gearbox ride-along instrument.
+
+**Known and accepted:**
+- A leapfrog makes the ghost look fast for one 0.5 s bubble pass, so the KB-286 recede rule may hold one car behind it back for that pass.
+- The observer's client must run NCM Pace for the bubble to drive cars near it. Both clients share one install.
+
+**Not proven (doc 46 G1-G8):**
+- a second client through the launcher (KB-4);
+- whether noclip plus a client teleport holds the body without falling;
+- whether `setTransform` + `lookAt` every frame is smooth;
+- pop-in at the 250 m bubble edge.
+
+**No live PASS** (MASTER_TEST §OB1-§OB8).
+
+## L309 - OWNER DIRECTION (SPEC, NOT RULED) / RACING WEEK - MOODY, AND THE SEVEN-DAY WEEK HISTORY RARELY ALLOWS (2026-10-04)
+
+**Owner direction (verbatim in doc 47 §0):**
+- Racing Week was advertised as seven days. History pulls hard toward collapse around hour 72, but that is an attractor, not a rule.
+- Every reconstruction starts from the same Day 1.
+- **Moody**, a seeded D20 rolled every ~4 h whose faces can also change Moody's own cadence, perturbs the *conditions*.
+- The simulation, NPCs and humans produce the *outcomes*.
+- At each noon from hour 72, a continuation judgement reads the world state as a probability (never 100 %).
+- Targets for unattended runs: about 25 % reach Day 4 and about 1 in 144 reach Day 7; completing Day 7 is rarer still.
+- No public meter: proxies only. Vibe is composed from state, not skinned by Day.
+- Conditions reach each NPC through their personality and circumstances.
+
+**Captured, not authorised:** [47_MOODY.md](47_MOODY.md) (SPEC) and IDEA-946 to IDEA-957. Nothing was built.
+
+**Contested (INDEX C-5, held open):** doc 45 §0 invariants 5 ("ends after Day 3") and 6 ("never a playable Day 4") are contradicted. Invariant 1 (fixed Day identities) is softened to an expected trajectory.
+
+**Found while capturing (doc 47 §2-§3):**
+- Most of the machine exists under other names: genesis is the anchor, the curve's live signal is the simulation, §G's seeded rolls are proto-Moody, and the tolerance is already hidden.
+- What must change:
+  - `week.clock` tiles fixed three-day runs, so run start and end must become state;
+  - the carrier reaches 0 at hour 72, which is exactly the deterministic reset the direction retires;
+  - finales, the crown and the countdown all count back from a known end.
+
+**OPEN for the owner:**
+- Q1: confirm that doc 47 supersedes doc 45 §0.5-§0.6 and amends §0.1.
+- Q2: the championships when the end is uncertain.
+- Q3: the countdown at every possible end.
+- Q4: the D20 replaces §G's dawn/dusk slots.
+- Q5: the first reservoirs.
+
+**No live PASS.**
+
+**L309 addendum (2026-10-04) - OWNER RULINGS:**
+1. **Q1 RULED: doc 47 supersedes doc 45 §0.5 and §0.6, and amends §0.1.**
+   - Racing Week is seven advertised days, and a run may survive past Day 3.
+   - Day 1/2/3 moods are the expected trajectory, not fixed skins.
+   - Doc 45's other fourteen invariants stand. INDEX C-5 is resolved.
+2. **Q2 RULED: the championships are crowned at every collapse.**
+   - Whatever the standings say when history catches is the crown. A run that completes Day 7 crowns at its scheduled end.
+   - This replaces L303's fixed hour-72 crown.
+   - *Coder follow-up, owed:* L303's double-points finales are scheduled back from hour 72. With the crown at an uncertain end, they need a rule: before every possible end, before the historical end only, or dropped (doc 47 Q6).
+3. **Q3 RULED: a countdown before every possible end** (noon of Day 3 through Day 7). Survival is silent: 12:00 becomes 12:01.
+4. **Q5 RULED: the first reservoirs are only those that facts already feed.**
+   - safety (crashes, civilian contact);
+   - enforcement (speeding, wanted);
+   - momentum / economy (races run, purses, grid fill);
+   - sentiment, derived from those three.
+   - The rest arrive with the systems that feed them.
+5. **Q4** (the D20 every ~4 h with self-modifying faces, in place of doc 45 §G's dawn/dusk slots) is the owner's own direction in doc 47 §0. §G's provenance and reset semantics carry over.
+
+Nothing built. Doc 47 §6 is the build order if the owner says go.
+
+## L310 - OWNER GO ("lets build it then ill test everything") + BUILT, NOT DEPLOYED / RACING WEEK - MOODY, THE VERDICTS, THE SEVEN-DAY TIMELINE (2026-10-04)
+
+**Owner:** "lets build it then ill test everything". This authorises doc 47 §6.
+- **Q6 default (coder, awaiting the owner):** the double-points finales run before **every** possible end. This falls out of the provider: an open run's end is its next possible end. One rule changes it: provider `endUtc` = the historical end.
+
+**Built (gate ALL GREEN under Lua 5.4 + LuaJIT; dev NOT restarted):**
+
+*The timeline.*
+- `week.clock` 0.3 adds `locate` / `inRun` / `nowIn` / `boundary` over **recorded ends**.
+- Run n+1 opens where run n ended. An open run has a provisional end (the next possible end it has not survived), and instants past it are `beyond`.
+- A run never outlives Day 7. `M.at` / `runBounds` stay as the historical calendar.
+
+*The curve.*
+- `week.curve` 0.2: 168 h; 7 chapter labels (Day 3 is "DAY THREE"; "FINAL DAY" is Day 7).
+- The carrier is a pull: 0.04 at hour 72 (it was 0), easing to 0.26 by hour 168. The band widens to ±0.45 by hour 168.
+- **Reservoirs:** safety, enforcement and momentum, with sentiment = their sum.
+  - Momentum needs the host's measured races per hour.
+  - Outside the band all three scale back together, so L302's dynamics are unchanged.
+- `read(st, h, fx)` applies Moody's *rules* (limit, police cap, bar).
+
+*Moody.*
+- `week.moody`: a seeded, ceremonial D20 every 4 h from hour 4, with 20 faces:
+  - neutral: STILL AIR, BUSINESS AS USUAL;
+  - purses: DEVIL'S PURSE, GOLD RUSH, SPONSOR PULLOUT, NIGHT MARKET, PREMIER SHOWCASE, HEADLINER;
+  - calendar: PACKED CALENDAR, QUIET HOURS;
+  - police: CRACKDOWN, BLIND EYE;
+  - limits: OPEN ROADS, SLOW ZONES;
+  - CALM, TURN OF THE TIDE, LONG HAUL;
+  - meta: RESTLESS, STABLE WEATHER, DOUBLE TROUBLE.
+- CROWD SURGE and SAFETY DRIVE wait for systems that back them.
+- `pull(lure, purse, who)` weighs a purse per person: need (team or own cash), boldness, caution, and a crash they saw lately. It returns an attendance factor and a hazard factor.
+
+*The verdicts.*
+- `week.continuation`: at hours 72/96/120/144/168, p = logistic(BASE[h] + 2·z), clamped 0.01-0.85, where z = deviation / band.
+- One seeded draw decides, and it is recorded with p, z, u and the state.
+
+*The harness.*
+- `week.harness` + `tools/week-harness.lua`: unattended runs (Paddock-only facts, Moody acting through calendar and lure).
+- **20,000 runs: Day 4 0.262, Day 4→5 0.333, Day 5→6 0.337, Day 6→7 0.240, Day 7 seen 1 in 142.**
+- BASE[72] was then set between the two measurements (-1.07). Mean z ≈ 0, so an NPC-only week tracks history.
+- The gate runs 1,500 runs and asserts Day 4 ≈ 1/4 ± 0.04 and Day 4→5 ≈ 1/3.
+
+*The vibe.*
+- `week.vibe`: mood from tolerance (euphoric / buoyant / uneasy / tense / hostile).
+- Cause: the dominant reservoir, or money holding things together. Surprise: how far the city stands from history. Off the map: past hour 72.
+- A racing-radio line every two run hours, deterministic and never a number.
+
+*Hosts.*
+- **Schema 064:** `racing_week_run` gains start/end/end_kind/survived/seed; new tables `racing_week_verdict` and `racing_week_moody`.
+- **ncm_world `week.lua`** is the timeline's only writer. It:
+  - steps Moody (announced as MOODY; a legacy run's dice start at the current hour; after downtime only the last three catch-up rolls are announced);
+  - judges at each possible end;
+  - runs the countdown before every possible end and waits for the recorded verdict (no verdict, no rewind);
+  - plays the rewind on a collapse, or a distinct "complete" beat;
+  - stays silent on survival;
+  - publishes `ncmWeek.moody` (names only) and `GlobalState.ncmWeekFx` / `ncm:week:fx`;
+  - `ncm.week` gains reservoirs, a DEVELOPER-ONLY p preview, Moody state, `moody`, `judge`, `day <1..7>` and `hour <0..168>`;
+  - `ncm_week_verdict history` forces every run to end at 72.
+- **ncm_league `collapse.lua`:** finished runs come from the recorded timeline.
+- **ncm_paddock:**
+  - the Cup provider reads the timeline (`beyond`: nothing is posted past an open run's possible end until the verdict);
+  - Moody purses go through `crazePurse(purse, tier)`;
+  - calendar density goes through `Season.window(..., PaddockWeek.rhythm())`;
+  - lures reach `World.raceField` (who turns up) and `lureRisk` in `paddock.sim` (who drives harder);
+  - every entrant of a race with a crash records `lastCrashSeenAt` (shaken for about a day);
+  - the Paddock requires schema 64.
+- New tests: `test_week_moody` (13), `test_paddock_moody` (3), `test_week_vibe` (3), plus curve tests updated to the new canon.
+
+**Not built:**
+- crowd, sign, PA-tone and dressing composition (`week.vibe.classify` is the hook);
+- CROWD SURGE, SAFETY DRIVE;
+- medical, civic, infrastructure and legitimacy reservoirs (L309 Q5: when systems feed them);
+- the Observer commentary of Moody.
+
+**No live PASS** (MASTER_TEST §MW1-§MW10).
+
+**L308 addendum (2026-10-04) - OWNER QA + BUILT, NOT LOADED / NCM OBSERVER - THE PANEL; KB-329.**
+
+**Owner:** "it doesn't feel intuitive / needs more camera control in buttons ... think iRacing simulator replay UI ... select what camera type, what onboard, what race ... turning your current client into observer needs some UX, not just console commands."
+
+**Measured in that session** (`l318`, `ncm_pace-35244.log`):
+- Entry worked: invisible and ghosted.
+- The director picked a battle.
+- The car stayed in the simulation (`src=model`): the tester had no Pace (KB-329).
+- When the race ended, the camera froze silently (`src=none`).
+
+**Built (gate ALL GREEN):**
+- **The F3 panel** (`ncm_observer/client/panel.lua` + `web/observer.html`):
+  - **RACES NOW**: click a race to see its order; click again to watch its leader.
+  - **RUNNING ORDER**: position, a live/sim dot, gap, and PLAYER tags. Click a driver to watch them.
+  - **CAMERA**: eight shots, plus DIRECTOR / BATTLE / LEADER / CLEAN HUD and ENTER / EXIT OBSERVER.
+- **The strip** while observing: who, which series, live or sim, the shot, and the keys.
+- **Rebindable hotkeys:** 1-8 shots, PgUp/PgDn car, Home leader, B battle, N director, H clean, F3 panel. While the panel holds the keyboard, the page answers the same keys itself.
+- **KB-61-safe focus:** focus only after the page confirms it drew, a watchdog, and a physical Esc/F3 read from Lua.
+- **Director:** `car <raceId> <key>` targets an exact car; each target carries `auto`.
+- **Silences fixed:**
+  - a lost target releases the camera;
+  - when nothing is running, auto says so, clears the target, and takes the next race.
+- KB-329 is fixed in ncm_paddock's client (an 8 s Pace handshake timeout).
+
+**Needs:** a resource or server restart, and both clients reconnecting. Entering from the owner's own client needs `observerAllow` to hold its user id. **No live PASS** (§OB9-§OB12).
+
+**L306 addendum (2026-10-04) - OWNER GO ("lets build" gear holding) + BUILT, INSTALLED ON THIS PC / NCM GEARBOX 0.1.0 - PHASE 3a: FIND THE GEAR.**
+
+**Why phase 3a comes first.** Nobody in this project knows where the engine keeps the current gear, or whether writing it holds. Holding a gear on a guessed offset is how a mod crashes the game.
+
+**What 0.1.0 asks the game** (logged to `ncm_gearbox-<pid>.log`):
+- **The census:** every RTTI class, field, function and enum named for gear, clutch, transmission, shift, neutral or rpm.
+- **Observe:** the player's car every frame, its gear-like numeric fields against the HUD's own gear, rpm and speed (`SHIFT` lines).
+- **Hold:** a guarded experiment, off until `ncm_gearbox_config.json` names a field.
+
+**Built and checked:**
+- `src/discover.cpp`, `src/natives.cpp`, and `r6/scripts/ncm_gearbox/*.reds`.
+- MSVC clean.
+- The redscript compiles against vanilla plus every installed script mod.
+- The gate is ALL GREEN.
+- Installed with `dev-hand-install-mods.py --only none --extra-zip dist/ncm-gearbox-0.1.0.zip`.
+
+**Not built:** the manual's input, clutch, neutral and HUD. They are built on what this finds. **No live PASS** (§GB4, §GB9-§GB10).
+
+**L306 addendum (2026-10-04) - LIVE FINDINGS + 0.1.1 BUILT AND INSTALLED: FIND THE GEAR BY VALUE.**
+
+**The owner's dev drive under 0.1.0** (`ncm_gearbox-53060.log`):
+- **S1, half answered:** the DLL loads and all 44 clones build; reverse-first is confirmed (§GB4 PASS).
+- **The census** (15,917 classes): the gear is **not** an RTTI field of `vehicleCarBaseObject`, and no script-callable function sets it. The 72 gear-named functions are UI listeners and TweakDB getters (§GB9 PASS, with that finding).
+- **The HUD gear** went -1 / 1 / 2 / 3 / 4, and showed -1 under braking.
+
+**0.1.1** (MSVC clean; redscript compiles; installed):
+- `src/scan.cpp` correlates raw memory against the HUD gear: the car object plus one pointer level, through ReadProcessMemory. After seeding it reads only the objects that still hold candidates.
+- `hold.path` takes the address path the scan reports.
+- `NcmGearbox_Left` resets and reports the scan.
+
+**No live PASS for the scan** (§GB11).
+
+**L306 addendum (2026-10-04 14:36) - THE SCAN FOUND TWO; 0.1.2 NAMES THEM AND TRIES THEM.**
+
+**The owner's drive under 0.1.1** (`ncm_gearbox-55384.log`):
+- The scan seeded 176,560 candidates (a 0xC40-byte car object and 96 pointed-to objects).
+- After the first shift, **2 survived**, and both then matched the HUD gear on every frame for three minutes across 0, -1 and 1-5.
+- **Not named, by my bug:** the report printed only when the count changed, and the game closed in the car.
+
+**0.1.2** (MSVC clean; installed):
+- It prints the survivors on every new distinct gear once 3+ are seen.
+- With `hold.trial` (on in this dev package), once the scan settles (4+ gears, 1-4 survivors) and the car is in 2nd or higher, it holds the CURRENT gear in each survivor for 6 s in turn, logging the HUD gear, rpm and speed every 0.5 s.
+- Elimination pauses while it writes.
+
+§GB11 is half answered (the scan converges). §GB12 is owed.
+
+**L306 addendum (2026-10-04 14:47) - S2 ANSWERED: THE GEAR IS ONE BYTE AND A HOLD OVERRIDES THE AUTOMATIC; 0.1.3 HOLDS IT INSIDE THE PHYSICS STEP.**
+
+**The owner's 0.1.2 drive** (`ncm_gearbox-75620.log`):
+- The scan's survivors are one byte reached two ways: `0x2D0 -> +0x3A4` and `0xBA8 -> +0x1C4`, both landing on the same address.
+- Writing the current gear there held 3rd past the normal 3-4 shift (rpm 4,638 at 28.7 m/s) and held 2nd to rpm 4,792 (§GB12 PASS).
+- **It flickers:** the automatic shifts between once-a-frame script writes (rpm dips, one HUD tick of the next gear).
+
+**0.1.3** (MSVC clean; installed):
+- `src/stepper.cpp` detours `RigidBody::Recalculate` (hash 593628708, checked against the game's address table first, as Carrier does) and writes the held gear before and after every physics step while a 150 ms lease from the script tick is fresh. Leaving the car disarms it.
+- The config's A/B trial alternates a frame-only hold (A) with frame plus physics-step (B), 6 s each, twice, and counts the fight.
+
+§GB13 is owed. The manual (input, clutch, neutral, HUD) is built on whichever hold is clean.
+
+**L306 addendum (2026-10-04 15:05) - OWNER DESIGN + RULING + BUILT, INSTALLED, DEV RESTARTED / THE MANUAL: ONE LONG NATIVE GEAR, VIRTUAL GEARS THROUGH CARRIER.**
+
+**Owner** (after KB-330): "slice up gear 1 into an eight speed? give gear 1 a super high top speed ceiling, block from true #2 ... why you dont seem to be aware of that data and need to test more". **Ruling:** the virtual gear acts through Carrier's live levers.
+
+**Gearbox 0.2.0:**
+- **Manual clones get ONE long native gear:** 0 to just past the spec's top speed, the model's strongest forward torque, idle to redline. Reverse is shared. The native box has nothing to shift, and its live state is never written.
+- **The spec's gears are virtual** (`src/manual.cpp`): N, then 1 to n. Each has a ceiling (the spec band's top) and a share (the torque of the model gear the band came from, against the long gear's).
+- **Shifting:** up with LShift, down with LCtrl (config `manual`), read only while THIS window has focus. Upshifts cut drive for the spec's shift time. A downshift past the target gear's ceiling x1.03 is refused. The game's own reverse is left alone. The car starts in N.
+- **To Carrier:** every frame it publishes the selected gear's share and ceiling through per-process shared memory (`levers_shm.hpp`).
+- **The HUD:** the car's own HUD shows the virtual gear and rpm (Vehicle blackboard GearValue / RPMValue, UI only).
+- **Off by default:** the S2 instrument and the physics-step hook.
+
+**Carrier 0.1.31:** `gearboxLevers()` reads that block (fresh = under 200 ms). The share multiplies `driveScale`, including the standstill creep; the ceiling joins the governor as a sharp limiter (full drive to 97 %). Downward only. A stale or absent block is the old behaviour.
+
+**Dev:**
+- `ncm.gearbox clones on|off` sets `ncm_gearbox_spawn_clones` in memory.
+- Both packages hand-installed on the owner's PC (`dev-mods/20261004-150351`).
+- Dev restarted clean (`l320-restart-20261004.stdout.log`).
+- Carrier 0.1.31 is NOT published to Online.
+
+**Known cost:** the engine drone follows the one long native gear (one sweep from idle to redline). Shift audio events are not wired.
+
+**No live PASS** (§GB14).
+
+**L306 addendum (2026-10-04 15:33) - OWNER QA:** "gears were stock / vanilla". **Cause:** the calls were for the owner's automatic Hella (asset `...0003`); the granted manuals sat in the garage.
+
+**Fixes, at the owner's direction ("its dev server its ok"):**
+- **Dev DB:** asset `10000000-0000-4000-8000-000000000003` is now `manual m5` (source `dev_owner`).
+- **Clones at boot:** ON by default in the `development` environment and OFF elsewhere. An explicit `ncm.gearbox clones on|off` is saved (server KVP `gearbox.clones`) and wins.
+- **Gearbox 0.2.1:** pad shifting through XInput, X up and A down (config `manual.padUp/padDown`), only while this window has focus.
+- Carrier 0.1.31 and Gearbox 0.2.1 reinstalled. Dev restarted (`l321-restart-20261004.stdout.log`).
+
+## L311 - OWNER DIRECTION (SPEC, NOT RULED) / ENGINEERING - THE ENGINEERING ENVELOPE: WHAT CAN PHYSICALLY BE BUILT OUT OF A CYBERPUNK CAR (2026-10-04)
+
+**Owner direction (verbatim in doc 48 §0):** the manual-transmission work exposed the missing abstraction for the whole engineering game.
+- A car has a multidimensional engineering envelope (mass, packaging, power, cooling, structure, electronics) instead of 11 slots. The families become systems.
+- Components are physical: footprint, mass, connections, heat.
+- "It fits": stupid builds are allowed and physics delivers the punchline.
+- A tactile 2D packaging puzzle; geometry is a stat.
+- Staged reverse engineering yields lineages (Mk I to Mk II, and forks).
+- NCM takes authority over systems progressively.
+- A campaign is a compressed technological era.
+- **The owner's sequencing:** finish the manual, then an Engineering Architecture pass before more part features.
+
+**Captured, not authorised:** [48_ENGINEERING_ENVELOPE.md](48_ENGINEERING_ENVELOPE.md) (SPEC) and IDEA-959 to IDEA-972.
+
+**Found (doc 48 §2-§3):**
+- Most of the "understanding" layer is already ruled: L134 (knowledge is not capability; staged evidence; fabrication outcomes), L153 (lineages), L162 (assets with provenance).
+- Missing:
+  - a mass lever (E1);
+  - per-car envelope data;
+  - per-component physical data;
+  - multiple components per family (L162 fits one per family);
+  - connections;
+  - the puzzle surface.
+
+**OPEN for the owner:**
+- Q1: does the envelope supersede L162's one-per-family rule?
+- Q2: mass as real physics or as an approximation, after a measurement.
+- Q3: authoring per body class or per model.
+- Q4: campaign survival, deferred.
+- Q5: confirm the sequencing (manual audio and shift feel, then the pass).
+
+Nothing built.
+
+**L311 addendum (2026-10-04) - OWNER RULINGS:**
+1. **Q1 RULED: the envelope supersedes L162's one-part-per-family fitting rule.** Family identity stays as the car's systems.
+2. **Q2 RULED: measure first** (doc 48 E1): can the bound body's mass be written per instance? Mass is real physics or an approximation, decided on that measurement.
+3. **Q3 RULED: envelopes are authored per individual car model.** Not body-class templates.
+4. **Q4 RULED: campaign survival is as before** (doc 45 §P). Saved (anchored) cars survive; knowledge stays.
+5. **Q5 RULED: the sequencing is** the manual's audio and shift feel, then the Engineering Architecture pass (doc 48 §5).
+
+**L306 addendum (2026-10-04 15:53) - THE MANUAL'S DASH, SPACING AND SOUND (Gearbox 0.2.2-0.2.3; installed on this PC; not yet driven).**
+
+**The dash** (owner: "i didnt see our dash showing gear and revs"):
+- The blackboard write lost to the game's every frame.
+- Now every vanilla gear and rpm callback the 0.1.0 census named is wrapped to draw the virtual gear and rpm while a manual is driven (`NcmGearboxDash.reds`, 10 wrappers, compiled): `hudCarController`, `vehicleInteriorUIGameController`, `vehicleVcarGameController`, `inkMotorcycleHUDGameController`, `gearboxLogicController`, `tachometerLogicController` and `analogTachLogicController`.
+
+**Spacing:**
+- `machine.gearbox.ratios` is PROGRESSIVE (`firstTop + (1-firstTop)*t^0.9`) instead of geometric. The owner's log refused most downshifts on 35/47/63/85/115 km/h.
+- The Hella m5 is now 34/58/78/97/115.
+- Specs regenerated (44 clones, parity clean). One test now asserts the shipped trade (m6o covers less than m6) instead of a synthetic pair that held only under the geometric spread.
+
+**Sound** (found offline in `audio_1_general.archive` with WolvenKit 8.20):
+- Every car has `v_car_<maker>_<model>_gear_up` / `_gear_down` events (`eventsmetadata.json`).
+- The engine sound is driven by the `veh_engine_rpm` and `veh_gear` parameters (`cooked_metadata.audio_metadata`).
+- The script API is `GameObject.PlaySoundEvent(GameObject, CName)` and `GameObject.SetAudioParameter(GameObject, CName, Float)` (from the script cache).
+- 0.2.3 plays the car's own shift sound on every shift, and feeds the virtual rpm and gear into `veh_engine_rpm` / `veh_gear` every frame (config `manual.engineAudio`, default on).
+- **Unproven:** whether our engine-parameter write wins over the game's (it may stutter; the switch turns it off).
+
+**No live PASS** (§GB15).
+
+**L306 addendum (2026-10-04 16:25) - GEAR INDICATOR, ENGINE NOTE, A REAL REVERSE (Gearbox 0.2.4; installed on this PC with Carrier 0.1.31; not yet driven).**
+
+Owner QA of 0.2.3: "never saw the dash, shifting seems ok but the engine note is redline basically the whole time im on the gas. and not knowing what gear im in is hard. also seems like reverse has multiple gears and doesnt get refused in drive gear".
+
+- **Indicator.** The dash wrappers draw nothing visible (left in place, harmless). 0.2.4 draws its own widget on the crosshair container (the layer NCM Broadcast uses): MANUAL, a large R / N / 1-n, and a rev bar that turns amber above 75 % and red above 93 % of the gear's limiter. It shows only while a manual is driven.
+- **Engine note.** `veh_engine_rpm` now gets the 0..1 fraction (idle to the gear's limiter) instead of raw rpm. Raw rpm against a parameter the game evidently treats as normalised read as redline. Config `manual.engineAudioScale`: fraction (default) | rpm | off.
+- **Reverse.** The selector is R - N - 1..n. A downshift from N below 1 m/s selects R, and above it is refused and logged. In N nothing drives. In a forward gear, drive is zero whenever the car rolls backwards, so S brakes but never reverses. In R the game's reverse drives only while not moving forward. An upshift from R goes to N with no cut and no sound.
+
+**No live PASS** (§GB16).
+
+## L312 - OWNER DIRECTION (SPEC, NOT RULED) / RACING WEEK - CITY MEMORY: THE CAMPAIGN SCAR LEDGER AND THE INFRASTRUCTURE KNOWLEDGE LEDGER (2026-10-04)
+
+**Owner direction (verbatim in doc 49 §0):** "NCM does not author what Day 3 looks like. NCM authors Day 1, records what happens, and lets Day 3 become the evidence."
+- A sparse, server-authoritative **Campaign Scar Ledger**: incidents aggregate into places with severity 0-4 and a presentation seed.
+- Clients materialise only the scars near them.
+- Persist meaning, regenerate presentation, from a native aftermath vocabulary.
+- An **Infrastructure Knowledge Ledger** across runs: impact clusters per passage and measured interventions.
+- Damage is data. The first campaign is near-naked, and its heatmap places Campaign 2's barriers.
+- Barriers have history. Damaged-but-repaired is visible organisation.
+- Broadcast vs Analysis Observer.
+- NPC organisers with safety styles; players can do the same job.
+- The gearbox → crash → infrastructure loop.
+
+**Captured, not authorised:** [49_CITY_MEMORY.md](49_CITY_MEMORY.md) (SPEC) and IDEA-973 to IDEA-984.
+
+**Relationship to what is ruled.** This is the **spatial half of doc 47**, not a new end rule:
+- It answers *where* for SAFETY DRIVE and *what the proxies show*.
+- Scars feed the SAFETY reservoir as evidence. They never set the outcome (doc 47: Moody creates conditions, not outcomes).
+- Collapse, the continuation verdicts and the 72-hour attractor stay as L309/L310 built them.
+- The term is **campaign scar**, to keep it distinct from the `life.climate` baseline scar (L240).
+
+**Found (doc 49 §2-§3):**
+- Live incidents are already spatial (`competition.incidents`).
+- The week's SAFETY reservoir takes counts only. The position is lost in two hops: the core session drops x/y/z (`ncm/core/session/race.lua:328`, `:331`; `quali.lua:116`), and `ncm_league/server/race.lua:833-834` sends a bare count. *(Corrected the same day; the first capture named only the league hop.)*
+- Simulated crashes carry a route segment, not coordinates.
+- `ncm_world/server/venue.lua` can place curated barrier props, and nothing else in the aftermath vocabulary.
+- E19 (prop scale) has never run.
+- The world-editing capabilities the paste cites (Red Modding wiki) are single-player tooling claims and are unverified for OPEN//77.
+
+**OPEN for the owner:**
+- Q1: aggregation radius and the band → severity mapping.
+- Q2: whether simulated-race scars materialise or only feed data.
+- Q3: reset vs decay at collapse, and what passes into the knowledge ledger.
+- Q4: who places barriers first (owner, SAFETY DRIVE, organisers).
+- Q5: casualties and memorials, in scope and in what tone.
+
+**Sequencing unchanged:** the gearbox drive (§GB16), then shift feel, then the Engineering Architecture pass (L311 Q5). Nothing built.
+
+**L312 addendum (2026-10-04) - OWNER RULINGS (verbatim in doc 49 §6.0):**
+1. **Q1 RULED: scar *clusters*.** v0 key: same course segment + a configurable radius (start 8-12 m, "configuration, not doctrine") + compatible impact context. Road-relative clustering later; no DBSCAN in v0. Severity **accumulates**: `burden += incident severity × consequence modifiers`, with thresholds → levels 1-4.
+2. **Q2 RULED: City Memory v0 is physical (live) incidents only.** No invented positions. Simulated races join once route geometry places a segment on a plausible point. Provenance stays `physical` / `simulated`.
+3. **Q3 RULED ("I feel quite strongly"): the scar ledger ends with the campaign.** Archived as history, distilled into the Infrastructure Knowledge Ledger. The next campaign starts visually fresh. Surviving scars (memorials, famous sites) only by an explicit later rule.
+4. **Q4 RULED: the experiment comes before automation.** Campaign A with little or no intervention; Campaign B with a few owner interventions; compare. SAFETY DRIVE and NPC organisers decide placement only after an arrangement is shown to materially reduce the bad outcome.
+5. **Q5 stays OPEN** (casualties and memorials, tone).
+
+Doc 49 §4's ladder is re-cut to these rulings (S1 through both hops, S2 physical clusters, S4/S5 Campaigns A/B, S9 automation last, S10 simulated scars). Still not authorised. Nothing built.
+
+## L313 - OWNER DIRECTION (SPEC, NOT RULED) / ENGINEERING - CIVIL ENGINEERING: MAKE THE CITY SURVIVE THE MACHINE (2026-10-04)
+
+**Owner direction (verbatim in doc 49 §0.2):** "Call it civil engineering". The same profession as vehicle engineering, pointed outward.
+- A tiny kit with combinatorial consequences: barrier, fence, post/anchor, panel/gate, deck/ramp, cable/net.
+- Snap sockets are the first prototype after basic placement.
+- The race judges a structure. There is no placement score.
+- One engineering grammar with doc 48. Not a sixth lane.
+- The profession emerges from evidence. No class pick.
+- The population is part of the experiment. No player-count multiplier.
+- Attribution, not a saboteur role. Governance from shared consequences.
+- Friction (logistics), not caps.
+- Observer layers for the engineer.
+- The seven-day week as a communal victory condition.
+
+**Captured, not authorised:** [49_CITY_MEMORY.md](49_CITY_MEMORY.md) §0.2 and §7 (SPEC) and IDEA-990 to IDEA-999.
+
+**Found (doc 49 §7.1):**
+- Placement exists only as the owner's `/ncm.au dress` (`ncm_world/server/venue.lua`).
+- `venue_point` has no author or placed-at column (schema 007).
+- A 2026-09-25 platform backup lists barrier, fence, pedestrian-barrier and swinging-gate aliases, but no deck, ramp, net or sockets. It is a snapshot, not the build-pinned card.
+- Whether any placed prop stops a car is E19, never run.
+
+**OPEN for the owner:**
+- C1: does civil engineering join the Engineering Architecture pass (doc 48 §5), or wait for a City Memory heatmap?
+- C2: who may build first, and how testers gain access.
+- C3: who may dismantle in v0.
+- C4: free during the experiment, or priced from the start?
+
+**Sequencing unchanged:** the gearbox drive (§GB16), shift feel, then the Engineering Architecture pass. Nothing built.
+
+**L313 addendum (2026-10-04) - OWNER RULINGS ON C1-C4, AND TWO NEW SPECS (verbatim in doc 49 §8.0):**
+1. **C1 RULED: civil engineering joins the Engineering Architecture pass** (doc 48 §5).
+2. **C2 RULED: anyone can build, for in-game money.** NCM keeps a rich record of who placed what, where and when, and how each contribution affects races. *Widens L312 Q4:* any player's placement is a measured intervention. Automated placement still waits for evidence.
+3. **C3 RULED: anyone can dismantle** if they can afford it and spend the time. They must go to each component on site; there is no remote or bulk removal. The community decides.
+4. **C4 RULED: priced, modestly** (placement and dismantling).
+5. **NEW SPEC - the Night City seed map** (doc 49 §8.2). At the end of each Racing Week cycle, export the built infrastructure plus a danger heatmap of documented incidents (**including general player driving, not only races**) and an infrastructure pin overlay. At rollover the operator loads a preferred seed, or a random draw between known seeds and a blank slate. **Chat publicly shows which seed is loading and which loaded.** Scars still end with the campaign (L312 Q3). The built city carries over only through this explicit choice.
+6. **NEW SPEC - infrastructure awareness from evidence** (doc 49 §8.3). The race simulation learns infrastructure effects only from observation (Observer, active players). Belief grows with evidence and is not swayed by early thin-data projections. The wild west at the start.
+
+**Found (doc 49 §8.4):**
+- Free-roam position samples already reach `ncm_speed`, but no crash detection runs on them. The incident detector is a pure module already shared by three hosts.
+- The rewind already messages every player (`ncm_world/server/week.lua:225-248`), the natural place to announce the seed.
+- Simulated crash hazard ignores infrastructure entirely (`paddock/sim.lua`).
+- `venue_point` has no author column.
+
+**Sequencing unchanged:** the gearbox drive (§GB16), shift feel, then the Engineering Architecture pass, which now carries civil engineering. Nothing built.
+
+**L306 addendum (2026-10-04 evening) - THE 7-SPEED, THE MANUAL'S REACH, THE ENGINE NOTE'S UNITS, NEUTRAL'S GRIP (Gearbox 0.2.5, Carrier 0.1.32; built, packaged, NOT INSTALLED -- the game and dev were running).**
+
+Owner QA of 0.2.4: "shift feel is ok, actually. engine is just too mute sounds low rpm alwaya ... some weord rotation of car at neutral but other that a solid 5 speed. i was doing upwards of 140 kph in this car previously can you make it a seven speed that can reach its potential? its got a thorton pu and mkg tires".
+
+- **Reach (KB-331).** Manual gears are now fractions of what the car reaches as an automatic on NCM: min(catalogue top, native top x Carrier's x1.45 headroom). They used to be fractions of the native top gear (115 km/h on the Hella), which capped every manual about 30 % below its automatic. This changes every manual's bands, not only the Hella's.
+- **The 7-speed.** New spec `m7` (7 gears, first gear at 0.24, 8 % overdrive, 240 ms shifts). On the Hella: about 40/65/87/108/128/148/180 km/h. It is a **refit only** (`machine.gearbox.REFIT`): the generator builds its clones (46 now), and the factory mix, production and the market are unchanged.
+- **Refit (owner override of "stamped at birth, never rewritten").** New console commands `ncm.gearbox find <vehicleKey>` and `ncm.gearbox refit <assetId> <spec>`, with source `refit`. A refit is refused unless the model has that spec's clone.
+- **Engine note (KB-333).** `veh_engine_rpm` is in rpm. The new default maps each gear onto idle..the model's median shift rpm.
+- **Neutral (KB-332, Carrier 0.1.32).** At a standstill, the gear's zero drive applies only while the throttle may be pressed, so N no longer erases the tyres' hold.
+
+Gate: ALL GREEN; `gen-gearbox-records --check` parity; core vendored (`machine/gearbox.lua` only). **No live PASS** (§GB17).
+
+**L306 addendum (2026-10-04 18:10) - THE SOUND EXPERIMENT (Gearbox 0.2.6, installed on this PC).**
+
+- Owner, on the refitted m7 (log 18:05 `in a m7 (7-speed, top gear to 180 km/h)`): "still no ramp". The engine note goes from quiet to a redline whine in a snap.
+- Three scales chosen by reading the metadata (limiter, fraction, rpm) have now failed. So 0.2.6 measures instead of guessing.
+- PAGEUP (`manual.audioCycleKey`) cycles the scale live: rpm, limiter, fraction, off. The HUD reads `MANUAL - SOUND <mode>`.
+- A once-a-second `trace:` line logs speed, gear, gear fraction, the value written, and the vehicle blackboard's RPMValue as read before our write that frame. That shows the game's own rpm scale, and whether the game rewrites it.
+- Redscript checked: every native registered, scratch `scc` compile clean. §GB18.
+
+**L311 addendum (2026-10-04 18:40) - THE ENGINEERING ARCHITECTURE PASS STARTED: E1 INSTRUMENT BUILT, DOC 50 PROPOSED.**
+
+The owner said "lets start engineering" after the Gearbox work moved on in another session.
+
+- **E1 so far (read from existing logs):** the live body mass at `+0x1BC` is the drive-model record's `total_mass` for every car in today's seven Carrier sessions (1800 kg for the Hella). So the physics loads its mass from the record at spawn. Whether the solver uses a changed record mass is not known.
+- **The instrument:** `/ncm.mass <0.70-1.40>|off` and `/ncm.massrun` in `ncm_world/client/carrier_bridge.lua` write `.total_mass` and `.chassis_mass` through Carrier's existing record channel (no Carrier change) and time 0-100 / 100-0. They reach a client at the next dev restart. §EN1.
+- **[50_ENGINEERING_ARCHITECTURE.md](50_ENGINEERING_ARCHITECTURE.md) (PROPOSAL):**
+  - one `engineering.body` grammar for the car and the city (L313 C1);
+  - a per-model plan-view envelope;
+  - a fitting rule where only geometry and topology can be red;
+  - gearboxes in series multiply;
+  - mass through the record or `m0/(m0+dm)` depending on E1.
+- Owner questions R1-R5 are open. No production behaviour changed.
+
+## L314 - RULED / ENGINEERING - THE ENGINEERING ARCHITECTURE: R1-R5, AND CAUSE / ACTUATOR / STATE / COARSE MODEL (2026-10-04)
+
+**Owner ruling (verbatim in doc 50 §11.0):** "The proposal is directionally approved, with amendments below." The principle: **"Describe physical things, how they connect, and what they cause. Let sites, runtimes and simulations decide how those facts are expressed."**
+
+- **R1 APPROVED WITH CLARIFICATION:**
+  - yellow = physically possible through adaptation, with real consequences (money, time and mass are examples, not a closed list);
+  - competency improves an adaptation and never erases conservation;
+  - adaptations should be able to become explicit bodies (in v1 they may stay summarised).
+- **R2 APPROVED FOR V1 REPRESENTATION, NOT AS CANONICAL PHYSICS:**
+  - the 10 cm grid is a projection;
+  - the body leaves room for 3D bounds or shape, transform, centre of mass, socket position and orientation, and force and load application points;
+  - no 3D construction now.
+- **R3 APPROVED AS FALLBACK:**
+  - run E1;
+  - **new invariant: NCM's canonical physical state records the actual modelled mass regardless of the REDengine hookup.**
+- **R4 APPROVED, COMPOSITION MODEL CHANGED:**
+  - the runtime channel lives in the Gearbox package;
+  - composition yields a drivetrain graph/spec covering series, range, discrete/selectable (no de-duplication) and adapter relationships;
+  - a transmission never creates power.
+- **R5 APPROVED PROVISIONALLY:**
+  - twelve families, and Human interface stays outside;
+  - `family` is open taxonomy, not physical law.
+- **The four-concept boundary for every physical system from now on:** physical cause, runtime actuator, persistent authoritative state, coarse simulation representation. NCM owns the meaning; REDengine supplies the presentation.
+- **Context, not scope:**
+  - general force components (force + direction + application point + power + heat + limits, never `allowsFlight`);
+  - construction sites beyond cars and roads;
+  - causal regeneration while the player is absent.
+  - These constrain the architecture. Flight, thrusters, spacecraft, orbital physics, offline regeneration, historical reconstruction, generalised 3D construction and procedural component invention are **not** to be implemented.
+- **Scope:**
+  1. E1;
+  2. body;
+  3. envelope;
+  4. fit;
+  5. drivetrain graph;
+  6. a read-only Hella/Quadra puzzle surface;
+  7. drag / rotate / snap;
+  8. hookup;
+  9. the city site after E19.
+
+**Executed the same day (offline):**
+- Steps 2-5 are pure core in `ncm/core/engineering/` (body, envelope, drivetrain, fit, actuate, fixtures), vendored into every resource.
+- 15 tests (`test_engineering_envelope`) pass under both interpreters, and the gate is green. Doc 50 §12 maps each ruling to its code.
+- Doc 50 is now CURRENT. Fixture geometry is illustrative, not surveyed.
+- **No live behaviour changed.** Nothing reads these modules at runtime yet. E1 (§EN1) is still not run.
+
+**L306 addendum (2026-10-04 20:31) - OWNER RULINGS ON THE SOUND, AND ONE SOURCE OF TRUTH (Gearbox 0.2.7, installed on this PC).**
+
+Owner, after §GB18: "mix of our pgup definitions, amping up the loudest rpm noise at the higher end and the quietest at the lowest end ... all 4 sounds or rather the blend between them get some volume throughout the whole rpm ramp ... lets just make it composable into a general rpm formula ... let them write the rpm and the actual speed it says on the dash ... there should be one source of truth and id rather it be the one writing itself on the actual cars dash in first person pov ... definitely not mirror the gears".
+
+1. **NOT mirroring the native gears.** The proposal to give the clone real gears matching the virtual ones is rejected. The one long native gear stays.
+2. **The engine voice is a blend.** The default `blend` writes one layer per frame from `manual.blend.layers` (quietest first: fraction, off, rpm, limiter). `off` leaves the game its own value. The proportions slide from the quietest at a gear's floor to the loudest at its limiter, with every layer at least `manual.blend.floor` (0.12) of the mix. It uses error diffusion, so the pattern is deterministic. PAGEUP still cycles to the single presets for comparison.
+3. **The game owns the dash.** The script no longer overwrites the vehicle blackboard's gear and rpm. Our gear and revs live on our own HUD.
+4. **One source of truth for speed: the car's own dash** (IDEA-1023). The trace logs `dash SpeedValue` beside ours. The Online gap the owner saw is KB-334. Switching NCM's speed sources is not done yet.
+
+Redscript checked (natives registered; scratch compile clean). No live PASS (§GB19).
+
+**L306 addendum (2026-10-04 20:42) - THE CONTINUOUS ENGINE VOICE, TUNED LIVE (Gearbox 0.2.8, installed on this PC).**
+
+- Owner on the 0.2.7 blend: "right idea ... but its mixed weirdly, clearly kinda chopped, need harmonic or melodic ... we may need to explore some values".
+- The chop was the method. Each frame jumped between values thousands of rpm apart.
+- 0.2.8's default `curve` writes ONE continuous value: `lo + (hi - lo) * x^gamma` across each gear (x = progress to the gear's limiter). It is then pulled `follow` of the way toward the game's own rpm (the game writes it anyway), and slewed over `smoothMs` so upshifts fall like revs.
+- Defaults are first guesses: lo 1500, hi 5300, gamma 1.6, follow 0.3, smooth 120 ms.
+- **The config file is now re-read while the game runs** (checked once a second), so the owner tunes by ear. `blend` and the single presets remain on PAGEUP. §GB20.
+
+**L306 addendum (2026-10-04 21:31) - THE BAND: THE GAME VOICES OUR GEARS (Gearbox 0.3.0, installed on this PC; experiment, owner: "yes build it, i want to test first").**
+
+- The curve still sounded "like a tape skipping over". Every trace frame showed two writers on `veh_engine_rpm`: ours, and the game's own (for example 3,203 against 800). No curve values can fix that.
+- 0.3.0's default `band` writes NO sound value. On each shift it repoints the clone's one native gear's `.maxSpeed` to the selected gear's limiter (the same flat write Carrier's live headroom uses), so the game's own engine sweeps its rpm and sound from idle to redline across the gear.
+- `.minSpeed` is never moved: it is a floor the engine pushes toward (Carrier `tweak.cpp`).
+- Leaving the car, or switching modes with PAGEUP, restores the full native gear.
+- Not the rejected mirrored gears: still one native gear, which never shifts on its own.
+- Unknown until §GB21: whether the vehicle re-reads the gear live.
+
+## L315 - OWNER DIRECTION (SPEC, NOT RULED) / RACING WEEK + BEYOND - THE SKIPPING TAPE ON A SLIDING SCALE, ESCALATING SENSITIVITY, THE ERA SLIDER, THE FLIGHT LADDER INTO SPACE AND A NEW SEED (2026-10-04)
+
+**Owner direction (verbatim, 2026-10-04):** "the endgame of ncm is that we are a braindance tape that is skippimg. strongly orbiting 72 hours but maybe the secret is its all a sliding scale, can finish as low as 1 hour. can go the whole 7 days. but strongly , tectonically rooted around a 3 day campaign with day 1 joyous welcoming of racing in night city day 2 conflict, uncertainty, day 3 turmoil due to racing . and we should make the world progressively , significantly more receptive and sensitive to accidents , fatalities , winners , losers, money made, events in the sim that left scars , what infrastructure was there, but mostly just sensitive to anything bad that could correlate with racing or has exposure to it aka fast driving , vehicle related incidents, as the day 1 to 3 usual progression goes. ... i was thinking of refreshing single player after all this, my sp mod for vanill cyberpunk with the ability to modulate a slider of how long a geological era takes and one geological era = the 3 day loop. so someone could makw the whole loop happen quickly like 1 hour per day of raceweek. so a whole campaign in three houra. server wide, ncm online stays my behemoth 1 day = 1 day because thats the more difficult problem: how to model the social decay onto a game for 72 hours, on average. but its only my server, someone elses may do it differently. ... the instincts towards flight of vehicles , aka starts as bouncing vehicles like 20 cm jumps from parts system and engineering loop or company rnd of seed to leap frog ability of cars to jump over other cars aka bad for going 7 days because that requires safety and an extreme attention to detail where there is infrastructure in place and no lunatic gets hurt hurtling their flying car at a flying or evej just road car race, with surprise flying car. Then the scope expands when they try to go higher and higher with flying car, engineering hits physics limits like how much force and propulsion it generates is genuinely limited by the part itself and how much lift its giving, not some end of world barrier. instead we hand to space mod. we make space around night city. big enough that its space. empty enough that its space. asteroids, etc . and we hide something like a wormhole or blackhole out in it that could look like all kinds of different imagery, procedurally, it invites curiosity and player approaches it, poof back in night city. except its a new seed , and they only keep their vehicle they left with. ... we can do that in sp. in online, its possible multiplayer until someone triws to cross dimenaions and needs a new server or night city client render in a room of other people also playing same game. but that is a later problem, first they need to realize the depth of the "racing sim". and still , the whole braindance skips on a loop, and you keep your anchored car(s) ... and ultimately, the racing and safetiness or lack thereof dictates the ability to reach a full race week."
+
+**Captured, not authorised:** IDEA-1025 to IDEA-1033.
+
+**Relationship to what is ruled and built:**
+- The 72-hour attractor, rare survival to Day 7, the skipping-tape fiction and anchored cars surviving the rewind are already doc 47 / doc 45 §P.
+- **New:** a run may also end EARLY. **This conflicts with what is built:** `week.continuation` judges only at each possible end from hour 72 (doc 47 §6, L310).
+- **New:** sensitivity that escalates Day 1 -> Day 3. The week curve today has a falling tolerance *carrier* (`week/curve.lua`: 0.35 at hour 48, 0.04 at 72) and a deviation from absolute harm; it does not scale the *cost* of the same harm by day.
+- Free-roam incidents (IDEA-1006) and City Memory (doc 49) supply "anything bad that correlates with racing".
+
+**OPEN for the owner:**
+- Q1: can the run end before hour 72, and by what -- tolerance reaching zero, or a verdict at every day boundary from hour 1? (This changes L310's built rule.)
+- Q2: the sensitivity curve -- a multiplier on harm by hour, or by day step?
+- Q3: the single-player era slider -- the same `week.*` core with a time scale, or the SP mod's own loop?
+- Q4: the flight ladder's sequencing against the Engineering Architecture pass (L314).
+
+Nothing built.
+
+**L306 addendum (2026-10-04 22:09) - THE BAND'S RPM WINDOW (Gearbox 0.3.1, installed on this PC).**
+
+- Owner on 0.3.0: "better, some things sound right. middle gears though all sound the same ... it just plays the same pitch until you shift".
+- The 0.3.0 trace proved the band takes live (139 band changes; the game's rpm moved with them). But the game's rpm parked near 4,200 in gears 3-6: a band starting at 0 km/h means a middle gear only ever drives its top quarter. 2nd gear's sweep (1,301 -> 3,246) was the "burst" that sounded right.
+- 0.3.1: each shift also writes the gear's rpm window. The previous limiter maps to `landingRpm` (2,600), this limiter to `redlineRpm` (5,300); `minEngineRPM = landing - (redline - landing) * f0 / (1 - f0)`, clamped at `minRpmFloor` (-30,000).
+- All three are live in `manual.band`; the HUD shows the window. §GB22.
+
+**L315 addendum (2026-10-04) - OWNER RULINGS ON Q1-Q4, AND AN AMENDMENT ON THE ANOMALY (owner-supplied text, adopted).**
+
+1. **Q1 RULED: yes, a run can end before hour 72, and the ending is continuous.** It is not a new verdict checkpoint. The city becomes untenable whenever the accumulated state crosses an actual failure condition. 72 hours is the strong attractor and natural campaign length, not an invulnerability shield until hour 72. *This changes L310's built rule* (`week.continuation` judges only from hour 72).
+   **Two independent axes:** `era duration / time scale` and `civilization survival`. A single-player loop set to 1 hour per Race Week day that completes in 3 hours is a complete three-day civilization at a faster clock, not an early collapse. Separately, any run at any clock can die halfway through Day 2.
+2. **Q2 RULED: sensitivity is continuous in normalized Race Week age, never stepped by day.** No `if Day3 then crashes x3`: a crash at Day 2 23:59 does not triple in meaning sixty seconds later. Inflection regions roughly follow Day 1 welcoming -> Day 2 concern and conflict -> Day 3 hypersensitive turmoil. What actually happens pushes the culture ahead of or behind that nominal mood: a catastrophically violent Day 1 sours the city early; an extraordinarily safe, organized campaign enters nominal Day 3 with unusual goodwill. Day labels are presentation and cultural phase.
+3. **Q3 RULED: one Race Week simulation, different clocks.** The core reasons in normalized Race Week time. Online sets 1 Race Week day = 24 real hours; single player sets 1 hour, 30 minutes, 8 hours or anything; other operators choose theirs. No Online Week and SP Week cousins.
+4. **Q4 RULED: engineering first; flight is discovered using engineering, not scheduled.** The ladder is engineering grammar -> ordinary components -> a force-producing component someday -> hop -> better hop -> leapfrog -> sustained flight -> altitude -> space handoff. No flight phase is scheduled now.
+5. **AMENDMENT (IDEA-1031): the anomaly is seeded geography, not a random procedural portal.** A world deterministically contains one or more discoverable traversal phenomena in its finite space domain. Position, detectability, appearance and eventual destination may vary by seed, but discovering one establishes knowledge: the same phenomenon and route can be found again and resolve consistently under the same world state and rules. It may be hard to detect at first, like FISHING / Nessie, mostly from not knowing where or what to look for. Mature civilizations may instrument, map or beacon a phenomenon an earlier civilization found mysterious. Traversal stays physical: the player reaches it with a capable enough vehicle and flies on through an occupiable liminal space. The other side rematerializes Night City under another deterministic NCM world state. *Procedural appearance, yes; random loot-portal behaviour, no.*
+
+**No implementation is authorized by these rulings.** Sequencing unchanged: tonight is the Hella's engine note (§GB22).
+
+## L316 - OWNER DIRECTION (SPEC, NOT RULED) / BEYOND - NCM SNOWGLOBE, THE STARRY SKY, THE SERVER-WIDE DEV WORMHOLE, AND PHYSICS-BASED FLIGHT (2026-10-04)
+
+**Owner direction (verbatim, 2026-10-04):** "i want to basically walk the whole vision end to end as the dev so i can properly plan what is coming, aka space mod and wormhole, flight mechanics. all needs to be lhysics based and requires a big ncm snowglobe mod which wraps the game in space as we map space, procedurally. if we can generate a starry night city sky procedurally in game that would be amazing , my vision is first person to discover flight on server and naturally try to fly as high as possible will encounter ncm-snowglobe mod , which gives night city an orbit on a desolated small planet, we can play with scale, maybe even little big planet style space, and then let the game naturally detect that and let it take place. build system from earth etc takes place in space, there is a wormhole out there somewhere whi h upon entry spits you out to a new seed of ncm in night city. were gonna test the mechanism as such that it affects the whole server on dev server so i can test, meaning when i reach wormhole the whole server follows. but thats a precursosr to our updated single player mod which actually allows players to do this themselves without dragging a whole server with them since that would strand players in different rooms and server cant be that complicated. wormhole should at minimum always save your seed and provide you with a new one, before we have any fanciness. the other fanciness we do need though is the physics based propulsion and flight system."
+
+**Captured, not authorised:** IDEA-1034 to IDEA-1042.
+
+**Relationship to what is ruled:**
+- **L314 states:** "Flight, thrusters, spacecraft, orbital physics ... are **not** to be implemented." L315 Q4 states that flight is discovered through engineering and is not scheduled. This direction asks to *plan* the whole ladder. It does not yet lift either exclusion. Q1 below asks whether it does.
+- **New:** the server-wide dev wormhole (IDEA-1039). It resolves L315's "Online needs a new server per dimension" for testing: a single server keeps one dimension, and everyone moves together.
+- **Tension:** IDEA-1031 says the traveller keeps "only the vehicle they left with". IDEA-1032 says the loop keeps anchored car(s). They differ when a player has anchored cars and is not driving one.
+
+**Evidence in the tree (2026-10-04):**
+- Carrier already intercepts the vehicle rigid-body force accumulator and writes it: `writeForceXYZ`, `ncm/carrier/src/vehicle/physics_probe.cpp`, with the layout from Let There Be Flight (MIT). It reads velocity, angular velocity and mass on 2.31. So a vertical force on a car is one channel away, not a research programme.
+- Seeds already exist, but separately: the Paddock genesis seed (`paddock/world.lua`) and the Racing Week run seed (`week.lua` `runSeed`). The seed map (doc 49 §8.2) is SPEC only.
+
+**OPEN for the owner:**
+- Q1: does L316 lift L314's exclusion for read-only and dev-only experiments? Candidates: F0, a measured vertical-force hop on the owner's own car; S0, the altitude, streaming and sky probe; W0, the seed swap with no space at all.
+- Q2: what is the snowglobe? Either the same world coordinates above an altitude threshold (the game's own sky, plus our meshes), or a handoff to a separate space region or instance.
+- Q3: is the dev server-wide wormhole the Racing Week rollover (the run ends, crowns, verdict record), or a distinct dimension jump that bypasses the verdict?
+- Q4: what carries through: the vehicle you are in, or your anchored cars?
+
+Nothing built.
+
+**L316 addendum (2026-10-04) - OWNER RULINGS ON Q1-Q4, THE LADDER REORDERED, AND F0 + S0 BUILT (owner-supplied text, adopted).** The owner's framing: "You're optimizing for **owner traversal of the complete game ontology**", not the cheapest proof. "Today Hella hops 20 cm ... BANG. New seed. Night City. Same Hella. ... At that point the complete NCM universe exists. Everything afterward is replacing cardboard scenery with actual systems."
+
+1. **Q1 RULED: L314's exclusion is lifted for dev-only experiments (F0, S0, W0 and the rungs after them). Production flight is NOT authorised.** L314's "not to be implemented" now means "not in production".
+2. **Q2 REFRAMED, NOT RULED:** "Snowglobe traversal must appear physically continuous to the player. Implementation architecture is not yet ruled. S0 determines whether same-space continuity is technically viable."
+   - A hand-off must carry: position, velocity, attitude, vehicle state, occupants, energy, heat, damage and build state.
+   - "The ground can't curve, so the planet must be an illusion" is withdrawn as unproven ("probe first").
+3. **Q3 RULED: the wormhole is a dimension/seed transition, NOT the Racing Week rollover.** It bypasses ordinary verdict mechanics.
+   - Rollover = Week → verdict → causal regeneration → next Week.
+   - Wormhole = physical traversal → preserve the old seed → new universe seed → rematerialisation.
+   - The two may share regeneration machinery underneath.
+4. **Q4 RULED: the vehicle you are physically in.** IDEA-1031 governs traversal; IDEA-1032 (anchored cars) governs the ordinary loop. "You don't get your garage magically FedExed across spacetime." The old seed is saved, not deleted, so a return stays possible (IDEA-1045).
+5. **THE LADDER, REORDERED** (supersedes the W0-first order I proposed):
+   1. F0 hop
+   2. F1 force part
+   3. F2 attitude authority
+   4. F3 ugly sustained flight
+   5. S0 altitude expedition, in parallel
+   6. F4 altitude regime
+   7. Snowglobe 0
+   8. Orbit 0 (IDEA-1046)
+   9. W0 seed swap
+   10. Anomaly 0
+   11. Return / seed archive
+   12. Nessie
+
+   Doc 51 is the authority (SPEC).
+6. **The first lever that ADDS force.** Every Carrier lever until now is "downward only". The lift lever is an explicit, dev-only exception: the same binding, kill switch and SEH gates; it stops on a stale publish.
+
+**Executed the same day (built; not installed; no live PASS):**
+- **NCM Thrust 0.0.1** (`ncm/thrust/`, its own package, `dist/ncm-thrust-0.0.1.zip`): the fire key and live config publish a thrust-to-weight ratio and a burn.
+- **Carrier 0.1.33** (`dist/ncm-carrier-0.1.33.zip`, = 0.1.32 + the lift lever):
+  - at the bound car's gravity entry it writes `gravZ * (1 - twr)`, timed in physics time;
+  - each burn logs a measured line against the predicted apex;
+  - the gearbox lever path is untouched.
+- **Core:** `f0_lift_rig`, `engineering.actuate.{liftN, lift, hopPrediction}` (actuate 0.1.1, fixtures 0.1.1), 3 tests; vendored.
+- **S0 instruments:** `/ncm.altlog` (`ncm_world/client/altitude.lua`), the server's `ncm.lift <pid> <metres>` and the `altlog` replication comparison.
+- Gate ALL GREEN. MASTER_TEST §FL1-§FL4, §AX1-§AX5.
+- **Correction:** the r = 3 hop rises 0.60 m, not 0.40. The rise goes as r(r-1), as the plan's arithmetic should have said.
+
+**L316 addendum 2 (2026-10-04 23:05) - F0 PASSES: THE HELLA HOPS (§FL1-§FL2).** Owner: "hop confirmed".
+- NCM's own force model lifts a stock Cyberpunk car through the gravity entry: 9 measured burns, 0 faults.
+- From rest, the rise is about **1.9 times** the free-body prediction. The cause is the suspension, which carries 1 g on the ground and keeps pushing during the burn; the prediction leaves it out. The push works; the prediction is incomplete.
+- **Consequence for F1:** the coarse model and the hop prediction must include the stored suspension load before thrust-to-weight is shown to a player as a rise.
+- §FL3 (r = 1.0) measures that share. KB-337 (lost result lines) is fixed in Carrier 0.1.34, not yet installed.
+
+**L316 addendum 3 (2026-10-04 23:54) - S0's FIRST ANSWER: NIGHT CITY HAS A HARD CEILING AT z = 16,384 m (2^14), AND THE OWNER FLEW THE HELLA TO IT.**
+- §AX4, by mashing TRIANGLE: 2,377 burns at 3.0 / 200 ms, peak climb 92 m/s, 0 write faults.
+- The car touched 16,378.6 m at 23:51:52, fell back, and climbed again. From 23:53:32 it sat pinned at exactly 16,383.9 m on both the client and the server, without falling.
+- At the ceiling, multiplayer authority broke down and the session left the world (KB-338).
+- **Consequences for doc 51 (no ruling, evidence):**
+  1. The engine's vertical bound is a power of two, not a soft fade.
+  2. The snowglobe hand-off has a hard budget: it must happen below about 16 km, or space must live elsewhere in the coordinate space.
+  3. The next S0 question is who owns the clamp (the engine vs Open77): run the same climb in single player.
+  4. The 92 m/s climb was mashed burns, not hold mode; hold mode is the cleaner elevator.
+
+## L317 - OWNER DIRECTION (SPEC, NOT RULED) / SNOWGLOBE - THE CEILING IS A DOORWAY: NCM OWNS POSITION ABOVE A TRANSITION ALTITUDE (FLOATING ORIGIN), AND THE SEAM COMES FIRST (2026-10-05)
+
+**Owner direction (owner-supplied text, 2026-10-05, after S0's first answer):** "do not hand off from Cyberpunk to another conventional 'map.' Hand off from REDengine being the authority over position to NCM being the authority over position." Above a transition altitude (placeholders: 12 km wake, 14 km full ownership), the server keeps each traveller's universe state (position, velocity, reference frame, time). REDengine only simulates a local bubble that is recentred under the car. Snowglobe v0 is Earth, Moon, Sun, stars and one vehicle; the Moon is the first destination, with seeded hierarchical terrain, and the Sun the scale test. There is no global floating origin: each player has their own bubble under one server universe and one clock. There are five components (Universe Authority, Flight Dynamics, Local Bubble Manager, Celestial Renderer/Streamer, Surface Generator), all under the server. "The very next prototype I'd build is the seam": Night City → Space Test Bubble → Night City, with no loading screen and no lost state.
+
+**Captured, not authorised:** IDEA-1048 to IDEA-1053.
+
+**Coder's reading against the tree (evidence, no authority):**
+1. **REDengine cannot shift Night City.** Its static world sits at fixed coordinates, so a rebase is invisible only when everything in view is NCM's: the car and NCM-spawned proxies. Rebasing from 15 km to 5 km above the real city would visibly bring the city 10 km closer. **The order must be: Night City leaves view, or is replaced by its proxy, first; rebase second.** Equivalently, the bubble lives where nothing native renders. Which of these is possible is unknown.
+2. **Moving an occupied car while keeping its velocity is unproven.**
+   - `Open77.players.teleport` moves the player and leaves the seat broken (KB-12).
+   - No NCM code moves a vehicle entity.
+   - Candidates:
+     - the game's `TeleportationFacility` on the vehicle (in the RED4ext SDK, never used by NCM);
+     - a Carrier write of the rigid body's position (offset not found).
+   - Velocity could come back through Carrier: either a direct write of `+0x18` (read verified, write untested) or one impulse through the proven force channel.
+3. **The horizontal bounds of the usable world are unknown.** If 2^14 is per axis, the bubble's possible locations are bounded too.
+4. **The authority revoke at the ceiling (KB-338) is the platform's.** Its cause is unknown, and a space bubble must not trigger it.
+5. Doubles (Lua numbers) hold 1.5 x 10^11 m to about 0.03 mm, so server-side universe state needs no special arithmetic.
+
+**Proposed seam experiments (dev only; L316 Q1):**
+- **SEAM-1:** move the occupied Hella in mid-air and keep its velocity.
+- **SEAM-2:** what is visible from 12-14 km, and can weather, fog or a proxy take Night City out of view?
+- **SEAM-3:** the horizontal bounds, using `ncm.tp`/`ncm.lift` on foot.
+- **SEAM-4:** the cause of `serverrevoke`, from the platform's API cards.
+- **Offline, any time:** a pure-core `space.universe` (bodies, frames, rebase arithmetic, impostor scale) with tests.
+
+**OPEN for the owner:**
+- Q1: does the seam move ahead of F2-F3 (attitude, sustained flight) in the doc 51 ladder?
+- Q2: the transition altitudes. Placeholders until SEAM-2 shows what 12-14 km looks like.
+
+Nothing built.
+
+**L317 addendum (2026-10-05) - Q1 RULED, SEAM-1 AND `space.universe` BUILT.** Owner: "L317: YES. Build the Snowglobe seam before F2-F3. Begin SEAM-1 and space.universe in parallel."
+- **Q1 RULED: the seam comes before F2-F3** (attitude, sustained flight). Doc 51's ladder is now F0 → S0 → **seam** → F2-F3 → F4 → Snowglobe 0 → Orbit 0 → W0 → Anomaly 0 → Return. Q2 (the transition altitudes) waits on SEAM-2.
+- **Built offline (no live PASS):**
+  - `space.universe` 0.1.0 (pure core, in MANIFEST, vendored): the v0 bodies (Earth, Moon, Sun), the Night City anchor (local x east, y north, z up), city ⇄ universe conversion, altitude and the three phases (native < 12 km < transition < 14 km < space, all under the 16,384 m ceiling), the bubble with `rebase` (it moves the origin and no universe position), `localSafe`, proxies at true angular size, and inverse-square gravity. 6 tests, both interpreters.
+  - **NCM Snowglobe 0.0.1** (`ncm/snowglobe/`, its own package, `dist/ncm-snowglobe-0.0.1.zip`, `tools/build-snowglobe.ps1`). It is SEAM-1 only.
+    - The dev key `J` asks for a move; above `minZ` (3,000 m), `NcmSnowglobe.reds` moves the occupied car by `offset` (default 2,000 m straight down, mid-air) with the game's own `TeleportationFacility`, keeping its orientation. This is the call single-player NCM uses for grid starts.
+    - It measures velocity from positions frame by frame (no engine field trusted), watches 90 frames, and logs one `SEAM-1 RESULT` line: velocity before and after, speed kept, seat lost in N frames, and where the car is.
+    - The redscript compiles against vanilla plus every installed script (scratch `scc`), natives are checked against registrations (KB-182), and the DLL builds with 0 warnings.
+
+**L317 addendum 2 (2026-10-05 01:05) - SEAM-1's ANSWER: THE CLIENT CANNOT MOVE A NETWORK CAR; THE SEAM'S MOVE BELONGS TO THE SERVER.**
+- **§SG2: three J moves.** The game's `TeleportationFacility` placed the occupied Hella exactly where it was sent and kept the driver seated. Then OPEN//77's server revoked the car in the same millisecond (`serverrevoke`), and the client snapped back to the last server-approved transform with zero speed, behind a loading screen. That is the platform's `motion_jump` rule (`open77_vehicles` README: "the server owns identity, durable state, occupancy, and physics authority").
+- **Consequence for L317:** every recentre of a network vehicle is a server operation. The platform's move is `Open77.vehicles.setTransform(id, { position, yaw })`. It revokes the lease, bumps the epoch and clears the electrical flags (open77_admin, freeroam race), and its documented shape carries no velocity. So the seam must either carry velocity back to the car after the lease returns (Carrier's force channel; F0 proves it can push) or happen where speed does not matter.
+- **Built, not loaded (needs a dev restart):** `ncm.seam <pid> <dz>` (ncm_world). It does the server move, restores the flags, and samples position, speed, owner, epoch and seat for 8 s (§SG4).
+- The client-side Snowglobe 0.0.1 stays installed as the measuring half; its J key now only demonstrates the veto.
+
+**L317 addendum 3 (2026-10-05 01:20) - SEAM-1b: THE SERVER'S MOVE HOLDS AND KEEPS THE DRIVER, BUT ERASES THE VELOCITY AND FREEZES THE CAR FOR ABOUT 3 s (§SG4).**
+- `Open77.vehicles.setTransform` put the occupied Hella exactly 2 km lower and it stayed there; the driver stayed seated.
+- Speed went from 83.6 m/s to 0.
+- The lease churned inside 70 ms (revoke, regrant, `validationfailed`, revoke): most likely the client's first motion report still came from the pre-move position (freeroam's pvp notes describe the same projection-adoption race). It returned to the driver after 3.0 s. Then the car fell from rest under gravity.
+- **The seam's remaining work:**
+  1. Restore velocity once the lease returns (Carrier's proven force channel: one impulse m·Δv, or a direct write of `+0x18`, never tried).
+  2. Shorten or hide the freeze: find which report fails validation, and adopt the move on the client before reporting.
+  3. Do both inside a view that hides the jump (SEAM-2).
+
+**L317 addendum 4 (2026-10-05 01:41) - SEAM-1c BUILT AND INSTALLED: THE VELOCITY KICK.**
+- **NCM Snowglobe 0.0.2:** the script treats any jump of more than 200 m in one frame that it did not make as the server's move. It keeps the velocity from before the jump, waits until the car moves under its own physics again (the lease is back), then calls `NcmSnowglobe_Kick(dv)` once with dv = velocity before - velocity now, and logs the velocity 1-60 frames later with a `SEAM-1c RESULT` (speed kept).
+- **NCM Carrier 0.1.35:** reads the new per-process `seam_levers` block. On a fresh kick, at the bound car's next gravity entry, it adds m·dv to the accumulator, re-reading it first so a thrust write in the same entry survives. dv is clamped at ±150 m/s per axis. Two gravity entries later it logs the velocity before and after.
+- Snowglobe creates the block at load, because Carrier looks for it every 2 s and a kick is stale after 0.5 s.
+- The redscript compiles against vanilla plus everything installed; the native check passes; 0 new warnings.
+- §SG5.
+
+**L317 addendum 5 (2026-10-05) - §SG5: THE RESTORE PIPELINE RUNS, BUT THE KICK MUST WAIT FOR THE BINDING. v2: A HELD TARGET VELOCITY.**
+- In §SG5 the jump detection, the kick publish and Carrier's receipt all worked. Carrier refused the kick because the server's move unbinds the car (`unbound by NCM` at the move) until the lease returns (`BOUND` about 4 s later), and the kick arrived about 1 s before that.
+- **v2 (Carrier 0.1.36, Snowglobe 0.0.3, `seam_levers` v2):**
+  - Snowglobe publishes the TARGET velocity (from before the jump) the moment it sees the jump.
+  - Carrier holds it for up to 8 s. At the first gravity entry where the car is bound again, it adds m · (target - v_now) once and reads the velocity back two entries later.
+  - Because the binding returns with the lease, that gate means "the car is ours to push again".
+- Built: the native check and the scratch redscript compile pass; no new warnings. Installed. §SG6.
+
+**L317 addendum 6 (2026-10-05 14:15) - THE DOORWAY IS AN ALTITUDE, NOT A COMMAND; AND AN ALTIMETER.**
+- §SG6 could not be run: a manual Warden trigger cannot be pulled while climbing on a gamepad (owner). A command typed while falling was refused at 1,490 m.
+- `ncm.seamauto <pid> <at> <dz>` (ncm_world, dev, console) arms an automatic doorway. The server samples the seated car every 100 ms. Crossing `at` while climbing does the same server move as `ncm.seam` (now one shared `seamMove`), and it re-arms 200 m below `at`. This is the first form of L317's altitude-triggered hand-off.
+- Owner: "need an altitude meter as well". **Snowglobe 0.0.4** draws an altimeter beside the gearbox readout: height, CLIMB/FALL m/s, and metres left to the 16,384 m ceiling (amber above 12 km, red above 15 km). It shows above 250 m or past 8 m/s vertical.
+- Dev restarted 14:08 with nobody connected (log `l326-restart-20261005.stdout.log`). Snowglobe 0.0.4 installed. §SG7.
+
+**L317 addendum 7 (2026-10-05 14:36) - OWNER COURSE CORRECTION, AND SNOWGLOBE 0 BUILT AND LIVE ON DEV.**
+- **Owner (verbatim):** "what are we even 'testing' with seam exactly? seems like were just hanging out not actually building it but getting hung up on the idea of making flight the actual speed ? who cares? if we are going 50 kph vs 300kph at that stage we are in snowglobe....we control the perspective of speed, and furthermore there has been a loading screen at sim so if we truly need a loading screen anyway, what are we perfecting by masking our true speed". **Adopted:**
+  1. REDengine speed through a rebase is presentation and is NOT preserved.
+  2. A freeze or loading screen at a rebase is acceptable.
+  3. SEAM-1c (the velocity kick) is parked: Snowglobe no longer publishes it, and Carrier's lever stays inert.
+  4. What the seam tests established and still stands: the client cannot move a network car (§SG2), and the server's `setTransform` move holds and keeps the driver (§SG4).
+- Owner: auto mode must not need a console command. `ncm.seamauto` is removed.
+- **Built and live (owner: "yes build it"):**
+  - **`ncm_world/server/snowglobe.lua`**, automatic in `development`, never elsewhere. A per-car floating origin in z:
+    - climbing through 14 km of game height moves the car to 4 km and adds the drop to its offset;
+    - each later 14 km crossing does the same;
+    - falling through 3 km with an offset moves it up by up to 10 km (a remainder under 500 m rides along);
+    - universe altitude = game z + offset, via `space.universe`.
+    - Simulated offline (climb to 18 km and fall home: one rebase down, one home). `ncm.snowglobe on|off|status`.
+  - **Snowglobe 0.0.5:** learns the offset from the server's vertical jumps, so no new transport is needed. The altimeter shows universe altitude and `IN SPACE (NCM owns it)`.
+- Dev restarted 14:36 with nobody on (`l327-restart-20261005.stdout.log`; `Snowglobe 0 ON`). §SG8.
+- Owner's top-speed complaint is traced to the Gearbox band, not Carrier (KB-340).
+
+**L317 addendum 8 (2026-10-05) - §SG8: SNOWGLOBE 0 TOOK THE HELLA TO 33,643 m UNIVERSE ALTITUDE; THE CLIENT THEN CRASHED. 2^15 IS NOT SUPPORTED AS THE CAUSE.**
+- **Confirmed:**
+  - Doorway (14:45:07) and one further rebase (14:52:57). Universe altitude went past 16,384 m to **33,643 m** (game z 13,634 + offset 20,009). The highest game coordinate was 14,009 m.
+  - Ownership was steady after each rebase (lease back in 2.5 s). Snowglobe client and server offsets agreed within 5 m.
+- **The crash (KB-341):**
+  - A null read in game code at `+0x1FA56B` on thread 3292, 14:56:57.777, about 20 s and about 900 m after universe altitude passed 32,768.
+  - Nothing near 2^15 exists in any REDengine-visible number: game z ≤ 14,009; universe altitude is NCM bookkeeping only; the offset is about 20,009; the registers are not 0x8000.
+  - Proximity to 32,768 is a coincidence on this evidence.
+- **Also found (KB-342):** vertical speed is capped at exactly 99.70 m/s and reset to about 0, 96 times, only in this flight.
+- **Discriminating runs, proposed, not run:**
+  - (a) the same climb, keeping under 99 m/s (no cap events), to the same universe altitude;
+  - (b) hover at game z about 13.6 km with offset 0, for the same time (does duration or height alone crash?);
+  - (c) a repeat of §SG8 to see whether the crash recurs, and at what universe altitude.
+  - If (c) recurs at a similar elapsed time but a different altitude, altitude is not the variable.
+
+## L318 - OWNER DIRECTION (SPEC, NOT RULED) / CROSS-WORLD - LOS SANTOS ON FIVEM AS A SECOND NCM RACING SERVER, SNOWGLOBE AS THE SHARED PROTOCOL BETWEEN THEM (2026-10-05)
+
+**Owner direction (owner-supplied text, 2026-10-05; excerpts):**
+- "STATUS: DESIGN + ARCHITECTURAL EXPLORATION ONLY. DO NOT BUILD A FIVEM SERVER AS PART OF THIS TASK."
+- "This document is not a request to pivot away from racing. It describes a possible extreme end state of the same motorsport system."
+- "Do not propose a third Snowglobe game server. Snowglobe should be treated as a shared protocol / coordinate domain implemented by both game servers."
+- "Cross-world continuity should primarily preserve semantic identity, not exact geometry ... Think LittleBigPlanet / toybox continuity rather than Star Citizen asset literalism."
+- "make a genuinely good NCM racing server first. Then its ability to connect to Night City becomes extraordinary because both sides are places worth being."
+
+**Recorded in [52_CROSS_WORLD.md](52_CROSS_WORLD.md)** (SPEC): the direction (§1), the minimum interfaces to preserve (§2), an audit of today's tree (§3) and door-keeping rules for current work (§4). Captured: IDEA-1054 to IDEA-1065.
+
+**Audit result (read-only):**
+- Driver, machine, part and design identities are already NCM-minted UUIDs independent of the engine.
+- Universe coordinates (`space.universe`) are already independent of REDengine.
+- Authority is already `server_id` on every row.
+- **Narrowings, none urgent:**
+  1. `ncm_driver.origin` is `ENUM('sp','online')`;
+  2. `vehicle_asset.record` (TweakDB) is fused into the machine identity row;
+  3. part serial ordinals are unique per `server_id`;
+  4. `ncm_world/server/snowglobe.lua` keys state by OPEN//77 `vehicleId`, in memory only.
+
+**OPEN for the owner (no decision needed now):**
+- Q1: move the Night City embodiment (`vehicle_asset.record`) into a per-world embodiment table before or after Foundry's vehicle-design work (doc 38)?
+- Q2: should Snowglobe's server state move to asset-id keying with the next Snowglobe change (doc 52 §4 rule 3), or wait?
+
+**Nothing built; nothing authorised.** Current priorities are unchanged (Night City racing; Snowglobe's discriminating runs, L317 addendum 8).
+
+**L318 addendum (2026-10-05) - OWNER DIRECTION (SPEC, NOT RULED): ONE ONLINE RACE WEEK ACROSS TWO CITIES; SP AND ONLINE SHARE RULES, NOT TOPOLOGY; THE WORMHOLE'S TWO MEANINGS.** Owner-supplied text ("DESIGN DIRECTION / ARCHITECTURAL CONSTRAINTS. DO NOT build the FiveM server or complete wormhole system"). Recorded in doc 52 §5; IDEA-1066 to IDEA-1077.
+
+**Distilled:**
+- One Online Race Week; both cities contribute evidence through a common vocabulary to a shared resolver.
+- Shared calendar, local consequences.
+- The link stays invisible until the community discovers it.
+- Each world has its own language for the loop.
+- Two Online servers maximum: no third, no winner server, no per-player instance.
+- The wormhole is a deterministic, moving, discoverable anomaly. SP: "what else could there be?" (another seed; seed A kept). Online: "WHAT DO YOU WANT?" (about four answers from the player's own life, bounded multiplayer-safe causal changes, then a return to the world of origin). Not a farm.
+- One identity, one authoritative location.
+- Don't over-physics it.
+
+**Owner's core model:** "Racing owns the calendar ... Snowglobe owns the distance between worlds ... The wormhole owns possibility ... NCM owns continuity."
+
+**Audit (doc 52 §5.1):**
+- Two narrowings in today's Race Week:
+  1. its identity is per server (`runSeed(serverId, index)`; `racing_week_run` keyed by `(server_id, run_index)`);
+  2. local consequences and the continuation verdict read the same `run.st`.
+- The verdict already consumes one evidence-derived standing (`st.deviation`), so it is resolver-shaped.
+- Door-keeping rules 6-10 added to doc 52.
+- **Tension recorded, not resolved:** L316's dev server-wide wormhole (IDEA-1039, W0) is a dev harness for SP seed traversal. The Online wormhole never swaps the shared seed.
+
+**Nothing built; nothing authorised.** Current priorities unchanged: oval timing and presentation, manual gearbox and NPC proficiency, dynamic speed limits, Day 1-3 behaviour, Race Week causality, engineering, parts, machines, NPC culture, infrastructure, Snowglobe.
+
+## L319 - RULED / LOS SANTOS - BUILD SPACE IN GTA V LEGACY ON A LOCAL FIVEM DEV SERVER NOW (2026-10-05)
+
+**Owner (verbatim):** "sorry disregard small little test instructions other partner is trolling, we are building what we can about what we know, today. finding out if we can make gta cars race is dumb, people have done that for years. we make space ... gta legacy is installed".
+
+- **Ruled:**
+  - L318's "do not build a FiveM server" and the partner's probe-first, race-first sequencing are set aside.
+  - **NCM Los Santos starts with space**, on a local FiveM (FXServer) dev server for GTA V Legacy.
+  - Probes happen inside the build (instrumented logs), not as separate steps.
+- **Standards carried in:**
+  - continuity, not seamlessness (a fade is allowed; losing state is not);
+  - no memory offsets, ASI or ScriptHook in anything NCM;
+  - GTA's limits (150 m/s, four gravity presets, map bounds) are adapter constraints, not NCM law;
+  - networked moves are the server's.
+- **Built (2026-10-05; not yet run, it needs the owner's license key and the FiveM client):**
+  - `space.universe` 0.2.0 with city anchors (Los Santos and Night City on one Earth, about 473 km apart; 7 tests);
+  - `ncm-build` vendors core into FiveM `fxmanifest.lua` resources;
+  - **`ncm/fivem/resources/ncm_ls_space`:** the server doorway and floating origin with an NCM machine id, a server move plus client velocity restore, and full instrumentation; client lift from the F0 rig via `engineering.actuate`, attitude from paired offset forces, `SET_ENTITY_MAX_SPEED` test, space view with inverse-square universe gravity and Earth/Moon/Sun stand-ins at true angular size, HUD, `/ncm.car`;
+  - **`tools/fivem-server.ps1`** (`-Setup` done: FXServer 35245 + cfx-server-data + junction; `-Start` / `-Stop`, license from DPAPI).
+- Doc 53 is the build's authority.
+
+## L320 - RULED / SNOWGLOBE - GRAVITY AS A CONCEPT: A COMPRESSED SNOWGLOBE EARTH WITH RADIAL INVERSE-SQUARE GRAVITY; NCM UNIVERSE VELOCITY SEPARATE FROM THE ENGINE'S; THE FRAME FOLLOWS THE PLAYER (2026-10-05)
+
+**Context:** the first Los Santos flight (§LS1-§LS5). Owner: "gravity still pulled me down so we need weightlessness or gravity essentially as a concept soon ... i clicked triangle to go higher and jumped out of car? ... then freedove towards gta".
+
+**Owner ruling (verbatim):**
+> "Choose stylized inverse-square gravity, not real-scale Earth gravity and not a zero-G doorway. Give Snowglobe Earth a deliberately compressed physical radius while retaining approximately 1 g at the surface. NCM owns the gravity calculation once Snowglobe owns the vehicle. Gravity should be radial toward the NCM Earth center, not GTA world -Z. Do not make altitude itself produce "weightlessness." Allow ballistic trajectories and real orbit within the compressed system. A vehicle launched vertically should eventually fall back. A vehicle with sufficient tangential universe velocity should orbit. Keep NCM universe velocity separate from local RAGE velocity if engine limits require it. The exact Earth radius is a tunable world/seed constant. 5 km is a reasonable first experiment, not yet canon. Also treat the player's accidental fall back toward Los Santos after exiting the car as a Snowglobe frame-ownership bug: once NCM owns the scene, player and vehicle must remain in the same local/universe reference frame."
+
+**Built the same day (live on the Los Santos dev server, 2026-10-05 ~17:45, hot-reloaded over rcon):**
+- **`space.universe` 0.3.0:**
+  - `setWorld({earthRadius, surfaceG})` (GM = g R^2; default real Earth);
+  - `circularSpeed`, a semi-implicit `integrate`, and `localToEarth` / `earthToLocal`;
+  - tests: 1 g at the compressed surface, g/4 one radius up, a circular orbit holding its radius within 2 % for a full period, and a vertical launch falling back.
+- **`ncm_ls_space` 0.2.0, `client/frame.lua`:**
+  - once through the doorway, the client integrates the universe state {u, w} every frame under radial compressed-Earth gravity plus the lift along the car's up axis;
+  - the GTA body only presents it (GTA gravity off; velocity = the universe velocity in local axes, clamped at 140 m/s for GTA's cap);
+  - a floating origin by server moves keeps the body in the local band 1,000-2,500 m and near x/y 0;
+  - **the frame follows the player** (car or on foot);
+  - home at universe altitude below 2,000 m, falling, over the Los Santos patch, to the true local position;
+  - the HUD shows universe altitude, universe speed, sideways speed against the circular-orbit speed, and g.
+- The server keeps the moves (only the requester's own ped or car) and the logs.
+- **The TRIANGLE exit bug fixed:** the exit was only blocked when FiveM thought a pad was in use; through Apollo the virtual mouse made it think keyboard. It is now always blocked while the lift is armed.
+
+**OPEN (owner) - Q1: cross-world geography on a compressed Earth.** With `earthRadius` 5 km, the Night City and Los Santos anchors (37.0, -122.0 / 34.05, -118.24) sit about **370 m** apart on the sphere (473 km on real Earth), so their city patches overlap in the universe. Options include:
+- placing anchors by a seed rule rather than real latitude/longitude;
+- one patch per hemisphere;
+- a larger planet;
+- Night City and Los Santos on separate bodies.
+
+Doc 52 (L318) assumes one Earth.
+
+**Known v1 gaps:**
+- the universe state lives on the client (a crash or resource restart loses it; persistence and server validation later);
+- passengers ride the driver's frame without their own;
+- beyond the Los Santos patch there is no surface ("no surface is built there yet" returns you above Los Santos).
+
+## L321 - DIRECTION + BUILT / ENGINEERING II: MACHINES FROM PHYSICAL SYSTEMS; THE HOP IS NOT A THRUSTER; LINEAGE ACROSS WORLDS; THE SEED TREE; SNOWGLOBE IS A MOTORSPORT ENVIRONMENT; ONE PHYSICS, HOST EXPRESSION LOSSES (2026-10-05)
+
+**Context:** the owner brief "NCM ENGINEERING / SNOWGLOBE / CROSS-RUNTIME EXPANSION - MAJOR DESIGN + IMPLEMENTATION PASS" (deliverables A-K), planned and approved the same evening. [54_ENGINEERING_II.md](54_ENGINEERING_II.md) is the authority; it marks every design element KEEP / EXTEND / GENERALIZE / SUPERSEDE / NEW / UNKNOWN.
+
+**Direction recorded (owner brief):**
+- NCM is one motorsport simulation across Night City, Los Santos and Snowglobe (NCM-owned shared space; not a third server).
+- Snowglobe races exist in every seed, with NPCs, before any player, contributing to one Race Week.
+- Machines are understood from their physical systems.
+- The hop is not a thruster; dev thrust is an instrument.
+- Technology is lineages that cross worlds through reverse engineering, with provenance.
+- The seed is a hierarchy: generated base + committed modifications = current world.
+- One canonical physics language; hosts express it and record their losses.
+
+**Built (core tested under Lua 5.4 and LuaJIT; gate ALL GREEN; vendored to Online and FiveM; FiveM live by rcon):**
+- **`world.seed`:** a path-keyed seed tree on `vocabulary.hash`, and `compose(base, mods)`.
+- **`engineering.systems`, `engineering.machine`, `engineering.dynamics`:**
+  - SI kinds;
+  - assembly with mass, CoM, inertia and a 6-axis wrench from mount points;
+  - authority per axis;
+  - capability with named consequences and the first failure;
+  - an integrator where ground reaction needs contact and stored energy, atmospheric pushes scale with density, reaction engines burn propellant and stop, heat derates, and off-centre force spins.
+- **`engineering.lineage`:** origin worlds; relations reconstructed_from / derived_from / adapted_for / successor / new_lineage; reverse engineering as estimation within knowledge x competency error bands, bounded by physics, able to fail.
+- **`engineering.hosts`:** REDengine and RAGE channels and measured limits; `express` returns commands plus expression losses; unmeasured limits stay unknown.
+- **`space.universe` 0.4.0:** atmosphere.
+- **`space.course`:** 3D gates, anchor and LVLH frames, seeded rings, a timer.
+- **`space.genesis`:** stations, venues, the anomaly, organisations, pilots, a seeded technology history and the machines built from it.
+- **`space.racesim`:** machine physics becomes `paddock.sim` pace exactly; refusals carry the reason; `paddock.racestate` provenance.
+- **`space.sport`:** events from the capability distribution; Race Week evidence, hidden.
+- **`ncm_ls_space` 0.3.0:**
+  - an NCM machine (default `ls_orbiter`) drives the car through `engineering.dynamics`, with finite propellant, placement torque and heat on the HUD;
+  - the F0 lift is `instrument` mode;
+  - `/ncm.race` runs the seeded venues with a server-run NPC field, 3D gates, ghosts and a classification with provenance.
+
+**Physics found three fixture errors before anyone flew:**
+- the first orbiter could not lift off (sea-level twr 0.95);
+- its main engine sat off the CoM;
+- the fan car's 20 MJ battery hovered for 40 s.
+
+All three were fixed in the fixtures, and the orbiter's balance is tested.
+
+**KB-343 found live and fixed:** `pairs` order differs per Lua 5.4 process. The server and the offline harness disagreed on the same seed; seeded code now iterates in fixed order, verified across processes and LuaJIT.
+
+**OPEN (owner, non-blocking) - Q1: engineer competency for the new families** (`propulsion`, `energy_storage`, `avionics`). They work now as open engineering taxonomy (L314 R5). Adding them to competency changes L120's locked 27 numbers per engineer.
+
+**OPEN - Q2: torque calibration on RAGE.** `torqueGain` (30) is uncalibrated; §EG3 measures commanded against observed spin.
+
+**Not built (doc 54 §J):**
+- persistence of universe, race and lineage state;
+- the Race Week resolver;
+- the Cyberpunk machine-driven thrust path;
+- life support;
+- logistics.
+
+## L322 - DIRECTION + BUILT / SNOWGLOBE DISCIPLINES (SPRINT, FIREBALL, RELAY, TRIATHLON; POINT-TO-POINT OPEN) AND NPC DRIVERS ACROSS DOMAINS; ONE RACE AT THREE FIDELITIES; UNSEEN SNOWGLOBE HISTORY (2026-10-05)
+
+**Context:** the owner brief "NCM SNOWGLOBE MOTORSPORT UPDATE - FIREBALL, SPRINT, RELAY, CROSS-DOMAIN TRIATHLON" and its addendum "SNOWGLOBE NPC DRIVER BEHAVIOR + AUTONOMOUS SPACE RACING", planned and approved the same evening. Owner, on terminology: "its npc to be clear". Doc 54 §L-§R is the authority.
+
+**Direction recorded:**
+- Snowglobe is the third motorsport domain (not a third server).
+- **Sprint:** start plane → finish plane, five lights, deliberately simple.
+- **Fireball:** valid distance round a central object inside a legal shell, any plane, chaos.
+- **Relay:** N legs; the baton is undecided.
+- **Triathlon:** the multi-machine one, and the cross-domain NC + LS + Snowglobe crown jewel, hidden until discovered.
+- **Point-to-point** stays OPEN until there is an interesting "between".
+- **NPCs** are one persistent identity across domains: personality transfers, skill does not.
+- Racing happens unobserved, at three fidelities of one causal race.
+- Driver, physics and engineering share one machine truth.
+
+**Built (core gate ALL GREEN, Lua 5.4 + LuaJIT; `ncm_ls_space` 0.4.0):**
+- **Disciplines:**
+  - `space.sprint`: planes, lanes, a measured reaction, a jump start, a cubic-Hermite photo finish, dead heats, rebase-proof universe timing;
+  - `space.fireball`: angle about a turn-rate-limited credited axis, angle or arc credit, the shell, OOB and the black flag;
+  - `space.relay`: the exchange rule shared by every baton candidate;
+  - `space.multievent`: points / sum / nonstop scoring and the discovery gate.
+- **Drivers and planner:**
+  - `npc.behavior`: risk, margins, commit, clutch, volatility, provocation mood;
+  - `npc.competency`: per-domain skills, transfer, learning by fidelity, machine familiarity;
+  - `engineering.allocate`: intent → throttles through the mounts, shared by player and NPC;
+  - `space.pilot`: Sprint and Fireball guidance, including 3D traffic by closest approach.
+- **Fidelities and history:**
+  - `space.tactical`: a deterministic, resumable race; promote, observe and demote; the flag window; provenance;
+  - `space.calendar`: events from venues; the unseen cadence; outcomes as `world.seed` mods (records, Race Week facts, driver learning, an engineering response); apply.
+- **Extended:**
+  - `space.genesis` 0.2.0: pilots are NCM person records with Snowglobe competency; per-org Sprint and Fireball builds; venues LSIA Sky Sprint, Earth Fireball, station sprints and Fireballs;
+  - `space.racesim` 0.2.0: abstract Sprint and Fireball;
+  - `space.sport`: per-discipline machines;
+  - `engineering.fixtures` 0.3.0: `sprint_dragster`, `fireball_racer`.
+- **FiveM `ncm_ls_space` 0.4.0:**
+  - `server/events.lua`: the unseen calendar (abstract), committed to the resource KVP; player races at tactical fidelity with the NPC field streamed at 10 Hz;
+  - `client/events.lua`: NPC cars as presentation, lanes, the finish plane, five lights, the Fireball HUD;
+  - `/ncm.race 5` (LSIA Sky Sprint) and `/ncm.race 6` (Earth Fireball).
+- **Harness, before live:** the dragster won the LSIA sprint in 6.690 s (physical) against 7 NPCs (tactical, 10.8-15.8 s), with one NPC contact; the Earth Fireball reached the lights and every NPC accumulated valid distance.
+
+**Findings:**
+- The Fireball lagged-mean axis was exploitable (tests); it is now turn-rate limited.
+- LSIA sits about 770 m above the compressed sphere, so flat-patch venues take air density from city height (L320 Q1 again).
+- KB-344: cp1252 bytes from my Python edits; fixed.
+
+**OPEN (owner):**
+- **Q1, the relay baton:** object / cargo / passenger / token (doc 54 §L.3).
+- **Q2, Fireball credit rule:** `angle` (default; the inside line is shorter, like an oval) or `arc` (radius-neutral).
+- **Q3, the point-to-point discipline:** stays open.
+- **Q4, the competency families (from L321):** still open.
+
+**Host boundaries (doc 54 §Q):**
+- NPC cars are client-local presentation in v0;
+- several players in one race needs networked NPC entities;
+- remote photo finish needs clock sync;
+- the cross-domain triathlon needs doc 52's transport;
+- Cyberpunk physical space racing needs OPEN//77 at altitude.
+
+## L323 - BUILT + LIVE (DEV) / THE SIX SNOWGLOBE HOST BOUNDARIES: CONTACT, MULTIPLAYER, CLOCK SYNC, THE CROSS-SERVER LINK + THREE CITIES, LIFE SUPPORT + EVA, AND SPACE RACING IN CYBERPUNK (2026-10-05)
+
+**Context:** owner, on doc 54 §Q's "not possible yet" list: "lets tackle this". Planned and approved the same evening. Doc 54 §Q (statuses) and §S are the authority.
+
+**Built:**
+- **Core** (gate ALL GREEN, Lua 5.4 + LuaJIT):
+  - `space.tactical.contactExternal` (+ host contacts never double-counted);
+  - `space.sprint.clockOffset`;
+  - `engineering.systems` pressure_cabin / life_support / eva_suit;
+  - `life.breath`;
+  - `world.link`;
+  - fixtures (cabins, the emergency suit, `instrument_car`);
+  - the Badlands Sky Sprint venue (appended last);
+  - `tests/test_space_hosts323.lua`.
+- **`ncm_ls_space` 0.5.0** (live; rcon refresh + restart):
+  - events keyed by event: multi-player grids, straggler lights, other players presented from universe states;
+  - contact reports checked and applied;
+  - clock sync;
+  - `client/eva.lua` (air, the EVA pack, boarding by the relay rule, `/ncm.eva.drill`);
+  - `server/link.lua`, the Snowglobe hub (loopback HTTP; `/ncm.link CODE`, `/ncm.tri`).
+- **Night City dev:** new resources `ncm_link` (calls the hub; listens to `ncm:week:fact`, `ncm:paddock.human.result`, `ncm:space.result`; edits no other resource) and `ncm_space` (`/ncm.sky`).
+- **Dev config:** `server.jsonc` `http.enabled = true`, `allowedHosts = ["127.0.0.1"]` (gitignored).
+- **Dev restarted twice** (20:24 and 20:25, `l328` / `l329`), with nobody connected (the last disconnect was at 19:59). **20:25: `ncm_link` → hub REACHABLE (HTTP 200)**, facts both ways; the Paddock is running (49 open races); 0 errors.
+
+**Design finding (doc 54 §Q):** networked NPC entities cannot serve several players above the doorway, because every client has its own floating origin. Multiplayer is universe-state presentation for NPCs and players alike.
+
+**Caught by the gate before any deploy:** `os.time()` in the two new NC resources (there is no `os` in the OPEN//77 server VM). Now `Open77.time.unix()`.
+
+**OPEN (owner):**
+- **Q1:** the link's topology beyond one PC (a shared token + TLS, or a companion service), and whether Online ever links.
+- **Q2:** the relay baton (L322 Q1) now has a working passenger candidate.
+
+**Still blocked (doc 54 §Q):**
+- Cyberpunk above 16,384 m (the seam) and machine-driven Cyberpunk thrust (a native publish path);
+- NPCs driven by GTA physics.
+
+## L324 - BUILT + LIVE (DEV), NO LIVE PASS / THE FIRST ENGINEERING LOOP: PHYSICAL COMPONENTS -> INSTALLED CAPABILITY -> PLAYER-CREATED FLIGHT (2026-10-06)
+
+**Context:** owner brief "NCM ENGINEERING IMPLEMENTATION: PHYSICAL COMPONENTS -> INSTALLED CAPABILITY -> PLAYER-CREATED FLIGHT": do NOT add "hold Triangle for forward thrust" as a vehicle control; forward thrust in the air must come through NCM engineering. Implement the general grammar (component -> installation -> resources -> controls -> physics -> persistence), not "Hella flight". Keep the hop. The first build should be crude.
+
+**Ruled by the brief (LOCKED):** components expose commands; controls bind to commands and never define capabilities. A propulsor thrusts along its INSTALLED axis (facing -> reaction). No speed buff, no drive/top-speed scalar, no stabilisation. Off-centre force that the host cannot apply is reported as an expression loss, never hidden. Uninstall removes the capability. Not Hella-specific.
+
+**Built:**
+- **Core** (gate ALL GREEN, 1076 tests, Lua 5.4 + LuaJIT):
+  - `engineering.systems`: kind `pulse_reaction` (the mid-air hop is a reaction stroke, not a ground ram); `COMMANDS` per kind (`throttle` analog, `discharge` event); `pulseMass`.
+  - `engineering.installation` (new): facings (thrust axis = -facing), four hardpoints (rear / underside / roof / front, positions, rated force, blocked facings), the first two designs (Zetatech **Reaction Propulsor RP-16**: 16 kN, Isp 2000 s, throttle lag 0.25 s, 600 kW heat vs 200 kW rejection, limit +450 K; Archer **Impulse Actuator IA-10**: 53 kN x 0.2 s = 10.6 kN s, matching NCM Thrust's twr-3 hop on the 1,800 kg Hella body), `check` (every refusal physical), `resolve`, `step` (throttle lag, exact pulses at any frame rate, fuel checked before spent, heat + shutdown), `toWorld`.
+  - `engineering.controls` (new): bindings `{control, gesture, componentId, command}`; gestures press / tap / held / hold; tap and hold only wait for each other when both are bound on one control.
+  - `test_engineering_installation.lua`: 14 invariants.
+- **Schema 065:** `machine_configuration_item.install_json` (the facing; copied forward by every later fit, including factory-part fits) and `machine_control_binding`. Applied on dev 01:20.
+- **Server** `ncm_world/server/engineering.lua`: `/ncm.eng` bench, `/ncm.eng.inspect`, `/ncm.eng.fabricate` (DEVELOPMENT ONLY: the one shortcut, creating the asset), `/ncm.eng.install <n> <mount> <facing>`, `/ncm.eng.remove`, `/ncm.eng.bind`, `/ncm.eng.unbind`, `/ncm.eng.machine`. Mount/unmount are new machine_configuration revisions + component_operation rows (kinds `mount` / `unmount`), parked-and-unoccupied rule and the odometer checkpoint as for any fit. Delivery to the bound driver only (targeted event, binding verified). Fuel: `NcmFuel.draw` from the Machine's own tank, the client's claim clamped to what the installed devices could burn. Telemetry line per second (`TELEMETRY`). `components.lua` keeps add-on families out of handling and wear and refuses them in the Parts fitter.
+- **Client** `ncm_world/client/engineering.lua`: reads bound controls (`Open77.input.isDown`), steps devices through core, maps to world with `Open77.character.frame` (forward/right/up incl. pitch and roll), sends a sustained-force lease and exact pulses to the Carrier.
+- **Carrier 0.1.37:** `ncm:machine.wrench` on the existing Machine channel: world N added at the bound body's gravity entry (F x dt from the entry itself), pulses timed in physics time, refused unless assetId = the handling binding; while a Machine has installed devices its lease parks NCM Thrust's legacy lift lever. Built, hand-installed (record `dev-mods/20261006-012025`).
+
+**Owner rule kept on purpose:** "new features, new mods" is about features riding on Carrier. Here the feature logic is all Lua and core; the Carrier gained only one generic physics primitive (an external force on the bound Machine) on its own Parts channel, with one stale check per gravity entry. The hop stays: a Machine with nothing installed still hops through NCM Thrust exactly as before.
+
+**Expression losses (in every telemetry line):** force at the centre of mass (an off-centre mount's torque is computed, not applied: no torque channel on 2.31); a pulse's direction is frozen at discharge; vertical speed capped near 99.7 m/s (KB-342). The odometer still burns fuel by distance while flying, on top of the propellant draw.
+
+**Not yet:** a market or manufacturing route for these designs (fabricate is dev-only); torque; free mount geometry; atmospheric derating for this design (seaLevelFactor 1.0, by choice).
+
+**No live PASS** (MASTER_TEST §EN1-§EN12). Online untouched.
+
+**L324 addendum (owner, 2026-10-06), direction only, nothing authorised:**
+- **Sequencing:** the L324 live run (§EN1-§EN12) comes before any OpenSpace work. Its objective is not "orbit": yesterday's machine could choose altitude; L324's should choose something about trajectory -- climb to 30-60 km, shove laterally, and change the descent footprint (§EN12).
+- **What L324 means if it passes:** the Hella then has an NCM description (this serialised Machine carries IA-10 at underside/down and RP-16 at rear/aft, fed by this tank, answering these commands) -- the object that would cross the REDengine boundary.
+- **OpenSpace (IDEA-1128) research question restated:** not "can it show telemetry" but "can its MIT components be the astronomical rendering/scene substrate of an NCM-owned Snowglobe runtime, NCM owning physics and gameplay". The telemetry-driven object is the first incision only.
+- **The 5 km Earth stays OPEN (IDEA-1129):** presentation geometry and simulation geometry may differ; decide after playing Snowglobe, not before. L320 Q1 unchanged.
+
+## L325 - DIRECTION (OWNER) / NCM IS A CYBERPUNK 2077 MOD; THE SPACE BEYOND NIGHT CITY RUNS IN AN OPENSPACE-SCALE UNIVERSE WITH NCM OWNING THE PHYSICS (2026-10-06)
+
+**Context:** owner, after L324 and the OpenSpace research: "more than you guys im more interested in getting openspace up and running somehow for our snowglobe."
+
+**The vision, in the owner's terms:**
+- **NCM is a Cyberpunk 2077 mod.** GTA V / Los Santos (L318-L323) and anything else are extra: they could happen, but they are not the point now. Nothing built there is deleted; it is parked.
+- **What we truly need is the space beyond Night City**, and it gives Night City its mystique: Night City is the most densely populated place in the universe. Fly out and there is racing orbiting Night City's Earth (Fireball and Sprint, L322). Go further and there is just... the universe.
+- **The Nessie** (IDEA-1031, IDEA-1073): a shifty, black-hole-like creature that asks "What do you want?" and offers dialogue answers (e.g. "I want the fastest car in the world") that have a lasting effect on your save. Then: okay. Goodbye. You wake up in Night City on a changed Night City seed, within whatever parameters we can change (IDEA-1038 minimum contract: save the current seed, give a new one).
+- **Otherwise it is Cyberpunk 2077 where you can fly your Hella out to space.** Primitive now; the mature version has the real engineering loop (L324).
+- **The transition is graceful:** out of REDengine, into NCM's own approximation of physics in an OpenSpace-scale universe, with a same-colour sedan model (or an approximation of it). Crucially NCM's parts system and its physics understanding drive the Machine out there.
+- **The look:** Night City blends out through earthy clouds above a place on Earth, into OpenSpace deep space, for the true wanderers.
+
+**Recorded conflicts (not resolved here):**
+- L318 addendum gave "what do you want?" to Online and "what else could there be?" to SP. The owner now puts "What do you want?" in the Nessie's mouth in this (Cyberpunk) product.
+- L320's 5 km Earth vs OpenSpace's real scale: IDEA-1129 stays open (decide by playing).
+- The Online server is multiplayer; leaving REDengine for a separate renderer is per player. What the shared world sees of a player who is "out there" is open.
+
+**First step taken (L325 P0):** OpenSpace 0.22.0 (MIT) downloaded to `tools/openspace/` (gitignored); its server protocol read from source (TCP 4681 / WebSocket 4682, newline-delimited JSON, `apiHandshake` then numbered topics: `luascript`, `set`, `flightcontroller`, `camera`). Next: run it, then an NCM-driven object over Night City's place on Earth (`prototypes/ncm_openspace`).
+
+**L325 P0 RUN (coder, 2026-10-06 01:57-02:00):** OpenSpace 0.22.0 (commit 8b2778bed1) runs on this PC (RTX 5060 Ti, 60 fps) from `tools/openspace/OpenSpace-0.22.0` with `--bypassLauncher true --profile default`; its server listens on 127.0.0.1:4681 without a password (stock `openspace.cfg`). `prototypes/ncm_openspace/probe.py` created an NCM-owned scene-graph node (GlobeTranslation + GlobeRotation over 35.37 N, 120.85 W), anchored the camera to it and moved it from outside OpenSpace: **1200 updates in 20.00 s = 60.0 Hz, worst send 0.3 ms; OpenSpace read back the altitude NCM set (9995 m).** `view.py` / `jumpToGeo` put the camera over the Central California coast in daylight (screenshot from 400 km: coast, Central Valley, Channel Islands). Not yet seen: the node itself (cartesian axes at 200x are invisible at 400 km), a car model, chase-camera framing at low altitude (the 12 km view was haze), update latency under load. Next: P1, the NCM space runtime flying a stand-in Machine.
+
+**L325 owner rulings (2026-10-06):** Night City sits at **35.37 N, 120.85 W** on OpenSpace's Earth (IDEA-1133). Machines out there are **sprites of Cyberpunk vehicles** -- the look is not the point; what a Machine can do physically, where it can go and how it is engineered is (IDEA-1132).
+
+**Sprites, built (coder):** WolvenKit 8.20 CLI uncooks `base\gameplay\gui\common\icons\vehicles_icons.{inkatlas,xbm}` from the player's own `basegame_4_gamedata.archive` (4096 x 4096, 104 named parts with UV rects); `prototypes/ncm_openspace/sprites.py` crops them to `tools/openspace/sprites/<part>.png` (gitignored). The Hella's is `archer_hella__basic_player_01` (468 x 156, side profile). Name matching covers 34 of the 45 catalogue machines; the 11 others are listed in IDEA-1132. The game also carries top-down views for 27 customisable cars (`vehicle_customization_preview/top_views`). In OpenSpace a sprite is a `RenderablePlaneImageLocal` billboard parented to the NCM node (`sprite_node.py`); it loads (after `ScaleByDistanceMinHeight` > 0) but has **not been seen on screen yet**: a camera at 12-14 km over the coast shows only haze/dark sky, while 60-400 km renders the coast. Low-altitude camera framing is P1 work.
+
+## L326 - DIRECTION (OWNER) + PROBE / NO SECOND PROGRAM: NCM'S OWN UNIVERSE, JUST OUT OF REDENGINE'S REACH, INSIDE THE GAME (2026-10-06)
+
+**Context:** the coder was starting an OpenSpace bridge (a second window). Owner: "its mit cant we port something of an understanding? if not the whole openspace ... but a universe we sim just slightly out of reach of red engine, reached by hitting the bounds vertically / loading screen into our space. i dont want to open a new program".
+
+**Direction (supersedes L325's "OpenSpace as the renderer"; L325's other rulings stand):**
+- **No second program.** The universe beyond Night City is simulated by NCM and drawn inside Cyberpunk. You reach it by hitting the vertical bounds; a loading screen (the white-out through cloud) takes you into NCM's space, and the same on the way back.
+- **OpenSpace becomes a source of understanding and MIT code, not a runtime:** camera-relative rendering for planet-to-car scales, the atmosphere-scattering approach, the scene-graph/reference-frame ideas. Attribution kept; its bundled data sets are not assumed MIT.
+- **Candidate renderer: an OPEN//77 WebUI surface** (CEF inside the game process; full screen, up to 60 fps per the API card) drawing with WebGL. Physics: NCM core in the client Lua (gravity, the Machine's mass, its installed components, fuel). REDengine holds the car where it is safe while NCM owns it. Sprites per L325.
+
+**Probe 0 built (`prototypes/ncm_deep`, dev only):** outside the `ncm/*` glob, junctioned into the dev server and started by its own `server.jsonc` entry (backup `server.jsonc.bak-l326`). `/ncm.deep` opens a full-screen surface for 20 s (never takes focus): white fade in, a lit procedural Earth, 6,000 stars, the Hella sprite (local game art, gitignored), and reports to the server log `[ncm_deep] ... webgl= renderer= fps=`. Loaded on dev 02:24 (`l333-restart-20261006.stdout.log`). **Not run** (MASTER_TEST §DP0). The answer decides the renderer: WebGL with a hardware renderer at ~60 fps -> build it there; no WebGL or a software renderer -> the fallback is drawing in REDengine itself (impostor sky, Grand-Theft-Space style).
+
+**OPEN (owner):** IDEA-1128's OpenSpace question narrows to "what do we port"; the OpenSpace install in `tools/openspace/` stays for reference.
+
+**L326 correction (owner, 2026-10-06):** the owner has flown the Cyberpunk Hella past **60 km** and stopped only when the fuel ran out. The 33,643 m client crash (§SG8, KB-341) was one event, not a ceiling; nothing measured so far puts a hard limit between 33.6 and 60+ km. "Hitting the vertical bounds" (L326) is therefore a threshold NCM chooses, not one REDengine imposes. **KB-346** (L324 broke dev joins) found and fixed 02:31.
+
+**L326 probe 0 RESULT (§DP0 PASS, owner 02:33):** WebGL runs inside an OPEN//77 WebUI surface in Cyberpunk on the real GPU (ANGLE -> D3D11 on the RTX 5060 Ti), WebGL2 available, 60 fps at 1920x1080. **The renderer question is answered: NCM's universe is drawn in-game, in a WebUI surface.** The REDengine-impostor fallback is not needed. Next: real Earth imagery (public domain), the sprite, then the handoff (threshold -> white-out -> NCM physics owns the Machine -> back).
+
+**L326 BUILT + LIVE (DEV) 02:44 -- NCM DEEP v0.1 (owner: "ok build that then i will build mine and fly through it"):**
+- **Core `space.deep`** (new; 9 tests; gate 1085 green): a real-scale spherical Earth (R 6,371 km, GM 3.986e14, no rotation in v1), Night City at 35.37 N 120.85 W, game metres <-> lat/lon/alt (x east, y north arc lengths), ENU/ECEF, inverse-square gravity, semi-implicit integration, the Machine basis, the dev attitude rig (`turn`, re-orthonormalised), ballistic landing prediction (`impact`), orbit speed, a Sun direction for a local hour.
+- **Server `ncm_world/server/deep.lua`** (development only): `ncm:deep.enter` freezes the bound car (`setFrozen`), `ncm:deep.exit` moves it (`setTransform`, flags restored) and releases it; `DEEP` telemetry lines once a second; a player who drops while out is released where frozen.
+- **Client `ncm_world/client/deep.lua`**: climbing through game z 12,000 m (below Snowglobe 0's 14 km rebase) opens the surface and hands the car over; flies it with `space.deep` and the Machine's OWN installed components, bindings and tank (`NcmClientEngineering`; the in-REDengine wrench pauses meanwhile; burns reported to `ncm:engineering.burn` as before); falls back through 11,500 m -> the car is put where you are (clamped to the map if you came down far away) and the Carrier returns the velocity (pulse, capped ~80 m/s). `/ncm.deep.go` leaves from anywhere (test), `/ncm.deep.home` returns over Night City, `/ncm.deep.rig` toggles the rig.
+- **Renderer `ncm_world/web/deep.html`** (WebGL): camera-relative rendering (OpenSpace's idea; doubles in JS, float32 only after subtracting the camera), NASA Blue Marble on the globe (`tools/fetch-deep-assets.py`, gitignored with the sprite), day/night from the Sun, an air halo, the sky blue near the ground fading to black and stars, the Machine sprite in screen space with an Earth-occlusion test, NIGHT CITY and LANDING markers, HUD (altitude, speed split, orbit speed, landing distance, fuel, thrust, devices), three cameras (chase / high / earth; V or R3), white-out in and out.
+- **Not physical, said on screen:** the DEV ATTITUDE RIG (sticks/WASD/QE turn the car; no installed component makes torque). The Hella body mass is the Carrier's 1,800 kg + installed components. Earth does not rotate. The returning speed is capped by the Carrier pulse; landing far from Night City is clamped to the map edge.
+- **No live PASS** (MASTER_TEST §DP1-§DP5).
+
+**L326 OWNER RULINGS (2026-10-06 ~03:35) -- LOCKED:**
+- **No more chat commands.** "this is not gameplay nor is it fun". Features are reached by playing and through in-game UI; dev commands (`/ncm.eng.*`, `/ncm.deep.*`) stay for the coder's debugging only and are never handed over as the way in.
+- **The owner's Machine architecture: tap Triangle = the hop (IA-10, underside, facing down); hold Triangle = forward (RP-16, rear, facing aft).** The coder's "lift build" (two more RP-16 facing down, replacing the IA-10) was "strap more horsepower to it" and destroyed the owner's way up; the owner crashed and died with it (and an EMPTY tank: 0 of 60,000 ml). Installed components keep owning propulsion (NCM Thrust's legacy hop stays parked while they are installed) -- a coder change to un-park it was reverted before it went live.
+- **Restored by the coder, owner-approved (03:38):** with dev stopped, one DB transaction -> configuration revision 8 (IA-10 underside/down + RP-16 rear/aft; RP-16 #2 and #3 to storage; their hold bindings removed; component_operation kind `restore`) and the tank filled to 60,000 ml. Dev started 03:39 (`l339-restart-20261006.stdout.log`).
+
+**L326 OWNER RULING (03:45) -- DEV FUEL:** "i said fuel should be taken care of ... cant get to space like this". A full 60 L tank was not that: the odometer burns by distance and every IA-10 discharge costs ~0.5 L. **On the DEVELOPMENT server nothing burns** -- no distance burn, no component propellant; a Machine that materialises below full is filled; the client is told and its parts never starve. Online unchanged. A deliberate dev fuel test sets the convar `ncm_dev_fuel 0`. Tank refilled to 60,000 ml; dev restarted 03:48 (`l340-restart-20261006.stdout.log`).
+
+**L326 OWNER (03:55) -- "you weakened the crap out of the hop and propulsor ..... takes insane mashing":** Carrier measured ~3 IA-10 discharges/s (each the old hop's 10.6 kN s) against ~8/s for NCM Thrust, whose every press restarted its burn. Fixed in core: the tap fires on the PRESS (not the release); the IA-10 has `retrigger` (each press restarts the stroke, rechargeS 0) -- mashing is ~continuous 53 kN again (new test); the RP-16 rises to 30 kN (the rear hardpoint's rating, ~1.7 g; same design id, dev balance). Dev restarted 03:57 (`l341-restart-20261006.stdout.log`). **Online (Lightsail) checked read-only 03:58: no L324-L326 file is there; every change this session is dev-only and uncommitted.**
+
+## L327 - BUILT (DEV, NOT YET RUN IN AC) / NCM 3.0: DEEP GUIDANCE -> ASSETTO CORSA EARTH NETWORK -> NPC MOTORSPORT (2026-10-06)
+
+**Context:** owner brief "NCM 3.0 -- IMPLEMENT DEEP GUIDANCE -> ASSETTO CORSA EARTH NETWORK -> NPC MOTORSPORT": one machine, one driver, one event, one clock, different embodiments. Drive the Hella out of Night City -> Deep -> Guidance -> fly to a real AC venue -> consent -> arrive in the AIR in AC as the same Machine, parts still physical -> an NCM NPC race already running on the shared clock -> results back -> climb out to Deep. Scope: Cyberpunk + Deep + AC only.
+
+**Found (2026-10-06 inventory):** AC on C: (content 1.16-era Kunos + DLC: 21 tracks, 180 cars), no CSP, no Content Manager, and **AC has never been run on this PC** (no Documents/Assetto Corsa). The owner downloaded CSP 0.2.11 + Content Manager; installed by `tools/assetto-install-csp.py` (695 files, 0 overwritten; record `%LOCALAPPDATA%/NCM/ac-mods/20261006-054843`, `--uninstall` restores). CSP 0.2.11's SDK gives apps/track scripts 94 `physics.*` functions incl. `addForce` (N at a point -> torque), `setCarPosition` ("aligned on track surface" -- the airborne arrival must be measured), `setCarVelocity`, `setAI*` (level, aggression, mistakes, driver names, `setAICarPosition`), all gated by `physics.allowed()` (when it is true is not documented -- measured on the first run). No CSP lighting configs for the Kunos tracks: every venue is unlit.
+
+**Built:**
+- **Core** (gate 1099 green, Lua 5.4 + LuaJIT): `space.venues` (17 real venues / 34 layouts, AUTHORED coordinates -- Kunos geotags are placeholders; fictional tracks unregistered; local + solar time from the one UTC clock; AC sun angle); `space.guidance` (great-circle route of raised waypoints so no chord cuts the Earth; autopilot flies with the Machine's own sustained thrust, GRAVITY FIRST, arrival envelope 3 km above the venue; attitude is the flagged assist) -- tested: the Hella (1,925 kg, one 30 kN RP-16) flies NC->Laguna Seca in 3.7 min, NC->Monza 33.6 min, NC->Spa 32.2 min, never near the ground; `space.raceworld` (a slot every 3 h per venue, unlit venues race in daylight only, families rotate; the race at any instant is a pure function of venue+slot+drivers+UTC -- order, laps, gaps, retirements; results with provenance `simulated`); `space.embodiment` (deterministic NCM machine -> AC car; the Hella -> ks_maserati_quattroporte; unlisted keys -> a stable pool pick).
+- **Deep Guidance in-game, pad-driven (no commands):** D-pad up / G opens; left/right (Z/C) destinations (the Earth view travels there; right stick pans; R3 zooms); A / F engages the autopilot; B / X disengages/closes; at the envelope: A / F open AC, Square / R always, B / X stay. Hold B / X two seconds (guidance closed) = home (replaces `/ncm.deep.home`). Returning to Night City by falling now only happens within 60 km of Night City.
+- **Server** (`ncm_world/server/deep.lua`): on consent, the race below NOW from NCM's own 744 active NPC drivers (`paddock_person` attrs: race_pace, consistency, aggression, mistake_rate...), the Machine's AC body, local/solar time -> POST to the host bridge; polls the bridge for `departed` -> resumes Deep above the venue.
+- **Host bridge** `tools/ncm-host-bridge.py` (127.0.0.1:47710; started by `o77-server.ps1` on dev): patches AC's OWN race.ini (track, layout, body, the NCM field with NCM names + AI level from pace, laps LEFT of the canonical race, sun), installs the AC app, launches acs.exe; serves the handoff; queues AC events.
+- **AC app** `ncm/assetto/apps/lua/NCM` (CSP Lua): arrival above the start line with translated velocity; the Machine's components as forces at their mounts (Triangle/H tap = IA-10 pulse, hold = RP-16); NPC names/level/aggression + NCM-decided brake mistakes; places the field at canonical track positions; departure past 2,500 m -> `departed` + shutdown; results `physical`. Every capability is MEASURED and reported (`probe` events: physicsAllowed, airborneSpawn, force dv vs expected, field).
+
+**Expression losses known before running:** AC's lap counter starts at 0 (the session is the laps LEFT); arrival/departure heading is the track's frame, not geography; vanilla sun range (CSP time beyond it not wired yet); no night lighting at any venue; AI steering/throttle is AC's (NCM sets level, aggression, mistakes, names, positions); Deep trips are real time (no warp: the clock is shared).
+
+**BLOCKERS (evidence):** AC needs its FIRST RUN on this PC (bridge `firstRunDone: false`; `/embody` answers 409 until then). Dev restart pending (the owner was connected at 06:0x).
+
+**No live PASS** (MASTER_TEST §AC1-§AC8).
+
+
+**Ruling 2026-10-06 07:10 (owner, KB-349 / IDEA-1143) - LOCKED for DEVELOPMENT: installed parts never overheat on the development server**, the same treatment as dev fuel ("go dev only heat waiver"). Why: one RP-16 sheds a third of the heat it makes, so the one-RP-16 Hella sustains thrust/weight 0.53 and guidance 0.2.0 refused it. Online keeps the thermal model; the RP-16's balance is unchanged; `ncm_dev_heat 0` restores heat on dev for a deliberate test.
+
+## L328 - BUILT (DEV), PARTLY LIVE / NCM 3.0 POST-LAGUNA INTEGRATION PASS (2026-10-06)
+
+**Context:** the owner's brief after the first end-to-end traversal (Night City -> Deep -> Guidance -> Laguna Seca -> Assetto Corsa as the Maserati, NCM NPCs already racing). Governing principle (owner): NCM owns the journey and the canonical simulation; hosts provide physical representations of places; make the seams disappear.
+
+**Built:** (1) a focus coordinator in the host bridge (KB-357); (2) the Machine at real size in Deep with a separate locator and a continuous zoom (IDEA-1146); (3) the Machine's bindings, forces, heat and propellant in AC (KB-355), placement only once the session is live and the pre-race screen pressed (KB-356); (4) the visual ascent from 4 km on the same page that becomes Deep (IDEA-1147); (5) journey recording, schema 067 (IDEA-1148).
+
+**Measured, not assumed:** a background-launched window does not get the foreground on this PC, and the coordinator does bring it forward (bench, 14:15); Deep scale renders as specified at 12 m / 621 m / 62 km / 20,716 km (headless); the ascent layers are correct at 6 / 9 / 11.8 km after a far-side bleed fix; burn/coast guidance is WORSE than the current controller and was reverted (IDEA-1149).
+
+**Hard limits (stated, not hidden):** OPEN//77 exposes no game camera to scripts and no depth to a WebUI layer, so REDengine and NCM's planet cannot be depth-composited; the ascent masks by distance from a reconstructed chase camera and may misalign at the horizon. Windows may still refuse the foreground in some states; the bridge logs REFUSED when it does.
+
+**PROVISIONAL:** ascent band 4,000 m -> 12,000 m, mask 9-16 km (convars) until the owner reports where REDengine actually runs out (§AC13).
+
+## L329 - BUILT (DEV), SERVER PARTS VERIFIED LIVE / NCM 3.0: ONE UNIVERSE, ONE DEEP, HOST ADAPTERS (2026-10-06)
+
+**Context:** owner brief "NCM 3.0 - one universe / Race Week / host adapter architecture": NCM is one persistent simulation; Cyberpunk and Assetto Corsa are physical embodiments of places; Deep connects them; Race Week governs all of them. Target: the round trip Night City -> Laguna Seca (AC) -> up through AC's sky -> the same Deep drawn by AC (Cyberpunk closed) -> Night City (Cyberpunk launched only when needed) -> AC closes. Plan approved in plan mode (`~/.claude/plans/synchronous-kindling-mitten.md`).
+
+**Owner rulings (LOCKED):** offline, **the autopilot keeps going** (Guidance keeps flying on the Machine's own propulsors, fuel/heat permitting; otherwise gravity); **the departing host closes** once the receiving host has acknowledged the Machine.
+
+**Found:** Race Week was already host-independent in time (`week.clock` derives the run from a UTC epoch + recorded run ends on the NCM server); Deep's physics already lived in ncm-core, which the gate runs under LuaJIT = CSP's runtime; CSP offers what Cyberpunk does not (`render.fullscreenPass` with depth clipping in a 3D callback, `ac.getTrackCoordinatesDeg`); Kunos tracks carry placeholder geotags on all 45 layouts here.
+
+**Built:** (1) core `space.canonical` (the host-independent Deep record + `propagate`) and `space.places` (verified / resolved / unresolved, never invented); schema 068 (`ncm_presence`, `place_registry`); `ncm_world/server/canonical.lua` (presence, unhosted propagation in slices, the universe for other hosts, joins resume where the driver IS); (2) Cyberpunk adapter boundary: 1 Hz checkpoints, resume-on-join (`NcmVehicleAccess.materializeAt`, extracted `spawnOwned`); (3) **Deep in Assetto Corsa**: the core vendored into the AC app by `ncm-build` (dependency closure, `core/LOAD.lua`), `ncm_deep.lua` (ascent overlay depth-clipped, the seam from AC physics, NCM-authoritative flight on the Machine's own bindings, HLSL planet + HUD, Guidance incl. Night City); the KB-354 "close AC on climb" departure is gone; (4) the bridge: universe relay, AC checkpoints, track scan, host lifecycle (launch Cyberpunk as the launcher does, wake its boot screen, graceful -> taskkill -> /F only after receipt), adapters.json (consent, disable restores; dev install migrated as enabled); (5) consent prompt and HOST ADAPTERS panel in Deep (pad).
+
+**Verified live (server):** migration 068; the place registry (45 layouts: 32 verified, 13 unresolved -- placeholder geotags); the universe relay (Race Week run/day/hour reaches the bridge); **an unhosted Deep Machine flown by the server with no game running: 1,009 s integrated in slices, Guidance arrived over Laguna Seca, record persisted** (fake test driver, removed). **Verified on the bench:** the vendored core loads and flies under LuaJIT exactly as the AC app loads it; the whole AC app (arrival, ascent pass, seam at 36.5861,-121.7535, Guidance to Night City, approach event) under a CSP stand-in; the lifecycle close order. **Not run:** anything inside real CSP/AC, the Cyberpunk launch/resume, the round trip.
+
+**Hard limits (stated):** Cyberpunk still has no camera/depth for its overlay (L328); AC holds the body and shows AC's chase camera only (roll not shown); AC -> another AC venue relaunches AC; Cyberpunk's boot screen is pressed by PostMessage (unverified); hosted Machines integrate locally (the server integrates only unhosted ones) -- a server-authoritative real-time Deep is the next step for two players in one sky.
+
+**PROVISIONAL:** AC ascent 1.5 km, seam 6 km above the track; Cyberpunk launch at 60 km from Night City; Night City held at ~14 km for the Cyberpunk seam.
+
+**Ruling 2026-10-06 15:5x (owner, L329) - LOCKED: one sun on NCM's clock.** "Make the OpenSpace rendition use the solar clock of our Night City approximation plus our AC instances synced to clock so night = night." Deep (Cyberpunk and AC) and the ascent overlay draw the sun from `space.deep.sunAt(utc)` (subsolar point from the real UTC: declination by day of year, solar noon by longitude; equation of time left out); the AC app sets CSP's Weather FX to the same UTC instant (`ac.setWeatherExactUTC0Timestamp`), so Laguna Seca has its real sun and real night at its own coordinates. Arrival at an AC venue is LOW and slow (80 m, 12 m/s), PROVISIONAL.
+
+## L330 - BUILT (DEV), LOOP VERIFIED LIVE / THE RACING WEEK IS THE UNIVERSE'S TEMPORAL LOOP; EARTH VENUES ON ITS SEEDED CALENDAR (2026-10-06)
+
+**Owner rulings (LOCKED):** (1) The Racing Week is a temporal loop for ALL of NCM: one run seed resolves every race in every discipline -- Night City's and the Earth venues' -- on the real clock, causally, without being held in RAM; nobody playing means it resolves by math. (2) The loop is universe-wide: a driver in Deep, at an AC circuit or anywhere in Night City is back in Night City at the reset (default spawn); between resets their progress and position hold, including in space ("day 2 discover space, day 3 log back in still in space, day 3 reset back in Night City"). Counted from the seed's start in real time, every reset, not just one; a run that public reception extends goes on (the existing continuation verdicts). (3) A race that starts as the player arrives is too convenient: each venue POSTS a timetable and the player drops into whatever session the clock says. (4) Online keeps ticking on its own seed; single-player catches up lazily on its seed. (5) Stranding for poor engineering comes later; the dev walks the path first, then the Night City wake-up is tailored.
+
+**Built:** `space.raceworld` seeded by the run (`NcmWeek.seed()`), a posted timetable per slot (practice 0:00-0:25, qualifying 0:25-0:40, the grid, the race at 0:45, a track day to the slot's end; unlit circuits CLOSED in the dark), `session()` / `schedule()`; the embodiment configures AC for the session on now (TYPE/duration left; closed = no field); Guidance shows the selected place's timetable in local time; `week.clock` exposes the run start; `world.location` will not restore a position from a previous run (`previous_racing_week`); `canonical.lua` resets any record written before the run began (boot, every 5 s, a join) and, at a live rollover, takes connected players out of Deep, stores their cars and wakes them at the loop spawn (`ncm_loop_spawn`, default Westbrook); AC is told (`loop`), closes, and Cyberpunk is launched.
+
+**Verified live (dev 16:33):** a test Machine left in Deep before run 2 began (written 11:00, run 2 opened 12:00) was reset to Night City on the server's first check (`LOOP driver ..000330 (written before this run began)`), never flown; the owner's run-2 record (Laguna) untouched. Core: the timetable, new calendars per run, closed-in-the-dark, the loop-aware restore. **Not run:** a live rollover (next at the run's end), the AC session types in AC.
+
+**OPEN:** AC venue incidents feeding the public mood (the week curve is calibrated on Night City's race/crash rates; 17 venues of simulated races need their own calibration before they move tolerance) -- IDEA-1158.
+
+## L331 - BUILT (DEV), NOT YET FLOWN / NCM DEEP ON THE FULL MACHINE MODEL (2026-10-06)
+
+**Context:** IDEA-1161 (owner paste on aerospace donor stacks): one canonical machine whose consequential forces change with the environment, never a `spaceMode` flag. Plan approved in plan mode.
+
+**Owner ruling (LOCKED):** a real attitude part in Foundry + a DEVELOPMENT-only attitude waiver (labelled, like dev fuel / dev heat) until the Machine carries one; production is fully physical -- no attitude part, no pointing.
+
+**Built:** `engineering.flightmodel` (a Foundry install + chassis + the Machine's own tank -> an `engineering.machine`; exponential air; state <-> Deep; dev waivers); `engineering.dynamics` gains pulse strokes (IA-10), per-device heat with shutdown, throttle response, attitude sets (torque about every axis paid in fuel at force = torque / arm) and the labelled waiver/rig; `engineering.machine` counts attitude torque in its authority table; the **Zetatech AC-6 attitude set** (30 kg, 1,500 N m, arm 1 m, Isp 220 s on fuel, sized from the Hella's ~3,500 kg m^2) is fabricable (`ac6`); `space.guidance.fly` turns the Machine's REAL thrust axis (PD on its own inertia, engine-torque feed-forward, no burning while misaligned) or uses the waiver, holds the cruise floor until 15 km from a venue, and a venue's own ground counts near it; `space.canonical.propagate`, Deep in Cyberpunk and Deep in AC all step the same model; HUDs show attitude authority, the waiver label, spin and air density; config `devAttitude` (convar `ncm_dev_attitude 0` turns it off).
+
+**Measured (tests, both runtimes; core 1129 green):** today's Hella has no yaw/roll authority and Guidance says so; a second RP-16 under the floor facing aft cartwheels it (the roof hardpoint, rated 20 kN, refuses an RP-16); one IA-10 stroke = 53 kN x 0.2 s against gravity exactly; a falling car is held under its ~200 m/s terminal speed in air but not at 60 km; the RP-16 overheats and stops at full throttle (dev heat keeps it cool); the AC-6 spins it up physically and burns fuel; the AC-6 flies the Hella to Laguna Seca offline with no waiver; the AC app flies the full model under the CSP stand-in (Night City approach after 233 s, was 141 without drag).
+
+**Not in this pass:** gyroscopic terms, aero moments/stability, reentry heating, tyres in Deep, any external project's code (concepts only; licences differ).

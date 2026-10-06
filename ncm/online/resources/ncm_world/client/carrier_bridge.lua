@@ -162,6 +162,13 @@ local function sendMachine(event, payload)
     return true
 end
 
+--- L324: the one way `client/engineering.lua` reaches the Carrier -- installed components as a force on the bound
+--- Machine. Same channel, same peer check, same KB-146 contract (the Carrier refuses an assetId it is not bound to).
+NcmClientMachineWrench = function(payload)
+    if type(payload) ~= "table" then return false end
+    return sendMachine("ncm:machine.wrench", payload)
+end
+
 --- The FFB channel's search order: `0..3` are the Rig Bridge's range, `4..7` the legacy companion's.
 local function ffbPortForIndex(i)
     i = i % FFB_SEARCH_SPAN
@@ -1562,4 +1569,98 @@ end, false)
 --- beside the bridge's own `handling:` lines, so one log shows what was asked for AND what was pushed.
 RegisterNetEvent("ncm:setup.result", function(message)
     log("setup: %s", tostring(message))
+end)
+
+-- ---------------------------------------------------------------------------------------------------
+-- E1: IS MASS REAL PHYSICS? (doc 48 §3 E1, L311 Q2 "lets measure")
+-- ---------------------------------------------------------------------------------------------------
+--
+-- `.total_mass` (and `.chassis_mass`, equal on every stock record) is a drive-model flat the Carrier's record
+-- channel can already write and nothing ever has (`machine.expression`: "alive on this build and not yet
+-- written by anything"). The live body's `+0x1BC` reads exactly the record's `total_mass` for every car in
+-- the 2026-10-04 Carrier logs (1800 kg Hella, 1470 Quadra, 1895 Outlaw ...), so the record is where the
+-- physics loads its mass from. What is NOT known is whether the solver then USES it -- the A/B below says.
+--
+-- `/ncm.mass <multiplier>` scales this car's drive-model mass (0.70-1.40, the `machine.flats` bound); the
+-- record channel is spawn-cached, so call the car again for it to take. `/ncm.mass off` restores.
+-- `/ncm.massrun` times 0-100 km/h and every stop from 100 (time and distance) for ten minutes, in this log.
+-- A heavier car that does not accelerate or stop any differently means the flat is cosmetic and mass must
+-- be approximated through drive and brake (F = m.a); one that does means mass is real physics.
+RegisterCommand("ncm.mass", function(_, args)
+    local own = NcmClientOwnVehicle and NcmClientOwnVehicle() or nil
+    local record = own and own.record
+    if not record then
+        log("mass: sit in a car first -- there is no record to write against")
+        return
+    end
+    local a = args and args[1]
+    if a == "off" then
+        if pushProjection({ v = 1, record = { path = record, flats = {}, gears = {}, restore = true } }) then
+            log("mass off: asked the carrier to restore %s -- call the car again", tostring(record))
+        end
+        return
+    end
+    local mult = tonumber(a)
+    if not mult or mult <= 0 then
+        log("usage: /ncm.mass <multiplier 0.70-1.40>   or   /ncm.mass off")
+        return
+    end
+    if mult < 0.70 then mult = 0.70 elseif mult > 1.40 then mult = 1.40 end
+    if pushProjection({ v = 1, record = { path = record, gears = {}, flats = {
+            { id = "mass", suffix = ".total_mass", multiplier = mult },
+            { id = "mass_chassis", suffix = ".chassis_mass", multiplier = mult },
+        } } }) then
+        log("mass: x%.2f pushed for %s -- call the car again (spawn-cached); the CARRIER log's `mass=` "
+            .. "should then read the new kg", mult, tostring(record))
+    else
+        log("mass: bridge is down, nothing sent")
+    end
+end, false)
+
+local massRunUntil = 0
+RegisterCommand("ncm.massrun", function()
+    massRunUntil = GetGameTimer() + 10 * 60 * 1000
+    log("massrun: armed for 10 min -- launch from a standstill to 100 km/h, then brake hard to a stop")
+end, false)
+
+CreateThread(function()
+    local TOP = 100 / 3.6
+    local launchAt, stopAt, stopDist, lastAt, lastSpeed = nil, nil, 0, nil, nil
+    local record = nil
+    while true do
+        if GetGameTimer() > massRunUntil then
+            launchAt, stopAt = nil, nil
+            Wait(500)
+        else
+            Wait(0)
+            local own = NcmClientOwnVehicle and NcmClientOwnVehicle() or nil
+            local speed = own and tonumber(own.speed)
+            local now = GetGameTimer()
+            if speed then
+                speed = math.abs(speed)
+                record = own.record
+                -- the launch: timed from leaving a standstill to 100 km/h
+                if speed < 0.3 then
+                    launchAt = now
+                elseif launchAt and speed >= TOP then
+                    log("massrun: 0-100 km/h in %.2f s (%s)", (now - launchAt) / 1000, tostring(record))
+                    launchAt = nil
+                end
+                -- the stop: from falling through 100 km/h to a standstill, time and distance
+                if lastSpeed and lastSpeed >= TOP and speed < TOP then
+                    stopAt, stopDist = now, 0
+                elseif stopAt then
+                    stopDist = stopDist + speed * (now - lastAt) / 1000
+                    if speed > lastSpeed + 0.5 then
+                        stopAt = nil   -- back on the throttle: not a stop
+                    elseif speed < 0.3 then
+                        log("massrun: 100-0 km/h in %.2f s over %.1f m (%s)", (now - stopAt) / 1000, stopDist,
+                            tostring(record))
+                        stopAt = nil
+                    end
+                end
+                lastSpeed, lastAt = speed, now
+            end
+        end
+    end
 end)

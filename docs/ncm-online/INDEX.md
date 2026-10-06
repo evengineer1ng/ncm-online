@@ -56,6 +56,11 @@ corpus claiming migrations 001-007 while the schema was at 023.
 | QA instrumentation mapping | [wp/QA_INSTRUMENTATION.md](wp/QA_INSTRUMENTATION.md) | - |
 | Driver Card and Fingerprint direction | [DECISION_RECORD.md](DECISION_RECORD.md#l130--locked--driver-card-expression-and-fingerprint-authority-stay-separate) | L130 |
 | Foundry scope and invariants | [DECISION_RECORD.md](DECISION_RECORD.md#l153---locked-owner-direction---foundry-is-vehicle-rd-over-existing-geometry) | L153; representation awaits ruling in Proposal 38 |
+| Engineering II (physical machines, the four ways to push, lineage and reverse engineering), the seed tree, Snowglobe motorsport (Sprint, Fireball, Relay, Triathlon), NPC drivers across domains, the cross-runtime physics contract | [54_ENGINEERING_II.md](54_ENGINEERING_II.md) | L321, L322, L323 |
+| NCM Los Santos dev build: FiveM server, GTA adapter, space above Los Santos | [53_LOS_SANTOS_SPACE.md](53_LOS_SANTOS_SPACE.md) | L319 |
+| Cross-world (Los Santos / FiveM as a second NCM server, Snowglobe as the shared protocol, cross-world identity and transfer) and the interface boundaries to preserve | [52_CROSS_WORLD.md](52_CROSS_WORLD.md) | L318 (direction only; not authorised) |
+| The flight ladder, the altitude/space hand-off (NCM Snowglobe), the wormhole as a seed transition, and the dev-only experiments that walk them | [51_THE_CAUSAL_TUNNEL.md](51_THE_CAUSAL_TUNNEL.md) | L315, L316 + addendum (dev only; not production) |
+| Engineering architecture: the physical body grammar (car and city), sites and envelopes, the fitting rule, drivetrain composition, cause / actuator / state / coarse model | [50_ENGINEERING_ARCHITECTURE.md](50_ENGINEERING_ARCHITECTURE.md) §11-§12 | L314 (R1-R5); SPEC above it: doc 48, doc 49 §7-§8 |
 | Parts economy and fitting v1 | [DECISION_RECORD.md](DECISION_RECORD.md#l162---executed-in-code--live-gated---parts-becomes-a-conserved-economy-of-physical-assets) | L162-L163; deployed/enabled on private Online surface; MASTER_TEST §BF live evidence pending |
 | Component Wear & Tear lifecycle | [DECISION_RECORD.md](DECISION_RECORD.md#l178--executed-in-code--live-gated--component-wear--tear-is-active-tyre-compounds-remain-deferred) plus CODE: `ncm/core/parts/wear.lua`, migration 038 | L120, L178; distance-only first generation built locally; Hard/Medium/Soft compounds deferred; MASTER_TEST §BM pending |
 | Observation vocabulary and observation provenance | [DECISION_RECORD.md](DECISION_RECORD.md#l164---executed-owner-ruling---the-first-observation-vocabulary-is-accepted-the-estimator-is-not) plus [31_CAPABILITY_AUDIT.md](31_CAPABILITY_AUDIT.md) §9 | L164; §9 accepted as authority, rest of 31 stays PROPOSAL; MASTER_TEST §BH pending |
@@ -83,6 +88,9 @@ repository proved it was only an authored brick. Economy v1 has now admitted the
 runtime evaluator with separate capped presentation and authored bounty consumption. The original assignment
 remains a SPEC artifact; current runtime behavior is the code and current economic behavior is document 40.
 
+**C-5 - Racing Week length, RESOLVED by L309's addendum.** Doc 47 supersedes doc 45 §0.5-§0.6 (three days, no Day 4)
+and amends §0.1. The code still implements fixed three-day runs until doc 47 §6 is built.
+
 ---
 
 ## Current (18)
@@ -100,6 +108,7 @@ remains a SPEC artifact; current runtime behavior is the code and current econom
 - [17_MARKET_NETWORK.md](17_MARKET_NETWORK.md) - markets, market discovery
 - [24_FOUNDATION_RECONCILIATION.md](24_FOUNDATION_RECONCILIATION.md) - foundational primitives, contradictions, sequencing
 - [40_ECONOMY_V1.md](40_ECONOMY_V1.md) - Economy v1 build contract: paid events, additional faucets, asset sinks and settlement
+- [50_ENGINEERING_ARCHITECTURE.md](50_ENGINEERING_ARCHITECTURE.md) - the engineering architecture: one body grammar for car and city, sites/envelopes, the fitting rule, the drivetrain graph, cause/actuator/state/coarse model (L314); steps 2-5 built offline in `ncm/core/engineering/`
 - [44_THE_PADDOCK.md](44_THE_PADDOCK.md) - the Paddock, NCM's persistent NPC motorsport world; adopted under L225; phases 1-2 and 4-5 built and running on dev (L226, L227); phase 3 skipped
 - [43_RIG_BRIDGE_ASSESSMENT.md](43_RIG_BRIDGE_ASSESSMENT.md) - dedicated multi-vendor Rig Bridge boundary and live acceptance order; implemented under L191, §BU owed
 - [OPS_STAGING.md](OPS_STAGING.md) - day-to-day operation of NCM Online
@@ -107,8 +116,12 @@ remains a SPEC artifact; current runtime behavior is the code and current econom
 - [wp/QA_INSTRUMENTATION.md](wp/QA_INSTRUMENTATION.md) - mapping the QA corpus to instrumentation
 - [wp/NPC_ECONOMY_AUDIT.md](wp/NPC_ECONOMY_AUDIT.md) - the NPC economy's actual state, measured on dev (L297); re-run with `tools/npc-economy-audit.ps1`
 
-## Spec - owner intent, not authorised (12)
+## Spec - owner intent, not authorised (20)
 
+- [54_ENGINEERING_II.md](54_ENGINEERING_II.md) - Engineering II (L321): machines assembled from physical systems (SI kinds, wrench from mount points, per-axis authority, first failure); the hop is not a thruster (ground / stored / atmospheric / reaction as physical preconditions); lineage and reverse engineering across worlds; the seed tree and world composition; Snowglobe as a motorsport environment (3D courses, NPC racing through paddock.sim with provenance, sport from the capability distribution); host expression losses; part two (L322): Snowglobe Sprint, Fireball, Relay, Triathlon, the open point-to-point slot, NPC drivers across domains, one race at three fidelities, unseen history. L323: the six host boundaries cleared or narrowed -- contact, multiplayer, clock sync, the live cross-server link (Snowglobe hub) and Three Cities, life support and EVA, the Badlands Sky Sprint in Cyberpunk (`ncm_link`, `ncm_space` on dev). Built in core and live in `ncm_ls_space` 0.5.0; no live PASS yet
+- [53_LOS_SANTOS_SPACE.md](53_LOS_SANTOS_SPACE.md) - NCM Los Santos' first build (L319): a local FiveM dev server for GTA V Legacy, NCM core running unchanged in FiveM, Snowglobe above Los Santos (physics lift from the F0 rig, torque attitude, server doorway and floating origin, universe altitude, inverse-square gravity, Earth/Moon/Sun stand-ins); built, not yet run
+- [52_CROSS_WORLD.md](52_CROSS_WORLD.md) - cross-world: a possible second NCM racing server on GTA V / FiveM (Los Santos), Snowglobe as the shared protocol between the two (no third server), identity over representation, portable serialized parts, transactional consensual transfer, emergent cross-world motorsport, worlds vs wormholes; the interfaces today's NCM should preserve, with an audit (L318); direction only, nothing authorised
+- [51_THE_CAUSAL_TUNNEL.md](51_THE_CAUSAL_TUNNEL.md) - the causal tunnel: hop → force part → attitude → ugly flight → altitude (S0) → snowglobe → orbit → seed swap (whole dev server follows) → anomaly → return; physics not flags; the wormhole is a seed transition, not the rollover; you keep the car you are in (L316 + addendum); F0 (NCM Thrust + Carrier 0.1.33 lift lever) and S0 instruments built, not run
 - [06_CHROME_ROSTER.md](06_CHROME_ROSTER.md) - vehicle cyberware / quickhack roster
 - [09_APPAREL.md](09_APPAREL.md) - apparel entitlement
 - [10_SPECIAL_EVENT_FISHING.md](10_SPECIAL_EVENT_FISHING.md) - the fishing special event
@@ -121,8 +134,13 @@ remains a SPEC artifact; current runtime behavior is the code and current econom
 - [39_GHOST_REPLAY.md](39_GHOST_REPLAY.md) - lap ghost replay: what a ghost is, what it wears, and why poses are not telemetry samples
 - [bricks/assignments/B-089-race-tags.v1.md](bricks/assignments/B-089-race-tags.v1.md) - original Race Tag component specification; admitted by L169, with runtime behavior now governed by code
 - [41_QUEST_GRAPH_PASS1.md](41_QUEST_GRAPH_PASS1.md) - the quest graph: character conversation trees, triggers, re-entry rules and payoffs (authoring Pass 1, preserved unchanged), plus Appendix A reconciling it against shipped telemetry, `L171` and `L172`. **Partly authorised by `L183`:** the Dex / Stu / Rico slice is BUILT and governed by code; the other fifteen contacts remain SPEC. A.5's word ceilings are withdrawn by `L176`
+- [46_NCM_OBSERVER.md](46_NCM_OBSERVER.md) - NCM Observer: a non-participating client that travels to races, makes them physical, films them with racer-relative and lane-generated cameras, feeds Radio OS and OBS, and loops the program back onto OPEN//77 televisions (L307). **Partly authorised by L308:** slices 1-2 (the mode, the exclusion, the director, the racer-relative lens) are BUILT in `ncm_observer` and governed by code; the rest remains SPEC
+- [47_MOODY.md](47_MOODY.md) - Moody, the volatility engine, and the seven-day Racing Week history rarely allows: a 72-hour attractor, a state-read continuation probability at each noon, Moody's self-modifying D20 conditions, coupled reservoirs, vibe as output (L309); supersedes doc 45 §0.5-§0.6 and amends §0.1 (C-5, resolved). **§6 authorised and BUILT by L310** (timeline, verdicts, Moody, reservoirs, harness, racing radio) and governed by code; not deployed
+- [48_ENGINEERING_ENVELOPE.md](48_ENGINEERING_ENVELOPE.md) - the engineering envelope: a car's multidimensional capacity instead of 11 slots, physical components, "it fits", the packaging puzzle, staged reverse engineering into lineages, NCM taking authority over systems; Engineering Architecture pass after the manual (L311); nothing built
+- [49_CITY_MEMORY.md](49_CITY_MEMORY.md) - city memory and civil engineering: author Day 1 and let Day 3 be the evidence; a sparse server-side Campaign Scar Ledger (clustered by segment + radius, accumulated burden → levels 1-4, physical incidents only in v0, ends with the campaign), an Infrastructure Knowledge Ledger across runs, a hand-run Campaign A/B experiment before any automation (L312 + addendum, Q1-Q4 ruled); civil engineering as engineering pointed outward, with a six-piece snapping kit judged by the race, anyone builds and dismantles for modest money (L313, C1-C4 ruled); the end-of-cycle Night City seed map with danger heatmap and infrastructure pins, chosen publicly at rollover; infrastructure belief proportional to evidence. The spatial half of doc 47, not a new end rule; nothing built
 
-## Proposal - no authority until ruled (18)
+## Proposal - no authority until ruled (19)
+
 
 - [21_ENGINEERING_PROPOSAL.md](21_ENGINEERING_PROPOSAL.md) - engineering architecture - ACCEPTED; decisions live in L120
 - [22_WEAR_PROPOSAL.md](22_WEAR_PROPOSAL.md) - wear architecture - ACCEPTED; decisions live in L120
@@ -143,6 +161,7 @@ remains a SPEC artifact; current runtime behavior is the code and current econom
 - [42_PARTS_BEHAVIOR_AND_WEAR_EXPANSION.md](42_PARTS_BEHAVIOR_AND_WEAR_EXPANSION.md) - design-only Parts behaviour, tyre-compound, stress-aware Wear, warning-light and service architecture exploration; **PROPOSAL, no implementation authorised** (`IDEA-627`-`IDEA-634`, `KB-163`)
 - [NCM_PVE_WORLD_VISION_AND_SIM_REVIEW.md](../research/open77/NCM_PVE_WORLD_VISION_AND_SIM_REVIEW.md) - long-term PvE vision: five-layer simulation stack over Night City, three capability tiers incl. NCM native mods, and the five-engine review; owner direction is L218-L223, architecture and source-port map remain proposals (`IDEA-722`-`IDEA-734`)
 - [PACE_ROAD_PATH_PROBE.md](../research/open77/PACE_ROAD_PATH_PROBE.md) - **CURRENT** 2026-09-30 verified native traffic graph and dev road-speed candidate; race PASS pending (`KB-239`, `IDEA-783`-`IDEA-784`)
+- [45_RACING_WEEK.md](45_RACING_WEEK.md) - Racing Week, the three-day reconstruction: architecture map, persistence map, reset boundary, three meta-progression models plus a hybrid, character bands, dialogue tags, conditions with provenance, archive schema, recovery and the implementation ladder - **PROPOSAL, nothing ruled or built** (`L300`, `IDEA-857`-`IDEA-874`)
 - [CARRIER_NEXT_STEPS_AND_UPGRADE.md](CARRIER_NEXT_STEPS_AND_UPGRADE.md) - **the canonical Carrier build/publish/verify/rollback runbook**. Every in-place Carrier replacement follows it; do not hand-copy the DLL and do not accept a warm reconnect as proof.
 
 ## Ledgers - living records (6)
@@ -162,8 +181,9 @@ remains a SPEC artifact; current runtime behavior is the code and current econom
 - [05_DATA_MODEL.md](archive/05_DATA_MODEL.md) - superseded by **ncm/online/resources/ncm_league/server/schema/ - the CODE is the authority**
 - [wp/BATCH-1-CATCHUP.md](archive/wp/BATCH-1-CATCHUP.md) - superseded by **NOW.md - self-declared superseded 2026-09-21**
 
-## Historical - archived, evidence not architecture (23)
+## Historical - archived, evidence not architecture (24)
 
+- [wp/ONLINE_NIGHT_2026-10-04.md](wp/ONLINE_NIGHT_2026-10-04.md) - Online's night of racing analysed: human races cut the NPC field in half, sim pace vs the owner, crash facts, money
 - [SERVER_BASELINE_2026-10-02.md](archive/SERVER_BASELINE_2026-10-02.md) - read-only platform, required-mod, and NCM resource inventory of both running servers before the next platform update
 
 - [23_OPEN_QUESTIONS.md](archive/23_OPEN_QUESTIONS.md) - the Q1-Q70 question set, answered 2026-09-24 (L123)

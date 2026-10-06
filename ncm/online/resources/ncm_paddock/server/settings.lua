@@ -56,6 +56,16 @@ local ok, settings = pcall(Open77.tunables.declare, {
     -- `liveMode` = watched (a player is near the route), always (anyone online), or off. `liveBackend` = auto (the
     -- NCM Pace plugin when the nearest player has it, else the platform), platform, or pace.
     liveEnabled = { value = true, type = "boolean", apply = "live" },
+    racingWeek = { value = true, type = "boolean", apply = "live" },
+    racerIcons = { value = true, type = "boolean", apply = "live" },        -- every racer on the map (owner, 2026-10-04)
+    racerIconsEverySec = { value = 2, type = "integer", min = 1, max = 30, unit = "s", apply = "live" },
+    -- L305 (owner, 2026-10-04: "make the economy alive ... money sinks and pressures for npcs"):
+    npcRunningShare = { value = 0.005, type = "number", min = 0, max = 0.05, apply = "live" },    -- of car value, per start
+    npcTeamRunwayDays = { value = 14, type = "integer", min = 0, max = 120, unit = "days", apply = "live" },
+    npcTeamCarShare = { value = 0.5, type = "number", min = 0, max = 1, apply = "live" },
+    calibrationHumanPaddock = { value = true, type = "boolean", apply = "live" },                 -- L305: your Paddock laps set the base
+    calibrationMinHumanSamples = { value = 3, type = "integer", min = 1, max = 100, apply = "live" },
+    calibHumanDays = { value = 30, type = "integer", min = 1, max = 120, unit = "days", apply = "live" },   -- L303: the Cup is the Racing Week run (read at boot)
     liveMode = { value = "watched", type = "string", apply = "live" },
     liveBackend = { value = "auto", type = "string", apply = "live" },
     liveWatchRadiusM = { value = 600, type = "integer", min = 50, max = 5000, unit = "m", apply = "live" },    liveMaxConcurrent = { value = 2, type = "integer", min = 1, max = 6, apply = "live" },

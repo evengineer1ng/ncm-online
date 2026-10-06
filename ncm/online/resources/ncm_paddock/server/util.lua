@@ -94,3 +94,19 @@ function PaddockUtil.fmtSec(ms)
     local m = math.floor(s / 60)
     return string.format("%d:%05.2f", m, s - m * 60)
 end
+
+--- Racing Week's craze multiplier on purses (L303), from ncm_world's published week; 1 when there is no week.
+function PaddockUtil.weekMoney()
+    local ok, v = pcall(function() return GlobalState.ncmWeek end)
+    local m = ok and type(v) == "table" and tonumber(v.money) or nil
+    return (m and m > 0) and m or 1
+end
+
+--- A purse table scaled by the craze, and by Moody's purse for the race's tier (doc 47: DEVIL'S PURSE ...).
+function PaddockUtil.crazePurse(purse, tier)
+    local m = PaddockUtil.weekMoney() * ((tier and PaddockWeek and PaddockWeek.purseX and PaddockWeek.purseX(tier)) or 1)
+    if m == 1 then return purse end
+    local out = {}
+    for k, v in pairs(purse or {}) do out[k] = math.floor((tonumber(v) or 0) * m + 0.5) end
+    return out
+end

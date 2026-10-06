@@ -376,6 +376,12 @@ RegisterNetEvent("ncm:wear", function(v)
     pcall(function() page:send("race:wear", (type(v)=="table") and v or false) end)
 end)
 
+-- Racing Week's advertised limit (L301): the server sends it only when it changes; `false` hides the sign.
+RegisterNetEvent("ncm:limit", function(v)
+    if not page then return end
+    pcall(function() page:send("race:limit", (type(v) == "table") and v or false) end)
+end)
+
 RegisterNetEvent("ncm:fuel", function(v)
     if not page then return end
     pcall(function() page:send("race:fuel", (type(v)=="table") and v or false) end)

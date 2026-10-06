@@ -519,6 +519,16 @@ local function step(entry, t)
     if NcmObservation and NcmObservation.sample then
         pcall(NcmObservation.sample, entry, cur, observedLateral, t)
     end
+    -- Racing Week's advertised limits (L301): the same sample goes to ncm_speed, its own resource (KB-327), which finds
+    -- the lane, the Day's sign and its cost. Only facts cross: never a table this VM keeps.
+    do
+        local pid = tonumber(snap and snap.driverPlayerId) or entry.pid
+        if pid and pid > 0 then
+            local prof = NcmIdentity and NcmIdentity.get and NcmIdentity.get(pid)
+            TriggerEvent("ncm:speed:sample", pid, prof and prof.ncmDriverId or "", cur.x, cur.y, cur.z or 0, cur.speedMps or 0,
+                cur.headingRad and math.deg(cur.headingRad) or -1000, t)
+        end
+    end
     if not prev then return end
     local seg = Identity.segment(prev, cur)
     trace(assetId, prev, cur, seg)

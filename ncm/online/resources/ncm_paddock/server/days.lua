@@ -433,6 +433,8 @@ local okX, errX = pcall(function()
     exports("lifeFact", function(district, kind, n) PaddockDays.fact(district, kind, n) end)
 end)
 if not okX then log("exports unavailable (%s): other resources cannot feed the life sim yet", tostring(errX)) end
+-- The same feed as a server event, for resources that must not depend on ncm_paddock (ncm_world's speed limits, L301).
+AddEventHandler("ncm:life:record", function(ncmDriverId, fact) pcall(PaddockDays.record, ncmDriverId, fact) end)
 
 --- A talk happened (garages.lua): the player's trajectory and the district's cohesion both hear of it.
 function PaddockDays.onTalk(ncmDriverId, body, personId, t)

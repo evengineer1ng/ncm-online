@@ -72,6 +72,26 @@ AddEventHandler("onResourceStart", function(name)
     end)
 end)
 
+-- KB-339 relief, console only: `ncm.heal <playerId>`. Logs what the platform thinks first -- the life phase, the
+-- health ledger -- because "stuck at 1 hp and the 2 hp/s regen never runs" is a question about state, then sets
+-- health to max through the same call freeroam's kill reward uses (`setHealth`). Not a feature.
+RegisterCommand("ncm.heal", function(source, args)
+    if (tonumber(source) or 0) ~= 0 then return end
+    local id = tonumber(args and args[1])
+    if not id then log("usage: ncm.heal <playerId>"); return end
+    local okL, life = pcall(Open77.players.getLifeState, id)
+    local okH, health = pcall(Open77.players.getHealth, id)
+    local phase = okL and type(life) == "table" and tostring(life.phase) or tostring(life)
+    local hp, max = okH and type(health) == "table" and tonumber(health.health), okH and type(health) == "table" and tonumber(health.maxHealth)
+    log("heal player=%d: before phase=%s health=%s/%s regen-target=%.2f hp/s", id, phase, tostring(hp), tostring(max), rate())
+    if not max then log("heal player=%d: no health ledger (%s)", id, tostring(health)); return end
+    local ok, done, reason = pcall(Open77.players.setHealth, id, max)
+    local okA, after = pcall(Open77.players.getHealth, id)
+    log("heal player=%d: setHealth(%s) -> %s %s | after %s", id, tostring(max), tostring(ok and done), tostring(ok and reason or done),
+        okA and type(after) == "table" and (tostring(after.health) .. "/" .. tostring(after.maxHealth)) or "?")
+    apply(id, "heal")
+end, false)
+
 -- `IDEA-677` probe, console only: `ncm.wanted <playerId> <0..5>`. Sets the player's NCPD heat through the
 -- platform's prevention policy (`open77_prevention` applies it to that player's own `PreventionSystem`), so a
 -- live test can answer "will units spawn and chase at all" before anyone designs a trigger. It is not a

@@ -271,12 +271,25 @@ function PaddockLife.standings(kind, seasonId, seriesId, cupId, limit)
 end
 
 local function titles(kind, seasonId, cupId, t)
-    local events = {}
+    local events, crowns = {}, {}
     local world = w()
     for id, s in pairs(world.series) do
         Wait(0)                                       -- fifteen series (L236)
         local top = PaddockLife.standings("driver", seasonId, id, cupId, 1)[1]
-        if top and top.points > 0 then
+        local run = kind == "cup_title" and PaddockWeek and PaddockWeek.runOf(cupId)
+        if top and top.points > 0 and run then
+            -- L303: a Racing Week crown -- NPC or human, the standings do not care -- goes into the hall of champions
+            local who = PaddockWeek.whoIs(top.id)
+            if who then
+                PaddockWeek.crown(run, s, top, who, t)
+                crowns[#crowns + 1] = { series = s.name, seriesId = id, tier = s.tier, display = who.display, org = who.orgName or "",
+                    human = who.human, points = top.points, wins = top.wins }
+                events[#events + 1] = Tape.event("cup_title", cupId .. ":" .. id, t, {
+                    entities = who.personId and { { "person", who.personId }, { "org", who.orgId } } or {},
+                    facts = { tier = s.tier, driver = who.display, org = who.orgName or "", series = s.name,
+                        cup = "Racing Week " .. run, points = top.points } })
+            end
+        elseif top and top.points > 0 then
             local p = world.people[top.id]
             if p then
                 if kind == "cup_title" then
@@ -294,7 +307,7 @@ local function titles(kind, seasonId, cupId, t)
             end
         end
     end
-    return events
+    return events, crowns
 end
 
 local function orgStanding(org, seasonId)
@@ -395,6 +408,9 @@ local function ownerDecides(org, t, medians)
     return events
 end
 
+local CROWN_WAIT_S = 20 * 60
+local crownWaitLogged
+
 function PaddockLife.cupBoundary(t)
     local world = w()
     local cup = Season.cupOf(t)
@@ -407,13 +423,35 @@ function PaddockLife.cupBoundary(t)
         PaddockStore.flush()
         return false
     end
+    -- L303: a Racing Week Cup is crowned only when its finales are in -- every race of the run resolved or void --
+    -- or, at the latest, CROWN_WAIT_S after the run's end (a stuck race must not hold the names back forever)
+    local prevRun = PaddockWeek and PaddockWeek.runOf(previous)
+    if prevRun then
+        local pending = 0
+        for _, race in pairs(PaddockRaces.byId or {}) do
+            if race.cupId == previous and race.state ~= "resolved" and race.state ~= "void" then pending = pending + 1 end
+        end
+        local wk = PaddockWeek.at(cup.cupStartUtc - 1)
+        local ended = wk and wk.endUtc or cup.cupStartUtc
+        if pending > 0 and t < ended + CROWN_WAIT_S then
+            if (crownWaitLogged or 0) + 60 <= t then
+                crownWaitLogged = t
+                log("Racing Week %d ended: crowning waits for %d race(s) still running (%d s left)", prevRun, pending, ended + CROWN_WAIT_S - t)
+            end
+            return false
+        end
+    end
     local events = {}
+    local crowns = {}
     do
         local prevSeason = tostring(previous):match("^(%d+%-S%d)") or world.seasonId
         pcall(MySQL.update.await, ARCHIVE_DRIVER, { previous, U.sid(), prevSeason, previous, previous })
         pcall(MySQL.update.await, ARCHIVE_ORG, { previous, U.sid(), prevSeason, previous, previous })
-        for _, e in ipairs(titles("cup_title", prevSeason, previous, t)) do events[#events + 1] = e end
+        local ev, cr = titles("cup_title", prevSeason, previous, t)
+        for _, e in ipairs(ev) do events[#events + 1] = e end
+        crowns = cr or {}
     end
+    if prevRun and #crowns > 0 then pcall(PaddockWeek.announce, prevRun, crowns) end
     -- queued human-manager roster moves land now (doc 44 §10)
     for i, oid in ipairs(world.orgOrder) do
         if i % 40 == 0 then Wait(0) end

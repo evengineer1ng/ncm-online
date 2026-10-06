@@ -19,7 +19,7 @@
 local Core = NcmCore
 
 Core.define("world.location", function(C)
-    local M = { version = "0.0.1" }
+    local M = { version = "0.0.2" }
 
     local DEFAULTS = {
         maxAgeSec = 7 * 86400,   -- a three-day-old position is not where the player thinks they are; a week is the outer bound
@@ -33,6 +33,11 @@ Core.define("world.location", function(C)
         minZ      = -100,
         maxZ      = 1200,
         arrivedM  = 3.0,         -- already within this of the pose: moving them is a second arrival for nothing
+        -- KB-339: flight broke "we replay a position the player was standing at". A car climbing or falling under
+        -- `maxZ` was saved at 652 m and the next join dropped the player 650 m on foot, twice. A body moving
+        -- vertically faster than this between two samples is airborne, not standing: a steep road at 180 km/h is
+        -- about 4 m/s vertical, a fall reaches 9.8 m/s within its first second.
+        maxVerticalMps = 8.0,
     }
 
     local function finite(n)
@@ -76,6 +81,10 @@ Core.define("world.location", function(C)
         local connectedAt = tonumber(cfg.connectedAt)
         if connectedAt and at >= connectedAt then return false, "same_session" end
         if now - at > maxAge then return false, "stale" end
+        -- L330: the Racing Week is a temporal loop. A position from before this run began belongs to a reconstruction
+        -- that has been rewound: the driver wakes at the default spawn, not where they stood last week.
+        local runStart = tonumber(cfg.runStartUtc)
+        if runStart and at < runStart then return false, "previous_racing_week" end
         -- A seat is not a place. The vehicle that seat belonged to is very likely gone, and arriving inside a
         -- vehicle that no longer exists is the classic wedge.
         if saved.inVehicle == true then return false, "was_in_vehicle" end
@@ -118,6 +127,19 @@ Core.define("world.location", function(C)
         local dx, dy, dz = current.x - previous.x, current.y - previous.y, current.z - previous.z
         if (dx*dx + dy*dy + dz*dz) < (minMove * minMove) then return false, "unmoved" end
         return true
+    end
+
+    --- Is the body airborne, judged by its vertical speed between the previous sample and this one (KB-339)?
+    --- previous: { z, t } (t in seconds); here: { z }; now: seconds. No previous sample, or no elapsed time, is
+    --- not evidence of flight. Returns the verdict and the measured vertical speed.
+    function M.airborne(previous, here, now, opts)
+        local cfg = type(opts) == "table" and opts or {}
+        local limit = tonumber(cfg.maxVerticalMps) or DEFAULTS.maxVerticalMps
+        if type(previous) ~= "table" or type(here) ~= "table" then return false, 0 end
+        local dt = (tonumber(now) or 0) - (tonumber(previous.t) or 0)
+        if not (dt > 0) or not finite(previous.z) or not finite(here.z) then return false, 0 end
+        local rate = math.abs(here.z - previous.z) / dt
+        return rate > limit, rate
     end
 
     M.DEFAULTS = DEFAULTS

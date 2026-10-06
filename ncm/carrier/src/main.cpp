@@ -231,6 +231,11 @@ void onLoad()
                                                h.hasBrake, h.brake, h.hasDrag, h.drag,
                                                h.hasTopSpeed, h.topSpeedKph);
         });
+        // `L324`: installed components push the bound Machine. The probe checks the assetId against the binding.
+        c.server->onWrench([](const ncm::bridge::Wrench& w) {
+            ncm::vehicle::probe::applyWrench(w.assetId, w.fx, w.fy, w.fz, w.ttlMs, w.supersedeLift,
+                                             w.hasPulse, w.pulseSeq, w.px, w.py, w.pz, w.pulseMs);
+        });
         c.server->onConnect([&c] { sendHealth(c); });
         c.server->onDisconnect([&c] {
             // The world went away. Put the player's game back the way we found it, immediately, without

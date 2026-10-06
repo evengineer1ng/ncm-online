@@ -1,0 +1,265 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>NCM Observer</title>
+  <style>
+    :root {
+      --bg: rgba(8, 10, 14, 0.86);
+      --bg-soft: rgba(18, 22, 30, 0.92);
+      --line: rgba(120, 220, 255, 0.18);
+      --text: #e8eef4;
+      --dim: #8a97a6;
+      --accent: #5fe3ff;
+      --hot: #ffcf3f;
+      --live: #49f29a;
+      --sim: #8a97a6;
+      --danger: #ff5d6c;
+      --street: #ff9a3c; --regional: #39d5ff; --pro: #b07bff; --premier: #ffd24a;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; width: 1920px; height: 1080px; overflow: hidden; background: transparent;
+      font-family: "Rajdhani", "Arial Narrow", Arial, sans-serif; color: var(--text); user-select: none; }
+    .hidden { display: none !important; }
+
+    /* ---------------------------------------------------------------- the strip (panel closed) */
+    #strip { position: absolute; left: 32px; bottom: 30px; display: flex; align-items: stretch; gap: 0;
+      background: var(--bg); border: 1px solid var(--line); border-left: 4px solid var(--accent); font-size: 22px; }
+    #strip .cell { padding: 8px 16px; border-right: 1px solid var(--line); display: flex; align-items: center; gap: 10px; }
+    #strip .cell:last-child { border-right: 0; }
+    #strip .tag { color: var(--accent); font-weight: 700; letter-spacing: 2px; }
+    #strip .pos { color: var(--hot); font-weight: 700; }
+    #strip .hint { color: var(--dim); font-size: 17px; }
+    .dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; background: var(--sim); }
+    .dot.live { background: var(--live); box-shadow: 0 0 8px var(--live); }
+
+    /* ---------------------------------------------------------------- the panel */
+    #panel { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 1500px; height: 760px;
+      background: var(--bg); border: 1px solid var(--line); border-top: 4px solid var(--accent); display: flex; flex-direction: column; }
+    header { display: flex; align-items: center; padding: 14px 22px; border-bottom: 1px solid var(--line); gap: 18px; }
+    header h1 { margin: 0; font-size: 30px; letter-spacing: 4px; color: var(--accent); }
+    header .now { font-size: 22px; color: var(--text); flex: 1; }
+    header .now b { color: var(--hot); }
+    .x { cursor: pointer; font-size: 26px; color: var(--dim); padding: 0 8px; }
+    .x:hover { color: var(--text); }
+    .cols { flex: 1; display: grid; grid-template-columns: 430px 1fr 400px; min-height: 0; }
+    .col { border-right: 1px solid var(--line); display: flex; flex-direction: column; min-height: 0; }
+    .col:last-child { border-right: 0; }
+    .col h2 { margin: 0; padding: 12px 18px; font-size: 18px; letter-spacing: 3px; color: var(--dim); border-bottom: 1px solid var(--line); }
+    .list { overflow-y: auto; flex: 1; }
+    .row { display: flex; align-items: center; gap: 12px; padding: 9px 18px; font-size: 21px; cursor: pointer;
+      border-bottom: 1px solid rgba(255,255,255,0.04); }
+    .row:hover { background: var(--bg-soft); }
+    .row.sel { background: rgba(95, 227, 255, 0.12); }
+    .row.watching { box-shadow: inset 4px 0 0 var(--hot); }
+    .tier { font-size: 14px; font-weight: 700; letter-spacing: 1px; padding: 2px 7px; border-radius: 3px; color: #0b0d12; min-width: 70px; text-align: center; }
+    .tier.street { background: var(--street); } .tier.regional { background: var(--regional); }
+    .tier.pro { background: var(--pro); } .tier.premier { background: var(--premier); }
+    .grow { flex: 1; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+    .meta { color: var(--dim); font-size: 17px; }
+    .p { width: 42px; color: var(--hot); font-weight: 700; }
+    .gap { width: 90px; text-align: right; color: var(--dim); font-variant-numeric: tabular-nums; }
+    .human { color: var(--accent); font-size: 14px; margin-left: 6px; }
+    .empty { padding: 28px 18px; color: var(--dim); font-size: 20px; }
+
+    .cams { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 16px; }
+    .btn { background: var(--bg-soft); border: 1px solid var(--line); color: var(--text); padding: 12px 10px; font-size: 20px;
+      font-family: inherit; cursor: pointer; text-align: left; display: flex; justify-content: space-between; align-items: center; letter-spacing: 1px; }
+    .btn:hover { border-color: var(--accent); }
+    .btn.on { border-color: var(--hot); background: rgba(255, 207, 63, 0.14); color: var(--hot); }
+    .btn .k { color: var(--dim); font-size: 15px; }
+    .btn.wide { grid-column: 1 / span 2; }
+    .btn.big { justify-content: center; font-size: 24px; padding: 16px; }
+    .btn.danger:hover { border-color: var(--danger); color: var(--danger); }
+    .btn.go { border-color: var(--accent); color: var(--accent); }
+    .actions { padding: 0 16px 16px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .note { padding: 6px 18px 14px; color: var(--dim); font-size: 17px; line-height: 1.35; }
+    footer { padding: 10px 22px; border-top: 1px solid var(--line); color: var(--dim); font-size: 17px; }
+    footer b { color: var(--text); font-weight: 600; }
+    #toast { position: absolute; left: 50%; top: 40px; transform: translateX(-50%); background: var(--bg); border: 1px solid var(--line);
+      border-left: 4px solid var(--hot); padding: 10px 18px; font-size: 21px; }
+  </style>
+</head>
+<body>
+  <div id="strip" class="hidden">
+    <div class="cell"><span class="tag">OBSERVER</span></div>
+    <div class="cell"><span class="dot" id="s-dot"></span><span class="pos" id="s-pos"></span><span id="s-name">Nothing yet</span></div>
+    <div class="cell"><span id="s-series" class="meta"></span></div>
+    <div class="cell"><span id="s-cam"></span><span id="s-auto" class="tag hidden">DIRECTOR</span></div>
+    <div class="cell hint" id="s-hint">F3 panel · 1-8 camera · PgUp/PgDn car · Home leader · B battle · N director · H clean</div>
+  </div>
+
+  <div id="panel" class="hidden">
+    <header>
+      <h1>OBSERVER</h1>
+      <div class="now" id="p-now">Not observing</div>
+      <span class="x" id="p-close" title="Close (Esc / F3)">✕</span>
+    </header>
+    <div class="cols">
+      <div class="col">
+        <h2>RACES NOW</h2>
+        <div class="list" id="races"></div>
+      </div>
+      <div class="col">
+        <h2 id="field-title">RUNNING ORDER</h2>
+        <div class="list" id="field"></div>
+      </div>
+      <div class="col">
+        <h2>CAMERA</h2>
+        <div class="cams" id="cams"></div>
+        <div class="actions" id="actions"></div>
+        <div class="note" id="note"></div>
+      </div>
+    </div>
+    <footer><b>Click</b> a race to see its order · <b>click</b> a driver to watch · <b>1-8</b> camera · <b>PgUp/PgDn</b> previous/next car · <b>Home</b> leader · <b>B</b> closest battle · <b>N</b> director · <b>H</b> clean HUD · <b>Esc/F3</b> close</footer>
+  </div>
+
+  <div id="toast" class="hidden"></div>
+
+  <script>
+    (function () {
+      var CAMS = [
+        ["chase", "CHASE"], ["far", "FAR CHASE"], ["drone", "DRONE"], ["onboard", "ONBOARD"],
+        ["orbit", "ORBIT"], ["side", "SIDE"], ["front", "FRONT"], ["low", "LOW"]
+      ];
+      var st = { on: false, open: false, mode: "chase", auto: false, clean: false, target: null, races: [], field: [], selected: null, allowed: true };
+      var $ = function (id) { return document.getElementById(id); };
+      var emit = function (ev, p) { try { Open77.emit(ev, p || {}); } catch (e) {} };
+      var toastTimer = null;
+
+      function esc(s) { return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
+      function gap(ms, p) {
+        if (p === 1) return "LEADER";
+        if (ms == null || ms < 0) return "";
+        return "+" + (ms / 1000).toFixed(1);
+      }
+      function camName(id) { for (var i = 0; i < CAMS.length; i++) if (CAMS[i][0] === id) return CAMS[i][1]; return String(id || "").toUpperCase(); }
+
+      function drawStrip() {
+        var show = st.on && !st.open;
+        $("strip").classList.toggle("hidden", !show);
+        if (!show) return;
+        var t = st.target;
+        $("s-pos").textContent = t && t.p ? "P" + t.p : "";
+        $("s-name").textContent = t ? t.name : "Pick a race: F3";
+        $("s-series").textContent = (t && t.series ? t.series : "") + (t && !t.live ? " · in the simulation, arriving as you get close" : "");
+        $("s-dot").className = "dot" + (t && t.live ? " live" : "");
+        $("s-cam").textContent = camName(st.mode);
+        $("s-auto").classList.toggle("hidden", !st.auto);
+        $("s-hint").classList.toggle("hidden", st.clean);
+      }
+
+      function drawRaces() {
+        var el = $("races");
+        if (!st.races.length) { el.innerHTML = '<div class="empty">No race is running right now. The Paddock posts races every few minutes.</div>'; return; }
+        var h = "";
+        st.races.forEach(function (r) {
+          var cls = "row" + (r.r === st.selected ? " sel" : "") + (st.target && st.target.raceId === r.r ? " watching" : "");
+          h += '<div class="' + cls + '" data-race="' + esc(r.r) + '"><span class="tier ' + esc(r.tier) + '">' + esc(String(r.tier || "").toUpperCase()) +
+            '</span><span class="grow">' + esc(r.series) + '</span><span class="meta">' + esc(r.n) + ' cars</span></div>';
+        });
+        el.innerHTML = h;
+      }
+
+      function drawField() {
+        var el = $("field");
+        var race = null;
+        st.races.forEach(function (r) { if (r.r === st.selected) race = r; });
+        $("field-title").textContent = race ? ("RUNNING ORDER · " + String(race.series || "").toUpperCase()) : "RUNNING ORDER";
+        if (!st.field.length) { el.innerHTML = '<div class="empty">' + (race ? "Waiting for this race's order..." : "Pick a race on the left.") + '</div>'; return; }
+        var h = "";
+        st.field.forEach(function (c) {
+          var watching = st.target && st.target.raceId === st.selected && st.target.key === c.k;
+          h += '<div class="row' + (watching ? " watching sel" : "") + '" data-car="' + esc(c.k) + '"><span class="p">' + esc(c.p || "") +
+            '</span><span class="dot' + (c.live ? " live" : "") + '" title="' + (c.live ? "on the road" : "in the simulation") + '"></span><span class="grow">' + esc(c.n) +
+            (c.h ? '<span class="human">PLAYER</span>' : "") + '</span><span class="gap">' + esc(gap(c.g, c.p)) + '</span></div>';
+        });
+        el.innerHTML = h;
+      }
+
+      function drawControls() {
+        var h = "";
+        CAMS.forEach(function (c, i) {
+          h += '<button class="btn' + (st.mode === c[0] ? " on" : "") + '" data-cam="' + c[0] + '">' + c[1] + '<span class="k">' + (i + 1) + '</span></button>';
+        });
+        $("cams").innerHTML = h;
+        var a = "";
+        if (st.on) {
+          a += '<button class="btn' + (st.auto ? " on" : "") + '" data-act="auto">DIRECTOR<span class="k">N</span></button>';
+          a += '<button class="btn" data-act="battle">BATTLE<span class="k">B</span></button>';
+          a += '<button class="btn" data-act="leader">LEADER<span class="k">HOME</span></button>';
+          a += '<button class="btn' + (st.clean ? " on" : "") + '" data-act="clean">CLEAN HUD<span class="k">H</span></button>';
+          a += '<button class="btn wide danger" data-act="exit">EXIT OBSERVER</button>';
+        } else {
+          a += '<button class="btn wide big go" data-act="enter">ENTER OBSERVER</button>';
+        }
+        $("actions").innerHTML = a;
+        $("note").textContent = st.on
+          ? "Director picks the story itself: it holds a shot, cuts to close battles and moves on. Clicking a driver takes over."
+          : "You become an invisible, flying camera: no racing, no money, nothing counts. Step out of your car first.";
+      }
+
+      function drawHeader() {
+        var t = st.target;
+        $("p-now").innerHTML = !st.on ? "Not observing"
+          : (t ? ("Watching <b>" + esc(t.p ? "P" + t.p + " " : "") + esc(t.name) + "</b> · " + esc(t.series || "") + " · " + esc(camName(st.mode)) + (st.auto ? " · DIRECTOR" : ""))
+               : "Observing · pick a race");
+      }
+
+      function draw() {
+        $("panel").classList.toggle("hidden", !st.open);
+        drawStrip();
+        if (st.open) { drawHeader(); drawRaces(); drawField(); drawControls(); }
+      }
+
+      function toast(text) {
+        var el = $("toast");
+        el.textContent = text; el.classList.remove("hidden");
+        if (toastTimer) clearTimeout(toastTimer);
+        toastTimer = setTimeout(function () { el.classList.add("hidden"); }, 3500);
+      }
+
+      document.addEventListener("click", function (e) {
+        var n = e.target.closest ? e.target.closest("[data-race],[data-car],[data-cam],[data-act]") : null;
+        if (e.target.id === "p-close") { emit("obs:close"); return; }
+        if (!n) return;
+        if (n.dataset.race) {
+          if (n.dataset.race === st.selected && st.on) emit("obs:watch", { text: "race " + n.dataset.race });
+          emit("obs:select", { raceId: n.dataset.race });
+        } else if (n.dataset.car) { emit("obs:watch", { text: "car " + st.selected + " " + n.dataset.car });
+        } else if (n.dataset.cam) { emit("obs:cam", { mode: n.dataset.cam });
+        } else if (n.dataset.act) { emit("obs:act", { act: n.dataset.act }); }
+      });
+
+      // while the panel holds the keyboard, mapped keys never fire: the page answers them itself
+      document.addEventListener("keydown", function (e) {
+        if (!st.open) return;
+        var k = e.key;
+        if (k === "Escape" || k === "F3") { e.preventDefault(); emit("obs:close"); return; }
+        if (k >= "1" && k <= "8") { emit("obs:cam", { mode: CAMS[Number(k) - 1][0] }); return; }
+        if (k === "PageUp") { emit("obs:act", { act: "prev" }); return; }
+        if (k === "PageDown") { emit("obs:act", { act: "next" }); return; }
+        if (k === "Home") { emit("obs:act", { act: "leader" }); return; }
+        var l = k.toLowerCase();
+        if (l === "b") emit("obs:act", { act: "battle" });
+        else if (l === "n") emit("obs:act", { act: "auto" });
+        else if (l === "h") emit("obs:act", { act: "clean" });
+      });
+
+      Open77.on("obs:state", function (p) {
+        if (!p) return;
+        for (var k in p) if (Object.prototype.hasOwnProperty.call(p, k)) st[k] = p[k];
+        if (!Array.isArray(st.races)) st.races = [];
+        if (!Array.isArray(st.field)) st.field = [];
+        draw();
+        if (p.open) emit("obs:drawn", { at: Date.now() });
+      });
+      Open77.on("obs:toast", function (p) { if (p && p.text) toast(p.text); });
+
+      draw();
+      emit("obs:ready", {});
+    })();
+  </script>
+</body>
+</html>

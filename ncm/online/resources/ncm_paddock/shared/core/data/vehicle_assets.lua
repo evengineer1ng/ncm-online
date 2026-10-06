@@ -83,6 +83,7 @@ Core.define("data.vehicle_assets", function(C)
                     manufacturer = entry and entry.manufacturer or nil,
                     acquiredVia = r.acquiredVia,
                     acquiredAt  = r.acquiredAt,
+                    gearbox     = r.gearbox,     -- machine.gearbox (L306), when the caller read it
                 }
             end
             byRecord[record] = nil

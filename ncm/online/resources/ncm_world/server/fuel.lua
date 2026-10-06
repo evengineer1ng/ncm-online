@@ -3,6 +3,17 @@ local Fuel=NcmCore.get("economy.fuel")
 local function log(f,...) print(("[ncm_world/fuel] "..f):format(...)) end
 -- Whole seconds: the host clock is fractional and `%d` refuses it (KB-206: every /ncm.refuel died on the idem key).
 local function now() return math.floor(Open77.time.unix()) end
+-- Owner, 2026-10-06: on the DEVELOPMENT server fuel must never stop a test flight ("fuel should be taken care of ...
+-- cant get to space like this"). Development burns nothing -- not distance, not installed components -- and every tank
+-- reads full. Online is untouched. A deliberate dev fuel test turns it off with the convar `ncm_dev_fuel 0`.
+local function devFuel()
+ local ok,id=pcall(function() return GlobalState.ncmIdentity end)
+ local env=ok and type(id)=="table" and id.environment or "development"
+ if tostring(env)~="development" then return false end
+ local okC,v=pcall(GetConvar,"ncm_dev_fuel","1")
+ return not okC or tostring(v)~="0"
+end
+NcmFuel_devFuel=devFuel
 local state={} -- asset -> {fuelMl,capacityMl,remainderMl,dirtyMl,lastWrite,emptyNotified}
 
 -- One map/recovery target per physical forecourt; every individual pump remains a valid refuelling point.
@@ -38,6 +49,7 @@ local function notifyEmpty(pid)
 end
 AddEventHandler("ncm:fuel:distance",function(entry,metres)
  if type(entry)~="table" or type(entry.assetId)~="string" then return end
+ if devFuel() then return end
  CreateThread(function()
   local s=load(entry.assetId);local r=Fuel.burn(s.fuelMl,metres,{capacityMl=s.capacityMl},s.remainderMl)
   s.fuelMl=r.fuelMl;s.remainderMl=r.remainderMl;s.dirtyMl=s.dirtyMl+r.burnedMl
@@ -47,8 +59,24 @@ AddEventHandler("ncm:fuel:distance",function(entry,metres)
   send(tonumber(entry.pid) or 0,entry.assetId,s)
  end)
 end)
+-- L324: propellant drawn by an installed component (a propulsor, an impulse actuator) out of the same tank the
+-- odometer burns. Whole millilitres, the remainder carried like the distance burn's. Returns the tank after the draw,
+-- or nil for a bad request. An empty tank is the same event wherever it came from: engine off, the driver told.
+NcmFuel.draw=function(asset,ml,pid,vehicleId)
+ if type(asset)~="string" or asset=="" then return nil end
+ if devFuel() then local s=load(asset);s.fuelMl=s.capacityMl;send(tonumber(pid) or 0,asset,s);return s.fuelMl,s.capacityMl,0 end
+ local s=load(asset);local want=math.max(0,tonumber(ml) or 0)+(s.remainderMl or 0)
+ local whole=math.floor(want);s.remainderMl=want-whole
+ local before=s.fuelMl;s.fuelMl=math.max(0,s.fuelMl-whole);local burned=before-s.fuelMl;s.dirtyMl=s.dirtyMl+burned
+ if before>0 and s.fuelMl<=0 then
+  persist(asset,s);if vehicleId then pcall(Open77.vehicles.setEngine,vehicleId,false) end;notifyEmpty(tonumber(pid) or 0)
+ elseif s.dirtyMl>=100 or now()-s.lastWrite>=30 then persist(asset,s) end
+ send(tonumber(pid) or 0,asset,s)
+ return s.fuelMl,s.capacityMl,burned
+end
+NcmFuel.ensure=function(asset) if type(asset)~="string" or asset=="" then return nil end local s=load(asset);return s.fuelMl,s.capacityMl end
 AddEventHandler("ncm:vehicle:materialized",function(asset,vehicleId,pid)
- CreateThread(function() local s=load(asset);send(tonumber(pid) or 0,asset,s);if s.fuelMl<=0 then pcall(Open77.vehicles.setEngine,vehicleId,false);notifyEmpty(tonumber(pid) or 0) end end)
+ CreateThread(function() local s=load(asset);if devFuel() and s.fuelMl<s.capacityMl then s.fuelMl=s.capacityMl;persist(asset,s) end;send(tonumber(pid) or 0,asset,s);if s.fuelMl<=0 then pcall(Open77.vehicles.setEngine,vehicleId,false);notifyEmpty(tonumber(pid) or 0) end end)
 end)
 
 local function help(pid)

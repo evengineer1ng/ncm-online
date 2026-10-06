@@ -5,9 +5,17 @@ PaddockPlayers = {}
 local U = PaddockUtil
 local driverOf = {}
 
+-- NCM Observer (doc 46, L307): a connection in observer mode is a presence without a person -- no driver, so
+-- nothing built on this lookup lets it enter, earn, buy or count. ncm_observer owns the list.
+local function observing(id)
+    local ok, o = pcall(function() return GlobalState.ncmObservers end)
+    return ok and type(o) == "table" and o[tostring(id)] ~= nil
+end
+
 function PaddockPlayers.driver(playerId)
     local id = tonumber(playerId) or 0
     if id <= 0 then return nil end
+    if observing(id) then return nil end
     if driverOf[id] then return driverOf[id] end
     local ok, userId = pcall(GetPlayerIdentifier, id)
     if not ok or type(userId) ~= "string" or userId == "" or not MySQL.isReady() then return nil end

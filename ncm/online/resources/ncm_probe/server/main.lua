@@ -28,7 +28,7 @@ local bootCount = math.floor((stash and tonumber(stash.bootCount) or 0) + 1)
 log("boot #%d (state.load %s; previous boot at %s)", bootCount,
     stash and "restored" or "empty", tostring(stash and stash.lastBoot or "n/a"))
 if type(Open77.state) == "table" and type(Open77.state.save) == "function" then
-    local okSave, err = pcall(Open77.state.save, { bootCount = bootCount, lastBoot = os and os.time and os.time() or "no-os" })
+    local okSave, err = pcall(Open77.state.save, { bootCount = bootCount, lastBoot = os and os.time and os.time() or "no-os" })   -- sandbox-ok: a guarded probe of whether `os` exists
     log("state.save -> %s", describe(okSave, err))
 end
 

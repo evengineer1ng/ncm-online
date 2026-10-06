@@ -65,10 +65,56 @@ function PaddockCalibration.recompute()
     if #st > 0 then U.transact(st) end
     PaddockCalibration.buckets = buckets
     PaddockCalibration.computedAt = t
+    pcall(PaddockCalibration.humanPaddock, t)
     local total = 0
     for _ in pairs(buckets) do total = total + 1 end
     log("recomputed: %d human samples in %d buckets, %d past the minimums (n>=%d, drivers>=%d); the rest run on the declared baseline",
         #races + #practice, total, qualified, minN, minD)
+end
+
+--- L305: humans in PADDOCK races (where the owner actually races), per tier, normalised to a stat-50 driver in a stat-50
+--- car (`paddock.calibration.normaliseMs`): the human's machine -- fitted parts and all -- is backed out, so the field's
+--- pace comes from each NPC's own attributes and car against what the human brings. Street routes only (the baked road
+--- line is the distance); one driver is enough (owner, 2026-10-04: "yes, my laps now"). The median speed of the last
+--- `calibHumanDays` replaces the physical-pace estimate for that tier once it has `calibrationMinHumanSamples` laps.
+PaddockCalibration.humanLearned = {}
+function PaddockCalibration.humanPaddock(t)
+    if not PaddockSettings.get("calibrationHumanPaddock", true) then PaddockCalibration.humanLearned = {} return end
+    local G = NcmCore.get("economy.npc_garage")
+    local Car = NcmCore.get("paddock.car")
+    local rows = MySQL.query.await([[SELECT x.finish_ms, r.route_id, r.tier, e.asset_id, e.ncm_driver_id
+        FROM paddock_result x JOIN paddock_race r ON r.server_id = x.server_id AND r.race_id = x.race_id
+        JOIN paddock_entry e ON e.server_id = x.server_id AND e.race_id = x.race_id AND e.person_key = x.person_id
+        WHERE x.server_id = ? AND x.person_id LIKE 'h%' AND x.state = 'finished' AND x.finish_ms > 0 AND r.window_opens_at > ?
+        ORDER BY r.window_opens_at DESC LIMIT 400]], { U.sid(), t - PaddockSettings.get("calibHumanDays", 30) * 86400 }) or {}
+    local byTier, used, perfs = {}, 0, {}
+    for i, r in ipairs(rows) do
+        local route = PaddockWorld.route(r.route_id)
+        local okP, path = pcall(PaddockLive.pathFor, r.route_id)
+        local lineM = route and not route.oval and okP and path and path.source == "road" and path.lengthM or nil
+        local c = r.asset_id and PaddockCars.load(r.asset_id)
+        if lineM and c then
+            local perf = perfs[r.asset_id]
+            if not perf then perf = Car.performance(G.levels(c.prestige, c.parts, nil)); perfs[r.asset_id] = perf end
+            local v = Cal.humanSpeed(lineM, tonumber(r.finish_ms), perf)
+            if v and v >= Cal.LEARN_MIN_MPS and v <= Cal.LEARN_MAX_MPS then
+                byTier[r.tier] = byTier[r.tier] or {}
+                local list = byTier[r.tier]; list[#list + 1] = v
+                used = used + 1
+            end
+        end
+        if i % 10 == 0 then Wait(0) end
+    end
+    local learned, parts = {}, {}
+    local minN = PaddockSettings.get("calibrationMinHumanSamples", 3)
+    for tier, list in pairs(byTier) do
+        local m = Cal.median(list)
+        if m and #list >= minN then learned[tier] = math.floor(m * 100 + 0.5) / 100 end
+        parts[#parts + 1] = ("%s %d lap(s) median %.1f m/s%s"):format(tier, #list, m or 0, learned[tier] and "" or " (too few)")
+    end
+    PaddockCalibration.humanLearned = learned
+    table.sort(parts)
+    log("human Paddock laps: %d of %d usable; %s", used, #rows, #parts > 0 and table.concat(parts, "; ") or "none yet")
 end
 
 --- The base seconds and source for a race.
@@ -83,9 +129,12 @@ function PaddockCalibration.baseFor(seed, route, tier, cond)
         end
     end
     local w = PaddockStore.world
-    local learned = w and w.paceLearned or nil
+    -- L305: a tier's speed is the humans' when their Paddock laps say so, else the physical NPC field's (L296), else seeds
+    local learned = nil
+    if w and w.paceLearned then learned = {}; for k, v in pairs(w.paceLearned) do learned[k] = v end end
+    for k, v in pairs(PaddockCalibration.humanLearned or {}) do learned = learned or {}; learned[k] = v end
     return Cal.basePace(seed, route, tier, cond, human, PaddockSettings.get("calibMinN", 8), PaddockSettings.get("calibMinDrivers", 3),
-        PaddockSettings.get("paceLearn", true) and learned or nil)
+        (PaddockSettings.get("paceLearn", true) or next(PaddockCalibration.humanLearned or {}) ~= nil) and learned or nil)
 end
 
 --- L296: one race's physical pace, learned into its tier (persisted in paddock_world.counters_json). `metres`/`ms` are

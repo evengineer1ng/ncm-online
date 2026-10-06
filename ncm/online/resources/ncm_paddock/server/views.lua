@@ -329,27 +329,10 @@ function PaddockViews.myorg(pid)
         balance = PaddockWallet.balance(d.ncmDriverId), rows = rows }
 end
 
---- LIVE: every race on track now, and for the one picked, a track strip and a timing tower. A simulated race reads the
---- continuous model (paddock.racestate); a street race reads its cars' real positions, projected onto the same line.
---- Betting closed when the window opened, so live order is coverage, not a leak.
-function PaddockViews.live(_, args)
-    local t = U.now()
+--- Every car of a running race where it is now: rows { id, d, state, human?, driverId?, pos?, ... } (KB-free extraction
+--- of the live view's own computation, so the map's racer icons and the live view can never disagree).
+function PaddockViews.rowsFor(pick, t)
     local Racestate = NcmCore.get("paddock.racestate")
-    local list = {}
-    for _, race in pairs(PaddockRaces.byId) do
-        if race.state == "running" and race.model and t >= race.opensAt then list[#list + 1] = race end
-    end
-    table.sort(list, function(a, b) return a.opensAt < b.opensAt end)
-    local races = {}
-    for i, race in ipairs(list) do
-        local lr = PaddockLive.byRace[race.raceId]
-        races[i] = { raceId = race.raceId, series = PaddockWorld.seriesName(race.seriesId), route = PaddockWorld.routeName(race.routeId),
-            eastern = Clock.hhmm(race.opensAt), street = (lr and lr.state == "running") or nil }
-    end
-    local pick
-    for _, race in ipairs(list) do if race.raceId == args.raceId then pick = race end end
-    pick = pick or list[1]
-    if not pick then return { view = "live", races = races, rows = {} } end
     local model = pick.model
     local route = PaddockWorld.route(pick.routeId)
     local lr = PaddockLive.byRace[pick.raceId]
@@ -442,6 +425,31 @@ function PaddockViews.live(_, args)
         end)
         for i, r in ipairs(rows) do r.pos = i end
     end
+    return rows, model, route, tMs, lr, street
+end
+
+--- LIVE: every race on track now, and for the one picked, a track strip and a timing tower. A simulated race reads the
+--- continuous model (paddock.racestate); a street race reads its cars' real positions, projected onto the same line.
+--- Betting closed when the window opened, so live order is coverage, not a leak.
+function PaddockViews.live(_, args)
+    local t = U.now()
+    local Racestate = NcmCore.get("paddock.racestate")
+    local list = {}
+    for _, race in pairs(PaddockRaces.byId) do
+        if race.state == "running" and race.model and t >= race.opensAt then list[#list + 1] = race end
+    end
+    table.sort(list, function(a, b) return a.opensAt < b.opensAt end)
+    local races = {}
+    for i, race in ipairs(list) do
+        local lr = PaddockLive.byRace[race.raceId]
+        races[i] = { raceId = race.raceId, series = PaddockWorld.seriesName(race.seriesId), route = PaddockWorld.routeName(race.routeId),
+            eastern = Clock.hhmm(race.opensAt), street = (lr and lr.state == "running") or nil }
+    end
+    local pick
+    for _, race in ipairs(list) do if race.raceId == args.raceId then pick = race end end
+    pick = pick or list[1]
+    if not pick then return { view = "live", races = races, rows = {} } end
+    local rows, model, route, tMs, lr, street = PaddockViews.rowsFor(pick, t)
     local out = {}
     for i, r in ipairs(rows) do
         local p = PaddockStore.world.people[r.id]

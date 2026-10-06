@@ -11,7 +11,7 @@
 --   knowing     known  (has met you)   heard  (your Spotlight >= 10)   famous  (>= 25)
 -- Untagged lines are for anyone. A line is also dropped if any `{slot}` cannot be filled (the truth rule).
 -- Slots: {name} {role} {org} {series} {route} {when} {lastRoute} {lastPlace} {lastDriver} {tagLabel} {tagSubject}
--- {place} {district} {player} -- facts; {addr} {good} {bad} {swear} -- the speaker's own words.
+-- {place} {district} {player} {champion} {championSeries} {championRun} -- facts; {addr} {good} {bad} {swear} -- the speaker's own words.
 --
 -- Parts live in `life.voice_bank_greet`, `life.voice_bank_scene`, `life.voice_bank_topics` and `life.voice_bank_more`
 -- (which appends to moves the others opened). Line ids are

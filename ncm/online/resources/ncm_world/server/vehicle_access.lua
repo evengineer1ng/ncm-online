@@ -119,7 +119,8 @@ end
 local function owner(pid, assetId)
     local profile = NcmIdentity.get(pid)
     if not profile or not MySQL.isReady() then return nil end
-    local row = MySQL.single.await([[SELECT asset_id, vehicle_key, record, paint_primary, paint_secondary
+    local row = MySQL.single.await([[SELECT asset_id, vehicle_key, record, paint_primary, paint_secondary,
+        gearbox_kind, gearbox_spec, gearbox_source
         FROM vehicle_asset
         WHERE asset_id=? AND ncm_driver_id=? AND server_id=?]],
         { assetId, profile.ncmDriverId, profile.serverId })
@@ -223,6 +224,90 @@ RegisterNetEvent("ncm:vehicle.call", function(assetId)
     end)
 end)
 
+--- Spawn an OWNED Machine at a pose and register it (paint, registry, collection, the player's active list). Shared
+--- by CALL (after its ground probe) and by `NcmVehicleAccess.materializeAt` (L329: arriving from Deep, no probe).
+local function spawnOwned(pid, assetId, row, profile, pose, bucket)
+    -- Exact stored record only. No model fallback, issue, grant, replacement asset or stock mutation.
+    -- L306: a manual is the same machine in its gearbox clone record (`<record>_ncm_gbx_<spec>`), which
+    -- only exists where NCM Gearbox is installed -- so it spawns as one only where the operator says
+    -- every client has it (`ncm_gearbox_spawn_clones`, dev spike first). Never silently as an automatic:
+    -- with the switch off a manual asset spawns its model record AND says so in the log.
+    local spawnRecord = row.record
+    do
+        local GB = NcmCore.get("machine.gearbox")
+        local gb = GB.fromRow(row)
+        if GB.isManual(gb) then
+            if GetConvar("ncm_gearbox_spawn_clones", "false") == "true" then
+                spawnRecord = GB.record(row.record, gb)
+            else
+                print(("[ncm_world/access] asset %s is a %s manual; clones off -- model record"):format(
+                    tostring(row.asset_id):sub(1, 8), gb.spec))
+            end
+        end
+    end
+    local vid, why = Open77.vehicles.create({record=spawnRecord,
+        position={x=pose.x,y=pose.y,z=pose.z},yaw=pose.yaw,bucket=bucket})
+    if not vid then
+        print("[ncm_world/access] create refused: " .. tostring(why))
+        return nil, why
+    end
+    -- L111: this machine's own finish, not whatever the engine felt like.
+    --
+    -- **This previously reached for `NcmOwnership`, which does not exist here.** `ncm_league` and
+    -- `ncm_world` are separate resources with separate Lua VMs, so the guard `if NcmOwnership` was
+    -- simply false and the paint was never applied once -- which is why an owned MaiMai came back
+    -- green, then red. That is the third time in one day this cross-resource assumption has bitten
+    -- (KB-66's grant, the `driver_location` identity, and now this).
+    --
+    -- The fix removes the dependency rather than bridging it: this file already reads `vehicle_asset`
+    -- directly, and `data.vehicle_config` is shared core available in both resources. Nothing is asked
+    -- of another VM.
+    -- Wrapped in a closure, not `pcall(NcmCore.get, ...)`: that form INDEXES `NcmCore` before pcall
+    -- can protect anything, so a missing core would throw rather than degrade. Caught by the
+    -- vehicle-access harness, which has no core loaded.
+    local okCfg, Config = pcall(function() return NcmCore.get("data.vehicle_config") end)
+    if okCfg and Config then
+        local paint = Config.paintFor(row.vehicle_key, assetId,
+            { primary = row.paint_primary, secondary = row.paint_secondary })
+        if paint and paint.primary then
+            -- **Applied twice, deliberately.** The first call lands in the same tick as `create`, and
+            -- owner QA on 2026-09-23 saw one machine spawn red and the next blue from identical calls
+            -- that both logged success -- a client that has already streamed the vehicle keeps the
+            -- engine's own variant. The second pass, after the entity has settled, is what makes the
+            -- finish stick. Cosmetic either way: a refused repaint never costs the player their car.
+            --
+            -- The result is logged RAW. The previous line treated a `nil` return as success, so it
+            -- could not have told us which of the two calls actually worked.
+            local function apply(tag)
+                local okPaint, applied = pcall(Open77.vehicles.setPaint, vid,
+                    { primary = paint.primary, secondary = paint.secondary })
+                print(("[ncm_world/access] paint %s asset=%s %s (%s) ok=%s ret=%s"):format(
+                    tag, tostring(assetId):sub(1, 8),
+                    tostring(paint.name or "stored"), tostring(paint.source),
+                    tostring(okPaint), tostring(applied)))
+                return okPaint and applied
+            end
+            apply("pass1")
+            CreateThread(function()
+                Wait(1500)
+                if active[assetId] and active[assetId].vehicleId == vid then apply("pass2") end
+            end)
+        end
+    end
+    -- `pid` is stored so the disconnect path never has to ask an identity cache that may already
+    -- have been cleared. At materialise time we certainly know who asked; at disconnect we
+    -- certainly know who left. Nothing in between needs to still be true.
+    active[assetId] = {vehicleId=vid,driverId=profile.ncmDriverId,record=row.record,pid=pid}
+    assetByVehicle[vehicleIndexKey(vid)] = assetId
+    TriggerEvent("ncm:vehicle:materialized", assetId, vid, pid)
+    TriggerEvent("ncm:collection:registerVehicle",vid,row.record,"owned_call",profile.ncmDriverId,"owned",assetId)
+    print(("[ncm_world/access] materialized asset=%s runtime=%s"):format(assetId,tostring(vid)))
+    -- Before the result, not after: the page labels the button from the active set, so settling it
+    -- first means CALL becomes STORE in one step rather than flickering through "CALL" again.
+    sendActive(pid)
+    return vid
+end
+
 RegisterNetEvent("ncm:vehicle.probed", function(token, pose, why, shape)
     local pid = tonumber(source) or 0
     local request = pending[pid]
@@ -278,67 +363,10 @@ RegisterNetEvent("ncm:vehicle.probed", function(token, pose, why, shape)
                     feedback(pid,"Another vehicle is too close. Move to a clear area and try again."); return
                 end
             end
-            -- Exact stored record only. No model fallback, issue, grant, replacement asset or stock mutation.
-            local vid, why = Open77.vehicles.create({record=row.record,
-                position={x=pose.x,y=pose.y,z=pose.z},yaw=pose.yaw,bucket=p.bucket})
+            local vid, whyCreate = spawnOwned(pid, request.assetId, row, profile, pose, p.bucket)
             if not vid then
-                print("[ncm_world/access] create refused: " .. tostring(why))
                 feedback(pid,"Your vehicle could not be called. Your ownership is unchanged."); return
             end
-            -- L111: this machine's own finish, not whatever the engine felt like.
-            --
-            -- **This previously reached for `NcmOwnership`, which does not exist here.** `ncm_league` and
-            -- `ncm_world` are separate resources with separate Lua VMs, so the guard `if NcmOwnership` was
-            -- simply false and the paint was never applied once -- which is why an owned MaiMai came back
-            -- green, then red. That is the third time in one day this cross-resource assumption has bitten
-            -- (KB-66's grant, the `driver_location` identity, and now this).
-            --
-            -- The fix removes the dependency rather than bridging it: this file already reads `vehicle_asset`
-            -- directly, and `data.vehicle_config` is shared core available in both resources. Nothing is asked
-            -- of another VM.
-            -- Wrapped in a closure, not `pcall(NcmCore.get, ...)`: that form INDEXES `NcmCore` before pcall
-            -- can protect anything, so a missing core would throw rather than degrade. Caught by the
-            -- vehicle-access harness, which has no core loaded.
-            local okCfg, Config = pcall(function() return NcmCore.get("data.vehicle_config") end)
-            if okCfg and Config then
-                local paint = Config.paintFor(row.vehicle_key, request.assetId,
-                    { primary = row.paint_primary, secondary = row.paint_secondary })
-                if paint and paint.primary then
-                    -- **Applied twice, deliberately.** The first call lands in the same tick as `create`, and
-                    -- owner QA on 2026-09-23 saw one machine spawn red and the next blue from identical calls
-                    -- that both logged success -- a client that has already streamed the vehicle keeps the
-                    -- engine's own variant. The second pass, after the entity has settled, is what makes the
-                    -- finish stick. Cosmetic either way: a refused repaint never costs the player their car.
-                    --
-                    -- The result is logged RAW. The previous line treated a `nil` return as success, so it
-                    -- could not have told us which of the two calls actually worked.
-                    local function apply(tag)
-                        local okPaint, applied = pcall(Open77.vehicles.setPaint, vid,
-                            { primary = paint.primary, secondary = paint.secondary })
-                        print(("[ncm_world/access] paint %s asset=%s %s (%s) ok=%s ret=%s"):format(
-                            tag, tostring(request.assetId):sub(1, 8),
-                            tostring(paint.name or "stored"), tostring(paint.source),
-                            tostring(okPaint), tostring(applied)))
-                        return okPaint and applied
-                    end
-                    apply("pass1")
-                    CreateThread(function()
-                        Wait(1500)
-                        if active[request.assetId] and active[request.assetId].vehicleId == vid then apply("pass2") end
-                    end)
-                end
-            end
-            -- `pid` is stored so the disconnect path never has to ask an identity cache that may already
-            -- have been cleared. At materialise time we certainly know who asked; at disconnect we
-            -- certainly know who left. Nothing in between needs to still be true.
-            active[request.assetId] = {vehicleId=vid,driverId=profile.ncmDriverId,record=row.record,pid=pid}
-            assetByVehicle[vehicleIndexKey(vid)] = request.assetId
-            TriggerEvent("ncm:vehicle:materialized", request.assetId, vid, pid)
-            TriggerEvent("ncm:collection:registerVehicle",vid,row.record,"owned_call",profile.ncmDriverId,"owned",request.assetId)
-            print(("[ncm_world/access] materialized asset=%s runtime=%s"):format(request.assetId,tostring(vid)))
-            -- Before the result, not after: the page labels the button from the active set, so settling it
-            -- first means CALL becomes STORE in one step rather than flickering through "CALL" again.
-            sendActive(pid)
             feedback(pid,"Your vehicle has been called nearby. Look around before driving.",true)
         end)
         clear(pid,request)
@@ -459,6 +487,23 @@ local function reclaim(pid, why)
     end
 end
 
+--- L329: put an owned Machine in the world at a pose WITHOUT the call's ground probe -- the Machine arrives from NCM
+--- Deep (canonical position, possibly in the air). Ownership is re-read from `vehicle_asset` exactly as CALL does; an
+--- already-live copy is reused, never duplicated. Returns vehicleId or nil + why.
+function NcmVehicleAccess.materializeAt(pid, assetId, pose, why)
+    pid = tonumber(pid) or 0
+    if pid <= 0 or type(assetId) ~= "string" or not position(pose) then return nil, "bad request" end
+    local cur = active[assetId]
+    if cur and Open77.vehicles.get(cur.vehicleId) then return cur.vehicleId, "already live" end
+    if cur then forgetActive(assetId, "runtime missing") end
+    local row, profile = owner(pid, assetId)
+    if not row or not supported[row.record] then return nil, "not owned or unsupported" end
+    local p = Open77.players.get(pid)
+    local vid, whyC = spawnOwned(pid, assetId, row, profile, pose, p and p.bucket or 0)
+    print(("[ncm_world/access] materializeAt asset=%s (%s) -> %s %s"):format(assetId:sub(1, 8), tostring(why), tostring(vid), tostring(whyC or "")))
+    return vid, whyC
+end
+
 --- Every asset currently materialised in the world, as { assetId, vehicleId } pairs.
 ---
 --- `odometer.lua` reads this to know which live vehicle IS which persistent machine. Same resource, same Lua
@@ -551,6 +596,16 @@ AddEventHandler("onPlayerDisconnected", function(pid)
     print(("[ncm_world/access] disconnect player=%d: %d called vehicle(s) to reclaim"):format(pid, n))
     pcall(reclaim, pid, "owner disconnected")
 end)
+-- Racing Week's collapse (L303): the tape rewinds and every called car goes back to its garage. Anchored cars are
+-- still owned and can be called again; the rest now live in the run's archive namespace.
+AddEventHandler("ncm:week:collapsed", function(run)
+    local pids = {}
+    for _, cur in pairs(active) do if cur.pid then pids[cur.pid] = true end end
+    for pid in pairs(pids) do pcall(reclaim, pid, "Racing Week " .. tostring(run) .. " ended") end
+    print(("[ncm_world/access] Racing Week %s collapsed: called cars reclaimed for %d player(s)"):format(tostring(run),
+        (function() local n = 0 for _ in pairs(pids) do n = n + 1 end return n end)()))
+end)
+
 AddEventHandler("onResourceStop", function(name)
     if name ~= "ncm_world" then return end
     for _,cur in pairs(active) do

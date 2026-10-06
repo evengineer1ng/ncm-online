@@ -66,6 +66,8 @@ const char* kBridgeHtml = R"HTML(<!doctype html>
     // and every other symptom (server composed it, client pushed it, carrier heard nothing) points away
     // from this file.
     Open77.on("ncm:machine.handling", function (p) { relay({ cmd: "handling", handling: p || {} }); });
+    // L324: installed components (a propulsor, an impulse actuator) as a force on the bound Machine.
+    Open77.on("ncm:machine.wrench", function (p) { relay({ cmd: "wrench", wrench: p || {} }); });
     // IDEA-507: a read-only request for the game's own drive-model data. Mutates nothing.
     Open77.on("ncm:machine.archdump", function (p) { relay({ cmd: "archdump", records: (p && p.records) || [] }); });
     // The gear chain, read-only. **The resource sandbox has no `TweakDB` global** -- that is a CET thing and
@@ -690,6 +692,31 @@ void Server::dispatch(const std::string& payload)
         else out.valid = true;
 
         onHandling_(out);
+        return;
+    }
+
+    if (cmd == "wrench") {
+        if (!onWrench_) return;
+        const auto& w = msg["wrench"];
+        if (!w.is_object()) return;
+        Wrench out;
+        out.version = w.value("v", 0);
+        if (out.version != 1) return;
+        out.assetId = w.value("assetId", std::string());
+        if (w.contains("vehicleId")) out.vehicleId = idText(w["vehicleId"]);
+        auto num = [](const json& j, const char* k) { return (j.contains(k) && j[k].is_number()) ? j[k].get<double>() : 0.0; };
+        out.fx = num(w, "fx"); out.fy = num(w, "fy"); out.fz = num(w, "fz");
+        out.ttlMs = static_cast<int>(num(w, "ttlMs"));
+        out.supersedeLift = w.value("supersedeLift", false);
+        if (w.contains("pulse") && w["pulse"].is_object()) {
+            const auto& p = w["pulse"];
+            out.hasPulse = true;
+            out.pulseSeq = static_cast<uint32_t>(num(p, "seq"));
+            out.px = num(p, "fx"); out.py = num(p, "fy"); out.pz = num(p, "fz");
+            out.pulseMs = static_cast<int>(num(p, "ms"));
+        }
+        if (out.assetId.empty()) return;
+        onWrench_(out);
         return;
     }
 

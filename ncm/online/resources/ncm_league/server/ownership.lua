@@ -30,6 +30,7 @@ local Catalogue = Core.get("data.vehicle_catalogue")
 local Config = Core.get("data.vehicle_config")
 local Identity = Core.get("data.vehicle_identity")
 local ids = Core.get("vocabulary.ids")
+local Gearbox = Core.get("machine.gearbox")
 
 local function log(fmt, ...) print(("[ncm_league/ownership] " .. fmt):format(...)) end
 local now = function() return Open77.time.unix() end
@@ -62,7 +63,8 @@ local function loadDriver(driverId)
         local ok, res = pcall(function()
             return MySQL.query.await(
                 "SELECT asset_id, record, vehicle_key, class, acquired_via, acquired_at, " ..
-                "paint_primary, paint_secondary FROM vehicle_asset WHERE ncm_driver_id = ? AND server_id = ?",
+                "paint_primary, paint_secondary, gearbox_kind, gearbox_spec, gearbox_source " ..
+                "FROM vehicle_asset WHERE ncm_driver_id = ? AND server_id = ?",
                 { driverId, serverId() }) or {}
         end)
         if ok then
@@ -71,6 +73,7 @@ local function loadDriver(driverId)
                     assetId = r.asset_id, record = r.record, vehicleKey = r.vehicle_key,
                     class = r.class, acquiredVia = r.acquired_via, acquiredAt = tonumber(r.acquired_at),
                     paint = { primary = r.paint_primary, secondary = r.paint_secondary },
+                    gearbox = NcmGearbox.remember(r.asset_id, r) or Gearbox.preGearbox(),
                 }
             end
         else
@@ -106,7 +109,15 @@ end
 function NcmOwnership.list(driverId)
     local rows = loadDriver(driverId)
     if not rows then return {} end
-    return Assets.shape(rows)
+    local out = Assets.shape(rows)
+    -- L306: two Galenas in one garage are told apart by their gearbox
+    for _, r in ipairs(out) do
+        if r.displayName and r.gearbox then
+            r.gearboxKind, r.gearboxSpec = r.gearbox.kind, r.gearbox.spec
+            r.displayName = Gearbox.label(r.displayName, r.gearbox)
+        end
+    end
+    return out
 end
 
 --- Distinct runtime record ids. Every eligibility caller wants THIS, not `list`: `Eligibility.eligibleOwned`
@@ -134,6 +145,10 @@ function NcmOwnership.counts(driverId)
 end
 
 local function insertAsset(driverId, record, via, grantedBy)
+    -- L306: a grant names its gearbox by record. `<model>_ncm_gbx_<spec>` is a manual of that spec; the model record
+    -- itself is an automatic. The asset stores the MODEL record (eligibility reads it); the clone is a spawn detail.
+    local specId
+    record, specId = Gearbox.baseOf(record)
     local meta = Pool.byRecord(record)
     -- the `class` column is a convenience for reading the table by hand; membership is the pool's to answer,
     -- and a record in two classes stores its first (CLASS_ORDER) one here. Never query eligibility off it.
@@ -157,10 +172,12 @@ local function insertAsset(driverId, record, via, grantedBy)
             -- silently take a number out of a manufacturer's history (addendum section 8).
             MySQL.insert.await(
                 "INSERT INTO vehicle_asset (asset_id, server_id, ncm_driver_id, vehicle_key, record, class, " ..
-                "acquired_via, granted_by, acquired_at, paint_primary, paint_secondary, origin, produced_at) " ..
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "acquired_via, granted_by, acquired_at, paint_primary, paint_secondary, origin, produced_at, " ..
+                "gearbox_kind, gearbox_spec, gearbox_source, gearbox_at) " ..
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 { assetId, serverId(), driverId, vehicleKey, record, primaryClass, via or "grant", grantedBy,
-                  acquiredAt, paintPrimary, paintSecondary, Identity.ORIGIN.GRANT, acquiredAt })
+                  acquiredAt, paintPrimary, paintSecondary, Identity.ORIGIN.GRANT, acquiredAt,
+                  NcmGearbox.columns(NcmGearbox.birth(assetId, vehicleKey, specId or "a")) })
         end)
         if not ok then return nil, "db" end
     end
@@ -235,9 +252,10 @@ function NcmOwnership.manufacture(record, opts)
     local producedAt = math.floor(now())
     local insertQuery = "INSERT INTO vehicle_asset (asset_id, server_id, ncm_driver_id, vehicle_key, record, class, " ..
         "acquired_via, acquired_at, allocation_id, allocation_slot, paint_primary, paint_secondary, " ..
-        "origin, manufacturer_key, production_ordinal, maker_ordinal, model_ordinal, produced_at) " ..
+        "origin, manufacturer_key, production_ordinal, maker_ordinal, model_ordinal, produced_at, " ..
+        "gearbox_kind, gearbox_spec, gearbox_source, gearbox_at) " ..
         "VALUES (?, ?, NULL, ?, ?, ?, NULL, ?, ?, NULLIF(?, 0), ?, ?, ?, NULLIF(?, ''), " ..
-        "NULLIF(?, 0), NULLIF(?, 0), NULLIF(?, 0), ?)"
+        "NULLIF(?, 0), NULLIF(?, 0), NULLIF(?, 0), ?, ?, ?, ?, ?)"
     -- KB-311: `allocation_slot` is an INT. Its sentinel is 0, never '': under STRICT_TRANS_TABLES `NULLIF(3, '')` is
     -- "Truncated incorrect DECIMAL value" (SQL 1292) inside an INSERT, and it failed every car's birth transaction from
     -- 2026-09-26 -- no vehicle was manufactured anywhere after that (proved against dev MariaDB, rolled back).
@@ -245,6 +263,12 @@ function NcmOwnership.manufacture(record, opts)
         opts.allocationId or "production", tonumber(opts.allocationSlot) or 0, paintPrimary, paintSecondary,
         origin, ord and ord.manufacturerKey or "",
         ord and ord.global or 0, ord and ord.maker or 0, ord and ord.model or 0, producedAt }
+    -- L306: manufacture rolls the gearbox from the model's factory mix, in the same INSERT as the car
+    do
+        local gk, gs, gsrc, gat = NcmGearbox.columns(NcmGearbox.birth(assetId, vehicleKey))
+        insertValues[#insertValues + 1] = gk; insertValues[#insertValues + 1] = gs
+        insertValues[#insertValues + 1] = gsrc; insertValues[#insertValues + 1] = gat
+    end
     local ok, err = pcall(function()
         local factory = NcmComponents and NcmComponents.factoryStatements and
             NcmComponents.factoryStatements(assetId, vehicleKey, nil, producedAt, 0) or nil

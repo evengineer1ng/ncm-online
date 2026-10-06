@@ -45,8 +45,9 @@ Core.define("paddock.attendance", function(C)
         return clamp(0.35 + 0.62 * ((u + v) / 2), 0.35, 0.97)
     end
 
-    --- The chance `person` turns up to a race at `atUtc` in `tier`, and the reason when it is low.
-    function M.chance(seed, person, tier, atUtc)
+    --- The chance `person` turns up to a race at `atUtc` in `tier`, and the reason when it is low. `pull` (optional,
+    --- doc 47 Moody): function(person) -> x on the chance -- a lured purse, weighed by this person (week.moody.pull).
+    function M.chance(seed, person, tier, atUtc, pull)
         if not person or person.role ~= "driver" then return 0, "not_a_driver" end
         if person.state ~= "active" then return 0, person.state or "inactive" end
         local p = (M.BASE[tier] or 0.5) * (0.55 + 0.6 * M.reliability(seed, person.id))
@@ -57,22 +58,27 @@ Core.define("paddock.attendance", function(C)
             p = p * ((tier == "street") and 0.35 or 0.7)
             why = "raced_recently"
         end
+        if pull then
+            local x = tonumber(pull(person)) or 1
+            if x < 1 and why == "no_show" then why = "stayed_away" end
+            p = p * x
+        end
         return clamp(p, 0.02, 0.98), why
     end
 
     --- Does `person` turn up? Returns turnedUp, eagerness (lower = keener), reason-if-not.
-    function M.turnsUp(seed, raceId, person, tier, atUtc)
-        local p, why = M.chance(seed, person, tier, atUtc)
+    function M.turnsUp(seed, raceId, person, tier, atUtc, pull)
+        local p, why = M.chance(seed, person, tier, atUtc, pull)
         local u = draw(seed, "attend", raceId, person.id)
         return u < p, (p > 0) and (u / p) or math.huge, why
     end
 
     --- A STREET field from the league pool. `pool` = list of persons; returns entrants (list of persons, keenest first,
     --- at most `fieldSize`) and `absent` = { [personId] = reason } for every member who is not in it.
-    function M.streetField(seed, raceId, pool, fieldSize, atUtc)
+    function M.streetField(seed, raceId, pool, fieldSize, atUtc, pull)
         local came, absent = {}, {}
         for _, p in ipairs(pool) do
-            local ok, eager, why = M.turnsUp(seed, raceId, p, "street", atUtc)
+            local ok, eager, why = M.turnsUp(seed, raceId, p, "street", atUtc, pull)
             if ok then came[#came + 1] = { p = p, eager = eager } else absent[p.id] = why end
         end
         table.sort(came, function(a, b)
@@ -88,12 +94,12 @@ Core.define("paddock.attendance", function(C)
 
     --- A SANCTIONED field: each team in `teams` ({ org, drivers = persons }) fields up to `cars` of its available
     --- drivers, best rated first (the team's choice). Returns entrants { { driver, org } } and `absent`.
-    function M.teamField(seed, raceId, teams, tier, cars, atUtc)
+    function M.teamField(seed, raceId, teams, tier, cars, atUtc, pull)
         local out, absent = {}, {}
         for _, t in ipairs(teams) do
             local avail = {}
             for _, d in ipairs(t.drivers) do
-                local ok, _, why = M.turnsUp(seed, raceId, d, tier, atUtc)
+                local ok, _, why = M.turnsUp(seed, raceId, d, tier, atUtc, pull)
                 if ok then avail[#avail + 1] = d else absent[d.id] = why end
             end
             table.sort(avail, function(a, b)

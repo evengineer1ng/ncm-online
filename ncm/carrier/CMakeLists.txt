@@ -1,4 +1,4 @@
-# NCM Carrier -- the RED4ext plugin that carries drive-model effects, final-command authority and force
+﻿# NCM Carrier -- the RED4ext plugin that carries drive-model effects, final-command authority and force
 # feedback for NCM Online.
 #
 # Dependencies are deliberately few and deliberately NOT managed by a package manager. SDL2 ships an official
@@ -13,7 +13,7 @@
 #   .\ncm\carrier\fetch-deps.ps1
 #   .\tools\build-carrier.ps1 -PublishDev
 cmake_minimum_required(VERSION 3.21)
-project(ncm_carrier VERSION 0.1.30 LANGUAGES CXX)
+project(ncm_carrier VERSION 0.1.37 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)

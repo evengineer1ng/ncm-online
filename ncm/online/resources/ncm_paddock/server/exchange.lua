@@ -322,8 +322,11 @@ function PaddockExchange.settle(post, bid, t)
     if not post or not bid or bid.postId ~= post.postId then return nil, "no_such_bid" end
     -- the database must hold what the Paddock holds before SQL checks an NPC's cash
     PaddockStore.flush()
+    -- KB-323: a fresh instruction slice before the settlement (the flush alone can spend most of one)
+    if coroutine.isyieldable() then Wait(0) end
     local tx, sid, legs = PaddockExchange.settlementTx(post, bid, t)
     local ok, err = PaddockMarkets.atomic(tx)
+    if coroutine.isyieldable() then Wait(0) end
     if not ok then stats.failed = stats.failed + 1 return nil, "refused: " .. tostring(err) end
     local landed = (tonumber(MySQL.scalar.await("SELECT COUNT(*) FROM exchange_settlement WHERE settlement_id = ?", { sid })) or 0) > 0
     if not landed then
@@ -333,15 +336,21 @@ function PaddockExchange.settle(post, bid, t)
         return nil, "could_not_settle"
     end
     stats.settled = stats.settled + 1
-    -- the Paddock's own copy of NPC money follows what the transaction did
+    -- The Paddock's own copy of NPC money is READ BACK from what the transaction committed (KB-328): applying the
+    -- increments in memory after the commit left memory richer than the database whenever the handler was cut off
+    -- between the two (KB-323), and every later purchase by that NPC failed with SQL 1690.
     local w = PaddockStore.world
     if legs.cash and legs.cash.amount > 0 then
-        for _, side in ipairs({ { legs.cash.from, -legs.cash.amount }, { legs.cash.to, legs.cash.amount } }) do
-            local kind, id = EX.split(side[1])
+        for _, key in ipairs({ legs.cash.from, legs.cash.to }) do
+            local kind, id = EX.split(key)
             local o = (kind == "org" and w.orgs[id]) or (kind == "person" and w.people[id]) or nil
             if o then
-                o.cash = (tonumber(o.cash) or 0) + side[2]
-                if kind == "org" then PaddockStore.markOrg(id) else PaddockStore.markPerson(id) end
+                local tbl, col = kind == "org" and "paddock_org" or "paddock_person", kind == "org" and "org_id" or "person_id"
+                local okC, cash = pcall(MySQL.scalar.await, ("SELECT cash FROM %s WHERE server_id = ? AND %s = ?"):format(tbl, col), { U.sid(), id })
+                if okC and tonumber(cash) then
+                    o.cash = tonumber(cash)
+                    if kind == "org" then PaddockStore.markOrg(id) else PaddockStore.markPerson(id) end
+                end
             end
         end
     end

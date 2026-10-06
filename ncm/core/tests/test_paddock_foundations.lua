@@ -81,4 +81,18 @@ return {
         T.eq(c.weather, "rain"); T.eq(c.family, "wet"); T.eq(c.light, "night"); T.eq(c.bucket, "wet:night")
         T.eq(W.lightOf(12 * 3600), "day"); T.eq(W.lightOf(19 * 3600), "dusk"); T.eq(W.lightOf(2 * 3600), "night")
     end,
+
+    human_laps_are_normalised_by_the_car_they_drove = function(T)
+        local Cal = T.Core.get("paddock.calibration")
+        local Car = T.Core.get("paddock.car")
+        local basic = Car.performance({ power_unit = 2, aerodynamics = 2, tires = 2, chassis = 2 })
+        local top = Car.performance({ power_unit = 8, aerodynamics = 8, tires = 8, chassis = 8 })
+        -- the same 120 s lap: in a basic car it says the average driver in an average car is FASTER (a stat-50 car would
+        -- have done better); in a top car it says they are slower
+        T.ok(Cal.normaliseMs(120000, basic) < 120000, "basic car backed out")
+        T.ok(Cal.normaliseMs(120000, top) > 120000, "top car backed out")
+        T.ok(math.abs(Cal.normaliseMs(120000, 50) - 120000) < 1e-6, "a stat-50 car is the anchor")
+        T.ok(Cal.humanSpeed(3000, 120000, basic) > Cal.humanSpeed(3000, 120000, top))
+        T.eq(Cal.median({ 3, 1, 2 }), 2); T.eq(Cal.median({ 4, 1, 2, 3 }), 2.5); T.eq(Cal.median({}), nil)
+    end,
 }

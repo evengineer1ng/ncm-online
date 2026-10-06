@@ -2,6 +2,7 @@
 NcmComponentInstall={}
 local Cat=NcmCore.get("parts.catalogue")
 local Wear=NcmCore.get("parts.wear")
+local Install=NcmCore.get("engineering.installation")   -- L324: add-on families (propulsor, impulse_actuator)
 local Json=NcmCore.get("vocabulary.json")
 local ids=NcmCore.get("vocabulary.ids")
 local hostRng=function() return math.random() end
@@ -36,7 +37,7 @@ local function current(machineId)
     local head=MySQL.single.await([[SELECT c.configuration_id,c.revision FROM machine_configuration_current x
       JOIN machine_configuration c ON c.configuration_id=x.configuration_id WHERE x.machine_asset_id=?]],{machineId})
     if not head then return nil,"configuration_missing" end
-    head.items=MySQL.query.await([[SELECT i.interface_id,i.component_asset_id,d.family FROM machine_configuration_item i
+    head.items=MySQL.query.await([[SELECT i.interface_id,i.component_asset_id,i.install_json,d.family FROM machine_configuration_item i
       JOIN component_asset a ON a.asset_id=i.component_asset_id JOIN component_design d ON d.design_id=a.design_id
       WHERE i.configuration_id=? ORDER BY i.interface_id]],{head.configuration_id}) or {}
     return head
@@ -63,9 +64,14 @@ function NcmComponentInstall.apply(machineId,why)
       JOIN component_asset a ON a.asset_id=s.component_asset_id
       WHERE a.machine_asset_id=? AND a.location_kind='installed' ORDER BY s.occurred_at,s.service_id]],{machineId}) or {}
     local byAsset={} for _,s in ipairs(services) do local k=tostring(s.component_asset_id);byAsset[k]=byAsset[k] or {};byAsset[k][#byAsset[k]+1]=s end
+    -- L324: an add-on (a propulsor on a mount) is physics, not a handling scalar. It reaches the car through
+    -- NcmEngineering and the Carrier wrench; the handling composer and the wear model never see it.
+    local scalar={} for _,r in ipairs(rows) do if not Install.isAddOnFamily(r.family) then scalar[#scalar+1]=r end end
+    rows=scalar
     local machineWear=Wear.machine(rows,byAsset)
     local parts={} for _,r in ipairs(rows) do parts[#parts+1]={id=r.asset_id,family=r.family,effect=tonumber(r.effect)} end
     NcmHandling.setWear(machineId,machineWear,why or "persistent component wear",false)
+    if NcmEngineering and NcmEngineering.changed then pcall(NcmEngineering.changed,machineId,why) end
     return NcmHandling.setParts(machineId,parts,why or "persistent component configuration")
 end
 
@@ -84,6 +90,7 @@ function NcmComponentInstall.install(pid,componentId,machineId,idemKey)
     local machine=MySQL.single.await("SELECT asset_id,vehicle_key,ncm_driver_id FROM vehicle_asset WHERE asset_id=? AND server_id=?",{machineId,serverId()})
     if not part or part.ncm_driver_id~=profile.ncmDriverId or part.location_kind~="storage" then return nil,"component_not_in_storage" end
     if not machine or machine.ncm_driver_id~=profile.ncmDriverId then return nil,"machine_not_owned" end
+    if Install.isAddOnFamily(part.family) then return nil,"this component installs on a mount: /ncm.eng.install" end
     local fit=Cat.resolve({supportedVehicles=dec(part.fitment_json) or {}},machine.vehicle_key);if not fit.compatible then return nil,fit.reason end
     local park=NcmComponentInstall.state(machineId);if not park.eligible then return nil,park.reason end
     -- KB-163: fitting changes which physical assets receive the Machine's pending interval. Settle the
@@ -97,7 +104,7 @@ function NcmComponentInstall.install(pid,componentId,machineId,idemKey)
     local displaced={};local seen={};local newItems={}
     for _,i in ipairs(old.items) do
         local aid=target[i.interface_id] and componentId or i.component_asset_id
-        newItems[#newItems+1]={interfaceId=i.interface_id,assetId=aid}
+        newItems[#newItems+1]={interfaceId=i.interface_id,assetId=aid,install=(aid==i.component_asset_id) and i.install_json or nil}
         if target[i.interface_id] and i.component_asset_id~=componentId and not seen[i.component_asset_id] then seen[i.component_asset_id]=true;displaced[#displaced+1]=i.component_asset_id end
         target[i.interface_id]=nil
     end
@@ -110,7 +117,9 @@ function NcmComponentInstall.install(pid,componentId,machineId,idemKey)
       EXISTS(SELECT 1 FROM vehicle_asset WHERE asset_id=? AND ncm_driver_id=?) AND
       EXISTS(SELECT 1 FROM machine_configuration_current WHERE machine_asset_id=? AND configuration_id=?)]],
       values={newConfig,machineId,rev,op,t,profile.ncmDriverId,componentId,profile.ncmDriverId,machineId,profile.ncmDriverId,machineId,old.configuration_id}}}
-    for _,i in ipairs(newItems) do tx[#tx+1]={query="INSERT INTO machine_configuration_item (configuration_id,interface_id,component_asset_id) VALUES (?,?,?)",values={newConfig,i.interfaceId,i.assetId}} end
+    for _,i in ipairs(newItems) do -- KB-347: a nil install_json is a trailing nil, which a Lua list drops -- 3 values for 4 placeholders. NULL is spelled out.
+        if i.install then tx[#tx+1]={query="INSERT INTO machine_configuration_item (configuration_id,interface_id,component_asset_id,install_json) VALUES (?,?,?,?)",values={newConfig,i.interfaceId,i.assetId,i.install}}
+        else tx[#tx+1]={query="INSERT INTO machine_configuration_item (configuration_id,interface_id,component_asset_id,install_json) VALUES (?,?,?,NULL)",values={newConfig,i.interfaceId,i.assetId}} end end
     tx[#tx+1]={query=[[INSERT INTO component_operation
       (operation_id,idem_key,server_id,ncm_driver_id,machine_asset_id,component_asset_id,old_configuration_id,new_configuration_id,kind,occurred_at)
       VALUES (?,?,?,?,?,?,?,?, 'fit',?)]],values={op,operationKey,serverId(),profile.ncmDriverId,machineId,componentId,old.configuration_id,newConfig,t}}

@@ -150,7 +150,12 @@ Core.define("data.vehicle_catalogue", function(C)
 
     function M.entries() return entries end
     function M.byKey(key) return type(key) == "string" and byKey[key] or nil end
-    function M.resolveRecord(record) return type(record) == "string" and byRecord[record] or nil end
+    --- A gearbox clone (`<record>_ncm_gbx_<spec>`, machine.gearbox, L306) is the same machine as its model record.
+    local function unclone(record) return (record:gsub("_ncm_gbx_%w+$", "")) end
+    function M.resolveRecord(record)
+        if type(record) ~= "string" then return nil end
+        return byRecord[record] or byRecord[unclone(record)]
+    end
 
     -- ---------------------------------------------------------------------------------------------
     -- AUTHORED TOP SPEED (`L157`)
@@ -234,7 +239,8 @@ Core.define("data.vehicle_catalogue", function(C)
     --- The authored top speed for a record, or nil when nobody has measured it yet.
     function M.topSpeedKph(record)
         if type(record) ~= "string" then return nil end
-        return M.TOP_SPEED_KPH[(record:gsub("[%.%-]", "_"))]
+        -- a gearbox clone's CATALOGUE top speed is its model's; the overdrive is machine.gearbox's to add
+        return M.TOP_SPEED_KPH[(unclone(record):gsub("[%.%-]", "_"))]
     end
 
     --- The authored top speed for a conceptual MACHINE, or nil when none of its records carries one.

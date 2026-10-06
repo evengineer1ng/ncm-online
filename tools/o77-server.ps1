@@ -38,6 +38,14 @@ if (-not (Test-Path $junction)) {
     cmd /c mklink /J "$junction" "$target" | Out-Null
     Write-Host "Created junction resources\ncm -> ncm\online\resources"
 }
+# Dev-only experiment probe (L301): OUTSIDE the ncm/* load glob so it can never reach Online; started only by its
+# own explicit entry in this server's server.jsonc.
+$probeJunction = Join-Path $serverDir 'resources\ncm_dev_probe'
+$probeTarget = Join-Path $root 'prototypes\ncm_dev_probe'
+if ((Test-Path $probeTarget) -and -not (Test-Path $probeJunction)) {
+    cmd /c mklink /J "$probeJunction" "$probeTarget" | Out-Null
+    Write-Host "Created junction resources\ncm_dev_probe -> prototypes\ncm_dev_probe"
+}
 
 $serverArgs = @()
 if ($Argv) { $serverArgs = $Argv | Where-Object { $_ -ne '--' } }
@@ -51,6 +59,14 @@ if ($firstRun) {
 
 Write-Host ("Starting {0} {1}" -f $exe, ($serverArgs -join ' '))
 Write-Host 'The server console is interactive (setup PIN, commands). Keep this window open; Ctrl+C stops it.'
+
+# L327: the NCM host bridge (Assetto Corsa embodiment) runs beside the DEVELOPMENT server, loopback only. Started once;
+# a second server start finds it already listening on 47710.
+$bridge = Join-Path $here 'ncm-host-bridge.py'
+if ((Test-Path $bridge) -and -not (Test-NetConnection -ComputerName 127.0.0.1 -Port 47710 -InformationLevel Quiet -WarningAction SilentlyContinue)) {
+    Start-Process python -ArgumentList '-I', "`"$bridge`"" -WindowStyle Hidden
+    Write-Host 'Started the NCM host bridge on 127.0.0.1:47710'
+}
 
 Push-Location $serverDir
 try {

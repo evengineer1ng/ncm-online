@@ -476,6 +476,18 @@ AddEventHandler("onClientResourceStart", function(name)
     page:on("panel:component.install",function(d)
         if type(d)=="table" and d.componentAssetId and d.machineAssetId then TriggerServerEvent("ncm:component.install",tostring(d.componentAssetId),tostring(d.machineAssetId),tostring(d.idempotencyKey or "")) end
     end)
+    -- the engineering bench on the pad: fabricate (dev), mount with a facing, remove
+    page:on("panel:engineering.fabricate",function(d)
+        if type(d)=="table" and d.key then TriggerServerEvent("ncm:engineering.fabricate",tostring(d.key)) end
+    end)
+    page:on("panel:engineering.mount",function(d)
+        if type(d)=="table" and d.componentAssetId and d.machineAssetId and d.mountId and d.facing then
+            TriggerServerEvent("ncm:engineering.mount",tostring(d.componentAssetId),tostring(d.machineAssetId),tostring(d.mountId),tostring(d.facing))
+        end
+    end)
+    page:on("panel:engineering.unmount",function(d)
+        if type(d)=="table" and d.componentAssetId then TriggerServerEvent("ncm:engineering.unmount",tostring(d.componentAssetId)) end
+    end)
     page:on("panel:component.service",function(d)
         if type(d)=="table" and d.componentAssetId and d.conditionId then TriggerServerEvent("ncm:component.service",tostring(d.componentAssetId),tostring(d.conditionId),tostring(d.idempotencyKey or "")) end
     end)

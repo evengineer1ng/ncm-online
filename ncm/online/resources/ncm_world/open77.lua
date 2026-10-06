@@ -28,7 +28,7 @@ auto_start true
 --   ring had never drawn -- every create was refused `permission_denied:world.markers`, ten times a second.
 -- world.prevention: the console-only `ncm.wanted` probe for IDEA-677 (`Open77.players.setWanted`). Declared
 --   so a live test cannot fail on a missing permission; the card lists none, the client plugin checks this one.
-permissions { "database.access", "network.events", "state.write", "world.vehicles", "ui.vanilla.map", "ui.nameplates", "input.actions", "map.control", "players.teleport", "world.props", "world.npcs", "vehicles.read", "world.query", "world.environment", "world.population", "players.stats.apply", "world.prevention", "players.hacking.define", "players.hacking.read", "players.hacking.activate", "players.hacking.cancel", "players.cyberware.define", "players.cyberware.read", "players.cyberware.manage", "combat.scope.control", "combat.config", "player.travel", "screen.effects", "world.markers" }
+permissions { "database.access", "network.events", "state.write", "world.vehicles", "ui.vanilla.map", "ui.nameplates", "input.actions", "map.control", "players.teleport", "players.life.read", "players.life.respawn", "http.request", "world.props", "world.npcs", "vehicles.read", "world.query", "world.environment", "world.population", "players.stats.apply", "world.prevention", "world.timescale", "players.screenfx", "players.hacking.define", "players.hacking.read", "players.hacking.activate", "players.hacking.cancel", "players.cyberware.define", "players.cyberware.read", "players.cyberware.manage", "combat.scope.control", "combat.config", "player.travel", "screen.effects", "world.markers", "world.transform" }
 
 -- Race HUD (M3.2): light tree, banner and race strip as our own WebUI page.
 web_ui_page "web/race.html"
@@ -110,6 +110,29 @@ shared_script "shared/core/parts/rnd.lua"
 shared_script "shared/core/parts/thermal.lua"
 shared_script "shared/core/parts/wear.lua"
 shared_script "shared/core/parts/handling.lua"
+shared_script "shared/core/engineering/body.lua"
+shared_script "shared/core/engineering/envelope.lua"
+shared_script "shared/core/engineering/drivetrain.lua"
+shared_script "shared/core/engineering/fit.lua"
+shared_script "shared/core/engineering/actuate.lua"
+shared_script "shared/core/engineering/fixtures.lua"
+shared_script "shared/core/engineering/systems.lua"
+shared_script "shared/core/engineering/machine.lua"
+shared_script "shared/core/engineering/dynamics.lua"
+shared_script "shared/core/engineering/installation.lua"
+shared_script "shared/core/engineering/controls.lua"
+shared_script "shared/core/engineering/lineage.lua"
+shared_script "shared/core/engineering/hosts.lua"
+shared_script "shared/core/engineering/allocate.lua"
+shared_script "shared/core/space/universe.lua"
+shared_script "shared/core/space/deep.lua"
+shared_script "shared/core/space/venues.lua"
+shared_script "shared/core/space/guidance.lua"
+shared_script "shared/core/engineering/flightmodel.lua"
+shared_script "shared/core/space/canonical.lua"
+shared_script "shared/core/space/places.lua"
+shared_script "shared/core/space/embodiment.lua"
+shared_script "shared/core/space/raceworld.lua"
 shared_script "shared/core/economy/markets.lua"
 shared_script "shared/core/economy/production.lua"
 shared_script "shared/core/economy/supply_profiles.lua"
@@ -132,7 +155,16 @@ shared_script "shared/core/graph/opening.lua"
 shared_script "shared/core/player/landing.lua"
 shared_script "shared/core/player/help.lua"
 shared_script "shared/core/vocabulary/hash.lua"
+shared_script "shared/core/machine/gearbox.lua"
 shared_script "shared/core/world/clock.lua"
+shared_script "shared/core/week/clock.lua"
+shared_script "shared/core/week/curve.lua"
+shared_script "shared/core/week/collapse.lua"
+shared_script "shared/core/week/moody.lua"
+shared_script "shared/core/week/continuation.lua"
+shared_script "shared/core/week/harness.lua"
+shared_script "shared/core/week/vibe.lua"
+shared_script "shared/core/world/speed_limits.lua"
 shared_script "shared/core/world/conditions.lua"
 shared_script "shared/core/paddock/names_data.lua"
 shared_script "shared/core/paddock/names.lua"
@@ -175,6 +207,23 @@ shared_script "shared/core/life/voice_bank_topics.lua"
 shared_script "shared/core/life/voice_bank_more.lua"
 shared_script "shared/core/life/voice_bank.lua"
 shared_script "shared/core/life/voice.lua"
+shared_script "shared/core/observer/director.lua"
+shared_script "shared/core/world/seed.lua"
+shared_script "shared/core/space/course.lua"
+shared_script "shared/core/space/genesis.lua"
+shared_script "shared/core/space/racesim.lua"
+shared_script "shared/core/space/sport.lua"
+shared_script "shared/core/npc/behavior.lua"
+shared_script "shared/core/npc/competency.lua"
+shared_script "shared/core/space/fireball.lua"
+shared_script "shared/core/space/sprint.lua"
+shared_script "shared/core/space/relay.lua"
+shared_script "shared/core/space/multievent.lua"
+shared_script "shared/core/space/pilot.lua"
+shared_script "shared/core/space/tactical.lua"
+shared_script "shared/core/space/calendar.lua"
+shared_script "shared/core/life/breath.lua"
+shared_script "shared/core/world/link.lua"
 -- ncm-core:end
 
 server_script "server/identity.lua"
@@ -182,11 +231,13 @@ server_script "server/presentation.lua"
 server_script "server/garage.lua"
 server_script "server/vehicle_access.lua"
 server_script "server/odometer.lua"
+server_script "server/week.lua"
 server_script "server/fuel.lua"
 server_script "server/machine.lua"
 server_script "server/handling.lua"
 server_script "server/chrome.lua"
 server_script "server/components.lua"
+server_script "server/engineering.lua"    -- L324: the first engineering loop (mounts, facings, bindings)
 server_script "server/observation.lua"
 server_script "server/state_probe.lua"
 server_script "server/pickup.lua"
@@ -198,6 +249,11 @@ server_script "server/ambient.lua"
 server_script "server/presence.lua"
 -- Also after identity.lua: passive health regen reads `playerRegenPerSecond` from the same block (KB-180).
 server_script "server/vitals.lua"
+server_script "server/snowglobe.lua"   -- L317 Snowglobe 0: automatic floating origin above 14 km (development only)
+server_script "server/canonical.lua"    -- L329: where every Machine canonically is; unhosted Deep; the universe for other hosts
+server_script "server/journey.lua"      -- schema 067: a Machine's physical journey, recorded (NCM 3.0 item 9)
+server_script "server/deep.lua"         -- L326: the handoff to NCM's own universe (development only)
+server_script "server/life.lua"         -- KB-350: a dead player comes back (NCM loads no freeroam)
 server_script "server/main.lua"
 client_script "client/main.lua"
 client_script "client/nameplates.lua"
@@ -224,7 +280,10 @@ client_script "client/telemetry.lua"
 client_script "client/ghost.lua"
 -- After telemetry.lua: the bridge reuses its `NcmClientOwnVehicle` reader rather than duplicating it.
 client_script "client/carrier_bridge.lua"
+client_script "client/engineering.lua"    -- L324: installed components -> world force (after carrier_bridge)
+client_script "client/deep.lua"          -- L326: flying the Machine out of REDengine's reach (after engineering.lua)
 client_script "client/state_probe.lua"
+client_script "client/altitude.lua"   -- L316 S0: the altitude expedition (after telemetry.lua: NcmClientOwnVehicle)
 -- Before panel.lua: it owns the page and calls into both of these.
 -- nav_input is the gamepad driver (a CEF page cannot see a pad); landing_content is authored panel copy.
 client_script "client/nav_input.lua"

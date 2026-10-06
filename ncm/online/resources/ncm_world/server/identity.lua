@@ -24,6 +24,8 @@ end
 -- is rejected outright and takes the whole resource down with it.
 local settings = Open77.tunables.declare({
     serverId = { value = "ncm-dev", type = "string", apply = "live" },
+    -- DEVELOPMENT one-shot engineering grant (`server/engineering.lua` devGrant): "<driverId>|<machineId>|<design>|<mount>|<facing>"
+    devGrant = { value = "", type = "string", apply = "live" },
 
     -- Ambient population (`server/ambient.lua`, `L177`). Budgets first, then placement, then the race
     -- corridor. Distances are metres.
@@ -250,7 +252,15 @@ function NcmIdentity.resolve(playerId)
     return profile
 end
 
+-- NCM Observer (doc 46, L307): a connection in observer mode is a presence without a person -- no driver, so
+-- nothing built on this lookup lets it enter, earn, buy or count. ncm_observer owns the list.
+local function observing(id)
+    local ok, o = pcall(function() return GlobalState.ncmObservers end)
+    return ok and type(o) == "table" and o[tostring(id)] ~= nil
+end
+
 function NcmIdentity.get(playerId)
+    if observing(tonumber(playerId) or 0) then return nil end
     return cache[tonumber(playerId) or 0]
 end
 

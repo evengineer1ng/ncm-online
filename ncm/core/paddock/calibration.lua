@@ -53,6 +53,33 @@ Core.define("paddock.calibration", function(C)
         return prev + (s - prev) * M.LEARN_WEIGHT, true
     end
 
+    --- L305 (owner, 2026-10-04: "keep it natural ... driver quality ... car speed ... parts fitted compared to what
+    --- you're bringing"): a human's Paddock lap, as the time a STAT-50 DRIVER IN A STAT-50 CAR would have done. The
+    --- human is the anchor driver (stat 50); their machine's performance is backed out with the sim's own model
+    --- (`paddock.sim.performance`, `PACE_SPREAD`). NPCs with better cars or better attributes then beat them naturally.
+    function M.normaliseMs(ms, carPerf)
+        local perf = (1 - Sim.CAR_WEIGHT) * 50 + Sim.CAR_WEIGHT * (tonumber(carPerf) or 50)
+        local mult = 1 - (perf - 50) / 50 * Sim.PACE_SPREAD
+        return (tonumber(ms) or 0) / mult
+    end
+
+    --- That lap as a stat-50 tier speed along the road line (m/s), the unit `learned` speeds are in.
+    function M.humanSpeed(lineM, ms, carPerf)
+        local base = M.normaliseMs(ms, carPerf)
+        if not (base > 0) or not (tonumber(lineM) and lineM > 0) then return nil end
+        return lineM / (base / 1000)
+    end
+
+    --- Median of a list of numbers (nil when empty).
+    function M.median(list)
+        local t = {}
+        for _, v in ipairs(list or {}) do if tonumber(v) then t[#t + 1] = tonumber(v) end end
+        if #t == 0 then return nil end
+        table.sort(t)
+        local m = (#t + 1) / 2
+        return (t[math.floor(m)] + t[math.ceil(m)]) / 2
+    end
+
     --- The road distance a route's crow-flies (or summed-leg) distance stands for (L236). A route's `distanceM` is
     --- planar; the road between two city nodes is longer, and relatively longer the shorter the hop (Troll Pass is
     --- 550 m crow-flies and a minute-plus of driving; the v1 sim raced it in 18 s). First numbers, replaced by the

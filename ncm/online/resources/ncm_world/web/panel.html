@@ -1629,6 +1629,10 @@
         const wear=p.wear||{status:"normal",conditions:[]};const wl=document.createElement("div");wl.className="dossier-label";wl.textContent="CONDITION";const wv=document.createElement("div");wv.className="dossier-value";wv.textContent=wear.status==="normal"?"NO ACTIVE CONDITION":String(wear.status||"attention").toUpperCase()+" · "+((wear.conditions&&wear.conditions[0]&&wear.conditions[0].label)||"SERVICE REQUIRED");collectionDetail.append(wl,wv);
         const sl=document.createElement("div");sl.className="dossier-label";sl.textContent="SERVICE HISTORY";const sv=document.createElement("div");sv.className="dossier-value";sv.textContent=Number(p.service_count||0).toLocaleString()+" RECORDED SERVICE"+(Number(p.service_count||0)===1?"":"S");collectionDetail.append(sl,sv);
         if(p.service_quote){const q=p.service_quote;const canPay=Number(componentData.balance||0)>=Number(q.cost||0);const b=document.createElement("button");b.className="detail-action";b.disabled=!canPay;b.textContent=canPay?("HOLD TO SERVICE · €$"+Number(q.cost||0).toLocaleString()):("SERVICE €$"+Number(q.cost||0).toLocaleString()+" · INSUFFICIENT FUNDS");if(canPay)holdAction(b,()=>{b.disabled=true;b.textContent="SERVICING…";Open77.emit("panel:component.service",{componentAssetId:p.asset_id,conditionId:q.condition_id,idempotencyKey:uuid4()});});collectionDetail.append(b);}
+        if(p.addOn&&p.location_kind==="installed"){const b=document.createElement("button");b.className="detail-action";b.textContent="HOLD TO REMOVE FROM ITS MOUNT";holdAction(b,()=>{b.disabled=true;b.textContent="REMOVING…";Open77.emit("panel:engineering.unmount",{componentAssetId:p.asset_id});});collectionDetail.append(b);const n=document.createElement("div");n.className="warning-box";n.textContent="ON MACHINE "+String(p.machine_asset_id).slice(0,8)+". Park it and get out first.";collectionDetail.append(n);return;}
+        if(p.addOn){const machines=Array.isArray(componentData.machines)?componentData.machines:[];for(const m of machines){const row=document.createElement("div");const opts=(p.mounts&&p.mounts[m.asset_id])||[];row.className="fit-machine "+(opts.length?"ok":"no");row.textContent=(opts.length?"✓ ":"⊘ ")+String(m.vehicle_key||"Machine")+" · "+String(m.asset_id).slice(0,8)+" · "+(opts.length?opts.length+" MOUNT POSITIONS":"NO MOUNT TAKES IT");row.addEventListener("click",()=>{selectedFitMachine=m.asset_id;renderPartDetail(p);});if(selectedFitMachine===m.asset_id)row.style.boxShadow="inset 0 0 0 2px var(--accent)";collectionDetail.append(row);}
+          const opts=(selectedFitMachine&&p.mounts&&p.mounts[selectedFitMachine])||[];for(const o of opts){const b=document.createElement("button");b.className="detail-action";b.textContent="HOLD TO MOUNT · "+String(o.mountId).replace(/^mount\./,"").toUpperCase()+" · FACING "+String(o.facing).toUpperCase();holdAction(b,()=>{b.disabled=true;b.textContent="MOUNTING…";Open77.emit("panel:engineering.mount",{componentAssetId:p.asset_id,machineAssetId:selectedFitMachine,mountId:o.mountId,facing:o.facing});});collectionDetail.append(b);}
+          return;}
         if(p.location_kind==="installed"){const n=document.createElement("div");n.className="warning-box";n.textContent="INSTALLED ON MACHINE "+p.machine_asset_id+". Service requires it parked and unoccupied; fit another compatible system to displace it.";collectionDetail.append(n);return;}
         const machines=Array.isArray(componentData.machines)?componentData.machines:[];
         for(const m of machines){const fit=m.fitment&&m.fitment[p.asset_id];const st=(componentData.states||{})[m.asset_id]||{eligible:false,state:"checking",reason:"Checking Machine state…"};const row=document.createElement("div");row.className="fit-machine "+(fit&&fit.compatible&&st.eligible?"ok":"no");row.textContent=(fit&&fit.compatible?"✓ ":"⊘ ")+String(m.vehicle_key||"Machine")+" · "+String(m.asset_id).slice(0,8)+" · "+(fit&&fit.compatible?st.reason:(fit&&fit.reason)||"Does not fit");row.addEventListener("click",()=>{selectedFitMachine=m.asset_id;renderPartDetail(p);});if(selectedFitMachine===m.asset_id)row.style.boxShadow="inset 0 0 0 2px var(--accent)";collectionDetail.append(row);}
@@ -1637,6 +1641,7 @@
       }
       function renderPartsInventory(){
         collectionTitle.textContent="Machine Index";machinesTab.classList.remove("active");partsTab.classList.add("active");const parts=Array.isArray(componentData.parts)?componentData.parts:[];collectionCount.innerHTML=parts.length+" COMPONENTS<small>STORED AND INSTALLED · SERIALIZED ASSETS</small>";collectionWall.innerHTML="";collectionWall.style.gridTemplateColumns="repeat(4,minmax(0,1fr))";
+        if(Array.isArray(componentData.fabricable)){for(const f of componentData.fabricable){const b=document.createElement("button");b.className="part-tile";b.textContent="HOLD TO FABRICATE (DEV) · "+f.code;holdAction(b,()=>{b.disabled=true;b.textContent="FABRICATING…";Open77.emit("panel:engineering.fabricate",{key:f.key});});collectionWall.append(b);}}
         if(!selectedPart&&parts.length)selectedPart=parts[0].asset_id;
         for(const p of parts){const b=document.createElement("button");b.className="part-tile "+(p.location_kind==="installed"?"installed ":"")+(p.asset_id===selectedPart?"selected":"");const m=document.createElement("div");m.className="vehicle-maker";m.textContent=p.display_manufacturer||"Factory";const n=document.createElement("div");n.className="vehicle-name";n.textContent=p.code||p.design_id;const meta=document.createElement("div");meta.className="vehicle-meta";meta.textContent=String(p.family||"").replaceAll("_"," ");const s=document.createElement("div");s.className="part-status "+(p.factory_original?"factory":"");s.textContent=(p.factory_original?"FACTORY ORIGINAL · ":"")+String(p.location_kind||"storage").toUpperCase();b.append(m,n,meta,s);b.addEventListener("click",()=>{selectedPart=p.asset_id;selectedFitMachine=null;renderPartsInventory();});collectionWall.append(b);}
         renderPartDetail(parts.find(p=>p.asset_id===selectedPart)||parts[0]);
@@ -1661,7 +1666,8 @@
       // has no component offerings to send. That blanked the whole market panel.
       const partsList = () => Array.isArray(marketData.componentOfferings) ? marketData.componentOfferings : [];
       let selectedOffering = null, selectedComponent = null, hoveredComponent = null, selectedPreviewVehicle = null, fitmentOverlay = true;
-      const offeringId = (o) => ((o && o.marketId) || "base_market") + "::" + (o && o.vehicleKey);
+      // L306: one offering per gearbox, so an automatic and a manual Galena are two cards
+      const offeringId = (o) => ((o && o.marketId) || "base_market") + "::" + (o && o.vehicleKey) + (o && o.gearbox ? "::" + o.gearbox : "");
       // One Market at a time (owner, 2026-09-29): Base Market first, then every discovered terminal, chosen from
       // the sources column. Stock is never merged across markets; a row without marketId belongs to Base Market.
       let selectedMarket = "base_market";
@@ -1733,6 +1739,7 @@
         const cat = document.createElement("div"); cat.className = "sub"; cat.textContent = o.category || "Vehicle";
         const spec = document.createElement("div"); spec.className = "market-spec";
         const pairs = [["PRICE", eddies(o.price)],
+                       ...(o.gearboxLine ? [["GEARBOX", o.gearboxLine]] : []),
                        ["AVAILABLE", Number(o.available || 0) + " / " + Number(o.ceiling || 0)],
                        ["STATE", o.soldOut ? "SOLD OUT" : "IN STOCK"],
                        ...buyerMetrics(o).map(([k, val]) => [k.toUpperCase(), val])];
@@ -1766,15 +1773,16 @@
         }
         const list = document.createElement("div"); list.className = "market-assets";
         const afford = Number(marketData.balance || 0) >= Number(o.price || 0);
+        const arriving = o.purchasable === false;
         // One row per individual car. Several rows means several cars: there is no one-per-player rule and
         // nothing here enforces one.
         for (const assetId of ids) {
           const row = document.createElement("div"); row.className = "asset-row";
           const aid = document.createElement("span"); aid.className = "aid"; aid.textContent = "ASSET " + String(assetId);
           const buy = document.createElement("button");
-          buy.textContent = afford ? "PURCHASE" : "INSUFFICIENT FUNDS";
-          buy.disabled = !afford;
-          if (afford) holdAction(buy, () => { buy.disabled = true; buy.textContent = "PURCHASING…";
+          buy.textContent = arriving ? "MANUAL — ARRIVING" : (afford ? "PURCHASE" : "INSUFFICIENT FUNDS");
+          buy.disabled = arriving || !afford;
+          if (afford && !arriving) holdAction(buy, () => { buy.disabled = true; buy.textContent = "PURCHASING…";
             Open77.emit("panel:market.purchase", { marketId: o.marketId, assetId: assetId }); });
           row.append(aid, buy); list.append(row);
         }
@@ -1814,7 +1822,7 @@
           const source=document.createElement("div");source.className="eyebrow";source.textContent=o.marketName||o.marketId;
           const maker=document.createElement("div");maker.className="vehicle-maker";maker.textContent=o.manufacturer||"NCM";
           const name=document.createElement("h2");name.textContent=o.displayName||o.vehicleKey;
-          const meta=document.createElement("div");meta.className="sub";meta.textContent=o.category||"Vehicle";
+          const meta=document.createElement("div");meta.className="sub";meta.textContent=(o.category||"Vehicle")+(o.gearboxKind==="manual"?" · MANUAL":"");
           const stock=document.createElement("div");stock.className="stock"+(o.soldOut?" out":"");
           // A sold-out model says so and stays on the shelf. Temporary shortage is information; a vanished
           // offering is an apparently broken market.

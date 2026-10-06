@@ -68,6 +68,69 @@ Core.define("paddock.season", function(C)
 
     M.POINTS = { 25, 18, 15, 12, 10, 8, 6, 4, 2, 1 }   -- SP championships.lua POINTS_TABLES.standard
 
+    -- ---------------------------------------------------------------------------------- Racing Week (L303)
+    -- RACING WEEK IS THE CUP. When the host installs a run provider, a Cup is one reconstruction: every series is
+    -- crowned when the run ends -- at whichever possible end its verdict falls (doc 47, L309 Q2: a crown at every
+    -- collapse) -- and the names go into the hall of champions. The provider is `fn(utc) -> { run, startUtc, endUtc,
+    -- beyond }` over the recorded timeline (week.clock.locate): endUtc is the run's recorded end or, while it is open,
+    -- its next POSSIBLE end, so the finales run before every possible end; `beyond` marks instants past an open run's
+    -- possible end, where nothing is posted until the verdict. Without a provider, Cups are the old weeks.
+    local week = nil
+    function M.setWeek(fn) week = fn end
+    function M.weekAt(utc) return week and week(math.floor(utc)) or nil end
+
+    -- THE FINALE. The calendar is scheduled around the crown: every series' last race starts in the final hours, in
+    -- tier order, the Hypercar finale last, each worth FINALE_POINTS times the points. Regular slots stop CLEAR_S
+    -- before the end so every result is in when the names are read. Offsets are seconds before the run's end.
+    M.FINALE_POINTS = 2
+    M.FINALE_CLEAR_S = 150 * 60
+    M.FINALE = { street = { at = 165 * 60, stagger = 6 * 60 }, regional = { at = 120 * 60, stagger = 8 * 60 },
+        pro = { at = 85 * 60, stagger = 10 * 60 }, premier = { at = 50 * 60, stagger = 0 } }
+
+    -- SPEC SERIES: one make, supplied by the organisers -- nobody races their own car (owner: "we have gotta police
+    -- npc cars into being maimai only etc for races that specify a specific car"). Physical NPCs spawn the spec
+    -- model's racer clone; the sim gives every entrant the same car; humans must enter in the model.
+    M.SPEC = {
+        regional_b = { record = "Vehicle.v_standard2_makigai_maimai", label = "MaiMai" },   -- the MaiMai Cup
+    }
+    function M.specFor(seriesId) return M.SPEC[seriesId or ""] end
+    --- The identical car every entrant of a spec series gets in the sim: the tier's base levels.
+    function M.specCar(tier)
+        local base = C.get("paddock.car").TIER_BASE[tier] or 4
+        local car = { progress = {} }
+        for _, a in ipairs(C.get("paddock.car").AREAS) do car[a] = base; car.progress[a] = 0 end
+        return car
+    end
+
+    --- The finale slot of every series for the run ending at `endUtc`: { seriesId, tier, utc, finale = true }.
+    function M.finaleSlots(endUtc)
+        local out = {}
+        for _, s in ipairs(M.allSeries()) do
+            local f = M.FINALE[s.tier]
+            if f then
+                out[#out + 1] = { seriesId = s.id, tier = s.tier, utc = endUtc - f.at + (s.division - 1) * f.stagger, finale = true }
+            end
+        end
+        return out
+    end
+
+    --- Is the race at `utc` its series' finale? (Derived from the run, never stored.)
+    function M.isFinale(seriesId, utc)
+        local wk = M.weekAt(utc)
+        if not wk then return false end
+        for _, f in ipairs(M.finaleSlots(wk.endUtc)) do
+            if f.seriesId == seriesId and f.utc == math.floor(utc) then return true end
+        end
+        return false
+    end
+
+    --- Points for a place, finale-weighted.
+    function M.pointsAt(position, state, seriesId, utc)
+        local p = M.pointsFor(position, state)
+        if p > 0 and seriesId and utc and M.isFinale(seriesId, utc) then p = p * M.FINALE_POINTS end
+        return p
+    end
+
     --- Series ids for a tier: "street_a", "street_b", "pro", ...
     function M.seriesIds(tier)
         local spec = M.TIERS[tier]
@@ -114,14 +177,29 @@ Core.define("paddock.season", function(C)
         return out
     end
 
-    --- All races starting in [fromUtc, toUtc), across the rhythm days that can contribute.
+    --- All races starting in [fromUtc, toUtc), across the rhythm days that can contribute. Under Racing Week the
+    --- last FINALE_CLEAR_S of each run carry only the finales (L303).
     function M.window(fromUtc, toUtc, rhythm)
         local first = Clock.eastern(fromUtc).dayIndex - 1
         local last = Clock.eastern(toUtc).dayIndex
         local out = {}
         for day = first, last do
             for _, r in ipairs(M.dayRhythm(day, rhythm)) do
-                if r.utc >= fromUtc and r.utc < toUtc then out[#out + 1] = r end
+                if r.utc >= fromUtc and r.utc < toUtc then
+                    local wk = M.weekAt(r.utc)
+                    -- doc 47: past an open run's possible end nothing is posted until its verdict is in (`beyond`)
+                    if not (wk and (wk.beyond or r.utc >= wk.endUtc - M.FINALE_CLEAR_S)) then out[#out + 1] = r end
+                end
+            end
+        end
+        local seenRun = {}
+        for _, at in ipairs({ fromUtc, toUtc }) do
+            local wk = M.weekAt(at)
+            if wk and not wk.beyond and not seenRun[wk.run] then
+                seenRun[wk.run] = true
+                for _, f in ipairs(M.finaleSlots(wk.endUtc)) do
+                    if f.utc >= fromUtc and f.utc < toUtc then out[#out + 1] = f end
+                end
             end
         end
         table.sort(out, function(a, b) if a.utc ~= b.utc then return a.utc < b.utc end return a.seriesId < b.seriesId end)
@@ -155,7 +233,8 @@ Core.define("paddock.season", function(C)
         local region = M.regionOf(seriesId)
         local k = math.floor(utc / 60)
         local ovals = C.get("data.ovals")
-        if ovals.SCHEDULED and (spec.ovalShare or 0) > 0 and #ovals.LIST > 0
+        -- a finale is never an oval: an oval may run an hour, and the crown cannot wait for it (L303)
+        if ovals.SCHEDULED and (spec.ovalShare or 0) > 0 and #ovals.LIST > 0 and not M.isFinale(seriesId, utc)
             and Hash.unit(seed, "route-oval", seriesId, k) < spec.ovalShare then
             local list = region and ovals.ids(region) or {}
             if #list == 0 then list = ovals.ids() end
@@ -170,6 +249,14 @@ Core.define("paddock.season", function(C)
     end
     --- Season and Cup for an instant: { seasonId, cup (1..13), cupId, startUtc, endUtc, cupStartUtc, cupEndUtc }.
     function M.cupOf(utc)
+        local wk = M.weekAt(utc)
+        if wk then
+            -- the run is the Cup; the whole run shares the season of its first hour
+            local season = Seasons.atUtc(math.floor(wk.startUtc))
+            return { seasonId = season.id, cup = wk.run, cupId = string.format("%s-RW%03d", season.id, wk.run),
+                startUtc = season.startUtc, endUtc = season.endUtc, cupStartUtc = wk.startUtc, cupEndUtc = wk.endUtc,
+                run = wk.run }
+        end
         local season = Seasons.atUtc(math.floor(utc))
         local week = math.floor((utc - season.startUtc) / (7 * 86400)) + 1
         if week > M.CUPS_PER_SEASON then week = M.CUPS_PER_SEASON end
