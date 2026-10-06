@@ -3,7 +3,10 @@
 > **STATUS: LEDGER** - living session memory, rewritten at the end of every working session.
 > Authority map: [INDEX.md](INDEX.md).
 
-**LATEST 2026-10-06 (18:32 ET) - KB-363 + IDEA-1163: THE BENCH IS ON THE PAD. Panel -> Parts now fabricates (dev), mounts with a facing and removes add-ons by holds -- no typing. The AC-6 is ON your Hella (..0003): roof, facing up, revision 9 (granted 19:00:58). Dev restarted 19:00 (`l364-restart-20261006.stdout.log`). Online (Lightsail) untouched.**
+**LATEST 2026-10-06 (19:08 ET) - KB-364 FIXED: racing (ncm_league) had stopped at 19:00:58 -- the AC-6 grant's player-less change event crashed it, so nothing reached the Race Guide. Guarded on both sides; dev restarted 19:07 (`l365-restart-20261006.stdout.log`), racing up, 5 races posted. The AC-6 stays on your Hella. Online (Lightsail) untouched.**
+- **THE ONE NEXT ACTION (owner):** open the Race Guide (races should be listed), then fly the Hella in Deep with the AC-6 (§EN2, §FM3) and the AC hop (§AC15).
+
+**EARLIER 2026-10-06 (18:32 ET) - KB-363 + IDEA-1163: THE BENCH IS ON THE PAD. Panel -> Parts now fabricates (dev), mounts with a facing and removes add-ons by holds -- no typing. The AC-6 is ON your Hella (..0003): roof, facing up, revision 9 (granted 19:00:58). Dev restarted 19:00 (`l364-restart-20261006.stdout.log`). Online (Lightsail) untouched.**
 - **THE ONE NEXT ACTION (owner):** get in the Hella and fly Deep: the ATTITUDE line shows +/- on all three axes with no waiver label (§EN2, §FM3). §AC15 (the AC hop) is still waiting too.
 
 **EARLIER 2026-10-06 (18:03 ET) - KB-362 FIXED: the AC hop now pushes through the car's centre of mass, straight along its up axis (as in Night City) -- it no longer rolls the car onto its side or roof. Tap Triangle repeatedly to climb; past 6 km going up, Deep takes over. The fix reaches AC at the next embodiment (the bridge copies the app). L331 below is unchanged.**

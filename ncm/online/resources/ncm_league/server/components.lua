@@ -387,4 +387,6 @@ RegisterNetEvent("ncm:component.purchase",function(marketId,assetId,idemKey) loc
         message=ok and "The serialized component is in Parts Inventory. Choose a compatible owned Machine to fit it." or tostring(why),
         reference=ok and "collection" or "market",surface="toast",repeatPolicy={mode=ok and "once" or "cooldown",cooldownSec=2}})
 end) end)
-AddEventHandler("ncm:component.changed",function(pid) NcmComponents.pushInventory(tonumber(pid) or 0);if NcmMarket then NcmMarket.push(tonumber(pid) or 0) end end)
+-- KB-364: a change with no player behind it (a server-side grant, pid 0) has nobody to push to -- and a host call
+-- with id 0 throws "id must be positive", which stops the WHOLE resource (racing went with it, 2026-10-06 19:00).
+AddEventHandler("ncm:component.changed",function(pid) pid=tonumber(pid) or 0;if pid<=0 then return end;NcmComponents.pushInventory(pid);if NcmMarket then pcall(NcmMarket.push,pid) end end)

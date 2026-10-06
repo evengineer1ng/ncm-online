@@ -332,7 +332,7 @@ function NcmEngineering.install(pid, ref, mountId, facing, onMachine)
     log("MOUNT player=%d machine=..%s %s (%s) on %s facing %s -> thrust axis (%g, %g, %g) | configuration rev %d%s", pid, short(machineId),
         serial(part), part.asset_id, mountId, facing, verdict.axis[1], verdict.axis[2], verdict.axis[3], rev, displaced and (" | displaced .." .. short(displaced)) or "")
     NcmComponentInstall.apply(machineId, "engineering mount")
-    TriggerEvent("ncm:component.changed", pid, machineId)
+    if pid > 0 then TriggerEvent("ncm:component.changed", pid, machineId) end
     return true, ("%s on the %s, facing %s: it pushes the Machine (%g, %g, %g) in its own frame. Configuration revision %d."):format(
         serial(part), verdict.mount.label, facing, verdict.axis[1], verdict.axis[2], verdict.axis[3], rev)
 end
@@ -357,7 +357,7 @@ function NcmEngineering.remove(pid, ref)
     if not cfg then return nil, rev end
     log("UNMOUNT player=%d machine=..%s %s from %s | configuration rev %d", pid, short(machineId), serial(part), at, rev)
     NcmComponentInstall.apply(machineId, "engineering unmount")
-    TriggerEvent("ncm:component.changed", pid, machineId)
+    if pid > 0 then TriggerEvent("ncm:component.changed", pid, machineId) end
     return true, ("%s is off the Machine and back in storage. Bindings to it are kept but inert until it is installed again. Revision %d."):format(serial(part), rev)
 end
 
@@ -431,7 +431,7 @@ function NcmEngineering.fabricate(pid, which)
     if not ok then return nil, "fabrication failed: " .. tostring(err) end
     local n = MySQL.scalar.await("SELECT design_ordinal FROM component_asset WHERE asset_id=?", { asset })
     log("FABRICATE player=%d %s #%s asset=%s (dev shortcut; custody from here is ordinary)", pid, d.code, tostring(n), asset)
-    TriggerEvent("ncm:component.changed", pid, nil)
+    if pid > 0 then TriggerEvent("ncm:component.changed", pid, nil) end
     return true, ("%s #%s (%s) is in your storage. /ncm.eng to see it."):format(d.code, tostring(n), d.name)
 end
 
@@ -561,7 +561,7 @@ end)
 local function padResult(pid, ok, title, msg)
     toast(pid, ok, title, tostring(msg))
     TriggerClientEvent("ncm:component.install.result", pid, { ok = ok and true or false, message = tostring(msg or "") })
-    TriggerEvent("ncm:component.changed", pid, nil)
+    if pid > 0 then TriggerEvent("ncm:component.changed", pid, nil) end
 end
 RegisterNetEvent("ncm:engineering.fabricate", function(key)
     local pid = tonumber(source) or 0
