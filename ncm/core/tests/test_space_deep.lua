@@ -92,6 +92,45 @@ return {
         end
     end,
 
+    -- L334: the Earth rotates; Deep's frame turns with it
+    a_body_at_rest_on_the_equator_feels_the_spin = function(T)
+        local M = D(T)
+        local p = M.llaToEcef(0, 0, 0)
+        local f = M.fictitious(p, { 0, 0, 0 })
+        near(T, M.vec.len(f), M.OMEGA ^ 2 * M.R, 1e-6, "centrifugal = W^2 R (~0.034 m/s^2)")
+        T.ok(M.vec.dot(f, M.vec.unit(p)) > 0, "outward")
+        local vi = M.inertialVel(p, { 0, 0, 0 })
+        near(T, M.vec.len(vi), M.OMEGA * M.R, 1e-6, "the ground at the equator moves W R (~465 m/s) inertially")
+    end,
+
+    a_dropped_body_lands_east_of_its_start = function(T)
+        local M = D(T)
+        -- dropped from rest (Earth-fixed) 100 km up over the equator: Coriolis carries it east
+        local s = { p = M.llaToEcef(0, 0, 100000), v = { 0, 0, 0 }, t = 0 }
+        while true do
+            local _, _, alt = M.ecefToLla(s.p)
+            if alt <= 0 then break end
+            M.step(s, 0.05, nil)
+        end
+        local _, lon = M.ecefToLla(s.p)
+        T.ok(lon > 0, ("lands east of the drop point (%.4f deg)"):format(lon))
+    end,
+
+    a_circular_orbit_reads_as_one = function(T)
+        local M = D(T)
+        local alt = 400000
+        local p = M.llaToEcef(0, 0, alt)
+        local vInertial = math.sqrt(M.GM / (M.R + alt))
+        -- prograde (east) at circular speed, expressed Earth-fixed: subtract the frame's own motion
+        local vFixed = { 0, vInertial - M.OMEGA * (M.R + alt), 0 }
+        local o = M.orbit(p, vFixed)
+        T.ok(not o.escape, "bound")
+        near(T, o.apoM, alt, 50, "apoapsis at 400 km")
+        near(T, o.periM, alt, 50, "periapsis at 400 km")
+        local esc = M.orbit(p, { 0, 12000, 0 })
+        T.ok(esc.escape, "12 km/s at 400 km escapes")
+    end,
+
     the_closed_form_is_one_evaluation = function(T)
         local M = D(T)
         local s = M.enter({ 0, 0, 400000 }, { 7000, 0, 0 }, nil)

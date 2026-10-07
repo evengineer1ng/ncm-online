@@ -20,6 +20,16 @@ local Canon = Core.get("space.canonical")   -- L329: the host-independent Deep r
 local Flight = Core.get("engineering.flightmodel")   -- L331: the full machine model
 local Venues = Core.get("space.venues")
 local GeoLod = Core.get("space.geolod")   -- L332: which real imagery the Deep page holds
+local Dyn = Core.get("engineering.dynamics")
+--- L334: what Guidance can be pointed at: the KSA border (Earth's sphere of influence) first, then the Earth venues
+local TARGETS = nil
+local function targets()
+    if not TARGETS then
+        TARGETS = { Guid.BORDER }
+        for _, v in ipairs(Venues.VENUES) do TARGETS[#TARGETS + 1] = v end
+    end
+    return TARGETS
+end
 local Json = Core.get("vocabulary.json")
 
 local function log(fmt, ...) print(("[ncm_world/client/deep] " .. fmt):format(...)) end
@@ -310,7 +320,7 @@ RegisterNetEvent("ncm:deep.loop", function()
 end)
 
 RegisterNetEvent("ncm:deep.schedule", function(m)
-    if type(m) == "table" and Venues.VENUES[GD.sel] and m.venue == Venues.VENUES[GD.sel].id then GD.schedule = m.items end
+    if type(m) == "table" and targets()[GD.sel] and m.venue == targets()[GD.sel].id then GD.schedule = m.items end
 end)
 
 -- ------------------------------------------------------------------------------------------------ config + watch
@@ -525,13 +535,13 @@ local function guidanceInput(now, dt)
         TriggerServerEvent("ncm:deep.adapter", { action = GD.acEnabled and "disable" or "enable" })
     end
     if GD.open then
-        local n = #Venues.VENUES
+        local n = #targets()
         if prevE then GD.sel = (GD.sel - 2) % n + 1; GD.panLat, GD.panLon = 0, 0 end
         if nextE then GD.sel = GD.sel % n + 1; GD.panLat, GD.panLon = 0, 0 end
         -- L330: the posted timetable of the selected place (asked again every 30 s while guidance is open)
         if prevE or nextE or openE or now - (GD.schedAt or 0) > 30000 then
             GD.schedAt, GD.schedule = now, nil
-            TriggerServerEvent("ncm:deep.schedule", Venues.VENUES[GD.sel].id)
+            if not targets()[GD.sel].border then TriggerServerEvent("ncm:deep.schedule", targets()[GD.sel].id) end
         end
         if zoomE then GD.zoom = GD.zoom % #ZOOMS + 1 end
         local px, py = dead(axis("padRightStickX")), dead(axis("padRightStickY"))
@@ -545,12 +555,29 @@ local function guidanceInput(now, dt)
                 local sus = Guid.thrustBudget(EN and EN.devices or {}, nil, NcmClientDevHeat)
                 local okF, tw, why = Guid.feasible(sus, A.mass)
                 if not okF then
-                    GD.msg = ("Guidance cannot fly this Machine to %s: %s."):format(Venues.VENUES[GD.sel].name, why)
-                    log("GUIDANCE refused -> %s: %s", Venues.VENUES[GD.sel].id, why)
-                    TriggerServerEvent("ncm:deep.guidance", { event = "refused", venue = Venues.VENUES[GD.sel].id })
+                    GD.msg = ("Guidance cannot fly this Machine to %s: %s."):format(targets()[GD.sel].name, why)
+                    log("GUIDANCE refused -> %s: %s", targets()[GD.sel].id, why)
+                    TriggerServerEvent("ncm:deep.guidance", { event = "refused", venue = targets()[GD.sel].id })
                     return
                 end
-                GD.route = Guid.plan(A.s, Venues.VENUES[GD.sel])
+                -- L334: the border needs the delta-v to get there -- the main drive's own propellant, honestly
+                if targets()[GD.sel].border and A.fm and A.dyn then
+                    local mass = Dyn.mass(A.fm, A.dyn)
+                    local thrust, isp, prop = 0, 0, "fuel"
+                    for _, d in ipairs(A.fm.devices) do
+                        if d.kind == "reaction_engine" and (d.perf.thrustN or 0) > thrust then thrust, isp, prop = d.perf.thrustN, d.perf.ispS or 0, d.perf.propellant or "fuel" end
+                    end
+                    local left = NcmClientDevFuel and 1e9 or Dyn.propellantLeft(A.fm, A.dyn, prop)
+                    local okB, need, have = Guid.borderBudget(A.s, mass, thrust, isp, math.min(left, mass * 0.9))
+                    if not okB then
+                        GD.msg = ("Guidance cannot reach the KSA border: it needs about %.0f km/s and this Machine's %s gives %.0f km/s (a Fusion Drive FD-1 and a Propellant Tank PT-500 can)."):format(
+                            need / 1000, prop, have / 1000)
+                        log("GUIDANCE refused -> ksa_border: delta-v %.0f of %.0f km/s", have / 1000, need / 1000)
+                        TriggerServerEvent("ncm:deep.guidance", { event = "refused", venue = "ksa_border" })
+                        return
+                    end
+                end
+                GD.route = Guid.planTo(A.s, targets()[GD.sel])
                 GD.engaged, GD.hold = true, nil
                 GD.msg = nil
                 local pts = {}
@@ -671,7 +698,15 @@ local function tick()
             local thr = 0
             for _, th in pairs(gc.throttle) do thr = math.max(thr, th) end
             gcmd.throttle = thr
-            if GD.engaged and Guid.arrived(GD.route, Flight.deep(ds)) then
+            if GD.engaged and GD.route.kind == "border" and Guid.arrived(GD.route, Flight.deep(ds)) then
+                -- L334: Earth's sphere of influence -- past here the KSA host flies the Machine. Until the KSA adapter is
+                -- set up the Machine holds here (its record says so); nothing pretends.
+                GD.engaged = false
+                GD.msg = "KSA border reached (925,000 km). The Kitten Space Agency host takes over from here -- not set up yet: holding."
+                log("GUIDANCE reached the KSA border")
+                TriggerServerEvent("ncm:deep.guidance", { event = "arrived", venue = "ksa_border" })
+                A.atBorder = true
+            elseif GD.engaged and Guid.arrived(GD.route, Flight.deep(ds)) then
                 GD.engaged = false
                 GD.prompt = GD.route.venue
                 GD.msg = nil
@@ -682,10 +717,14 @@ local function tick()
         end
     end
     local fuel0 = Flight.fuelKg(m, ds)
+    A.fusion0 = Dyn.propellantLeft(m, ds, "fusion")
     local tel
     ds, tel = Flight.step(m, ds, cmd, dt, opts)
     A.dyn = ds
     if EN and not opts.devFuel then
+        local usedF = math.max(0, (A.fusion0 or 0) - Dyn.propellantLeft(m, ds, "fusion"))
+        EN.fusionKg = math.max(0, (EN.fusionKg or 0) - usedF)
+        A.report.fusionKg = (A.report.fusionKg or 0) + usedF
         local used = math.max(0, fuel0 - Flight.fuelKg(m, ds))
         EN.fuelKg = math.max(0, (EN.fuelKg or 0) - used)
         A.report.kg = A.report.kg + used
@@ -728,14 +767,14 @@ local function tick()
     geoTick(A.page, A.s, now, GD.route and GD.route.venue and { lat = GD.route.venue.lat, lon = GD.route.venue.lon } or nil)
     if now - A.lastSend >= 33 then
         A.lastSend = now
-        local sel = Venues.VENUES[GD.sel]
+        local sel = targets()[GD.sel]
         local g = {
             open = GD.open, sel = GD.sel, engaged = GD.engaged, msg = GD.msg, always = GD.always,
             prompt = GD.prompt and GD.prompt.name or nil,
             consent = GD.consent and GD.consent.name or nil, adapters = GD.adapters and { ac = GD.acEnabled == true } or nil,
             schedule = GD.schedule,
             selName = sel.name, selRegion = sel.region,
-            selKm = Deep.distance(lat, lon, sel.lat, sel.lon) / 1000,
+            selKm = sel.border and math.max(0, sel.radiusM - Deep.vec.len(A.s.p)) / 1000 or Deep.distance(lat, lon, sel.lat, sel.lon) / 1000,
             backHold = GD.backSince and math.min(1, (now - GD.backSince) / 2000) or 0,
         }
         if gcmd then
@@ -747,6 +786,9 @@ local function tick()
         send("deep:state", {
             p = A.s.p, v = A.s.v, r = A.s.basis.right, f = A.s.basis.forward, u = A.s.basis.up,
             alt = alt, lat = lat, lon = lon, speed = speed, hs = hs, vs = vs, orbit = Deep.orbitSpeed(alt),
+            orb = (function() local o = Deep.orbit(A.s.p, A.s.v); return { apo = o.apoM, peri = o.periM, escape = o.escape, vi = o.speed } end)(),
+            borderKm = math.max(0, Guid.BORDER.radiusM - Deep.vec.len(A.s.p)) / 1000,
+            fusionKg = A.fm and Dyn.propellantLeft(A.fm, A.dyn, "fusion") or nil,
             fuelKg = EN and EN.fuelKg or nil, thrust = A.thrustN, devices = devText, impact = A.impact, land = A.land,
             rig = rig and not GD.engaged, cam = CAM_NAMES[camMode], zoom = A.zoom or 22, t = (now - A.startedAt) / 1000, devFuel = NcmClientDevFuel == true,
             twr = (A.fm and (function() local t = 0 for _, d in ipairs(A.fm.devices) do if d.kind == "reaction_engine" then t = t + (d.perf.thrustN or 0) end end return t end)() or 0)
@@ -762,8 +804,8 @@ local function tick()
             lat = lat, lon = lon, ncKm = ncKm, landing = A.impact, fuelKg = EN and EN.fuelKg or 0, thrust = A.thrustN, rig = rig,
             devices = devText, guidance = gcmd and ("%s -> %s %.0f km eta %.0f s throttle %.2f"):format(gcmd.phase, GD.route.venue.id,
                 gcmd.distanceM / 1000, gcmd.etaS, gcmd.throttle) or nil })
-        if EN and A.report.kg > 0 then
-            TriggerServerEvent("ncm:engineering.burn", { assetId = EN.assetId, kg = A.report.kg, dtS = (now - A.report.since) / 1000,
+        if EN and (A.report.kg > 0 or (A.report.fusionKg or 0) > 0) then
+            TriggerServerEvent("ncm:engineering.burn", { assetId = EN.assetId, kg = A.report.kg, fusionKg = A.report.fusionKg or 0, dtS = (now - A.report.since) / 1000,
                 pulses = A.report.pulses, t = { devices = devText, f = A.thrustN, z = alt, speed = speed,
                     loss = "in NCM deep space (no REDengine): force at CoM; attitude by the dev rig / guidance assist" } })
         end

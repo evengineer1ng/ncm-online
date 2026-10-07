@@ -43,8 +43,11 @@ local function apply(p)
     E = {
         assetId = p.assetId, vehicleKey = p.vehicleKey, devices = devices, bindings = p.bindings or {}, state = Install.newState(devices),
         ctl = Controls.newState(), fuelKg = fuelMl and (fuelMl / 1000 * Install.FUEL_KG_PER_L) or 0, fuelKnown = fuelMl ~= nil,
-        controls = Controls.controls(p.bindings or {}), report = { kg = 0, pulses = 0, since = ms() }, lastSend = 0, lastF = nil,
+        controls = Controls.controls(p.bindings or {}), report = { kg = 0, fusionKg = 0, pulses = 0, since = ms() }, lastSend = 0, lastF = nil,
     }
+    -- L334: a tank PART's own propellant (the Fusion Drive's), apart from the car's fuel
+    E.fusionKg = 0
+    for _, d in ipairs(devices) do if d.kind == "propellant_tank" and (d.perf.propellant or "fuel") == "fusion" then E.fusionKg = E.fusionKg + (d.fillKg or 0) end end
     local parts = {}
     for _, d in ipairs(devices) do parts[#parts + 1] = ("%s@%s/%s"):format(d.code, d.mountId:gsub("^mount%.", ""), d.facing) end
     for _, r in ipairs(refused) do parts[#parts + 1] = "REFUSED " .. tostring(r.reason) end
@@ -141,10 +144,14 @@ CreateThread(function()
             local commands = Controls.step(E.ctl, E.bindings, E.devices, pressed, t)
             -- `/ncm.eng.devfuel` (client/deep.lua, development only): nothing burned, nothing reported
             if NcmClientDevHeat then NcmClientCoolAll(E.state) end
-            local r = Install.step(E.devices, E.state, commands, dt, NcmClientDevFuel and 1e9 or E.fuelKg)
+            local r = Install.step(E.devices, E.state, commands, dt,
+                NcmClientDevFuel and { fuel = 1e9, fusion = 1e9 } or { fuel = E.fuelKg, fusion = E.fusionKg or 0 })
             if not NcmClientDevFuel then
-                E.fuelKg = math.max(0, E.fuelKg - r.propellantKg)
-                E.report.kg = E.report.kg + r.propellantKg
+                local bp = r.byPropellant or {}
+                E.fuelKg = math.max(0, E.fuelKg - (bp.fuel or 0))
+                E.fusionKg = math.max(0, (E.fusionKg or 0) - (bp.fusion or 0))
+                E.report.kg = E.report.kg + (bp.fuel or 0)
+                E.report.fusionKg = (E.report.fusionKg or 0) + (bp.fusion or 0)
                 E.report.pulses = E.report.pulses + r.pulses
             end
 
@@ -176,7 +183,7 @@ CreateThread(function()
             E.lastW, E.lastFrame, E.hot = w, frame, hot
 
             if t - E.report.since >= REPORT_MS then
-                local active = E.report.kg > 0 or mag > 0
+                local active = E.report.kg > 0 or (E.report.fusionKg or 0) > 0 or mag > 0
                 if active then
                     local okV, v = pcall(Open77.vehicles.get, boundVehicle)
                     local pos = okV and type(v) == "table" and v.position or {}
@@ -189,12 +196,13 @@ CreateThread(function()
                     end
                     local f = frame or {}
                     local fw, up = f.forward or {}, f.up or {}
-                    TriggerServerEvent("ncm:engineering.burn", { assetId = E.assetId, kg = E.report.kg, dtS = (t - E.report.since) / 1000, pulses = E.report.pulses,
+                    TriggerServerEvent("ncm:engineering.burn", { assetId = E.assetId, kg = E.report.kg, fusionKg = E.report.fusionKg or 0,
+                        dtS = (t - E.report.since) / 1000, pulses = E.report.pulses,
                         t = { devices = table.concat(parts, " | "), fx = w[1], fy = w[2], fz = w[3], f = mag,
                             fwx = fw.x, fwy = fw.y, fwz = fw.z, upx = up.x, upy = up.y, upz = up.z,
                             speed = okV and type(v) == "table" and v.speed or 0, z = pos.z or 0, hot = hot, loss = LOSS } })
                 end
-                E.report = { kg = 0, pulses = 0, since = t }
+                E.report = { kg = 0, fusionKg = 0, pulses = 0, since = t }
             end
         end
     end

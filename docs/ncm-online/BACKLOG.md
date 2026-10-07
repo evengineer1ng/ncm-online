@@ -17,7 +17,7 @@ a milestone or batch) → `built` (code + offline proof) → `validated` (live P
 **Where things live:** ideas and work → here. Choices made and questions for the owner → `DECISION_RECORD.md`.
 Defects → `KNOWN_BUGS.md`. Live PASS/FAIL → `wp/MASTER_TEST.md`. What to do next → `NOW.md`.
 
-**IDs are permanent.** Next free ID: **IDEA-1169**.
+**IDs are permanent.** Next free ID: **IDEA-1172**.
 *(This line has now been stale twice — left at IDEA-127 while the ledger ran to IDEA-183, then at IDEA-205 while it
 ran to IDEA-294. It is the only guard against reusing an ID. Check it against the last row before you append.)*
 
@@ -1703,3 +1703,6 @@ Owner: "its time to build out from paddock and into life sim pve layer ... concr
 | IDEA-1166 | DEEP/TERRAIN-ELEVATION | 2026-10-06 | **Terrain height under the imagery** (SRTM-class elevation, public domain) so ridgelines and valleys have relief near the ground -- the next geographic step after L332's imagery clipmap. | L332 (not in that pass) | open | L332 |
 | IDEA-1167 | DEEP/NON-US-IMAGERY | 2026-10-06 | **Finer than 30 m outside the US**: L332 is public-domain only, and the only global public-domain source found is Landsat WELD 2000 (~30 m). Sentinel-2 cloudless (EOX, 10 m) is CC BY-NC-SA -- an owner decision. | L332 owner ruling | open | L332 |
 | IDEA-1168 | ENGINEERING/AC6-LEVEL-HOLD-BOTH-HOSTS | 2026-10-06 | **The AC-6 holds the Machine level in the air, in every host** (only if KB-367 alone does not stop the AC flip): rate damping + upright hold limited to its real 1,500 N m and paid in fuel, one core controller for both hosts. AC expresses it as an exact torque (a force couple); Night City needs the Carrier to write angular velocity (+0x24, 12 bytes past a verified field -- unverified, would need the same kick-and-measure proof as the velocity write) -- until then it is Night City's own airborne stability, said as a loss. Sizing: 1,500 N m turns the car's roll ~1.6 rad/s^2 but its pitch only ~0.3 rad/s^2. | owner L333 | open | L333, KB-367 |
+| IDEA-1169 | HOSTS/KSA | 2026-10-07 | **Kitten Space Agency as the host past Deep** (owner's choice over Elite Dangerous, KSP and Orbiter: free, C#, highly moddable, real-scale Sol): P0 a StarMap/Harmony probe mod on 127.0.0.1:47712 that reads and sets a craft's state (Earth-fixed / inertial), P4 the bridge's KSA adapter -- the Machine at the border becomes a KSA craft from its NCM parts at its exact state; the departing host closes after the acknowledgement. Open: KSA's terms on mods/outside tools; the planned switch from real Sol to a fictional system; no wheels yet. | owner 2026-10-07 | open (waits for the owner's KSA install) | L334 |
+| IDEA-1170 | HOSTS/KSA-RETURN | 2026-10-07 | **Back from KSA into Deep**: re-entering Earth's sphere of influence in KSA hands the Machine back to Deep at the same state. | L334 (not in that pass) | open | L334 |
+| IDEA-1171 | DEEP/MOON-SUN | 2026-10-07 | **The Moon and the Sun's gravity in Deep** (and the Moon drawn): needed for anything slower than the torch inside the sphere of influence. | L334 owner ruling (later) | open | L334 |

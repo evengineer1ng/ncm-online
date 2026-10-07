@@ -78,8 +78,74 @@ Core.define("space.guidance", function(C)
             arriveRadius = host and M.HOST_ARRIVE_RADIUS_M or M.ARRIVE_RADIUS_M }
     end
 
+    -- ------------------------------------------------------------------------------------------ L334: the KSA border
+    -- Owner: "simply set the Guidance waypoint to the KSA border". Deep ends at Earth's sphere of influence; past it the
+    -- Kitten Space Agency host flies the Machine (its real-scale Sol, its time warp). The route has no waypoints: climb
+    -- out of the thick air, then burn along the INERTIAL velocity with an outward bias (energy gained fastest, never
+    -- falling back), full throttle, all the way -- the owner's torch profile (~1 g, ~3-4 h). It arrives fast; KSA takes
+    -- the Machine at that velocity.
+    M.BORDER = { id = "ksa_border", name = "KSA border - Earth's sphere of influence", region = "925,000 km from Earth",
+        radiusM = 925000000, host = "ksa", border = true }
+    M.BORDER_CLIMB_M = 40000       -- straight up until here: no lingering in the air at speed
+    M.BORDER_MIN_VR = 300          -- m/s outward: below it the burn leans further outward
+
+    function M.planBorder(state)
+        local r = V.len(state.p)
+        return { kind = "border", venue = M.BORDER, waypoints = {}, arrival = { radiusM = M.BORDER.radiusM },
+            distanceM = math.max(0, M.BORDER.radiusM - r), next = 1, phase = "climb" }
+    end
+
+    --- A target by id: the KSA border or an Earth venue (VN). For records and pickers.
+    function M.target(id, VN)
+        if id == M.BORDER.id then return M.BORDER end
+        return VN and VN.get and VN.get(id) or nil
+    end
+
+    --- Plan to a target (border or venue).
+    function M.planTo(state, target)
+        if target and target.border then return M.planBorder(state) end
+        return M.plan(state, target)
+    end
+
+    local function borderCommand(route, state, aMax)
+        local p, v = state.p, state.v
+        local r = V.len(p)
+        local _, _, alt = D.ecefToLla(p)
+        local up = V.unit(p)
+        local vi = D.inertialVel(p, v)
+        local vr = V.dot(v, up)
+        local dir, phase
+        if alt < M.BORDER_CLIMB_M then
+            dir, phase = up, "climb"
+        else
+            -- prograde (inertial) plus an outward lean that grows when the climb rate is low
+            local lean = math.max(0.3, math.min(2.0, (M.BORDER_MIN_VR - vr) / 200 + 0.5))
+            dir, phase = V.unit(V.add(V.unit(vi), V.scale(up, lean))), "escape"
+        end
+        local d = math.max(0, route.venue.radiusM - r)
+        local a = math.max(0.1, aMax - D.GM / (r * r) * math.max(0, V.dot(dir, up)))
+        local eta = (-vr + math.sqrt(math.max(0, vr * vr + 2 * a * d))) / a
+        route.phase = phase
+        return { dir = dir, throttle = 1, phase = phase, target = route.venue.name, distanceM = d, etaS = eta, vWant = nil }
+    end
+
+    --- Can this Machine reach the border on what it carries? The torch profile at its sustained acceleration needs about
+    --- a*t of delta-v (with sqrt(2d/a) for t) plus escaping Earth's well from here; the rocket equation gives what the
+    --- propellant of its main drive buys. Returns ok, needMps, haveMps.
+    function M.borderBudget(state, massKg, thrustN, ispS, propKg)
+        local r = V.len(state.p)
+        local d = math.max(0, M.BORDER.radiusM - r)
+        local a = math.max(0.1, thrustN / math.max(1, massKg))
+        local t = math.sqrt(2 * d / a)
+        local need = a * t + math.sqrt(2 * D.GM / r) * 0.3     -- gravity losses on the way out of the well (rough, stated)
+        local mDry = math.max(1, massKg - propKg)
+        local have = ispS * M.G_SURFACE * math.log(massKg / mDry)
+        return have >= need, need, have
+    end
+
     --- Is the Machine inside the arrival envelope?
     function M.arrived(route, state)
+        if route.kind == "border" then return V.len(state.p) >= route.venue.radiusM end
         local la, lo, alt = D.ecefToLla(state.p)
         local d = D.distance(la, lo, route.arrival.lat, route.arrival.lon)
         local v = route.venue
@@ -129,6 +195,7 @@ Core.define("space.guidance", function(C)
     --- engaged at 21 km falling 409 m/s, the Hella went down at a constant ~405 m/s on full thrust into the ground. The
     --- descent rate is also bounded by what the spare thrust can still stop above the floor.
     function M.command(route, state, aMax)
+        if route.kind == "border" then return borderCommand(route, state, aMax) end
         local p, v = state.p, state.v
         local la, lo, alt = D.ecefToLla(p)
         local target, final = nil, false
@@ -229,9 +296,15 @@ Core.define("space.guidance", function(C)
             local errW = V.cross(V.unit(curW), cmd0.dir)
             local errB = { R[1][1] * errW[1] + R[2][1] * errW[2] + R[3][1] * errW[3], R[1][2] * errW[1] + R[2][2] * errW[2] + R[3][2] * errW[3],
                 R[1][3] * errW[1] + R[2][3] * errW[2] + R[3][3] * errW[3] }
-            local tmax = 0
+            local tmax, gimballed = 0, false
             for _, at in ipairs(m.attitude or {}) do tmax = tmax + (at.perf.torqueNm or 0) end
-            if tmax > 0 then
+            for _, d in ipairs(m.devices) do if d.kind == "reaction_engine" and (d.perf.gimbalDeg or 0) > 0 then gimballed = true end end
+            if gimballed then
+                -- L334: an absolute torque request; the gimbals trim the engines and steer first, the attitude sets take
+                -- the rest (engineering.dynamics)
+                cmd.torqueNm = {}
+                for a = 1, 3 do cmd.torqueNm[a] = m.inertia[a] * (M.K_ATT * errB[a] - M.K_RATE * (s.omega[a] or 0)) end
+            elseif tmax > 0 then
                 -- feed-forward: cancel the torque the engines themselves will make (an engine off the CoM line pitches it)
                 local ff = { 0, 0, 0 }
                 for i, d in ipairs(m.devices) do
@@ -261,6 +334,7 @@ Core.define("space.guidance", function(C)
     --- The ground under the Machine for a "came down" test: a venue's own ground when it is close, else sea level.
     function M.groundBelow(route, lat, lon)
         local v = route and route.venue
+        if v and v.border then return 0 end
         if v and D.distance(lat, lon, v.lat, v.lon) < 10000 then return v.alt or 0 end
         return 0
     end

@@ -6,10 +6,15 @@
 --
 -- This is deliberately NOT `space.universe` (L320's compressed 5 km Snowglobe Earth): IDEA-1129 keeps presentation
 -- and simulation geometry open, and the owner asked for an OpenSpace-scale universe. Same idea as OpenSpace's
--- reference frames, reduced to what a car needs: one spherical Earth, Earth-centred coordinates, no rotation (v1).
+-- reference frames, reduced to what a car needs: one spherical Earth, Earth-centred coordinates. L334: the Earth
+-- ROTATES (sidereal rate); the working frame stays Earth-fixed, so a moving body feels the rotating frame's Coriolis
+-- and centrifugal accelerations, and orbits are judged on the INERTIAL velocity.
 --
 -- Frames:
---   ECEF here = Earth-centred, x through (0 N, 0 E), z through the north pole, metres. Earth does not rotate in v1.
+--   ECEF here = Earth-centred, Earth-FIXED: x through (0 N, 0 E), z through the north pole, metres. It turns with the
+--              Earth (L334), so velocities in it are relative to the ground; `inertialVel` adds the frame's own motion.
+--              Expression loss (said): a Machine's attitude is carried in this frame; the frame's own turn (7.3e-5 rad/s)
+--              is not added to its spin.
 --   ENU      = east, north, up at a point.
 --   GAME     = Cyberpunk world metres: x east, y north, z up, origin (0, 0) at ORIGIN, z = height above sea level.
 --   MACHINE  = engineering.installation's frame: x right, y forward, z up; its basis is carried in ECEF.
@@ -90,9 +95,35 @@ Core.define("space.deep", function(C)
         return scale(p, -M.GM / (r * r * r))
     end
 
+    -- L334: the Earth's rotation. Sidereal rate about +z (the north pole).
+    M.OMEGA = 7.2921159e-5
+    local W = { 0, 0, M.OMEGA }
+    --- The rotating frame's fictitious acceleration on a body at p moving at v (both Earth-fixed): Coriolis -2W x v plus
+    --- centrifugal -W x (W x p). Small near the ground (~0.03 m/s^2 at the equator), decisive for orbits.
+    function M.fictitious(p, v)
+        local cor = scale(cross(W, v), -2)
+        local cen = scale(cross(W, cross(W, p)), -1)
+        return add(cor, cen)
+    end
+    --- Earth-fixed velocity -> inertial (Earth-centred, non-rotating) velocity at p.
+    function M.inertialVel(p, v) return add(v, cross(W, p)) end
+    --- Two-body orbit of a state (Earth-fixed p, v), judged on the inertial velocity: { speed (inertial), energy, e,
+    --- escape, apoM, periM } -- apo/peri as altitudes above the mean radius; apoM nil when escaping.
+    function M.orbit(p, v)
+        local vi = M.inertialVel(p, v)
+        local r, vv = len(p), dot(vi, vi)
+        local energy = vv / 2 - M.GM / r
+        local h = len(cross(p, vi))
+        local e = math.sqrt(math.max(0, 1 + 2 * energy * h * h / (M.GM * M.GM)))
+        local peri = (h * h / M.GM) / (1 + e) - M.R
+        if energy >= 0 then return { speed = math.sqrt(vv), energy = energy, e = e, escape = true, periM = peri } end
+        local a = -M.GM / (2 * energy)
+        return { speed = math.sqrt(vv), energy = energy, e = e, escape = false, a = a, apoM = a * (1 + e) - M.R, periM = a * (1 - e) - M.R }
+    end
+
     --- One semi-implicit Euler step. `accEcef` = extra acceleration (thrust / mass), m/s^2.
     function M.step(s, dt, accEcef)
-        local a = add(M.gravity(s.p), accEcef or { 0, 0, 0 })
+        local a = add(add(M.gravity(s.p), M.fictitious(s.p, s.v)), accEcef or { 0, 0, 0 })
         s.v = add(s.v, scale(a, dt))
         s.p = add(s.p, scale(s.v, dt))
         s.t = s.t + dt
@@ -131,13 +162,16 @@ Core.define("space.deep", function(C)
     --- Where a ballistic trajectory meets the ground, in CLOSED FORM (two-body conic): one evaluation, no loop -- the
     --- stepped version blew OPEN//77's per-call script budget on the first frame (KB-348). Returns lat, lon, seconds
     --- (nil for the degenerate straight-up case), or nil + "orbit" / "escape".
-    function M.impact(p, v)
+    function M.impact(p, vFixed)
+        -- L334: the fall is a Kepler arc in the INERTIAL frame (the Earth-fixed velocity plus the frame's own motion);
+        -- the ground turns under it for the flight time, so the landing point is rotated back by OMEGA x t.
+        local v = M.inertialVel(p, vFixed)
         local r, vv = len(p), len(v)
         if r <= M.R then local la, lo = M.ecefToLla(p); return la, lo, 0 end
         local h = cross(p, v)
         local hl = len(h)
         if hl < 1e-6 * r * math.max(vv, 1e-9) then
-            -- radial: straight up and down the same line (Earth does not rotate in v1)
+            -- radial in the inertial frame (only at a pole): straight up and down the same line
             if dot(p, v) > 0 and vv * vv / 2 - M.GM / r >= 0 then return nil, "escape" end
             local la, lo = M.ecefToLla(p)
             return la, lo, nil
@@ -157,7 +191,6 @@ Core.define("space.deep", function(C)
             if dot(p, v) > 0 then return nil, "escape" end
         end
         local pos = add(scale(P, M.R * math.cos(nuD)), scale(Q, M.R * math.sin(nuD)))
-        local la, lo = M.ecefToLla(pos)
         local t = nil
         if e < 1 then
             local a = pp / (1 - e * e)
@@ -169,7 +202,25 @@ Core.define("space.deep", function(C)
             local dM = meanAnom(nuD) - meanAnom(nu0)
             while dM < 0 do dM = dM + 2 * math.pi end
             t = dM / n
+        else
+            -- a hyperbolic arc that still hits the ground (fast and steep): hyperbolic anomaly
+            local a = pp / (1 - e * e)                    -- negative
+            local n = math.sqrt(M.GM / (-a * a * a))
+            local function meanAnomH(nu)
+                local x = math.sqrt((e - 1) / (e + 1)) * math.tan(nu / 2)
+                local F = 0.5 * math.log((1 + x) / (1 - x))   -- atanh
+                return e * (math.exp(F) - math.exp(-F)) / 2 - F
+            end
+            local okH, dM = pcall(function() return meanAnomH(nuD) - meanAnomH(nu0) end)
+            if okH and dM == dM and dM > 0 then t = dM / n end
         end
+        if t then
+            -- the Earth turned OMEGA * t under the arc: back into the Earth-fixed frame
+            local ang = -M.OMEGA * t
+            local c2, s2 = math.cos(ang), math.sin(ang)
+            pos = { pos[1] * c2 - pos[2] * s2, pos[1] * s2 + pos[2] * c2, pos[3] }
+        end
+        local la, lo = M.ecefToLla(pos)
         return la, lo, t
     end
 

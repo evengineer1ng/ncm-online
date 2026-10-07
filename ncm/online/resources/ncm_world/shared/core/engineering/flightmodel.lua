@@ -57,6 +57,11 @@ Core.define("engineering.flightmodel", function(C)
             if (perf.kind == "reaction_engine" or perf.kind == "pulse_reaction" or perf.kind == "attitude_control") and not perf.propellant then
                 perf.propellant = "fuel"
             end
+            -- L334: a tank PART carries its own propellant, as the server last recorded it (full when unknown)
+            if perf.kind == "propellant_tank" then
+                local cap = math.max(1e-9, tonumber(perf.capacityKg) or 0)
+                perf.fill = d.fillKg and math.max(0, math.min(1, d.fillKg / cap)) or 1
+            end
             parts[#parts + 1] = {
                 key = d.componentId or d.code, componentId = d.componentId, thermal = d.thermal,
                 body = { massKg = d.massKg or 0, perf = perf, loads = { { kind = "thrust", pos = { 0, 0, 0 }, dir = d.axis or { 0, 1, 0 } } } },
@@ -108,6 +113,10 @@ Core.define("engineering.flightmodel", function(C)
         if type(carry) == "table" then
             if carry.omega then s.omega = { carry.omega[1] or 0, carry.omega[2] or 0, carry.omega[3] or 0 } end
             s.dev, s.thr, s.pulse, s.att = carry.dev or s.dev, carry.thr or s.thr, carry.pulse or s.pulse, carry.att or s.att
+            -- L334: every tank's fill (the Machine's fuel and any tank part's own propellant) survives checkpoints
+            if type(carry.tanks) == "table" then
+                for i in ipairs(m.tanks) do if tonumber(carry.tanks[i]) then s.tanks[i] = tonumber(carry.tanks[i]) end end
+            end
         end
         return s
     end
@@ -116,12 +125,13 @@ Core.define("engineering.flightmodel", function(C)
     function M.deep(s) return { p = s.pos, v = s.vel, basis = basisFromRot(s.rot), t = s.t } end
 
     --- What to carry in a canonical record (JSON-safe).
-    function M.carry(s) return { omega = s.omega, dev = s.dev, thr = s.thr, pulse = s.pulse, att = s.att } end
+    function M.carry(s) return { omega = s.omega, dev = s.dev, thr = s.thr, pulse = s.pulse, att = s.att, tanks = s.tanks } end
 
-    --- The environment at a state: real gravity, air by altitude.
+    --- The environment at a state: real gravity plus the rotating Earth's Coriolis and centrifugal terms (L334), air by
+    --- altitude.
     function M.env(s, extra)
         local _, _, alt = D.ecefToLla(s.pos)
-        local e = { g = D.gravity(s.pos), rho = M.density(alt) }
+        local e = { g = V.add(D.gravity(s.pos), D.fictitious(s.pos, s.vel or { 0, 0, 0 })), rho = M.density(alt) }
         for k, v in pairs(extra or {}) do e[k] = v end
         return e, alt
     end

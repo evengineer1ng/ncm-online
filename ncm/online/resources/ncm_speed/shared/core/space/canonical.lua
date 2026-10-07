@@ -67,10 +67,11 @@ Core.define("space.canonical", function(C)
         local F = C.get("engineering.flightmodel")
         local m = F.build(r.devices or {}, { vehicleKey = r.vehicleKey, fuelKg = r.devFuel and 40 or (tonumber(r.fuelKg) or 0) })
         local s = F.state(m, M.toDeep(r), r.dyn)
-        local venue = r.guidance and r.guidance.engaged and r.guidance.venueId and VN.get(r.guidance.venueId) or nil
+        -- L334: the target may be the KSA border (Earth's sphere of influence) as well as an Earth venue
+        local venue = r.guidance and r.guidance.engaged and r.guidance.venueId and G.target(r.guidance.venueId, VN) or nil
         local canPoint = F.canPoint(m, r.devAttitude)
         if venue and not canPoint then info.cannotPoint = true end
-        local route = (venue and canPoint and F.mainAxis(m)) and G.plan(M.toDeep(r), venue) or nil
+        local route = (venue and canPoint and F.mainAxis(m)) and G.planTo(M.toDeep(r), venue) or nil
         -- the waiver turns the body directly (stable at 1 s); a physical attitude law needs finer steps
         local dt = (route and not r.devAttitude) and 0.25 or M.DT
         local budget = maxSteps or math.huge
@@ -78,7 +79,17 @@ Core.define("space.canonical", function(C)
             local cmd, waiver = {}, nil
             if route then
                 cmd, waiver = G.fly(route, m, s, { devHeat = r.devHeat, waiver = r.devAttitude })
-                if not r.guidance.arrived and G.arrived(route, F.deep(s)) then r.guidance.arrived = true; info.arrived = true end
+                if not r.guidance.arrived and G.arrived(route, F.deep(s)) then
+                    r.guidance.arrived = true; info.arrived = true
+                    if route.kind == "border" then
+                        -- L334: at the border the Machine waits for its next host (KSA); Deep stops flying it
+                        r.utc = r.utc + dt
+                        r.place, r.border = "border", { utc = r.utc, host = "ksa" }
+                        info.border = true
+                        info.steps = info.steps + 1
+                        break
+                    end
+                end
             end
             s = F.step(m, s, cmd, dt, { devFuel = r.devFuel, devHeat = r.devHeat, waiver = waiver })
             if route and not r.devFuel and F.fuelKg(m, s) <= 1e-6 then r.guidance.engaged, route, info.fuelOut = false, nil, true end

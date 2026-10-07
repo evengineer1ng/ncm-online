@@ -50,7 +50,7 @@ Core.define("engineering.installation", function(C)
 
     --- Families that install on a mount (add-ons), as opposed to the effect-scalar families that replace a
     --- factory component at a fixed interface (parts.catalogue). Handling composition must never see these.
-    M.FAMILIES = { propulsor = true, impulse_actuator = true, attitude = true }
+    M.FAMILIES = { propulsor = true, impulse_actuator = true, attitude = true, tank = true }
     function M.isAddOnFamily(family) return M.FAMILIES[family] == true end
 
     -- ------------------------------------------------------------------------------------------ designs
@@ -93,6 +93,35 @@ Core.define("engineering.installation", function(C)
             interface = "hardpoint.h1", massKg = 30, envelope = { 0.6, 0.6, 0.3 }, price = 5400,
             perf = { kind = "attitude_control", torqueNm = 1500, armM = 1.0, ispS = 220, propellant = "fuel", heatKw = 40 },
             thermal = { capacityKjK = 20, rejectKw = 25, limitK = 300, resumeK = 150 },
+        },
+        -- L334 (owner: "the Hella equipped with relevant parts to break through Deep ... to the KSA border", torch
+        -- drive ~1 g for ~3-4 h). Sized from the trip: ~2.4 t to Earth's sphere of influence (925,000 km) at a steady
+        -- ~1 g is ~145 km/s of delta-v; at Isp 100,000 s (exhaust ~980 km/s) that is ~16 % of the mass, ~380 kg of
+        -- propellant (carried in a 500 kg tank: margin). 28 kN is inside the rear hardpoint's 30 kN and lifts the car (~1.2 g at sea level), so in Night
+        -- City and Assetto Corsa it is the same forward push the RP-16 was (L333: one part, every host).
+        -- Fusion-class, Cyberpunk-plausible, said so: the exhaust carries the jet power (~14 GW at full thrust); the
+        -- drive itself sheds ~400 kW into its own radiator.
+        {
+            designId = "eng:zetatech:fd1:r1", lineageId = "eng:zetatech:fd1", revision = 1,
+            manufacturer = "Zetatech", makerKey = "zetatech", code = "ZTC-FD1", family = "propulsor",
+            name = "Fusion Drive FD-1",
+            subtitle = "A fusion torch: 28 kN for hours on a little propellant. Burns fusion pellets from a tank part.",
+            interface = "hardpoint.h1", massKg = 150, envelope = { 0.6, 1.4, 0.6 }, price = 48000,
+            -- a +-3 deg gimbal: it trims its own thrust line through the centre of mass (the rear mount sits a few cm off
+            -- it: ~1.6 kN m at full thrust, more than an AC-6) and steers the Machine with the thrust it is already making
+            perf = { kind = "reaction_engine", thrustN = 28000, ispS = 100000, propellant = "fusion", seaLevelFactor = 1.0,
+                throttleTauS = 0.5, minThrottle = 0, heatKw = 400, gimbalDeg = 3 },
+            thermal = { capacityKjK = 60, rejectKw = 420, limitK = 500, resumeK = 300 },
+        },
+        -- its propellant, carried in its own tank part (the Machine's fuel tank stays the car's)
+        {
+            -- 500 kg: the 400 kg first cut reached the border with 21 kg left (5 %) in simulation -- no room for a detour
+            designId = "eng:zetatech:pt500:r1", lineageId = "eng:zetatech:pt500", revision = 1,
+            manufacturer = "Zetatech", makerKey = "zetatech", code = "ZTC-PT500", family = "tank",
+            name = "Propellant Tank PT-500",
+            subtitle = "500 kg of fusion pellets for a fusion drive. Mounts anywhere it fits.",
+            interface = "hardpoint.h1", massKg = 70, envelope = { 1.0, 1.0, 0.5 }, price = 10500,
+            perf = { kind = "propellant_tank", capacityKg = 500, propellant = "fusion" },
         },
     }
     local designById = {}
@@ -158,6 +187,8 @@ Core.define("engineering.installation", function(C)
                     kind = d.perf.kind, perf = d.perf, thermal = d.thermal, massKg = d.massKg,
                     mountId = it.mountId, facing = it.facing, pos = { v.mount.pos[1], v.mount.pos[2], v.mount.pos[3] },
                     axis = v.axis, commands = cmds,
+                    -- L334: a tank part's own propellant (kg), as the server last recorded it
+                    fillKg = d.perf.kind == "propellant_tank" and tonumber(it.fillKg) or nil,
                 }
             else
                 refused[#refused + 1] = { componentId = it.componentId, reason = v.reason }
@@ -182,14 +213,19 @@ Core.define("engineering.installation", function(C)
     end
 
     --- Advance every device by dt seconds under `commands` ({ [componentId] = { throttle = 0..1, discharge = true } })
-    --- with `fuelKg` available. Returns { force = {x,y,z} N (Machine frame), torque = {x,y,z} N m about `com`,
+    --- with `fuelKg` available -- a number (the Machine's fuel) or, L334, a table of pools by propellant
+    --- ({ fuel = kg, fusion = kg }); each device draws from its own `propellant` (default fuel). The result also
+    --- carries `byPropellant` ({ fuel = kg, fusion = kg } spent). Returns { force = {x,y,z} N (Machine frame), torque = {x,y,z} N m about `com`,
     --- propellantKg, pulses, out = { [componentId] = { thrustN, heatK, hot, starved } } }.
     ---
     --- Propellant is checked BEFORE it is spent: a device that cannot be fed for this step produces nothing.
     function M.step(devices, state, commands, dt, fuelKg, com)
         commands = commands or {}
         com = com or { 0, 0, 0.5 }
-        local fuel = math.max(0, tonumber(fuelKg) or 0)
+        local pools = {}
+        if type(fuelKg) == "table" then for k, v in pairs(fuelKg) do pools[k] = math.max(0, tonumber(v) or 0) end
+        else pools.fuel = math.max(0, tonumber(fuelKg) or 0) end
+        local byProp = {}
         local F, T = { 0, 0, 0 }, { 0, 0, 0 }
         local spent, pulses, out = 0, 0, {}
         for _, d in ipairs(devices or {}) do
@@ -198,6 +234,8 @@ Core.define("engineering.installation", function(C)
             local cmd = commands[d.componentId] or {}
             local p, thrust, starved = d.perf, 0, false
             local heatIn = 0
+            local prop = p.propellant or "fuel"
+            local fuel = pools[prop] or 0
             if p.kind == "reaction_engine" then
                 local want = math.max(0, math.min(1, tonumber(cmd.throttle) or 0))
                 if st.hot then want = 0 end
@@ -207,7 +245,8 @@ Core.define("engineering.installation", function(C)
                 local f = Sys.thrustAt(p, Sys.RHO0, st.throttle)
                 local kg = f / (p.ispS * Sys.G0) * dt
                 if kg > fuel then starved = f > 0; f, kg = 0, 0; st.throttle = 0 end
-                fuel, spent, thrust = fuel - kg, spent + kg, f
+                pools[prop], spent, thrust = fuel - kg, spent + kg, f
+                byProp[prop] = (byProp[prop] or 0) + kg
                 heatIn = (p.heatKw or 0) * st.throttle * dt
             elseif p.kind == "pulse_reaction" then
                 st.sinceS = st.sinceS + dt
@@ -215,7 +254,8 @@ Core.define("engineering.installation", function(C)
                 if cmd.discharge and ready and st.sinceS >= (p.rechargeS or 0) and not st.hot then
                     local kg = Sys.pulseMass(p)
                     if kg <= fuel then
-                        fuel, spent, pulses = fuel - kg, spent + kg, pulses + 1
+                        pools[prop], spent, pulses = fuel - kg, spent + kg, pulses + 1
+                        byProp[prop] = (byProp[prop] or 0) + kg
                         st.pulseLeft, st.sinceS = p.pulseS, 0
                         heatIn = heatIn + (p.heatKj or 0)
                     else
@@ -243,7 +283,7 @@ Core.define("engineering.installation", function(C)
             T[3] = T[3] + r[1] * f[2] - r[2] * f[1]
             out[d.componentId] = { thrustN = thrust, throttle = st.throttle, heatK = st.heatK, hot = st.hot, starved = starved }
         end
-        return { force = F, torque = T, propellantKg = spent, pulses = pulses, out = out }
+        return { force = F, torque = T, propellantKg = spent, pulses = pulses, out = out, byPropellant = byProp }
     end
 
     --- Machine frame -> world, with the host's live basis ({ right, forward, up }, each {x,y,z} or {1,2,3}).

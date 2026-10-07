@@ -130,10 +130,10 @@ CreateThread(function()
             if not stale and r.place == "deep" and r.rec and t - (r.hostedAt or 0) > UNHOSTED_S and (r.rec.utc or t) < t - 1 then
                 -- nobody is flying it: the server does (in slices so the instruction quota is never the limit)
                 local from = r.rec.utc or t
-                local rec, done, info, arrived, landed = r.rec, false, nil, false, false
+                local rec, done, info, arrived, landed, border = r.rec, false, nil, false, false, false
                 repeat
                     rec, done, info = Canon.propagate(rec, t, SLICE)
-                    arrived, landed = arrived or info.arrived, landed or info.landed
+                    arrived, landed, border = arrived or info.arrived, landed or info.landed, border or info.border
                     Wait(0)
                 until done
                 r.rec, r.host = rec, nil
@@ -141,7 +141,11 @@ CreateThread(function()
                     log("UNHOSTED driver ..%s flown %.0f s by the server%s%s", tostring(d):sub(-6), t - from,
                         arrived and " | arrived (holding over the venue)" or "", landed and (" | CAME DOWN at %.3f, %.3f"):format(rec.landed.lat, rec.landed.lon) or "")
                 end
-                if landed then NcmCanonical.set(d, "landed", nil, ("%.3f,%.3f"):format(rec.landed.lat, rec.landed.lon), rec, true)
+                if border then
+                    -- L334: Earth's sphere of influence reached with nobody flying: the Machine waits there for KSA
+                    log("UNHOSTED driver ..%s reached the KSA border: waiting for the KSA host", tostring(d):sub(-6))
+                    NcmCanonical.set(d, "border", nil, "ksa_border", rec, true)
+                elseif landed then NcmCanonical.set(d, "landed", nil, ("%.3f,%.3f"):format(rec.landed.lat, rec.landed.lon), rec, true)
                 else r.updatedAt = t; if t - (r.persistedAt or 0) >= 30 then r.persistedAt = t; persist(d) end end
             end
         end
@@ -261,7 +265,7 @@ AddEventHandler("playerDropped", function() claimed[tonumber(source) or 0] = nil
 function NcmCanonical.claimJoin(pid, driverId)
     local r = rows[driverId]
     if not enabled() or not r then return false end
-    if r.place == "deep" or r.place == "host_surface" then
+    if r.place == "deep" or r.place == "host_surface" or r.place == "border" then   -- L334: waiting at the KSA border resumes there
         if not claimed[pid] then claimed[pid] = true; resume(pid, r) end
         return true
     end

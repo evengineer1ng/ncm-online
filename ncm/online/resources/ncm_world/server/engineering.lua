@@ -160,13 +160,53 @@ local function benchMachine(pid, driverId)
     return nil
 end
 
+-- ------------------------------------------------------------------------------------------------ tank fill (L334)
+-- A tank PART's own propellant (schema 069). No row = full (a fresh tank); the row is created on first read.
+local function tankFill(assetId, design)
+    local cap = design and design.perf and tonumber(design.perf.capacityKg) or 0
+    local kg = MySQL.scalar.await("SELECT propellant_kg FROM component_state WHERE asset_id=?", { assetId })
+    if kg == nil then
+        MySQL.insert.await("INSERT IGNORE INTO component_state (asset_id, propellant_kg, updated_at) VALUES (?,?,?)", { assetId, cap, now() })
+        return cap
+    end
+    return math.max(0, math.min(cap, tonumber(kg) or 0))
+end
+
+--- Take `kg` of a propellant from a Machine's tank parts (largest first); returns what was taken and what is left.
+local function drawTanks(machineId, propellant, kg)
+    local c = resolveMachine(machineId)
+    if not c or kg <= 0 then return 0, nil end
+    local taken, left = 0, 0
+    for _, d in ipairs(c.devices) do
+        if d.kind == "propellant_tank" and (d.perf.propellant or "fuel") == propellant then
+            local have = tankFill(d.componentId, Install.design(d.designId))
+            local take = math.min(have, kg - taken)
+            if take > 0 then
+                MySQL.update.await("UPDATE component_state SET propellant_kg=?, updated_at=? WHERE asset_id=?", { have - take, now(), d.componentId })
+                taken = taken + take
+            end
+            left = left + (have - take)
+        end
+    end
+    return taken, left
+end
+
 -- ------------------------------------------------------------------------------------------------ delivery
 local function payload(machineId)
     local c, why = resolveMachine(machineId)
     if not c then return nil, why end
     local ml, cap = nil, nil
     if NcmFuel and NcmFuel.ensure then ml, cap = NcmFuel.ensure(machineId) end
-    return { v = 1, assetId = machineId, vehicleKey = c.vehicleKey, items = c.items, refused = c.refused,
+    -- L334: each tank part's current fill rides with its item (the core resolves it into the device)
+    local items = {}
+    for i, it in ipairs(c.items) do
+        local d = Install.design(it.designId)
+        local copy = {}
+        for k, v in pairs(it) do copy[k] = v end
+        if d and d.perf and d.perf.kind == "propellant_tank" then copy.fillKg = tankFill(it.componentId, d) end
+        items[i] = copy
+    end
+    return { v = 1, assetId = machineId, vehicleKey = c.vehicleKey, items = items, refused = c.refused,
         bindings = bindingsOf(machineId), addedMassKg = Install.addedMassKg(c.devices), fuel = { ml = ml, capacityMl = cap } }
 end
 
@@ -218,9 +258,11 @@ RegisterNetEvent("ncm:engineering.burn", function(r)
         local c = resolveMachine(machineId)
         if not c then return end
         local dtS = math.max(0, math.min(5, tonumber(r.dtS) or 0))
-        local maxKg = 0
+        local maxKg, maxFusion = 0, 0
         for _, d in ipairs(c.devices) do
-            if d.kind == "reaction_engine" then maxKg = maxKg + Sys.massFlow(d.perf) * dtS
+            -- L334: a part that burns something other than the car's fuel is accounted to its own tank
+            if d.kind == "reaction_engine" and (d.perf.propellant or "fuel") ~= "fuel" then maxFusion = maxFusion + Sys.massFlow(d.perf) * dtS
+            elseif d.kind == "reaction_engine" then maxKg = maxKg + Sys.massFlow(d.perf) * dtS
             elseif d.kind == "pulse_reaction" then
                 local per = d.perf.retrigger and 0.05 or ((d.perf.pulseS or 0.2) + (d.perf.rechargeS or 0))   -- a retriggered hop can fire on every press
                 maxKg = maxKg + Sys.pulseMass(d.perf) * (math.floor(dtS / math.max(0.05, per)) + 1)
@@ -229,6 +271,12 @@ RegisterNetEvent("ncm:engineering.burn", function(r)
         local claimed = math.max(0, tonumber(r.kg) or 0)
         local kg = math.min(claimed, maxKg * 1.05)
         local ml = kg / Install.FUEL_KG_PER_L * 1000
+        local fusionKg = math.min(math.max(0, tonumber(r.fusionKg) or 0), maxFusion * 1.05)
+        if fusionKg > 0 then
+            local took, leftF = drawTanks(machineId, "fusion", fusionKg)
+            log("FUSION player=%d machine=..%s burned %.4f kg (claimed %.4f, cap %.4f) | tanks left %.2f kg", pid, short(machineId),
+                took, tonumber(r.fusionKg) or 0, maxFusion * 1.05, leftF or 0)
+        end
         local left, cap = nil, nil
         if ml > 0 and NcmFuel and NcmFuel.draw then left, cap = NcmFuel.draw(machineId, ml, pid, b.vehicleId) end
         local t = type(r.t) == "table" and r.t or {}
@@ -429,6 +477,9 @@ function NcmEngineering.fabricate(pid, which)
             VALUES (?,?,?,?,NULL,?,'fabricate',NULL,NULL,?)]], values = { ids.uuid4(hostRng), "eng_fab:" .. asset, serverId(), asset, driverId, t } },
     })
     if not ok then return nil, "fabrication failed: " .. tostring(err) end
+    if d.perf and d.perf.kind == "propellant_tank" then   -- L334: a fabricated tank comes full
+        MySQL.insert.await("INSERT IGNORE INTO component_state (asset_id, propellant_kg, updated_at) VALUES (?,?,?)", { asset, d.perf.capacityKg or 0, t })
+    end
     local n = MySQL.scalar.await("SELECT design_ordinal FROM component_asset WHERE asset_id=?", { asset })
     log("FABRICATE player=%d %s #%s asset=%s (dev shortcut; custody from here is ordinary)", pid, d.code, tostring(n), asset)
     if pid > 0 then TriggerEvent("ncm:component.changed", pid, nil) end
@@ -587,18 +638,50 @@ end)
 
 -- Development one-shot (owner asked "do it for me", 2026-10-06): tunable ncm_world.devGrant = "<driverId>|<machineId>|<design key>|<mount>|<facing>"
 -- fabricates that component for that driver and mounts it, once -- skipped when the driver already holds that design.
+local devGrantOne
 local function devGrant()
     local okS, v = pcall(function() return NcmIdentity and NcmIdentity.settings and NcmIdentity.settings.devGrant end)
     local spec = tostring(okS and v or "")
-    if spec == "" then return end
+    if spec == "" then log("DEV GRANT: no grant configured (tunable empty or unreadable: %s)", tostring(okS and type(v) or v)); return end
+    log("DEV GRANT: %d grant(s) configured (%d chars)", select(2, spec:gsub(";", ";")) + 1, #spec)
     -- the identity (server id, environment) is published by ncm_league a little after start: wait for it
     for _ = 1, 60 do
         local ok, id = pcall(function() return GlobalState.ncmIdentity end)
         if ok and type(id) == "table" and id.serverId then break end
         Wait(1000)
     end
-    if not isDev() then return end
-    local driverId, machineId, key, mountId, facing = spec:match("^([^|]+)|([^|]+)|([^|]+)|([^|]+)|([^|]+)$")
+    if not isDev() then log("DEV GRANT: not a development server -- ignored"); return end
+    -- KB-371: Open77 silently drops a long string tunable (290 chars read back as ""; 99 worked). The compact form
+    -- "<driver id prefix>|<machine id suffix>|<design>@<mount>@<facing>[@control:gesture:command],..." is expanded here.
+    local dPre, mSuf, list = spec:match("^([%w%-]+)|([%w%-]+)|(.+)$")
+    if dPre and not spec:find(";", 1, true) and list:find("@", 1, true) then
+        local drv = MySQL.scalar.await("SELECT ncm_driver_id FROM ncm_driver WHERE ncm_driver_id LIKE ? LIMIT 1", { dPre .. "%" })
+        local mac = drv and MySQL.scalar.await("SELECT asset_id FROM vehicle_asset WHERE server_id=? AND ncm_driver_id=? AND asset_id LIKE ? LIMIT 1",
+            { serverId(), drv, "%" .. mSuf })
+        if not drv or not mac then log("DEV GRANT: no driver %s* / Machine *%s", dPre, mSuf); return end
+        local parts = {}
+        for one in list:gmatch("[^,]+") do
+            local key, mnt, facing, bind = one:match("^([^@]+)@([^@]+)@([^@]+)@?(.*)$")
+            if key then
+                local mountId = mnt:find("^mount%.") and mnt or ("mount." .. mnt)
+                parts[#parts + 1] = ("%s|%s|%s|%s|%s%s"):format(tostring(drv), tostring(mac), key, mountId, facing, (bind or "") ~= "" and ("|" .. bind) or "")
+            end
+        end
+        spec = table.concat(parts, ";")
+        log("DEV GRANT: %d grant(s) for driver ..%s Machine ..%s", #parts, short(drv), short(mac))
+    end
+    -- L334: several grants separated by ';', each "<driver>|<machine>|<design>|<mount>|<facing>[|<control>:<gesture>:<command>]"
+    if spec:find(";", 1, true) then
+        for one in spec:gmatch("[^;]+") do
+            local okOne, errOne = pcall(devGrantOne, one)
+            if not okOne then log("DEV GRANT %s failed: %s", one, tostring(errOne)) end
+        end
+        return
+    end
+    return devGrantOne(spec)
+end
+devGrantOne = function(spec)
+    local driverId, machineId, key, mountId, facing, bindSpec = spec:match("^([^|]+)|([^|]+)|([^|]+)|([^|]+)|([^|]+)|?([^|]*)$")
     if not driverId then log("DEV GRANT ignored: bad spec %s", spec); return end
     local d
     for _, x in ipairs(Install.DESIGNS) do if x.code:lower():find(key:lower(), 1, true) then d = x end end
@@ -621,6 +704,11 @@ local function devGrant()
         local part = MySQL.single.await([[SELECT asset_id FROM component_asset WHERE server_id=? AND ncm_driver_id=? AND design_id=? AND location_kind='storage'
             ORDER BY created_at DESC LIMIT 1]], { serverId(), driverId, d.designId })
         ok2, m2 = NcmEngineering.install(0, part and part.asset_id, mountId, facing, machineId)
+        local control, gesture, command = (bindSpec or ""):match("^([^:]+):([^:]+):([^:]+)$")
+        if ok2 and control and part then
+            local okB, mB = NcmEngineering.bind(0, control, gesture, part.asset_id, command)
+            m2 = tostring(m2) .. " | bind " .. tostring(okB) .. " (" .. tostring(mB) .. ")"
+        end
     end
     driverOf = saved
     log("DEV GRANT %s -> Machine ..%s %s %s: fabricate %s (%s) | mount %s (%s)", d.code, short(machineId), mountId, facing,

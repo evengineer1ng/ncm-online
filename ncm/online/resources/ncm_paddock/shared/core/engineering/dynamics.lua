@@ -32,6 +32,7 @@ Core.define("engineering.dynamics", function(C)
     local Mach = C.get("engineering.machine")
     local V = Mach.vec
     local add, sub, scale, dot, cross, len = V.add, V.sub, V.scale, V.dot, V.cross, V.len
+    local function unit(a) local l = len(a); return l > 0 and scale(a, 1 / l) or { 0, 0, 0 } end
 
     local function rotate(R, v) return { dot(R[1], v), dot(R[2], v), dot(R[3], v) } end
     local function transpose(R) return { { R[1][1], R[2][1], R[3][1] }, { R[1][2], R[2][2], R[3][2] }, { R[1][3], R[2][3], R[3][3] } } end
@@ -244,7 +245,33 @@ Core.define("engineering.dynamics", function(C)
                 end
                 deviceHeat(d, st, (p.heatKw or 0) * t * dt, dt)
                 if F > 0 then
-                    local f = scale(d.dir, F)
+                    local dir = d.dir
+                    -- L334: a GIMBALLED engine (perf.gimbalDeg) steers its own thrust line: first through the centre of
+                    -- mass (no torque from a mount that sits off it -- the drive's own trim), then tilted for the torque
+                    -- the pilot or Guidance asks for (cmd.torqueNm, body N m), all within its gimbal range.
+                    local gmax = math.rad(p.gimbalDeg or 0)
+                    if gmax > 0 then
+                        local lever = sub(com, d.at)
+                        local L = len(lever)
+                        if L > 1e-6 then
+                            local w = scale(lever, 1 / L)
+                            local tw = cmd and cmd.torqueNm
+                            if type(tw) == "table" then
+                                local want = { tonumber(tw[1]) or 0, tonumber(tw[2]) or 0, tonumber(tw[3]) or 0 }
+                                w = add(w, scale(cross(lever, want), 1 / (F * L * L)))
+                            end
+                            w = unit(w)
+                            local c = dot(w, d.dir)
+                            if c < math.cos(gmax) then
+                                -- beyond the gimbal: the furthest it can lean toward w
+                                local perp = sub(w, scale(d.dir, c))
+                                local pl = len(perp)
+                                w = pl > 1e-9 and add(scale(d.dir, math.cos(gmax)), scale(perp, math.sin(gmax) / pl)) or d.dir
+                            end
+                            dir = w
+                        end
+                    end
+                    local f = scale(dir, F)
                     Fb = add(Fb, f)
                     Tb = add(Tb, cross(sub(d.at, com), f))
                     thrustTotal = thrustTotal + F
@@ -255,17 +282,30 @@ Core.define("engineering.dynamics", function(C)
 
         -- attitude sets: torque on command about every axis, paid for in propellant (force = torque / arm)
         local tq = cmd and cmd.torque
+        -- L334: an ABSOLUTE torque request (N m) is what is left after the engines' own torque (gimbals, offsets);
+        -- each attitude set takes what it can of that remainder, per axis
+        local rest = nil
+        if cmd and type(cmd.torqueNm) == "table" then
+            rest = { (tonumber(cmd.torqueNm[1]) or 0) - Tb[1], (tonumber(cmd.torqueNm[2]) or 0) - Tb[2], (tonumber(cmd.torqueNm[3]) or 0) - Tb[3] }
+        end
         s.att = s.att or {}
         for j, at in ipairs(m.attitude or {}) do
             local p = at.perf
             s.att[j] = s.att[j] or { heatK = 0, hot = false }
             local st = s.att[j]
             local inKj = 0
-            if type(tq) == "table" and not st.hot then
+            if (type(tq) == "table" or rest) and not st.hot then
                 local want = { 0, 0, 0 }
                 local mag = 0
+                local lim = (p.torqueNm or 0) * der
                 for a = 1, 3 do
-                    want[a] = math.max(-1, math.min(1, tonumber(tq[a]) or 0)) * (p.torqueNm or 0) * der
+                    if rest then
+                        want[a] = math.max(-lim, math.min(lim, rest[a]))
+                        rest[a] = rest[a] - want[a]
+                    else
+                        want[a] = math.max(-1, math.min(1, tonumber(tq[a]) or 0)) * lim
+                    end
+                    if math.abs(want[a]) < 1e-3 * math.max(1, lim) then want[a] = 0 end
                     mag = mag + math.abs(want[a])
                 end
                 if mag > 0 then
