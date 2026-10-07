@@ -17,7 +17,7 @@ a milestone or batch) → `built` (code + offline proof) → `validated` (live P
 **Where things live:** ideas and work → here. Choices made and questions for the owner → `DECISION_RECORD.md`.
 Defects → `KNOWN_BUGS.md`. Live PASS/FAIL → `wp/MASTER_TEST.md`. What to do next → `NOW.md`.
 
-**IDs are permanent.** Next free ID: **IDEA-1168**.
+**IDs are permanent.** Next free ID: **IDEA-1169**.
 *(This line has now been stale twice — left at IDEA-127 while the ledger ran to IDEA-183, then at IDEA-205 while it
 ran to IDEA-294. It is the only guard against reusing an ID. Check it against the last row before you append.)*
 
@@ -1702,3 +1702,4 @@ Owner: "its time to build out from paddock and into life sim pve layer ... concr
 | IDEA-1165 | DEEP/TEMPORAL-RECONSTRUCTION | 2026-10-06 | **A temporal reconstructor later** (FSR 2/3 class, XeSS, DLSS or NCM's own) behind L332's WorldFrame interface -- only with TRUE inputs: depth, motion vectors, a sub-pixel jitter, frame history and reset semantics (scale change, camera mode, the seam, reference-frame changes, host handovers, teleports). "We shouldn't counterfeit those inputs merely to tick an FSR 2 box." | owner brief 2026-10-06 | open | L332 |
 | IDEA-1166 | DEEP/TERRAIN-ELEVATION | 2026-10-06 | **Terrain height under the imagery** (SRTM-class elevation, public domain) so ridgelines and valleys have relief near the ground -- the next geographic step after L332's imagery clipmap. | L332 (not in that pass) | open | L332 |
 | IDEA-1167 | DEEP/NON-US-IMAGERY | 2026-10-06 | **Finer than 30 m outside the US**: L332 is public-domain only, and the only global public-domain source found is Landsat WELD 2000 (~30 m). Sentinel-2 cloudless (EOX, 10 m) is CC BY-NC-SA -- an owner decision. | L332 owner ruling | open | L332 |
+| IDEA-1168 | ENGINEERING/AC6-LEVEL-HOLD-BOTH-HOSTS | 2026-10-06 | **The AC-6 holds the Machine level in the air, in every host** (only if KB-367 alone does not stop the AC flip): rate damping + upright hold limited to its real 1,500 N m and paid in fuel, one core controller for both hosts. AC expresses it as an exact torque (a force couple); Night City needs the Carrier to write angular velocity (+0x24, 12 bytes past a verified field -- unverified, would need the same kick-and-measure proof as the velocity write) -- until then it is Night City's own airborne stability, said as a loss. Sizing: 1,500 N m turns the car's roll ~1.6 rad/s^2 but its pitch only ~0.3 rad/s^2. | owner L333 | open | L333, KB-367 |

@@ -209,11 +209,20 @@ local function burn(d, kg)
   return true
 end
 
--- KB-359: CSP applies an addForce call for ONE physics step (AC runs 333 Hz), not for the frame -- its own docs: "scale
--- your force by dt". Measured 2026-10-06 15:49: the hop gave 1.23 of 5.37 m/s (0.23 = ~77 fps / 333 Hz), the RP-16 0 of 15.
-local PHYS_HZ = 333
+-- KB-359 -> KB-367: the parts push by changing the car's VELOCITY (F x dt / m per frame), not with physics.addForce --
+-- addForce lasts one physics step (it needed a 333 Hz scale) and acts at the car-local origin, which is not AC's centre
+-- of gravity, so it also twisted the car. A velocity change is exact at any frame rate and makes no torque.
+local hopN = 0
+local function spinOf(car)
+  local ok, w = pcall(function() return car.angularVelocity end)
+  return (ok and w and w.length) and w:length() or nil
+end
+local function tiltOf(car)
+  local ok, u = pcall(function() return car.up end)
+  if not ok or not u then return nil end
+  return math.deg(math.acos(math.max(-1, math.min(1, u.y))))
+end
 local function components(car, dt)
-  local physScale = math.max(1, math.min(20, dt * PHYS_HZ))
   local devices, bindings = devicesOf(), bindingsOf()
   if #devices == 0 then return end
   -- the controls the bindings read, as tap (press event) and hold (analog after HOLD_S when a tap shares the control)
@@ -253,7 +262,7 @@ local function components(car, dt)
           for i = #pulses, 1, -1 do if pulses[i].id == d.componentId then table.remove(pulses, i) end end
           -- KB-362: the direction is frozen at discharge (as in Night City), so a stroke cannot chase a rolling body
           pulses[#pulses + 1] = { id = d.componentId, code = d.code, left = p.pulseS or 0.2, force = p.forceN or 0,
-            dir = toWorld(car, d.axis):normalize(), v0 = car.velocity:clone() }
+            dir = toWorld(car, d.axis):normalize(), v0 = car.velocity:clone(), spin0 = spinOf(car) }
           heat(d, st, p.heatKj or 0, 0)
         end
       elseif d.kind == "reaction_engine" and (b.gesture == "hold" or b.gesture == "held") and holding[b.control] then
@@ -261,6 +270,12 @@ local function components(car, dt)
       end
     end
   end
+  -- KB-367: every push is a change of VELOCITY through the centre of mass, summed for the frame and written once --
+  -- exactly what Night City's Carrier does (force at the centre of mass, no position, no moment). physics.addForce at
+  -- the car-local origin is not AC's centre of gravity, and AC never damps spin in the air: each hop added a little
+  -- rotation and the taps stacked it until the car was upside down. A velocity change cannot make torque.
+  local dv = vec3(0, 0, 0)
+  local mass = math.max(1, car.mass or 1)
   for _, d in ipairs(devices) do
     local st, p = dev[d.componentId], d.perf or {}
     local on = thrusting[d.componentId] and not st.hot
@@ -269,8 +284,7 @@ local function components(car, dt)
       on = burn(d, kg)
     end
     if on then
-      -- KB-362: at the centre of mass, as the Night City Carrier applies it (the same expression loss, said in telemetry `loss`)
-      physics.addForce(0, vec3(0, 0, 0), true, toWorld(car, d.axis) * ((p.thrustN or 0) * physScale), false)
+      dv = dv + toWorld(car, d.axis) * ((p.thrustN or 0) * dt / mass)
       if not firstThrust then firstThrust = { at = simT, v0 = car.velocity:clone(), code = d.code, thrustN = p.thrustN } end
     end
     if d.kind == "reaction_engine" then heat(d, st, (p.heatKw or 0) * (on and 1 or 0) * dt, dt) end
@@ -284,19 +298,24 @@ local function components(car, dt)
   for i = #pulses, 1, -1 do
     local p = pulses[i]
     local step = math.min(dt, p.left)
-    -- impulse exact at any frame rate: the step's average force (engineering.installation)
-    -- KB-362: through the centre of mass (car-local origin), not the mount -- the mount's offset rolled the car over
-    physics.addForce(0, vec3(0, 0, 0), true, p.dir * (p.force * step / dt * physScale), false)
+    -- the stroke's impulse for this frame, exact at any frame rate (engineering.installation)
+    dv = dv + p.dir * (p.force * step / mass)
     p.left = p.left - step
     if p.left <= 0 then
       if not probe.force then
-        local dv = (car.velocity - p.v0):length()
-        probe.force = { component = p.code, force = p.force, pulseS = 0.2, mass = car.mass, measuredDv = dv, expectedDv = p.force * 0.2 / car.mass }
+        local got = (car.velocity - p.v0):length()
+        probe.force = { component = p.code, force = p.force, pulseS = 0.2, mass = car.mass, measuredDv = got, expectedDv = p.force * 0.2 / car.mass }
         post({ type = "probe", what = "force", result = probe.force })
+      end
+      -- KB-367 evidence: does a stroke spin the car? (the first ten strokes; spin in rad/s, tilt = how far `up` is from the sky)
+      hopN = hopN + 1
+      if hopN <= 10 then
+        post({ type = "probe", what = "hopSpin", n = hopN, spinBefore = p.spin0, spinAfter = spinOf(car), tiltDeg = tiltOf(car) })
       end
       table.remove(pulses, i)
     end
   end
+  if dv:length() > 0 then physics.setCarVelocity(0, car.velocity + dv) end
 end
 
 local cmdT = 0
@@ -406,7 +425,7 @@ function script.update(dt)
   if simT - lastTele > 1 then
     lastTele = simT
     post({ type = "telemetry", height = height, speed = car.velocity:length(), lap = car.lapCount, spline = car.splinePosition,
-      propellantKg = spentKg, armed = armed, loss = "force at the centre of mass (mount offsets make no torque); pulse direction fixed at discharge" })
+      propellantKg = spentKg, armed = armed, loss = "velocity change at the centre of mass (mount offsets make no torque), as the Night City Carrier; pulse direction fixed at discharge" })
   end
   if not resultSent and sim.isSessionFinished then
     resultSent = true

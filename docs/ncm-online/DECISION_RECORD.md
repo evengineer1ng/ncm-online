@@ -6461,3 +6461,11 @@ All three were fixed in the fixtures, and the orbiter's balance is tested.
 **Measured (headless, not live):** Chrome/SwiftShader running the real page: 3 km over Laguna Seca = 2.4 m per texel real imagery with a sharp HUD at 50 % world scale; 30 km = Monterey Bay, Monterey, Salinas; no bridge = the global image with the reason on screen. All three AC shaders compile with `fxc` ps_5_0; the CSP stand-in drew 192 tiles through the AC layer. NAIP Plus ImageServer took ~17 s per tile, the cached USGS Imagery Only service ~0.45 s (chosen). Details: [docs/research/open77/DEEP_RENDER_PROBES.md](../research/open77/DEEP_RENDER_PROBES.md).
 
 **Not in this pass:** temporal reconstruction (IDEA-1165), terrain elevation (IDEA-1166), non-US imagery finer than 30 m (IDEA-1167), the atmosphere at its own scale.
+
+## L333 - LOCKED / ONE MACHINE, EVERY HOST: NO PART EXISTS IN ONE GAME ONLY (2026-10-06)
+
+**Owner ruling (verbatim):** "whatever change you make to hella/maserati to make it work in ac, make sure it also works equally in night city if possible, so we dont have parts on one vehicle that we dont have represented somewhere else. so if we add extra propellant devices to triangle on ac, should also be modelled in cyberpunk."
+
+**Rule:** a host never gets a part, a binding or a behaviour the Machine does not have in every other host. Fixes for one host are made by changing how the SAME part is expressed there, not by adding a part. Where a host cannot express something (e.g. Night City's Carrier cannot write torque), that is a stated expression loss on that host, and the backlog carries the capability -- never a host-only substitute.
+
+**Applied first (KB-367):** AC's hop and RP-16 are now a velocity change through the centre of mass -- exactly the Night City Carrier's expression (force at the centre of mass, no moment). No new part. If AC still tips, the next step is the AC-6 (already on the owner's Hella in both hosts) holding the car level in the air in BOTH hosts (IDEA-1168), not an AC-only stabiliser.
