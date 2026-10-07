@@ -559,6 +559,7 @@ local function guidanceInput(now, dt)
                 send("deep:route", { points = pts })
                 log("GUIDANCE engaged -> %s (%.0f km, %d waypoint(s))", GD.route.venue.id, GD.route.distanceM / 1000, #GD.route.waypoints)
                 TriggerServerEvent("ncm:deep.guidance", { event = "engaged", venue = GD.route.venue.id, km = GD.route.distanceM / 1000 })
+                A.yieldFrame = true   -- KB-369: planning the route is this frame's work; flying it starts next frame
             end
         end
         if backE then
@@ -594,6 +595,7 @@ local function tick()
     end
     guidanceInput(now, dt)
     if not A then return end   -- held B brought us home
+    if A.yieldFrame then A.yieldFrame = nil; return end
 
     -- L331: the sticks. With an attitude part they command TORQUE (physical); without one, on the development server
     -- only, they turn the body directly (the labelled waiver). The autopilot owns attitude while engaged or holding.
@@ -704,7 +706,8 @@ local function tick()
     elseif GD.engaged then
         GD.engaged, GD.msg = false, "Guidance cannot fly this Machine: it has no installed propulsion."
     end
-    A.authority = Flight.authorityText(m)
+    -- KB-369: the authority table depends only on the Machine -- once per model, not every frame
+    if A.authorityKey ~= A.fmKey then A.authority, A.authorityKey = Flight.authorityText(m), A.fmKey end
     A.spin = Deep.vec.len(ds.omega)
 
     local lat, lon, alt = Deep.ecefToLla(A.s.p)
@@ -791,7 +794,16 @@ CreateThread(function()
         else
             Wait(0)
             local ok, err = pcall(tick)
-            if not ok then
+            -- KB-369: a frame that only ran out of OPEN//77's per-frame budget (1.5 M instructions / ~6 ms; a garbage
+            -- collection pause on a heavy frame is enough) is SKIPPED and the next frame carries on. Only a run of them
+            -- (about two seconds) -- or any other error -- still brings the Machine home (KB-348).
+            if ok then
+                if A and (A.overBudget or 0) > 0 then log("budget recovered after %d skipped frame(s)", A.overBudget); A.overBudget = 0 end
+            elseif A and tostring(err):find("budget exceeded", 1, true) and (A.overBudget or 0) < 120 then
+                A.overBudget = (A.overBudget or 0) + 1
+                A.overBudgetTotal = (A.overBudgetTotal or 0) + 1
+                if A.overBudget == 1 then log("frame over the script budget -- skipped (%s)", tostring(err)) end
+            else
                 log("FLIGHT ERROR, bringing you home: %s", tostring(err))
                 pcall(exit, "flight error", true)
             end
