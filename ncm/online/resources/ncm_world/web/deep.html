@@ -26,7 +26,8 @@
 (function () {
   "use strict";
   var bridge = window.Open77 || null;
-  var gl = document.getElementById("gl").getContext("webgl", { antialias: true });
+  // L332: no MSAA on the screen -- the world is drawn into its own target and reconstructed (EASU + RCAS)
+  var gl = document.getElementById("gl").getContext("webgl", { antialias: false, alpha: true, premultipliedAlpha: true });
   var hudC = document.getElementById("hud"), hud = hudC.getContext("2d");
   var fade = document.getElementById("fade");
   var dpr = window.devicePixelRatio || 1;
@@ -64,50 +65,335 @@
   function prog(vs, fs) { var p = gl.createProgram(); gl.attachShader(p, sh(gl.VERTEX_SHADER, vs)); gl.attachShader(p, sh(gl.FRAGMENT_SHADER, fs)); gl.linkProgram(p); return p; }
   function emit(k, v) { try { if (bridge && bridge.emit) bridge.emit(k, v); } catch (e) {} }
 
-  // unit sphere, z = north pole (the same axes as core space.deep)
-  var verts = [], idx = [], LAT = 128, LON = 256;
-  for (var i = 0; i <= LAT; i++) { var la = Math.PI / 2 - i * Math.PI / LAT;
-    for (var j = 0; j <= LON; j++) { var lo = -Math.PI + j * 2 * Math.PI / LON;
-      verts.push(Math.cos(la) * Math.cos(lo), Math.cos(la) * Math.sin(lo), Math.sin(la)); } }
-  for (i = 0; i < LAT; i++) for (j = 0; j < LON; j++) { var a = i * (LON + 1) + j, b = a + LON + 1; idx.push(a, a + 1, b, b, a + 1, b + 1); }
-  var vb = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, vb); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(verts), gl.STATIC_DRAW);
-  var ext32 = gl.getExtension("OES_element_index_uint");
-  var ib = gl.createBuffer(); gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ib);
-  gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, ext32 ? new Uint32Array(idx) : new Uint16Array(idx), gl.STATIC_DRAW);
-  var IDXTYPE = ext32 ? gl.UNSIGNED_INT : gl.UNSIGNED_SHORT;
 
-  var earthP = prog(
-    "attribute vec3 p; uniform mat4 mvp; varying vec3 n; void main(){ n=p; gl_Position=mvp*vec4(p,1.0); }",
-    "precision highp float; varying vec3 n; uniform vec3 sun; uniform vec3 eye; uniform sampler2D tex; uniform float hasTex;" +
-    "void main(){ vec3 N=normalize(n); float lat=asin(clamp(N.z,-1.0,1.0)); float lon=atan(N.y,N.x);" +
-    " vec2 uv=vec2(lon/6.2831853+0.5, 0.5-lat/3.1415927);" +
-    " vec3 col = hasTex>0.5 ? texture2D(tex,uv).rgb : mix(vec3(0.03,0.12,0.32),vec3(0.25,0.35,0.15),step(0.55,fract(sin(dot(floor(uv*64.0),vec2(12.9898,78.233)))*43758.5)));" +
-    " float d=dot(N,normalize(sun)); float day=smoothstep(-0.08,0.25,d);" +
-    " vec3 V=normalize(eye-N); float rim=pow(1.0-max(dot(N,V),0.0),4.0);" +
-    " vec3 lit=col*(0.03+0.97*day)+vec3(0.30,0.55,1.0)*rim*(0.15+0.85*day);" +
-    " gl_FragColor=vec4(lit,1.0); }");
-  var haloP = prog(
-    "attribute vec3 p; uniform mat4 mvp; varying vec3 n; void main(){ n=p; gl_Position=mvp*vec4(p*1.018,1.0); }",
-    "precision highp float; varying vec3 n; uniform vec3 eye; uniform vec3 sun;" +
-    "void main(){ vec3 N=normalize(n); vec3 V=normalize(eye-N*1.018); float g=pow(1.0-abs(dot(N,V)),5.0);" +
-    " float day=smoothstep(-0.2,0.4,dot(N,normalize(sun))); gl_FragColor=vec4(vec3(0.35,0.6,1.0)*g*day, g*day*0.85); }");
-  // the Earth for the ascent: premultiplied alpha = altitude ramp x distance mask (near = REDengine's, far = NCM's)
-  var earthAscP = prog(
-    "attribute vec3 p; uniform mat4 mvp; uniform vec3 centre; uniform float rr; varying vec3 n; varying vec3 rel;" +
-    " void main(){ n=p; rel=centre+p*rr; gl_Position=mvp*vec4(p,1.0); }",
-    "precision highp float; varying vec3 n; varying vec3 rel; uniform vec3 sun; uniform sampler2D tex; uniform float hasTex;" +
-    " uniform float k; uniform float d0; uniform float d1;" +
-    "void main(){ vec3 N=normalize(n); float lat=asin(clamp(N.z,-1.0,1.0)); float lon=atan(N.y,N.x);" +
-    " vec2 uv=vec2(lon/6.2831853+0.5, 0.5-lat/3.1415927);" +
-    " vec3 col = hasTex>0.5 ? texture2D(tex,uv).rgb : vec3(0.1,0.2,0.3);" +
-    " float day=smoothstep(-0.08,0.25,dot(N,normalize(sun)));" +
-    " float dist=length(rel); float far=smoothstep(d0,d1,dist); float haze=smoothstep(d0,d1*6.0,dist);" +
-    " vec3 lit=mix(col*(0.03+0.97*day), vec3(0.62,0.74,0.9)*(0.1+0.9*day), 0.35*haze);" +
-    " float a=k*far; gl_FragColor=vec4(lit*a,a); }");
+  // ---------------------------------------------------------------- L332: the WORLD layer
+  // Owner brief (2026-10-06): "more actual geography underneath, fewer pixels spent rendering it, smarter reconstruction
+  // on top, and never upscale the HUD." The pipeline:
+  //   canonical Deep state (Lua) -> geographic LOD (core space.geolod: a clipmap of real imagery from the host bridge)
+  //   -> the WORLD (sky, planet, the air's rim) drawn at an INTERNAL resolution into its own target, premultiplied, alpha
+  //   = how much it hides what is behind -> spatial reconstruction to the display (EASU, then restrained RCAS: a GLSL ES
+  //   port of AMD FidelityFX FSR 1, MIT licence, (c) Advanced Micro Devices) -> stars drawn NATIVELY under it -> the 2D
+  //   HUD canvas (instruments, Guidance, markers, the Machine's sprite and locator) at native resolution, never scaled.
+  // The planet is RAY-TRACED per pixel (camera-relative, the stable root c / (-b + sqrt(disc))), as AC's pass is: no
+  // facets near the ground. Imagery comes from a clipmap: one 1024 px window per zoom 5..16 (atlas cells), sampled at the
+  // finest zoom whose texels are no smaller than this pixel's ground footprint, in coordinates relative to the point
+  // under the camera (so precision is centimetres, not float32 latitude). A tile not yet here shows its parent, and the
+  // global image under everything: never a blank.
+  // WorldFrame contract for a later TEMPORAL reconstructor (not built): it would also need depth, motion vectors, a
+  // sub-pixel jitter and RS.reset (raised on a scale change, a camera mode change, the seam and any teleport).
+  var QUAD = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, QUAD);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
+  var VS_Q = "attribute vec2 q; varying vec2 ndc; void main(){ ndc=q; gl_Position=vec4(q,0.0,1.0); }";
+  function loc(p, n) { p.__u = p.__u || {}; if (!(n in p.__u)) p.__u[n] = gl.getUniformLocation(p, n); return p.__u[n]; }
+  function drawQuad(p) { gl.bindBuffer(gl.ARRAY_BUFFER, QUAD); var a = gl.getAttribLocation(p, "q");
+    gl.enableVertexAttribArray(a); gl.vertexAttribPointer(a, 2, gl.FLOAT, false, 0, 0); gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4); gl.disableVertexAttribArray(a); }
+
+  var planetP = prog(VS_Q,
+    "precision highp float; varying vec2 ndc;" +
+    "uniform vec3 uCam; uniform float uC; uniform float uAlt; uniform float uR;" +
+    "uniform vec3 uFwd; uniform vec3 uUp; uniform vec3 uSide; uniform float uTan; uniform float uAspect;" +
+    "uniform vec3 uSun; uniform sampler2D uEarth; uniform float uHasTex;" +
+    "uniform float uAscent; uniform float uK; uniform float uD0; uniform float uD1;" +
+    "uniform sampler2D uAtlas; uniform float uGeo; uniform vec4 uLev[12]; uniform float uZFine;" +
+    "uniform vec3 uE; uniform vec3 uN; uniform vec3 uU; uniform float uSubLat; uniform float uPixAng;" +
+    "void main(){" +
+    " vec3 d=normalize(uFwd+ndc.x*uTan*uAspect*uSide+ndc.y*uTan*uUp);" +
+    " float b=dot(uCam,d); float disc=b*b-uC;" +
+    " float airTop=clamp(1.0-uAlt/70000.0,0.0,1.0); float dayHere=clamp(dot(normalize(uCam),uSun)*3.0+0.4,0.0,1.0);" +
+    " vec4 outc=uAscent>0.5?vec4(0.0):vec4(vec3(0.35,0.55,0.9)*airTop*dayHere,airTop*dayHere);" +
+    " if(disc>0.0&&b<0.0){" +
+    "  float t=uC/(-b+sqrt(disc)); vec3 hr=d*t; vec3 n=normalize(uCam+hr);" +
+    "  vec2 uv=vec2(atan(n.y,n.x)/6.2831853+0.5,0.5-asin(clamp(n.z,-1.0,1.0))/3.1415927);" +
+    "  vec3 col=uHasTex>0.5?texture2D(uEarth,uv).rgb:vec3(0.05,0.15,0.3);" +
+    "  if(uGeo>0.5){" +
+    "   vec3 ps=uU*uAlt+hr; float rr=uR+dot(ps,uU);" +
+    "   float dlat=atan(dot(ps,uN),rr); float dlon=atan(dot(ps,uE),rr)/max(cos(uSubLat+dlat),0.01);" +
+    "   float latD=degrees(dlat); float lonD=degrees(dlon);" +
+    "   float inc=max(-dot(d,n),0.08); float zd=log2(78271.52*inc/max(t*uPixAng,0.01));" +
+    "   for(int i=0;i<12;i++){" +
+    "    float fi=float(i); if(fi>uZFine) break;" +
+    "    vec4 L=uLev[i]; float z=fi+5.0; float wz=clamp(zd-z+1.0,0.0,1.0);" +
+    "    if(L.z<0.5||wz<=0.0) continue;" +
+    "    float span=180.0/exp2(z); float tu=L.x+lonD/span; float tv=L.y-latD/span;" +
+    "    float edge=min(min(tu,4.0-tu),min(tv,4.0-tv)); if(edge<=0.0) continue;" +
+    "    vec2 cell=vec2(mod(fi,4.0),floor(fi/4.0));" +
+    "    vec2 a=(cell*1024.0+clamp(vec2(tu,tv)*256.0,0.5,1023.5))/vec2(4096.0,3072.0);" +
+    "    col=mix(col,texture2D(uAtlas,a).rgb,wz*clamp(edge/0.35,0.0,1.0));" +
+    "   }" +
+    "  }" +
+    "  float day=smoothstep(-0.08,0.25,dot(n,uSun)); vec3 lit=col*(0.03+0.97*day);" +
+    "  lit=mix(lit,vec3(0.6,0.72,0.9)*(0.1+0.9*day),0.35*clamp(t/400000.0,0.0,1.0)*airTop);" +
+    "  float a=uAscent>0.5?uK*smoothstep(uD0,uD1,t):1.0; outc=vec4(lit*a,a);" +
+    " } else if(uAscent<0.5&&uAlt>2000.0&&b<0.0){" +
+    "  float r=sqrt(max(dot(uCam,uCam)-b*b,0.0));" +
+    "  if(r>uR){ float g=clamp(1.0-(r-uR)/(0.02*uR),0.0,1.0); g=g*g*g;" +
+    "   float dl=smoothstep(-0.2,0.4,dot(normalize(uCam-d*b),uSun)); float ga=g*dl*0.85;" +
+    "   outc=vec4(outc.rgb+vec3(0.35,0.6,1.0)*ga*(1.0-outc.a),max(outc.a,ga)); }" +
+    " }" +
+    " gl_FragColor=outc; }");
+
+  // EASU: edge-adaptive spatial upsampling (12 taps, Lanczos-2 shaped along the local edge, clamped to its 2x2 so it
+  // cannot ring). Input: the premultiplied world at its internal size; output: the display size.
+  var easuP = prog(VS_Q,
+    "precision highp float; uniform sampler2D uIn; uniform vec2 uInSize; uniform vec2 uOutSize;" +
+    "vec4 T(vec2 p){ return texture2D(uIn,(p+0.5)/uInSize); }" +
+    "float Lu(vec4 c){ return c.b*0.5+(c.r*0.5+c.g); }" +
+    "void tap(inout vec4 aC,inout float aW,vec2 off,vec2 dir,vec2 len,float lob,float clp,vec4 c){" +
+    " vec2 v=vec2(off.x*dir.x+off.y*dir.y,off.x*(-dir.y)+off.y*dir.x)*len; float d2=min(dot(v,v),clp);" +
+    " float wB=0.4*d2-1.0; float wA=lob*d2-1.0; wB*=wB; wA*=wA; wB=1.5625*wB-0.5625; float w=wB*wA; aC+=c*w; aW+=w; }" +
+    "void setDir(inout vec2 dir,inout float len,float w,float lA,float lB,float lC,float lD,float lE){" +
+    " float dc=lD-lC; float cb=lC-lB; float lx=max(abs(dc),abs(cb)); lx=lx>0.0?1.0/lx:0.0; float dx=lD-lB; dir.x+=dx*w;" +
+    " lx=clamp(abs(dx)*lx,0.0,1.0); lx*=lx; len+=lx*w;" +
+    " float ec=lE-lC; float ca=lC-lA; float ly=max(abs(ec),abs(ca)); ly=ly>0.0?1.0/ly:0.0; float dy=lE-lA; dir.y+=dy*w;" +
+    " ly=clamp(abs(dy)*ly,0.0,1.0); ly*=ly; len+=ly*w; }" +
+    "void main(){" +
+    " vec2 pp=gl_FragCoord.xy*(uInSize/uOutSize)-0.5; vec2 fp=floor(pp); pp-=fp;" +
+    " vec4 b=T(fp+vec2(0.0,-1.0)); vec4 c=T(fp+vec2(1.0,-1.0));" +
+    " vec4 e=T(fp+vec2(-1.0,0.0)); vec4 f=T(fp); vec4 g=T(fp+vec2(1.0,0.0)); vec4 h=T(fp+vec2(2.0,0.0));" +
+    " vec4 i=T(fp+vec2(-1.0,1.0)); vec4 j=T(fp+vec2(0.0,1.0)); vec4 k=T(fp+vec2(1.0,1.0)); vec4 l=T(fp+vec2(2.0,1.0));" +
+    " vec4 n=T(fp+vec2(0.0,2.0)); vec4 o=T(fp+vec2(1.0,2.0));" +
+    " float bL=Lu(b),cL=Lu(c),eL=Lu(e),fL=Lu(f),gL=Lu(g),hL=Lu(h),iL=Lu(i),jL=Lu(j),kL=Lu(k),lL=Lu(l),nL=Lu(n),oL=Lu(o);" +
+    " vec2 dir=vec2(0.0); float len=0.0;" +
+    " setDir(dir,len,(1.0-pp.x)*(1.0-pp.y),bL,eL,fL,gL,jL); setDir(dir,len,pp.x*(1.0-pp.y),cL,fL,gL,hL,kL);" +
+    " setDir(dir,len,(1.0-pp.x)*pp.y,fL,iL,jL,kL,nL); setDir(dir,len,pp.x*pp.y,gL,jL,kL,lL,oL);" +
+    " vec2 dir2=dir*dir; float dirR=dir2.x+dir2.y; bool zro=dirR<1.0/32768.0; dirR=zro?1.0:inversesqrt(dirR);" +
+    " dir.x=zro?1.0:dir.x; dir*=dirR; len=len*0.5; len*=len;" +
+    " float stretch=dot(dir,dir)/max(abs(dir.x),abs(dir.y)); vec2 len2=vec2(1.0+(stretch-1.0)*len,1.0-0.5*len);" +
+    " float lob=0.5+((1.0/4.0-0.04)-0.5)*len; float clp=1.0/lob;" +
+    " vec4 mn=min(min(f,g),min(j,k)); vec4 mx=max(max(f,g),max(j,k)); vec4 aC=vec4(0.0); float aW=0.0;" +
+    " tap(aC,aW,vec2(0.0,-1.0)-pp,dir,len2,lob,clp,b); tap(aC,aW,vec2(1.0,-1.0)-pp,dir,len2,lob,clp,c);" +
+    " tap(aC,aW,vec2(-1.0,1.0)-pp,dir,len2,lob,clp,i); tap(aC,aW,vec2(0.0,1.0)-pp,dir,len2,lob,clp,j);" +
+    " tap(aC,aW,vec2(0.0,0.0)-pp,dir,len2,lob,clp,f); tap(aC,aW,vec2(-1.0,0.0)-pp,dir,len2,lob,clp,e);" +
+    " tap(aC,aW,vec2(1.0,1.0)-pp,dir,len2,lob,clp,k); tap(aC,aW,vec2(2.0,1.0)-pp,dir,len2,lob,clp,l);" +
+    " tap(aC,aW,vec2(2.0,0.0)-pp,dir,len2,lob,clp,h); tap(aC,aW,vec2(1.0,0.0)-pp,dir,len2,lob,clp,g);" +
+    " tap(aC,aW,vec2(1.0,2.0)-pp,dir,len2,lob,clp,o); tap(aC,aW,vec2(0.0,2.0)-pp,dir,len2,lob,clp,n);" +
+    " gl_FragColor=min(mx,max(mn,aC/aW)); }");
+
+  // RCAS: robust contrast-adaptive sharpening, restrained (uSharp in stops: 0 = AMD's maximum; 0.5 here), limited by
+  // the local min/max so it cannot overshoot; premultiplied colour stays valid.
+  var rcasP = prog(VS_Q,
+    "precision highp float; uniform sampler2D uIn; uniform vec2 uSize; uniform float uSharp;" +
+    "vec4 T(vec2 p){ return texture2D(uIn,p/uSize); }" +
+    "void main(){ vec2 p=gl_FragCoord.xy;" +
+    " vec4 e=T(p); vec4 b=T(p+vec2(0.0,1.0)); vec4 d=T(p+vec2(-1.0,0.0)); vec4 f=T(p+vec2(1.0,0.0)); vec4 h=T(p+vec2(0.0,-1.0));" +
+    " vec3 mn4=min(min(b.rgb,d.rgb),min(f.rgb,h.rgb)); vec3 mx4=max(max(b.rgb,d.rgb),max(f.rgb,h.rgb));" +
+    " vec3 hitMin=mn4/(4.0*mx4+1e-5); vec3 hitMax=(1.0-mx4)/(4.0*mn4-4.0-1e-5); vec3 lobeRGB=max(-hitMin,hitMax);" +
+    " float lobe=max(-0.1875,min(max(lobeRGB.r,max(lobeRGB.g,lobeRGB.b)),0.0))*exp2(-uSharp);" +
+    " vec4 c=(lobe*(b+d+f+h)+e)/(4.0*lobe+1.0); c=clamp(c,0.0,1.0); c.rgb=min(c.rgb,vec3(c.a)); gl_FragColor=c; }");
+
+  // ---- render targets and the internal scale (dynamic, explicit: 100 / 77 / 67 / 59 / 50 %)
+  var RS = { steps: [1, 0.77, 0.67, 0.59, 0.5], i: 1, world: null, out: null, ok: true, frameMs: 16.7, lastT: 0,
+    slowSince: 0, fastSince: 0, changedAt: 0, reset: true, probed: false, sharp: 0.5, fov: 1.0 };
+  function makeTarget(w, h) {
+    var t = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, t);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    var f = gl.createFramebuffer(); gl.bindFramebuffer(gl.FRAMEBUFFER, f);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, t, 0);
+    var ok = gl.checkFramebufferStatus(gl.FRAMEBUFFER) === gl.FRAMEBUFFER_COMPLETE;
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    return { tex: t, fb: f, w: w, h: h, ok: ok };
+  }
+  function dropTarget(T) { if (T) { gl.deleteFramebuffer(T.fb); gl.deleteTexture(T.tex); } }
+  function internalSize() { var k = RS.steps[RS.i]; return [Math.max(64, Math.round(W * k)), Math.max(64, Math.round(H * k))]; }
+  function targets() {
+    var sz = internalSize();
+    if (!RS.world || RS.world.w !== sz[0] || RS.world.h !== sz[1]) { dropTarget(RS.world); RS.world = makeTarget(sz[0], sz[1]); RS.reset = true; }
+    if (!RS.out || RS.out.w !== W || RS.out.h !== H) { dropTarget(RS.out); RS.out = makeTarget(W, H); RS.reset = true; }
+    RS.ok = RS.world.ok && RS.out.ok;
+    if (!RS.probed) { RS.probed = true; probe(); }
+  }
+  function announceView() { emit("deep:view", { h: internalSize()[1], fov: RS.fov, scale: RS.steps[RS.i] }); }
+  // the frame-time controller: step down after 1 s over 20 ms, back up after 5 s under 17.5 ms (2 s between changes)
+  function pace(now) {
+    if (RS.lastT) { var dt = now - RS.lastT; if (dt > 0 && dt < 250) RS.frameMs = RS.frameMs * 0.95 + dt * 0.05; }
+    RS.lastT = now;
+    if (now - RS.changedAt < 2000) return;
+    if (RS.frameMs > 20) { RS.fastSince = 0; if (!RS.slowSince) RS.slowSince = now;
+      if (now - RS.slowSince > 1000 && RS.i < RS.steps.length - 1) { RS.i++; RS.changedAt = now; RS.slowSince = 0; announceView(); } }
+    else if (RS.frameMs < 17.5) { RS.slowSince = 0; if (!RS.fastSince) RS.fastSince = now;
+      if (now - RS.fastSince > 5000 && RS.i > 0) { RS.i--; RS.changedAt = now; RS.fastSince = 0; announceView(); } }
+    else { RS.slowSince = 0; RS.fastSince = 0; }
+  }
+  function probe() {
+    var hp = gl.getShaderPrecisionFormat(gl.FRAGMENT_SHADER, gl.HIGH_FLOAT);
+    var dbg = gl.getExtension("WEBGL_debug_renderer_info");
+    emit("deep:probe", { what: "render", fbo: RS.ok, maxTexture: gl.getParameter(gl.MAX_TEXTURE_SIZE),
+      textureUnits: gl.getParameter(gl.MAX_TEXTURE_IMAGE_UNITS), fragmentUniforms: gl.getParameter(gl.MAX_FRAGMENT_UNIFORM_VECTORS),
+      highp: hp ? hp.precision : 0, atlas: GEO.ok, renderer: dbg ? gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) : "?",
+      internal: internalSize(), display: [W, H] });
+  }
+
+  // ---- the clipmap (zoom 5..16, one 1024 px window each, cells of a 4096 x 3072 atlas)
+  var BRIDGE = window.NCM_TILE_BRIDGE || "http://127.0.0.1:47710";   // (a test harness may point it elsewhere)
+  var GEO = { ok: false, atlas: null, lev: [], zFine: -1, credit: "", earthImg: null, inflight: 0, loaded: 0, failed: 0,
+    tmp: null, prefetchKey: "", tileProbe: false, refreshZ: 99, refreshAt: 0 };
+  (function geoInit() {
+    if (gl.getParameter(gl.MAX_TEXTURE_SIZE) < 4096) return;
+    GEO.atlas = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, GEO.atlas);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, 4096, 3072, 0, gl.RGB, gl.UNSIGNED_BYTE, null);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    for (var li = 0; li < 12; li++) { var cv = document.createElement("canvas"); cv.width = 1024; cv.height = 1024;
+      GEO.lev.push({ z: li + 5, ox: null, oy: null, cv: cv, cx: cv.getContext("2d"), tiles: {}, active: false, dirty: false, layer: null }); }
+    GEO.tmp = document.createElement("canvas"); GEO.tmp.width = 1024; GEO.tmp.height = 1024;
+    GEO.ok = true;
+  })();
+  function span(z) { return 180 / Math.pow(2, z); }
+  // a slot with no tile yet shows its parent's pixels, or the global image under everything
+  function placeholder(L, i, j) {
+    var P = L.z > 5 ? GEO.lev[L.z - 6] : null, X = L.ox + i, Y = L.oy + j;
+    if (P && P.ox !== null) {
+      var sx = (X - 2 * P.ox) * 128, sy = (Y - 2 * P.oy) * 128;
+      if (sx >= 0 && sy >= 0 && sx + 128 <= 1024 && sy + 128 <= 1024) { L.cx.drawImage(P.cv, sx, sy, 128, 128, i * 256, j * 256, 256, 256); return; }
+    }
+    var E = GEO.earthImg;
+    if (E && E.width) { var s0 = span(L.z), lonW = -180 + X * s0, latN = 90 - Y * s0;
+      L.cx.drawImage(E, (lonW + 180) / 360 * E.width, (90 - latN) / 180 * E.height, Math.max(0.5, s0 / 360 * E.width), Math.max(0.5, s0 / 180 * E.height), i * 256, j * 256, 256, 256); }
+    else { L.cx.fillStyle = "#0b2340"; L.cx.fillRect(i * 256, j * 256, 256, 256); }
+  }
+  function moveWindow(L, ox, oy) {
+    var old = L.tiles, near = L.ox !== null && Math.abs(ox - L.ox) < 4 && Math.abs(oy - L.oy) < 4;
+    if (near) { var t = GEO.tmp.getContext("2d"); t.clearRect(0, 0, 1024, 1024); t.drawImage(L.cv, 0, 0);
+      L.cx.clearRect(0, 0, 1024, 1024); L.cx.drawImage(GEO.tmp, (L.ox - ox) * 256, (L.oy - oy) * 256); }
+    L.tiles = {}; L.ox = ox; L.oy = oy;
+    for (var j = 0; j < 4; j++) for (var i = 0; i < 4; i++) { var key = (ox + i) + "," + (oy + j);
+      if (near && old[key] && old[key] !== "loading") L.tiles[key] = old[key]; else placeholder(L, i, j); }
+    L.dirty = true;
+  }
+  function wrapX(x, z) { var n = Math.pow(2, z + 1); return ((x % n) + n) % n; }
+  function loadTile(L, i, j) {
+    var kx = L.ox + i, ky = L.oy + j, key = kx + "," + ky, layer = L.layer, z = L.z;
+    L.tiles[key] = "loading"; GEO.inflight++;
+    var img = new Image(); img.crossOrigin = "anonymous";
+    img.onload = function () { GEO.inflight--;
+      if (!GEO.tileProbe) { GEO.tileProbe = true; emit("deep:probe", { what: "tiles", ok: true, first: layer + "/" + z }); }
+      var ii = kx - L.ox, jj = ky - L.oy;
+      if (L.tiles[key] === "loading" && ii >= 0 && ii < 4 && jj >= 0 && jj < 4) {
+        L.cx.drawImage(img, ii * 256, jj * 256, 256, 256); L.tiles[key] = "ok"; L.dirty = true; GEO.loaded++;
+        GEO.refreshZ = Math.min(GEO.refreshZ, L.z + 1); }
+      pump(); };
+    img.onerror = function () { GEO.inflight--; GEO.failed++; if (L.tiles[key] === "loading") L.tiles[key] = "none";
+      if (!GEO.tileProbe && GEO.failed >= 8) { GEO.tileProbe = true; emit("deep:probe", { what: "tiles", ok: false, note: "no tile from the bridge (not running, CORS or no data)" }); }
+      pump(); };
+    img.src = BRIDGE + "/tiles/" + layer + "/" + z + "/" + wrapX(kx, z) + "/" + ky + ".jpg";
+  }
+  function pump() {
+    for (var li = 0; li < 12 && GEO.inflight < 6; li++) { var L = GEO.lev[li]; if (!L.active || !L.layer || L.ox === null) continue;
+      for (var j = 0; j < 4 && GEO.inflight < 6; j++) for (var i = 0; i < 4 && GEO.inflight < 6; i++) {
+        if (!L.tiles[(L.ox + i) + "," + (L.oy + j)]) loadTile(L, i, j); } }
+  }
+  function geoPlan(m) {
+    if (!GEO.ok || !m) return;
+    GEO.zFine = Number(m.zFine) || -1; if (m.credit) GEO.credit = m.credit;
+    var act = {};
+    (m.levels || []).forEach(function (l) { var L = GEO.lev[l.z - 5]; if (!L) return; act[l.z] = true; L.active = true; L.layer = l.layer || null;
+      if (L.ox !== l.ox || L.oy !== l.oy) moveWindow(L, l.ox, l.oy); });
+    GEO.lev.forEach(function (L) { if (!act[L.z]) L.active = false; });
+    if (m.prefetch && m.prefetch.length) {
+      var list = m.prefetch.slice(0, 500), key = list.length + ":" + JSON.stringify(list[0]) + JSON.stringify(list[list.length - 1]);
+      if (key !== GEO.prefetchKey) { GEO.prefetchKey = key;
+        try { fetch(BRIDGE + "/tiles/prefetch", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ tiles: list }) }).catch(function () {}); } catch (e) {} }
+    }
+    pump();
+  }
+  // a coarser tile arrived: the finer windows' placeholders over it are drawn again from it (coarse to fine, so a chain
+  // of placeholders inherits the newest pixels), at most five times a second
+  function geoRefresh(now) {
+    if (GEO.refreshZ > 16 || now - GEO.refreshAt < 200) return;
+    GEO.refreshAt = now;
+    for (var z = GEO.refreshZ; z <= 16; z++) { var L = GEO.lev[z - 5]; if (!L || L.ox === null) continue;
+      for (var j = 0; j < 4; j++) for (var i = 0; i < 4; i++) { if (L.tiles[(L.ox + i) + "," + (L.oy + j)] !== "ok") { placeholder(L, i, j); L.dirty = true; } } }
+    GEO.refreshZ = 99;
+  }
+  function geoUpload() {
+    var n = 0;
+    for (var li = 0; li < 12 && n < 3; li++) { var L = GEO.lev[li]; if (!L.dirty) continue;
+      gl.bindTexture(gl.TEXTURE_2D, GEO.atlas);
+      gl.texSubImage2D(gl.TEXTURE_2D, 0, (li % 4) * 1024, Math.floor(li / 4) * 1024, gl.RGB, gl.UNSIGNED_BYTE, L.cv);
+      L.dirty = false; n++; }
+  }
+  function geoText() {
+    if (!GEO.ok) return "global image only (no atlas: texture size < 4096)";
+    if (GEO.zFine < 0) return "global image only (no plan yet)";
+    var have = 0, want = 0, fine = null;
+    GEO.lev.forEach(function (L) { if (!L.active || !L.layer) return; for (var k in L.tiles) { if (L.tiles[k] === "ok") have++; } want += 16;
+      if (!fine || L.z > fine.z) fine = L; });
+    if (!fine) return "global image only";
+    var m = span(fine.z) * 111319.49 / 256;
+    return "z" + fine.z + " " + (m < 10 ? m.toFixed(1) : m.toFixed(0)) + " m/texel " + fine.layer + "  |  tiles " + have + "/" + want +
+      (GEO.failed && !GEO.loaded ? "  (no tile bridge: global image)" : "");
+  }
+
+  // ---- one world frame: into the internal target (or straight to the screen when targets are unavailable)
+  // v = { cam, fwd, up, side, fov, ascent, k, d0, d1 }
+  function worldUniforms(v, ih) {
+    var p = planetP, camLen = len(v.cam), alt = camLen - R;
+    gl.useProgram(p);
+    gl.uniform3fv(loc(p, "uCam"), v.cam); gl.uniform1f(loc(p, "uC"), alt * (2 * R + alt)); gl.uniform1f(loc(p, "uAlt"), alt);
+    gl.uniform1f(loc(p, "uR"), R);
+    gl.uniform3fv(loc(p, "uFwd"), v.fwd); gl.uniform3fv(loc(p, "uUp"), v.up); gl.uniform3fv(loc(p, "uSide"), v.side);
+    gl.uniform1f(loc(p, "uTan"), Math.tan(v.fov / 2)); gl.uniform1f(loc(p, "uAspect"), W / H);
+    gl.uniform3fv(loc(p, "uSun"), unit(SUN));
+    gl.uniform1f(loc(p, "uAscent"), v.ascent ? 1 : 0); gl.uniform1f(loc(p, "uK"), v.k || 0);
+    gl.uniform1f(loc(p, "uD0"), v.d0 || 0); gl.uniform1f(loc(p, "uD1"), Math.max((v.d0 || 0) + 1, v.d1 || 1));
+    gl.uniform1f(loc(p, "uHasTex"), earthTex ? 1 : 0);
+    gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, earthTex); gl.uniform1i(loc(p, "uEarth"), 0);
+    // the point under the camera (double precision here) and its local frame
+    var Uv = unit(v.cam), Ev = unit(cross([0, 0, 1], Uv)), Nv = cross(Uv, Ev);
+    var subLat = Math.asin(Math.max(-1, Math.min(1, Uv[2]))), subLon = Math.atan2(Uv[1], Uv[0]);
+    var latD = subLat * 180 / Math.PI, lonD = subLon * 180 / Math.PI;
+    gl.uniform3fv(loc(p, "uE"), Ev); gl.uniform3fv(loc(p, "uN"), Nv); gl.uniform3fv(loc(p, "uU"), Uv);
+    gl.uniform1f(loc(p, "uSubLat"), subLat); gl.uniform1f(loc(p, "uPixAng"), 2 * Math.tan(v.fov / 2) / ih);
+    var lev = new Float32Array(48), geo = GEO.ok && GEO.zFine >= 5;
+    if (geo) {
+      geoRefresh(performance.now()); geoUpload();
+      for (var li = 0; li < 12; li++) { var L = GEO.lev[li]; if (!L.active || L.ox === null) continue;
+        var s0 = span(L.z), cols = Math.pow(2, L.z + 1), u0 = (lonD + 180) / s0 - L.ox;
+        if (u0 > cols / 2) u0 -= cols; if (u0 < -cols / 2) u0 += cols;
+        lev[li * 4] = u0; lev[li * 4 + 1] = (90 - latD) / s0 - L.oy; lev[li * 4 + 2] = 1; }
+      gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, GEO.atlas); gl.uniform1i(loc(p, "uAtlas"), 1);
+    }
+    gl.uniform4fv(loc(p, "uLev[0]"), lev); gl.uniform1f(loc(p, "uGeo"), geo ? 1 : 0); gl.uniform1f(loc(p, "uZFine"), geo ? GEO.zFine - 5 : -1);
+  }
+  // returns true when the world went into the targets (reconstruct + composite later), false = draw it directly
+  function worldPasses(v, now) {
+    pace(now);
+    if (RS.fov !== v.fov) { RS.fov = v.fov; announceView(); }
+    targets();
+    if (!RS.ok) return false;
+    gl.disable(gl.DEPTH_TEST); gl.disable(gl.BLEND);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, RS.world.fb); gl.viewport(0, 0, RS.world.w, RS.world.h);
+    gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT);
+    worldUniforms(v, RS.world.h); drawQuad(planetP);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, RS.out.fb); gl.viewport(0, 0, W, H);
+    gl.useProgram(easuP); gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, RS.world.tex); gl.uniform1i(loc(easuP, "uIn"), 0);
+    gl.uniform2f(loc(easuP, "uInSize"), RS.world.w, RS.world.h); gl.uniform2f(loc(easuP, "uOutSize"), W, H);
+    drawQuad(easuP);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.viewport(0, 0, W, H);
+    RS.reset = false;
+    return true;
+  }
+  // over whatever is already on the screen (stars), premultiplied
+  function composite(v, inTargets) {
+    gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+    if (inTargets) {
+      gl.useProgram(rcasP); gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, RS.out.tex); gl.uniform1i(loc(rcasP, "uIn"), 0);
+      gl.uniform2f(loc(rcasP, "uSize"), W, H); gl.uniform1f(loc(rcasP, "uSharp"), RS.sharp); drawQuad(rcasP);
+    } else { worldUniforms(v, H); drawQuad(planetP); }
+    gl.disable(gl.BLEND);
+  }
+  function renderText() {
+    var sz = internalSize();
+    return "RENDER     WORLD " + Math.round(RS.steps[RS.i] * 100) + "% " + sz[0] + "x" + sz[1] + " -> " + W + "x" + H +
+      (RS.ok ? "  EASU+RCAS" : "  NATIVE (no render target)") + "  |  " + RS.frameMs.toFixed(1) + " ms";
+  }
+
   var starP = prog(
     "attribute vec3 p; attribute float b; uniform mat4 vp; uniform float vis; varying float vb; void main(){ vb=b*vis; gl_Position=vp*vec4(p,1.0); gl_PointSize=1.0+2.0*b; }",
     "precision mediump float; varying float vb; void main(){ gl_FragColor=vec4(vec3(0.75+0.25*vb),vb); }");
-  var stars = []; for (i = 0; i < 9000; i++) { var u = Math.random() * 2 - 1, w = Math.random() * 2 * Math.PI, rr = Math.sqrt(1 - u * u);
+  var stars = []; for (var i = 0; i < 9000; i++) { var u = Math.random() * 2 - 1, w = Math.random() * 2 * Math.PI, rr = Math.sqrt(1 - u * u);
     stars.push(rr * Math.cos(w) * 100, rr * Math.sin(w) * 100, u * 100, 0.15 + 0.85 * Math.pow(Math.random(), 5)); }
   var sb = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, sb); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(stars), gl.STATIC_DRAW);
 
@@ -132,7 +418,7 @@
         document.documentElement.style.background = "transparent"; document.body.style.background = "transparent"; }
       if (m.nc) NC = m.nc; if (m.R) R = m.R; if (m.sun) SUN = arr(m.sun); if (m.venues) VENUES = m.venues;
       var e = new Image(); e.onload = function () { earthTex = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, earthTex);
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, e);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, e); GEO.earthImg = e;
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
         gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE); };
       e.onerror = function () { emit("deep:error", { where: "earth texture missing", log: m.earth }); };
@@ -146,6 +432,7 @@
       prev = S; prevAt = at; S = st; at = performance.now();
     });
     bridge.on("deep:route", function (m) { ROUTE = (m && m.points) || null; });
+    bridge.on("deep:tiles", geoPlan);   // L332: the clipmap plan + prefetch list (core space.geolod)
     bridge.on("deep:ascent", function (m) { if (m.sun) SUN = arr(m.sun); AS = { p: arr(m.p), f: arr(m.f), u: arr(m.u), k: Number(m.k) || 0, alt: Number(m.alt) || 0,
       toSeam: Number(m.toSeam) || 0, d0: Number(m.d0) || 9000, d1: Number(m.d1) || 16000 }; });
     // the seam: the ascent page becomes Deep (opaque from here; no white-out, the planet is already there)
@@ -159,7 +446,7 @@
   // ---------------------------------------------------------------- frame
   function frame(now) {
     requestAnimationFrame(frame);
-    gl.viewport(0, 0, W, H);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.viewport(0, 0, W, H);
     if (MODE === "ascent") { drawAscent(now); return; }
     if (!S) { gl.clearColor(1, 1, 1, 1); gl.clear(gl.COLOR_BUFFER_BIT); return; }
     // interpolate between the last two Lua states (~33 ms apart) for smooth motion at 60 fps
@@ -185,13 +472,15 @@
     var camAlt = len(cam) - R;
     var near = Math.max(0.5, Math.min(camAlt * 0.25, 5e5)), far = 5e9;
     var P = persp(1.0, W / H, near, far), VP = mul(P, V);
-    // sky: blue near the ground, black above the air (the "earthy" end of the blend)
+    // L332: the world at its internal resolution, reconstructed; stars native under it; the HUD native over it
     var air = Math.max(0, Math.min(1, 1 - (camAlt - 8000) / 70000));
     var dayHere = Math.max(0, Math.min(1, dot(unit(cam), unit(SUN)) * 3 + 0.4));
-    gl.clearColor(0.35 * air * dayHere, 0.55 * air * dayHere, 0.9 * air * dayHere, 1);
-    gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+    var fwdC = unit(look), sideC = unit(cross(fwdC, camUp)), upC = cross(sideC, fwdC);
+    var wv = { cam: cam, fwd: fwdC, up: upC, side: sideC, fov: 1.0, ascent: false, k: 1, d0: 0, d1: 1 };
+    var inTargets = worldPasses(wv, now);
+    gl.clearColor(0, 0, 0, 1); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     gl.disable(gl.DEPTH_TEST);
-    // stars (rotation only), invisible in a bright sky
+    // stars (rotation only, analytic points at the display's own resolution), invisible in a bright sky
     gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
     gl.useProgram(starP); gl.uniformMatrix4fv(gl.getUniformLocation(starP, "vp"), false, mul(persp(1.0, W / H, 0.1, 1000), V));
     gl.uniform1f(gl.getUniformLocation(starP, "vis"), 1 - air * dayHere);
@@ -199,26 +488,8 @@
     var lp = gl.getAttribLocation(starP, "p"), lb = gl.getAttribLocation(starP, "b");
     gl.enableVertexAttribArray(lp); gl.vertexAttribPointer(lp, 3, gl.FLOAT, false, 16, 0);
     gl.enableVertexAttribArray(lb); gl.vertexAttribPointer(lb, 1, gl.FLOAT, false, 16, 12);
-    gl.drawArrays(gl.POINTS, 0, 9000); gl.disableVertexAttribArray(lb); gl.disable(gl.BLEND);
-    // Earth, camera-relative: centre at -cam, scale R
-    var M = model(sc(cam, -1), R), MVP = mul(VP, M), eyeUnit = sc(cam, 1 / R);
-    // one sphere, depth-tested (near = camAlt/4, so 24 bits separate its two hemispheres at any range): no winding to get wrong
-    gl.enable(gl.DEPTH_TEST); gl.depthFunc(gl.LEQUAL); gl.depthMask(true);
-    gl.useProgram(earthP); gl.uniformMatrix4fv(gl.getUniformLocation(earthP, "mvp"), false, MVP);
-    gl.uniform3fv(gl.getUniformLocation(earthP, "sun"), SUN); gl.uniform3fv(gl.getUniformLocation(earthP, "eye"), eyeUnit);
-    gl.uniform1f(gl.getUniformLocation(earthP, "hasTex"), earthTex ? 1 : 0);
-    if (earthTex) { gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, earthTex); gl.uniform1i(gl.getUniformLocation(earthP, "tex"), 0); }
-    gl.bindBuffer(gl.ARRAY_BUFFER, vb); gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ib);
-    var ep = gl.getAttribLocation(earthP, "p"); gl.enableVertexAttribArray(ep); gl.vertexAttribPointer(ep, 3, gl.FLOAT, false, 0, 0);
-    gl.drawElements(gl.TRIANGLES, idx.length, IDXTYPE, 0);
-    if (camAlt > 2000) {   // the air as a halo seen from outside
-      gl.depthMask(false); gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE);
-      gl.useProgram(haloP); gl.uniformMatrix4fv(gl.getUniformLocation(haloP, "mvp"), false, MVP);
-      gl.uniform3fv(gl.getUniformLocation(haloP, "eye"), eyeUnit); gl.uniform3fv(gl.getUniformLocation(haloP, "sun"), SUN);
-      var hp = gl.getAttribLocation(haloP, "p"); gl.enableVertexAttribArray(hp); gl.vertexAttribPointer(hp, 3, gl.FLOAT, false, 0, 0);
-      gl.drawElements(gl.TRIANGLES, idx.length, IDXTYPE, 0); gl.disable(gl.BLEND);
-    }
-    gl.depthMask(true); gl.disable(gl.DEPTH_TEST);
+    gl.drawArrays(gl.POINTS, 0, 9000); gl.disableVertexAttribArray(lb); gl.disableVertexAttribArray(lp); gl.disable(gl.BLEND);
+    composite(wv, inTargets);
 
     // ------------------------------------------------ 2D: markers, the Machine, the HUD
     hud.clearRect(0, 0, W, H);
@@ -276,7 +547,7 @@
       }
     }
     // HUD
-    hud.fillStyle = "rgba(0,0,0,0.45)"; hud.fillRect(16 * px, 16 * px, 620 * px, 306 * px);
+    hud.fillStyle = "rgba(0,0,0,0.45)"; hud.fillRect(16 * px, 16 * px, 700 * px, 354 * px);
     hud.fillStyle = "#9ff"; hud.font = (16 * px) + "px Consolas, monospace";
     var L = [
       "NCM DEEP  -  out of REDengine's reach (" + m.cam + " camera)",
@@ -290,10 +561,15 @@
       "THRUST/WT  " + (m.twr != null ? m.twr.toFixed(2) + (m.twr < 1 ? "  (sustained thrust cannot hold you up here)" : "  (can climb)") : "-"),
       "ATTITUDE   " + (m.authority || "-") + (m.waiver ? "   DEV WAIVER (not physical)" : "") + "   spin " + (Number(m.spin) || 0).toFixed(2) + " rad/s",
       "AIR        " + (Number(m.rho) || 0).toPrecision(2) + " kg/m3",
+      renderText(),
+      "GEOGRAPHY  " + geoText(),
     ];
     for (var q = 0; q < L.length; q++) hud.fillText(String(L[q]).replace(/undefined|NaN|null/g, "-"), 28 * px, (42 + q * 24) * px);
     hud.fillStyle = m.rig ? "#ffb347" : "#7a7"; hud.font = (13 * px) + "px Consolas, monospace";
     hud.fillText(m.rig ? "DEV ATTITUDE RIG ON (not physical): left stick / WASD pitch+yaw, right stick / QE roll   -   /ncm.deep.rig" : "attitude: no torque on this Machine (rig off)", 28 * px, H - 44 * px);
+    hud.fillStyle = "rgba(200,220,220,0.7)"; hud.font = (11 * px) + "px Consolas, monospace";
+    var credit = (GEO.loaded > 0 && GEO.credit) || "Imagery: NASA Blue Marble (global)"; hud.fillText(credit, W - hud.measureText(credit).width - 16 * px, H - 8 * px);
+    hud.font = (13 * px) + "px Consolas, monospace";
     hud.fillStyle = "#cdd"; hud.fillText("D-pad up / G: GUIDANCE  |  V / R3: camera  |  R-stick up/down or I/O: zoom (" + (Number(m.zoom) || 22).toExponential(1) + " m)  |  hold B / X: home", 28 * px, H - 22 * px);
     if (G.backHold > 0) { hud.fillStyle = "rgba(255,255,255,0.85)"; hud.fillRect(W / 2 - 150 * px, H - 90 * px, 300 * px * G.backHold, 8 * px);
       hud.fillText("returning home...", W / 2 - 60 * px, H - 98 * px); }
@@ -335,6 +611,7 @@
     }
   }
   function drawAscent(now) {
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT); hud.clearRect(0, 0, W, H);
     if (!AS || AS.k <= 0.001) return;
     var car = AS.p, u = AS.u, f = AS.f;
@@ -342,21 +619,11 @@
     var cam = add(add(car, sc(f, -9)), sc(u, 3)), look = sub(add(car, sc(f, 30)), cam);
     var V = viewRot(look, u), camAlt = len(cam) - R;
     var P = persp(0.86, W / H, Math.max(50, camAlt * 0.25), 5e8), VP = mul(P, V);
-    var M = model(sc(cam, -1), R), MVP = mul(VP, M);
-    gl.enable(gl.DEPTH_TEST); gl.depthFunc(gl.LEQUAL); gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
-    gl.useProgram(earthAscP); gl.uniformMatrix4fv(gl.getUniformLocation(earthAscP, "mvp"), false, MVP);
-    gl.uniform3fv(gl.getUniformLocation(earthAscP, "centre"), sc(cam, -1)); gl.uniform1f(gl.getUniformLocation(earthAscP, "rr"), R);
-    gl.uniform3fv(gl.getUniformLocation(earthAscP, "sun"), SUN); gl.uniform1f(gl.getUniformLocation(earthAscP, "hasTex"), earthTex ? 1 : 0);
-    gl.uniform1f(gl.getUniformLocation(earthAscP, "k"), AS.k); gl.uniform1f(gl.getUniformLocation(earthAscP, "d0"), AS.d0);
-    gl.uniform1f(gl.getUniformLocation(earthAscP, "d1"), AS.d1);
-    if (earthTex) { gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, earthTex); gl.uniform1i(gl.getUniformLocation(earthAscP, "tex"), 0); }
-    gl.bindBuffer(gl.ARRAY_BUFFER, vb); gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ib);
-    var ap = gl.getAttribLocation(earthAscP, "p"); gl.enableVertexAttribArray(ap); gl.vertexAttribPointer(ap, 3, gl.FLOAT, false, 0, 0);
-    // depth first, colour second: the masked (transparent) near ground must still hide the far side of the planet
-    gl.colorMask(false, false, false, false); gl.drawElements(gl.TRIANGLES, idx.length, IDXTYPE, 0);
-    gl.colorMask(true, true, true, true); gl.depthFunc(gl.EQUAL); gl.drawElements(gl.TRIANGLES, idx.length, IDXTYPE, 0);
-    gl.depthFunc(gl.LEQUAL);
-    gl.disable(gl.BLEND); gl.disable(gl.DEPTH_TEST);
+    var fwdA = unit(look), sideA = unit(cross(fwdA, u)), upA = cross(sideA, fwdA);
+    var av = { cam: cam, fwd: fwdA, up: upA, side: sideA, fov: 0.86, ascent: true, k: AS.k, d0: AS.d0, d1: AS.d1 };
+    var inT = worldPasses(av, now);
+    gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT);
+    composite(av, inT);
     // Night City where it is on the planet, and how far the seam is
     var px = dpr, nc = lla(NC.lat, NC.lon, 0);
     if (!hidden(cam, nc)) { var s = project(VP, sub(nc, cam)); if (s && AS.k > 0.3) { hud.globalAlpha = Math.min(1, (AS.k - 0.3) * 2);

@@ -89,6 +89,7 @@ return {
     "space/places.lua",
     "space/embodiment.lua",
     "space/raceworld.lua",
+    "space/geolod.lua",
     "economy/markets.lua",
     "economy/production.lua",
     "economy/supply_profiles.lua",

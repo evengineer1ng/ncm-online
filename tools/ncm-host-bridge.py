@@ -485,6 +485,133 @@ def write_race_ini(h):
     return laps_left
 
 
+# ---------------------------------------------------------------------------------------------- tiles (L332)
+# Geographic imagery for NCM Deep (core space.geolod decides WHICH tiles; this only fetches, caches and serves them).
+# NCM's grid: EPSG:4326 quadtree, zoom z = 2^(z+1) x 2^z tiles of 180/2^z degrees, 256 px, (0,0) at lat 90 lon -180.
+# Public-domain sources only (owner ruling 2026-10-06). A miss with no network, or a source with nothing there (ocean
+# for NAIP, a blank WELD cell), is a 404: the renderer keeps the coarser level, never a blank. The cache lives outside the
+# repository and is capped (least recently used first).
+import urllib.request
+import time as _time
+
+TILE_DIR = os.path.join(os.environ.get("LOCALAPPDATA") or os.path.expanduser("~"), "NCM", "tiles")
+TILE_CAP_BYTES = 4 * 1024 ** 3
+TILE_EMPTY_BYTES = 3000          # a flat answer (GIBS ~668 B, USGS white sea ~2.4 KB); a real uniform sea falling back is harmless
+GIBS_WMS = ("https://gibs.earthdata.nasa.gov/wms/epsg4326/best/wms.cgi?SERVICE=WMS&REQUEST=GetMap&VERSION=1.3.0&STYLES="
+            "&CRS=EPSG:4326&WIDTH=256&HEIGHT=256&FORMAT=image/jpeg&LAYERS={layer}{time}&BBOX={latS},{lonW},{latN},{lonE}")
+TILE_SOURCES = {
+    "bmng": {"url": GIBS_WMS, "layer": "BlueMarble_NextGeneration", "time": "", "zmax": 8},
+    "weld": {"url": GIBS_WMS, "layer": "Landsat_WELD_CorrectedReflectance_TrueColor_Global_Annual", "time": "&TIME=2000-12-01", "zmax": 12},
+    # USGS The National Map orthoimagery (NAIP-based, public domain): the cached MapServer answers in ~0.5 s where the
+    # NAIP Plus ImageServer took ~17 s per tile (measured 2026-10-06)
+    "naip": {"url": "https://basemap.nationalmap.gov/arcgis/rest/services/USGSImageryOnly/MapServer/export?"
+                    "bbox={lonW},{latS},{lonE},{latN}&bboxSR=4326&imageSR=4326&size=256,256&format=jpg&f=image", "zmax": 16},
+}
+tile_sem = threading.BoundedSemaphore(6)          # concurrent upstream fetches
+tile_queue = []                                   # prefetch keys, soonest first
+tile_queued = set()
+tile_cv = threading.Condition()
+tile_stats = {"hit": 0, "fetched": 0, "empty": 0, "failed": 0, "prefetched": 0}
+
+
+def tile_blank(data):
+    """a source with nothing there answers a flat image (GIBS ~668 bytes, USGS white over the sea)"""
+    if len(data) < TILE_EMPTY_BYTES:
+        return True
+    try:
+        from PIL import Image, ImageStat
+        st = ImageStat.Stat(Image.open(io.BytesIO(data)).convert("L"))
+        return st.stddev[0] < 1.5
+    except Exception:
+        return False
+
+
+def tile_path(layer, z, x, y):
+    return os.path.join(TILE_DIR, layer, str(z), str(x), "%d.jpg" % y)
+
+
+def tile_bounds(z, x, y):
+    s = 180.0 / (2 ** z)
+    lon_w, lat_n = -180.0 + x * s, 90.0 - y * s
+    return {"latS": lat_n - s, "latN": lat_n, "lonW": lon_w, "lonE": lon_w + s}
+
+
+def tile_get(layer, z, x, y):
+    """bytes of the tile, or None (no data there / no network). Cached on disk either way (empty = a marker file)."""
+    src = TILE_SOURCES.get(layer)
+    if not src or z < 0 or z > src["zmax"] or y < 0 or y >= 2 ** z or x < 0 or x >= 2 ** (z + 1):
+        return None
+    path = tile_path(layer, z, x, y)
+    if os.path.exists(path):
+        tile_stats["hit"] += 1
+        try:
+            os.utime(path, None)
+            with open(path, "rb") as f:
+                return f.read()
+        except OSError:
+            return None
+    if os.path.exists(path + ".empty"):
+        return None
+    url = src["url"].format(layer=src.get("layer", ""), time=src.get("time", ""), **tile_bounds(z, x, y))
+    with tile_sem:
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": "NCM-Deep/1 (Night City Motorsports; noncommercial)"})
+            with urllib.request.urlopen(req, timeout=20) as r:
+                ctype = r.headers.get("Content-Type", "")
+                data = r.read()
+        except Exception as e:
+            tile_stats["failed"] += 1
+            log("TILE %s/%d/%d/%d failed: %s", layer, z, x, y, e)
+            return None
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    if "image" not in ctype or tile_blank(data):
+        tile_stats["empty"] += 1
+        open(path + ".empty", "wb").close()
+        return None
+    with open(path, "wb") as f:
+        f.write(data)
+    tile_stats["fetched"] += 1
+    return data
+
+
+def tile_prefetch_worker():
+    while True:
+        with tile_cv:
+            while not tile_queue:
+                tile_cv.wait()
+            key = tile_queue.pop(0)
+            tile_queued.discard(key)
+        layer, z, x, y = key
+        p = tile_path(layer, z, x, y)
+        if not os.path.exists(p) and not os.path.exists(p + ".empty"):
+            tile_get(layer, z, x, y)
+            tile_stats["prefetched"] += 1
+
+
+def tile_prune():
+    """keep the cache under its cap, least recently used first (hourly)"""
+    while True:
+        try:
+            files = []
+            for root, _, names in os.walk(TILE_DIR):
+                for n in names:
+                    p = os.path.join(root, n)
+                    st = os.stat(p)
+                    files.append((max(st.st_atime, st.st_mtime), st.st_size, p))
+            total = sum(f[1] for f in files)
+            if total > TILE_CAP_BYTES:
+                files.sort()
+                for _, size, p in files:
+                    if total <= TILE_CAP_BYTES * 0.9:
+                        break
+                    os.remove(p)
+                    total -= size
+                log("TILES pruned the cache to %.1f GB", total / 1024 ** 3)
+        except Exception as e:
+            log("TILES prune failed: %s", e)
+        _time.sleep(3600)
+
+
 class H(BaseHTTPRequestHandler):
     def log_message(self, *a):
         pass
@@ -505,8 +632,40 @@ class H(BaseHTTPRequestHandler):
         except ValueError:
             return {}
 
+    def do_OPTIONS(self):   # CORS preflight (the Deep page posts its prefetch list)
+        self.send_response(204)
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.end_headers()
+
     def do_GET(self):
         u = urlparse(self.path)
+        if u.path.startswith("/tiles/"):   # L332: /tiles/<layer>/<z>/<x>/<y>.jpg
+            parts = u.path.split("/")
+            try:
+                layer, z, x, y = parts[2], int(parts[3]), int(parts[4]), int(parts[5].split(".")[0])
+            except (IndexError, ValueError):
+                return self.send_json(400, {"error": "bad tile path"})
+            data = tile_get(layer, z, x, y)
+            if data is None:
+                self.send_response(404)
+                self.send_header("Access-Control-Allow-Origin", "*")
+                self.send_header("Content-Length", "0")
+                self.end_headers()
+                return
+            self.send_response(200)
+            self.send_header("Content-Type", "image/jpeg")
+            self.send_header("Content-Length", str(len(data)))
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.send_header("Cache-Control", "max-age=86400")
+            self.end_headers()
+            self.wfile.write(data)
+            return
+        if u.path == "/tiles-status":
+            with tile_cv:
+                q = len(tile_queue)
+            return self.send_json(200, dict(tile_stats, queued=q, dir=TILE_DIR))
         if u.path == "/handoff":
             with lock:
                 return self.send_json(200, handoff or {})
@@ -541,6 +700,29 @@ class H(BaseHTTPRequestHandler):
         global handoff
         u = urlparse(self.path)
         body = self.read_json()
+        if u.path == "/tiles/prefetch":   # L332: soonest first; a new list replaces what is still waiting
+            items = []
+            for t in (body.get("tiles") or [])[:600]:
+                try:
+                    items.append((str(t["layer"]), int(t["z"]), int(t["x"]), int(t["y"])))
+                except (KeyError, TypeError, ValueError):
+                    continue
+            with tile_cv:
+                tile_queue.clear()
+                tile_queued.clear()
+                for k in items:
+                    if k not in tile_queued:
+                        tile_queue.append(k)
+                        tile_queued.add(k)
+                tile_cv.notify_all()
+            out = json.dumps({"queued": len(items)}).encode("utf-8")
+            self.send_response(200)
+            self.send_header("Access-Control-Allow-Origin", "*")
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(out)))
+            self.end_headers()
+            self.wfile.write(out)
+            return
         if u.path == "/embody":
             v = body.get("venue") or {}
             if not os.path.exists(RACE_INI):
@@ -631,4 +813,8 @@ if __name__ == "__main__":
     with lock:
         places_out.extend(scanned)
     log("PLACES scanned %d AC track layout(s) for the registry", len(scanned))
+    for _ in range(3):
+        threading.Thread(target=tile_prefetch_worker, daemon=True).start()
+    threading.Thread(target=tile_prune, daemon=True).start()
+    log("TILES cache %s (cap %.0f GB): %s", TILE_DIR, TILE_CAP_BYTES / 1024 ** 3, ", ".join(sorted(TILE_SOURCES)))
     ThreadingHTTPServer(("127.0.0.1", PORT), H).serve_forever()

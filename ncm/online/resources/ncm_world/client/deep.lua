@@ -19,6 +19,8 @@ local Guid = Core.get("space.guidance")
 local Canon = Core.get("space.canonical")   -- L329: the host-independent Deep record
 local Flight = Core.get("engineering.flightmodel")   -- L331: the full machine model
 local Venues = Core.get("space.venues")
+local GeoLod = Core.get("space.geolod")   -- L332: which real imagery the Deep page holds
+local Json = Core.get("vocabulary.json")
 
 local function log(fmt, ...) print(("[ncm_world/client/deep] " .. fmt):format(...)) end
 local function ms() return GetGameTimer() end
@@ -68,6 +70,44 @@ local function dead(v) return math.abs(v) < 0.15 and 0 or v end
 -- ------------------------------------------------------------------------------------------------ the page
 local function send(kind, payload) if A and A.page then pcall(function() A.page:send(kind, payload) end) end end
 
+-- L332: GEOGRAPHIC LOD. Core space.geolod plans the clipmap for the camera's ground point (twice a second) and, every two
+-- seconds, the tiles along the predicted path and at Guidance's destination; the page fetches them through the host
+-- bridge. The page reports its WORLD layer's internal height (it changes with the dynamic render scale) and its field
+-- of view, so the plan asks for no more geography than the pixels can show. Resolution never reaches the simulation.
+local GEO = { planAt = 0, prefetchAt = 0, heightPx = 693, fovY = 1.0 }
+local function geoTick(page, st, now, dest)
+    if not page or not st or not st.p or now - GEO.planAt < 500 then return end
+    GEO.planAt = now
+    local lat, lon, alt = Deep.ecefToLla(st.p)
+    local view = { fovY = GEO.fovY, heightPx = GEO.heightPx }
+    local plan = GeoLod.plan(lat, lon, math.max(1, alt), view)
+    local msg = { zFine = plan.zFine, levels = plan.levels, credit = GeoLod.credit(plan) }
+    if now - GEO.prefetchAt >= 2000 then
+        GEO.prefetchAt = now
+        msg.prefetch = GeoLod.prefetch({ p = st.p, v = st.v or { 0, 0, 0 } }, dest, view)
+    end
+    pcall(function() page:send("deep:tiles", msg) end)
+end
+--- the page's own reports: its render view, and the probes (WebGL facts, whether tiles arrive) -- logged once each
+local function watchPage(page)
+    pcall(function()
+        page:on("deep:view", function(v)
+            if type(v) ~= "table" then return end
+            GEO.heightPx, GEO.fovY = tonumber(v.h) or GEO.heightPx, tonumber(v.fov) or GEO.fovY
+            GEO.planAt = 0
+        end)
+        page:on("deep:probe", function(v)
+            local ok, txt = pcall(Json.encode, v)
+            print("[ncm_world/client/deep] RENDER PROBE " .. (ok and txt or tostring(v)))
+            TriggerServerEvent("ncm:deep.render", ok and txt or tostring(v))
+        end)
+        page:on("deep:error", function(v)
+            local ok, txt = pcall(Json.encode, v)
+            print("[ncm_world/client/deep] PAGE ERROR " .. (ok and txt or tostring(v)))
+        end)
+    end)
+end
+
 local function closePage(page)
     if not page then return end
     CreateThread(function()
@@ -113,6 +153,7 @@ local function enter(vid, pos, why, resumeRec)
             transparent = false, visible = true, fps = 60 })
     end
     if not ok or not page then log("could not open the deep surface (%s %s): staying in Night City", tostring(page), tostring(reason)); return end
+    if not seamless then watchPage(page) end
     local EN = NcmClientEngineering and NcmClientEngineering.get() or nil
     local asset = NcmClientEngineering and select(1, NcmClientEngineering.bound()) or nil
     A = {
@@ -371,6 +412,7 @@ CreateThread(function()
                     local okP, page = pcall(Open77.webui.create, { entry = "web/deep.html", layer = "hud", zIndex = 950,
                         transparent = true, visible = true, fps = 60 })
                     if okP and page then
+                        watchPage(page)
                         ASC = { page = page, ready = false }
                         local mine = ASC
                         page:on("deep:ready", function()
@@ -386,6 +428,7 @@ CreateThread(function()
                     local k = math.max(0, math.min(1, (p.z - cfg.ascentZ) / math.max(1, cfg.enterZ - cfg.ascentZ)))
                     pcall(function() ASC.page:send("deep:ascent", { sun = sunNow(), p = s.p, f = s.basis.forward, u = s.basis.up, k = k * k * (3 - 2 * k),
                         alt = p.z, toSeam = cfg.enterZ - p.z, d0 = cfg.maskNearM, d1 = cfg.maskFarM }) end)
+                    geoTick(ASC.page, s, GetGameTimer(), nil)
                 end
             elseif ASC and (not p or not p.z or p.z < cfg.ascentZ - 200) then
                 local page = ASC.page
@@ -655,6 +698,7 @@ local function tick()
             A.impact, A.land = (lo == "escape") and "none: escaping Earth" or "none: in orbit", nil
         end
     end
+    geoTick(A.page, A.s, now, GD.route and GD.route.venue and { lat = GD.route.venue.lat, lon = GD.route.venue.lon } or nil)
     if now - A.lastSend >= 33 then
         A.lastSend = now
         local sel = Venues.VENUES[GD.sel]

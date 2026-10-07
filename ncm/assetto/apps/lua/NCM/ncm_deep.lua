@@ -20,6 +20,7 @@ local NC = { id = "night_city", name = "Night City", region = "California (Cyber
   alt = 11000, host = "cyberpunk" }   -- held at ~14 km so Cyberpunk takes it at its own seam (12 km)
 
 local C, D, G, CN, I, CT, VN, FM
+local World = require("ncm_world")   -- L332: the world layer (geographic LOD + internal resolution + EASU/RCAS)
 local fm, dyn, devAtt = nil, nil, false   -- L331: the full machine model and its state
 local ctx
 local F = nil              -- AC world <-> local ENU at the track
@@ -95,6 +96,7 @@ function M.init(context)
   D, G, CN, I, CT, VN = C.get("space.deep"), C.get("space.guidance"), C.get("space.canonical"), C.get("engineering.installation"),
     C.get("engineering.controls"), C.get("space.venues")
   FM = C.get("engineering.flightmodel")
+  pcall(World.init, C, ctx.post)
   list = { NC }
   for _, v in ipairs(VN.VENUES) do list[#list + 1] = v end
 end
@@ -304,6 +306,17 @@ function M.draw3D(car, heightAboveGround)
   local k = deep and 1 or math.max(0, math.min(1, (heightAboveGround - ASCENT_M) / (DEEP_M - ASCENT_M)))
   k = k * k * (3 - 2 * k)
   local cam, alt, fwd, up, side = cameraEcef(sim, car, deep)
+  -- L332: the world layer first; if CSP refuses any part of it, the direct pass below draws the planet as before
+  local utc0 = ctx.utcNow and ctx.utcNow()
+  local sun0 = utc0 and D.sunAt(utc0) or D.sun(13)
+  local route = GD.route and GD.route.venue
+  local okW, drew = pcall(World.draw, { sim = sim, cam = cam, alt = alt, fwd = fwd, up = up, side = side,
+    tanHalf = math.tan(math.rad(sim.cameraFOV) / 2), fovY = math.rad(sim.cameraFOV), k = k,
+    depth = deep and HOLD_DEPTH_M or MASK_NEAR_M, sun = sun0, earth = ctx.dir .. "/earth.jpg",
+    p = (deep and s) and s.p or cam, vel = (deep and s) and s.v or nil,
+    dest = route and { lat = route.lat, lon = route.lon } or nil })
+  if okW and drew then return end
+  if not okW and not M.worldErr then M.worldErr = true; ctx.post({ type = "probe", what = "render", ok = false, why = tostring(drew) }) end
   pass = pass or {
     async = true, blendMode = render.BlendMode.AlphaBlend, depth = MASK_NEAR_M,
     textures = { txEarth = ctx.dir .. "/earth.jpg" },
@@ -364,7 +377,7 @@ function M.drawUI(heightAboveGround)
     end
     return
   end
-  ui.drawRectFilled(vec2(16, 16), vec2(700, 260), rgbm(0, 0, 0, 0.45))
+  ui.drawRectFilled(vec2(16, 16), vec2(700, 310), rgbm(0, 0, 0, 0.45))
   local L = {
     "NCM DEEP  -  run by Assetto Corsa (the same Deep as Night City)",
     ("ALTITUDE   %.2f km"):format((M.alt or 0) / 1000),
@@ -374,9 +387,13 @@ function M.drawUI(heightAboveGround)
     ("FUEL       %s"):format(devFuel and "DEV FUEL (development only)" or ("%.1f kg"):format(fuelKg)),
     ("RACE WEEK  %s"):format(ctx.weekText()),
     ("ATTITUDE   %s%s  spin %.2f rad/s"):format(M.authority or "-", M.waiver and "   DEV WAIVER (not physical)" or "", M.spin or 0),
+    World.renderText(),
+    World.geoText(),
   }
   for i, l in ipairs(L) do text(l, 28, 22 + i * 24) end
   text("D-pad up / G: GUIDANCE   left stick: attitude (rig, not physical)   your bindings: your parts", 28, sw.y - 30, 13, rgbm(0.8, 0.85, 0.85, 1))
+  local credit = World.credit()
+  text(credit, sw.x - 8 * #credit - 16, sw.y - 18, 11, rgbm(0.8, 0.85, 0.85, 0.7))
   if GD.open or GD.engaged or GD.msg then
     local x = sw.x - 580
     ui.drawRectFilled(vec2(x, 16), vec2(sw.x - 16, 200), rgbm(0, 0.05, 0.02, 0.6))

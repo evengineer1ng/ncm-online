@@ -99,7 +99,7 @@ foreach ($res in $resources) {
 $acApp = Join-Path $here '..\ncm\assetto\apps\lua\NCM'
 if (Test-Path $acApp) {
     $acApp = (Resolve-Path $acApp).Path
-    $acRoots = @('space.canonical', 'space.places', 'space.guidance', 'space.venues', 'space.deep', 'engineering.installation', 'engineering.controls')
+    $acRoots = @('space.canonical', 'space.places', 'space.guidance', 'space.venues', 'space.deep', 'engineering.installation', 'engineering.controls', 'engineering.flightmodel', 'space.geolod')
     $fileOf = @{}; $depsOf = @{}
     foreach ($f in $entries) {
         $src = [IO.File]::ReadAllText((Join-Path $CoreRoot $f), (New-Object Text.UTF8Encoding($false)))

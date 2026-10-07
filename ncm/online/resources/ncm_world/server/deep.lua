@@ -78,6 +78,11 @@ RegisterNetEvent("ncm:deep.exit", function(r)
     if NcmJourney then NcmJourney.finish(pid, tostring(r.why or "returned"), { landKm = tonumber(r.landKm), back = { x = x, y = y, z = z } }) end
 end)
 
+-- L332: the Deep page's render probes (WebGL facts, the render scale, whether imagery tiles arrive), one line each
+RegisterNetEvent("ncm:deep.render", function(t)
+    log("RENDER PROBE player=%d %s", tonumber(source) or 0, tostring(t):sub(1, 700))
+end)
+
 RegisterNetEvent("ncm:deep.telemetry", function(t)
     local pid = tonumber(source) or 0
     if not inDeep[pid] or type(t) ~= "table" then return end

@@ -13,4 +13,5 @@ return {
     "engineering/flightmodel",
     "space/canonical",
     "space/places",
+    "space/geolod",
 }
