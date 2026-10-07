@@ -15,6 +15,7 @@
     <Reference Include="KSA"><HintPath>$(KsaDir)\KSA.dll</HintPath><Private>false</Private></Reference>
     <Reference Include="Brutal.Core.Numerics"><HintPath>$(KsaDir)\Brutal.Core.Numerics.dll</HintPath><Private>false</Private></Reference>
     <Reference Include="BepuUtilities"><HintPath>$(KsaDir)\BepuUtilities.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="Planet.Render.Core"><HintPath>$(KsaDir)\Planet.Render.Core.dll</HintPath><Private>false</Private></Reference>
     <Reference Include="StarMap.API"><HintPath>$(StarMapDir)\StarMap.API.dll</HintPath><Private>false</Private></Reference>
   </ItemGroup>
   <ItemGroup>

@@ -21,14 +21,12 @@ local Flight = Core.get("engineering.flightmodel")   -- L331: the full machine m
 local Venues = Core.get("space.venues")
 local GeoLod = Core.get("space.geolod")   -- L332: which real imagery the Deep page holds
 local Dyn = Core.get("engineering.dynamics")
--- L335: the KSA pre-flight: what the bridge says about KSA (installed, loader, runtime, mod, self-test) and when it said it
-local KSA = { pre = nil, preAt = 0, selftest = nil, selftesting = false, embodying = false, holdL3 = nil }
-RegisterNetEvent("ncm:deep.ksa.preflight", function(p) KSA.pre = type(p) == "table" and p or nil end)
-RegisterNetEvent("ncm:deep.ksa.selftest", function(p)
-    KSA.selftesting = false
-    KSA.selftest = type(p) == "table" and p or { ok = false, why = "no answer" }
-    KSA.preAt = 0
-end)
+-- KB-375 (owner, 2026-10-07: "cant have ksa opening way before you know its there ... a consent screen saying that there is
+-- a deeper simulation layer and activating it ... on demand when approaching the border of ncm deep"): nothing about KSA is
+-- asked, probed or launched until the player consents, approaching the border. `consent` nil = not asked yet, true =
+-- activate, false = stay in Deep. `ready` = KSA started and proved a placement (the activation). L329's AC rule, for KSA.
+local KSA_ASK_ETA_S = 600   -- ask ~10 min out, so KSA is ready on arrival; arrival without it holds there and asks again
+local KSA = { consent = nil, ask = false, activating = false, ready = false, why = nil, embodying = false, holdL3 = nil, dev = nil, devAt = 0 }
 
 --- L334: what Guidance can be pointed at: the KSA border (Earth's sphere of influence) first, then the Earth venues
 local TARGETS = nil
@@ -51,7 +49,7 @@ local RETURN_DV_MAX = 80        -- m/s: 150 kN x 1 s on 1.8 t (the Carrier's cla
 local GROUND_M = 300            -- KB-349: Deep has no terrain; below this the trip ends (home over Night City)
 local EXIT_SAFE_M = 3000        -- KB-349: a return from lower than this comes home at the bound, at rest
 
-local cfg = { enabled = false, enterZ = 12000, exitZ = 11500, ascentZ = 4000, maskNearM = 9000, maskFarM = 16000 }
+local cfg = { enabled = false, enterZ = 12000, exitZ = 11500, ascentZ = 4000, maskNearM = 9000, maskFarM = 16000, ascentProbe = false }
 --- NCM's one clock on this client: the server's UTC at config time, advanced by the game timer
 local utcBase, utcAtMs = nil, 0
 local function utcNow() return utcBase and (utcBase + (GetGameTimer() - utcAtMs) / 1000) or nil end
@@ -341,6 +339,7 @@ RegisterNetEvent("ncm:deep.config", function(c)
     if tonumber(c.utc) then utcBase, utcAtMs = tonumber(c.utc), GetGameTimer() end
     cfg.ascentZ = tonumber(c.ascentZ) or cfg.ascentZ
     cfg.maskNearM, cfg.maskFarM = tonumber(c.maskNearM) or cfg.maskNearM, tonumber(c.maskFarM) or cfg.maskFarM
+    cfg.ascentProbe = c.ascentProbe == true
     -- and no part overheats (owner, 2026-10-06: dev heat waiver, IDEA-1143)
     NcmClientDevHeat = c.devHeat == true
     NcmClientDevAttitude = c.devAttitude == true   -- L331: the labelled attitude waiver (development only)
@@ -438,6 +437,70 @@ RegisterNetEvent("ncm:deep.embody.status", function(st)
     if NcmClientDeepSetMessage then NcmClientDeepSetMessage(msg) end
 end)
 
+-- ------------------------------------------------------------------------------------------------ KB-377: the game's camera
+--- The REAL game camera, measured: Open77.camera.project gives where a world point lands on screen (0..1), so aim at a far
+--- point until it sits at the screen centre (Newton on yaw/pitch), then read the field of view and roll from how the screen
+--- moves per radian there. Points are 100 km out, so the camera's few metres from the car do not matter. ~14 projections.
+--- Returns { yaw, pitch, roll, fovX, fovY } (radians; yaw from +x towards +y, pitch up positive) or nil.
+-- the first climb measured nothing at 100 km ("unmeasured" on every line): try nearer points, and log the raw answer once
+local CAM_TRY = { 100000, 20000, 3000, 500 }
+local CAM_D, camDumped = nil, false
+local function camRaw(o, yaw, pitch, d)
+    local cp = math.cos(pitch)
+    return pcall(Open77.camera.project, { x = o.x + d * cp * math.cos(yaw), y = o.y + d * cp * math.sin(yaw), z = o.z + d * math.sin(pitch) })
+end
+local function camProject(o, yaw, pitch)
+    for _, d in ipairs(CAM_D and { CAM_D } or CAM_TRY) do
+        local ok, r = camRaw(o, yaw, pitch, d)
+        if not camDumped then
+            local parts = {}
+            if type(r) == "table" then for k, v in pairs(r) do parts[#parts + 1] = tostring(k) .. "=" .. tostring(v) end
+            else parts[1] = tostring(r) end
+            log("ASCENT PROBE camera.project at %d m: ok=%s %s {%s}", d, tostring(ok), type(r), table.concat(parts, " "))
+        end
+        if ok and type(r) == "table" and tonumber(r.x) and tonumber(r.y) then
+            if not CAM_D then CAM_D = d; log("ASCENT PROBE camera measured with points %d m out", d) end
+            camDumped = true
+            -- a point BEHIND the camera (depth < 0) projects mirrored: the second climb locked on to the wrong side
+            return tonumber(r.x), tonumber(r.y), tonumber(r.depth) or 1
+        end
+    end
+    camDumped = true
+    return nil
+end
+function NcmGameCamera(o, yaw0)
+    local yaw, pitch, e = yaw0 or 0, -0.05, 0.01
+    -- start IN FRONT of the camera: of the car's heading and the other three quarters, the one most squarely ahead
+    local best
+    for q = 0, 3 do
+        local _, _, dep = camProject(o, yaw0 + q * math.pi / 2, pitch)
+        if dep and dep > 0 and (not best or dep > best) then yaw, best = yaw0 + q * math.pi / 2, dep end
+    end
+    if not best then return nil end
+    local jx, jy
+    for _ = 1, 6 do
+        local x, y, dep = camProject(o, yaw, pitch)
+        local xa, ya = camProject(o, yaw + e, pitch)
+        local xb, yb = camProject(o, yaw, pitch + e)
+        if not (x and xa and xb) or (dep or 1) <= 0 then return nil end
+        local a, b, c, d = (xa - x) / e, (xb - x) / e, (ya - y) / e, (yb - y) / e
+        local det = a * d - b * c
+        if math.abs(det) < 1e-9 then return nil end
+        local ex, ey = 0.5 - x, 0.5 - y
+        local dy, dp = (d * ex - b * ey) / det, (-c * ex + a * ey) / det
+        local step = math.max(math.abs(dy), math.abs(dp))
+        if step > 0.5 then dy, dp = dy * 0.5 / step, dp * 0.5 / step end   -- never jump past the camera's side
+        yaw, pitch = yaw + dy, math.max(-1.5, math.min(1.5, pitch + dp))
+        jx, jy = { a, c }, { b, d }
+    end
+    local xc, yc = camProject(o, yaw, pitch)
+    if not xc or math.abs(xc - 0.5) > 0.01 or math.abs(yc - 0.5) > 0.01 then return nil end   -- did not converge: say so
+    -- at the centre: screen x per radian of yaw = 1 / (2 tan(fovX/2)); roll tilts the yaw motion off the screen's x axis
+    local sx = math.sqrt(jx[1] * jx[1] + jx[2] * jx[2]) / math.max(1e-6, math.cos(pitch))
+    local sy = math.sqrt(jy[1] * jy[1] + jy[2] * jy[2])
+    return { yaw = yaw, pitch = pitch, roll = math.atan(-jx[2], -jx[1]), fovX = 2 * math.atan(1 / (2 * sx)), fovY = 2 * math.atan(1 / (2 * sy)) }
+end
+
 -- ------------------------------------------------------------------------------------------------ the ascent (visual)
 -- The authority seam stays at enterZ. The VISUAL takeover starts at ascentZ: a transparent Deep page over REDengine draws
 -- NCM's Earth beyond maskNearM..maskFarM from the camera, fading in with altitude, anchored to the same Earth frame as
@@ -459,7 +522,7 @@ CreateThread(function()
                         ASC = { page = page, ready = false }
                         local mine = ASC
                         page:on("deep:ready", function()
-                            pcall(function() page:send("deep:init", { ascent = true, nc = Deep.ORIGIN, R = Deep.R, sun = sunNow(),
+                            pcall(function() page:send("deep:init", { ascent = true, probe = cfg.ascentProbe, nc = Deep.ORIGIN, R = Deep.R, sun = sunNow(),
                                 sprite = "deep/sprites/machine.png", earth = "deep/earth.jpg", venues = {} }) end)
                             mine.ready = true
                         end)
@@ -472,6 +535,37 @@ CreateThread(function()
                     pcall(function() ASC.page:send("deep:ascent", { sun = sunNow(), p = s.p, f = s.basis.forward, u = s.basis.up, k = k * k * (3 - 2 * k),
                         alt = p.z, toSeam = cfg.enterZ - p.z, d0 = cfg.maskNearM, d1 = cfg.maskFarM }) end)
                     geoTick(ASC.page, s, GetGameTimer(), nil)
+                    -- KB-377: the measurement -- the game's real camera and the car, twice a second, into the client log
+                    if cfg.ascentProbe and GetGameTimer() - (ASC.probeAt or 0) >= 500 then
+                        ASC.probeAt = GetGameTimer()
+                        local fwd = s.basis.forward
+                        local up = Deep.vec.unit(s.p)
+                        local carPitch = math.asin(math.max(-1, math.min(1, Deep.vec.dot(fwd, up))))
+                        -- start the search along the car's heading (game x = east, y = north at Night City)
+                        local la0, lo0 = Deep.ecefToLla(s.p)
+                        local e0, n0 = Deep.enu(la0, lo0)
+                        local cam = NcmGameCamera(p, math.atan(Deep.vec.dot(fwd, n0), Deep.vec.dot(fwd, e0)))
+                        -- KB-377: the third climb measured nothing (a point 29 deg off-centre came back 3 screens away):
+                        -- every 500 m log the raw projection of 16 headings x 3 pitches, to fit offline whatever it really is
+                        local band = math.floor(p.z / 500)
+                        if band ~= ASC.gridBand then
+                            ASC.gridBand = band
+                            local rows = {}
+                            for _, pd in ipairs({ -30, -10, 10 }) do
+                                for h = 0, 15 do
+                                    local yw, pr = math.rad(h * 22.5), math.rad(pd)
+                                    local ok, r = pcall(Open77.camera.project, { x = p.x + 3000 * math.cos(pr) * math.cos(yw),
+                                        y = p.y + 3000 * math.cos(pr) * math.sin(yw), z = p.z + 3000 * math.sin(pr) })
+                                    rows[#rows + 1] = (ok and type(r) == "table") and ("%d/%d:%.3f,%.3f,%.0f"):format(h * 22.5, pd,
+                                        tonumber(r.x) or 0 / 0, tonumber(r.y) or 0 / 0, tonumber(r.depth) or 0 / 0) or ("%d/%d:-"):format(h * 22.5, pd)
+                                end
+                            end
+                            log("ASCENT GRID z %.0f car %.1f,%.1f | %s", p.z, p.x, p.y, table.concat(rows, " "))
+                        end
+                        log("ASCENT PROBE z %.0f | camera %s | car pitch %.1f deg", p.z,
+                            cam and ("yaw %.1f pitch %.2f roll %.2f fovX %.1f fovY %.1f deg"):format(math.deg(cam.yaw), math.deg(cam.pitch),
+                                math.deg(cam.roll), math.deg(cam.fovX), math.deg(cam.fovY)) or "unmeasured", math.deg(carPitch))
+                    end
                 end
             elseif ASC and (not p or not p.z or p.z < cfg.ascentZ - 200) then
                 local page = ASC.page
@@ -501,6 +595,32 @@ local function edge(name, isDown)
     return isDown and not was
 end
 
+-- KB-375: the deeper layer's events and activation (here, below A / GD / log, which they use)
+RegisterNetEvent("ncm:deep.ksa.preflight", function(p) KSA.dev = type(p) == "table" and p.dev == true end)
+RegisterNetEvent("ncm:deep.ksa.selftest", function(p)
+    KSA.activating = false
+    p = type(p) == "table" and p or { ok = false, why = "no answer" }
+    KSA.ready, KSA.why = p.ok == true, p.why
+    if not A then return end
+    if KSA.ready then
+        GD.msg = "The deeper layer is active: Kitten Space Agency is ready behind the game." .. (A.borderHold and " Handing over now." or " It takes the Machine at the border.")
+        log("KSA activated (placement proved)")
+        if A.borderHold and KSA.consent and not KSA.embodying then ksaHandover(A.borderHold, GD.rehearsal) end
+    else
+        GD.msg = "The deeper layer could not be activated: " .. tostring(p.why) .. ". Deep holds the Machine at the border -- A asks again."
+        log("KSA activation failed: %s", tostring(p.why))
+    end
+end)
+
+--- KB-375: the player said yes -- prepare the deeper layer now (KSA starts behind the game and proves a placement)
+local function ksaActivate()
+    KSA.consent, KSA.ask = true, false
+    if KSA.ready or KSA.activating then return end
+    KSA.activating = true
+    GD.msg = "Activating the deeper layer: Kitten Space Agency is starting behind the game (about 25 s)..."
+    TriggerServerEvent("ncm:deep.ksa.selftest")
+end
+
 --- L335: hand the Machine to Kitten Space Agency: its exact state (latitude, longitude, altitude, INERTIAL velocity on the
 --- Earth-fixed axes). The bridge starts KSA, places the craft, reads it back and only then says yes.
 function ksaHandover(st, rehearsal)
@@ -509,8 +629,9 @@ function ksaHandover(st, rehearsal)
     local la, lo, alt = Deep.ecefToLla(st.p)
     local vI = Deep.inertialVel(st.p, st.v)
     GD.msg = "KSA border: handing the Machine to Kitten Space Agency -- KSA is starting (up to a minute)..."
+    -- L336: what is really left in the PT-500 goes with the Machine (KSA's craft is filled to it, not to full)
     TriggerServerEvent("ncm:deep.ksa.embody", { lat = la, lon = lo, altM = alt, velocityInertialCcf = vI, massKg = A.mass,
-        asset = A.asset, rehearsal = rehearsal == true })
+        asset = A.asset, rehearsal = rehearsal == true, propellantKg = EN and EN.fusionKg or nil })
 end
 RegisterNetEvent("ncm:deep.ksa.status", function(p)
     KSA.embodying = false
@@ -526,8 +647,8 @@ RegisterNetEvent("ncm:deep.ksa.status", function(p)
     end
 end)
 
---- The pre-flight checklist for the KSA border: this Machine (drive, delta-v, attitude) and KSA (from the bridge). Every
---- line must pass before Guidance flies there: an attempt is hours of real time, a failure found at the border wastes it.
+--- The pre-flight checklist for the border of Deep: THIS MACHINE only (drive, delta-v, attitude). KB-375: KSA is not part
+--- of it -- the deeper layer is offered at the border, with consent; nothing about it is probed at departure.
 local function ksaPreflight()
     local list, allOk = {}, true
     local function add(ok, label, detail)
@@ -550,16 +671,6 @@ local function ksaPreflight()
         local okP = Flight.canPoint(A.fm, NcmClientDevAttitude == true)
         add(okP, "Attitude authority", Flight.authorityText(A.fm))
     end
-    local pre = KSA.pre
-    if not pre then add(false, "KSA host", "asking the bridge...")
-    elseif not pre.reachable then add(false, "Host bridge", "not reachable -- is it running?")
-    else
-        for _, c in ipairs(pre.status and pre.status.checks or {}) do add(c.ok == true, c.label, nil) end
-        local st = KSA.selftest
-        if KSA.selftesting then add(false, "KSA placement self-test", "running (KSA is starting)...")
-        elseif st then add(st.ok == true, "KSA placement self-test", st.ok and "PASS" or ("FAIL: " .. tostring(st.why)))
-        else add(false, "KSA placement self-test", "not run yet -- A runs it") end
-    end
     return allOk, list
 end
 
@@ -580,7 +691,8 @@ local function ksaRehearse()
     GD.route = Guid.planBorder(A.s)
     GD.engaged, GD.rehearsal, GD.open = true, true, false
     A.borderHold, A.atBorder = nil, nil
-    GD.msg = "DEV REHEARSAL (not physical): 60 s before the KSA border, Guidance engaged."
+    KSA.consent, KSA.ask = nil, false   -- KB-375: the rehearsal goes through the same consent screen
+    GD.msg = "DEV REHEARSAL (not physical): 60 s before the border of Deep, Guidance engaged."
     log("KSA REHEARSAL: placed 60 s before the border over %.3f, %.3f (r %.0f km, %.0f km/s)", la, lo, r / 1000, speed / 1000)
 end
 
@@ -594,6 +706,15 @@ local function guidanceInput(now, dt)
     local alwaysE = edge("always", down("padX") or down("R"))
     local zoomE = edge("zoom", GD.open and (down("padRightThumb")) or false)
 
+    -- KB-375: the deeper layer, asked at the border (A activates it, B stays in Deep)
+    if KSA.ask then
+        if aE then ksaActivate()
+        elseif backE then
+            KSA.consent, KSA.ask = false, false
+            GD.msg = "Staying in Deep. Nothing was started; the border holds the Machine -- A there asks again."
+        end
+        return
+    end
     -- L329: the adapter is only installed with consent, asked when it matters (over the place, never at install)
     if GD.consent then
         if aE then
@@ -638,8 +759,8 @@ local function guidanceInput(now, dt)
         if zoomE then GD.zoom = GD.zoom % #ZOOMS + 1 end
         -- L335: the KSA border selected: keep the pre-flight fresh; on dev, L3 held 2 s = the rehearsal
         if targets()[GD.sel] and targets()[GD.sel].border then
-            if now - KSA.preAt > 8000 then KSA.preAt = now; TriggerServerEvent("ncm:deep.ksa.preflight") end
-            if KSA.pre and KSA.pre.dev and down("padLeftThumb") then
+            if KSA.dev == nil and now - KSA.devAt > 8000 then KSA.devAt = now; TriggerServerEvent("ncm:deep.ksa.preflight") end
+            if KSA.dev and down("padLeftThumb") then
                 KSA.holdL3 = KSA.holdL3 or now
                 if now - KSA.holdL3 >= 2000 then KSA.holdL3 = nil; ksaRehearse(); return end
             else KSA.holdL3 = nil end
@@ -647,7 +768,10 @@ local function guidanceInput(now, dt)
         local px, py = dead(axis("padRightStickX")), dead(axis("padRightStickY"))
         local rate = ZOOMS[GD.zoom] / 1000000 * 8 * dt
         GD.panLon, GD.panLat = GD.panLon + px * rate, math.max(-60, math.min(60, GD.panLat + py * rate))
-        if aE and A.borderHold and not KSA.embodying then ksaHandover(A.borderHold, GD.rehearsal); return end
+        if aE and A.borderHold and not KSA.embodying then
+            if KSA.ready then ksaHandover(A.borderHold, GD.rehearsal) else KSA.ask = true end
+            return
+        end
         if aE then
             if GD.engaged then GD.engaged = false; GD.msg = "Autopilot off: you have the Machine."
             else
@@ -661,20 +785,13 @@ local function guidanceInput(now, dt)
                     TriggerServerEvent("ncm:deep.guidance", { event = "refused", venue = targets()[GD.sel].id })
                     return
                 end
-                -- L335: the KSA border flies only on a full pre-flight pass; a missing self-test is run first
+                -- L335/KB-375: the border flies on THIS MACHINE's pre-flight; the deeper layer is offered at the border
                 if targets()[GD.sel].border then
                     local okAll, list = ksaPreflight()
                     if not okAll then
-                        local st = KSA.pre and KSA.pre.reachable and KSA.pre.status and KSA.pre.status.ok
-                        if st and not KSA.selftest and not KSA.selftesting then
-                            KSA.selftesting = true
-                            TriggerServerEvent("ncm:deep.ksa.selftest")
-                            GD.msg = "Running the KSA placement self-test first (KSA starts, places a test craft, reads it back)..."
-                        else
-                            local bad = {}
-                            for _, c in ipairs(list) do if not c.ok then bad[#bad + 1] = c.label end end
-                            GD.msg = "Pre-flight not passed: " .. table.concat(bad, ", ")
-                        end
+                        local bad = {}
+                        for _, c in ipairs(list) do if not c.ok then bad[#bad + 1] = c.label end end
+                        GD.msg = "Pre-flight not passed: " .. table.concat(bad, ", ")
                         return
                     end
                 end
@@ -809,13 +926,16 @@ local function tick()
             GD.engaged, GD.hold, GD.msg = false, nil, "Guidance cannot point this Machine: " .. tostring(why)
         else
             local gc, waiver, info = Guid.fly(GD.route, m, ds, { devHeat = opts.devHeat, waiver = devAtt and #(m.attitude or {}) == 0 })
-            for id, th in pairs(gc.throttle) do cmd.throttle[id] = th end
-            if gc.torque then cmd.torque = gc.torque end
+            Guid.apply(cmd, gc)   -- KB-376: ALL of Guidance's command (it steers by torqueNm with a gimballed engine)
             opts.waiver = waiver
             gcmd = info
             local thr = 0
             for _, th in pairs(gc.throttle) do thr = math.max(thr, th) end
             gcmd.throttle = thr
+            if GD.engaged and GD.route.kind == "border" and KSA.consent == nil and not KSA.ask and (info.etaS or 1e9) <= KSA_ASK_ETA_S then
+                KSA.ask = true   -- KB-375: approaching the border -- offer the deeper layer now, so it is ready on arrival
+                log("GUIDANCE approaching the border of Deep (%.0f s): offering the deeper layer", info.etaS or 0)
+            end
             if GD.engaged and GD.route.kind == "border" and Guid.arrived(GD.route, Flight.deep(ds)) then
                 -- L335: Earth's sphere of influence -- KSA takes the Machine at THIS state. Deep holds it here (labelled, like
                 -- AC's held body) until KSA confirms it placed it and read it back.
@@ -824,7 +944,9 @@ local function tick()
                 TriggerServerEvent("ncm:deep.guidance", { event = "arrived", venue = "ksa_border" })
                 A.atBorder = true
                 A.borderHold = Flight.deep(ds)
-                ksaHandover(A.borderHold, GD.rehearsal)
+                if KSA.ready and KSA.consent then ksaHandover(A.borderHold, GD.rehearsal)
+                elseif KSA.consent and KSA.activating then GD.msg = "At the border: holding while Kitten Space Agency gets ready..."
+                else KSA.ask = true end   -- not asked, declined or failed: ask here (KB-375)
             elseif GD.engaged and Guid.arrived(GD.route, Flight.deep(ds)) then
                 GD.engaged = false
                 GD.prompt = GD.route.venue
@@ -841,6 +963,7 @@ local function tick()
     local fuel0 = Flight.fuelKg(m, ds)
     A.fusion0 = Dyn.propellantLeft(m, ds, "fusion")
     local tel
+    A.dtMax = math.max(A.dtMax or 0, dt)   -- KB-376: the longest physics step this second (telemetry)
     ds, tel = Flight.step(m, ds, cmd, dt, opts)
     A.dyn = ds
     if EN and not opts.devFuel then
@@ -895,9 +1018,10 @@ local function tick()
             prompt = GD.prompt and GD.prompt.name or nil,
             consent = GD.consent and GD.consent.name or nil, adapters = GD.adapters and { ac = GD.acEnabled == true } or nil,
             schedule = GD.schedule,
-            selName = sel.name, selRegion = sel.region,
+            selName = sel.name, selRegion = sel.region, selId = sel.id,
             preflight = (sel.border and GD.open) and (function() local _, l = ksaPreflight(); return l end)() or nil,
-            held = A.borderHold and "HELD AT THE KSA BORDER for the handover (not physical)" or nil,
+            held = A.borderHold and "HELD AT THE BORDER OF DEEP (not physical)" or nil,
+            ksaAsk = KSA.ask or nil, ksaRehearsal = GD.rehearsal or nil,
             selKm = sel.border and math.max(0, sel.radiusM - Deep.vec.len(A.s.p)) / 1000 or Deep.distance(lat, lon, sel.lat, sel.lon) / 1000,
             backHold = GD.backSince and math.min(1, (now - GD.backSince) / 2000) or 0,
         }
@@ -905,7 +1029,8 @@ local function tick()
             g.phase, g.target, g.km, g.eta, g.throttle, g.vWant = gcmd.phase, GD.route.venue.name, gcmd.distanceM / 1000, gcmd.etaS, gcmd.throttle, gcmd.vWant
         end
         if GD.open then
-            g.cam = { lat = sel.lat + GD.panLat, lon = sel.lon + GD.panLon, alt = ZOOMS[GD.zoom] }
+            -- KB-372: the KSA border is a radius, not a place (no lat/lon): the map looks at the Machine instead
+            g.cam = { lat = (sel.lat or lat) + GD.panLat, lon = (sel.lon or lon) + GD.panLon, alt = ZOOMS[GD.zoom] }
         end
         send("deep:state", {
             p = A.s.p, v = A.s.v, r = A.s.basis.right, f = A.s.basis.forward, u = A.s.basis.up,
@@ -926,8 +1051,12 @@ local function tick()
         local ncKm = Deep.distance(lat, lon, Deep.ORIGIN.lat, Deep.ORIGIN.lon) / 1000
         TriggerServerEvent("ncm:deep.telemetry", { alt = alt, speed = speed, hspeed = hs, vspeed = vs, orbit = Deep.orbitSpeed(alt),
             lat = lat, lon = lon, ncKm = ncKm, landing = A.impact, fuelKg = EN and EN.fuelKg or 0, thrust = A.thrustN, rig = rig,
-            devices = devText, guidance = gcmd and ("%s -> %s %.0f km eta %.0f s throttle %.2f"):format(gcmd.phase, GD.route.venue.id,
-                gcmd.distanceM / 1000, gcmd.etaS, gcmd.throttle) or nil })
+            -- KB-376: how the Machine is pointing (alignment of its thrust with what Guidance wants, spin rate) and how the
+            -- frames ran -- the live climb fell in bursts the simulation never shows
+            devices = devText, guidance = gcmd and ("%s -> %s %.0f km eta %.0f s throttle %.2f | align %.2f spin %.2f rad/s | dt max %.0f ms skipped %d"):format(
+                gcmd.phase, GD.route.venue.id, gcmd.distanceM / 1000, gcmd.etaS, gcmd.throttle, tonumber(gcmd.align) or -1,
+                Deep.vec.len(A.dyn and A.dyn.omega or { 0, 0, 0 }), (A.dtMax or 0) * 1000, A.overBudgetTotal or 0) or nil })
+        A.dtMax = 0
         if EN and (A.report.kg > 0 or (A.report.fusionKg or 0) > 0) then
             TriggerServerEvent("ncm:engineering.burn", { assetId = EN.assetId, kg = A.report.kg, fusionKg = A.report.fusionKg or 0, dtS = (now - A.report.since) / 1000,
                 pulses = A.report.pulses, t = { devices = devText, f = A.thrustN, z = alt, speed = speed,
@@ -971,6 +1100,8 @@ CreateThread(function()
                 if A.overBudget == 1 then log("frame over the script budget -- skipped (%s)", tostring(err)) end
             else
                 log("FLIGHT ERROR, bringing you home: %s", tostring(err))
+                -- KB-372: the reason reaches the server log too (it was only in the player's client log)
+                pcall(TriggerServerEvent, "ncm:deep.render", '{"what":"flight_error","error":' .. string.format("%q", tostring(err):sub(1, 300)) .. '}')
                 pcall(exit, "flight error", true)
             end
         end

@@ -92,6 +92,9 @@ Core.define("space.guidance", function(C)
         radiusM = math.floor(0.98 * M.KSA_SOI_M), host = "ksa", border = true }
     M.BORDER_CLIMB_M = 40000       -- straight up until here: no lingering in the air at speed
     M.BORDER_MIN_VR = 300          -- m/s outward: below it the burn leans further outward
+    -- KB-373: burn to this inertial speed, then coast. A torch burning all the way spends sqrt(2 d a) of delta-v -- MORE
+    -- the stronger the drive (30 kN arrived with 25 kg of 400 in simulation); at 120 km/s the trip takes the same ~3.4 h.
+    M.BORDER_CRUISE_V = 120000
 
     function M.planBorder(state)
         local r = V.len(state.p)
@@ -127,6 +130,11 @@ Core.define("space.guidance", function(C)
             dir, phase = V.unit(V.add(V.unit(vi), V.scale(up, lean))), "escape"
         end
         local d = math.max(0, route.venue.radiusM - r)
+        -- cruise reached and climbing out fast: coast, pointing along the way (the drive idles; nothing is spent)
+        if phase == "escape" and V.len(vi) >= M.BORDER_CRUISE_V and vr > 0 then
+            route.phase = "coast"
+            return { dir = dir, throttle = 0, phase = "coast", target = route.venue.name, distanceM = d, etaS = d / math.max(1, vr), vWant = nil }
+        end
         local a = math.max(0.1, aMax - D.GM / (r * r) * math.max(0, V.dot(dir, up)))
         local eta = (-vr + math.sqrt(math.max(0, vr * vr + 2 * a * d))) / a
         route.phase = phase
@@ -141,10 +149,21 @@ Core.define("space.guidance", function(C)
         local d = math.max(0, M.BORDER.radiusM - r)
         local a = math.max(0.1, thrustN / math.max(1, massKg))
         local t = math.sqrt(2 * d / a)
-        local need = a * t + math.sqrt(2 * D.GM / r) * 0.3     -- gravity losses on the way out of the well (rough, stated)
+        local need = math.min(a * t, M.BORDER_CRUISE_V) + math.sqrt(2 * D.GM / r) * 0.3     -- burn to cruise (KB-373); gravity losses rough, stated
         local mDry = math.max(1, massKg - propKg)
         local have = ispS * M.G_SURFACE * math.log(massKg / mDry)
         return have >= need, need, have
+    end
+
+    --- KB-376: put Guidance's command onto the pilot's: its throttles, and its attitude -- `torque` (normalised, attitude
+    --- sets only) or `torqueNm` (absolute, when an engine gimbals: L334). Live, only `torque` was copied, so a gimballed
+    --- Machine was never steered and fell; the simulation passed the whole command and flew. One function for both now.
+    function M.apply(cmd, gc)
+        cmd.throttle = cmd.throttle or {}
+        for id, th in pairs(gc.throttle or {}) do cmd.throttle[id] = th end
+        if gc.torqueNm then cmd.torqueNm, cmd.torque = gc.torqueNm, nil
+        elseif gc.torque then cmd.torque, cmd.torqueNm = gc.torque, nil end
+        return cmd
     end
 
     --- Is the Machine inside the arrival envelope?

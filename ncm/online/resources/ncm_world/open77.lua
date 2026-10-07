@@ -134,6 +134,9 @@ shared_script "shared/core/space/places.lua"
 shared_script "shared/core/space/embodiment.lua"
 shared_script "shared/core/space/raceworld.lua"
 shared_script "shared/core/space/geolod.lua"
+shared_script "shared/core/data/machine_seeds.lua"
+shared_script "shared/core/machine/passport.lua"
+shared_script "shared/core/machine/correspondence.lua"
 shared_script "shared/core/economy/markets.lua"
 shared_script "shared/core/economy/production.lua"
 shared_script "shared/core/economy/supply_profiles.lua"
@@ -253,6 +256,7 @@ server_script "server/vitals.lua"
 server_script "server/snowglobe.lua"   -- L317 Snowglobe 0: automatic floating origin above 14 km (development only)
 server_script "server/canonical.lua"    -- L329: where every Machine canonically is; unhosted Deep; the universe for other hosts
 server_script "server/journey.lua"      -- schema 067: a Machine's physical journey, recorded (NCM 3.0 item 9)
+server_script "server/passport.lua"     -- L336: the Machine Passport; each host expresses a Machine through it
 server_script "server/deep.lua"         -- L326: the handoff to NCM's own universe (development only)
 server_script "server/life.lua"         -- KB-350: a dead player comes back (NCM loads no freeroam)
 server_script "server/main.lua"

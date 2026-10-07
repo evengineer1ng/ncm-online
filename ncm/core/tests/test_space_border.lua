@@ -13,7 +13,7 @@ local function hella(T, opts)
     for _, d in ipairs(I.DESIGNS) do ids[d.code] = d.designId end
     local items = {
         { componentId = "fd", designId = ids["ZTC-FD1"], mountId = "mount.rear", facing = "aft" },
-        { componentId = "pt", designId = ids["ZTC-PT500"], mountId = "mount.front", facing = "up", fillKg = opts.fillKg or 500 },
+        { componentId = "pt", designId = ids["ZTC-PT500"], mountId = "mount.front", facing = "up", fillKg = opts.fillKg or 400 },
         { componentId = "ia", designId = ids["ARC-IA10"], mountId = "mount.underside", facing = "down" },
         { componentId = "ac", designId = ids["ZTC-AC6"], mountId = "mount.roof", facing = "up" },
     }
@@ -32,7 +32,7 @@ return {
         local fd, pt
         for _, d in ipairs(devices) do if d.code == "ZTC-FD1" then fd = d elseif d.code == "ZTC-PT500" then pt = d end end
         T.ok(fd and fd.perf.propellant == "fusion" and fd.perf.thrustN <= I.mount("mount.rear").ratedN, "the drive burns fusion, inside the rear rating")
-        T.eq(pt.fillKg, 500, "the tank carries its own fill")
+        T.eq(pt.fillKg, 400, "the tank carries its own fill")
     end,
 
     each_part_burns_its_own_propellant = function(T)
@@ -64,12 +64,40 @@ return {
     the_border_is_within_reach_and_says_so_when_not = function(T)
         local D, G = mods(T)
         local m, s, ds = hella(T)
-        local ok, need, have = G.borderBudget(ds, 2600, 28000, 100000, 500)
+        local ok, need, have = G.borderBudget(ds, 2534, 30000, 100000, 400)
         T.ok(ok and have > need, ("full tank: %.0f km/s needed, %.0f available"):format(need / 1000, have / 1000))
-        local ok2 = G.borderBudget(ds, 2150, 28000, 100000, 50)
+        local ok2 = G.borderBudget(ds, 2184, 30000, 100000, 50)
         T.falsy(ok2, "50 kg of fusion cannot reach the border")
         T.ok(G.target("ksa_border").radiusM < G.KSA_SOI_M and G.target("ksa_border").radiusM > 0.95 * G.KSA_SOI_M,
             "the border sits just inside KSA's own Earth sphere of influence")
+    end,
+
+    -- KB-373: the fully fitted Hella (car, IA-10, AC-6, FD-1, a FULL tank, fuel) weighed more than its FD-1 could hold up
+    -- with Guidance's margin (1.08 < 1.15), so Guidance refused every target -- Mugello and the border alike
+    guidance_accepts_the_fully_fitted_hella = function(T)
+        local _, G, _, _, Dyn = mods(T)
+        local m, s = hella(T)
+        local thrust = 0
+        for _, d in ipairs(m.devices) do if d.kind == "reaction_engine" then thrust = thrust + d.perf.thrustN end end
+        local ok, tw, why = G.feasible(thrust, Dyn.mass(m, s))
+        T.ok(ok, ("Guidance flies the full Hella: thrust/weight %.2f (%s)"):format(tw, tostring(why)))
+    end,
+
+    -- KB-376: the live client merges Guidance onto the pilot's command; a stick command must not survive, and a gimballed
+    -- Machine's absolute torque must arrive (it was dropped live: the Hella fell from 12 km in bursts)
+    guidance_steering_reaches_the_machine = function(T)
+        local _, G = mods(T)
+        local m, s, ds = hella(T)
+        local route = G.planBorder(ds)
+        local gc = G.fly(route, m, s, { devHeat = false })
+        T.ok(gc.torqueNm or gc.torque, "Guidance asks for an attitude torque")
+        local cmd = G.apply({ throttle = {}, torque = { 0.3, 0, 0 } }, gc)
+        if gc.torqueNm then
+            T.eq(cmd.torqueNm, gc.torqueNm, "the absolute torque reaches the Machine")
+            T.eq(cmd.torque, nil, "and the pilot's stick does not fight it")
+        else
+            T.eq(cmd.torque, gc.torque, "the attitude torque reaches the Machine")
+        end
     end,
 
     guidance_flies_the_hella_to_the_border = function(T)
@@ -91,7 +119,7 @@ return {
         T.ok(arrived, ("reached the KSA border (after %.2f h)"):format(t / 3600))
         T.ok(t < 4.5 * 3600, "in under 4.5 hours")
         T.ok(minAlt > 12000, ("never sank below where it started (min %.0f m)"):format(minAlt))
-        T.ok(Dyn.propellantLeft(m, s, "fusion") > 25, ("with propellant to spare (%.0f kg)"):format(Dyn.propellantLeft(m, s, "fusion")))
+        T.ok(Dyn.propellantLeft(m, s, "fusion") > 60, ("with propellant to spare (burn to cruise, then coast: KB-373) (%.0f kg)"):format(Dyn.propellantLeft(m, s, "fusion")))
     end,
 
     offline_flight_reaches_the_border_and_waits_for_ksa = function(T)

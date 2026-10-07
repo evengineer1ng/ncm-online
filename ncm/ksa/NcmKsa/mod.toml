@@ -1,4 +1,8 @@
 name = "NcmKsa"
 
+# L336: the Machine's own craft (NCM-authored XML). Its mesh and textures (Meshes/, Textures/) are made locally from the
+# player's own game files by tools/ksa-hella-body.py and never committed.
+assets = [ "content/NcmHella.xml" ]
+
 [StarMap]
 EntryAssembly = "NcmKsa"

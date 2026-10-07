@@ -41,7 +41,9 @@ RegisterNetEvent("ncm:deep.config.request", function()
         -- the visual ascent band (convars so it can be tuned to where REDengine actually runs out, without a build)
         ascentZ = tonumber(GetConvar("ncm_deep_ascent_z", "4000")) or 4000,
         maskNearM = tonumber(GetConvar("ncm_deep_mask_near", "9000")) or 9000,
-        maskFarM = tonumber(GetConvar("ncm_deep_mask_far", "16000")) or 16000 })
+        maskFarM = tonumber(GetConvar("ncm_deep_mask_far", "16000")) or 16000,
+        -- KB-377: the measurement build -- the ascent draws no Earth and logs the game's real camera (development only)
+        ascentProbe = enabled() and tostring(GetConvar("ncm_deep_ascent_probe", "1")) ~= "0" })
 end)
 
 RegisterNetEvent("ncm:deep.enter", function(r)
@@ -91,6 +93,7 @@ RegisterNetEvent("ncm:deep.telemetry", function(t)
         pid, tonumber(t.alt) or 0, tonumber(t.speed) or 0, tonumber(t.hspeed) or 0, tonumber(t.vspeed) or 0, tonumber(t.orbit) or 0,
         tonumber(t.lat) or 0, tonumber(t.lon) or 0, tonumber(t.ncKm) or 0, tostring(t.landing or "?"), tonumber(t.fuelKg) or 0,
         tonumber(t.thrust) or 0, t.rig and " | dev attitude rig ON" or "", t.devices and (" | " .. tostring(t.devices)) or "")
+    if t.guidance then log("GUIDE player=%d %s", pid, tostring(t.guidance):sub(1, 240)) end   -- KB-376
     if NcmJourney then NcmJourney.sample(pid, t) end
 end)
 
@@ -191,7 +194,10 @@ RegisterNetEvent("ncm:deep.embody.request", function(r)
         Wait(0)
         local lh, sh = Venues.localHour(v, now)
         local machine = MySQL.single.await("SELECT vehicle_key FROM vehicle_asset WHERE asset_id=?", { tostring(r.asset or "") })
-        local body = Embodiment.forMachine(machine and machine.vehicle_key)
+        -- L336: the Machine's passport picks its AC body and skin (sticky); the old table only if the roster is unavailable
+        local body = machine and NcmPassport and NcmPassport.expressAc(tostring(r.asset)) or nil
+        if not body then body = Embodiment.forMachine(machine and machine.vehicle_key) end
+        Wait(0)
         local top = {}
         if st then for i = 1, math.min(3, #st.cars) do top[#top + 1] = st.cars[i].driver.name end end
         log("EMBODY player=%d over %s (local %02d:%02d, solar %.1f h) | %s, %d min left | event %s %s %s lap %s/%s | body %s (%s) | %d NPC(s) in the field",
@@ -242,20 +248,39 @@ local function ksaRelay(pid, path, method, body, reply)
         reply(tonumber(code) or 0, ok and type(st) == "table" and st or {}, err)
     end, method, body or "", { ["Content-Type"] = "application/json" })
 end
+-- KB-375: no KSA call before consent -- the client only learns whether this is a development server (the L3 rehearsal)
 RegisterNetEvent("ncm:deep.ksa.preflight", function()
     local pid = tonumber(source) or 0
     if pid <= 0 or not inDeep[pid] then return end
-    ksaRelay(pid, "/ksa/status", "GET", nil, function(code, st)
-        TriggerClientEvent("ncm:deep.ksa.preflight", pid, { reachable = code == 200, status = st, dev = enabled() })
-    end)
+    TriggerClientEvent("ncm:deep.ksa.preflight", pid, { dev = enabled() })
 end)
 RegisterNetEvent("ncm:deep.ksa.selftest", function()
     local pid = tonumber(source) or 0
     if pid <= 0 or not inDeep[pid] then return end
-    log("KSA SELFTEST player=%d asked", pid)
-    ksaRelay(pid, "/ksa/selftest", "POST", "{}", function(code, r)
-        log("KSA SELFTEST player=%d -> %d %s %s", pid, code, r.ok and "PASS" or "FAIL", tostring(r.why or r.error or ""))
+    log("KSA ACTIVATE player=%d consented: start KSA and prove a placement", pid)
+    local function done(r, how)
+        log("KSA SELFTEST player=%d -> %s %s%s", pid, r.ok and "PASS" or "FAIL", tostring(r.why or r.error or ""), how or "")
         TriggerClientEvent("ncm:deep.ksa.selftest", pid, { ok = r.ok == true, why = r.why or r.error, errors = r.errors })
+    end
+    -- KB-374: starting KSA takes ~25 s and this HTTP call stops waiting at 10 s (it said "FAIL nil" over a PASS). Note the
+    -- bridge's self-test counter first; if the reply never comes, read the verdict when the counter moves (up to 4 min).
+    ksaRelay(pid, "/ksa/selftest-result", "GET", nil, function(_, before)
+        local seq0 = tonumber(before.seq) or 0
+        ksaRelay(pid, "/ksa/selftest", "POST", "{}", function(code, r)
+            if code == 200 or r.ok ~= nil then return done(r) end
+            CreateThread(function()
+                local t0 = Open77.time.unix()
+                while Open77.time.unix() - t0 < 240 do
+                    Wait(3000)
+                    local got
+                    ksaRelay(pid, "/ksa/selftest-result", "GET", nil, function(_, res) got = res end)
+                    local w0 = Open77.time.unix()
+                    while got == nil and Open77.time.unix() - w0 < 12 do Wait(200) end
+                    if got and (tonumber(got.seq) or 0) > seq0 then return done(got, " (read back after KSA started)") end
+                end
+                done({ ok = false, why = "the bridge never finished the self-test (4 min)" })
+            end)
+        end)
     end)
 end)
 RegisterNetEvent("ncm:deep.ksa.embody", function(r)
@@ -263,6 +288,9 @@ RegisterNetEvent("ncm:deep.ksa.embody", function(r)
     if pid <= 0 or type(r) ~= "table" or not inDeep[pid] then return end
     local driverId = NcmCanonical and NcmCanonical.driverOf(pid) or nil
     r.driverId = driverId
+    -- L336: the Machine's KSA body, chosen through its passport (sticky, recorded) -- the craft KSA spawns at the handoff
+    local kb = r.asset and NcmPassport and NcmPassport.expressKsa(tostring(r.asset)) or nil
+    r.ksaBody = kb and kb.body or "NcmHella"   -- cross-scope-ok: a KSA craft id (a string), not a global
     local Json = NcmCore.get("vocabulary.json")
     local okE, body = pcall(Json.encode, r)
     log("KSA EMBODY player=%d at %.4f, %.4f alt %.0f km (%s)", pid, tonumber(r.lat) or 0, tonumber(r.lon) or 0, (tonumber(r.altM) or 0) / 1000,

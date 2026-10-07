@@ -29,6 +29,16 @@ if ($LASTEXITCODE -ne 0) { throw "build failed ($LASTEXITCODE)" }
 
 New-Item -ItemType Directory -Force $modDir | Out-Null
 Copy-Item (Join-Path $out 'NcmKsa.dll'), (Join-Path $out 'NcmKsa.pdb'), (Join-Path $out 'mod.toml') $modDir -Force
+# L336: the Machine's craft -- NCM's XML (content/, vehicles/) from the repo; its body from the player's own game files
+$src = Join-Path $repo 'ncm\ksa\NcmKsa'
+foreach ($d in 'content', 'vehicles') {
+  Copy-Item (Join-Path $src $d) $modDir -Recurse -Force
+}
+if (-not (Test-Path (Join-Path $modDir 'Meshes\NcmHella_MeshAtlas.glb'))) {
+  Write-Host 'Making the Hella''s KSA body from your game files (tools/ksa-hella-body.py) ...'
+  & python (Join-Path $repo 'tools\ksa-hella-body.py')
+  if ($LASTEXITCODE -ne 0) { throw "ksa-hella-body.py failed ($LASTEXITCODE)" }
+}
 
 $manifest = Join-Path $docs 'manifest.toml'
 $text = if (Test-Path $manifest) { Get-Content $manifest -Raw } else { "[[mods]]`nid = `"Core`"`nenabled = true`n" }

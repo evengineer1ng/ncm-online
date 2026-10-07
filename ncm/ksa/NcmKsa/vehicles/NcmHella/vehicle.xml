@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- NCM (L336): the Archer Hella as a KSA craft, as it reaches the KSA border: the PT-400 full (the handoff then sets
+     what is really left, from NCM's own record), the AC-6's fuel full (44 kg, as NCM carries). Parts: ncm/ksa/NcmKsa/content/NcmHella.xml. -->
+<VehicleSaveData Id="NcmHella">
+  <RootPartRef InstanceOf="NcmHella_Part" LocalInstanceId="0">
+    <Transform>
+      <Position X="0" Y="0" Z="0" />
+      <Rotation X="0" Y="0" Z="0" />
+      <Scale X="1" Y="1" Z="1" />
+    </Transform>
+    <!-- Sequence 1: the FD-1's stage (an engine in no sequence never fires: 0 N on the first bench, 2026-10-07) -->
+    <SubPartRef InstanceOf="NcmHella_Subpart_Body" LocalInstanceId="1" Stage="0" Sequence="1" SequenceOrder="1">
+      <TankData InstanceOf="PT500">
+        <RoleAffinity>Engine</RoleAffinity>
+        <Mole SubstancePhaseId="H2O(l)">
+          <Mass Kg="399.9979" />
+        </Mole>
+      </TankData>
+      <TankData InstanceOf="PT500Trap">
+        <RoleAffinity>Engine</RoleAffinity>
+        <Mole SubstancePhaseId="AntiH2(l)">
+          <Mass Kg="0.0021401" />
+        </Mole>
+      </TankData>
+      <TankData InstanceOf="AC6Tank">
+        <RoleAffinity>Thruster</RoleAffinity>
+        <Mole SubstancePhaseId="MMH(l)">
+          <Mass Kg="16.92" />
+        </Mole>
+        <Mole SubstancePhaseId="N2O4(l)">
+          <Mass Kg="27.08" />
+        </Mole>
+      </TankData>
+    </SubPartRef>
+  </RootPartRef>
+</VehicleSaveData>

@@ -22,6 +22,7 @@ import shutil
 import subprocess
 import sys
 import threading
+import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse, parse_qs
 
@@ -298,6 +299,113 @@ ac_commands = []          # commands for the AC app (release ...)
 lifecycle = {"from_cyberpunk": False, "cp_launched": False, "cp_ready": False}
 
 
+# ---------------------------------------------------------------------------------------------- the AC roster (L336)
+# Assetto Corsa's half of the Machine Passport: every installed car's own data (ui/ui_car.json: brand, name, class, tags,
+# specs) and every skin's colour (its ui livery.png swatch), sent to NCM, which turns them into passports
+# (machine.passport.fromAc) and picks a body through machine.correspondence. No body is chosen here.
+import struct
+import zlib
+
+
+def _png_mean_rgb(path):
+    """Mean colour of a small PNG (8-bit RGB/RGBA, non-interlaced), transparent pixels skipped. Pure Python: the bridge
+    runs isolated (-I) without Pillow. None when it cannot be read."""
+    try:
+        data = open(path, "rb").read()
+        if data[:8] != b"\x89PNG\r\n\x1a\n":
+            return None
+        pos, idat, w = 8, b"", 0
+        while pos < len(data):
+            ln, typ = struct.unpack(">I4s", data[pos:pos + 8])
+            body = data[pos + 8:pos + 8 + ln]
+            if typ == b"IHDR":
+                w, h, depth, ctype, _, _, inter = struct.unpack(">IIBBBBB", body)
+                if depth != 8 or ctype not in (2, 6) or inter != 0:
+                    return None
+                bpp = 3 if ctype == 2 else 4
+            elif typ == b"IDAT":
+                idat += body
+            elif typ == b"IEND":
+                break
+            pos += 12 + ln
+        raw = zlib.decompress(idat)
+        stride = w * bpp
+        prev = bytearray(stride)
+        r = g = b = n = 0
+        i = 0
+        for _ in range(h):
+            ft = raw[i]
+            line = bytearray(raw[i + 1:i + 1 + stride])
+            i += 1 + stride
+            for x in range(stride):
+                a = line[x - bpp] if x >= bpp else 0
+                up = prev[x]
+                c = prev[x - bpp] if x >= bpp else 0
+                if ft == 1:
+                    line[x] = (line[x] + a) & 255
+                elif ft == 2:
+                    line[x] = (line[x] + up) & 255
+                elif ft == 3:
+                    line[x] = (line[x] + ((a + up) >> 1)) & 255
+                elif ft == 4:
+                    pa, pb, pc = abs(up - c), abs(a - c), abs(a + up - 2 * c)
+                    pr = a if pa <= pb and pa <= pc else (up if pb <= pc else c)
+                    line[x] = (line[x] + pr) & 255
+            for x in range(0, stride, bpp):
+                if bpp == 4 and line[x + 3] < 128:
+                    continue
+                r, g, b, n = r + line[x], g + line[x + 1], b + line[x + 2], n + 1
+            prev = line
+        return [round(r / n), round(g / n), round(b / n)] if n else None
+    except Exception:
+        return None
+
+
+def scan_ac_cars():
+    cars_dir = os.path.join(AC, "content", "cars")
+    out = []
+    if not os.path.isdir(cars_dir):
+        return out
+    for folder in sorted(os.listdir(cars_dir)):
+        uip = os.path.join(cars_dir, folder, "ui", "ui_car.json")
+        if not os.path.exists(uip):
+            continue
+        try:
+            text = open(uip, encoding="utf-8", errors="replace").read()
+            ui = json.loads("".join(ch if ch >= " " else " " for ch in text), strict=False)
+        except ValueError:
+            continue
+        skins = []
+        sdir = os.path.join(cars_dir, folder, "skins")
+        for sk in sorted(os.listdir(sdir)) if os.path.isdir(sdir) else []:
+            rgb = _png_mean_rgb(os.path.join(sdir, sk, "livery.png"))
+            if rgb:
+                skins.append({"id": sk, "rgb": rgb})
+        out.append({"id": folder, "ui": {k: ui.get(k) for k in ("name", "brand", "class", "tags", "specs", "year", "country")}, "skins": skins})
+    return out
+
+
+# the scanned roster, served at /ac/roster; kept on disk so a bridge restart serves at once (a full scan takes ~20 s)
+ac_roster = {"cars": None, "at": 0}
+AC_ROSTER_FILE = os.path.join(os.environ.get("LOCALAPPDATA", os.path.expanduser("~")), "NCM", "ac_roster.json")
+
+
+def ac_roster_refresh():
+    try:
+        if ac_roster["cars"] is None and os.path.exists(AC_ROSTER_FILE):
+            ac_roster["cars"] = json.load(open(AC_ROSTER_FILE, encoding="utf-8"))
+            log("AC ROSTER %d car(s) from the last scan (rescanning)", len(ac_roster["cars"]))
+        t0 = time.time()
+        cars = scan_ac_cars()
+        ac_roster["cars"], ac_roster["at"] = cars, time.time()
+        os.makedirs(os.path.dirname(AC_ROSTER_FILE), exist_ok=True)
+        with open(AC_ROSTER_FILE, "w", encoding="utf-8", newline="") as f:
+            json.dump(cars, f)
+        log("AC ROSTER scanned %d car(s), %d skin colour(s) in %.0f s", len(cars), sum(len(c["skins"]) for c in cars), time.time() - t0)
+    except Exception as e:
+        log("AC ROSTER scan failed: %s", e)
+
+
 def scan_tracks():
     """Every AC track/layout and its ui_track.json geotags, for space.places (never trusted blindly)."""
     root = os.path.join(AC, "content", "tracks")
@@ -451,7 +559,11 @@ def write_race_ini(h):
     cp["RACE"]["AI_LEVEL"] = "95"
     cp["RACE"]["FIXED_SETUP"] = "0"
     cp["RACE"]["PENALTIES"] = "0"
-    cp["CAR_0"] = {"MODEL": body["car"], "SKIN": skin_for(body["car"], "player"), "DRIVER_NAME": "NCM Machine", "NATIONALITY": "", "AI": "0"}
+    # L336: the skin the Machine's passport chose (nearest to its paint), if it is still installed
+    skin0 = body.get("skin")
+    if not (skin0 and os.path.isdir(os.path.join(AC, "content", "cars", body["car"], "skins", skin0))):
+        skin0 = skin_for(body["car"], "player")
+    cp["CAR_0"] = {"MODEL": body["car"], "SKIN": skin0, "DRIVER_NAME": "NCM Machine", "NATIONALITY": "", "AI": "0"}
     for i, c in enumerate(cars, start=1):
         cp["CAR_%d" % i] = {"MODEL": c["car"], "SKIN": skin_for(c["car"], c.get("id") or c["name"]), "DRIVER_NAME": c["name"], "NATIONALITY": "", "AI": "1",
                             "AI_LEVEL": str(int(80 + 20 * float(c.get("pace") or 0.5)))}
@@ -624,7 +736,17 @@ STARMAP_DIR = os.path.join(NCM_LOCAL, "StarMap")
 DOTNET_DIR = os.path.join(NCM_LOCAL, "dotnet")
 KSA_MOD = "http://127.0.0.1:47712"
 KSA_TOL = {"radiusM": 1000.0, "speedMps": 1.0, "deg": 0.01}
-ksa = {"selftest": None, "selftestAt": None, "embodied": None, "launching": False}
+ksa = {"selftest": None, "selftestAt": None, "embodied": None, "launching": False, "selftestSeq": 0, "selftestResult": None}
+
+
+def ksa_selftest_done(code, r):
+    """KB-374: every self-test outcome is kept with a counter -- a launch takes ~25 s, longer than the server's HTTP call
+    waits (10 s), so the server reads the verdict from /ksa/selftest-result instead of the reply it never got."""
+    ksa["selftest"], ksa["selftestAt"] = bool(r.get("ok")), datetime.datetime.now().isoformat(timespec="seconds")
+    ksa["selftestSeq"] += 1
+    ksa["selftestResult"] = {"seq": ksa["selftestSeq"], "code": code, "ok": bool(r.get("ok")), "at": ksa["selftestAt"],
+                             "why": r.get("why") or r.get("error"), "errors": r.get("errors")}
+    return code, r
 
 
 def ksa_get(path, timeout=15):
@@ -678,9 +800,24 @@ def ksa_status():
     return out
 
 
+def ksa_no_start_dialogs():
+    """KSA's start-up CONFIGURATION dialog (selectSystemOnStart) and welcome popup wait for a click: a handoff launch that
+    meets one never reaches a flight (bench, 2026-10-07: stuck 7 min). Turn both off in KSA's own settings, said in the log."""
+    path = os.path.join(KSA_DOCS, "settings.toml")
+    try:
+        text = open(path, encoding="utf-8", newline="").read()
+    except OSError:
+        return
+    new = text.replace("selectSystemOnStart = true", "selectSystemOnStart = false").replace("welcomePopup = true", "welcomePopup = false")
+    if new != text:
+        open(path, "w", encoding="utf-8", newline="").write(new)
+        log("KSA settings: start-up dialogs off (selectSystemOnStart, welcomePopup) -- a handoff cannot wait for a click")
+
+
 def ksa_launch(wait_s=180):
     """Start KSA through StarMap (if it is not running) and wait until NcmKsa answers from inside a flight."""
     if not ksa_running():
+        ksa_no_start_dialogs()
         env = dict(os.environ, DOTNET_ROOT=DOTNET_DIR)
         log("KSA launching through StarMap (%s)", STARMAP_DIR)
         out = open(os.path.join(STARMAP_DIR, "starmap.out.log"), "w", encoding="utf-8")
@@ -758,6 +895,12 @@ class H(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(data)
             return
+        if u.path == "/ac/roster":   # L336: every installed AC car's own data + skin colours, for the Machine Passport
+            if ac_roster["cars"] is None:
+                return self.send_json(503, {"error": "the AC roster is still being scanned"})
+            return self.send_json(200, ac_roster["cars"])
+        if u.path == "/ksa/selftest-result":   # KB-374: the last self-test's verdict and its counter (instant, no KSA call)
+            return self.send_json(200, ksa["selftestResult"] or {"seq": ksa["selftestSeq"], "ok": False, "why": "no self-test yet"})
         if u.path == "/ksa/status":   # L334: every KSA precondition, and the live state if it is running
             return self.send_json(200, ksa_status())
         if u.path == "/tiles-status":
@@ -801,12 +944,16 @@ class H(BaseHTTPRequestHandler):
         if u.path == "/ksa/selftest":   # L334: start KSA if needed, prove a placement round trip, cache the verdict
             st = ksa_status()
             if not st["ok"]:
-                return self.send_json(409, {"ok": False, "why": "KSA preconditions", "status": st})
+                return self.send_json(*ksa_selftest_done(409, {"ok": False, "why": "KSA preconditions", "status": st}))
             ready, info = ksa_launch()
             if not ready:
-                return self.send_json(504, {"ok": False, "why": info.get("why")})
+                return self.send_json(*ksa_selftest_done(504, {"ok": False, "why": info.get("why")}))
+            # L336: the self-test proves the Machine's own craft -- spawned first, then placed and read back
+            sp = ksa_post("/ksa/spawn", {"body": body.get("body") or "NcmHella"})
+            log("KSA SELFTEST spawn %s: %s", body.get("body") or "NcmHella", "ok" if sp.get("ok") else (sp.get("why") or sp.get("error")))
             r = ksa_get("/ksa/selftest", timeout=60)
-            ksa["selftest"], ksa["selftestAt"] = bool(r.get("ok")), datetime.datetime.now().isoformat(timespec="seconds")
+            r["spawn"] = sp
+            ksa_selftest_done(200, r)
             log("KSA SELFTEST %s | errors %s", "PASS" if r.get("ok") else "FAIL", r.get("errors") or r.get("error") or r.get("why"))
             return self.send_json(200, r)
         if u.path == "/ksa/embody":   # L334: THE HANDOFF -- the Machine at the border becomes KSA's craft at the same state
@@ -823,6 +970,13 @@ class H(BaseHTTPRequestHandler):
             if not ready:
                 log("KSA EMBODY failed: %s", info.get("why"))
                 return self.send_json(504, {"ok": False, "why": info.get("why")})
+            # L336: KSA flies the Machine's own craft (its passport's KSA body), filled to what NCM says is left
+            sp = ksa_post("/ksa/spawn", {"body": want.get("ksaBody") or "NcmHella", "propellantKg": want.get("propellantKg")})
+            if sp.get("ok"):
+                log("KSA EMBODY body %s (%s), propellant %.1f kg", want.get("ksaBody") or "NcmHella", "kept" if sp.get("reused") else "spawned",
+                    float(((sp.get("vehicle") or {}).get("propellantKg")) or 0))
+            else:   # never deny the Machine its geography: KSA's own craft carries it, said as a loss
+                log("KSA EMBODY body FAILED (%s): KSA's own craft carries the Machine (an expression loss)", sp.get("why") or sp.get("error"))
             r = ksa_post("/ksa/place", {"lat": want["lat"], "lon": want["lon"], "altM": want["altM"], "velocityInertialCcf": want["velocityInertialCcf"]})
             if not r.get("ok"):
                 log("KSA EMBODY place refused: %s", r.get("why") or r.get("error"))
@@ -838,7 +992,8 @@ class H(BaseHTTPRequestHandler):
             bring_forward("StarMap.exe", "the Machine is in Kitten Space Agency")
             if cp_running():
                 threading.Thread(target=close_gracefully, args=("Cyberpunk2077.exe", "KSA has the Machine (verified)"), daemon=True).start()
-            return self.send_json(200, {"ok": True, "errors": errs, "placed": r["placed"]})
+            return self.send_json(200, {"ok": True, "errors": errs, "placed": r["placed"], "body": {"id": want.get("ksaBody") or "NcmHella",
+                                        "ok": bool(sp.get("ok")), "why": sp.get("why") or sp.get("error")}})
         if u.path == "/tiles/prefetch":   # L332: soonest first; a new list replaces what is still waiting
             items = []
             for t in (body.get("tiles") or [])[:600]:
@@ -952,6 +1107,7 @@ if __name__ == "__main__":
     with lock:
         places_out.extend(scanned)
     log("PLACES scanned %d AC track layout(s) for the registry", len(scanned))
+    threading.Thread(target=ac_roster_refresh, daemon=True).start()
     for _ in range(3):
         threading.Thread(target=tile_prefetch_worker, daemon=True).start()
     threading.Thread(target=tile_prune, daemon=True).start()

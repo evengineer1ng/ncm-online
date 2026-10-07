@@ -6493,3 +6493,29 @@ All three were fixed in the fixtures, and the orbiter's balance is tested.
 **Measured:** see [docs/research/open77/KSA_PROBE.md](../research/open77/KSA_PROBE.md) -- cold start to a flight 23 s; self-test PASS 0 m / 0.00003 m/s / 0 deg; the real handoff with NCM core's own payload VERIFIED 0 / 0 / 0 / 0.
 
 **Loss (stated):** the craft in KSA is KSA's starting vessel, not the Machine built from its parts (next KSA step, L333).
+
+## L336 - BUILT (DEV), LIVE PASS (KSA) / THE MACHINE PASSPORT: ONE MACHINE, EVERY HOST EXPRESSES IT; AC RE-MATCHED; THE HELLA AS A KSA CRAFT (2026-10-07)
+
+**Owner (verbatim):** "we need the passport desperately, maserati is a bad approximation of hella. we partly selected ksa also to approximate a car as a mod spaceship so same hella makes it to deep deep space visually." Rulings: this pass = passport + AC + KSA Hella (GTA -> Deep next pass); the Hella's KSA look is exported from the owner's own game files and never committed.
+
+**Built:**
+- **Core `machine.passport`** (every field `{v, src, conf}`; groups identity / morphology / architecture / performance / character / appearance; `merge` keeps the higher confidence and remembers the other; `fromAc` ingests an AC `ui_car.json`), **`data.machine_seeds`** (authored passports for the catalogue; stock AC bodies), **`machine.correspondence`** (exact -> authored -> gated -> fallback; morphology and architecture gates; character weighted 0.35; colour by redmean; sticky `decide` with `REVISE_BY` 0.10 and explicit revisions). Tests `test_machine_correspondence` (8) on the real scanned roster.
+- **Schema 070** (`machine_passport`, `machine_expression`, `machine_expression_history`); `ncm_world/server/passport.lua` (`forAsset`, `express`, `expressAc`, `expressKsa`); the bridge scans the AC roster (178 cars, 2,147 skin colours from `livery.png`, cached) at `/ac/roster`; `race.ini` takes the chosen skin.
+- **AC:** the Hella (Deep Teal) now lands on an ordinary Alfa (Giulietta QV / Giulia QV near tie, grey skins -- AC has no teal), not the Quattroporte; Type-66 -> Mustang, Caliburn -> hypercars.
+- **KSA:** `tools/ksa-hella-body.py` makes the Hella's KSA body locally from the game's own whole-car proxy (WolvenKit; 5.81 x 2.37 x 1.48 m; recoloured to the passport paint); `ncm/ksa/NcmKsa/content/NcmHella.xml` + `vehicles/NcmHella` (NCM-authored): the FD-1 as KSA's directed-exhaust core at exactly 30 kN / Isp 100,000 s (expression loss: KSA accounts its jet power to 2.1 g of antihydrogen in a magnetic trap; the reaction mass is water), the PT-400, the AC-6 as four MMU-pattern rotation quads (hypergolic stand-in for the car's fuel). NcmKsa 0.3: `/ksa/spawn` (the Machine replaces KSA's Rocket, gets a control point and KSA's own per-frame registration), `/ksa/view`, `/ksa/burn` (bench).
+- **KB-373 owner ruling:** the FD-1 is 30 kN (the rear hardpoint's rating) and the tank 400 kg (PT-400; design id keeps `pt500`): the fitted Hella at 28 kN / 500 kg had thrust/weight 1.08 < Guidance's 1.15. Guidance's border run burns to 120 km/s and coasts.
+
+**Measured:** bench -- FD-1 27.9 kN measured in KSA, KSA's own delta-v readout 237,373 m/s = NCM's rocket equation; KSA mass = NCM's (car 1,800 + parts). **Live (owner, 05:10-13:43):** Night City -> Guidance -> the KSA border in 3 h 34 m (simulation 3 h 29 m), aligned 1.00 throughout; KSA activated on consent, placement proved in 30 s, handoff VERIFIED (1e-7 m, 0 m/s). The passport chose `NcmHella` (exact).
+
+**Losses (stated):** the KSA body is the game's distance proxy (blocky up close: IDEA-1172); the fusion drive is annihilation-accounted in KSA; the AC-6 burns hypergolics there.
+
+## L337 - LOCKED (OWNER RULING) / THE DEEPER LAYER IS OPTED INTO AT THE BORDER: NOTHING OF KSA STARTS BEFORE CONSENT (2026-10-07)
+
+**Owner (verbatim):** "cant have ksa opening way before you know its there.... the whole point is a consent screen saying that there is a deeper simulation layer and activating it (aka downloading ksa on opt in to consent screen) on demand when approaching the border of ncm deep."
+
+**Ruling:** a host beyond Deep is never launched, probed, tested or installed before the player consents, at the border -- L329's rule for AC's adapter, applied to KSA. Departure checks cover the Machine only (thrust, delta-v, attitude).
+
+**Built (KB-375):** ~10 min out (ETA 600 s) Guidance shows THE BORDER OF NCM DEEP: A activates (KSA starts behind the game and proves a placement), B stays in Deep; arrival hands over only if activated, else holds and asks again; the dev rehearsal goes through the same screen. The client no longer asks the bridge anything about KSA before consent.
+
+**Open:** downloading/installing KSA on opt-in (IDEA-1173).
+

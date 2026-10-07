@@ -97,31 +97,34 @@ Core.define("engineering.installation", function(C)
         -- L334 (owner: "the Hella equipped with relevant parts to break through Deep ... to the KSA border", torch
         -- drive ~1 g for ~3-4 h). Sized from the trip: ~2.4 t to Earth's sphere of influence (925,000 km) at a steady
         -- ~1 g is ~145 km/s of delta-v; at Isp 100,000 s (exhaust ~980 km/s) that is ~16 % of the mass, ~380 kg of
-        -- propellant (carried in a 500 kg tank: margin). 28 kN is inside the rear hardpoint's 30 kN and lifts the car (~1.2 g at sea level), so in Night
-        -- City and Assetto Corsa it is the same forward push the RP-16 was (L333: one part, every host).
+        -- propellant. KB-373 (owner ruling 2026-10-07): 30 kN -- the rear hardpoint's full rating -- with a 400 kg tank; at
+        -- 28 kN and 500 kg the fitted Hella (2,634 kg: the car, IA-10, AC-6, FD-1, PT-500 full, fuel) had thrust/weight 1.08
+        -- and Guidance (SUSTAIN_MIN_TW 1.15) refused every target. Now ~2,534 kg full, T/W 1.21. In Night City and Assetto
+        -- Corsa it is the same forward push the RP-16 was (L333: one part, every host).
         -- Fusion-class, Cyberpunk-plausible, said so: the exhaust carries the jet power (~14 GW at full thrust); the
         -- drive itself sheds ~400 kW into its own radiator.
         {
             designId = "eng:zetatech:fd1:r1", lineageId = "eng:zetatech:fd1", revision = 1,
             manufacturer = "Zetatech", makerKey = "zetatech", code = "ZTC-FD1", family = "propulsor",
             name = "Fusion Drive FD-1",
-            subtitle = "A fusion torch: 28 kN for hours on a little propellant. Burns fusion pellets from a tank part.",
+            subtitle = "A fusion torch: 30 kN for hours on a little propellant. Burns fusion pellets from a tank part.",
             interface = "hardpoint.h1", massKg = 150, envelope = { 0.6, 1.4, 0.6 }, price = 48000,
             -- a +-3 deg gimbal: it trims its own thrust line through the centre of mass (the rear mount sits a few cm off
             -- it: ~1.6 kN m at full thrust, more than an AC-6) and steers the Machine with the thrust it is already making
-            perf = { kind = "reaction_engine", thrustN = 28000, ispS = 100000, propellant = "fusion", seaLevelFactor = 1.0,
+            perf = { kind = "reaction_engine", thrustN = 30000, ispS = 100000, propellant = "fusion", seaLevelFactor = 1.0,
                 throttleTauS = 0.5, minThrottle = 0, heatKw = 400, gimbalDeg = 3 },
             thermal = { capacityKjK = 60, rejectKw = 420, limitK = 500, resumeK = 300 },
         },
         -- its propellant, carried in its own tank part (the Machine's fuel tank stays the car's)
         {
-            -- 500 kg: the 400 kg first cut reached the border with 21 kg left (5 %) in simulation -- no room for a detour
+            -- KB-373: 400 kg (the 500 kg tank's extra 100 kg held the full Hella under Guidance's thrust/weight 1.15). The
+            -- design id keeps "pt500": it is the persistent identity of tanks already built and fitted.
             designId = "eng:zetatech:pt500:r1", lineageId = "eng:zetatech:pt500", revision = 1,
             manufacturer = "Zetatech", makerKey = "zetatech", code = "ZTC-PT500", family = "tank",
-            name = "Propellant Tank PT-500",
-            subtitle = "500 kg of fusion pellets for a fusion drive. Mounts anywhere it fits.",
+            name = "Propellant Tank PT-400",
+            subtitle = "400 kg of fusion pellets for a fusion drive. Mounts anywhere it fits.",
             interface = "hardpoint.h1", massKg = 70, envelope = { 1.0, 1.0, 0.5 }, price = 10500,
-            perf = { kind = "propellant_tank", capacityKg = 500, propellant = "fusion" },
+            perf = { kind = "propellant_tank", capacityKg = 400, propellant = "fusion" },
         },
     }
     local designById = {}

@@ -17,7 +17,7 @@ a milestone or batch) → `built` (code + offline proof) → `validated` (live P
 **Where things live:** ideas and work → here. Choices made and questions for the owner → `DECISION_RECORD.md`.
 Defects → `KNOWN_BUGS.md`. Live PASS/FAIL → `wp/MASTER_TEST.md`. What to do next → `NOW.md`.
 
-**IDs are permanent.** Next free ID: **IDEA-1172**.
+**IDs are permanent.** Next free ID: **IDEA-1178**.
 *(This line has now been stale twice — left at IDEA-127 while the ledger ran to IDEA-183, then at IDEA-205 while it
 ran to IDEA-294. It is the only guard against reusing an ID. Check it against the last row before you append.)*
 
@@ -1706,3 +1706,9 @@ Owner: "its time to build out from paddock and into life sim pve layer ... concr
 | IDEA-1169 | HOSTS/KSA | 2026-10-07 | **Kitten Space Agency as the host past Deep** (owner's choice over Elite Dangerous, KSP and Orbiter: free, C#, highly moddable, real-scale Sol): P0 a StarMap/Harmony probe mod on 127.0.0.1:47712 that reads and sets a craft's state (Earth-fixed / inertial), P4 the bridge's KSA adapter -- the Machine at the border becomes a KSA craft from its NCM parts at its exact state; the departing host closes after the acknowledgement. Open: KSA's terms on mods/outside tools; the planned switch from real Sol to a fictional system; no wheels yet. | owner 2026-10-07 | **BUILT (dev): adapter + handoff verified on the bench; next: the Machine as a KSA craft** | L334, L335 |
 | IDEA-1170 | HOSTS/KSA-RETURN | 2026-10-07 | **Back from KSA into Deep**: re-entering Earth's sphere of influence in KSA hands the Machine back to Deep at the same state. | L334 (not in that pass) | open | L334 |
 | IDEA-1171 | DEEP/MOON-SUN | 2026-10-07 | **The Moon and the Sun's gravity in Deep** (and the Moon drawn): needed for anything slower than the torch inside the sphere of influence. | L334 owner ruling (later) | open | L334 |
+| IDEA-1172 | HOSTS/KSA-BODY-DETAIL | 2026-10-07 | **The Hella's detailed KSA body**: assemble the per-panel exterior meshes (body, doors, hood, bumpers, wheels) with the vehicle entity's slot transforms instead of the distance proxy. | L336 (stated loss) | open | L336 |
+| IDEA-1173 | HOSTS/KSA-ON-OPT-IN | 2026-10-07 | **Download and install the deeper layer on opt-in**: on ACTIVATE at the border, fetch KSA (official source), StarMap, the .NET runtime and NcmKsa if missing; progress on the consent screen. | owner 2026-10-07 (L337) | open | L337 |
+| IDEA-1174 | DEEP/ASCENT-OVER-THE-BAND | 2026-10-07 | **The ascent Earth drawn with the game's real camera, laid onto Cyberpunk's dark world band and continued outward** (not a flat half-screen). | owner 2026-10-07 (KB-377) | in progress | KB-377 |
+| IDEA-1175 | MACHINE/EXPRESSIONS-LINE | 2026-10-07 | **Machine Index EXPRESSIONS line**: per host, the expressed body, skin, correspondence and reason (from `machine_expression`). | L336 plan P5 | open | L336 |
+| IDEA-1176 | DEEP/PER-CAR-SPRITES | 2026-10-07 | **Deep draws each Machine's own sprite** chosen through its passport, not one generic `machine.png`. | L336 plan P5 | open | L336 |
+| IDEA-1177 | HOSTS/GTA-TO-DEEP | 2026-10-07 | **GTA/FiveM into real-scale Deep** through the passport (replacing L320's Snowglobe doorway at 2,500 m in `ncm_ls_space`). | owner 2026-10-07 | next pass | L336 |

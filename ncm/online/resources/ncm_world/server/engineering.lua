@@ -224,6 +224,12 @@ function NcmEngineering.changed(machineId, why)
     for pid, aid in pairs(subscribed) do if aid == machineId then push(pid, machineId) end end
 end
 
+--- The mass the Machine's mounted add-ons add (kg; 0 when it has none or no configuration). L336: the passport's loaded mass.
+function NcmEngineering.addedMassKg(machineId)
+    local c = resolveMachine(machineId)
+    return c and Install.addedMassKg(c.devices) or 0
+end
+
 local function boundTo(pid, machineId)
     if not (NcmVehicleAccess and NcmVehicleAccess.bindingForAuthority) then return nil end
     local b = NcmVehicleAccess.bindingForAuthority(pid)

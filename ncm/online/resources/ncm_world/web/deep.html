@@ -44,7 +44,7 @@
   // is still useful (no depth from the game reaches a WebUI layer, so the mask is distance from the camera), fading in
   // with altitude; at the seam the same page becomes Deep. The game camera is not exposed to scripts: the view is the
   // vehicle chase camera reconstructed from the car's own frame (an approximation, said so).
-  var MODE = "deep", AS = null;
+  var MODE = "deep", AS = null, PROBE = false;
 
   // ---------------------------------------------------------------- vectors (double precision, plain arrays)
   function sub(a, b) { return [a[0] - b[0], a[1] - b[1], a[2] - b[2]]; }
@@ -416,6 +416,7 @@
   // ---------------------------------------------------------------- bridge
   if (bridge && bridge.on) {
     bridge.on("deep:init", function (m) {
+      PROBE = m.probe === true;
       if (m.ascent) { MODE = "ascent"; fade.style.transition = "none"; fade.style.opacity = 0;
         document.documentElement.style.background = "transparent"; document.body.style.background = "transparent"; }
       if (m.nc) NC = m.nc; if (m.R) R = m.R; if (m.sun) SUN = arr(m.sun); if (m.venues) VENUES = m.venues;
@@ -506,7 +507,8 @@
     marker(lla(NC.lat, NC.lon, 0), "NIGHT CITY", "#ff3df5", true);
     if (m.land) marker(lla(m.land[0], m.land[1], 0), "LANDING", "#ffd84a", false);
     for (var vi = 0; vi < VENUES.length; vi++) {
-      var ve = VENUES[vi], selected = G.sel === vi + 1;
+      // KB-372: Guidance's list starts with the KSA border, the venue list does not: match by id, not by position
+      var ve = VENUES[vi], selected = G.selId ? G.selId === ve.id : G.sel === vi + 1;
       if (G.open || selected && G.engaged) marker(lla(ve.lat, ve.lon, 0), (selected ? "> " : "") + ve.name, selected ? "#7dff7d" : "rgba(200,255,200,0.75)", selected);
     }
     if (ROUTE && G.engaged) {
@@ -580,12 +582,18 @@
     if (G.backHold > 0) { hud.fillStyle = "rgba(255,255,255,0.85)"; hud.fillRect(W / 2 - 150 * px, H - 90 * px, 300 * px * G.backHold, 8 * px);
       hud.fillText("returning home...", W / 2 - 60 * px, H - 98 * px); }
     // the guidance computer
-    if (G.open || G.engaged || G.prompt || G.msg || G.consent || G.adapters) {
+    if (G.open || G.engaged || G.prompt || G.msg || G.consent || G.adapters || G.ksaAsk) {
       var gx = W - 560 * px, gy = 16 * px;
       hud.fillStyle = "rgba(0,12,4,0.6)"; hud.fillRect(gx, gy, 620 * px, ((G.preflight ? 330 : 0) + (G.open && G.schedule ? 340 : 210)) * px);
       hud.fillStyle = "#7dff7d"; hud.font = (16 * px) + "px Consolas, monospace";
       var gl2 = ["GUIDANCE" + (G.engaged ? "  -  AUTOPILOT ENGAGED" : "")];
-      if (G.consent) {
+      if (G.ksaAsk) {   // KB-375: the deeper layer, offered at the border with consent -- nothing started before
+        gl2.push("THE BORDER OF NCM DEEP" + (G.ksaRehearsal ? "   (DEV REHEARSAL)" : ""));
+        gl2.push("A deeper simulation layer lies beyond: Kitten Space Agency.");
+        gl2.push("Your Machine continues there at this exact position and speed;");
+        gl2.push("NCM keeps its record. Activating starts KSA behind the game (~25 s).");
+        gl2.push("A / F: ACTIVATE      B / X: REMAIN IN DEEP");
+      } else if (G.consent) {
         gl2.push("HIGH-FIDELITY SURFACE AVAILABLE");
         gl2.push(G.consent);
         gl2.push("Assetto Corsa detected");
@@ -609,12 +617,12 @@
           gl2.push("ATTITUDE: guidance assist (not physical)"); }
         else gl2.push("< > destination   R-stick pan   R3 zoom   A engage   B close");
         if (G.open && G.schedule) for (var si = 0; si < G.schedule.length; si++) gl2.push(G.schedule[si]);
-        // L335: the KSA pre-flight -- every line must pass before Guidance flies to the border
+        // L335/KB-375: the Machine's pre-flight -- every line must pass before Guidance flies to the border
         if (G.preflight && G.preflight.length) {
-          gl2.push("PRE-FLIGHT (KSA border)");
+          gl2.push("PRE-FLIGHT (this Machine)");
           for (var pi = 0; pi < G.preflight.length; pi++) { var c = G.preflight[pi];
             gl2.push((c.ok ? "  [ OK ] " : "  [ -- ] ") + c.label + (c.detail ? "  " + c.detail : "")); }
-          gl2.push("A: engage (or run the self-test)   L3 hold: DEV rehearsal (60 s before the border)");
+          gl2.push("A: engage   L3 hold: DEV rehearsal (60 s before the border)");
         }
         if (G.held) gl2.push(G.held);
         if (G.always) gl2.push("Assetto Corsa: always allowed");
@@ -628,6 +636,11 @@
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
     gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT); hud.clearRect(0, 0, W, H);
     if (!AS || AS.k <= 0.001) return;
+    if (PROBE) {   // KB-377 measurement build: the game's own world only, our readout kept (screenshots carry the altitude)
+      var pxp = dpr; hud.fillStyle = "rgba(160,255,255,0.85)"; hud.font = (13 * pxp) + "px Consolas, monospace";
+      hud.fillText("PROBE  ALT " + (AS.alt / 1000).toFixed(2) + " km", W / 2 - 80 * pxp, H - 28 * pxp);
+      return;
+    }
     var car = AS.p, u = AS.u, f = AS.f;
     // Cyberpunk's vehicle chase camera, reconstructed: ~9 m behind, ~3 m up, looking ahead; vertical FOV ~0.86 rad
     var cam = add(add(car, sc(f, -9)), sc(u, 3)), look = sub(add(car, sc(f, 30)), cam);
