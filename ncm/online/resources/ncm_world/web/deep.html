@@ -582,7 +582,7 @@
     // the guidance computer
     if (G.open || G.engaged || G.prompt || G.msg || G.consent || G.adapters) {
       var gx = W - 560 * px, gy = 16 * px;
-      hud.fillStyle = "rgba(0,12,4,0.6)"; hud.fillRect(gx, gy, 544 * px, (G.open && G.schedule ? 340 : 210) * px);
+      hud.fillStyle = "rgba(0,12,4,0.6)"; hud.fillRect(gx, gy, 620 * px, ((G.preflight ? 330 : 0) + (G.open && G.schedule ? 340 : 210)) * px);
       hud.fillStyle = "#7dff7d"; hud.font = (16 * px) + "px Consolas, monospace";
       var gl2 = ["GUIDANCE" + (G.engaged ? "  -  AUTOPILOT ENGAGED" : "")];
       if (G.consent) {
@@ -609,6 +609,14 @@
           gl2.push("ATTITUDE: guidance assist (not physical)"); }
         else gl2.push("< > destination   R-stick pan   R3 zoom   A engage   B close");
         if (G.open && G.schedule) for (var si = 0; si < G.schedule.length; si++) gl2.push(G.schedule[si]);
+        // L335: the KSA pre-flight -- every line must pass before Guidance flies to the border
+        if (G.preflight && G.preflight.length) {
+          gl2.push("PRE-FLIGHT (KSA border)");
+          for (var pi = 0; pi < G.preflight.length; pi++) { var c = G.preflight[pi];
+            gl2.push((c.ok ? "  [ OK ] " : "  [ -- ] ") + c.label + (c.detail ? "  " + c.detail : "")); }
+          gl2.push("A: engage (or run the self-test)   L3 hold: DEV rehearsal (60 s before the border)");
+        }
+        if (G.held) gl2.push(G.held);
         if (G.always) gl2.push("Assetto Corsa: always allowed");
       }
       if (G.msg) gl2.push(G.msg);

@@ -232,6 +232,55 @@ RegisterNetEvent("ncm:deep.embody.request", function(r)
     end)
 end)
 
+-- L335: KITTEN SPACE AGENCY -- the pre-flight checks, the placement self-test and the handoff at the border, relayed to
+-- the host bridge (which owns KSA, StarMap and the NcmKsa mod). Nothing here decides whether KSA is ready: the bridge
+-- answers from the files and from KSA itself.
+local function ksaRelay(pid, path, method, body, reply)
+    PerformHttpRequest(BRIDGE .. path, function(code, text, _, err)
+        local Json = NcmCore.get("vocabulary.json")
+        local ok, st = pcall(Json.decode, tostring(text or "{}"))
+        reply(tonumber(code) or 0, ok and type(st) == "table" and st or {}, err)
+    end, method, body or "", { ["Content-Type"] = "application/json" })
+end
+RegisterNetEvent("ncm:deep.ksa.preflight", function()
+    local pid = tonumber(source) or 0
+    if pid <= 0 or not inDeep[pid] then return end
+    ksaRelay(pid, "/ksa/status", "GET", nil, function(code, st)
+        TriggerClientEvent("ncm:deep.ksa.preflight", pid, { reachable = code == 200, status = st, dev = enabled() })
+    end)
+end)
+RegisterNetEvent("ncm:deep.ksa.selftest", function()
+    local pid = tonumber(source) or 0
+    if pid <= 0 or not inDeep[pid] then return end
+    log("KSA SELFTEST player=%d asked", pid)
+    ksaRelay(pid, "/ksa/selftest", "POST", "{}", function(code, r)
+        log("KSA SELFTEST player=%d -> %d %s %s", pid, code, r.ok and "PASS" or "FAIL", tostring(r.why or r.error or ""))
+        TriggerClientEvent("ncm:deep.ksa.selftest", pid, { ok = r.ok == true, why = r.why or r.error, errors = r.errors })
+    end)
+end)
+RegisterNetEvent("ncm:deep.ksa.embody", function(r)
+    local pid = tonumber(source) or 0
+    if pid <= 0 or type(r) ~= "table" or not inDeep[pid] then return end
+    local driverId = NcmCanonical and NcmCanonical.driverOf(pid) or nil
+    r.driverId = driverId
+    local Json = NcmCore.get("vocabulary.json")
+    local okE, body = pcall(Json.encode, r)
+    log("KSA EMBODY player=%d at %.4f, %.4f alt %.0f km (%s)", pid, tonumber(r.lat) or 0, tonumber(r.lon) or 0, (tonumber(r.altM) or 0) / 1000,
+        r.rehearsal and "DEV REHEARSAL" or "the border")
+    if NcmJourney then NcmJourney.mark(pid, "embody_requested", { venue = "ksa_border", host = "ksa" }) end
+    ksaRelay(pid, "/ksa/embody", "POST", okE and body or "{}", function(code, res)
+        local ok = code == 200 and res.ok == true
+        log("KSA EMBODY player=%d -> %d %s %s", pid, code, ok and "VERIFIED" or "REFUSED", tostring(res.why or ""))
+        if ok and NcmCanonical and driverId then
+            -- the Machine is now canonically in Kitten Space Agency, past Deep
+            NcmCanonical.set(driverId, "host_space", "ksa", "ksa_border", { asset = r.asset, massKg = r.massKg, devices = r.devices,
+                ksa = res.placed }, true)
+        end
+        if NcmJourney then NcmJourney.mark(pid, ok and "host_launched" or "host_refused", { host = "ksa", code = code }) end
+        TriggerClientEvent("ncm:deep.ksa.status", pid, { ok = ok, why = res.why, errors = res.errors })
+    end)
+end)
+
 -- L329: optional host adapters, asked for and reversed from the pad (no chat commands): the bridge owns the files.
 RegisterNetEvent("ncm:deep.adapter", function(r)
     local pid = tonumber(source) or 0

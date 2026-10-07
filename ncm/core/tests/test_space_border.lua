@@ -1,5 +1,5 @@
 -- L334: Deep to the KSA border -- the Fusion Drive FD-1, the Propellant Tank PT-500, the gimbal, and Guidance to Earth's
--- sphere of influence (925,000 km), live and offline.
+-- sphere of influence (the border: 98 % of KSA's own, ~854,000 km), live and offline.
 local function mods(T)
     local C = T.Core
     return C.get("space.deep"), C.get("space.guidance"), C.get("engineering.flightmodel"), C.get("engineering.installation"),
@@ -68,7 +68,8 @@ return {
         T.ok(ok and have > need, ("full tank: %.0f km/s needed, %.0f available"):format(need / 1000, have / 1000))
         local ok2 = G.borderBudget(ds, 2150, 28000, 100000, 50)
         T.falsy(ok2, "50 kg of fusion cannot reach the border")
-        T.eq(G.target("ksa_border").radiusM, 925000000, "the border is Earth's sphere of influence")
+        T.ok(G.target("ksa_border").radiusM < G.KSA_SOI_M and G.target("ksa_border").radiusM > 0.95 * G.KSA_SOI_M,
+            "the border sits just inside KSA's own Earth sphere of influence")
     end,
 
     guidance_flies_the_hella_to_the_border = function(T)
@@ -87,7 +88,7 @@ return {
             if t > 5 then minAlt = math.min(minAlt, alt) end
             if G.arrived(route, { p = s.pos, v = s.vel }) then arrived = true; break end
         end
-        T.ok(arrived, ("reached 925,000 km (after %.2f h)"):format(t / 3600))
+        T.ok(arrived, ("reached the KSA border (after %.2f h)"):format(t / 3600))
         T.ok(t < 4.5 * 3600, "in under 4.5 hours")
         T.ok(minAlt > 12000, ("never sank below where it started (min %.0f m)"):format(minAlt))
         T.ok(Dyn.propellantLeft(m, s, "fusion") > 25, ("with propellant to spare (%.0f kg)"):format(Dyn.propellantLeft(m, s, "fusion")))
@@ -106,6 +107,6 @@ return {
         until done or n > 200
         T.eq(rec.place, "border", "the record waits at the border")
         T.ok(rec.border and rec.border.host == "ksa", "for KSA")
-        T.ok(D.vec.len(rec.p) >= 925000000, "925,000 km out")
+        T.ok(D.vec.len(rec.p) >= G.BORDER.radiusM, "at the border")
     end,
 }

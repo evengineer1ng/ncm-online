@@ -21,6 +21,15 @@ local Flight = Core.get("engineering.flightmodel")   -- L331: the full machine m
 local Venues = Core.get("space.venues")
 local GeoLod = Core.get("space.geolod")   -- L332: which real imagery the Deep page holds
 local Dyn = Core.get("engineering.dynamics")
+-- L335: the KSA pre-flight: what the bridge says about KSA (installed, loader, runtime, mod, self-test) and when it said it
+local KSA = { pre = nil, preAt = 0, selftest = nil, selftesting = false, embodying = false, holdL3 = nil }
+RegisterNetEvent("ncm:deep.ksa.preflight", function(p) KSA.pre = type(p) == "table" and p or nil end)
+RegisterNetEvent("ncm:deep.ksa.selftest", function(p)
+    KSA.selftesting = false
+    KSA.selftest = type(p) == "table" and p or { ok = false, why = "no answer" }
+    KSA.preAt = 0
+end)
+
 --- L334: what Guidance can be pointed at: the KSA border (Earth's sphere of influence) first, then the Earth venues
 local TARGETS = nil
 local function targets()
@@ -492,6 +501,89 @@ local function edge(name, isDown)
     return isDown and not was
 end
 
+--- L335: hand the Machine to Kitten Space Agency: its exact state (latitude, longitude, altitude, INERTIAL velocity on the
+--- Earth-fixed axes). The bridge starts KSA, places the craft, reads it back and only then says yes.
+function ksaHandover(st, rehearsal)
+    if KSA.embodying then return end
+    KSA.embodying = true
+    local la, lo, alt = Deep.ecefToLla(st.p)
+    local vI = Deep.inertialVel(st.p, st.v)
+    GD.msg = "KSA border: handing the Machine to Kitten Space Agency -- KSA is starting (up to a minute)..."
+    TriggerServerEvent("ncm:deep.ksa.embody", { lat = la, lon = lo, altM = alt, velocityInertialCcf = vI, massKg = A.mass,
+        asset = A.asset, rehearsal = rehearsal == true })
+end
+RegisterNetEvent("ncm:deep.ksa.status", function(p)
+    KSA.embodying = false
+    if not A then return end
+    if type(p) == "table" and p.ok then
+        local e = p.errors or {}
+        GD.msg = ("In Kitten Space Agency: placed and verified (%.0f m, %.2f m/s, %.4f deg). Cyberpunk closes now."):format(
+            tonumber(e.radiusM) or 0, tonumber(e.speedMps) or 0, math.max(tonumber(e.latDeg) or 0, tonumber(e.lonDeg) or 0))
+        log("KSA has the Machine (verified)")
+    else
+        GD.msg = "KSA handover failed: " .. tostring(p and p.why or "no answer") .. ". Holding at the border -- A retries."
+        log("KSA handover failed: %s", tostring(p and p.why))
+    end
+end)
+
+--- The pre-flight checklist for the KSA border: this Machine (drive, delta-v, attitude) and KSA (from the bridge). Every
+--- line must pass before Guidance flies there: an attempt is hours of real time, a failure found at the border wastes it.
+local function ksaPreflight()
+    local list, allOk = {}, true
+    local function add(ok, label, detail)
+        list[#list + 1] = { ok = ok, label = label, detail = detail }
+        if not ok then allOk = false end
+    end
+    local EN = NcmClientEngineering and NcmClientEngineering.get() or nil
+    local sus = Guid.thrustBudget(EN and EN.devices or {}, nil, NcmClientDevHeat)
+    local okF, tw = Guid.feasible(sus, A.mass)
+    add(okF, "Sustained thrust", ("thrust/weight %.2f"):format(tw or 0))
+    if A.fm and A.dyn then
+        local mass = Dyn.mass(A.fm, A.dyn)
+        local thrust, isp, prop = 0, 0, "fuel"
+        for _, d in ipairs(A.fm.devices) do
+            if d.kind == "reaction_engine" and (d.perf.thrustN or 0) > thrust then thrust, isp, prop = d.perf.thrustN, d.perf.ispS or 0, d.perf.propellant or "fuel" end
+        end
+        local left = NcmClientDevFuel and 1e9 or Dyn.propellantLeft(A.fm, A.dyn, prop)
+        local okB, need, have = Guid.borderBudget(A.s, mass, thrust, isp, math.min(left, mass * 0.9))
+        add(okB, "Delta-v to the border", ("%.0f km/s needed, %.0f available (%s)"):format(need / 1000, have / 1000, prop))
+        local okP = Flight.canPoint(A.fm, NcmClientDevAttitude == true)
+        add(okP, "Attitude authority", Flight.authorityText(A.fm))
+    end
+    local pre = KSA.pre
+    if not pre then add(false, "KSA host", "asking the bridge...")
+    elseif not pre.reachable then add(false, "Host bridge", "not reachable -- is it running?")
+    else
+        for _, c in ipairs(pre.status and pre.status.checks or {}) do add(c.ok == true, c.label, nil) end
+        local st = KSA.selftest
+        if KSA.selftesting then add(false, "KSA placement self-test", "running (KSA is starting)...")
+        elseif st then add(st.ok == true, "KSA placement self-test", st.ok and "PASS" or ("FAIL: " .. tostring(st.why)))
+        else add(false, "KSA placement self-test", "not run yet -- A runs it") end
+    end
+    return allOk, list
+end
+
+--- DEVELOPMENT rehearsal (owner: "we are not burning 3 hours per attempt"): put the Machine on a real arrival -- outward at
+--- ~148 km/s, 60 s before the border, over where it is now -- with Guidance engaged, so the whole handover is tested in a
+--- minute. Not physical, said on the HUD and in the log.
+local function ksaRehearse()
+    if not A or not A.fm then return end
+    local la, lo = Deep.ecefToLla(A.s.p)
+    local e, n, u = Deep.enu(la, lo)
+    local speed = 148000
+    local r = Guid.BORDER.radiusM - speed * 60
+    local p = Deep.vec.scale(u, r)
+    local vI = Deep.vec.add(Deep.vec.scale(u, speed), Deep.vec.scale(e, 3))
+    local vFixed = Deep.vec.add(vI, Deep.vec.scale(Deep.vec.cross({ 0, 0, Deep.OMEGA }, p), -1))
+    A.s = { p = p, v = vFixed, basis = { right = e, forward = u, up = Deep.vec.scale(n, -1) }, t = A.s.t }
+    A.dyn = Flight.state(A.fm, A.s, Flight.carry(A.dyn))
+    GD.route = Guid.planBorder(A.s)
+    GD.engaged, GD.rehearsal, GD.open = true, true, false
+    A.borderHold, A.atBorder = nil, nil
+    GD.msg = "DEV REHEARSAL (not physical): 60 s before the KSA border, Guidance engaged."
+    log("KSA REHEARSAL: placed 60 s before the border over %.3f, %.3f (r %.0f km, %.0f km/s)", la, lo, r / 1000, speed / 1000)
+end
+
 local function guidanceInput(now, dt)
     local openE = edge("open", down("padUp") or down("G"))
     local prevE = edge("prev", down("padLeft") or down("Z"))
@@ -544,9 +636,18 @@ local function guidanceInput(now, dt)
             if not targets()[GD.sel].border then TriggerServerEvent("ncm:deep.schedule", targets()[GD.sel].id) end
         end
         if zoomE then GD.zoom = GD.zoom % #ZOOMS + 1 end
+        -- L335: the KSA border selected: keep the pre-flight fresh; on dev, L3 held 2 s = the rehearsal
+        if targets()[GD.sel] and targets()[GD.sel].border then
+            if now - KSA.preAt > 8000 then KSA.preAt = now; TriggerServerEvent("ncm:deep.ksa.preflight") end
+            if KSA.pre and KSA.pre.dev and down("padLeftThumb") then
+                KSA.holdL3 = KSA.holdL3 or now
+                if now - KSA.holdL3 >= 2000 then KSA.holdL3 = nil; ksaRehearse(); return end
+            else KSA.holdL3 = nil end
+        end
         local px, py = dead(axis("padRightStickX")), dead(axis("padRightStickY"))
         local rate = ZOOMS[GD.zoom] / 1000000 * 8 * dt
         GD.panLon, GD.panLat = GD.panLon + px * rate, math.max(-60, math.min(60, GD.panLat + py * rate))
+        if aE and A.borderHold and not KSA.embodying then ksaHandover(A.borderHold, GD.rehearsal); return end
         if aE then
             if GD.engaged then GD.engaged = false; GD.msg = "Autopilot off: you have the Machine."
             else
@@ -559,6 +660,23 @@ local function guidanceInput(now, dt)
                     log("GUIDANCE refused -> %s: %s", targets()[GD.sel].id, why)
                     TriggerServerEvent("ncm:deep.guidance", { event = "refused", venue = targets()[GD.sel].id })
                     return
+                end
+                -- L335: the KSA border flies only on a full pre-flight pass; a missing self-test is run first
+                if targets()[GD.sel].border then
+                    local okAll, list = ksaPreflight()
+                    if not okAll then
+                        local st = KSA.pre and KSA.pre.reachable and KSA.pre.status and KSA.pre.status.ok
+                        if st and not KSA.selftest and not KSA.selftesting then
+                            KSA.selftesting = true
+                            TriggerServerEvent("ncm:deep.ksa.selftest")
+                            GD.msg = "Running the KSA placement self-test first (KSA starts, places a test craft, reads it back)..."
+                        else
+                            local bad = {}
+                            for _, c in ipairs(list) do if not c.ok then bad[#bad + 1] = c.label end end
+                            GD.msg = "Pre-flight not passed: " .. table.concat(bad, ", ")
+                        end
+                        return
+                    end
                 end
                 -- L334: the border needs the delta-v to get there -- the main drive's own propellant, honestly
                 if targets()[GD.sel].border and A.fm and A.dyn then
@@ -699,13 +817,14 @@ local function tick()
             for _, th in pairs(gc.throttle) do thr = math.max(thr, th) end
             gcmd.throttle = thr
             if GD.engaged and GD.route.kind == "border" and Guid.arrived(GD.route, Flight.deep(ds)) then
-                -- L334: Earth's sphere of influence -- past here the KSA host flies the Machine. Until the KSA adapter is
-                -- set up the Machine holds here (its record says so); nothing pretends.
+                -- L335: Earth's sphere of influence -- KSA takes the Machine at THIS state. Deep holds it here (labelled, like
+                -- AC's held body) until KSA confirms it placed it and read it back.
                 GD.engaged = false
-                GD.msg = "KSA border reached (925,000 km). The Kitten Space Agency host takes over from here -- not set up yet: holding."
                 log("GUIDANCE reached the KSA border")
                 TriggerServerEvent("ncm:deep.guidance", { event = "arrived", venue = "ksa_border" })
                 A.atBorder = true
+                A.borderHold = Flight.deep(ds)
+                ksaHandover(A.borderHold, GD.rehearsal)
             elseif GD.engaged and Guid.arrived(GD.route, Flight.deep(ds)) then
                 GD.engaged = false
                 GD.prompt = GD.route.venue
@@ -715,6 +834,9 @@ local function tick()
                 if GD.always then local v = GD.prompt; GD.prompt = nil; requestEmbodiment(v) end
             end
         end
+    end
+    if A.borderHold then   -- L335: held at the border for the handover (not physical, said on the HUD)
+        ds.vel = { 0, 0, 0 }
     end
     local fuel0 = Flight.fuelKg(m, ds)
     A.fusion0 = Dyn.propellantLeft(m, ds, "fusion")
@@ -774,6 +896,8 @@ local function tick()
             consent = GD.consent and GD.consent.name or nil, adapters = GD.adapters and { ac = GD.acEnabled == true } or nil,
             schedule = GD.schedule,
             selName = sel.name, selRegion = sel.region,
+            preflight = (sel.border and GD.open) and (function() local _, l = ksaPreflight(); return l end)() or nil,
+            held = A.borderHold and "HELD AT THE KSA BORDER for the handover (not physical)" or nil,
             selKm = sel.border and math.max(0, sel.radiusM - Deep.vec.len(A.s.p)) / 1000 or Deep.distance(lat, lon, sel.lat, sel.lon) / 1000,
             backHold = GD.backSince and math.min(1, (now - GD.backSince) / 2000) or 0,
         }

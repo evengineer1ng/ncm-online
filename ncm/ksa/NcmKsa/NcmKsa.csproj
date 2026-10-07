@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- NcmKsa: NCM's Kitten Space Agency adapter (a StarMap code mod). Built against the INSTALLED game and loader:
+       KSA's own assemblies and StarMap.API are referenced in place and never copied or redistributed. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AssemblyName>NcmKsa</AssemblyName>
+    <RootNamespace>Ncm.Ksa</RootNamespace>
+    <KsaDir Condition="'$(KsaDir)' == ''">C:\Program Files\Kitten Space Agency</KsaDir>
+    <StarMapDir Condition="'$(StarMapDir)' == ''">$(LOCALAPPDATA)\NCM\StarMap</StarMapDir>
+    <CopyLocalLockFileAssemblies>false</CopyLocalLockFileAssemblies>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="KSA"><HintPath>$(KsaDir)\KSA.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="Brutal.Core.Numerics"><HintPath>$(KsaDir)\Brutal.Core.Numerics.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="BepuUtilities"><HintPath>$(KsaDir)\BepuUtilities.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="StarMap.API"><HintPath>$(StarMapDir)\StarMap.API.dll</HintPath><Private>false</Private></Reference>
+  </ItemGroup>
+  <ItemGroup>
+    <None Update="mod.toml"><CopyToOutputDirectory>Always</CopyToOutputDirectory></None>
+  </ItemGroup>
+</Project>

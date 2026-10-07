@@ -84,8 +84,12 @@ Core.define("space.guidance", function(C)
     -- out of the thick air, then burn along the INERTIAL velocity with an outward bias (energy gained fastest, never
     -- falling back), full throttle, all the way -- the owner's torch profile (~1 g, ~3-4 h). It arrives fast; KSA takes
     -- the Machine at that velocity.
-    M.BORDER = { id = "ksa_border", name = "KSA border - Earth's sphere of influence", region = "925,000 km from Earth",
-        radiusM = 925000000, host = "ksa", border = true }
+    -- L335: KSA's OWN Earth sphere of influence (measured from KSA 2026.10.10 by NcmKsa: 0.9431 a (m/M)^0.4 = 871,696 km),
+    -- and the handoff 2 % inside it: a state outside it is not an Earth orbit in KSA (CreateFromStateCci throws), and inside
+    -- it KSA carries the Machine out of Earth's sphere itself
+    M.KSA_SOI_M = 871696116
+    M.BORDER = { id = "ksa_border", name = "KSA border - Earth's sphere of influence", region = "854,000 km from Earth",
+        radiusM = math.floor(0.98 * M.KSA_SOI_M), host = "ksa", border = true }
     M.BORDER_CLIMB_M = 40000       -- straight up until here: no lingering in the air at speed
     M.BORDER_MIN_VR = 300          -- m/s outward: below it the burn leans further outward
 

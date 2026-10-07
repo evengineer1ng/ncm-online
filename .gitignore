@@ -106,3 +106,7 @@ tools/assetto/
 
 # The AC app's Earth image: copied from ncm_world/web/deep/earth.jpg (fetched, NASA public domain) by tools/ncm-build.ps1
 /ncm/assetto/apps/lua/NCM/earth.jpg
+
+# L335 the KSA adapter build output (tools/ksa-build-mod.ps1 builds outside the repo; a direct dotnet build drops these)
+/ncm/ksa/NcmKsa/bin/
+/ncm/ksa/NcmKsa/obj/

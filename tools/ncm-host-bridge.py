@@ -612,6 +612,102 @@ def tile_prune():
         _time.sleep(3600)
 
 
+# ---------------------------------------------------------------------------------------------- KSA (L334, IDEA-1169)
+# Kitten Space Agency is the host past NCM Deep (Earth's sphere of influence). KSA runs inside the StarMap loader
+# (MIT) with NCM's own code mod NcmKsa (ncm/ksa/NcmKsa), which answers on 127.0.0.1:47712. This side: is everything
+# there (status), start it and wait until it is in a flight (launch), prove a placement round trip (selftest), and the
+# HANDOFF itself -- place the Machine at the state Deep hands over, read it back, and only acknowledge if it matches.
+KSA_DIR = r"C:\Program Files\Kitten Space Agency"
+KSA_DOCS = os.path.join(os.path.expanduser("~"), "Documents", "My Games", "Kitten Space Agency")
+NCM_LOCAL = os.path.join(os.environ.get("LOCALAPPDATA") or "", "NCM")
+STARMAP_DIR = os.path.join(NCM_LOCAL, "StarMap")
+DOTNET_DIR = os.path.join(NCM_LOCAL, "dotnet")
+KSA_MOD = "http://127.0.0.1:47712"
+KSA_TOL = {"radiusM": 1000.0, "speedMps": 1.0, "deg": 0.01}
+ksa = {"selftest": None, "selftestAt": None, "embodied": None, "launching": False}
+
+
+def ksa_get(path, timeout=15):
+    try:
+        with urllib.request.urlopen(KSA_MOD + path, timeout=timeout) as r:
+            return json.loads(r.read().decode("utf-8"))
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+def ksa_post(path, obj, timeout=30):
+    try:
+        req = urllib.request.Request(KSA_MOD + path, data=json.dumps(obj).encode("utf-8"), headers={"Content-Type": "application/json"})
+        with urllib.request.urlopen(req, timeout=timeout) as r:
+            return json.loads(r.read().decode("utf-8"))
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+
+
+def ksa_manifest_enabled():
+    try:
+        text = open(os.path.join(KSA_DOCS, "manifest.toml"), encoding="utf-8").read()
+    except OSError:
+        return False
+    blocks = text.split("[[mods]]")
+    return any('id = "NcmKsa"' in b and "enabled = true" in b for b in blocks)
+
+
+def ksa_running():
+    return bool(_pids("StarMap.exe")) or bool(_pids("KSA.exe"))
+
+
+def ksa_status():
+    checks = [
+        ("ksa_installed", os.path.exists(os.path.join(KSA_DIR, "KSA.exe")), "Kitten Space Agency installed"),
+        ("starmap", os.path.exists(os.path.join(STARMAP_DIR, "StarMap.exe")) and os.path.exists(os.path.join(STARMAP_DIR, "StarMapConfig.json")), "StarMap mod loader configured"),
+        ("dotnet10", os.path.exists(os.path.join(DOTNET_DIR, "dotnet.exe")), ".NET 10 runtime for StarMap"),
+        ("mod_installed", os.path.exists(os.path.join(KSA_DOCS, "mods", "NcmKsa", "NcmKsa.dll")), "NcmKsa mod installed"),
+        ("mod_enabled", ksa_manifest_enabled(), "NcmKsa enabled in KSA's mod manifest"),
+    ]
+    out = {"checks": [{"id": c[0], "ok": bool(c[1]), "label": c[2]} for c in checks], "running": ksa_running()}
+    if out["running"]:
+        st = ksa_get("/ksa/state", timeout=12)
+        out["inFlight"] = bool(st.get("ok"))
+        out["state"] = st
+        if st.get("earth"):
+            out["soiRadiusM"] = st["earth"].get("soiRadiusM")
+    out["selftest"] = ksa["selftest"]
+    out["selftestAt"] = ksa["selftestAt"]
+    out["ok"] = all(c["ok"] for c in out["checks"])
+    return out
+
+
+def ksa_launch(wait_s=180):
+    """Start KSA through StarMap (if it is not running) and wait until NcmKsa answers from inside a flight."""
+    if not ksa_running():
+        env = dict(os.environ, DOTNET_ROOT=DOTNET_DIR)
+        log("KSA launching through StarMap (%s)", STARMAP_DIR)
+        out = open(os.path.join(STARMAP_DIR, "starmap.out.log"), "w", encoding="utf-8")
+        subprocess.Popen([os.path.join(STARMAP_DIR, "StarMap.exe")], cwd=STARMAP_DIR, env=env, stdout=out, stderr=subprocess.STDOUT)
+    t0 = _time.time()
+    while _time.time() - t0 < wait_s:
+        st = ksa_get("/ksa/state", timeout=5)
+        if st.get("ok"):
+            log("KSA ready in a flight after %.0f s (Earth sphere of influence %.0f km)", _time.time() - t0, (st.get("earth") or {}).get("soiRadiusM", 0) / 1000)
+            return True, st
+        _time.sleep(2)
+    return False, {"why": "KSA did not reach a flight within %d s" % wait_s}
+
+
+def ksa_verify(want, got):
+    """The read-back must match what Deep handed over, or the handoff is refused."""
+    import math
+    errs = {
+        "radiusM": abs(got["radiusM"] - (want["meanRadiusM"] + want["altM"])),
+        "speedMps": abs(got["inertialSpeed"] - math.sqrt(sum(x * x for x in want["velocityInertialCcf"]))),
+        "latDeg": abs(got["lat"] - want["lat"]),
+        "lonDeg": abs(((got["lon"] - want["lon"]) + 540) % 360 - 180),
+    }
+    ok = errs["radiusM"] < KSA_TOL["radiusM"] and errs["speedMps"] < KSA_TOL["speedMps"] and errs["latDeg"] < KSA_TOL["deg"] and errs["lonDeg"] < KSA_TOL["deg"]
+    return ok, errs
+
+
 class H(BaseHTTPRequestHandler):
     def log_message(self, *a):
         pass
@@ -662,6 +758,8 @@ class H(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(data)
             return
+        if u.path == "/ksa/status":   # L334: every KSA precondition, and the live state if it is running
+            return self.send_json(200, ksa_status())
         if u.path == "/tiles-status":
             with tile_cv:
                 q = len(tile_queue)
@@ -700,6 +798,47 @@ class H(BaseHTTPRequestHandler):
         global handoff
         u = urlparse(self.path)
         body = self.read_json()
+        if u.path == "/ksa/selftest":   # L334: start KSA if needed, prove a placement round trip, cache the verdict
+            st = ksa_status()
+            if not st["ok"]:
+                return self.send_json(409, {"ok": False, "why": "KSA preconditions", "status": st})
+            ready, info = ksa_launch()
+            if not ready:
+                return self.send_json(504, {"ok": False, "why": info.get("why")})
+            r = ksa_get("/ksa/selftest", timeout=60)
+            ksa["selftest"], ksa["selftestAt"] = bool(r.get("ok")), datetime.datetime.now().isoformat(timespec="seconds")
+            log("KSA SELFTEST %s | errors %s", "PASS" if r.get("ok") else "FAIL", r.get("errors") or r.get("error") or r.get("why"))
+            return self.send_json(200, r)
+        if u.path == "/ksa/embody":   # L334: THE HANDOFF -- the Machine at the border becomes KSA's craft at the same state
+            want = body
+            for k in ("lat", "lon", "altM", "velocityInertialCcf"):
+                if k not in want:
+                    return self.send_json(400, {"ok": False, "why": "missing " + k})
+            st = ksa_status()
+            if not st["ok"]:
+                bad = [c["label"] for c in st["checks"] if not c["ok"]]
+                log("KSA EMBODY refused: %s", ", ".join(bad))
+                return self.send_json(409, {"ok": False, "why": "not ready: " + ", ".join(bad)})
+            ready, info = ksa_launch()
+            if not ready:
+                log("KSA EMBODY failed: %s", info.get("why"))
+                return self.send_json(504, {"ok": False, "why": info.get("why")})
+            r = ksa_post("/ksa/place", {"lat": want["lat"], "lon": want["lon"], "altM": want["altM"], "velocityInertialCcf": want["velocityInertialCcf"]})
+            if not r.get("ok"):
+                log("KSA EMBODY place refused: %s", r.get("why") or r.get("error"))
+                return self.send_json(502, {"ok": False, "why": "KSA refused the placement: " + str(r.get("why") or r.get("error"))})
+            want = dict(want, meanRadiusM=((info.get("earth") or {}).get("meanRadiusM") or 6371000.0))
+            ok, errs = ksa_verify(want, r["placed"])
+            log("KSA EMBODY %s | %.4f,%.4f alt %.0f km %.0f m/s | read-back errors %s", "VERIFIED" if ok else "MISMATCH",
+                want["lat"], want["lon"], want["altM"] / 1000, r["placed"]["inertialSpeed"], errs)
+            if not ok:
+                return self.send_json(502, {"ok": False, "why": "read-back mismatch", "errors": errs})
+            with lock:
+                ksa["embodied"] = {"at": datetime.datetime.now().isoformat(timespec="seconds"), "state": r["placed"], "driverId": want.get("driverId")}
+            bring_forward("StarMap.exe", "the Machine is in Kitten Space Agency")
+            if cp_running():
+                threading.Thread(target=close_gracefully, args=("Cyberpunk2077.exe", "KSA has the Machine (verified)"), daemon=True).start()
+            return self.send_json(200, {"ok": True, "errors": errs, "placed": r["placed"]})
         if u.path == "/tiles/prefetch":   # L332: soonest first; a new list replaces what is still waiting
             items = []
             for t in (body.get("tiles") or [])[:600]:

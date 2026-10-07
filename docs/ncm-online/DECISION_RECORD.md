@@ -6481,3 +6481,15 @@ All three were fixed in the fixtures, and the orbiter's balance is tested.
 **Measured (core simulation, both runtimes; core 1146 green):** from 12 km over Night City the Hella (2.6 t) climbs straight, leans into the escape at 40 km and reaches 925,000 km in **3.79 h** at 148 km/s inertial with **110 kg** of its 500 kg left, never sinking below 12.5 km, spin ~0; the 400 kg first cut arrived with 21 kg (5 %), so the tank was made 500 kg. Offline flight reaches the border in slices and parks the record there.
 
 **Not in this pass:** the KSA handoff itself (P0 probe + P4 adapter wait for the owner's KSA install), the Moon and the Sun's gravity, return from KSA into Deep, the AC Deep runner's border target.
+
+## L335 - BUILT (DEV), HANDOFF VERIFIED (BENCH) / KSA INSTALLED, THE NcmKsa ADAPTER, PRE-FLIGHT CHECKS AND A ONE-MINUTE REHEARSAL (2026-10-07)
+
+**Context:** owner installed KSA (`setup_ksa_v2026.10.10.5554.exe`): "we need to make sure our ksa handling and stuff is immaculate because we are not burning 3 hours per attempt, we need comprehensive flight checks."
+
+**Built:** KSA installed (signed by RocketWerkz); StarMap 0.4.7 (MIT) and a private .NET 10 SDK under `%LOCALAPPDATA%\NCM`; **NcmKsa** (`ncm/ksa/NcmKsa`, NCM's own StarMap code mod, `tools/ksa-build-mod.ps1`) on 127.0.0.1:47712 -- `/ksa/ping`, `/ksa/state` (KSA's Earth incl. its own sphere of influence, the craft's inertial and Earth-fixed state), `/ksa/place` (KSA's own `Orbit.CreateFromStateCci` + `Vehicle.Teleport`, refusing a state outside the sphere, nudging an exactly radial velocity 1 cm/s), `/ksa/selftest` (place at a real border arrival, read back, restore); the bridge -- `/ksa/status` (every precondition), `/ksa/selftest` (cold start through StarMap, cached verdict), `/ksa/embody` (THE HANDOFF: place, read back, acknowledge only within 1 km / 1 m/s / 0.01 deg, then KSA forward and Cyberpunk closed); server relays; Cyberpunk Deep -- the **PRE-FLIGHT** checklist in Guidance when the KSA border is selected (thrust, delta-v, attitude, bridge, KSA, loader, runtime, mod, self-test: Guidance will not fly to the border unless every line passes, and A runs the self-test when that is the only thing missing), the handoff on arrival with the Machine HELD at the border (labelled) until KSA confirms, A to retry, and the **DEV REHEARSAL** (hold L3 2 s: the Machine on a real arrival 60 s before the border, Guidance engaged -- the whole handoff in a minute instead of 3.8 h).
+
+**Corrected:** the border is 98 % of **KSA's own** Earth sphere of influence (871,696 km measured -> 854,262 km), not 925,000 km: past KSA's sphere a state is not an Earth orbit there and its orbit constructor throws.
+
+**Measured:** see [docs/research/open77/KSA_PROBE.md](../research/open77/KSA_PROBE.md) -- cold start to a flight 23 s; self-test PASS 0 m / 0.00003 m/s / 0 deg; the real handoff with NCM core's own payload VERIFIED 0 / 0 / 0 / 0.
+
+**Loss (stated):** the craft in KSA is KSA's starting vessel, not the Machine built from its parts (next KSA step, L333).
