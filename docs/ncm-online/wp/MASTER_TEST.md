@@ -3108,4 +3108,4 @@ Offline 2026-10-01: Release build, existing Pace state tests, five guard checks,
 | §MP2 | **Sticky**: a second Laguna trip. | The same car and skin; no `EXPRESSION ... ->` revision line. | **NOT RUN** |
 | §MP3 | **The Hella in KSA** (L336): any handoff. | KSA shows the teal Hella (not the Rocket; the Rocket is gone); HUD shows Water, Liquid Antihydrogen, MMH, NTO. | **PASS 2026-10-07 13:42 (live)** |
 | §MP4 | **The FD-1 in KSA**: ACTIVATE + throttle. | Pushes ~30 kN; KSA's TOTAL dV ~ NCM's figure for what is left. | **PASS (bench: 27.9 kN at 28 kN rating; dV 237,373 m/s)**; live NOT RUN |
-| §MP5 | **The ascent over the game's band** (IDEA-1174, after KB-377). | Our Earth sits on Cyberpunk's dark band and continues outward; nothing covers the game's sky. | **NOT BUILT** |
+| §MP5 | **The ascent over the game's band** (IDEA-1174, after KB-377). | Our Earth sits on Cyberpunk's dark band and continues outward; nothing covers the game's sky; client log `ASCENT CAMERA z ... (the game's own)` every 5 s. | **NOT RUN** (built 14:15) |

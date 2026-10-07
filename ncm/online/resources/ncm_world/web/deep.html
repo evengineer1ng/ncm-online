@@ -437,7 +437,8 @@
     bridge.on("deep:route", function (m) { ROUTE = (m && m.points) || null; });
     bridge.on("deep:tiles", geoPlan);   // L332: the clipmap plan + prefetch list (core space.geolod)
     bridge.on("deep:ascent", function (m) { if (m.sun) SUN = arr(m.sun); AS = { p: arr(m.p), f: arr(m.f), u: arr(m.u), k: Number(m.k) || 0, alt: Number(m.alt) || 0,
-      toSeam: Number(m.toSeam) || 0, d0: Number(m.d0) || 9000, d1: Number(m.d1) || 16000 }; });
+      toSeam: Number(m.toSeam) || 0, d0: Number(m.d0) || 9000, d1: Number(m.d1) || 16000,
+      camF: m.camF ? arr(m.camF) : null, camU: m.camU ? arr(m.camU) : null, camFovY: Number(m.camFovY) || 0 }; });
     // the seam: the ascent page becomes Deep (opaque from here; no white-out, the planet is already there)
     bridge.on("deep:mode", function (m) { MODE = (m && m.mode) || "deep";
       if (MODE === "deep") { document.documentElement.style.background = "#000"; document.body.style.background = "#000"; } });
@@ -642,12 +643,19 @@
       return;
     }
     var car = AS.p, u = AS.u, f = AS.f;
-    // Cyberpunk's vehicle chase camera, reconstructed: ~9 m behind, ~3 m up, looking ahead; vertical FOV ~0.86 rad
-    var cam = add(add(car, sc(f, -9)), sc(u, 3)), look = sub(add(car, sc(f, 30)), cam);
-    var V = viewRot(look, u), camAlt = len(cam) - R;
-    var P = persp(0.86, W / H, Math.max(50, camAlt * 0.25), 5e8), VP = mul(P, V);
-    var fwdA = unit(look), sideA = unit(cross(fwdA, u)), upA = cross(sideA, fwdA);
-    var av = { cam: cam, fwd: fwdA, up: upA, side: sideA, fov: 0.86, ascent: true, k: AS.k, d0: AS.d0, d1: AS.d1 };
+    // IDEA-1174: the GAME's own camera (measured live by the client through Open77.camera.project): its aim, up and
+    // vertical field of view, a few metres behind the car -- so our Earth meets Cyberpunk's world band where the game
+    // draws it. Without a reading: the old reconstruction (~9 m behind, ~3 m up, vertical FOV ~0.86 rad).
+    var cam, look, upV, fovY;
+    if (AS.camF && AS.camU && AS.camFovY > 0.1) {
+      look = AS.camF; upV = AS.camU; fovY = AS.camFovY; cam = add(car, sc(look, -7));
+    } else {
+      cam = add(add(car, sc(f, -9)), sc(u, 3)); look = sub(add(car, sc(f, 30)), cam); upV = u; fovY = 0.86;
+    }
+    var V = viewRot(look, upV), camAlt = len(cam) - R;
+    var P = persp(fovY, W / H, Math.max(50, camAlt * 0.25), 5e8), VP = mul(P, V);
+    var fwdA = unit(look), sideA = unit(cross(fwdA, upV)), upA = cross(sideA, fwdA);
+    var av = { cam: cam, fwd: fwdA, up: upA, side: sideA, fov: fovY, ascent: true, k: AS.k, d0: AS.d0, d1: AS.d1 };
     var inT = worldPasses(av, now);
     gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT);
     composite(av, inT);

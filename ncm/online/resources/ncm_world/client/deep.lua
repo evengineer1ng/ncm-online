@@ -468,17 +468,22 @@ local function camProject(o, yaw, pitch)
     camDumped = true
     return nil
 end
-function NcmGameCamera(o, yaw0)
-    local yaw, pitch, e = yaw0 or 0, -0.05, 0.01
-    -- start IN FRONT of the camera: of the car's heading and the other three quarters, the one most squarely ahead
-    local best
-    for q = 0, 3 do
-        local _, _, dep = camProject(o, yaw0 + q * math.pi / 2, pitch)
-        if dep and dep > 0 and (not best or dep > best) then yaw, best = yaw0 + q * math.pi / 2, dep end
+function NcmGameCamera(o, yaw0, pitch0)
+    local yaw, pitch, e = yaw0 or 0, pitch0 or -0.05, 0.01
+    local iters = 6
+    if pitch0 then
+        iters = 2   -- warm start from the last frame's camera (it moves little in 1/15 s)
+    else
+        -- start IN FRONT of the camera: of the car's heading and the other three quarters, the one most squarely ahead
+        local best
+        for q = 0, 3 do
+            local _, _, dep = camProject(o, yaw0 + q * math.pi / 2, pitch)
+            if dep and dep > 0 and (not best or dep > best) then yaw, best = yaw0 + q * math.pi / 2, dep end
+        end
+        if not best then return nil end
     end
-    if not best then return nil end
     local jx, jy
-    for _ = 1, 6 do
+    for _ = 1, iters do
         local x, y, dep = camProject(o, yaw, pitch)
         local xa, ya = camProject(o, yaw + e, pitch)
         local xb, yb = camProject(o, yaw, pitch + e)
@@ -532,12 +537,39 @@ CreateThread(function()
                     local okF, f = pcall(Open77.character.frame, { vehicleId = vid })
                     local s = Deep.enter({ p.x, p.y, p.z }, { 0, 0, 0 }, okF and type(f) == "table" and f or nil)
                     local k = math.max(0, math.min(1, (p.z - cfg.ascentZ) / math.max(1, cfg.enterZ - cfg.ascentZ)))
+                    -- IDEA-1174: the GAME's camera, read live (Open77.camera.project), so our Earth lands where the game's
+                    -- own world band is instead of under a guessed chase camera; the guess remains only as the fallback
+                    local now = GetGameTimer()
+                    if now - (ASC.camAt or 0) >= 66 then
+                        ASC.camAt = now
+                        local la0, lo0 = Deep.ecefToLla(s.p)
+                        local okC, cam = pcall(NcmGameCamera, p, ASC.cam and ASC.cam.yaw or (function()
+                            local e0, n0 = Deep.enu(la0, lo0)
+                            return math.atan(Deep.vec.dot(s.basis.forward, n0), Deep.vec.dot(s.basis.forward, e0)) end)(), ASC.cam and ASC.cam.pitch or nil)
+                        if okC and cam then
+                            local cy, sy, cp, sp = math.cos(cam.yaw), math.sin(cam.yaw), math.cos(cam.pitch), math.sin(cam.pitch)
+                            ASC.cam = cam
+                            ASC.camF = Deep.vec.unit(Deep.enuToEcef({ cp * cy, cp * sy, sp }, la0, lo0))
+                            ASC.camU = Deep.vec.unit(Deep.enuToEcef({ -sp * cy, -sp * sy, cp }, la0, lo0))
+                            if now - (ASC.camLogAt or 0) >= 5000 then
+                                ASC.camLogAt = now
+                                log("ASCENT CAMERA z %.0f | yaw %.1f pitch %.2f fovY %.1f fovX %.1f deg (the game's own)", p.z, math.deg(cam.yaw),
+                                    math.deg(cam.pitch), math.deg(cam.fovY), math.deg(cam.fovX))
+                            end
+                        else
+                            if ASC.cam or not ASC.camWhy then log("ASCENT CAMERA unreadable (%s): the guessed chase camera stands in", okC and "no solution" or tostring(cam)) end
+                            ASC.cam, ASC.camF, ASC.camU, ASC.camWhy = nil, nil, nil, true
+                        end
+                    end
                     pcall(function() ASC.page:send("deep:ascent", { sun = sunNow(), p = s.p, f = s.basis.forward, u = s.basis.up, k = k * k * (3 - 2 * k),
-                        alt = p.z, toSeam = cfg.enterZ - p.z, d0 = cfg.maskNearM, d1 = cfg.maskFarM }) end)
+                        alt = p.z, toSeam = cfg.enterZ - p.z, d0 = cfg.maskNearM, d1 = cfg.maskFarM,
+                        camF = ASC.camF, camU = ASC.camU, camFovY = ASC.cam and ASC.cam.fovY or nil }) end)
                     geoTick(ASC.page, s, GetGameTimer(), nil)
                     -- KB-377: the measurement -- the game's real camera and the car, twice a second, into the client log
                     if cfg.ascentProbe and GetGameTimer() - (ASC.probeAt or 0) >= 500 then
                         ASC.probeAt = GetGameTimer()
+                        -- KB-377: a probe bug must never stop the ascent loop (a %d on 22.5 did, 2026-10-07 14:03)
+                        local okProbe, probeErr = pcall(function()
                         local fwd = s.basis.forward
                         local up = Deep.vec.unit(s.p)
                         local carPitch = math.asin(math.max(-1, math.min(1, Deep.vec.dot(fwd, up))))
@@ -556,8 +588,8 @@ CreateThread(function()
                                     local yw, pr = math.rad(h * 22.5), math.rad(pd)
                                     local ok, r = pcall(Open77.camera.project, { x = p.x + 3000 * math.cos(pr) * math.cos(yw),
                                         y = p.y + 3000 * math.cos(pr) * math.sin(yw), z = p.z + 3000 * math.sin(pr) })
-                                    rows[#rows + 1] = (ok and type(r) == "table") and ("%d/%d:%.3f,%.3f,%.0f"):format(h * 22.5, pd,
-                                        tonumber(r.x) or 0 / 0, tonumber(r.y) or 0 / 0, tonumber(r.depth) or 0 / 0) or ("%d/%d:-"):format(h * 22.5, pd)
+                                    rows[#rows + 1] = (ok and type(r) == "table") and ("%.1f/%d:%.3f,%.3f,%.0f"):format(h * 22.5, pd,
+                                        tonumber(r.x) or 0 / 0, tonumber(r.y) or 0 / 0, tonumber(r.depth) or 0 / 0) or ("%.1f/%d:-"):format(h * 22.5, pd)
                                 end
                             end
                             log("ASCENT GRID z %.0f car %.1f,%.1f | %s", p.z, p.x, p.y, table.concat(rows, " "))
@@ -565,6 +597,8 @@ CreateThread(function()
                         log("ASCENT PROBE z %.0f | camera %s | car pitch %.1f deg", p.z,
                             cam and ("yaw %.1f pitch %.2f roll %.2f fovX %.1f fovY %.1f deg"):format(math.deg(cam.yaw), math.deg(cam.pitch),
                                 math.deg(cam.roll), math.deg(cam.fovX), math.deg(cam.fovY)) or "unmeasured", math.deg(carPitch))
+                        end)
+                        if not okProbe then log("ASCENT PROBE error (the ascent carries on): %s", tostring(probeErr)) end
                     end
                 end
             elseif ASC and (not p or not p.z or p.z < cfg.ascentZ - 200) then

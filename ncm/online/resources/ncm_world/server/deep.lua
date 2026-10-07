@@ -43,7 +43,7 @@ RegisterNetEvent("ncm:deep.config.request", function()
         maskNearM = tonumber(GetConvar("ncm_deep_mask_near", "9000")) or 9000,
         maskFarM = tonumber(GetConvar("ncm_deep_mask_far", "16000")) or 16000,
         -- KB-377: the measurement build -- the ascent draws no Earth and logs the game's real camera (development only)
-        ascentProbe = enabled() and tostring(GetConvar("ncm_deep_ascent_probe", "1")) ~= "0" })
+        ascentProbe = enabled() and tostring(GetConvar("ncm_deep_ascent_probe", "0")) == "1" })   -- off: IDEA-1174 reads the camera live
 end)
 
 RegisterNetEvent("ncm:deep.enter", function(r)
