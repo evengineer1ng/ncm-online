@@ -74,20 +74,44 @@ local function send(kind, payload) if A and A.page then pcall(function() A.page:
 -- seconds, the tiles along the predicted path and at Guidance's destination; the page fetches them through the host
 -- bridge. The page reports its WORLD layer's internal height (it changes with the dynamic render scale) and its field
 -- of view, so the plan asks for no more geography than the pixels can show. Resolution never reaches the simulation.
-local GEO = { planAt = 0, prefetchAt = 0, heightPx = 693, fovY = 1.0 }
+-- KB-368: Open77 runs client scripts under a per-frame budget. Planning the PREFETCH inside the flight frame exceeded it
+-- (23:48, "geolod.lua: script execution budget exceeded"), the flight frame threw and Deep dropped the Machine over Night
+-- City. So: the frame only plans the clipmap (a few dozen operations), guarded so geography can never end a flight; the
+-- prefetch runs in its own thread, one predicted point per frame.
+local GEO = { planAt = 0, prefetchAt = 0, heightPx = 693, fovY = 1.0, job = nil, busy = false }
 local function geoTick(page, st, now, dest)
     if not page or not st or not st.p or now - GEO.planAt < 500 then return end
     GEO.planAt = now
-    local lat, lon, alt = Deep.ecefToLla(st.p)
-    local view = { fovY = GEO.fovY, heightPx = GEO.heightPx }
-    local plan = GeoLod.plan(lat, lon, math.max(1, alt), view)
-    local msg = { zFine = plan.zFine, levels = plan.levels, credit = GeoLod.credit(plan) }
-    if now - GEO.prefetchAt >= 2000 then
-        GEO.prefetchAt = now
-        msg.prefetch = GeoLod.prefetch({ p = st.p, v = st.v or { 0, 0, 0 } }, dest, view)
-    end
-    pcall(function() page:send("deep:tiles", msg) end)
+    local ok, err = pcall(function()
+        local lat, lon, alt = Deep.ecefToLla(st.p)
+        local view = { fovY = GEO.fovY, heightPx = GEO.heightPx }
+        local plan = GeoLod.plan(lat, lon, math.max(1, alt), view)
+        page:send("deep:tiles", { zFine = plan.zFine, levels = plan.levels, credit = GeoLod.credit(plan) })
+        if now - GEO.prefetchAt >= 3000 and not GEO.busy then
+            GEO.prefetchAt = now
+            GEO.job = { page = page, view = view, pts = GeoLod.prefetchPoints({ p = st.p, v = st.v or { 0, 0, 0 } }, dest) }
+        end
+    end)
+    if not ok then log("geography skipped this tick: %s", tostring(err)) end
 end
+CreateThread(function()
+    while true do
+        Wait(100)
+        local job = GEO.job
+        if job then
+            GEO.job, GEO.busy = nil, true
+            local list = {}
+            for _, pt in ipairs(job.pts) do
+                Wait(0)   -- one point per frame
+                local ok, tiles = pcall(GeoLod.prefetchAt, pt, job.view)
+                if ok then for _, t in ipairs(tiles) do list[#list + 1] = t end end
+            end
+            Wait(0)
+            if #list > 0 then pcall(function() job.page:send("deep:tiles", { prefetch = list }) end) end
+            GEO.busy = false
+        end
+    end
+end)
 --- the page's own reports: its render view, and the probes (WebGL facts, whether tiles arrive) -- logged once each
 local function watchPage(page)
     pcall(function()

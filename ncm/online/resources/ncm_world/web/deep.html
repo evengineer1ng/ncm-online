@@ -286,11 +286,13 @@
   }
   function geoPlan(m) {
     if (!GEO.ok || !m) return;
+    if (m.levels) {
     GEO.zFine = Number(m.zFine) || -1; if (m.credit) GEO.credit = m.credit;
     var act = {};
     (m.levels || []).forEach(function (l) { var L = GEO.lev[l.z - 5]; if (!L) return; act[l.z] = true; L.active = true; L.layer = l.layer || null;
       if (L.ox !== l.ox || L.oy !== l.oy) moveWindow(L, l.ox, l.oy); });
     GEO.lev.forEach(function (L) { if (!act[L.z]) L.active = false; });
+    }
     if (m.prefetch && m.prefetch.length) {
       var list = m.prefetch.slice(0, 500), key = list.length + ":" + JSON.stringify(list[0]) + JSON.stringify(list[list.length - 1]);
       if (key !== GEO.prefetchKey) { GEO.prefetchKey = key;

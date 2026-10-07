@@ -118,10 +118,11 @@ Core.define("space.geolod", function(C)
     end
 
     --- The tiles a plan needs, coarse first (so something is always on screen), each { layer, z, x, y } with x wrapped.
-    function M.tiles(plan)
+    --- minZ: only zooms at or above it (the prefetch wants the fine end; the coarse windows are shared and already held).
+    function M.tiles(plan, minZ)
         local out = {}
         for _, l in ipairs(plan.levels) do
-            if l.layer then
+            if l.layer and l.z >= (minZ or 0) then
                 for j = 0, M.WINDOW - 1 do
                     for i = 0, M.WINDOW - 1 do
                         local x, y = wrapX(l.ox + i, l.z), l.oy + j
@@ -140,24 +141,34 @@ Core.define("space.geolod", function(C)
 
     --- What to fetch BEFORE it is needed: the plans at the ground track ahead (now + each horizon, dead reckoning on the
     --- real gravity-free line, good for tens of seconds) and, when Guidance has a destination, at its arrival height over
-    --- it. state = { p, v } (ECEF metres); dest = { lat, lon, alt } | nil. Returns de-duplicated tiles, soonest first.
+    --- it -- the FINEST `PREFETCH_LEVELS` windows of each (the coarse ones are shared and already held).
+    --- KB-368: a host with a per-frame script budget (Open77) must not do this in one frame -- `prefetchPoints` gives the
+    --- points, and `prefetchAt` the tiles for one of them, so the caller can yield between points.
     M.HORIZONS_S = { 10, 30, 60, 120 }
     M.ARRIVAL_ALT_M = 3000
-    function M.prefetch(state, dest, view, horizons)
-        local out, seen = {}, {}
-        local function add(plan)
-            for _, t in ipairs(M.tiles(plan)) do
-                local k = M.key(t)
-                if not seen[k] then seen[k] = true; out[#out + 1] = t end
-            end
-        end
+    M.PREFETCH_LEVELS = 3
+    function M.prefetchPoints(state, dest, horizons)
+        local pts = {}
         for _, h in ipairs(horizons or M.HORIZONS_S) do
             local p = { state.p[1] + state.v[1] * h, state.p[2] + state.v[2] * h, state.p[3] + state.v[3] * h }
             local lat, lon, alt = D.ecefToLla(p)
-            if alt > 0 then add(M.plan(lat, lon, alt, view)) end
+            if alt > 0 then pts[#pts + 1] = { lat = lat, lon = lon, alt = alt } end
         end
-        if dest and dest.lat and dest.lon then
-            add(M.plan(dest.lat, dest.lon, dest.alt or M.ARRIVAL_ALT_M, view))
+        if dest and dest.lat and dest.lon then pts[#pts + 1] = { lat = dest.lat, lon = dest.lon, alt = dest.alt or M.ARRIVAL_ALT_M } end
+        return pts
+    end
+    function M.prefetchAt(pt, view)
+        local plan = M.plan(pt.lat, pt.lon, pt.alt, view)
+        return M.tiles(plan, plan.zFine - M.PREFETCH_LEVELS + 1)
+    end
+    --- all of it at once, de-duplicated, soonest first (fine where there is no budget: AC, the server, tests)
+    function M.prefetch(state, dest, view, horizons)
+        local out, seen = {}, {}
+        for _, pt in ipairs(M.prefetchPoints(state, dest, horizons)) do
+            for _, t in ipairs(M.prefetchAt(pt, view)) do
+                local k = M.key(t)
+                if not seen[k] then seen[k] = true; out[#out + 1] = t end
+            end
         end
         return out
     end
