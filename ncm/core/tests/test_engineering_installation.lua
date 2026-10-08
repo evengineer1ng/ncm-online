@@ -57,7 +57,7 @@ return {
         near(T, r.force[1], 0, 1e-9, "no side force")
         near(T, r.force[3], 0, 1e-9, "no lift")
         T.ok(r.propellantKg > 0, "it burns")
-        near(T, r.propellantKg, 30000 / (2000 * 9.80665) / 60, 1e-6, "F / (Isp g0) per step")
+        near(T, r.propellantKg, 30000 / (360 * 9.80665) / 60, 1e-6, "F / (Isp g0) per step")
         -- off-centre mount: a rear push above the CoM pitches the nose down (torque about x, the right axis)
         T.ok(math.abs(r.torque[1]) > 0, "an off-CoM mount makes torque")
     end,

@@ -289,11 +289,13 @@ local function showCollection()
     if not page or not pageReady then return end
     TriggerServerEvent("ncm:collection")
     TriggerServerEvent("ncm:component.inventory.request")
+    TriggerServerEvent("ncm:market")
     TriggerServerEvent("ncm:vehicle.active.request")
     setOpen("collection")   -- BEFORE the send: the page can answer panel:drawn faster than the next line runs
     page:send("panel:show", { panel = "collection" })
     sendBig("panel:collection", lastCollection or { slots = {}, loading = true }, "slots")
     if lastComponents then sendBig("panel:components",lastComponents,"parts") end
+    if lastMarket then sendBig("panel:market.components",{componentOfferings=lastMarket.componentOfferings or {}},"componentOfferings",1) end
     if lastCalled then page:send("panel:vehicle.active", lastCalled) end
 end
 
@@ -804,7 +806,8 @@ local function finishMarketWire()
     value.offerings=vehicles;value.vehicleOfferings=vehicles;value.componentOfferings=components;value.loading=false
     lastMarket=value;marketWire=nil
     log("market stream complete id=%s vehicles=%d components=%d",tostring(s.id),#vehicles,#components)
-    if page and pageReady and open=="market" then sendMarket(value) end
+    if page and pageReady and open=="market" then sendMarket(value)
+    elseif page and pageReady and open=="collection" then sendBig("panel:market.components",{componentOfferings=components},"componentOfferings",1) end
 end
 
 RegisterNetEvent("ncm:market.stream.begin",function(meta)
@@ -814,7 +817,8 @@ RegisterNetEvent("ncm:market.stream.begin",function(meta)
     marketWire={id=meta.id,head=head,vehicles=Chunks.receiver(meta.vehicleParts),components=Chunks.receiver(meta.componentParts)}
     lastMarket=head
     log("market stream begin id=%s packets=%d+%d",meta.id,marketWire.vehicles.expected,marketWire.components.expected)
-    if page and pageReady and open=="market" then sendMarket(head) end
+    if page and pageReady and open=="market" then sendMarket(head)
+    elseif page and pageReady and open=="collection" then sendBig("panel:market.components",{componentOfferings={}},"componentOfferings",1) end
     finishMarketWire() -- the empty-market case has no part events
 end)
 

@@ -38,6 +38,7 @@ function NcmClientCoolAll(state)
 end
 
 local function apply(p)
+    for _, spec in ipairs(p.specs or {}) do Install.register(spec) end
     local devices, refused = Install.resolve(p.items or {}, p.vehicleKey)
     local fuelMl = p.fuel and tonumber(p.fuel.ml)
     E = {

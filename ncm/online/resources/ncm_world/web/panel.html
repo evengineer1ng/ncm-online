@@ -1641,6 +1641,14 @@
       }
       function renderPartsInventory(){
         collectionTitle.textContent="Machine Index";machinesTab.classList.remove("active");partsTab.classList.add("active");const parts=Array.isArray(componentData.parts)?componentData.parts:[];collectionCount.innerHTML=parts.length+" COMPONENTS<small>STORED AND INSTALLED · SERIALIZED ASSETS</small>";collectionWall.innerHTML="";collectionWall.style.gridTemplateColumns="repeat(4,minmax(0,1fr))";
+        for(const offer of partsList().filter(x=>x.fidelity==="physical")){
+          const b=document.createElement("button");b.className="part-tile";
+          const afford=Number(componentData.balance||0)>=Number(offer.price||0);
+          b.disabled=!offer.nextAsset||!componentData.partsEnabled||!afford;
+          b.textContent="MARKET · "+String(offer.code||offer.designId)+" · "+eddies(offer.price)+(offer.nextAsset?(afford?" · HOLD TO BUY":" · FUNDS NEEDED"):" · SOLD OUT");
+          if(!b.disabled)holdAction(b,()=>{b.disabled=true;b.textContent="PURCHASING…";Open77.emit("panel:component.purchase",{marketId:offer.marketId,assetId:offer.nextAsset.asset_id,idempotencyKey:uuid4()});});
+          collectionWall.append(b);
+        }
         if(Array.isArray(componentData.fabricable)){for(const f of componentData.fabricable){const b=document.createElement("button");b.className="part-tile";b.textContent="HOLD TO FABRICATE (DEV) · "+f.code;holdAction(b,()=>{b.disabled=true;b.textContent="FABRICATING…";Open77.emit("panel:engineering.fabricate",{key:f.key});});collectionWall.append(b);}}
         if(!selectedPart&&parts.length)selectedPart=parts[0].asset_id;
         for(const p of parts){const b=document.createElement("button");b.className="part-tile "+(p.location_kind==="installed"?"installed ":"")+(p.asset_id===selectedPart?"selected":"");const m=document.createElement("div");m.className="vehicle-maker";m.textContent=p.display_manufacturer||"Factory";const n=document.createElement("div");n.className="vehicle-name";n.textContent=p.code||p.design_id;const meta=document.createElement("div");meta.className="vehicle-meta";meta.textContent=String(p.family||"").replaceAll("_"," ");const s=document.createElement("div");s.className="part-status "+(p.factory_original?"factory":"");s.textContent=(p.factory_original?"FACTORY ORIGINAL · ":"")+String(p.location_kind||"storage").toUpperCase();b.append(m,n,meta,s);b.addEventListener("click",()=>{selectedPart=p.asset_id;selectedFitMachine=null;renderPartsInventory();});collectionWall.append(b);}
@@ -1712,9 +1720,18 @@
         const spec = document.createElement("div"); spec.className = "market-spec";
         const pairs = [["PRICE", eddies(p.price)], ["EFFECT", Number(p.effect || 1).toFixed(2)], ["FIDELITY", String(p.fidelity || "modelled").toUpperCase()], ["AVAILABLE", Number(p.available || 0) + " / " + Number(p.ceiling || 0)], ["NEXT PRODUCTION", untilText(p.nextProductionAt, marketNow())], ["NEXT BATCH", "up to " + Number(p.nextBatch || 0)], ["CADENCE", "about every " + cadenceText(p.cadenceSec)], ["TARGET", selectedPreviewVehicle || "—"], ["FITMENT", fit ? (fit.compatible ? "✓ FITS" : "⊘ DOES NOT FIT") : "UNAVAILABLE"]];
         const levers = p.projection && p.projection.levers;
+        if(p.fidelity==="physical"&&p.perf){
+          const x=p.perf;
+          pairs.splice(1,2);
+          if(x.thrustN||x.forceN)pairs.push(["THRUST",Math.round((x.thrustN||x.forceN)/1000)+" kN"]);
+          if(x.torqueNm)pairs.push(["TORQUE",Math.round(x.torqueNm)+" N m"]);
+          if(x.ispS)pairs.push(["SPECIFIC IMPULSE",Math.round(x.ispS)+" s"]);
+          if(x.capacityKg)pairs.push(["CAPACITY",Math.round(x.capacityKg)+" kg"]);
+          pairs.push(["MASS",Math.round(p.massKg||0)+" kg"]);
+        }
         if (levers) { pairs.push(["GRIP", pct(levers.gripScale)], ["DRIVE FORCE", pct(levers.driveScale)], ["BRAKE FORCE", pct(levers.brakeScale)]); if (p.projection.topSpeedScale) pairs.push(["TOP-SPEED SCALE", pct(p.projection.topSpeedScale)]); }
         for (const pair of pairs) { const b=document.createElement("b");b.textContent=pair[0];const s=document.createElement("span");s.textContent=pair[1];spec.append(b,s); } box.append(spec);
-        const limits=document.createElement("div");limits.className="line muted";limits.textContent=(p.fidelity==="direct"?"DIRECT: the primary lever is the component's quantity. ":"MODELLED: a coarse projection onto verified force levers. ")+"Absolute vehicle metrics remain Not rated until authoritative baselines exist.";box.append(limits);
+        const limits=document.createElement("div");limits.className="line muted";limits.textContent=p.fidelity==="physical"?"Physical output depends on mount, facing, Machine mass, fuel and heat.":(p.fidelity==="direct"?"DIRECT: the primary lever is the component's quantity. ":"MODELLED: a coarse projection onto verified force levers. ")+"Absolute vehicle metrics remain Not rated until authoritative baselines exist.";box.append(limits);
         if (!p.ownedCompatible) { const w=document.createElement("div");w.className="warning-box";w.textContent="YOU OWN NO COMPATIBLE MACHINE. Purchase is allowed for future planning; this component cannot currently be fitted.";box.append(w); }
         const a=p.nextAsset;
         if (a) { const ser=document.createElement("div");ser.className="asset-id";ser.textContent="NEXT UNIT · NCM "+a.global_ordinal+" · MAKER "+a.maker_ordinal+" · DESIGN "+a.design_ordinal;box.append(ser);const buy=document.createElement("button");const afford=Number(marketData.balance||0)>=Number(p.price||0);buy.className="detail-action";buy.disabled=!afford||!marketData.partsEnabled;buy.textContent=!marketData.partsEnabled?"AWAITING LIVE QA":(afford?"HOLD TO PURCHASE":"INSUFFICIENT FUNDS");if(!buy.disabled)holdAction(buy,()=>{buy.disabled=true;buy.textContent="PURCHASING…";Open77.emit("panel:component.purchase",{marketId:p.marketId,assetId:a.asset_id,idempotencyKey:uuid4()});});box.append(buy); }
@@ -1859,7 +1876,7 @@
       Open77.on("panel:market", (d) => { if (mode === "market") guard("market", () => renderMarket(d)); });
       Open77.on("panel:market.head",d=>{marketData=Object.assign(marketData,d||{});if(mode==="market")guard("market",()=>renderMarket(null));});
       Open77.on("panel:market.vehicles",d=>{marketData.offerings=d&&d.offerings||[];marketData.vehicleOfferings=marketData.offerings;if(mode==="market")guard("market",()=>renderMarket(null));});
-      Open77.on("panel:market.components",d=>{marketData.componentOfferings=d&&d.componentOfferings||[];if(mode==="market")guard("market",()=>renderMarket(null));});
+      Open77.on("panel:market.components",d=>{marketData.componentOfferings=d&&d.componentOfferings||[];if(mode==="market")guard("market",()=>renderMarket(null));else if(mode==="collection"&&collectionMode==="parts")guard("collection",()=>renderPartsInventory());});
       for(const tab of document.querySelectorAll("[data-panel-nav]")) tab.addEventListener("click",()=>{
         const target=tab.dataset.panelNav;if(target===mode)return;Open77.emit("panel:navigate",{panel:target});
       });
@@ -4167,7 +4184,7 @@
         else if (p.name === "panel:collection") { if (mode === "collection") guard("collection", () => renderCollection(value)); }
         else if (p.name === "panel:market") { if (mode === "market") guard("market", () => renderMarket(value)); }
         else if (p.name === "panel:market.vehicles") { marketData.offerings=value.offerings||[];marketData.vehicleOfferings=marketData.offerings;if(mode==="market")guard("market",()=>renderMarket(null)); }
-        else if (p.name === "panel:market.components") { marketData.componentOfferings=value.componentOfferings||[];if(mode==="market")guard("market",()=>renderMarket(null)); }
+        else if (p.name === "panel:market.components") { marketData.componentOfferings=value.componentOfferings||[];if(mode==="market")guard("market",()=>renderMarket(null));else if(mode==="collection"&&collectionMode==="parts")guard("collection",()=>renderPartsInventory()); }
         else if (p.name === "panel:components") { componentData=Object.assign(componentData,value||{});if(mode==="collection"&&collectionMode==="parts")guard("collection",()=>renderPartsInventory()); }
         else if (p.name === "panel:inbox") { lastInboxData = value; if (mode === "messages") guard("messages", renderMessages); }
         else if (p.name === "panel:graph") { lastGraphData = value; if (mode === "messages") guard("messages", renderMessages); }

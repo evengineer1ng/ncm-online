@@ -13,7 +13,7 @@ local inDeep = {}   -- pid -> { vid, at, flags }
 
 local function environment()
     local ok, id = pcall(function() return GlobalState.ncmIdentity end)
-    return tostring(ok and type(id) == "table" and id.environment or "development")
+    return tostring(ok and type(id) == "table" and id.environment or "unknown")
 end
 -- L341: Deep runs on Online too. What a Machine can do out there is what its owner bought and installed.
 local function enabled() local env = environment(); return env == "development" or env == "online" end

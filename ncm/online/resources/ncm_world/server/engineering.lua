@@ -28,8 +28,8 @@ local function enc(v) local ok, x = pcall(Json.encode, v); return ok and x or "{
 local function dec(v) if type(v) == "table" then return v end local ok, x = pcall(Json.decode, tostring(v or "")); return ok and x or nil end
 local function identity()
     local ok, id = pcall(function() return GlobalState.ncmIdentity end)
-    if ok and type(id) == "table" then return id.serverId or "ncm-dev", tostring(id.environment or "development") end
-    return "ncm-dev", "development"
+    if ok and type(id) == "table" then return id.serverId or "ncm-dev", tostring(id.environment or "unknown") end
+    return "ncm-dev", "unknown"
 end
 local function serverId() local s = identity(); return s end
 local function isDev() local _, env = identity(); return env == "development" end
@@ -54,14 +54,20 @@ local function seedDesigns()
     for _, d in ipairs(Install.DESIGNS) do
         MySQL.insert.await([[INSERT IGNORE INTO component_design
             (design_id,lineage_id,revision,manufacturer_key,display_manufacturer,code,subtitle,family,tier,effect,price,
-             fidelity,distribution,origin_kind,positions_json,fitment_json,created_at)
-            VALUES (?,?,?,?,?,?,?,?,'engineering',1.0,?,'physical','engineering','design','[]',?,?)]],
+             fidelity,distribution,origin_kind,positions_json,fitment_json,spec_json,created_at)
+            VALUES (?,?,?,?,?,?,?,?,'engineering',1.0,?,'physical','engineering','design','[]',?,?,?)]],
             { d.designId, d.lineageId, d.revision, d.makerKey, d.manufacturer, d.code, d.subtitle, d.family, d.price,
-              enc({ standard = d.interface }), now() })
+              enc({ standard = d.interface }), enc(d), now() })
+        MySQL.update.await("UPDATE component_design SET spec_json=? WHERE design_id=? AND spec_json IS NULL", { enc(d), d.designId })
     end
     log("engineering designs ready: %d (%s)", #Install.DESIGNS, (function()
         local c = {} for _, d in ipairs(Install.DESIGNS) do c[#c + 1] = d.code end return table.concat(c, ", ") end)())
 end
+AddEventHandler("ncm:rnd:design", function(spec)
+    if type(spec) ~= "table" or spec.origin ~= "rnd_physical" then return end
+    local registered, why = Install.register(spec)
+    if not registered then log("physical R&D Design refused: %s", tostring(why)) end
+end)
 
 -- ------------------------------------------------------------------------------------------------ reads
 local function driverOf(pid)
@@ -206,7 +212,14 @@ local function payload(machineId)
         if d and d.perf and d.perf.kind == "propellant_tank" then copy.fillKg = tankFill(it.componentId, d) end
         items[i] = copy
     end
-    return { v = 1, assetId = machineId, vehicleKey = c.vehicleKey, items = items, refused = c.refused,
+    local specs, seen = {}, {}
+    for _, it in ipairs(items) do
+        if not seen[it.designId] then
+            local d = Install.design(it.designId)
+            if d then specs[#specs + 1] = d; seen[it.designId] = true end
+        end
+    end
+    return { v = 2, assetId = machineId, vehicleKey = c.vehicleKey, items = items, specs = specs, refused = c.refused,
         bindings = bindingsOf(machineId), addedMassKg = Install.addedMassKg(c.devices), fuel = { ml = ml, capacityMl = cap } }
 end
 
@@ -727,6 +740,15 @@ AddEventHandler("onResourceStart", function(name)
         Wait(6000)
         local ok, err = pcall(seedDesigns)
         if not ok then log("design seed failed: %s", tostring(err)) end
+        local okR, errR = pcall(function()
+            local rows = MySQL.query.await("SELECT spec_json FROM component_design WHERE spec_json IS NOT NULL AND origin_kind='rnd_physical'") or {}
+            for _, row in ipairs(rows) do
+                local spec = dec(row.spec_json)
+                local registered, why = Install.register(spec)
+                if not registered then log("physical Design refused on load: %s", tostring(why)) end
+            end
+        end)
+        if not okR then log("physical Design load failed: %s", tostring(errR)) end
         local okG, errG = pcall(devGrant)
         if not okG then log("DEV GRANT failed: %s", tostring(errG)) end
     end)

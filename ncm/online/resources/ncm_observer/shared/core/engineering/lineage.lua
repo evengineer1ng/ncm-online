@@ -37,7 +37,7 @@ Core.define("engineering.lineage", function(C)
         documents = 0.02,    -- the drawings
     }
     --- Physical ceilings that no copy can exceed (vacuum specific impulse by propellant, seconds).
-    M.ISP_CEILING = { n2 = 75, hydrazine = 240, kerosene = 360, methalox = 380, hydrolox = 465 }
+    M.ISP_CEILING = { n2 = 75, hydrazine = 240, kerosene = 360, fuel = 360, methalox = 380, hydrolox = 465 }
 
     local COMPETENCY_CEILING = 1000
 

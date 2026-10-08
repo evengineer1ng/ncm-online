@@ -35,7 +35,7 @@ local function sid()
 end
 local function enabled()
     local ok, id = pcall(function() return GlobalState.ncmIdentity end)
-    local env = ok and type(id) == "table" and id.environment or "development"
+    local env = ok and type(id) == "table" and id.environment or "unknown"
     -- single player (L338): the temporal loop is the tape's own -- presence and the rollover reset belong to NCM 3.0
     -- L341: Online too -- Deep and the Racing Week loop ship together (owner: "everything goes to online")
     return tostring(env) == "development" or tostring(env) == "single_player" or tostring(env) == "online"

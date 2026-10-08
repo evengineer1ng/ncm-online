@@ -26,9 +26,9 @@ local playedThisSession = {} -- playerId -> true once they were observed playabl
 local function worldIdentity()
     local ok, id = pcall(function() return GlobalState.ncmIdentity end)
     if ok and type(id) == "table" and type(id.serverId) == "string" and id.serverId ~= "" then
-        return id.serverId, tostring(id.environment or "development")
+        return id.serverId, tostring(id.environment or "unknown")
     end
-    return "ncm-dev", "development"
+    return "ncm-dev", "unknown"
 end
 
 local function nowS()

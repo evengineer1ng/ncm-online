@@ -144,7 +144,7 @@ and amends §0.1. The code still implements fixed three-day runs until doc 47 §
 ## Proposal - no authority until ruled (20)
 
 
-- [56_RND_OVERHAUL.md](56_RND_OVERHAUL.md) - R&D overhaul (L341): flight parts arrive only through manufacturer R&D -- physical design points from lineages, physics-capped, competency-banded, specs persisted in the database (`spec_json`), sold on markets; today no Online player can obtain flight hardware. **PROPOSAL for the next coder; Q1-Q6 open; nothing built**
+- [56_RND_OVERHAUL.md](56_RND_OVERHAUL.md) - **SPEC (L342)** for physical manufacturer R&D and the flight-parts market; §5 records the six owner rulings. Implementation and live PASS remain separate.
 - [21_ENGINEERING_PROPOSAL.md](21_ENGINEERING_PROPOSAL.md) - engineering architecture - ACCEPTED; decisions live in L120
 - [22_WEAR_PROPOSAL.md](22_WEAR_PROPOSAL.md) - wear architecture - ACCEPTED; decisions live in L120
 - [25_MACHINE_ARCHITECTURE_PROFILE.md](25_MACHINE_ARCHITECTURE_PROFILE.md) - machine architecture profile - awaiting Q18/Q19; section 10 undecided

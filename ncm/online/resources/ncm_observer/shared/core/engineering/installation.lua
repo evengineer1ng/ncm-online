@@ -65,7 +65,9 @@ Core.define("engineering.installation", function(C)
             interface = "hardpoint.h1", massKg = 85, envelope = { 0.5, 1.1, 0.5 }, price = 6500,
             -- owner, 2026-10-06: 16 kN (< 1 g on the Hella) "weakened the crap out of" forward push. 30 kN = the rear
             -- hardpoint's rating, ~1.7 g on the 1.8 t body. Same design id: dev balance, not a new revision.
-            perf = { kind = "reaction_engine", thrustN = 30000, ispS = 2000, propellant = "fuel", seaLevelFactor = 1.0,
+            -- L342: fuelled reaction hardware obeys the world's 360 s chemistry ceiling. The earlier 2000 s
+            -- development balance is retired; dev fuel remains an explicit development waiver.
+            perf = { kind = "reaction_engine", thrustN = 30000, ispS = 360, propellant = "fuel", seaLevelFactor = 1.0,
                 throttleTauS = 0.25, minThrottle = 0, heatKw = 600 },
             thermal = { capacityKjK = 40, rejectKw = 200, limitK = 450, resumeK = 300 },
         },
@@ -78,7 +80,7 @@ Core.define("engineering.installation", function(C)
             -- matches the hop the owner already flies (NCM Thrust twr 3.0 x 200 ms on the 1,800 kg Hella body)
             -- rechargeS 0 + `retrigger`: every press starts a fresh stroke even mid-stroke, like NCM Thrust's hop ("interrupted
             -- by the next burn"); owner: waiting out each stroke made the hop "take insane mashing" (3/s measured vs ~8/s).
-            perf = { kind = "pulse_reaction", forceN = 53000, pulseS = 0.2, ispS = 3000, propellant = "fuel", rechargeS = 0,
+            perf = { kind = "pulse_reaction", forceN = 53000, pulseS = 0.2, ispS = 360, propellant = "fuel", rechargeS = 0,
                 retrigger = true, heatKj = 0 },
         },
         -- L331: the first ATTITUDE part. On the full machine model a car only turns if something on it makes torque;
@@ -130,6 +132,20 @@ Core.define("engineering.installation", function(C)
     local designById = {}
     for _, d in ipairs(M.DESIGNS) do designById[d.designId] = d end
     function M.design(id) return designById[id] end
+    -- Persisted physical Designs are server authority. Registration never mutates an existing Design.
+    function M.register(d)
+        if type(d) ~= "table" or type(d.designId) ~= "string" or d.designId == "" or
+            not M.isAddOnFamily(d.family) or d.interface ~= M.STANDARD or
+            type(d.massKg) ~= "number" or d.massKg <= 0 or type(d.price) ~= "number" or d.price <= 0 or
+            type(d.envelope) ~= "table" or #d.envelope ~= 3 then return nil, "invalid_physical_design" end
+        for _, v in ipairs(d.envelope) do if type(v) ~= "number" or v <= 0 then return nil, "invalid_envelope" end end
+        local ok, errs = Sys.validate(d.perf)
+        if not ok then return nil, table.concat(errs, "; ") end
+        local old = designById[d.designId]
+        if old then return old, "already_registered" end
+        designById[d.designId] = d
+        return d
+    end
 
     --- Peak force a design can put through its mount (N).
     function M.peakForceN(d)

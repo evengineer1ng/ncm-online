@@ -28,7 +28,7 @@ local function log(fmt, ...) print(("[ncm_world/snowglobe] " .. fmt):format(...)
 -- L341: flight ships to Online, so the altitude doorway runs there too (the name is historical).
 local function development()
     local ok, id = pcall(function() return GlobalState.ncmIdentity end)
-    local env = tostring(ok and type(id) == "table" and id.environment or "development")
+    local env = tostring(ok and type(id) == "table" and id.environment or "unknown")
     return env == "development" or env == "online"
 end
 

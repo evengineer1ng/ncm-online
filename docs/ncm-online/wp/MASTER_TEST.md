@@ -3159,3 +3159,14 @@ Headless evidence (2026-10-07): `tools/test-host-webui.lua` 14/14 (the real reso
 | §PB7 | **The Race Week line.** After choosing. | Top right: `TAPE 01 · RW .. · D.. · ..:..` and the time to the next possible end. `ncm_host.log`: `MACHINE CHANNEL BOUND to the NCM Carrier`. | **NOT RUN** |
 | §PB8 | **Remembered.** Quit to the main menu and load the save again. | TAPE 01 mounts by itself (Mod Settings keeps "Tape in play"). | **NOT RUN** |
 | §PB9 | **Where the lag is.** Play normally ~10 min with a tape in play. | `ncm_host.log` names every frame NCM held > 8 ms (`slow frame ... slowest <resource> <job> (<file:line>)`) and any `slow tape snapshot`. Send the log; the fix follows the evidence. | **NOT RUN** |
+
+## Physical manufacturer R&D (L342; offline build is not a live PASS)
+
+| ID | Live action | PASS evidence | Result |
+|---|---|---|---|
+| §RN1 | After migrations 071-072, inspect the first Zetatech attitude R&D run on dev. | One claimed v2 run, persisted spec_json, physics within ceilings, one WIRE release story; v1 scalar results unchanged. | **NOT RUN** |
+| §RN2 | Open Online Panel > Parts after the first physical release. | The R&D add-on is market stock with a real price and compatible mount; none of the five lineage roots is offered. | **NOT RUN** |
+| §RN3 | Buy an attitude part and mount it from the pad, then buy and fit propulsion and tank hardware. | Eddies charged once, serialized assets enter storage, mount/facing holds work; no typed or free acquisition path. | **NOT RUN** |
+| §RN4 | Fly the bought Machine into Deep, disconnect and reconnect, then observe on another client. | The purchased spec produces its stated thrust/torque and fuel/heat use in every host; no attitude waiver on Online; restart keeps the design and install. | **NOT RUN** |
+| §RN5 | Run the dev soak across 100 seeded continuities through one Racing Week. | First buyable part by 48 h and complete stock kit within the Week at a measured acceptable rate; failures and no-candidate runs recorded. | **NOT RUN** |
+| §RN6 | Leave a single-player tape for 19 days, return, then open another tape. | Every missed physical run is resolved in order on the first tape; the second tape has independent IDs, outcomes and stock. | **NOT RUN** (host bench: PASS, live game owed) |

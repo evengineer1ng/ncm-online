@@ -8,7 +8,7 @@ local function now() return math.floor(Open77.time.unix()) end
 -- reads full. Online is untouched. A deliberate dev fuel test turns it off with the convar `ncm_dev_fuel 0`.
 local function devFuel()
  local ok,id=pcall(function() return GlobalState.ncmIdentity end)
- local env=ok and type(id)=="table" and id.environment or "development"
+ local env=ok and type(id)=="table" and id.environment or "unknown"
  if tostring(env)~="development" then return false end
  local okC,v=pcall(GetConvar,"ncm_dev_fuel","1")
  return not okC or tostring(v)~="0"
