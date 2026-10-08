@@ -70,8 +70,7 @@ function NcmComponents.seed()
     end
     local release=math.floor(tonumber(settings.partsReleaseEpoch) or 0); if release<=0 then release=t end
     -- Physical research begins when this build first boots for the continuity, not at the older scalar launch epoch.
-    local physicalRelease=math.floor(tonumber(settings.partsPhysicalReleaseEpoch) or 0)
-    if physicalRelease<=0 then physicalRelease=t end
+    local physicalRelease=t
     for makerKey,m in pairs(Rnd.MAKERS) do
         MySQL.insert.await([[INSERT IGNORE INTO component_rnd_state
           (server_id,maker_key,release_epoch,next_run_index,next_run_at,logic_version,updated_at)
