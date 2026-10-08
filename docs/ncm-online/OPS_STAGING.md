@@ -176,6 +176,27 @@ Post-upgrade health, in one line each: `migrations: N applied` → `ownership le
 `ncm_world started v…` → `class ceilings published` → `scheduler started: 5 series`. If the series line is
 missing, NCM did not start.
 
+## Physical manufacturer R&D (2026-10-08 01:36 UTC) -- L342
+
+**Deployed:** committed resources `f28c409` (first implementation `14fdb2a` plus the Online tunable fix),
+with `ncm_link` withheld and no required-mod change. Pre-change backup:
+`/opt/ncm/backups/pre-carrier-prod-20261008T012803Z` contains verified `ncm.sql.gz` (152 tables),
+`operator-state.tar.gz`, and `resources-ncm.tar.gz` (9.1 MB). Five representative uploaded files
+hash-matched the committed workspace before restart. Migrations 071-072 applied. On the corrected boot,
+Online reported `environment = online`, seeded all five v2 physical programmes, persisted five root specs,
+and completed component seeding. The first Zetatech attitude evaluation is scheduled for
+2026-10-08 13:36 UTC (09:36 ET); no physical run or player-facing flight PASS exists yet (§RN).
+
+**Correction during rollout:** the first boot at 01:31 UTC rejected an undeclared
+`partsPhysicalReleaseEpoch` read in `components.lua`; migration succeeded but component seeding stopped.
+Commit `f28c409` uses the first physical boot time without a new tunable. After a second restart,
+the five programme rows and normal component seed were verified in MariaDB/logs. The first error remains
+in the append-only server log; it is not from the corrected boot (KB-395).
+
+**Rollback:** stop `ncm-server`; restore `resources-ncm.tar.gz` and the pre-change database dump
+from the backup directory (071-072 are forward migrations); restore operator state only if it changed;
+start the service. The server was active after the corrected restart.
+
 ## Online Baseline 3 (2026-10-08 00:51 UTC) -- L341
 
 **Deployed:** resources at commit `0ab8c00` (tag `online-baseline-3`) = dev's tree minus `ncm_link` (withheld by

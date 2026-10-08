@@ -14,7 +14,8 @@ competency that grows and failures that are real, listed on markets and bought w
 
 **Build status (2026-10-07):** the shared core, migrations 071-072, five physical programmes, database/client spec delivery,
 market stock and fitment, Panel Parts purchase tiles, and WIRE release stories are built and headless-green. Single-player
-tapes replay missed physical runs in order. The live acceptance rows are `wp/MASTER_TEST.md` §RN1-§RN6; none has a live PASS.
+tapes replay missed physical runs in order. Online and dev have been restarted with this code; the live acceptance rows
+are `wp/MASTER_TEST.md` §RN1-§RN6, and none has a live gameplay PASS.
 
 ---
 
