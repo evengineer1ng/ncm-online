@@ -1,0 +1,163 @@
+﻿{
+    "at":  "2026-10-07T20:17:16",
+    "game":  "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Cyberpunk 2077",
+    "reason":  "KB-391: launcher quarantine + solo-adjust took the hand-installed NCM dev mods",
+    "files":  [
+                  {
+                      "path":  "r6\\scripts\\ncm_broadcast\\NcmBroadcast.reds",
+                      "action":  "added",
+                      "source":  "dist\\ncm_broadcast",
+                      "sha256":  "F534540A02F0C0D0ED141BEDE8ADB4C1A8554F051625144FF144C8D9EBF223D3"
+                  },
+                  {
+                      "path":  "r6\\scripts\\ncm_broadcast\\NcmBroadcastNatives.reds",
+                      "action":  "added",
+                      "source":  "dist\\ncm_broadcast",
+                      "sha256":  "CAB84B5154CEA038B5E66C7C0A668786FC8771BF9D605282D946275497BF9EE8"
+                  },
+                  {
+                      "path":  "archive\\pc\\mod\\ncm_pace_race_splines.archive",
+                      "action":  "added",
+                      "source":  "dist\\ncm_pace",
+                      "sha256":  "DB720A7F6DBEC7D0EC5D85263C999E30BCA5CD2CA6E27CD03D1BA9243C95ACCC"
+                  },
+                  {
+                      "path":  "archive\\pc\\mod\\ncm_pace_race_splines.archive.xl",
+                      "action":  "added",
+                      "source":  "dist\\ncm_pace",
+                      "sha256":  "FDB6AA6DE647CF1762256731224FD0E60011ED5132A22A9E5DA98ABD619B93AC"
+                  },
+                  {
+                      "path":  "r6\\scripts\\ncm_pace\\NcmPace.reds",
+                      "action":  "added",
+                      "source":  "dist\\ncm_pace",
+                      "sha256":  "47F630E98C5882A9DAC0C8067E39342C1192D4D5F8795F8CD274C45EE4B9C411"
+                  },
+                  {
+                      "path":  "r6\\scripts\\ncm_pace\\NcmPaceDump.reds",
+                      "action":  "added",
+                      "source":  "dist\\ncm_pace",
+                      "sha256":  "4FE0679EE353353705B28C3E47DAF52EF0A02A835AEAE5E1C7511D1C548C9F6C"
+                  },
+                  {
+                      "path":  "r6\\scripts\\ncm_pace\\NcmPaceNatives.reds",
+                      "action":  "added",
+                      "source":  "dist\\ncm_pace",
+                      "sha256":  "B1B9CE326592E906FAA2B431A8B11EE1E1A0C1D9D9098A640545C8C4A250BCAA"
+                  },
+                  {
+                      "path":  "r6\\scripts\\ncm_pace\\NcmPaceProbe.reds",
+                      "action":  "added",
+                      "source":  "dist\\ncm_pace",
+                      "sha256":  "B85427273B8081B89FB9FBED915B0A25D7BABB4877E153FF1CEAC1B597FA9184"
+                  },
+                  {
+                      "path":  "r6\\scripts\\ncm_pace\\NcmPaceScales.reds",
+                      "action":  "added",
+                      "source":  "dist\\ncm_pace",
+                      "sha256":  "DFBF3823F14F5518378F2B815545A192D832C74D9AB287497B829F8B79909AB9"
+                  },
+                  {
+                      "path":  "r6\\tweaks\\ncm_pace\\racers.yaml",
+                      "action":  "added",
+                      "source":  "dist\\ncm_pace",
+                      "sha256":  "442DFAEDFAE692C8AEC31E3408CF95A853CE2A94115C8FEA2A6DF87EA68B61C2"
+                  },
+                  {
+                      "path":  "r6\\scripts\\ncm_rig_bridge\\ncm_rig_bridge.reds",
+                      "action":  "added",
+                      "source":  "dist\\ncm_rig_bridge",
+                      "sha256":  "F89EB73C1B87BA80C3F50F9E2F0E9664FE675C570102E09E0F3F8EC285379174"
+                  },
+                  {
+                      "path":  "r6\\scripts\\ncm_vision\\NcmScannerNatives.reds",
+                      "action":  "added",
+                      "source":  "dist\\ncm_vision",
+                      "sha256":  "69541918C82856958466D2C8A5D156A2BB74ADEBAE2A9F2984DB3BC40B7614D3"
+                  },
+                  {
+                      "path":  "r6\\scripts\\ncm_vision\\NcmScannerReticle.reds",
+                      "action":  "added",
+                      "source":  "dist\\ncm_vision",
+                      "sha256":  "5019FAF612CC1C9AF32BC08B6ED4C302100D4C4F3FB4E34E02FC942EC3B9930C"
+                  },
+                  {
+                      "path":  "r6\\scripts\\ncm_vision\\NcmVision.reds",
+                      "action":  "added",
+                      "source":  "dist\\ncm_vision",
+                      "sha256":  "4964C94DD10BB17DB862FAB8E866D4C4B5469182B2936E9A94E551DDBE8F9E71"
+                  },
+                  {
+                      "path":  "r6\\scripts\\ncm_snowglobe\\NcmSnowglobe.reds",
+                      "action":  "added",
+                      "source":  "dist\\ncm_snowglobe",
+                      "sha256":  "9208E13132CBE687EF5D1EDEC207AC960265BD3102E1987824548B021E447D76"
+                  },
+                  {
+                      "path":  "r6\\scripts\\ncm_snowglobe\\NcmSnowglobeNatives.reds",
+                      "action":  "added",
+                      "source":  "dist\\ncm_snowglobe",
+                      "sha256":  "48EA588E71738F36E1A9B01018F3F3E30761D0E665AB405520106CE36C60B9AF"
+                  },
+                  {
+                      "path":  "archive\\pc\\mod\\ncm_clock.archive",
+                      "action":  "added",
+                      "source":  "launcher quarantine",
+                      "sha256":  "709A46F4084E334045B16AA244E2E871232DBB55529AC9C2225AB5729224D50E"
+                  },
+                  {
+                      "path":  "archive\\pc\\mod\\ncm_clock.txt",
+                      "action":  "added",
+                      "source":  "launcher quarantine",
+                      "sha256":  "2028E29CEF610F69AF345B69DA4BBDA91C09C98A69B57A143530E26B54923E1F"
+                  },
+                  {
+                      "path":  "archive\\pc\\mod\\ncm_iwn_braking.archive",
+                      "action":  "added",
+                      "source":  "launcher quarantine",
+                      "sha256":  "601DA9577E9964EB464061DAFDB8B9F194DDCED27783EBFA115A28CF4929BC09"
+                  },
+                  {
+                      "path":  "r6\\scripts\\ncm_gearbox\\NcmGearbox.reds",
+                      "action":  "added",
+                      "source":  "launcher quarantine",
+                      "sha256":  "B79F9E97C8048D35A3049A2CB39686C72E091E165F9FED62DA22CD49AC6D5D24"
+                  },
+                  {
+                      "path":  "r6\\scripts\\ncm_gearbox\\NcmGearboxDash.reds",
+                      "action":  "added",
+                      "source":  "launcher quarantine",
+                      "sha256":  "FB44B8B0097948441D9F6CED7E98AB445217D4C169B95D2CD1A7892C8E6D650A"
+                  },
+                  {
+                      "path":  "r6\\scripts\\ncm_gearbox\\NcmGearboxNatives.reds",
+                      "action":  "added",
+                      "source":  "launcher quarantine",
+                      "sha256":  "0DDDCEDB7957762273EFF445FC7D5F47B85749E38603D8738632260AA94B303B"
+                  },
+                  {
+                      "path":  "r6\\scripts\\ncm_pace_diag\\NcmPaceDiag.reds",
+                      "action":  "added",
+                      "source":  "launcher quarantine",
+                      "sha256":  "08B13462ED547E2C8B8E564CE936CBF7E3793AD37D148B7D3FF538BBC7234B5C"
+                  },
+                  {
+                      "path":  "r6\\tweaks\\ncm_gearbox\\clones.yaml",
+                      "action":  "added",
+                      "source":  "launcher quarantine",
+                      "sha256":  "BB9561B9AF2B1FCF9268E46A4A568BF4A0521100E626AA8B9ED87381AF31DFA7"
+                  },
+                  {
+                      "path":  "red4ext\\plugins\\ncm_thrust\\ncm_thrust_config.json",
+                      "action":  "replaced",
+                      "source":  "solo-adjust-backup (enabled)",
+                      "sha256":  "6CB6C996136C8AD2E8202AD52F0834FE723D01E04665084F5596CD43CD3D3200"
+                  },
+                  {
+                      "path":  "red4ext\\plugins\\ncm_snowglobe\\ncm_snowglobe_config.json",
+                      "action":  "replaced",
+                      "source":  "solo-adjust-backup (enabled)",
+                      "sha256":  "1A6EE7934BFAF93CDD85A18D9207E337BB224B43C23A1E236AA90BE52667B62A"
+                  }
+              ]
+}

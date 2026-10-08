@@ -1,0 +1,9 @@
+﻿{
+    "at":  "2026-10-07T16:39:57",
+    "actions":  [
+                    "restored the 2026-10-07 livery manifest (Solo had put back the Sept 19 copy; kept in solo-adjust-backup)",
+                    "ncm_thrust enabled=false (dev-only; original config in solo-adjust-backup)",
+                    "ncm_snowglobe enabled=false (dev-only; original config in solo-adjust-backup)",
+                    "moved CET mod MT_Ecosystem (NCM 2.0) to cyber_engine_tweaks\\mods_disabled (move it back to re-enable)"
+                ]
+}

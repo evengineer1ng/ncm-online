@@ -34,6 +34,7 @@ corpus claiming migrations 001-007 while the schema was at 023.
 
 | Topic | Authority | Affirmed |
 |---|---|---|
+| **NCM 3.0 single player**: the NCM Host (the dev resources in-process over SQLite), Race Week tapes, offline canonical time, the deck, the seam report toward Nexus | [55_NCM3_SINGLE_PLAYER.md](55_NCM3_SINGLE_PLAYER.md) | L338 |
 | Organisations, team ownership, governance, grid slots | [14_TEAM_ORGANIZATIONS.md](14_TEAM_ORGANIZATIONS.md) | L92, L93; reaffirmed L123 |
 | Foundational primitives, contradictions, build sequencing | [24_FOUNDATION_RECONCILIATION.md](24_FOUNDATION_RECONCILIATION.md) | L123 |
 | NPC motorsport world: organizations, calendar, sim, WIRE, Billie's board, manager mode, garages, live races | [44_THE_PADDOCK.md](44_THE_PADDOCK.md); [DECISION_RECORD.md](DECISION_RECORD.md) L248 for the oval spline candidate and its live gate | L222, L224-L227, L248 |
@@ -93,8 +94,9 @@ and amends §0.1. The code still implements fixed three-day runs until doc 47 §
 
 ---
 
-## Current (18)
+## Current (19)
 
+- [55_NCM3_SINGLE_PLAYER.md](55_NCM3_SINGLE_PLAYER.md) - NCM 3.0 single player (L338): the NCM Host runs the dev server's resources unchanged inside Cyberpunk over SQLite; Race Week tapes (one continuity = one server_id), the present calculated on return (`week.catchup`), the deck, the Time Lab; the seam report (doc §8). Headless gates green; MASTER_TEST §TP NOT RUN
 - [01_ARCHITECTURE.md](01_ARCHITECTURE.md) - overall system shape - SEE CONFLICT C-1 in INDEX.md
 - [02_ROADMAP.md](02_ROADMAP.md) - milestone vocabulary (M0-M12) ONLY; current sequencing is 24
 - [07_NODE_NETWORK.md](07_NODE_NETWORK.md) - nodes, routes, ordered chains
@@ -139,9 +141,10 @@ and amends §0.1. The code still implements fixed three-day runs until doc 47 §
 - [48_ENGINEERING_ENVELOPE.md](48_ENGINEERING_ENVELOPE.md) - the engineering envelope: a car's multidimensional capacity instead of 11 slots, physical components, "it fits", the packaging puzzle, staged reverse engineering into lineages, NCM taking authority over systems; Engineering Architecture pass after the manual (L311); nothing built
 - [49_CITY_MEMORY.md](49_CITY_MEMORY.md) - city memory and civil engineering: author Day 1 and let Day 3 be the evidence; a sparse server-side Campaign Scar Ledger (clustered by segment + radius, accumulated burden → levels 1-4, physical incidents only in v0, ends with the campaign), an Infrastructure Knowledge Ledger across runs, a hand-run Campaign A/B experiment before any automation (L312 + addendum, Q1-Q4 ruled); civil engineering as engineering pointed outward, with a six-piece snapping kit judged by the race, anyone builds and dismantles for modest money (L313, C1-C4 ruled); the end-of-cycle Night City seed map with danger heatmap and infrastructure pins, chosen publicly at rollover; infrastructure belief proportional to evidence. The spatial half of doc 47, not a new end rule; nothing built
 
-## Proposal - no authority until ruled (19)
+## Proposal - no authority until ruled (20)
 
 
+- [56_RND_OVERHAUL.md](56_RND_OVERHAUL.md) - R&D overhaul (L341): flight parts arrive only through manufacturer R&D -- physical design points from lineages, physics-capped, competency-banded, specs persisted in the database (`spec_json`), sold on markets; today no Online player can obtain flight hardware. **PROPOSAL for the next coder; Q1-Q6 open; nothing built**
 - [21_ENGINEERING_PROPOSAL.md](21_ENGINEERING_PROPOSAL.md) - engineering architecture - ACCEPTED; decisions live in L120
 - [22_WEAR_PROPOSAL.md](22_WEAR_PROPOSAL.md) - wear architecture - ACCEPTED; decisions live in L120
 - [25_MACHINE_ARCHITECTURE_PROFILE.md](25_MACHINE_ARCHITECTURE_PROFILE.md) - machine architecture profile - awaiting Q18/Q19; section 10 undecided

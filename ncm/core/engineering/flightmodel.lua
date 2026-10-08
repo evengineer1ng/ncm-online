@@ -36,12 +36,14 @@ Core.define("engineering.flightmodel", function(C)
     end
 
     --- The machine model from a Foundry install. `devices` = resolved installation devices ({ componentId, kind, perf,
-    --- thermal, massKg, pos, axis }); opts = { vehicleKey, fuelKg, tankKg }. Returns the `engineering.machine` model.
+    --- thermal, massKg, pos, axis }); opts = { vehicleKey, fuelKg, tankKg, body }. `body` = an `engineering.flightbody`
+    --- (the Machine's own mass, bounds, drag, lift and skin, from its passport); without it, `CHASSIS` by key as before.
+    --- Returns the `engineering.machine` model.
     function M.build(devices, opts)
         opts = opts or {}
-        local ch = M.CHASSIS[opts.vehicleKey or ""] or M.CHASSIS.default
+        local ch = opts.body or M.CHASSIS[opts.vehicleKey or ""] or M.CHASSIS.default
         local parts = {
-            { key = "body", body = { massKg = 0, perf = { kind = "aero_surface", areaM2 = ch.areaM2, cd = ch.cd, cl = 0 } }, pos = ch.com },
+            { key = "body", body = { massKg = 0, perf = { kind = "aero_surface", areaM2 = ch.areaM2, cd = ch.cd, cl = ch.cl or 0 } }, pos = ch.com },
         }
         local fuel = math.max(0, tonumber(opts.fuelKg) or 0)
         local cap = math.max(fuel, tonumber(opts.tankKg) or fuel)
@@ -69,10 +71,11 @@ Core.define("engineering.flightmodel", function(C)
             }
         end
         local m = Mach.assemble({
-            chassis = { massKg = ch.massKg, com = ch.com, bounds = ch.bounds, ratedLoadN = 150000, wheels = true },
+            chassis = { massKg = ch.massKg, com = ch.com, bounds = ch.bounds, ratedLoadN = 150000, wheels = true, skin = ch.skin },
             parts = parts,
         })
         m.vehicleKey = opts.vehicleKey
+        m.flightBody = opts.body and { family = opts.body.family, prov = opts.body.prov } or nil
         return m
     end
 
@@ -149,6 +152,32 @@ Core.define("engineering.flightmodel", function(C)
         if opts.devFuel then for i, t in ipairs(m.tanks) do s2.tanks[i] = t.kg end end   -- dev fuel: nothing burns
         tel.alt, tel.mass = select(3, D.ecefToLla(s2.pos)), Dyn.mass(m, s2)
         return s2, tel
+    end
+
+    --- The canonical FLIGHT TELEMETRY row (aerospace brief §4): one shape for every host, the race log and a diagnosis.
+    --- `extra` = { machineId, driver, leg, gate, toGateM, position, gapS } from the race, merged in.
+    function M.row(m, s, tel, extra)
+        tel = tel or {}
+        local Dy = Dyn
+        local mass = Dy.mass(m, s)
+        local thrust = tel.thrustN or 0
+        local _, _, alt = D.ecefToLla(s.pos)
+        local up = V.unit(s.pos)
+        local vr = V.dot(s.vel, up)
+        local vt = V.len(V.add(s.vel, V.scale(up, -vr)))
+        local fuel = {}
+        for i, t in ipairs(m.tanks) do fuel[t.propellant or ("tank" .. i)] = (fuel[t.propellant or ("tank" .. i)] or 0) + (s.tanks[i] or 0) end
+        local r = {
+            t = s.t, massKg = mass, thrustN = thrust, accel = thrust / math.max(1, mass),
+            pos = { s.pos[1], s.pos[2], s.pos[3] }, vel = { s.vel[1], s.vel[2], s.vel[3] }, speed = V.len(s.vel),
+            vRadial = vr, vTangential = vt, altM = alt, omega = { s.omega[1], s.omega[2], s.omega[3] },
+            forward = { s.rot[1][2], s.rot[2][2], s.rot[3][2] },
+            propellantKg = fuel, heatK = s.heatK, derate = tel.derate, rho = tel.rho or M.density(alt), qPa = tel.qPa or 0,
+            aeroHeatKw = tel.aeroHeatKw or 0, skinRejectKw = tel.skinRejectKw or 0, waiver = tel.waiver or nil,
+            family = m.flightBody and m.flightBody.family or m.vehicleKey,
+        }
+        for k, v in pairs(extra or {}) do r[k] = v end
+        return r
     end
 
     --- Fuel left (kg) in the Machine's tank.

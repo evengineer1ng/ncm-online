@@ -115,6 +115,9 @@ Core.define("engineering.dynamics", function(C)
         return got
     end
 
+    M.SUTTON_GRAVES = 1.7415e-4   -- Earth air, SI (W m^-2 with rho in kg/m^3, Rn in m, v in m/s)
+    M.AMBIENT_K = 288
+
     --- Thermal derate: full output below 80 % of the limit, falling linearly to nothing at the limit.
     function M.derate(s)
         local lim = Mach.TEMP_LIMIT_K
@@ -325,6 +328,16 @@ Core.define("engineering.dynamics", function(C)
         local Fw = rotate(s.rot, Fb)
         if rho > 0 then
             local v = len(s.vel)
+            tel.qPa = 0.5 * rho * v * v
+            -- aerodynamic heating (aerospace brief, 2026-10-07): Sutton-Graves stagnation-point flux k sqrt(rho / Rn) v^3,
+            -- averaged at half that over the frontal area. Nothing at road speed, a few kW climbing out, megawatts coming
+            -- home at orbital speed. Only a machine with a described skin (`engineering.flightbody`) heats.
+            if m.skin and v > 0 then
+                local sk = m.skin
+                local kw = 0.5 * M.SUTTON_GRAVES * math.sqrt(rho / sk.noseRadiusM) * v ^ 3 * sk.frontalM2 / 1000
+                heatKj = heatKj + kw * dt
+                tel.aeroHeatKw = kw
+            end
             if v > 0 then
                 local fwd = dot(s.vel, { s.rot[1][2], s.rot[2][2], s.rot[3][2] })
                 for _, surf in ipairs(m.surfaces) do
@@ -376,6 +389,14 @@ Core.define("engineering.dynamics", function(C)
         -- heat: generated against rejected at this density, into the machine's heat capacity
         local rej = 0
         for _, r in ipairs(m.radiators) do rej = rej + Sys.rejectionKw(r, rho) end
+        -- a described skin radiates what it holds (grey body, against a 288 K surround): zero when cool, ~20 kW for a car
+        -- at its derate threshold -- the most heat it can take in steadily
+        if m.skin and s.heatK > 0 then
+            local T, T0 = M.AMBIENT_K + s.heatK, M.AMBIENT_K
+            local kw = m.skin.emissivity * 5.670374e-8 * m.skin.wettedM2 * (T ^ 4 - T0 ^ 4) / 1000
+            rej = rej + kw
+            tel.skinRejectKw = kw
+        end
         local capKjPerK = math.max(1e-6, m.dryMassKg * Mach.CP / 1000)
         s.heatK = math.max(0, s.heatK + (heatKj - rej * dt) / capKjPerK)
 

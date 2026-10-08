@@ -1,0 +1,55 @@
+{
+  "liveries": [
+    "archer",
+    "herrera",
+    "kimiko",
+    "mizutani",
+    "probe",
+    "quadra",
+    "raven",
+    "rayfield",
+    "spunky_monkey",
+    "thorton",
+    "yorinobu"
+  ],
+  "appearance_names": {
+    "archer": "archer",
+    "herrera": "herrera",
+    "kimiko": "kimiko",
+    "mizutani": "mizutani",
+    "probe": "probe",
+    "quadra": "quadra",
+    "raven": "raven",
+    "rayfield": "rayfield",
+    "spunky_monkey": "spunky_monkey",
+    "thorton": "thorton",
+    "yorinobu": "yorinobu"
+  },
+  "badges": {
+    "archer": "own",
+    "herrera": "own",
+    "kimiko": "own",
+    "mizutani": "own",
+    "probe": "own",
+    "quadra": "own",
+    "raven": "default",
+    "rayfield": "default",
+    "spunky_monkey": "own",
+    "thorton": "own",
+    "yorinobu": "own"
+  },
+  "records": {
+    "archer": "Vehicle.v_sport1_rb15_f1_archer",
+    "herrera": "Vehicle.v_sport1_rb15_f1_herrera",
+    "kimiko": "Vehicle.v_sport1_rb15_f1_kimiko",
+    "mizutani": "Vehicle.v_sport1_rb15_f1_mizutani",
+    "probe": "Vehicle.v_sport1_rb15_f1_probe",
+    "quadra": "Vehicle.v_sport1_rb15_f1_quadra",
+    "raven": "Vehicle.v_sport1_rb15_f1_raven",
+    "rayfield": "Vehicle.v_sport1_rb15_f1_rayfield",
+    "spunky_monkey": "Vehicle.v_sport1_rb15_f1_spunky_monkey",
+    "thorton": "Vehicle.v_sport1_rb15_f1_thorton",
+    "yorinobu": "Vehicle.v_sport1_rb15_f1_yorinobu"
+  },
+  "built": "2026-09-19T16:23:43"
+}

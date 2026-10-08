@@ -335,7 +335,7 @@ RegisterNetEvent("ncm:deep.config", function(c)
     if type(c) ~= "table" then return end
     cfg.enabled, cfg.enterZ, cfg.exitZ = c.enabled == true, tonumber(c.enterZ) or cfg.enterZ, tonumber(c.exitZ) or cfg.exitZ
     -- the development server takes care of fuel (owner, 2026-10-06): nothing burns, the parts never starve
-    if c.devFuel == true then NcmClientDevFuel = true end
+    NcmClientDevFuel = c.devFuel == true   -- L341: only the server says so, and never on Online
     if tonumber(c.utc) then utcBase, utcAtMs = tonumber(c.utc), GetGameTimer() end
     cfg.ascentZ = tonumber(c.ascentZ) or cfg.ascentZ
     cfg.maskNearM, cfg.maskFarM = tonumber(c.maskNearM) or cfg.maskNearM, tonumber(c.maskFarM) or cfg.maskFarM
@@ -1145,22 +1145,5 @@ end)
 -- ------------------------------------------------------------------------------------------------ commands
 RegisterCommand("ncm.deep.home", function() if A then exit("/ncm.deep.home", true) else log("not in deep space") end end, false)
 RegisterCommand("ncm.deep.rig", function() rig = not rig; log("dev attitude rig %s", rig and "ON" or "OFF") end, false)
---- `/ncm.eng.devfuel` (DEVELOPMENT ONLY): installed components burn nothing and report nothing, in Night City and in deep
---- space, until toggled off. A developer convenience, never a game rule: the HUD says DEV FUEL while it is on.
-RegisterCommand("ncm.eng.devfuel", function()
-    if not cfg.enabled then log("dev fuel is development-only"); return end
-    NcmClientDevFuel = not NcmClientDevFuel
-    print(("[ENG] DEV FUEL %s: installed components %s"):format(NcmClientDevFuel and "ON" or "OFF", NcmClientDevFuel and "burn nothing (dev only)" or "burn the Machine's tank again"))
-end, false)
---- `/ncm.deep.go [km]` (dev): leave now, starting `km` up (default 30) at rest -- to test without the climb. Starting
---- at the 12 km bound left 500 m before the return (owner: "couldnt get it to keep me going higher").
-RegisterCommand("ncm.deep.go", function(_, args)
-    if not cfg.enabled then log("deep is off on this server"); return end
-    local vid = seat()
-    local okV, v = pcall(Open77.vehicles.get, vid)
-    if not (vid and okV and type(v) == "table" and v.position) then log("get in your car first"); return end
-    local p = v.position
-    local km = math.max(cfg.enterZ / 1000 + 1, math.min(2000, tonumber(args and args[1]) or 30))
-    samples = {}
-    enter(vid, { x = p.x, y = p.y, z = km * 1000 }, "/ncm.deep.go " .. km .. " km")
-end, false)
+-- L341 (owner, 2026-10-07): `/ncm.eng.devfuel` and `/ncm.deep.go` are gone -- no typed fuel, no typed altitude. Dev
+-- fuel survives only as the DEVELOPMENT server's own setting (server/fuel.lua `ncm_dev_fuel`), never on Online.

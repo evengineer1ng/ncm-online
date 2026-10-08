@@ -135,5 +135,88 @@ Core.define("space.pilot", function(C)
         return noise(thrust, ctx.comp, ctx.eff, ctx.rng), note, { rt = rt, speed = speed }
     end
 
+    --- The speed whose aerodynamic heating a skin can shed at `frac` of its limit (m/s; huge in vacuum). The same law
+    --- `engineering.dynamics` heats with, read backwards: the pilot knows its machine's skin, not a speed table.
+    --- `budget` = { capKjK, heatK, horizonS }: the heat it can still soak up over the horizon counts too, so a cool machine
+    --- may run hot through thick air for a while and a hot one must slow.
+    function M.heatSpeed(skin, rho, frac, limitK, ambientK, sg, budget)
+        if not skin or rho <= 0 then return math.huge end
+        local T, T0 = ambientK + frac * limitK, ambientK
+        local shedKw = skin.emissivity * 5.670374e-8 * skin.wettedM2 * (T ^ 4 - T0 ^ 4) / 1000
+        if budget then
+            shedKw = shedKw + budget.capKjK * math.max(0, frac * limitK - budget.heatK) / (budget.horizonS or 60)
+        end
+        local per = 0.5 * sg * math.sqrt(rho / skin.noseRadiusM) * skin.frontalM2 / 1000   -- kW per (m/s)^3
+        return (shedKw / per) ^ (1 / 3)
+    end
+
+    --- COURSE (aerospace brief, 2026-10-07): a chain of 3D gates from Night City into Deep and home. Braking guidance:
+    --- toward the next gate at the speed this machine can still stop from -- v = sqrt(vPass^2 + 2 aBrake d), aBrake its
+    --- own spare thrust over gravity times the driver's margin -- capped in air by what its skin can shed as heat. A
+    --- reversal gate (the turnaround) is passed slowly because the machine must come back. Traffic as in Fireball.
+    --- ctx = { self = { pos, vel, aMax, heatFrac, progressM }, gate, nextGate, g, rho, skin, heat = { limitK, ambientK,
+    --- sg }, comp, eff, others = { {id, pos, vel, progressM} }, rng }. Returns thrust acceleration, note, targets.
+    function M.course(ctx)
+        local s, gate = ctx.self, ctx.gate
+        local risk = ctx.eff.risk
+        -- my own line through the gate: the nearest point of its disc (inside a margin), not everyone's centre
+        local off = sub(s.pos, gate.centre)
+        off = sub(off, scale(gate.normal, dot(off, gate.normal)))
+        local lim = (0.35 + 0.35 * risk) * gate.radius
+        if len(off) > lim then off = scale(unit(off), lim) end
+        local aim = add(gate.centre, off)
+        local toGate = sub(aim, s.pos)
+        local d = len(toGate)
+        local u = unit(toGate)
+        local tau = 1.0 + 1.5 * (1 - (ctx.comp.piloting or 8) / 100)
+        local gmag = len(ctx.g)
+        local spare = s.aMax - gmag
+        local aBrake = (0.45 + 0.4 * risk) * math.max(0.15 * s.aMax, spare)
+        -- how fast to cross: straight on -> carry speed; a turn -> as much as the machine can bend in the gate's radius
+        local vPass = gate.passMs or 0
+        if ctx.nextGate and not gate.passMs then
+            local out = unit(sub(ctx.nextGate.centre, gate.centre))
+            local c = dot(u, out)
+            local bend = math.sqrt(math.max(0, 0.6 * s.aMax * gate.radius))
+            vPass = c > 0 and math.max(bend, c * c * math.sqrt(2 * aBrake * len(sub(ctx.nextGate.centre, gate.centre)))) or bend
+        end
+        -- the distance I will still cover before my correction bites (my reaction, at my speed) is not braking distance
+        local speed = math.sqrt(vPass * vPass + 2 * aBrake * math.max(0, d - len(s.vel) * tau))
+        local note = "line"
+        local hcap = M.heatSpeed(ctx.skin, ctx.rho or 0, 0.45 + 0.35 * risk, ctx.heat.limitK, ctx.heat.ambientK, ctx.heat.sg,
+            ctx.heat.capKjK and { capKjK = ctx.heat.capKjK, heatK = s.heatK or 0, horizonS = 60 } or nil)
+        if hcap < speed then speed, note = hcap, "heat" end
+        if s.heatFrac > 0.75 + 0.2 * risk then speed = speed * 0.8; note = "saves the machine" end
+        -- traffic: closest approach, as Fireball
+        local margin = M.BASE_MARGIN_M * ctx.eff.marginScale
+        local avoid = { 0, 0, 0 }
+        for _, o in ipairs(ctx.others or {}) do
+            local rel, vrel = sub(o.pos, s.pos), sub(o.vel, s.vel)
+            local d2 = dot(vrel, vrel)
+            local tca = d2 > 1e-6 and -dot(rel, vrel) / d2 or 0
+            if tca > 0 and tca < M.HORIZON_S then
+                local missV = add(rel, scale(vrel, tca))
+                local miss = len(missV)
+                if miss < margin then
+                    local away = unit(scale(missV, -1))
+                    if len(away) == 0 then away = unit(cross(u, { 0, 0, 1 })) end
+                    local give = (risk > 0.7 and (o.progressM or 0) > (s.progressM or 0)) and 0.05 or ((1 - risk) * 0.6 + 0.1)
+                    note = give < 0.1 and "holds the line" or "gives way"
+                    avoid = add(avoid, scale(away, s.aMax * give * (1 - miss / margin)))
+                end
+            end
+            local ahead = (o.progressM or 0) - (s.progressM or 0)
+            if ahead > 0 and ahead < 500 and len(rel) < 600 then
+                speed = speed * (1 + 0.08 * risk)
+                if note == "line" then note = "attacks" end
+            end
+        end
+        -- velocity tracking toward the gate, damped across it, against gravity
+        local vWant = scale(u, speed)
+        local aWant = scale(sub(vWant, s.vel), 1 / tau)
+        local thrust = add(sub(aWant, ctx.g), avoid)
+        return noise(thrust, ctx.comp, ctx.eff, ctx.rng), note, { speed = speed, vPass = vPass, distM = d }
+    end
+
     return M
 end)

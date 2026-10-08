@@ -31,7 +31,12 @@ function NcmPassport.forAsset(assetId)
     local pe = Pool and Pool.byRecord and Pool.byRecord(row.record) or nil
     local added = 0
     if NcmEngineering and NcmEngineering.addedMassKg then added = NcmEngineering.addedMassKg(assetId) or 0 end
-    local pass = P.forMachine(row.vehicle_key, assetId, { paint = paint, tags = pe and pe.tags, prestige = pe and pe.prestige, addedMassKg = added })
+    -- the livery this machine's record carries (data.liveries, L338): Kimiko is an appearance of the RB15, not another model
+    local livery = nil
+    local okL, Liveries = pcall(function() return NcmCore.get("data.liveries") end)
+    if okL and Liveries then livery = Liveries.appearance(Liveries.fromRecord(row.record)) end
+    local pass = P.forMachine(row.vehicle_key, assetId, { paint = paint, tags = pe and pe.tags, prestige = pe and pe.prestige,
+        addedMassKg = added, livery = livery })
     local ok, text = pcall(Json.encode, pass)
     if ok then
         MySQL.update.await([[INSERT INTO machine_passport (asset_id, passport_json, version, updated_at) VALUES (?,?,?,?)
@@ -128,3 +133,6 @@ function NcmPassport.expressAc(assetId)
     return { car = choice.id, skin = choice.variant and choice.variant.id or nil, why = choice.reason, correspondence = choice.score,
         revision = choice.revision, tier = choice.tier, mapVersion = "passport-" .. P.version }
 end
+
+-- a claimed machine (ncm_league ownership.claim, L338) gets its passport at once: its livery, its model, what the host says
+AddEventHandler("ncm:host:claimed", function(_, _, assetId) if assetId then pcall(NcmPassport.forAsset, assetId) end end)

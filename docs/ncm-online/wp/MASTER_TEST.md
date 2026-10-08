@@ -3109,3 +3109,53 @@ Offline 2026-10-01: Release build, existing Pace state tests, five guard checks,
 | §MP3 | **The Hella in KSA** (L336): any handoff. | KSA shows the teal Hella (not the Rocket; the Rocket is gone); HUD shows Water, Liquid Antihydrogen, MMH, NTO. | **PASS 2026-10-07 13:42 (live)** |
 | §MP4 | **The FD-1 in KSA**: ACTIVATE + throttle. | Pushes ~30 kN; KSA's TOTAL dV ~ NCM's figure for what is left. | **PASS (bench: 27.9 kN at 28 kN rating; dV 237,373 m/s)**; live NOT RUN |
 | §MP5 | **The ascent over the game's band** (IDEA-1174, after KB-377). | Our Earth sits on Cyberpunk's dark band and continues outward; nothing covers the game's sky; client log `ASCENT CAMERA z ... (the game's own)` every 5 s. | **NOT RUN** (built 14:15) |
+
+## §TP - NCM 3.0 single player: the NCM Host, Race Week tapes, the deck (L338, doc 55) - **BUILT; HEADLESS GATE GREEN; LIVE NOT RUN**
+
+Headless evidence (2026-10-07): `tools/test-host-sql.lua` 26/26 (460/460 statements translate + prepare), `tools/test-host-boot.lua` 37/37, core `test_week_catchup` 8/8, package smoke from the staged folder (0 errors). Before any live case: back up the Cyberpunk saves; remove the old `MT_Ecosystem` mod if installed; extract `dist/ncm-3.0.0-alpha.1.zip` into the game folder; play WITHOUT the OPEN//77 launcher (Steam / GOG directly).
+
+| ID | Steps | Expected | Result |
+|---|---|---|---|
+| §TP0 | **Boot.** Launch Cyberpunk with the package installed. | CET log `[NCM 3.0] v3.0.0-alpha.1 ready`; no `BOOT FAILED`. On first mount the log's `database:` line names SQLite >= 3.35 and 140 tables created. | **NOT RUN** |
+| §TP1 | **The deck at the main menu** (open the CET overlay). First NEW TAPE. | The deck lists + NEW TAPE and CYBERPUNK WITHOUT NCM; NEW TAPE shows the Race Week explanation (nothing about Deep or other hosts) and BEGIN RW 01 · D1. | **NOT RUN** |
+| §TP2 | **Enter a tape.** Load any save; choose TAPE 01. | Until the choice: no NCM toast, pin or HUD line. After: `mounted T01-...`; top-right `TAPE 01 · RW 01 · D1 · hh:mm` + time to the next possible end; fuel stations / landmarks on the map; no `tick error` lines. | **NOT RUN** |
+| §TP3 | **The pad.** With the deck up and the overlay closed: D-pad up/down, A. | The selection moves and A enters. The CET log lists `deck saw action ...` names (send them to the coder if nothing moves). | **NOT RUN** |
+| §TP4 | **Cyberpunk without NCM.** Load a save, choose it. | Nothing of NCM runs this session: no HUD line, no NCM pins or toasts. | **NOT RUN** |
+| §TP5 | **Stranded, then away.** Quit to the main menu. Deck: Developer mode -> Strand machine in Deep (tape at rest) -> Skip 4 Weeks. Load the save, choose TAPE 01. | The deck row says DEEP and a later RW before entering; after: `While you were away: N Race Week rollover(s)...`, the machine in Night City, the RW line matches the deck's. | **NOT RUN** |
+| §TP6 | **Two tapes.** NEW TAPE, enter it. | TAPE 02 at RW 01 · D1 while TAPE 01 keeps its own Week; TAPE 01's row unchanged. | **NOT RUN** |
+| §TP7 | **A Cyberpunk save is not a tape.** Load an OLDER save and enter TAPE 01. | TAPE 01's Race Week is unchanged (not rewound). | **NOT RUN** |
+| §TP8 | **Back to ordinary Cyberpunk.** Delete `mods/NCM`. | The game and the same saves load normally. | **NOT RUN** |
+| §TP9 | **Kimiko in ordinary Cyberpunk** (after `tools/install-ncm3-kimiko.ps1`, launched from Steam). Claim it (§TP10) or use any spawner for `Vehicle.v_sport1_rb15_f1_kimiko`. | Navy Kimiko Racing / Orbital Air body, KIMIKO RACING on the nose, the rear wing EVENRAC1NG / ODD with New Empire endplates; no Red Bull art. | **NOT RUN** |
+| §TP10 | **Claim the Kimiko car.** In a tape: the Tape Deck hotkey (bind "NCM: Tape Deck" once in CET Bindings) -> GARAGE -> Claim Kimiko Racing · Orbital Air. | Toast `Claimed: Vehicle.v_sport1_rb15_f1_kimiko (NCM #... · red_bull_racing #...)` and `In your garage`; it appears in the vanilla call-vehicle menu; the deck lists it `yours` with its serial. Claiming again changes nothing. | **NOT RUN** |
+| §TP11 | **Claim the car you are in** -- any other vehicle, ideally a mod NCM has never heard of. | `CLAIM THIS CAR` -> an asset of its own (no serial for an unknown model), listed in the garage. | **NOT RUN** |
+| §TP12 | **A rocket on the ground, nothing upward.** Drive the Kimiko RB15 flat out, then press Triangle. | Very fast (note the top speed seen); Triangle does nothing (no installed components). | **NOT RUN** |
+
+## §XR - Aerospace race in single player (`ncm_aero`, L339) - **BUILT; HEADLESS + HOST GATES GREEN; LIVE NOT RUN**
+
+Headless evidence (2026-10-07): core `test_engineering_flightbody` 7/7 and `test_space_aerocourse` 7/7 (Lua 5.4 + LuaJIT), `tools/test-host-boot.lua` 60/60 (11 aero checks), native self-test 0 failures. Needs 3.0.0-alpha.3 (`tools/install-ncm3-kimiko.ps1 -UpdateNcm`, game closed) and at least one claimed catalogue machine on the tape.
+
+| ID | Steps | Expected | Result |
+|---|---|---|---|
+| §XR1 | **The section.** In a tape, open the Tape Deck. | Under GARAGE: `AEROSPACE RACE · experimental`, a `Machine:` button cycling through your own claimed machines, and `Start an aerospace race`. With nothing claimed: "Claim a machine into this tape first". | **NOT RUN** |
+| §XR2 | **The grid.** Start a race with any of your machines. | A 12-row tower: P1-P12, NPC names, the machine's liveries if it has any (otherwise blank), all on the `ground` leg at 0 km. | **NOT RUN** |
+| §XR3 | **Up, round and home.** Watch the tower (or, in DEV, x10). | Rows move through ascent -> deep (~120 km) -> return -> reentry -> landing; nobody jumps legs; gaps in km, then seconds at the finish. | **NOT RUN** |
+| §XR4 | **Classification.** Let it finish. | `Race over.`; finishers with times, DNFs with reasons (hit the ground / contact / overheated). | **NOT RUN** |
+| §XR5 | **The city hears it.** A race with a hard landing at Hill Abode. | `Race Week heard it: wreck (npc:..., landing)` under the tower; ncm_host.log has `[ncm_aero] Race Week hears it`. | **NOT RUN** |
+| §XR6 | **DEV time-lapse.** Developer mode on; x10 during a race. | The race runs ~10x faster; the tower header says `DEV x10`; the tape row shows DEV. With developer mode off the x buttons are absent. | **NOT RUN** |
+| §XR7 | **Never on the dev server.** (Coder, on the next dev restart.) | ncm_aero is not started (auto_start false); if started by hand it logs `not single player ... stays off`. | **NOT RUN** |
+
+## §PB - NCM single player: the plugins reached without a browser (L340 phase 1, KB-386) - **BUILT; HEADLESS GREEN; LIVE NOT RUN**
+
+Headless evidence (2026-10-07): `tools/test-host-webui.lua` 14/14 (the real resources against a fake loopback), native self-test 0 failures. Installed 3.0.0-alpha.4. The CET deck is still the front end until phase 2.
+
+| ID | Steps | Expected | Result |
+|---|---|---|---|
+| §PB1 | **Carrier.** Start Cyberpunk from Steam, enter a tape, wait ~30 s in a car. | `red4ext/plugins/ncm_host/ncm_host.log`: `webui: carrier page http://127.0.0.1:38480/bridge.html -> native adapter` and `MACHINE CHANNEL BOUND to the NCM Carrier 0.1.37`; no more `no handshake -- trying the next port`. | **PASS** (live 2026-10-07 19:09 (ncm_host.log): carrier page -> native adapter 19:09:02, `MACHINE CHANNEL BOUND to the NCM Carrier 0.1.37 ... faults=0` 19:09:03; 0 error lines in the session) |
+| §PB2 | **Rig Bridge.** With the wheel connected. | The log shows a rig page on 38520 as a native adapter; force feedback can arm (it waits for phase 3's WHEEL panel to be switched on from a native screen). | **NOT RUN** |
+| §PB3 | **Scanner transport.** In a tape. | `[ncm_scanner] transport connected at http://127.0.0.1:38600/vision.html`. Identifying a car needs the scanner key, which arrives with phase 2. | **PASS (transport)** (live 2026-10-07 19:09 (ncm_host.log): `[ncm_scanner] transport connected at http://127.0.0.1:38600/vision.html` 19:09:00; Pace `Pace plugin 0.9.2 on http://127.0.0.1:38640/pace.html`, Broadcast and Rig Bridge pages up as adapters) |
+| §PB4 | **Map pins are map pins.** Enter a tape; look across the city, then open the map. | No floating NCM icons with distances in the sky (KB-387); landmarks, fuel stations and Paddock racers on the world map and minimap; your GPS waypoint still drawn in the world. | **NOT RUN** |
+| §PB5 | **No CET, no lag.** Start Cyberpunk from Steam, load YOUR save. | No NCM overlay anywhere; smooth frame rate; a toast "NCM is dormant. Choose a tape: Esc -> NIGHT CITY MOTORSPORTS." | **NOT RUN** |
+| §PB6 | **The tape in Mod Settings (alpha.7).** Esc -> Settings -> Mod Settings -> Night City Motorsports -> Tape in play = 1 -> Apply. | Back in the game the Race Week line appears top right (TAPE 01). 0 + Apply turns NCM off; the number after your last tape starts a new one. No NCM button anywhere else. | **FAILED alpha.5** (popup captured all input, KB-389); alpha.6 superseded; alpha.7 **NOT RUN** |
+| §PB7 | **The Race Week line.** After choosing. | Top right: `TAPE 01 · RW .. · D.. · ..:..` and the time to the next possible end. `ncm_host.log`: `MACHINE CHANNEL BOUND to the NCM Carrier`. | **NOT RUN** |
+| §PB8 | **Remembered.** Quit to the main menu and load the save again. | TAPE 01 mounts by itself (Mod Settings keeps "Tape in play"). | **NOT RUN** |
+| §PB9 | **Where the lag is.** Play normally ~10 min with a tape in play. | `ncm_host.log` names every frame NCM held > 8 ms (`slow frame ... slowest <resource> <job> (<file:line>)`) and any `slow tape snapshot`. Send the log; the fix follows the evidence. | **NOT RUN** |

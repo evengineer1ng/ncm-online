@@ -77,7 +77,8 @@ Core.define("machine.passport", function(C)
 
     --- The Machine's passport: the authored seed for its catalogue key (or an inference from the catalogue's pool tags when
     --- there is none), then what NCM knows live -- paint, the Foundry install's mass, a measured mass -- merged over it.
-    --- live = { paint = { r, g, b } | nil, massKg = n | nil (measured), addedMassKg = n, record = string, prestige, tags }
+    --- live = { paint = { r, g, b } | nil, massKg = n | nil (measured), addedMassKg = n, record = string, prestige, tags,
+    ---         livery = data.liveries.appearance(...) | nil }
     function M.forMachine(vehicleKey, assetId, live)
         live = live or {}
         local Seeds = C.get("data.machine_seeds")
@@ -90,6 +91,12 @@ Core.define("machine.passport", function(C)
             p = M.new(M.inferFromTags(live.tags, live.prestige), "inferred", 0.35, { host = "cyberpunk", key = vehicleKey, assetId = assetId })
         end
         local over = { appearance = {}, performance = {} }
+        -- the livery (data.liveries): an APPEARANCE of this model -- its identity, colours, art provenance, wing
+        if type(live.livery) == "table" then
+            for k, v in pairs(live.livery) do
+                if v ~= nil then over.appearance[k] = M.field(v, "authored", (k == "primary") and 0.9 or 0.85) end
+            end
+        end
         if live.paint then over.appearance.primary = M.field(live.paint, "host_data", 0.95) end
         if live.massKg then over.performance.massKg = M.field(live.massKg, "measured", 0.95) end
         p = M.merge(p, { groups = over })

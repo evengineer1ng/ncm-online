@@ -1,0 +1,12 @@
+{
+    "enabled":  false,
+    "seamKey":  "J",
+    "seamButton":  "NONE",
+    "offset":  [
+                   0,
+                   0,
+                   -2000
+               ],
+    "minZ":  2500,
+    "watchFrames":  90
+}

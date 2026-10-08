@@ -306,6 +306,85 @@ function NcmOwnership.grant(driverId, record, via, grantedBy)
     return assetId, true
 end
 
+--- CLAIM a car into this world (L338): the single-player way a car the player has -- a Collection mod, a livery, any
+--- installed vehicle -- becomes an NCM Machine on this tape. A catalogue model is MANUFACTURED with a birth certificate
+--- (global / maker / model serial, a production transfer) and handed to the driver (a `claim` transfer), so it is a
+--- serialized machine like any market car. A record NCM has never heard of still becomes a real asset (its own entry,
+--- its own observations; the passport infers what it can) -- it simply has no maker history to take a serial from.
+--- Idempotent per record and driver: claiming the Kimiko RB15 twice returns the same machine.
+--- Returns assetId, isNew, ordinal (or nil + reason).
+function NcmOwnership.claim(driverId, record, via)
+    if type(driverId) ~= "string" or type(record) ~= "string" or record == "" then return nil, "invalid" end
+    local rows, why = loadDriver(driverId)
+    if not rows then return nil, why or "db_unavailable" end
+    for _, r in ipairs(rows) do if r.record == record then return r.assetId, false end end
+    local entry = Catalogue.resolveRecord(record)
+    if not entry then
+        local assetId, reason = insertAsset(driverId, record, via or "claim", "claim")
+        if not assetId then return nil, reason end
+        log("CLAIM %s (not in the catalogue: an unserialized machine, passport inferred) -> asset=%s", record, assetId:sub(1, 8))
+        return assetId, true, nil
+    end
+    local ord = nil
+    if NcmProvenance and NcmProvenance.allocate then
+        local list = NcmProvenance.allocate(entry.vehicleKey, 1)
+        ord = list and list[1] or nil
+    end
+    local assetId, reason = NcmOwnership.manufacture(record, { ordinal = ord, allocationId = "claim", vehicleKey = entry.vehicleKey })
+    if not assetId then return nil, reason end
+    local t = math.floor(now())
+    -- a livery car wears its livery's colours, not a factory roll (data.liveries)
+    local pp, ps
+    local okL, Liveries = pcall(function() return NcmCore.get("data.liveries") end)
+    local l = okL and Liveries and Liveries.fromRecord(record) or nil
+    if l and l.spec and l.spec.primary then pp, ps = l.spec.primary:gsub("#", ""), (l.spec.secondary or l.spec.primary):gsub("#", "") end
+    local ok, err = MySQL.transaction.await({
+        { query = [[UPDATE vehicle_asset SET ncm_driver_id = ?, acquired_via = ?, acquired_at = ?,
+            paint_primary = COALESCE(NULLIF(?, ''), paint_primary), paint_secondary = COALESCE(NULLIF(?, ''), paint_secondary)
+            WHERE asset_id = ? AND ncm_driver_id IS NULL]], values = { driverId, via or "claim", t, pp or "", ps or "", assetId } },
+        { query = [[INSERT IGNORE INTO vehicle_asset_transfer (transfer_id, idem_key, server_id, asset_id, from_driver_id, to_driver_id,
+            kind, market_id, amount, occurred_at) VALUES (?, ?, ?, ?, NULL, NULL, 'production', NULL, 0, ?)]],
+            values = { ids.uuid4(hostRng), "production:" .. assetId, serverId(), assetId, t } },
+        { query = [[INSERT IGNORE INTO vehicle_asset_transfer (transfer_id, idem_key, server_id, asset_id, from_driver_id, to_driver_id,
+            kind, market_id, amount, occurred_at) VALUES (?, ?, ?, ?, NULL, ?, 'claim', NULL, 0, ?)]],
+            values = { ids.uuid4(hostRng), "claim:" .. assetId, serverId(), assetId, driverId, t } },
+    })
+    if not ok then return nil, "claim_transaction: " .. tostring(err) end
+    NcmOwnership.invalidate(driverId)
+    log("CLAIM %s -> %s%s asset=%s", record, entry.vehicleKey,
+        ord and (" NCM " .. Identity.formatOrdinal(ord.global) .. " | " .. tostring(ord.manufacturerKey) .. " " ..
+            Identity.formatOrdinal(ord.maker, 4) .. " | " .. entry.vehicleKey .. " " .. Identity.formatOrdinal(ord.model, 4)) or "",
+        assetId:sub(1, 8))
+    return assetId, true, ord
+end
+
+-- The single-player host asks for a claim when the player presses CLAIM on the deck (it knows the car they are in, or
+-- the livery they picked). Server-local event: `ncm:host:claim`(pid, record). OPEN//77 never sends it.
+AddEventHandler("ncm:host:claim", function(pid, record)
+    pid = tonumber(pid) or 0
+    local driver = NcmCalendar.resolveDriver(pid)
+    if not driver then log("claim: no NCM driver on player %d", pid); return end
+    local assetId, isNew, ord = NcmOwnership.claim(driver.ncmDriverId, tostring(record or ""), "claim")
+    if not assetId then
+        tell(pid, "Could not claim that car: " .. tostring(isNew))
+        TriggerEvent("ncm:host:claimed", pid, record, nil, tostring(isNew))
+        return
+    end
+    local serial = ord and ("NCM " .. Identity.formatOrdinal(ord.global) .. " · " .. tostring(ord.manufacturerKey) .. " " ..
+        Identity.formatOrdinal(ord.maker, 4)) or nil
+    tell(pid, isNew and ("Claimed: %s%s. It is yours in this Race Week continuity."):format(record, serial and (" (" .. serial .. ")") or "")
+        or ("Already yours: %s."):format(record))
+    TriggerEvent("ncm:host:claimed", pid, record, assetId, isNew and "new" or "existing", serial)
+    pcall(refreshCompetitionViews, pid)
+end)
+
+RegisterCommand("ncm.claim", function(source, args)
+    if (tonumber(source) or 0) ~= 0 then return end
+    local pid, record = tonumber(args and args[1]), args and args[2]
+    if not pid or not record then log("usage: ncm.claim <playerId> <record>"); return end
+    TriggerEvent("ncm:host:claim", pid, record)
+end, false)
+
 --- Remove EVERY example of a record from a driver's garage. Matches what `revoke` did before this migration,
 --- which is the behaviour the console command and its operators already expect.
 function NcmOwnership.revoke(driverId, record)

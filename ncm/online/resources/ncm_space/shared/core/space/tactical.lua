@@ -33,11 +33,13 @@ Core.define("space.tactical", function(C)
     local Fireball = C.get("space.fireball")
     local Sprint = C.get("space.sprint")
     local Course = C.get("space.course")
+    local Aero = C.get("space.aerocourse")
     local V = Pilot.vec
     local add, sub, scale, dot, cross, len, unit = V.add, V.sub, V.scale, V.dot, V.cross, V.len, V.unit
 
     M.DT = 0.05
     M.CONTACT_M = 6
+    M.CONTACT_COURSE_M = 3     -- two car bodies side by side (a course grid stands on a road, 8 m apart)
     M.SIM_RATE = { sprint = 1, fireball = 1 }
 
     -- ------------------------------------------------------------------------------------------ venue physics
@@ -92,7 +94,7 @@ Core.define("space.tactical", function(C)
         local race = { event = event, t = 0, k = 0, entrants = {}, order = {}, log = {} }
         local rules = event.rules
         for i, e in ipairs(event.entrants) do
-            local model = Mach.assemble(e.design)
+            local model = e.model or Mach.assemble(e.design)   -- a course entrant arrives fitted (`engineering.loadout`)
             local prep = Alloc.prepare(model)
             local person = e.person
             Comp.enter(person, "snowglobe")
@@ -102,6 +104,9 @@ Core.define("space.tactical", function(C)
                 pos = Course.toWorld(f, Sprint.laneSpot(rules, i))
                 vel = { 0, 0, 0 }
                 rot = rotFrom(f.y, scale(f.z, -1))
+            elseif event.discipline == "course" then
+                local spot = event.venue.grid[i] or event.venue.grid[#event.venue.grid]
+                pos, vel, rot = spot.pos, { 0, 0, 0 }, rotFrom(spot.up, spot.fwd)
             else
                 local v = event.venue
                 local side = unit(cross(v.gridUp, v.gridFwd))
@@ -111,6 +116,15 @@ Core.define("space.tactical", function(C)
                 rot = rotFrom(v.gridUp, v.gridFwd)
             end
             local cap = Mach.capability(model)
+            -- the machine's own main thrust axis (body frame): a Snowglobe lifter pushes up, a car's FD-1 pushes forward
+            local axisB = { 0, 0, 1 }
+            if event.discipline == "course" then
+                local a = { 0, 0, 0 }
+                for _, dv in ipairs(model.devices) do
+                    if dv.kind ~= "ground_ram" and dv.kind ~= "pulse_reaction" then a = add(a, scale(dv.dir, dv.perf.thrustN or 0)) end
+                end
+                if len(a) > 0 then axisB = unit(a) end
+            end
             local maxRate = 0
             for a = 1, 2 do maxRate = math.max(maxRate, prep.maxTau[a] / math.max(1, model.inertia[a])) end
             race.entrants[e.id] = {
@@ -119,13 +133,14 @@ Core.define("space.tactical", function(C)
                 -- mutable state (snapshot covers exactly these)
                 s = {
                     dyn = Dyn.init(model, { pos = pos, vel = vel, rot = rot }),
-                    judge = event.discipline == "sprint" and Sprint.newState() or Fireball.newState(),
+                    judge = event.discipline == "sprint" and Sprint.newState()
+                        or (event.discipline == "course" and Aero.newState() or Fireball.newState()),
                     mood = Beh.newMood(), plan = nil, nextPlanT = 0, status = "racing", reason = nil,
                     reactS = nil, physicalS = 0, axis = nil, note = nil, laneX = event.discipline == "sprint" and Sprint.laneSpot(rules, i)[1] or 0,
                     hotS = 0, finishT = nil,
                 },
                 slewRate = math.min(1.2, maxRate),       -- rad/s the machine's torque can turn it (capped)
-                lane = i,
+                lane = i, axisB = axisB, skin = model.skin, family = model.flightBody and model.flightBody.family or nil,
             }
             race.order[i] = e.id
         end
@@ -136,15 +151,16 @@ Core.define("space.tactical", function(C)
         local d = E.s.dyn
         local mass = Dyn.mass(E.model, d)
         local thrustUp = 0
+        local ax = race.event.discipline == "course" and E.axisB or { 0, 0, 1 }
         for _, dev in ipairs(E.model.devices) do
             if dev.kind == "reaction_engine" or dev.kind == "jet" or dev.kind == "propeller" then
-                thrustUp = thrustUp + math.max(0, dev.dir[3]) * (dev.perf.thrustN or 0)
+                thrustUp = thrustUp + math.max(0, dot(dev.dir, ax)) * (dev.perf.thrustN or 0)
             end
         end
         local dry = E.model.dryMassKg
         local dvLeft = E.cap.deltaVms > 0 and E.cap.deltaVms * math.log(mass / dry) / math.log(E.model.wetMassKg / dry) or 0
         return { pos = d.pos, vel = d.vel, aMax = thrustUp / mass, dvLeft = dvLeft, mass = mass,
-            heatFrac = d.heatK / Mach.TEMP_LIMIT_K, creditM = E.s.judge.creditM or 0, axis = E.s.axis }
+            heatFrac = d.heatK / Mach.TEMP_LIMIT_K, creditM = E.s.judge.creditM or 0, axis = E.s.axis, progressM = E.s.judge.progressM }
     end
 
     local function comp(E)
@@ -156,6 +172,10 @@ Core.define("space.tactical", function(C)
         local ev = race.event
         if ev.discipline == "sprint" then
             return (race.t < ev.rules.startT + 2) and 1 or 0.4
+        end
+        if ev.discipline == "course" then
+            local frac = (E.s.judge.progressM or 0) / ev.rules.lengthM
+            return frac > 0.95 and 1 or (race.t < ev.rules.startT + 5 and 0.8 or 0.3)
         end
         local frac = (E.s.judge.creditM or 0) / ev.rules.distanceM
         return frac > 0.9 and 1 or (race.t < 10 and 0.8 or 0.2)
@@ -178,7 +198,32 @@ Core.define("space.tactical", function(C)
                 Beh.decay(S.mood, E.profile, dt)
                 local cs = comp(E)
                 if t >= S.nextPlanT or not S.plan then
-                    if ev.discipline == "sprint" then
+                    if ev.discipline == "course" then
+                        local gate = rules.gates[S.judge.next]
+                        if t < rules.startT or not gate then
+                            S.plan, S.note = { 0, 0, 0 }, "grid"
+                        else
+                            if not S.reactS then S.reactS = Pilot.reaction(cs, E.profile, Hash.stream("ncm-react", ev.id, id)) end
+                            if t < rules.startT + S.reactS then
+                                S.plan, S.note = { 0, 0, 0 }, "lights"
+                            else
+                                local others = {}
+                                for _, oid in ipairs(race.order) do
+                                    local O = race.entrants[oid]
+                                    if oid ~= id and O.s.status == "racing" and len(sub(O.s.dyn.pos, d.pos)) < 5000 then
+                                        others[#others + 1] = { id = oid, pos = O.s.dyn.pos, vel = O.s.dyn.vel, progressM = O.s.judge.progressM }
+                                    end
+                                end
+                                selfv.heatK = d.heatK
+                                local plan, note = Pilot.course({ self = selfv, gate = gate, nextGate = rules.gates[S.judge.next + 1],
+                                    g = g, rho = densityAt(ev.venue, d.pos), skin = E.skin,
+                                    heat = { limitK = Mach.TEMP_LIMIT_K, ambientK = Dyn.AMBIENT_K, sg = Dyn.SUTTON_GRAVES,
+                                        capKjK = E.model.dryMassKg * Mach.CP / 1000 },
+                                    comp = cs, eff = eff, others = others, rng = rng })
+                                S.plan, S.note = plan, note
+                            end
+                        end
+                    elseif ev.discipline == "sprint" then
                         if not S.reactS then S.reactS = Pilot.reaction(cs, E.profile, Hash.stream("ncm-react", ev.id, id)) end
                         local grounded = dot(sub(d.pos, ev.venue.frame.origin), ev.venue.frame.y) <= 0.01
                         S.plan = Pilot.sprint({ t = t, startT = rules.startT, reactS = S.reactS, self = selfv, frame = ev.venue.frame,
@@ -216,7 +261,8 @@ Core.define("space.tactical", function(C)
                 -- attitude: slew the main thrust axis toward the planned thrust, as fast as the machine can turn
                 local want = unit(S.plan)
                 if len(want) > 0 then
-                    local z = bodyZ(d.rot)
+                    local ax = E.axisB
+                    local z = (ev.discipline == "course" and ax) and { dot(d.rot[1], ax), dot(d.rot[2], ax), dot(d.rot[3], ax) } or bodyZ(d.rot)
                     local ang = math.acos(math.max(-1, math.min(1, dot(z, want))))
                     local axis = unit(cross(z, want))
                     local skill = 0.4 + 0.6 * ((cs.attitude or 8) / 100)
@@ -231,8 +277,13 @@ Core.define("space.tactical", function(C)
                     contact = dot(sub(d.pos, ev.venue.frame.origin), ev.venue.frame.y) <= 0.01
                 end
                 local rot = d.rot
-                Dyn.step(E.model, d, { g = g, rho = rho, contact = contact }, { throttle = thr }, dt)
+                local held = ev.discipline == "course" and (S.note == "grid" or S.note == "lights")
+                if not held then
+                    local _, dtel = Dyn.step(E.model, d, { g = g, rho = rho, contact = contact }, { throttle = thr }, dt)
+                    S.aeroHeatKw = dtel and dtel.aeroHeatKw or nil
+                end
                 d.rot, d.omega = rot, { 0, 0, 0 }                -- attitude is the planner's slew at this fidelity
+                if ev.discipline == "course" and not held then M.ground(race, E, t) end
                 if contact ~= nil then
                     local h = dot(sub(d.pos, ev.venue.frame.origin), ev.venue.frame.y)
                     if h < 0 then
@@ -243,6 +294,10 @@ Core.define("space.tactical", function(C)
                 end
                 if d.heatK >= Mach.TEMP_LIMIT_K then S.hotS = S.hotS + dt else S.hotS = 0 end
                 if S.hotS > 10 then S.status, S.reason = "dnf", "overheated" end
+                if S.status == "dnf" and S.reason == "overheated" and not S.loggedHot then
+                    S.loggedHot = true
+                    race.log[#race.log + 1] = { t = t, kind = "overheat", ids = { id }, pos = d.pos, vel = d.vel, heatK = d.heatK, dnf = true }
+                end
                 if ev.venue.centre == nil and ev.discipline == "fireball" and U.altitude(d.pos) <= 0 then
                     S.status, S.reason = "dnf", "hit the ground"
                 end
@@ -263,9 +318,52 @@ Core.define("space.tactical", function(C)
         return race
     end
 
+    --- Course ground: the road under Night City (`venue.groundAltM` above the sphere). Arriving slowly is a landing;
+    --- arriving fast is an impact -- an incident with the machine, its speed, where, and which leg it was on.
+    function M.ground(race, E, t)
+        local ev, S, d = race.event, E.s, E.s.dyn
+        local floor = ev.venue.groundAltM or 0
+        local alt = U.altitude(d.pos)
+        if alt >= floor then return end
+        local up = unit(d.pos)
+        local vIn = -dot(d.vel, up)
+        d.pos = add(d.pos, scale(up, floor - alt))
+        if vIn > 0 then d.vel = add(d.vel, scale(up, vIn)) end
+        local band = Aero.band(vIn)
+        if band >= 1 and not S.grounded then
+            local leg = Aero.leg(ev.rules, S.judge)
+            local dnf = band >= 3
+            race.log[#race.log + 1] = { t = t, kind = "impact", ids = { E.id }, pos = d.pos, vel = d.vel, vInMs = vIn, band = band,
+                leg = leg, dnf = dnf or nil, family = E.family }
+            if dnf then S.status, S.reason = "dnf", "hit the ground" end
+        end
+        S.grounded = true
+    end
+
     function M.judge(race, E, t, dt)
         local ev, S = race.event, E.s
         local before = S.judge.creditM
+        if ev.discipline == "course" then
+            if U.altitude(S.dyn.pos) > (ev.venue.groundAltM or 0) + 1 then S.grounded = false end
+            local beforeP = S.judge.progressM or 0
+            local _, e = Aero.step(ev.rules, S.judge, t, S.dyn.pos, S.dyn.vel, dt)
+            if e and e.finished then
+                S.status, S.finishT = "finished", e.finished
+                local v = len(S.dyn.vel)
+                local band = Aero.band(math.max(0, v - 5))
+                race.log[#race.log + 1] = { t = t, kind = "landing", ids = { E.id }, pos = S.dyn.pos, vel = S.dyn.vel, speedMs = v,
+                    band = band, leg = "landing", dnf = nil, family = E.family }
+            end
+            for _, oid in ipairs(race.order) do
+                local O = race.entrants[oid]
+                if O ~= E and (O.s.judge.progressM or 0) > (S.judge.progressM or 0) and (O.s.judge.prevProgressM or 0) <= beforeP
+                    and len(sub(O.s.dyn.pos, S.dyn.pos)) < 500 then
+                    Beh.provoke(S.mood, E.profile, "passed")
+                end
+            end
+            S.judge.prevProgressM = S.judge.progressM
+            return
+        end
         if ev.discipline == "sprint" then
             local _, e = Sprint.step(ev.rules, S.judge, t, S.dyn.pos, S.dyn.vel)
             if e and e.finished then S.status, S.finishT = "finished", e.finished end
@@ -335,7 +433,7 @@ Core.define("space.tactical", function(C)
                 -- a host-flown entrant's contacts are the host's to report (`contactExternal`), never guessed here
                 if A.s.status == "racing" and B.s.status == "racing" and not A.external and not B.external then
                     local d = len(sub(A.s.dyn.pos, B.s.dyn.pos))
-                    if d < M.CONTACT_M then
+                    if d < (race.event.discipline == "course" and M.CONTACT_COURSE_M or M.CONTACT_M) then
                         local vrel = len(sub(A.s.dyn.vel, B.s.dyn.vel))
                         local key = ids[i] .. "|" .. ids[j]
                         race.touching = race.touching or {}
@@ -345,9 +443,14 @@ Core.define("space.tactical", function(C)
                             Beh.provoke(B.s.mood, B.profile, "contact")
                             local h = Hash.stream("ncm-contact", race.event.id, key, race.k)
                             local p = math.min(0.9, vrel / 80)
-                            race.log[#race.log + 1] = { t = race.t, kind = "contact", ids = { ids[i], ids[j] }, vRelMs = vrel }
+                            local entry = { t = race.t, kind = "contact", ids = { ids[i], ids[j] }, vRelMs = vrel }
+                            race.log[#race.log + 1] = entry
                             for _, X in ipairs({ A, B }) do
-                                if not X.external and h() < p then X.s.status, X.s.reason = "dnf", "contact" end
+                                if not X.external and h() < p then X.s.status, X.s.reason = "dnf", "contact"; entry.dnf = true end
+                            end
+                            if race.event.discipline == "course" then
+                                entry.pos, entry.vel, entry.band = A.s.dyn.pos, A.s.dyn.vel, Aero.band(vrel)
+                                entry.leg = Aero.leg(race.event.rules, A.s.judge)
                             end
                         end
                     elseif race.touching then
@@ -433,6 +536,18 @@ Core.define("space.tactical", function(C)
         E.external = false
     end
 
+    --- The course timing tower: `space.aerocourse.standings` over every entrant (NPC or host-flown), with provenance.
+    function M.standings(race)
+        local rows = {}
+        for _, id in ipairs(race.order) do
+            local E = race.entrants[id]
+            local share = race.t > 0 and E.s.physicalS / race.t or 0
+            rows[#rows + 1] = { id = id, judge = E.s.judge, status = E.s.status, reason = E.s.reason, pos = E.s.dyn.pos, vel = E.s.dyn.vel,
+                mode = share >= 0.999 and "physical" or (share > 0 and "mixed" or "tactical"), family = E.family }
+        end
+        return Aero.standings(race.event.rules, rows, race.event.rules.startT)
+    end
+
     --- Classification with provenance. Every row: id, position, state, raceS / creditM, reason, mode, physicalShare.
     function M.result(race)
         local ev = race.event
@@ -442,7 +557,9 @@ Core.define("space.tactical", function(C)
             entries[#entries + 1] = { id = id, state = E.s.judge, E = E }
         end
         local rows
-        if ev.discipline == "sprint" then
+        if ev.discipline == "course" then
+            rows = M.standings(race)
+        elseif ev.discipline == "sprint" then
             rows = Sprint.classify(ev.rules, entries)
         else
             local cl = Fireball.classify(entries)

@@ -1,4 +1,5 @@
--- ncm_world / server / deep -- L326: the handoff between REDengine and NCM's own universe. DEVELOPMENT ONLY.
+-- ncm_world / server / deep -- L326: the handoff between REDengine and NCM's own universe. Development AND Online
+-- (L341, owner 2026-10-07: "deep and flight are crucial to ship"); the dev waivers below stay development-only.
 --
 -- Climbing through ENTER_Z (game height, below Snowglobe 0's 14 km rebase), the client hands the Machine to NCM: the
 -- server freezes the car where it is (setFrozen: transform pinned, gravity and impulses stopped) and the client flies it
@@ -10,11 +11,14 @@ local function log(fmt, ...) print(("[ncm_world/deep] " .. fmt):format(...)) end
 local ENTER_Z, EXIT_Z = 12000, 11500
 local inDeep = {}   -- pid -> { vid, at, flags }
 
-local function enabled()
+local function environment()
     local ok, id = pcall(function() return GlobalState.ncmIdentity end)
-    local env = ok and type(id) == "table" and id.environment or "development"
-    return tostring(env) == "development"
+    return tostring(ok and type(id) == "table" and id.environment or "development")
 end
+-- L341: Deep runs on Online too. What a Machine can do out there is what its owner bought and installed.
+local function enabled() local env = environment(); return env == "development" or env == "online" end
+-- The development waivers (dev heat, dev attitude, the ascent probe, the KSA rehearsal): never on Online.
+local function development() return environment() == "development" end
 
 local function driving(pid)
     local b = NcmVehicleAccess and NcmVehicleAccess.bindingForAuthority and NcmVehicleAccess.bindingForAuthority(pid)
@@ -25,7 +29,7 @@ end
 -- never runs dry -- one RP-16 sheds a third of its heat and could not hold the Hella up for guidance (KB-349). Online is
 -- untouched. A deliberate heat test turns it off with the convar `ncm_dev_heat 0`.
 local function devHeat()
-    if not enabled() then return false end
+    if not development() then return false end
     local okC, v = pcall(GetConvar, "ncm_dev_heat", "1")
     return not okC or tostring(v) ~= "0"
 end
@@ -36,14 +40,14 @@ RegisterNetEvent("ncm:deep.config.request", function()
     TriggerClientEvent("ncm:deep.config", pid, { enabled = enabled(), enterZ = ENTER_Z, exitZ = EXIT_Z,
         devFuel = NcmFuel_devFuel and NcmFuel_devFuel() or false, devHeat = devHeat(),
         -- L331: the labelled DEVELOPMENT attitude waiver, until the Machine carries an attitude part (convar to turn off)
-        devAttitude = enabled() and tostring(GetConvar("ncm_dev_attitude", "1")) ~= "0",
+        devAttitude = development() and tostring(GetConvar("ncm_dev_attitude", "1")) ~= "0",
         utc = Open77.time.unix(),   -- NCM's one clock: Deep's sun is the real sun (owner: "night = night")
         -- the visual ascent band (convars so it can be tuned to where REDengine actually runs out, without a build)
         ascentZ = tonumber(GetConvar("ncm_deep_ascent_z", "4000")) or 4000,
         maskNearM = tonumber(GetConvar("ncm_deep_mask_near", "9000")) or 9000,
         maskFarM = tonumber(GetConvar("ncm_deep_mask_far", "16000")) or 16000,
         -- KB-377: the measurement build -- the ascent draws no Earth and logs the game's real camera (development only)
-        ascentProbe = enabled() and tostring(GetConvar("ncm_deep_ascent_probe", "0")) == "1" })   -- off: IDEA-1174 reads the camera live
+        ascentProbe = development() and tostring(GetConvar("ncm_deep_ascent_probe", "0")) == "1" })   -- off: IDEA-1174 reads the camera live
 end)
 
 RegisterNetEvent("ncm:deep.enter", function(r)
@@ -252,7 +256,7 @@ end
 RegisterNetEvent("ncm:deep.ksa.preflight", function()
     local pid = tonumber(source) or 0
     if pid <= 0 or not inDeep[pid] then return end
-    TriggerClientEvent("ncm:deep.ksa.preflight", pid, { dev = enabled() })
+    TriggerClientEvent("ncm:deep.ksa.preflight", pid, { dev = development() })
 end)
 RegisterNetEvent("ncm:deep.ksa.selftest", function()
     local pid = tonumber(source) or 0
@@ -360,5 +364,5 @@ AddEventHandler("playerDropped", function()
 end)
 
 AddEventHandler("onResourceStart", function(name)
-    if name == "ncm_world" then log("deep handoff %s: out at game z %d climbing, back at %d (development only)", enabled() and "ENABLED" or "disabled", ENTER_Z, EXIT_Z) end
+    if name == "ncm_world" then log("deep handoff %s: out at game z %d climbing, back at %d (%s)", enabled() and "ENABLED" or "disabled", ENTER_Z, EXIT_Z, environment()) end
 end)

@@ -25,10 +25,11 @@ local TICK_MS, COOLDOWN_MS = 200, 6000
 
 local function log(fmt, ...) print(("[ncm_world/snowglobe] " .. fmt):format(...)) end
 
+-- L341: flight ships to Online, so the altitude doorway runs there too (the name is historical).
 local function development()
     local ok, id = pcall(function() return GlobalState.ncmIdentity end)
-    local env = ok and type(id) == "table" and id.environment or "development"
-    return tostring(env) == "development"
+    local env = tostring(ok and type(id) == "table" and id.environment or "development")
+    return env == "development" or env == "online"
 end
 
 local enabled = true
@@ -85,8 +86,8 @@ end
 
 CreateThread(function()
     Wait(5000)
-    log("Snowglobe 0 %s: doorway at %d m game height (rebase to %d), home below %d m; development only",
-        development() and (enabled and "ON" or "off") or "inactive (not development)", UP, LOW, DOWN)
+    log("Snowglobe 0 %s: doorway at %d m game height (rebase to %d), home below %d m; development and online",
+        development() and (enabled and "ON" or "off") or "inactive (not development/online)", UP, LOW, DOWN)
     while true do
         Wait(TICK_MS)
         if enabled and development() then
@@ -124,5 +125,5 @@ RegisterCommand("ncm.snowglobe", function(source, args)
     for vid, st in pairs(cars) do
         if st.offset > 0 then n = n + 1; log("  vehicle=%d offset %.0f, %d move(s)", vid, st.offset, st.moves) end
     end
-    log("snowglobe %s (%s); %d car(s) in space", enabled and "ON" or "off", development() and "development" or "not development", n)
+    log("snowglobe %s (%s); %d car(s) in space", enabled and "ON" or "off", development() and "development/online" or "inactive", n)
 end, false)

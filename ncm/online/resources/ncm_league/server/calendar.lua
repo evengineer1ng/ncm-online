@@ -166,6 +166,8 @@ NcmCalendar.serverId = serverId
 --- One identity, published once, read everywhere.
 function NcmCalendar.environment()
     local v = tostring(settings.environment or "development"):lower()
+    -- `single_player` (the NCM Host, L338) is its own role: not Online, and not Development either -- no dev waivers.
+    if v == "single_player" then return "single_player" end
     return (v == "online") and "online" or "development"
 end
 

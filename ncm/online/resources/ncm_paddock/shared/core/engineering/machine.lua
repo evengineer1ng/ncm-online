@@ -120,6 +120,8 @@ Core.define("engineering.machine", function(C)
         end
         m.inertia = I
         m.chassis = { wheels = ch.wheels ~= false, ratedLoadN = ch.ratedLoadN, boundsZ = ch.bounds and ch.bounds[3] or 1.4 }
+        -- the skin the air heats and the machine radiates through (`engineering.flightbody.skin`); absent = not modelled
+        m.skin = ch.skin
         -- structure: the chassis rating plus any structure bodies
         local rated = ch.ratedLoadN or 0
         for _, part in ipairs(m.parts) do

@@ -70,7 +70,14 @@ Write-Host "== sync resources -> /opt/ncm/resources/ncm"
 $src = Join-Path $repo 'ncm\online\resources'
 $tar = Join-Path $env:TEMP 'ncm-resources.tar.gz'
 if (Test-Path $tar) { Remove-Item $tar -Force }
-& $tarExe -czf $tar -C $src .
+# Resources that never reach Online: `resources.load` is "ncm/*", so withholding means leaving the directory out.
+# ncm_link (the Los Santos cross-server link) -- owner 2026-10-07 (L341): "maybe not los santos yet".
+$OnlineWithheld = @('ncm_link')
+$excludeArgs = @(); foreach ($r in $OnlineWithheld) { $excludeArgs += @('--exclude', "./$r") }
+& $tarExe -czf $tar @excludeArgs -C $src .
+$leaked = & $tarExe -tzf $tar | Where-Object { $p = $_; $OnlineWithheld | Where-Object { $p -like "./$_/*" -or $p -eq "./$_/" } }
+if ($leaked) { Write-Host "  REFUSED: withheld resources in the bundle: $($leaked | Select-Object -First 3)" -ForegroundColor Red; exit 1 }
+Write-Host ("  withheld from Online: {0}" -f ($OnlineWithheld -join ', '))
 & scp -q -i $Key $tar "$User@${HostName}:/tmp/ncm-resources.tar.gz"
 Remote 'rm -rf /opt/ncm/resources/ncm.new && mkdir -p /opt/ncm/resources/ncm.new && tar -xzf /tmp/ncm-resources.tar.gz -C /opt/ncm/resources/ncm.new && rm -rf /opt/ncm/resources/ncm && mv /opt/ncm/resources/ncm.new /opt/ncm/resources/ncm && ln -sfn /opt/ncm/resources/ncm /opt/ncm/server/resources/ncm && ls /opt/ncm/resources/ncm'
 

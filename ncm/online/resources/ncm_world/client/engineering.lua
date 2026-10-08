@@ -142,7 +142,7 @@ CreateThread(function()
             local pressed = {}
             for _, c in ipairs(E.controls) do pressed[c] = down(c) end
             local commands = Controls.step(E.ctl, E.bindings, E.devices, pressed, t)
-            -- `/ncm.eng.devfuel` (client/deep.lua, development only): nothing burned, nothing reported
+            -- dev fuel (the DEVELOPMENT server's setting, sent in the Deep config): nothing burned, nothing reported
             if NcmClientDevHeat then NcmClientCoolAll(E.state) end
             local r = Install.step(E.devices, E.state, commands, dt,
                 NcmClientDevFuel and { fuel = 1e9, fusion = 1e9 } or { fuel = E.fuelKg, fusion = E.fusionKg or 0 })

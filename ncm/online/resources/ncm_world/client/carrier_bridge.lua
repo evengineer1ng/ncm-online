@@ -1262,46 +1262,13 @@ CreateThread(function()
     end
 end)
 
---- `/ncm.setup` -- fit a synthetic part and feel it, before the parts economy exists.
----
---- The server holds the truth and does the composing; this only relays. See `server/handling.lua` for what
---- it accepts. Deliberately a test instrument, and it drives the real mechanism rather than a shortcut
---- around it -- `NcmHandling.setParts` is the same call the inventory will make.
-RegisterCommand("ncm.setup", function(_, args)
-    TriggerServerEvent("ncm:setup", args and args[1] or nil, args and args[2] or nil)
-end, false)
 
---- `/ncm.topspeed <kph>` -- the capability spike for per-instance top speed.
----
---- Nothing in NCM has ever capped a top speed: the per-record path's payload has never reached a client
---- (`server/state_probe.lua`), and the per-instance server call has never been made. This relays to a
---- server that makes it for the first time. See `server/handling.lua` for what it answers.
----
---- Deliberately separate from `/ncm.setup`: this proves a PLATFORM capability, while `ncm.setup` drives
---- NCM's own composition. Folding an unproven call into the command that already works would make one
---- failure look like the other.
 --- `/ncm.tyre` -- the readout behind the gauge. The gauge shows a POSITION; this shows the degrees, the
 --- ambient it is being pulled toward, and the window. Added after a live drive where the needle sat on the
 --- bottom stop and there was no way to tell a broken feed from a cold tyre.
---- `/ncm.govern <kph>` -- set this Machine's top speed, live, per car.
----
---- Not TweakDB and not spawn-cached: the carrier tapers drive as the target is approached, so the change
---- is felt on the straight you are already on.
-RegisterCommand("ncm.govern", function(_, args)
-    local a = args and args[1]
-    if a == nil then
-        log("usage: /ncm.govern <kph>   or   /ncm.govern off")
-        return
-    end
-    TriggerServerEvent("ncm:govern", (tostring(a):lower() == "off") and 0 or tonumber(a))
-end, false)
 
 RegisterCommand("ncm.tyre", function()
     TriggerServerEvent("ncm:tyre.query")
-end, false)
-
-RegisterCommand("ncm.topspeed", function(_, args)
-    TriggerServerEvent("ncm:topspeed", args and args[1] or nil)
 end, false)
 
 --- `/ncm.ratedtopspeed` -- the one-off dump that fills `data.vehicle_catalogue`'s authored table.
@@ -1375,60 +1342,9 @@ end, false)
 -- ---------------------------------------------------------------------------------------------------
 -- THE GEAR CHAIN
 -- ---------------------------------------------------------------------------------------------------
---
--- **Every gear declares a speed FLOOR, and the engine enforces it with forward force.** A car in a high
--- gear has a high floor, so full brake from speed does not stop the car -- it brings the car down to the
--- gear's `minSpeed` and holds it there. NCM's own Manual Transmission work found this and fixed it by
--- zeroing the floor.
---
--- **Neither existing lever can reach it, and that is why this needed a new channel rather than a tune.**
--- `brakeScale` only ever scales RETARDING force and the floor is a forward PUSH. `driveScale` does scale
--- it, but it bottoms out at 0.30, so it can remove at most 70 percent of the floor -- and it takes the
--- car's entire power delivery down with it. A car that cannot stop and a car with no engine are not a
--- trade worth making.
---
--- Sent straight to the carrier rather than through the fleet publication, on purpose: `NcmMachine` composes
--- projections from `GlobalState.ncmCeilings`, whose only producer was the class disabled by `KB-144`, so
--- the fleet may currently be empty. This proves the MECHANISM against the car you are sitting in, which is
--- the question, and leaves wiring it into the fleet as a separate and later thing.
-local function gearFloorCommand(args)
-    local own = NcmClientOwnVehicle and NcmClientOwnVehicle() or nil
-    local record = own and own.record
-    if not record then
-        log("gearfloor: sit in a car first -- there is no record to write against")
-        return
-    end
-
-    local restore = (args and args[1] == "off")
-    if restore then
-        if pushProjection({ v = 1, record = { path = record, flats = {}, gears = {}, restore = true } }) then
-            log("gearfloor OFF: asked the carrier to restore %s", tostring(record))
-        else
-            log("gearfloor: bridge is down, nothing sent")
-        end
-        return
-    end
-
-    local Projection = NcmCore.get("machine.projection")
-    local gears = {}
-    for _, change in ipairs(Projection.GEAR_FLOOR) do
-        gears[#gears + 1] = {
-            id = change.id, gear = change.gear,
-            suffix = change.suffix, multiplier = change.multiplier,
-        }
-    end
-
-    if pushProjection({ v = 1, record = { path = record, flats = {}, gears = gears } }) then
-        log("gearfloor ON: %d gear change(s) pushed for %s -- the carrier log says how many landed",
-            #gears, tostring(record))
-        log("gearfloor: now brake hard from speed in a high gear. Before this, the car stops at the "
-            .. "gear's minSpeed and crawls; after it, it should come to a stop.")
-    else
-        log("gearfloor: bridge is down, nothing sent")
-    end
-end
-
-RegisterCommand("ncm.gearfloor", function(_, args) gearFloorCommand(args) end, false)
+-- L341 (owner, 2026-10-07): the player tuning commands are gone -- /ncm.setup, /ncm.govern, /ncm.topspeed,
+-- /ncm.gearfloor, /ncm.gearcap, /ncm.gearing, /ncm.mass. "All parts buying defines flight and race potential":
+-- nothing a player types changes what a Machine can do. /ncm.gears below only reads.
 
 --- `/ncm.gears` -- read the gear chain of the car being sat in.
 ---
@@ -1479,92 +1395,6 @@ RegisterCommand("ncm.gears", function()
     log("gears: asked the carrier to read %s -- the answer is in the CARRIER log", tostring(record))
 end, false)
 
--- ---------------------------------------------------------------------------------------------------
--- THE CEILING
--- ---------------------------------------------------------------------------------------------------
---
--- **Top speed is the last gear's `maxSpeed`.** Not drag, not power. The engine will not pull a car past
--- the band of the gear it is in, so the top of the last band is the top of the car -- which is exactly why
--- three drag runs at 1.0, 1.217 and 1.575 drive all finished at the SAME speed. There was nothing left to
--- multiply: at the ceiling the drive force is already gone.
---
--- Two different operations, because they are two different cars:
---
---   `/ncm.gearcap 1.2`    stretch ONLY the last gear. Same acceleration through the box, then a longer
---                         run at the top. The cheapest possible top-speed change.
---   `/ncm.gearing 1.2`    stretch the WHOLE chain, every gear's floor and ceiling together. That is a
---                         longer final drive: higher top speed AND lazier acceleration, the real trade.
---
--- Multipliers against whatever this install's original was, never absolutes -- the same rule every other
--- flat obeys, because the server does not know what the factory value is on this machine.
-local function pushGearChange(label, changes)
-    local own = NcmClientOwnVehicle and NcmClientOwnVehicle() or nil
-    local record = own and own.record
-    if not record then
-        log("%s: sit in a car first -- there is no record to write against", label)
-        return
-    end
-    if pushProjection({ v = 1, record = { path = record, flats = {}, gears = changes } }) then
-        log("%s: %d gear change(s) pushed for %s -- the CARRIER log says how many landed",
-            label, #changes, tostring(record))
-    else
-        log("%s: bridge is down, nothing sent", label)
-    end
-end
-
-local function gearMultiplierArg(args, label)
-    local mult = tonumber(args and args[1])
-    if args and args[1] == "off" then return nil, true end
-    if not mult or mult <= 0 then
-        log("usage: /%s <multiplier>   e.g. 1.25 for 25%% more, or 'off' to restore", label)
-        return nil, false
-    end
-    -- Bounded for the same reason every lever is: a typo that multiplied a gear by 100 would be a car
-    -- that never reaches its own first upshift.
-    if mult < 0.25 then mult = 0.25 elseif mult > 4.0 then mult = 4.0 end
-    return mult, false
-end
-
---- Stretch the LAST gear only. The narrowest possible top-speed change.
-RegisterCommand("ncm.gearcap", function(_, args)
-    local mult, off = gearMultiplierArg(args, "ncm.gearcap")
-    if off then
-        local own = NcmClientOwnVehicle and NcmClientOwnVehicle() or nil
-        local record = own and own.record
-        if record and pushProjection({ v = 1, record = { path = record, flats = {}, gears = {}, restore = true } }) then
-            log("gearcap off: asked the carrier to restore %s", tostring(record))
-        end
-        return
-    end
-    if not mult then return end
-    pushGearChange("gearcap", {
-        { id = "ceiling_top_gear", gear = -1, suffix = ".maxSpeed", multiplier = mult },
-    })
-    log("gearcap: top gear maxSpeed x%.2f. Run /ncm.gears first and after to see the number move, "
-        .. "then drive a long straight.", mult)
-end, false)
-
---- Stretch the WHOLE chain -- a longer or shorter final drive.
-RegisterCommand("ncm.gearing", function(_, args)
-    local mult, off = gearMultiplierArg(args, "ncm.gearing")
-    if off then
-        local own = NcmClientOwnVehicle and NcmClientOwnVehicle() or nil
-        local record = own and own.record
-        if record and pushProjection({ v = 1, record = { path = record, flats = {}, gears = {}, restore = true } }) then
-            log("gearing off: asked the carrier to restore %s", tostring(record))
-        end
-        return
-    end
-    if not mult then return end
-    -- Both ends of every band, or the bands stop meeting and a gear has a hole in front of it.
-    pushGearChange("gearing", {
-        { id = "gearing_max", gear = 0, suffix = ".maxSpeed", multiplier = mult },
-        { id = "gearing_min", gear = 0, suffix = ".minSpeed", multiplier = mult },
-    })
-    log("gearing: every gear x%.2f -- higher top speed AND lazier acceleration, which is the trade a "
-        .. "longer final drive actually makes.", mult)
-end, false)
-
 --- The server answers in chat as well (`Open77.chat.send`); this puts the same line in the client log,
 --- beside the bridge's own `handling:` lines, so one log shows what was asked for AND what was pushed.
 RegisterNetEvent("ncm:setup.result", function(message)
@@ -1580,43 +1410,8 @@ end)
 -- written by anything"). The live body's `+0x1BC` reads exactly the record's `total_mass` for every car in
 -- the 2026-10-04 Carrier logs (1800 kg Hella, 1470 Quadra, 1895 Outlaw ...), so the record is where the
 -- physics loads its mass from. What is NOT known is whether the solver then USES it -- the A/B below says.
+-- The mass write that drove this A/B was a player command and is gone (L341); the stopwatch stays.
 --
--- `/ncm.mass <multiplier>` scales this car's drive-model mass (0.70-1.40, the `machine.flats` bound); the
--- record channel is spawn-cached, so call the car again for it to take. `/ncm.mass off` restores.
--- `/ncm.massrun` times 0-100 km/h and every stop from 100 (time and distance) for ten minutes, in this log.
--- A heavier car that does not accelerate or stop any differently means the flat is cosmetic and mass must
--- be approximated through drive and brake (F = m.a); one that does means mass is real physics.
-RegisterCommand("ncm.mass", function(_, args)
-    local own = NcmClientOwnVehicle and NcmClientOwnVehicle() or nil
-    local record = own and own.record
-    if not record then
-        log("mass: sit in a car first -- there is no record to write against")
-        return
-    end
-    local a = args and args[1]
-    if a == "off" then
-        if pushProjection({ v = 1, record = { path = record, flats = {}, gears = {}, restore = true } }) then
-            log("mass off: asked the carrier to restore %s -- call the car again", tostring(record))
-        end
-        return
-    end
-    local mult = tonumber(a)
-    if not mult or mult <= 0 then
-        log("usage: /ncm.mass <multiplier 0.70-1.40>   or   /ncm.mass off")
-        return
-    end
-    if mult < 0.70 then mult = 0.70 elseif mult > 1.40 then mult = 1.40 end
-    if pushProjection({ v = 1, record = { path = record, gears = {}, flats = {
-            { id = "mass", suffix = ".total_mass", multiplier = mult },
-            { id = "mass_chassis", suffix = ".chassis_mass", multiplier = mult },
-        } } }) then
-        log("mass: x%.2f pushed for %s -- call the car again (spawn-cached); the CARRIER log's `mass=` "
-            .. "should then read the new kg", mult, tostring(record))
-    else
-        log("mass: bridge is down, nothing sent")
-    end
-end, false)
-
 local massRunUntil = 0
 RegisterCommand("ncm.massrun", function()
     massRunUntil = GetGameTimer() + 10 * 60 * 1000

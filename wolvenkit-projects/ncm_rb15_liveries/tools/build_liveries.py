@@ -269,6 +269,11 @@ def build(liveries, with_fallback=False):
             if with_fallback:
                 f.write(f'\nVehicle.v_sport1_rb15_f1_{name}_fb:\n  $base: Vehicle.v_sport1_rb15_f1\n  appearanceName: {name}\n'
                         f'  entityTemplatePath: {BS.join(NS + ["rb15_ncm_fallback.ent"])}\n')
+        # L338: every livery record is a real player vehicle -- the NCM 3.0 deck can CLAIM one into V's garage
+        # (VehicleSystem.EnablePlayerVehicle needs the record in the game's vehicle list, as the RB15 does for its own)
+        f.write('\nVehicle.vehicle_list.list:\n')
+        for name in liveries:
+            f.write(f'  - !append-once Vehicle.v_sport1_rb15_f1_{name}\n')
     # livery manifest for NCM / humans
     json.dump({'liveries': list(liveries), 'appearance_names': {n: n for n in liveries}, 'badges': badge_source,
                'records': {n: f'Vehicle.v_sport1_rb15_f1_{n}' for n in liveries},

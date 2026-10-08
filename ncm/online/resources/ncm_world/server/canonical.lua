@@ -7,7 +7,7 @@
 --
 -- It also publishes the UNIVERSE to the local host bridge (utc, Race Week, the driver records, the place registry) so
 -- a host that is not Cyberpunk -- Assetto Corsa, started on its own -- sees the same clock and the same Deep.
--- DEVELOPMENT ONLY, like Deep.
+-- DEVELOPMENT and SINGLE PLAYER (L338); never Online.
 local function log(fmt, ...) print(("[ncm_world/canonical] " .. fmt):format(...)) end
 local Canon = NcmCore.get("space.canonical")
 local Places = NcmCore.get("space.places")
@@ -36,7 +36,9 @@ end
 local function enabled()
     local ok, id = pcall(function() return GlobalState.ncmIdentity end)
     local env = ok and type(id) == "table" and id.environment or "development"
-    return tostring(env) == "development"
+    -- single player (L338): the temporal loop is the tape's own -- presence and the rollover reset belong to NCM 3.0
+    -- L341: Online too -- Deep and the Racing Week loop ship together (owner: "everything goes to online")
+    return tostring(env) == "development" or tostring(env) == "single_player" or tostring(env) == "online"
 end
 local function week()
     local ok, w = pcall(function() return GlobalState.ncmWeek end)
@@ -107,6 +109,13 @@ end)
 -- ------------------------------------------------------------------------------------------------ boot + unhosted Deep
 CreateThread(function()
     Wait(8000)
+    -- the world's identity first (ncm_league publishes it): before it, sid() is the fallback and the boot would read
+    -- nobody's presence -- a Machine left in Deep would never be found by the loop (KB-379, found by the NCM Host)
+    for _ = 1, 120 do
+        local okI, id = pcall(function() return GlobalState.ncmIdentity end)
+        if okI and type(id) == "table" and id.serverId then break end
+        Wait(500)
+    end
     if not enabled() or not MySQL then return end
     for _ = 1, 60 do if MySQL.isReady and MySQL.isReady() then break end; Wait(500) end
     local okQ, list = pcall(MySQL.query.await, "SELECT driver_id, place, host, location_id, state_json, race_week_run, updated_at FROM ncm_presence WHERE server_id=?", { sid() })

@@ -155,16 +155,26 @@ end
 
 -- ---------------------------------------------------------------------------------------------------- execute
 
+-- Single player (the NCM Host, L338): money is the player's eddies and the owner ruled it does NOT reset at rollover.
+-- OPEN//77 has no `Open77.runtime.host`, so on every server this is false and nothing changes there.
+local function singlePlayer()
+    local ok, h = pcall(function() return Open77.runtime.host and Open77.runtime.host() end)
+    return ok and h == "ncm_sp"
+end
+
 local function executeDrivers(plan, t)
     local base, archive = plan.server, plan.archive
+    local keepMoney = singlePlayer()
     for _, d in ipairs(plan.drivers) do
         local tx = {}
-        tx[#tx + 1] = { query = [[INSERT IGNORE INTO ledger (ncm_driver_id, server_id, kind, amount, currency, ref, note, idem_key)
-            VALUES (?, ?, 'reconstruction_collapse', ?, 'eddies', ?, 'Racing Week ended: the run''s money is gone', ?)]],
-            values = { d.driverId, base, d.wallet.close, archive, ("rw-close:%s:%s"):format(archive, d.driverId) } }
-        tx[#tx + 1] = { query = [[INSERT IGNORE INTO ledger (ncm_driver_id, server_id, kind, amount, currency, ref, note, idem_key)
-            VALUES (?, ?, 'reconstruction_open', ?, 'eddies', ?, 'Racing Week begins: everyone starts here', ?)]],
-            values = { d.driverId, base, d.wallet.open, archive, ("rw-open:%s:%s"):format(archive, d.driverId) } }
+        if not keepMoney then
+            tx[#tx + 1] = { query = [[INSERT IGNORE INTO ledger (ncm_driver_id, server_id, kind, amount, currency, ref, note, idem_key)
+                VALUES (?, ?, 'reconstruction_collapse', ?, 'eddies', ?, 'Racing Week ended: the run''s money is gone', ?)]],
+                values = { d.driverId, base, d.wallet.close, archive, ("rw-close:%s:%s"):format(archive, d.driverId) } }
+            tx[#tx + 1] = { query = [[INSERT IGNORE INTO ledger (ncm_driver_id, server_id, kind, amount, currency, ref, note, idem_key)
+                VALUES (?, ?, 'reconstruction_open', ?, 'eddies', ?, 'Racing Week begins: everyone starts here', ?)]],
+                values = { d.driverId, base, d.wallet.open, archive, ("rw-open:%s:%s"):format(archive, d.driverId) } }
+        end
         for _, a in ipairs(d.anchors) do
             tx[#tx + 1] = { query = [[INSERT IGNORE INTO racing_week_anchor (server_id, run_index, ncm_driver_id, asset_id, source, chosen_at)
                 VALUES (?, ?, ?, ?, ?, ?)]], values = { base, plan.run, d.driverId, a.assetId, a.source, t } }

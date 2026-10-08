@@ -6519,3 +6519,88 @@ All three were fixed in the fixtures, and the orbiter's balance is tested.
 
 **Open:** downloading/installing KSA on opt-in (IDEA-1173).
 
+## L338 - LOCKED (OWNER DIRECTION + RULINGS) / NCM 3.0 IS A SINGLE-PLAYER MOD BUILT FROM THE DEV SERVER MINUS ONLINE; RACE WEEK TAPES; THE PRESENT IS CALCULATED (2026-10-07)
+
+**Owner direction (verbatim, abridged):** "Night City Motorsports 3.0 is a Cyberpunk 2077 single-player mod ... distributed alongside a curated Nexus Mods Collection ... The existing OPEN//77/dev-server implementation remains extremely valuable. Do not remove it ... do not treat the server architecture as the final product architecture." "A tape represents an independent NCM continuity. Its canonical clock continues while the player is away ... Do not simulate every absent second. Calculate the present." "Stranding is allowed." "New tape is not reroll this bad week." "Cyberpunk is the front door. Night City is home."
+
+**Owner rulings in this session:**
+- **Do not rework the old single-player mod** ("dont mangle sp to redo sp. make a new sp basically baked from devserver online right now minus being online (and make sure to add the race week stuff too)"). `ncm-localized/` (NCM 2.0) stays as published.
+- **Runtime: the in-game host shim** (chosen over a bundled local OPEN//77 server, which is PolyForm-NC, gated, launcher-bound and MariaDB-bound): the NCM resources run UNCHANGED inside Cyberpunk under the NCM Host (CET), over SQLite.
+- **Clock:** every tape runs real time (1 Race Week day = 24 h); the tape stores `daySeconds`, so L315 Q3's single-player slider is DEFERRED, not overturned.
+- **Money:** eddies are the player's money, with race payouts proportioned to the online economy; **no 10k reset at rollover**.
+
+**Rules:**
+1. One tape = one continuity = one Race Week clock = one `server_id` in the host's database. Starting another tape never rescues, rerolls or touches a previous one.
+2. The present = tape epoch + real clock + the tape's seed + recorded causal state. Missed verdicts are judged in order on return (`week.catchup`); a run nobody lived in is judged unattended; nothing runs while the player is away.
+3. Rollover returns every Machine to Night City (L330), Deep included; stranding before rollover is legitimate. Persistence follows L303/L330's rules, money excepted in single player.
+4. NCM is dormant until the player chooses a tape on the deck; CYBERPUNK WITHOUT NCM is always offered.
+5. The environment `single_player` is its own role: not Online, not Development (no dev waivers).
+6. Hosts are physicalizers, never the save, the clock or machine identity (`vehicle_asset.asset_id`).
+
+**Built (doc 55):** `ncm/host/` (runtime, SQL translation + schema model + MySQL shim, headless Open77 API, CET bindings, tapes, deck, Time Lab); core `week.catchup`; `tools/ncm-host-build.ps1` (`dist/ncm-3.0.0-alpha.1.zip`); gates `tools/test-host-sql.lua` (460/460 statements translate and prepare) and `tools/test-host-boot.lua` (37 checks: boot, 19-day absence, stranded return, tape isolation, clock regression, deck). Resource fixes KB-379, KB-380, KB-381; `collapse.lua` keeps money in single player.
+
+**Not built (doc 55 §8):** spawning (vehicles/NPCs), WebUI page adapters, plugin bridges as natives, the eddies wallet, unknown-vehicle minting, environment bindings with snapshot/restore, a native main-menu entry (blocker stated, doc 55 §6). **No live PASS:** MASTER_TEST §TP is NOT RUN.
+
+**L338 addendum (2026-10-07, evening) - THE FIRST COLLECTION CAR IS THE KIMIKO RB15; ANY CAR CAN BE CLAIMED.** Owner: "reintroduce the rb15 mod ... make sure i can get a serialized kimiko orbital air liveried f1 car ... if someone mods a car we havent seen into ncm ... it gets added to machine index as its own entry, own observations, and transfers into ac or deep space as an appropriate approximation"; "all 10, and lets make it easy to claim the car for me in this seed somehow".
+- **Rule:** a livery is an APPEARANCE of a model, never a separate machine (`data.liveries`): model `ncx_rb15` / appearance `kimiko` / machine = its own asset_id and serial. The RB15 (Nexus 31543) is never redistributed by NCM; the ten liveries are NCM's add-on on top.
+- **Built:** core `data.liveries` (the ten, with the Kimiko livery's colours, sponsors, wing and owner authorship; source mod provenance) + the catalogue resolves all ten records to `ncx_rb15` + the passport carries the livery; `NcmOwnership.claim` (ncm_league): a catalogue model is MANUFACTURED with a birth certificate (global / maker / model serial, production + claim transfers) and given to the driver, a livery car wears its livery's colours, an unknown record becomes an unserialized machine of its own; `ncm:host:claim` / `ncm:host:claimed`, console `ncm.claim`; the deck's GARAGE (claim the car you sit in, or any of the ten liveries) and the car goes into V's garage (`EnablePlayerVehicle`; the livery yaml now appends the ten records to `Vehicle.vehicle_list`). Liveries rebuilt (`NCM_RB15_Liveries_20261007-1625.zip`); `tools/install-ncm3-kimiko.ps1` installs the RB15 + liveries + NCM 3.0 with a record and `-Uninstall`. Gate: test_liveries (4), host boot 49/49 (the claim: serialized, owned, livery colours, transfers, passport formula/kimiko, idempotent, an unseen car claimed unserialized).
+- **Not installed:** the game was running. **Rollover:** a claimed car is an ordinary machine -- un-anchored cars go to the archive at a Week's end; one anchor slot defaults to the most-raced car (L303).
+
+**L338 addendum (2026-10-07, night) - THE NCM HOST IS NATIVE (owner ruling).** CET's Lua sandbox has no coroutines (KB-385), no `load`, `loadstring`, `setfenv` or `_G` (KB-383, KB-384), so the NCM resources cannot run inside CET. Offered: a CET-only stopgap for the Kimiko claim, or a native host. **Owner: "A only"** -- the native host, no throwaway stopgap.
+- **Built:** `ncm/host_native` -- the `ncm_host` RED4ext plugin (Lua 5.4.7 + SQLite 3.49.1, fetched by `fetch-deps.ps1`; RED4ext.SDK shared with Carrier), natives `NcmHost_Call(cmd, payload) -> String` and `NcmHost_Ready()` (+ the `NcmHostBridge` scriptable system); `ncm/host/native.lua` (the dispatcher: boot, deck, newTape, setDoc, mount, unmount, tick, claim, garage, dev, status); `driver_native.lua`. The CET mod is the front end only (`init.lua`, `ui/deck.lua` over a port, `game/cet.lua`). `tools/build-host-native.ps1` (build + stage + native self-test), `tools/ncm-host-build.ps1` (the full 3.0.0-alpha.2 package), `install-ncm3-kimiko.ps1 -UpdateNcm` prunes what a build no longer ships.
+- **Consequence:** the resources now run in exactly OPEN//77's Lua (5.4: integers, coroutines, load with env) -- no LuaJIT-compatibility layer and no source transform is needed. The in-CET runtime pieces (isolate transform, CET SQLite driver, compile probe) were removed.
+
+## L339 - LOCKED (OWNER RULINGS) + BUILT / AEROSPACE RACING: ONE RACE FROM NIGHT CITY INTO DEEP AND HOME, ON THE MACHINES' OWN PHYSICS, SINGLE PLAYER ONLY (2026-10-07)
+
+**Owner brief (abridged):** "We are not building a separate space-racing minigame. We already have cars ... parts ... propulsion ... races ... NPC competitors ... Deep ... incidents ... Race Week. Connect them." A Formula car, a motorcycle and a Hella with the same propulsion must race differently *because they are physically different*; NPCs must fly; aerospace incidents must reach Race Week; GREEN/YELLOW first.
+
+**Owner rulings in this session:**
+1. **Single player only.** "this is explicitly for ncm sp ... i cant host rb15 on a server". The aerospace race is never wired to the dev server or `ncm_space`.
+2. **The RB15 is plugged in by the player, never a dependency.** "a sandbox, that can have a rb15 independently plugged into it, not a dependency, and not hardcoded". Core code and core tests name no vehicle; a race takes whatever machine the caller (the tape's garage) supplies. The existing `data.liveries` registry entry for `ncx_rb15` (L338) **stays** ("leave it").
+3. **New features, new mods:** the race runs in its own resource, `ncm_aero`.
+
+**Rules:**
+1. One canonical machine, continuous physics: environment terms (density, heating) change with the world, never a ground/space mode. No per-vehicle performance constants: differences come from passport mass, dimensions, drag, lift, skin and installed parts (F = m a).
+2. Every flight-body value carries provenance and confidence; a prior is labelled `inferred`.
+3. One race, one tower: progress along the gate chain orders a field whether a car is on the road or in Deep; results keep fidelity provenance (`tactical` / `mixed` / `physical`).
+4. The city hears only what happens where it is (low, near Night City); the source of a Race Week fact rides along with it. NPC incidents count exactly as the player's.
+5. Time-lapse of a race is DEV only and marks the tape DEV.
+
+**Built:** core `engineering.flightbody`, `engineering.loadout`, `space.aerocourse`, `space.pilot.course`, the `course` discipline in `space.tactical`, aero heating + skin radiation in `engineering.dynamics`, `flightmodel.row`; resource `ncm_aero` (`auto_start false`, refuses unless `single_player`); `App:aeroCmd` + native `aero` + the deck's AEROSPACE RACE section; package `dist/ncm-3.0.0-alpha.3.zip`. Evidence: core 1182/1182 (Lua 5.4 + LuaJIT), host boot 60/60 (a six-car field of the tape's machine to 120 km and home to Hill Abode inside the real host; two hard landings heard by Race Week once each), native self-test 0 failures, `ncm-test` ALL GREEN. Headless results: identical kit -> bike 375 s, supercar 681 s, Formula 738 s, Hellas crash landing; 12-car field 12/12 home in 641-888 s (120 km turn) and 1042-1469 s (400 km).
+
+**Not built:** the player as a racing entrant (IDEA-1209), driven ground legs (IDEA-1210), the tolerance readout (IDEA-1211), the Moon (IDEA-1212), Triathlon (IDEA-1213), VFX (IDEA-1215), thermal damage (IDEA-1216). Stated simplifications: tactical attitude is a torque-limited kinematic slew; the ground legs are a low flown corridor. **No live PASS:** MASTER_TEST §XR is NOT RUN.
+
+## L340 - LOCKED (OWNER RULINGS) / NCM SINGLE PLAYER REACHES DEV-SERVER PARITY NATIVELY: NO CET, NATIVE INK, TWO FRONT DOORS; THE V ROLL IS PARKED (2026-10-07)
+
+**Owner (verbatim, abridged):** "what is even going on with this mod? where is my scanner? rig bridge? does carrier work? why is there still a cet overlay asking what tape youd like to load. diageteic format please not a lick of cet its busted anyway ... this is supposed to feel like dev server status now, but instead feels like a clumsy reinterpretation thus far. still need you to close the gaps on where we are lacking what our dev server already has." Rulings on the plan: **native ink** screens (diegetic where it fits), the tape chosen from **both** a native menu entry and the phone, the per-tape V roll **parked**.
+
+**Finding (why it felt like a reinterpretation):** the simulation runs unchanged in `ncm_host`, but everything the player sees or touches on the dev server goes through OPEN//77's browser -- every HTML screen and the hidden pages that relay to the NCM plugins -- and single player had none (KB-386).
+**Finding (the strange man):** "NCMP-Template-M" / "-F" are OPEN//77's multiplayer PRISTINE saves, written into the ordinary saves folder (newer than the owner's last save, so Continue opens one). NCM never loads saves. Load AutoSave-15 / ManualSave-63; do not delete the templates (OPEN//77 needs them).
+
+**Rules:**
+1. Zero CET in NCM single player: the game itself (redscript + the `ncm_host` natives) drives NCM.
+2. The resources stay byte-for-byte the dev server's; parity comes from host adapters (pages played natively, APIs bound natively), never from forking resource code.
+3. Screens are native game UI: phone, journal, map, ink HUD and ink panels; menu entries are WRAPPED, never replaced (Mod Settings already replaces PopulateMenuItemList).
+4. Four phases, each shipped and live-testable: (1) plugin bridges, (2) zero CET + front doors, (3) screens, (4) spawning.
+
+**Built (phase 1):** `ncm/host_native/src/net.cpp` (ws_open/send/poll/close, tcp_probe, http_start/poll), `ncm/host/webui/init.lua` (Carrier, Rig Bridge, Vision, Broadcast, Pace), hooks in `api/headless.lua` (refusal, destroy) and `runtime.lua` (adapter tick), installed at mount (`app.lua`); `tools/test-host-webui.lua` 14/14; package and install 3.0.0-alpha.4. **No live PASS:** MASTER_TEST §PB NOT RUN.
+
+**L340 addendum (2026-10-07, night) - PHASE 2 BUILT: NO CET.** Owner: "and remove cet asap its terrible" (with "crazy lag now", KB-388).
+- **Built (3.0.0-alpha.5, installed):** `NcmHostRuntime.reds` (OnPlayerAttach -> `session`, a 30 Hz `frame` tick carrying V in and toasts / teleport / GPS waypoint / giveCar / the Race Week line out, OnPlayerDetach -> `leave`); `NcmHostHud.reds` (the Race Week line in ink, on the crosshair container as NCM Broadcast attaches); `NcmHostMenu.reds` (NIGHT CITY MOTORSPORTS added to the main and pause menus by WRAPPING PopulateMenuItemList, a Codeware InMenuPopup listing every tape + NEW TAPE + WITHOUT NCM). The host answers redscript in LINES (`kind|field...`, '~' empty; no JSON in redscript). A tape choice is remembered: a save loads dormant until one is chosen, then mounts it on every later load. The CET mod is no longer packaged (the installer pruned it); NCM 2.0's redscript is parked.
+- **Evidence:** `tools/check-host-redscript.ps1` (new: compiles ncm_host against the installed game's scripts + plugin scripts in a scratch cache) clean; native self-test 0 failures incl. session -> choose -> frame -> tapes -> leave -> session(remembered); `ncm-test` ALL GREEN. **No live PASS yet** (§PB5-§PB8). Map layers, input forwarding (scanner key) and the garage / aero screens move to phase 3.
+
+## L341 - LOCKED (OWNER RULINGS) / ONLINE GOES TO BASELINE 3: EVERYTHING BUT THE LOS SANTOS LINK; DEEP AND FLIGHT SHIP; NO TYPED TUNING; FLIGHT PARTS COME FROM R&D (2026-10-07)
+
+**Owner, 2026-10-07:** "everything goes to online, but one subplot is no devfuel, rip out chat commands that boost tuning
+unrealistically outside of the economy so all parts buying defines flight and race potential. we'll keep woeking at it";
+"maybe not los santos ye, dont ship that one to online"; "um deep and flight are crucial to ship"; "let rnd handle flight
+parts organically, at the end draft a proposal for rnd overhaul ill share to next coder".
+
+**Rules:**
+1. **Online = dev's tree (Baseline 3), minus `ncm_link`.** `tools/deploy-staging.ps1` carries `$OnlineWithheld` and refuses a bundle that contains a withheld resource. `ncm_space` ships (its results simply have no hub on Online).
+2. **Deep, the altitude doorway (snowglobe) and the Racing Week loop (canonical) run on Online** (`environment` development OR online; canonical also single_player).
+3. **Development waivers never reach Online:** dev fuel (`ncm_dev_fuel`), dev heat, dev attitude, the ascent probe, the KSA rehearsal, fabrication and the dev grant are `environment == "development"` only. The client takes dev fuel only from the server's Deep config.
+4. **No typed tuning, on any server.** Removed: `/ncm.setup`, `/ncm.govern`, `/ncm.topspeed` and their server events (`ncm:setup`, `ncm:govern`, `ncm:topspeed`, KB-392); `/ncm.gearfloor`, `/ncm.gearcap`, `/ncm.gearing`, `/ncm.mass`; `/ncm.eng.devfuel`, `/ncm.deep.go`. Read-only instruments stay (`/ncm.gears`, `/ncm.tyre`, `/ncm.massrun`, `/ncm.ratedtopspeed`). Console-only operator commands (source 0) are not player commands and stay.
+5. **Flight hardware reaches Online only through manufacturer R&D.** Nothing is granted or seeded to Online players. Until doc 56 lands, no Online Machine owns flight hardware -- accepted (owner: "we'll keep working at it").
+
+**Built:** `ncm_world/client/carrier_bridge.lua`, `server/handling.lua`, `client/deep.lua`, `client/engineering.lua`, `server/deep.lua`, `server/snowglobe.lua`, `server/canonical.lua`; `tools/deploy-staging.ps1` (withheld list). Proposal: [56_RND_OVERHAUL.md](56_RND_OVERHAUL.md) (IDEA-1223, IDEA-1224). **Evidence:** `ncm-test` ALL GREEN under every interpreter; dev booted clean 20:34 (`l384-restart-20261007.stdout.log`: 0 ERR, deep ENABLED, snowglobe ON). **No live PASS on Online yet.**

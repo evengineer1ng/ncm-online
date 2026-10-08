@@ -30,7 +30,9 @@ NcmComponents.enabled=enabled
 local function enc(v) local ok,s=pcall(Json.encode,v); return ok and s or "[]" end
 local function dec(v) if type(v)=="table" then return v end local ok,x=pcall(Json.decode,tostring(v or "")); return ok and x or nil end
 local function driver(pid) return NcmCalendar.resolveDriver(tonumber(pid) or 0) end
-local function hash(s) local h=2166136261 for i=1,#s do h=(h*16777619+s:byte(i))%4294967296 end return h end
+-- h*16777619 is split (0x01000193 = 256*65536 + 403) so every intermediate stays below 2^42: exact in Lua 5.4 integers
+-- AND in LuaJIT doubles, so a design id is the same on OPEN//77 and in the single-player host (KB-380, L338)
+local function hash(s) local h=2166136261 for i=1,#s do h=(h*403+(h*256%65536)*65536+s:byte(i))%4294967296 end return h end
 local function stableId(s) return ids.uuid4(ids.seededRng(hash(s))) end
 
 local function seedDesign(d,t)

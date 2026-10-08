@@ -146,6 +146,11 @@ Core.define("data.vehicle_catalogue", function(C)
     local LIVERIES = { "arasaka", "herrera", "kang_tao", "militech", "mizutani", "quadra", "rayfield", "thorton", "trauma", "yorinobu" }
     if rb15 then
         for _, suffix in ipairs(LIVERIES) do addRuntime(rb15, "Vehicle.v_sport1_rb15_f1_" .. suffix) end
+        -- the liveries actually built (data.liveries, L338): kimiko, archer, raven, spunky_monkey ... -- one machine model
+        local okL, Liveries = pcall(C.get, "data.liveries")
+        if okL and Liveries then
+            for _, rec in ipairs(Liveries.records("ncx_rb15")) do if not byRecord[rec] then addRuntime(rb15, rec) end end
+        end
     end
 
     function M.entries() return entries end

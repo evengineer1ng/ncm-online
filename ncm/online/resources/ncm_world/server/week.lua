@@ -33,6 +33,7 @@ local Week = NcmCore.get("week.clock")
 local Curve = NcmCore.get("week.curve")
 local Moody = NcmCore.get("week.moody")
 local Cont = NcmCore.get("week.continuation")
+local Catch = NcmCore.get("week.catchup")
 local Vibe = NcmCore.get("week.vibe")
 local Hash = NcmCore.get("vocabulary.hash")
 local Json = NcmCore.get("vocabulary.json")
@@ -300,34 +301,49 @@ end
 
 -- ---------------------------------------------------------------------------------------------------- the verdict
 
---- Judge the open run at its provisional end. Records the verdict (once per boundary, ever), moves the timeline and
---- tells the other resources. `history` mode ends every run at hour 72 (the old week), still recorded.
+--- The standing a run's verdicts are judged on: the live run's curve, a stored run's last persisted curve, or nil --
+--- a run nobody lived in faces history unattended (week.catchup).
+local function standingFor(n)
+    if run and not run.scratch and run.index == n then return run.st end
+    local okR, row = pcall(MySQL.single.await, "SELECT state_json FROM racing_week_run WHERE server_id = ? AND run_index = ?", { sid(), n })
+    local st = okR and row and dec(row.state_json)
+    if type(st) == "table" and st.deviation ~= nil then return st end
+    return nil
+end
+
+--- Judge every possible end that has passed and not been judged -- one while the world runs, every one it missed
+--- after downtime or a single player's absence (week.catchup, L338), in order. Records each verdict (once per
+--- boundary, ever), moves the timeline and tells the other resources once. `history` mode ends every run at hour 72.
 local function judgeIfDue(t)
-    if not run or run.scratch then return end
-    local rec = Week.locate(cfg(), runs, t)
-    if not (rec and rec.open and rec.beyond and rec.run == run.index) then return end
-    local boundaryK = rec.survived + 1
-    local hours = boundaryK * 24
-    local v = Cont.judge(run.seed, run.index, hours, run.st)
-    if not v then return end
-    if verdictMode() == "history" then v.survive, v.kind = false, "collapse" end
-    local state = { deviation = run.st.deviation, reservoirs = run.st.res, carrier = Curve.carrier(hours), band = Curve.band(hours),
-        moody = Moody.public(run.md, hours).active, mode = verdictMode() }
-    local okI = pcall(MySQL.update.await, [[INSERT IGNORE INTO racing_week_verdict (server_id, run_index, boundary_h, kind, p, z, u, state_json, at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)]], { sid(), run.index, hours, v.kind, v.p, v.z, v.u, enc(state), t })
-    -- the recorded verdict wins (a restart re-judges nothing)
-    local row = MySQL.single.await("SELECT kind, p, z, u FROM racing_week_verdict WHERE server_id = ? AND run_index = ? AND boundary_h = ?",
-        { sid(), run.index, hours })
-    local kind = row and row.kind or v.kind
-    log("VERDICT run %d at hour %d: p %.3f (z %+.3f, u %.3f) -> %s%s", run.index, hours, tonumber(row and row.p) or v.p,
-        tonumber(row and row.z) or v.z, tonumber(row and row.u) or v.u, kind, okI and "" or " (record failed)")
-    if kind == "continue" then
-        pcall(MySQL.update.await, "UPDATE racing_week_run SET survived = GREATEST(survived, ?) WHERE server_id = ? AND run_index = ?",
-            { boundaryK, sid(), run.index })
-    else
-        pcall(MySQL.update.await, [[UPDATE racing_week_run SET end_utc = COALESCE(end_utc, ?), end_kind = COALESCE(end_kind, ?)
-            WHERE server_id = ? AND run_index = ?]], { rec.provisionalEnd, kind, sid(), run.index })
+    if run and run.scratch then return end
+    local settled = Catch.settle(cfg(), runs, t, runSeed, standingFor, { mode = verdictMode() })
+    if #settled.verdicts == 0 then return end
+    for _, v in ipairs(settled.verdicts) do
+        local st = standingFor(v.run)
+        local state = { deviation = st and st.deviation, reservoirs = st and st.res, carrier = Curve.carrier(v.hours),
+            band = Curve.band(v.hours), moody = (run and run.index == v.run) and Moody.public(run.md, v.hours).active or nil,
+            mode = verdictMode(), unattended = v.unattended or nil }
+        -- a run the world never opened (it passed entirely during an absence) still gets its row: the timeline is rows
+        pcall(MySQL.update.await, [[INSERT IGNORE INTO racing_week_run (server_id, run_index, opened_at, state_json, updated_at, start_utc, seed)
+            VALUES (?, ?, ?, ?, ?, ?, ?)]], { sid(), v.run, t, "{}", t, v.startUtc, runSeed(v.run) })
+        local okI = pcall(MySQL.update.await, [[INSERT IGNORE INTO racing_week_verdict (server_id, run_index, boundary_h, kind, p, z, u, state_json, at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)]], { sid(), v.run, v.hours, v.kind, v.p, v.z, v.u, enc(state), t })
+        -- the recorded verdict wins (a restart re-judges nothing)
+        local row = MySQL.single.await("SELECT kind, p, z, u FROM racing_week_verdict WHERE server_id = ? AND run_index = ? AND boundary_h = ?",
+            { sid(), v.run, v.hours })
+        local kind = row and row.kind or v.kind
+        log("VERDICT run %d at hour %d: p %.3f (z %+.3f, u %.3f) -> %s%s%s", v.run, v.hours, tonumber(row and row.p) or v.p,
+            tonumber(row and row.z) or v.z, tonumber(row and row.u) or v.u, kind, v.unattended and " [unattended]" or "",
+            okI and "" or " (record failed)")
+        if kind == "continue" then
+            pcall(MySQL.update.await, "UPDATE racing_week_run SET survived = GREATEST(survived, ?) WHERE server_id = ? AND run_index = ?",
+                { math.floor(v.hours / 24), sid(), v.run })
+        else
+            pcall(MySQL.update.await, [[UPDATE racing_week_run SET end_utc = COALESCE(end_utc, ?), end_kind = COALESCE(end_kind, ?)
+                WHERE server_id = ? AND run_index = ?]], { v.atUtc, kind, sid(), v.run })
+        end
     end
+    if #settled.verdicts > 1 then log("caught up %d verdict(s) missed while the world was not running", #settled.verdicts) end
     loadRuns(true)
     tellTimeline()
 end
@@ -356,15 +372,12 @@ end
 function NcmWeek.step(t)
     t = t or now()
     loadRuns()
+    -- the verdicts first, every one that is due (after an absence there may be many): the run this instant belongs to
+    -- is only known once the timeline is settled
+    if not pinned then judgeIfDue(t) end
     local c = clock(t)
     if not c then return nil end
     ensureRun(c, t)
-    -- a verdict first: if the run ended at this boundary, the rest of the step belongs to the next run
-    if not pinned then
-        judgeIfDue(t)
-        local c2 = clock(t)
-        if c2 and c2.runIndex ~= c.runIndex then c = c2; ensureRun(c, t) end
-    end
     -- after downtime the missed rolls are made late, in order; all are recorded, only the last three are announced
     local made = Moody.step(run.md, run.seed, run.index, c.hours)
     for i, rec in ipairs(made) do rec.quiet = (#made - i) >= 3; rolled(rec, t) end
