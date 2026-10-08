@@ -6604,3 +6604,5 @@ parts organically, at the end draft a proposal for rnd overhaul ill share to nex
 5. **Flight hardware reaches Online only through manufacturer R&D.** Nothing is granted or seeded to Online players. Until doc 56 lands, no Online Machine owns flight hardware -- accepted (owner: "we'll keep working at it").
 
 **Built:** `ncm_world/client/carrier_bridge.lua`, `server/handling.lua`, `client/deep.lua`, `client/engineering.lua`, `server/deep.lua`, `server/snowglobe.lua`, `server/canonical.lua`; `tools/deploy-staging.ps1` (withheld list). Proposal: [56_RND_OVERHAUL.md](56_RND_OVERHAUL.md) (IDEA-1223, IDEA-1224). **Evidence:** `ncm-test` ALL GREEN under every interpreter; dev booted clean 20:34 (`l384-restart-20261007.stdout.log`: 0 ERR, deep ENABLED, snowglobe ON). **No live PASS on Online yet.**
+
+**L341 addendum (2026-10-08 00:57 UTC) - DEPLOYED.** Online is Baseline 3 (`online-baseline-3` = `0ab8c00`), and for the first time it boots as `environment = online` (KB-393: it had no `tunables.json`; owner yes to create it). Backup `/opt/ncm/backups/pre-carrier-prod-20261008T004829Z`. Details and rollback: OPS_STAGING "Online Baseline 3".

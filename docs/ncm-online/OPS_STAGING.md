@@ -176,6 +176,24 @@ Post-upgrade health, in one line each: `migrations: N applied` → `ownership le
 `ncm_world started v…` → `class ceilings published` → `scheduler started: 5 series`. If the series line is
 missing, NCM did not start.
 
+## Online Baseline 3 (2026-10-08 00:51 UTC) -- L341
+
+**Deployed:** resources at commit `0ab8c00` (tag `online-baseline-3`) = dev's tree minus `ncm_link` (withheld by
+`deploy-staging.ps1` `$OnlineWithheld`); hash-verified against the working tree after upload (0 changed, 0 removed,
+only `ncm_link` absent). Migrations 059-070 applied on first boot. Required mods unchanged (8, digest `7b070f25...`).
+`check-load-list.py`: 48 resources OK.
+
+**Environment (KB-393):** Online had no `/opt/ncm/server/tunables.json`, so `ncm_league.environment` defaulted to
+`development` on every boot until now. Created 2026-10-08 00:56 UTC (owner yes):
+`{"schemaVersion":1,"resources":{"ncm_league":{"serverId":"ncm-dev","environment":"online"}}}`. Boot 00:57 logs
+`QA instrumentation ... online` and `manual clones OFF at boot (default for online)`. **Never delete this file**;
+`upgrade-open77.sh` / `o77-upgrade.ps1` already preserve `tunables.json`.
+
+**Pre-change backup:** `/opt/ncm/backups/pre-carrier-prod-20261008T004829Z` (`ncm.sql.gz` 136 tables,
+`operator-state.tar.gz`, `resources-ncm.tar.gz` = Baseline 2's tree). **Rollback:** stop `ncm-server`; restore
+`resources-ncm.tar.gz` into `/opt/ncm/resources/`; restore the database from `ncm.sql.gz` (059-070 add tables and
+columns); remove `tunables.json` only if the rollback must also restore the old (development) role; start.
+
 ## Required mods (state as of 2026-10-03 08:12 UTC) -- ONLINE BASELINE 2 (L299)
 
 The Baseline 1 freeze is over (L299). Online runs dev's code at `fb23f35` (tag `online-baseline-2`) and dev's mod stack:
