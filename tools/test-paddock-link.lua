@@ -116,8 +116,10 @@ check(("open Paddock races become calendar events, ovals and a race 5 min out in
     n == 4 and e and e.class == "paddock" and e.entryClosesAt == startsAt - 60 and ovalE and ovalE.disciplineId == "oval"
     and NcmCalendar.events["paddock:pr-soon-4"] ~= nil)
 local pro = NcmCalendar.events["paddock:pr-pro_b-2"]
-check("a league named after a championship takes its economy; a street league the fallback (City Cup's)",
-    pro.seriesId == "city_cup" and pro.economy.id == "city_cup_v1" and e.seriesId == "paddock_street_a" and e.economy.id == "city_cup_v1")
+-- IDEA-1272: an unnamed league scales City Cup's lines onto its own division ladder (street_a = Street x1)
+check("a league named after a championship takes its economy; a street league its own ladder (City Cup's lines, Street x1)",
+    pro.seriesId == "city_cup" and pro.economy.id == "city_cup_v1" and e.seriesId == "paddock_street_a"
+    and e.economy.id == "paddock_street_a_v1" and e.economy.scale == 1)
 check("adoption is idempotent", NcmPaddockLink.adoptAll(clock) == 0)
 
 -- ---------------------------------------------------------------- QUALIFY and a run
@@ -131,7 +133,7 @@ emitted = {}
 NcmPaddockLink.onQualiRun(rec, DRIVER.ncmDriverId, 1, { finished = true, runSec = 161.25, machine = { assetId = "11111111-2222-4333-8444-555555555555" } }, clock)
 local en = e.entries[DRIVER.ncmDriverId]
 check("the first time ENTERS the driver, through the league's ordinary entry (fee, machine)", en and en.state == "checked_in"
-    and #checkIns == 1 and checkIns[1].assetId == "11111111-2222-4333-8444-555555555555" and checkIns[1].economy.entryFee == 50)
+    and #checkIns == 1 and checkIns[1].assetId == "11111111-2222-4333-8444-555555555555" and checkIns[1].economy.entryFee == 25)   -- City Cup 50 at x2, scaled to Street x1
 local msg = emitted[1] and emitted[1].name == "ncm:paddock.entry" and emitted[1].args[1]
 check("and the Paddock hears the entry with the time", msg and msg.raceId == "pr-street_a-1" and msg.qualiMs == 161250 and msg.state == "entered")
 emitted = {}

@@ -4,9 +4,11 @@
 <meta charset="utf-8">
 <title>NCM Deep</title>
 <style>
-  html, body { margin: 0; height: 100%; background: #000; overflow: hidden; font-family: "Consolas", monospace; }
+  /* KB-439: transparent until the first frame decides -- the native view (the default camera) shows the game through
+     this page, so every white or black frame before that was a flash over the car */
+  html, body { margin: 0; height: 100%; background: transparent; overflow: hidden; font-family: "Consolas", monospace; }
   canvas { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; }
-  #fade { position: fixed; inset: 0; background: #fff; opacity: 1; transition: opacity 1.4s ease-out; pointer-events: none; }
+  #fade { position: fixed; inset: 0; background: #fff; opacity: 0; transition: opacity 1.4s ease-out; pointer-events: none; }
 </style>
 </head>
 <body>
@@ -44,6 +46,7 @@
   // is still useful (no depth from the game reaches a WebUI layer, so the mask is distance from the camera), fading in
   // with altitude; at the seam the same page becomes Deep. The game camera is not exposed to scripts: the view is the
   // vehicle chase camera reconstructed from the car's own frame (an approximation, said so).
+  var LAST_NATIVE = null;
   var MODE = "deep", AS = null, PROBE = false;
 
   // ---------------------------------------------------------------- vectors (double precision, plain arrays)
@@ -440,9 +443,10 @@
       toSeam: Number(m.toSeam) || 0, d0: Number(m.d0) || 9000, d1: Number(m.d1) || 16000,
       camF: m.camF ? arr(m.camF) : null, camU: m.camU ? arr(m.camU) : null, camFovY: Number(m.camFovY) || 0 }; });
     // the seam: the ascent page becomes Deep (opaque from here; no white-out, the planet is already there)
-    bridge.on("deep:mode", function (m) { MODE = (m && m.mode) || "deep";
-      if (MODE === "deep") { document.documentElement.style.background = "#000"; document.body.style.background = "#000"; } });
-    bridge.on("deep:leave", function () { fade.style.transition = "opacity 1.2s ease-in"; fade.style.opacity = 1; });
+    // the frame sets the background once it knows the camera (native: transparent; NCM's own render: black)
+    bridge.on("deep:mode", function (m) { MODE = (m && m.mode) || "deep"; });
+    bridge.on("deep:leave", function () { if (LAST_NATIVE === true) return;
+      fade.style.transition = "opacity 1.2s ease-in"; fade.style.opacity = 1; });
     if (bridge.ready) bridge.ready();
   }
   emit("deep:ready", {});
@@ -452,7 +456,7 @@
     requestAnimationFrame(frame);
     gl.bindFramebuffer(gl.FRAMEBUFFER, null); gl.viewport(0, 0, W, H);
     if (MODE === "ascent") { drawAscent(now); return; }
-    if (!S) { gl.clearColor(1, 1, 1, 1); gl.clear(gl.COLOR_BUFFER_BIT); return; }
+    if (!S) { gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT); return; }
     // interpolate between the last two Lua states (~33 ms apart) for smooth motion at 60 fps
     var k = prev ? Math.min(1.5, (now - at) / Math.max(1, at - prevAt)) : 0;
     var car = prev ? lerp(S.p, add(S.p, sub(S.p, prev.p)), Math.max(0, Math.min(1, k)) ) : S.p;
@@ -481,6 +485,14 @@
     var dayHere = Math.max(0, Math.min(1, dot(unit(cam), unit(SUN)) * 3 + 0.4));
     var fwdC = unit(look), sideC = unit(cross(fwdC, camUp)), upC = cross(sideC, fwdC);
     var wv = { cam: cam, fwd: fwdC, up: upC, side: sideC, fov: 1.0, ascent: false, k: 1, d0: 0, d1: 1 };
+    // L352: the NATIVE view -- the car is in the game's own world (client/deepview.lua) and this page is only the HUD over it.
+    // Guidance's map and the chase / high / earth cameras still draw NCM's own WebGL universe, for scale.
+    var NATIVE = m.cam === "native" && !G.open;
+    if (NATIVE !== LAST_NATIVE) { LAST_NATIVE = NATIVE; var bgc = NATIVE ? "transparent" : "#000";
+      document.documentElement.style.background = bgc; document.body.style.background = bgc; }
+    hud.clearRect(0, 0, W, H);
+    var px = dpr;
+    if (NATIVE) { gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT); } else {
     var inTargets = worldPasses(wv, now);
     gl.clearColor(0, 0, 0, 1); gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     gl.disable(gl.DEPTH_TEST);
@@ -496,8 +508,6 @@
     composite(wv, inTargets);
 
     // ------------------------------------------------ 2D: markers, the Machine, the HUD
-    hud.clearRect(0, 0, W, H);
-    var px = dpr;
     function marker(pos, label, color, pulse) {
       if (hidden(cam, pos)) return;
       var s = project(VP, sub(pos, cam)); if (!s) return;
@@ -551,18 +561,18 @@
         }
       }
     }
+    }   // end of the WebGL universe (not NATIVE)
     // HUD
     hud.fillStyle = "rgba(0,0,0,0.45)"; hud.fillRect(16 * px, 16 * px, 700 * px, 378 * px);
     hud.fillStyle = "#9ff"; hud.font = (16 * px) + "px Consolas, monospace";
     var L = [
-      "NCM DEEP  -  out of REDengine's reach (" + m.cam + " camera)",
+      "NCM DEEP  -  " + (m.cam === "native" ? "native view" : m.cam + " camera (NCM's own render, for scale)"),
       "ALTITUDE   " + (m.alt / 1000).toFixed(2) + " km",
       "SPEED      " + m.speed.toFixed(0) + " m/s  (horizontal " + m.hs.toFixed(0) + ", vertical " + (m.vs >= 0 ? "+" : "") + m.vs.toFixed(0) + ")",
       // L334: the orbit judged on the inertial velocity (Deep's Earth rotates), and how far the KSA border is
       "ORBIT      " + (m.orb ? (m.orb.escape ? "ESCAPING Earth" : "apo " + (m.orb.apo / 1000).toFixed(0) + " km  peri " + (m.orb.peri / 1000).toFixed(0) + " km")
         + "   inertial " + (m.orb.vi / 1000).toFixed(2) + " km/s" : "-") + "   (circular here: " + m.orbit.toFixed(0) + " m/s)",
-      "KSA BORDER " + (m.borderKm != null ? Number(m.borderKm).toLocaleString(undefined, { maximumFractionDigits: 0 }) + " km" : "-")
-        + (m.fusionKg != null && m.fusionKg > 0 ? "   fusion " + Number(m.fusionKg).toFixed(0) + " kg" : ""),
+      "FUSION     " + (m.fusionKg != null ? Number(m.fusionKg).toFixed(0) + " kg" : "-"),
       "POSITION   " + m.lat.toFixed(3) + ", " + m.lon.toFixed(3),
       "LANDING    " + m.impact,
       "FUEL       " + (m.devFuel ? "DEV FUEL (unlimited, development only)" : (m.fuelKg != null ? m.fuelKg.toFixed(1) + " kg (" + (m.fuelKg / 0.745).toFixed(1) + " L)" : "-")),
@@ -579,7 +589,7 @@
     hud.fillStyle = "rgba(200,220,220,0.7)"; hud.font = (11 * px) + "px Consolas, monospace";
     var credit = (GEO.loaded > 0 && GEO.credit) || "Imagery: NASA Blue Marble (global)"; hud.fillText(credit, W - hud.measureText(credit).width - 16 * px, H - 8 * px);
     hud.font = (13 * px) + "px Consolas, monospace";
-    hud.fillStyle = "#cdd"; hud.fillText("D-pad up / G: GUIDANCE  |  V / R3: camera  |  R-stick up/down or I/O: zoom (" + (Number(m.zoom) || 22).toExponential(1) + " m)  |  hold B / X: home", 28 * px, H - 22 * px);
+    hud.fillStyle = "#cdd"; hud.fillText("D-pad up / G: GUIDANCE  |  V / R3: native / chase / high / earth  |  R-stick up/down or I/O: zoom (" + (Number(m.zoom) || 22).toExponential(1) + " m)  |  hold B / X: home", 28 * px, H - 22 * px);
     if (G.backHold > 0) { hud.fillStyle = "rgba(255,255,255,0.85)"; hud.fillRect(W / 2 - 150 * px, H - 90 * px, 300 * px * G.backHold, 8 * px);
       hud.fillText("returning home...", W / 2 - 60 * px, H - 98 * px); }
     // the guidance computer
@@ -665,7 +675,8 @@
       hud.strokeStyle = "#ff3df5"; hud.lineWidth = 1.5 * px; hud.beginPath(); hud.arc(s[0], s[1], 7 * px, 0, 6.283); hud.stroke();
       hud.fillStyle = "#ff3df5"; hud.font = (12 * px) + "px Consolas, monospace"; hud.fillText("NIGHT CITY", s[0] + 10 * px, s[1] - 6 * px); hud.globalAlpha = 1; } }
     hud.fillStyle = "rgba(160,255,255," + (0.35 + 0.5 * AS.k).toFixed(2) + ")"; hud.font = (13 * px) + "px Consolas, monospace";
-    hud.fillText("ALT " + (AS.alt / 1000).toFixed(2) + " km   NCM DEEP in " + (AS.toSeam / 1000).toFixed(2) + " km", W / 2 - 150 * px, H - 28 * px);
+    // altitude only: where Deep begins is the player's to discover, never a countdown (owner, 2026-10-08)
+    hud.fillText("ALT " + (AS.alt / 1000).toFixed(2) + " km", W / 2 - 50 * px, H - 28 * px);
   }
   requestAnimationFrame(frame);
 })();

@@ -1,0 +1,30 @@
+{
+  "generator": "NCWE Studio",
+  "project": "NCM World Layer",
+  "projectId": "5673244a-08f6-4c29-a24e-3d1f7714790f",
+  "exportedUtc": "2026-10-10T02:40:00Z",
+  "game": "2.31",
+  "archiveXl": "1.27.1",
+  "resource": "ncm_world_layer",
+  "version": "1.1.0",
+  "requiredMod": "ncm_world_layer-assets",
+  "package": "dist/ncm-world-layer.zip",
+  "sha256": "3bf0c45c56408ca9c8d64f1a0b40c251663ddcc4567ec04a9db4c46590fb1950",
+  "bytes": 27455979,
+  "entries": [
+    "archive/pc/mod/ncwe_5673244a08f64c29a24e3d1f7714790f.archive",
+    "archive/pc/mod/ncwe_5673244a08f64c29a24e3d1f7714790f.archive.xl"
+  ],
+  "changes": {
+    "Transformed": 0,
+    "Deleted": 0,
+    "Added": 4,
+    "Roads": 0,
+    "Elements": 0
+  },
+  "sounds": [],
+  "soundEmitters": 0,
+  "syncedSounds": 0,
+  "sourceExport": "C:\\Users\\eveng\\AppData\\Local\\NCWE\\Open77Exports\\ncwe-5673244a08f64c29a24e3d1f7714790f-20261008-194931-0e2d4169",
+  "note": "L358: the q201 starfield shells and globe removed; the NCWE space render bodies (star dome, Blue Marble Earth, LROC Moon) carried here as NCWE-cooked meshes, drawn and turned at runtime by ncm-sky."
+}

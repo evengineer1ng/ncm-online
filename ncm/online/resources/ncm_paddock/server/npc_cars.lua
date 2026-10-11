@@ -29,6 +29,7 @@ local Season = NcmCore.get("paddock.season")
 local Wear = NcmCore.get("parts.wear")
 local ids = NcmCore.get("vocabulary.ids")
 local Gearbox = NcmCore.get("machine.gearbox")
+local Service = NcmCore.get("engineering.vehicle_service")
 local function set(k, d) return PaddockSettings.get(k, d) end
 local function rng() return math.random() end
 
@@ -118,6 +119,124 @@ end
 
 function PaddockCars.invalidate(assetId) if assetId then PaddockCars.cache[assetId] = nil end end
 
+-- One chassis condition for each serialized NPC car. The incident row makes race resolution idempotent.
+function PaddockCars.condition(assetId)
+    local row = MySQL.single.await("SELECT damage_json FROM vehicle_week_condition WHERE server_id=? AND asset_id=?", { U.sid(), assetId })
+    return row and U.decode(row.damage_json) or { health = 1 }
+end
+
+function PaddockCars.recordIncident(p, race, result, physical, t, frozenAssetId)
+    if not p or not (frozenAssetId or p.raceCarId) then return false end
+    local fraction = Service.raceDamage(result, physical)
+    if fraction <= 0 then return false end
+    local assetId = frozenAssetId or p.raceCarId
+    local prior = MySQL.single.await("SELECT asset_id FROM npc_vehicle_incident WHERE server_id=? AND race_id=? AND asset_id=?",
+        { U.sid(), race.raceId, assetId })
+    if prior then return false end
+    local before = PaddockCars.condition(assetId)
+    local after = Service.accumulate(before, fraction)
+    local source = physical and "physical" or "simulated"
+    local tx = {
+        { query = [[INSERT INTO npc_vehicle_incident (server_id,race_id,asset_id,provenance,damage_fraction,before_json,after_json,occurred_at)
+            VALUES (?,?,?,?,?,?,?,?)]], values = { U.sid(),race.raceId,assetId,source,fraction,U.encode(before),U.encode(after),t } },
+        { query = [[INSERT INTO vehicle_week_condition (asset_id,server_id,damage_json,recorded_at) VALUES (?,?,?,?)
+            ON DUPLICATE KEY UPDATE damage_json=VALUES(damage_json),recorded_at=VALUES(recorded_at)]],
+            values = { assetId,U.sid(),U.encode(after),t } },
+    }
+    local ok, err = atomic(tx)
+    if not ok then log("incident store FAILED %s %s: %s", race.raceId, p.id, tostring(err)) return false end
+    return true
+end
+
+function PaddockCars.work(assetId)
+    return MySQL.single.await("SELECT state,ready_at FROM npc_vehicle_work WHERE server_id=? AND asset_id=?", { U.sid(), assetId })
+end
+
+function PaddockCars.raceFactor(assetId)
+    if not assetId then return 1 end
+    local job = PaddockCars.work(assetId)
+    if job and job.state == "queued" then return nil end
+    local condition = PaddockCars.condition(assetId)
+    if (tonumber(condition.health) or 1) <= 0.08 then return nil end
+    local row = MySQL.single.await("SELECT workmanship_json FROM npc_vehicle_work WHERE server_id=? AND asset_id=?", { U.sid(), assetId })
+    local work = row and U.decode(row.workmanship_json)
+    return Service.paceFactor(condition, work and work.setup)
+end
+
+-- The garage pass performs decisions without a player command. No money is charged for an unaffordable job.
+function PaddockCars.servicePass(p, t, supplied)
+    local assetId = supplied and supplied.asset_id or p.raceCarId
+    if not assetId then return end
+    local c = PaddockCars.load(assetId)
+    if not c then return end
+    local job = MySQL.single.await("SELECT * FROM npc_vehicle_work WHERE server_id=? AND asset_id=?", { U.sid(), c.assetId })
+    if job and job.state == "queued" then
+        if tonumber(job.ready_at) > t then return end
+        local before = PaddockCars.condition(c.assetId)
+        local after, work = Service.resolve(before, job.provider, tonumber(job.skill) or 0, rng, c.value)   -- one roll per section
+        if not after then return end
+        local ok, err = atomic({
+            { query = [[UPDATE npc_vehicle_work SET state='complete',completed_at=?,after_json=?,workmanship_json=?
+                WHERE server_id=? AND asset_id=? AND state='queued']],
+                values = { t,U.encode(after),U.encode(work),U.sid(),c.assetId } },
+            { query = [[UPDATE vehicle_week_condition SET damage_json=?,recorded_at=? WHERE server_id=? AND asset_id=?]],
+                values = { U.encode(after),t,U.sid(),c.assetId } },
+        })
+        if not ok then log("service complete FAILED %s: %s", c.assetId, tostring(err)) end
+        if ok and job.principal_kind == "person" then
+            local learner = PaddockStore.world.people[job.principal_id]
+            if learner then
+                learner.evidence = learner.evidence or {}
+                learner.evidence.engineeringSkill = math.min(1000,(tonumber(job.skill) or 300) + 12)
+                PaddockStore.markPerson(learner.id)
+            end
+        elseif ok and job.principal_kind == "org" then
+            local team = PaddockStore.world.orgs[job.principal_id]
+            local engineer = team and PaddockStore.world.people[team.engineerId or ""]
+            if engineer and engineer.attrs then
+                engineer.attrs.skill = math.min(97,(tonumber(engineer.attrs.skill) or 50) + 0.1)
+                PaddockStore.markPerson(engineer.id)
+            end
+        end
+        return
+    end
+    local condition = PaddockCars.condition(c.assetId)
+    if Service.severity(condition) < 0.08 then return end
+    local kind, id = supplied and "series" or c.ownerKind, supplied and supplied.series_id or c.ownerId
+    if kind ~= "org" and kind ~= "person" and kind ~= "series" then return end
+    local owner = supplied or (kind == "org" and PaddockStore.world.orgs[id] or PaddockStore.world.people[id])
+    if not owner then return end
+    local tier = kind == "series" and "premier" or (kind == "org" and owner.tier or "street")
+    local engineer = kind == "org" and PaddockStore.world.people[owner.engineerId or ""] or nil
+    local skill = kind == "series" and 750 or (kind == "org" and math.floor((tonumber(engineer and engineer.attrs and engineer.attrs.skill) or 50) * 10)
+        or (tonumber((p.evidence or {}).engineeringSkill) or math.floor((tonumber((p.attrs or {}).vehicle_sympathy) or 45) * 7)))
+    local plan = Service.npcPlan(condition, c.value, owner.cash, tier, skill)
+    if not plan or plan.action ~= "repair" then return end
+    local jobId = ids.uuid4(rng)
+    local tx = {
+        { query = [[INSERT INTO npc_vehicle_work (server_id,asset_id,work_id,principal_kind,principal_id,provider,state,
+            amount,material_amount,labour_amount,skill,start_at,ready_at,before_json)
+            VALUES (?,?,?,?,?,?,'queued',?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE
+            work_id=VALUES(work_id),provider=VALUES(provider),state='queued',amount=VALUES(amount),
+            material_amount=VALUES(material_amount),labour_amount=VALUES(labour_amount),
+            skill=VALUES(skill),start_at=VALUES(start_at),ready_at=VALUES(ready_at),before_json=VALUES(before_json),
+            after_json=NULL,workmanship_json=NULL]],
+            values = { U.sid(),c.assetId,jobId,kind,id,plan.provider,plan.cost,plan.materials,plan.labour,skill,t,t+plan.readySeconds,U.encode(condition) } },
+        { query = [[INSERT IGNORE INTO npc_money (entry_id,server_id,principal_kind,principal_id,amount,kind,ref,idem_key,created_at,reason)
+            VALUES (?,?,?,?,?,'repair',?,?,?,'chassis_service')]],
+            values = { ids.uuid4(rng),U.sid(),kind,id,-plan.cost,c.assetId,"vehicle_work:" .. jobId,t } },
+    }
+    if kind == "series" then tx[#tx + 1] = { query = [[UPDATE paddock_spec_car SET cash=cash-? WHERE server_id=? AND series_id=?
+        AND person_id=? AND asset_id=? AND cash>=?]],
+        values = { plan.cost,U.sid(),supplied.series_id,supplied.person_id,c.assetId,plan.cost } } end
+    local ok, err = atomic(tx)
+    if not ok then log("service booking FAILED %s: %s", c.assetId, tostring(err)) return end
+    owner.cash = (tonumber(owner.cash) or 0) - plan.cost
+    if kind == "org" then PaddockStore.markOrg(id) elseif kind == "person" then PaddockStore.markPerson(id) end
+    log("%s %s booked %s on %s for %d (materials %d, labour %d), ready in %d s",
+        kind,id,plan.provider,c.assetId,plan.cost,plan.materials,plan.labour,plan.readySeconds)
+end
+
 -- ---------------------------------------------------------------------------------------------------------- mint
 
 --- Statements that create a racer's car and its factory configuration, owned by (kind, id).
@@ -157,6 +276,25 @@ local function mintStatements(model, kind, id, t)
     return tx, assetId
 end
 PaddockCars.mintStatements = mintStatements
+
+--- One organiser-supplied spec car per entrant and series, through this Week. It is never the driver's own car.
+function PaddockCars.specCar(p, seriesId, t)
+    local spec = Season.specFor(seriesId)
+    if not spec or not p then return nil end
+    local row = MySQL.single.await("SELECT asset_id FROM paddock_spec_car WHERE server_id=? AND series_id=? AND person_id=?",
+        { U.sid(),seriesId,p.id })
+    if row then return PaddockCars.load(row.asset_id) end
+    local entry = Vehicles.resolveRecord(spec.record)
+    if not entry then return nil end
+    local ownerId = seriesId .. ":" .. p.id
+    local tx, assetId = mintStatements({ vehicleKey=entry.vehicleKey,record=spec.record },"series",ownerId,t or U.now())
+    tx[#tx + 1] = { query = [[INSERT INTO paddock_spec_car (server_id,series_id,person_id,asset_id,cash,created_at)
+        VALUES (?,?,?,?,5000,?)]], values = { U.sid(),seriesId,p.id,assetId,t or U.now() } }
+    local ok, err = atomic(tx)
+    if not ok then log("spec car for %s %s FAILED: %s", seriesId,p.id,tostring(err)) return nil end
+    log("%s borrowed organiser car %s for %s (repair budget 5000)",p.id,assetId,seriesId)
+    return PaddockCars.load(assetId)
+end
 
 --- Make sure a racer has a car (minting one if needed). Returns the loaded car or nil, reason.
 function PaddockCars.ensure(p, t)
@@ -281,12 +419,13 @@ function PaddockCars.raced(personIds, metres)
     local st = {}
     for _, pid in ipairs(personIds) do
         local p = PaddockStore.world.people[pid]
-        if p and p.raceCarId then
+        local assetId = (p and p.raceCarId) or (type(pid) == "string" and #pid == 36 and pid)
+        if assetId then
             st[#st + 1] = { query = "UPDATE vehicle_asset SET odometer_m = odometer_m + ?, odometer_at = ? WHERE asset_id = ?",
-                values = { metres, U.now(), p.raceCarId } }
+                values = { metres, U.now(), assetId } }
             st[#st + 1] = { query = "UPDATE component_asset SET exposure_m = exposure_m + ? WHERE machine_asset_id = ? AND location_kind = 'installed'",
-                values = { metres, p.raceCarId } }
-            PaddockCars.invalidate(p.raceCarId)
+                values = { metres, assetId } }
+            PaddockCars.invalidate(assetId)
         end
     end
     if #st == 0 then return 0 end
@@ -320,6 +459,7 @@ end
 PaddockCars.racers = racers
 
 local cursor = 0
+local specCursor = 0
 --- A few racers get their car each pass (and every car's levels are re-derived when it is loaded).
 function PaddockCars.pass(t)
     if not set("npcCarsEnabled", true) then return end
@@ -336,7 +476,16 @@ function PaddockCars.pass(t)
         elseif not p.car or not p.car.tune then
             pcall(PaddockCars.derive, p)
         end
+        if p.raceCarId then pcall(PaddockCars.servicePass, p, t or U.now()) end
         y()
+    end
+    local supplied = MySQL.query.await("SELECT series_id,person_id,asset_id,cash FROM paddock_spec_car WHERE server_id=? ORDER BY series_id,person_id",
+        { U.sid() }) or {}
+    for _ = 1, math.min(#supplied, 4) do
+        specCursor = specCursor % #supplied + 1
+        local s = supplied[specCursor]
+        local p = PaddockStore.world.people[s.person_id]
+        if p then pcall(PaddockCars.servicePass,p,t or U.now(),s) end
     end
     return made
 end

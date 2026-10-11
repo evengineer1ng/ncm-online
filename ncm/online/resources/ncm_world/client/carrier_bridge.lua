@@ -169,6 +169,13 @@ NcmClientMachineWrench = function(payload)
     return sendMachine("ncm:machine.wrench", payload)
 end
 
+--- Stacked gearboxes (client/gearing.lua): the Machine's composed driveline paths for NCM Gearbox, relayed by the
+--- Carrier into per-process shared memory (owner, 2026-10-08: "relay through carrier").
+NcmClientMachineGearing = function(payload)
+    if type(payload) ~= "table" then return false end
+    return sendMachine("ncm:machine.gearing", payload)
+end
+
 --- The FFB channel's search order: `0..3` are the Rig Bridge's range, `4..7` the legacy companion's.
 local function ffbPortForIndex(i)
     i = i % FFB_SEARCH_SPAN
@@ -1077,64 +1084,11 @@ end
 local WetHandling = NcmCore.get("parts.handling")   -- `L208`: wetPowerGrip
 local wetFast = false
 
--- Slipstream is a transient local physics effect. Open77's client vehicle snapshots expose nearby
--- replicated cars' positions, headings and speeds; the Carrier's dedicated dragScale affects coasting
--- retarding force only, so this cannot soften braking or change the persistent Machine setup.
-local SLIPSTREAM_RADIUS = 30.0
-local SLIPSTREAM_MAX_GAP = 22.0
-local SLIPSTREAM_HALF_WIDTH = 3.5
-local SLIPSTREAM_MIN_SPEED = 12.0 -- m/s
-local SLIPSTREAM_HEADING_DOT = 0.906 -- cos(25 degrees)
-local SLIPSTREAM_DRAG_FACTOR = 0.82
-local slipstreamStrength = 0
-
-local function hasSlipstream(mine, snapshot)
-    local p = snapshot.position
-    local heading = tonumber(snapshot.heading or snapshot.yaw)
-    local speed = tonumber(snapshot.speed)
-    if type(p) ~= "table" or type(mine.position) ~= "table" or not heading or not speed
-        or speed < SLIPSTREAM_MIN_SPEED or (tonumber(mine.speed) or 0) < SLIPSTREAM_MIN_SPEED then
-        return false
-    end
-
-    local dx, dy = p.x - mine.position.x, p.y - mine.position.y
-    if type(dx) ~= "number" or type(dy) ~= "number" then return false end
-    local forward = math.rad(tonumber(mine.heading or mine.yaw) or 0)
-    local fx, fy = math.cos(forward), math.sin(forward) -- shared SP/Open77 heading convention
-    local ahead = dx * fx + dy * fy
-    if ahead <= 0 or ahead > SLIPSTREAM_MAX_GAP then return false end
-    local lateral = math.abs(dx * -fy + dy * fx)
-    if lateral > SLIPSTREAM_HALF_WIDTH then return false end
-
-    local otherForward = math.rad(heading)
-    if fx * math.cos(otherForward) + fy * math.sin(otherForward) < SLIPSTREAM_HEADING_DOT then
-        return false
-    end
-    return ahead * ahead + lateral * lateral <= SLIPSTREAM_RADIUS * SLIPSTREAM_RADIUS
-end
-
-local function slipstreamActive(mine, ownId)
-    if type(mine) ~= "table" or type(mine.position) ~= "table" then return false end
-    local ok, nearby = pcall(Open77.vehicles.nearby, SLIPSTREAM_RADIUS,
-        { streamed = true, limit = 24 })
-    if not ok or type(nearby) ~= "table" then return false end
-    for _, candidate in ipairs(nearby) do
-        if type(candidate) == "table" then
-            local vehicle = candidate
-            local id = candidate.id or candidate.vehicleId
-            if id ~= nil and tostring(id) ~= tostring(ownId)
-                and (candidate.position == nil or candidate.heading == nil) then
-                local readOk, resolved = pcall(Open77.vehicles.get, id)
-                if readOk and type(resolved) == "table" then vehicle = resolved end
-            end
-            if tostring(vehicle.id or vehicle.vehicleId or "") ~= tostring(ownId)
-                and hasSlipstream(mine, vehicle) then
-                return true
-            end
-        end
-    end
-    return false
-end
+-- L356: the slipstream that lived here (L271: an on/off wake check that eased `dragScale` to 0.82) is retired. The
+-- Carrier applies `dragScale` only to a negative, brake-at-rest net force -- coasting -- so on the throttle, where a
+-- tow matters, it did nothing, and at top speed it left the drive/drag balance where it was. The wake is now
+-- `aero.wake` (a phenomenon, for every car) and the SL-1's active share is `aero.slipstream`; ncm_slipstream turns
+-- both into a real along-track force through engineering.lua's wrench lease (`slipTow`).
 
 local function resolveHandling(bagOk, setup)
     local function unbound(reason)
@@ -1179,18 +1133,6 @@ local function resolveHandling(bagOk, setup)
     -- here, at the lease rate; the server says how wet the road is. Quantised so the lease is not rewritten
     -- by pedal noise.
     local levers = setup.levers
-    local slipstream = slipstreamActive(snapshot, mine)
-    -- Ease the 2 Hz geometry probe into/out of the effect so streamed-position jitter does not chatter
-    -- the drag lever at the edge of the wake. Wet handling already polls faster, so scale by that cadence.
-    local blend = wetFast and 0.25 or 0.65
-    slipstreamStrength = slipstreamStrength + ((slipstream and 1 or 0) - slipstreamStrength) * blend
-    if slipstreamStrength > 0.01 then
-        local copy = {}
-        for k, v in pairs(levers) do copy[k] = v end
-        local dragFactor = 1.0 - (1.0 - SLIPSTREAM_DRAG_FACTOR) * slipstreamStrength
-        copy.dragScale = math.max(0.5, (tonumber(levers.dragScale) or 1.0) * dragFactor)
-        levers = copy
-    end
     local wet = tonumber(setup.wetPower)
     if wet and wet > 0 and type(levers.gripScale) == "number" then
         local okL, lift = pcall(WetHandling.wetPowerGrip, wet, tonumber(snapshot.throttle))
@@ -1214,13 +1156,12 @@ local function resolveHandling(bagOk, setup)
     -- **The tail, not the head.** Truncating to the first 8 characters made both seeded fixtures read as
     -- `10000000`, so the one log a player is most likely to look at could not tell two Machines apart --
     -- during the very test whose whole point is that two Machines differ.
-    }, ("BOUND asset=..%s vehicle=%s entity=%s grip=%.3f drive=%.3f brake=%.3f drag=%.3f slipstream=%s topSpeed=%s"):format(
+    }, ("BOUND asset=..%s vehicle=%s entity=%s grip=%.3f drive=%.3f brake=%.3f drag=%.3f topSpeed=%s"):format(
         setup.assetId:sub(-6), tostring(setup.vehicleId), entity,
         tonumber(setup.levers.gripScale) or 1,
         tonumber(setup.levers.driveScale) or 1,
         tonumber(setup.levers.brakeScale) or 1,
         tonumber(levers.dragScale) or 1,
-        slipstreamStrength > 0.1 and "on" or "off",
         -- **Named even when absent.** The governor produced no carrier line at all and there was no way
         -- to tell "the server never sent a target" from "the carrier ignored one", which are different
         -- bugs in different processes.

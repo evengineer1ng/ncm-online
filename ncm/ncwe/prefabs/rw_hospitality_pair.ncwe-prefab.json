@@ -1,0 +1,182 @@
+{
+  "name": "rw_hospitality_pair",
+  "description": "Race Week hospitality: Quadra \u002B Mizutani 9x6 m branded marquees side by side (11 m centres) with collision. Footprint about 20 x 7 m.",
+  "saved": "2026-10-08T08:43:02.2300247-04:00",
+  "items": 4,
+  "prefab": {
+    "Version": 1,
+    "Name": "rw_hospitality_pair",
+    "Items": [
+      {
+        "Kind": "mesh",
+        "Name": "pdm_marquee_quadra",
+        "Transform": {
+          "Position": {
+            "X": -4.2001953,
+            "Y": 3.5,
+            "Z": 0
+          },
+          "Rotation": {
+            "IsIdentity": false,
+            "X": 0,
+            "Y": 0,
+            "Z": -0.33955896,
+            "W": 0.9405848
+          },
+          "Scale": {
+            "X": 1,
+            "Y": 1,
+            "Z": 1
+          }
+        },
+        "Mesh": {
+          "Hash": 12866469978248237302,
+          "Path": "ncwe\\custom\\rw_marquee_quadra_9ef05f\\rw_marquee_quadra_9ef05f.mesh",
+          "Appearance": "default"
+        },
+        "Shapes": [],
+        "CookedSector": 0
+      },
+      {
+        "Kind": "mesh",
+        "Name": "pdm_marquee_mizutani",
+        "Transform": {
+          "Position": {
+            "X": 4.199951,
+            "Y": -3.5,
+            "Z": 0
+          },
+          "Rotation": {
+            "IsIdentity": false,
+            "X": 0,
+            "Y": 0,
+            "Z": -0.33955896,
+            "W": 0.9405848
+          },
+          "Scale": {
+            "X": 1,
+            "Y": 1,
+            "Z": 1
+          }
+        },
+        "Mesh": {
+          "Hash": 2980647308186120560,
+          "Path": "ncwe\\custom\\rw_marquee_mizutani_f61de7\\rw_marquee_mizutani_f61de7.mesh",
+          "Appearance": "default"
+        },
+        "Shapes": [],
+        "CookedSector": 0
+      },
+      {
+        "Kind": "collision",
+        "Name": "pdm_marquee_quadra collision",
+        "Transform": {
+          "Position": {
+            "X": -4.2001953,
+            "Y": 3.5,
+            "Z": 0
+          },
+          "Rotation": {
+            "IsIdentity": false,
+            "X": 0,
+            "Y": 0,
+            "Z": -0.33955896,
+            "W": 0.9405848
+          },
+          "Scale": {
+            "X": 1,
+            "Y": 1,
+            "Z": 1
+          }
+        },
+        "Shapes": [
+          {
+            "Kind": 0,
+            "Position": {
+              "X": 0,
+              "Y": 0,
+              "Z": 2.3
+            },
+            "Rotation": {
+              "IsIdentity": true,
+              "X": 0,
+              "Y": 0,
+              "Z": 0,
+              "W": 1
+            },
+            "Size": {
+              "X": 4.7,
+              "Y": 3.3,
+              "Z": 2.3
+            },
+            "MeshHash": 0,
+            "Preset": "World Static",
+            "Material": "concrete.physmat",
+            "IsMesh": false,
+            "HalfExtents": {
+              "X": 4.7,
+              "Y": 3.3,
+              "Z": 2.3
+            }
+          }
+        ],
+        "CookedSector": 0
+      },
+      {
+        "Kind": "collision",
+        "Name": "pdm_marquee_mizutani collision",
+        "Transform": {
+          "Position": {
+            "X": 4.199951,
+            "Y": -3.5,
+            "Z": 0
+          },
+          "Rotation": {
+            "IsIdentity": false,
+            "X": 0,
+            "Y": 0,
+            "Z": -0.33955896,
+            "W": 0.9405848
+          },
+          "Scale": {
+            "X": 1,
+            "Y": 1,
+            "Z": 1
+          }
+        },
+        "Shapes": [
+          {
+            "Kind": 0,
+            "Position": {
+              "X": 0,
+              "Y": 0,
+              "Z": 2.3
+            },
+            "Rotation": {
+              "IsIdentity": true,
+              "X": 0,
+              "Y": 0,
+              "Z": 0,
+              "W": 1
+            },
+            "Size": {
+              "X": 4.7,
+              "Y": 3.3,
+              "Z": 2.3
+            },
+            "MeshHash": 0,
+            "Preset": "World Static",
+            "Material": "concrete.physmat",
+            "IsMesh": false,
+            "HalfExtents": {
+              "X": 4.7,
+              "Y": 3.3,
+              "Z": 2.3
+            }
+          }
+        ],
+        "CookedSector": 0
+      }
+    ]
+  }
+}

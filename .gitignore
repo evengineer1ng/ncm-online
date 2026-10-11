@@ -110,3 +110,15 @@ tools/assetto/
 # L335 the KSA adapter build output (tools/ksa-build-mod.ps1 builds outside the repo; a direct dotnet build drops these)
 /ncm/ksa/NcmKsa/bin/
 /ncm/ksa/NcmKsa/obj/
+
+# NCM Sky (RED4ext) CMake build output -- reproducible from source (tools/build-sky.ps1)
+/ncm/sky/build/
+
+# NCWE export packages: built from the .ncwe projects by NCWE Studio's export -- reproducible, 25-35 MB zips
+/ncm/online/resources/*/dist/
+
+# NCWE Studio's autosave backups beside each project
+/ncm/ncwe/*.ncwe.bak
+
+# Scratch from the 2026-10 index hotfix (tarballs and hash lists)
+/.tmp-indexfix/

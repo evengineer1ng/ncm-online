@@ -160,6 +160,13 @@ local ok, settings = pcall(Open77.tunables.declare, {
     bubbleOutM = { value = 300, type = "integer", min = 80, max = 1200, unit = "m", apply = "live" },
     bubbleSpawnsPerPass = { value = 3, type = "integer", min = 1, max = 16, apply = "live" },
     bubbleTickMs = { value = 500, type = "integer", min = 200, max = 5000, unit = "ms", apply = "live" },
+    -- NPC racer quickhacking (owner brief 2026-10-08): racers decide, upload, defend and purge on the real chrome
+    -- machinery (hacking.lua). `hackTest` makes the first test deterministic: "auto" boosts the field's most offensive
+    -- netrunner and its best defender in the next race with hacking allowed; "off" leaves every racer as they are.
+    hackEnabled = { value = true, type = "boolean", apply = "live" },
+    hackModelEnabled = { value = true, type = "boolean", apply = "live" },
+    hackTest = { value = "auto", type = "string", apply = "live" },
+    hackModelEverySec = { value = 5, type = "integer", min = 1, max = 60, unit = "s", apply = "live" },
 })
 if not ok then print("[ncm_paddock/settings] tunables.declare FAILED: " .. tostring(settings)) settings = nil end
 PaddockSettings.proxy = settings

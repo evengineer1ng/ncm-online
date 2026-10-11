@@ -1,0 +1,302 @@
+[
+ {
+  "name": "hero",
+  "kind": "wide",
+  "png": "C:\\Users\\eveng\\Documents\\cyberpunk2077\\ncm\\ncwe\\art\\city\\rw_city_hero.png",
+  "w": 8.4,
+  "h": 2.6906,
+  "aspect": 3.122,
+  "asset": "ncwe\\custom\\rw_city_hero_0a72e3\\rw_city_hero_0a72e3.mesh",
+  "mesh_id": "rw_city_hero_0a72e3"
+ },
+ {
+  "name": "drivers",
+  "kind": "poster",
+  "png": "C:\\Users\\eveng\\Documents\\cyberpunk2077\\ncm\\ncwe\\art\\city\\rw_city_drivers.png",
+  "w": 3.0,
+  "h": 4.7578,
+  "aspect": 0.631,
+  "asset": "ncwe\\custom\\rw_city_drivers_991fd1\\rw_city_drivers_991fd1.mesh",
+  "mesh_id": "rw_city_drivers_991fd1"
+ },
+ {
+  "name": "ncm_poster",
+  "kind": "poster",
+  "png": "C:\\Users\\eveng\\Documents\\cyberpunk2077\\ncm\\ncwe\\art\\city\\rw_city_ncm_poster.png",
+  "w": 3.0,
+  "h": 4.8662,
+  "aspect": 0.616,
+  "asset": "ncwe\\custom\\rw_city_ncm_poster_9a4c7a\\rw_city_ncm_poster_9a4c7a.mesh",
+  "mesh_id": "rw_city_ncm_poster_9a4c7a"
+ },
+ {
+  "name": "quadra",
+  "kind": "wide",
+  "png": "C:\\Users\\eveng\\Documents\\cyberpunk2077\\ncm\\ncwe\\art\\city\\rw_city_quadra.png",
+  "w": 8.4,
+  "h": 2.9613,
+  "aspect": 2.837,
+  "asset": "ncwe\\custom\\rw_city_quadra_8ca0c8\\rw_city_quadra_8ca0c8.mesh",
+  "mesh_id": "rw_city_quadra_8ca0c8"
+ },
+ {
+  "name": "nodes",
+  "kind": "wide",
+  "png": "C:\\Users\\eveng\\Documents\\cyberpunk2077\\ncm\\ncwe\\art\\city\\rw_city_nodes.png",
+  "w": 8.4,
+  "h": 3.2361,
+  "aspect": 2.596,
+  "asset": "ncwe\\custom\\rw_city_nodes_558cb5\\rw_city_nodes_558cb5.mesh",
+  "mesh_id": "rw_city_nodes_558cb5"
+ },
+ {
+  "name": "streets",
+  "kind": "wide",
+  "png": "C:\\Users\\eveng\\Documents\\cyberpunk2077\\ncm\\ncwe\\art\\city\\rw_city_streets.png",
+  "w": 8.4,
+  "h": 3.3592,
+  "aspect": 2.501,
+  "asset": "ncwe\\custom\\rw_city_streets_969325\\rw_city_streets_969325.mesh",
+  "mesh_id": "rw_city_streets_969325"
+ },
+ {
+  "name": "mizutani",
+  "kind": "wide",
+  "png": "C:\\Users\\eveng\\Documents\\cyberpunk2077\\ncm\\ncwe\\art\\city\\rw_city_mizutani.png",
+  "w": 8.4,
+  "h": 3.6955,
+  "aspect": 2.273,
+  "asset": "ncwe\\custom\\rw_city_mizutani_800a67\\rw_city_mizutani_800a67.mesh",
+  "mesh_id": "rw_city_mizutani_800a67"
+ },
+ {
+  "name": "kusanagi",
+  "kind": "wide",
+  "png": "C:\\Users\\eveng\\Documents\\cyberpunk2077\\ncm\\ncwe\\art\\city\\rw_city_kusanagi.png",
+  "w": 8.4,
+  "h": 2.8875,
+  "aspect": 2.909,
+  "asset": "ncwe\\custom\\rw_city_kusanagi_cc89da\\rw_city_kusanagi_cc89da.mesh",
+  "mesh_id": "rw_city_kusanagi_cc89da"
+ },
+ {
+  "name": "orbital",
+  "kind": "wide",
+  "png": "C:\\Users\\eveng\\Documents\\cyberpunk2077\\ncm\\ncwe\\art\\city\\rw_city_orbital.png",
+  "w": 8.4,
+  "h": 3.2771,
+  "aspect": 2.563,
+  "asset": "ncwe\\custom\\rw_city_orbital_a6e696\\rw_city_orbital_a6e696.mesh",
+  "mesh_id": "rw_city_orbital_a6e696"
+ },
+ {
+  "name": "arasaka",
+  "kind": "wide",
+  "png": "C:\\Users\\eveng\\Documents\\cyberpunk2077\\ncm\\ncwe\\art\\city\\rw_city_arasaka.png",
+  "w": 8.4,
+  "h": 3.1582,
+  "aspect": 2.66,
+  "asset": "ncwe\\custom\\rw_city_arasaka_49d06a\\rw_city_arasaka_49d06a.mesh",
+  "mesh_id": "rw_city_arasaka_49d06a"
+ },
+ {
+  "name": "samurai",
+  "kind": "wide",
+  "png": "C:\\Users\\eveng\\Documents\\cyberpunk2077\\ncm\\ncwe\\art\\city\\rw_city_samurai.png",
+  "w": 8.4,
+  "h": 3.8514,
+  "aspect": 2.181,
+  "asset": "ncwe\\custom\\rw_city_samurai_ba0d78\\rw_city_samurai_ba0d78.mesh",
+  "mesh_id": "rw_city_samurai_ba0d78"
+ },
+ {
+  "name": "welcome",
+  "kind": "wide",
+  "png": "C:\\Users\\eveng\\Documents\\cyberpunk2077\\ncm\\ncwe\\art\\city\\rw_city_welcome.png",
+  "w": 8.4,
+  "h": 2.8506,
+  "aspect": 2.947,
+  "asset": "ncwe\\custom\\rw_city_welcome_04ceb4\\rw_city_welcome_04ceb4.mesh",
+  "mesh_id": "rw_city_welcome_04ceb4"
+ },
+ {
+  "name": "nihongo",
+  "kind": "wide",
+  "png": "C:\\Users\\eveng\\Documents\\cyberpunk2077\\ncm\\ncwe\\art\\city\\rw_city_nihongo.png",
+  "w": 8.4,
+  "h": 3.027,
+  "aspect": 2.775,
+  "asset": "ncwe\\custom\\rw_city_nihongo_eb63f1\\rw_city_nihongo_eb63f1.mesh",
+  "mesh_id": "rw_city_nihongo_eb63f1"
+ },
+ {
+  "name": "helmet",
+  "kind": "wide",
+  "png": "C:\\Users\\eveng\\Documents\\cyberpunk2077\\ncm\\ncwe\\art\\city\\rw_city_helmet.png",
+  "w": 8.4,
+  "h": 3.2648,
+  "aspect": 2.573,
+  "asset": "ncwe\\custom\\rw_city_helmet_1b4c24\\rw_city_helmet_1b4c24.mesh",
+  "mesh_id": "rw_city_helmet_1b4c24"
+ },
+ {
+  "name": "all_eyes",
+  "kind": "wide",
+  "png": "C:\\Users\\eveng\\Documents\\cyberpunk2077\\ncm\\ncwe\\art\\city\\rw_city_all_eyes.png",
+  "w": 8.4,
+  "h": 2.9654,
+  "aspect": 2.833,
+  "asset": "ncwe\\custom\\rw_city_all_eyes_409ddf\\rw_city_all_eyes_409ddf.mesh",
+  "mesh_id": "rw_city_all_eyes_409ddf"
+ },
+ {
+  "name": "badlands",
+  "kind": "wide",
+  "png": "C:\\Users\\eveng\\Documents\\cyberpunk2077\\ncm\\ncwe\\art\\city\\rw_city_badlands.png",
+  "w": 8.4,
+  "h": 2.4363,
+  "aspect": 3.448,
+  "asset": "ncwe\\custom\\rw_city_badlands_b63150\\rw_city_badlands_b63150.mesh",
+  "mesh_id": "rw_city_badlands_b63150"
+ },
+ {
+  "name": "obsession",
+  "kind": "wide",
+  "png": "C:\\Users\\eveng\\Documents\\cyberpunk2077\\ncm\\ncwe\\art\\city\\rw_city_obsession.png",
+  "w": 8.4,
+  "h": 3.0229,
+  "aspect": 2.779,
+  "asset": "ncwe\\custom\\rw_city_obsession_80a89b\\rw_city_obsession_80a89b.mesh",
+  "mesh_id": "rw_city_obsession_80a89b"
+ },
+ {
+  "name": "skyline",
+  "kind": "wide",
+  "png": "C:\\Users\\eveng\\Documents\\cyberpunk2077\\ncm\\ncwe\\art\\city\\rw_city_skyline.png",
+  "w": 8.4,
+  "h": 1.4191,
+  "aspect": 5.919,
+  "asset": "ncwe\\custom\\rw_city_skyline_2f36fe\\rw_city_skyline_2f36fe.mesh",
+  "mesh_id": "rw_city_skyline_2f36fe"
+ },
+ {
+  "name": "pole_ncm",
+  "kind": "pole",
+  "png": "C:\\Users\\eveng\\Documents\\cyberpunk2077\\ncm\\ncwe\\art\\city\\rw_city_pole_ncm.png",
+  "w": 1.0,
+  "h": 2.5,
+  "aspect": 0.4,
+  "asset": "ncwe\\custom\\rw_city_pole_ncm_b8af5c\\rw_city_pole_ncm_b8af5c.mesh",
+  "mesh_id": "rw_city_pole_ncm_b8af5c"
+ },
+ {
+  "name": "pole_kanji",
+  "kind": "pole",
+  "png": "C:\\Users\\eveng\\Documents\\cyberpunk2077\\ncm\\ncwe\\art\\city\\rw_city_pole_kanji.png",
+  "w": 1.0,
+  "h": 2.4395,
+  "aspect": 0.41,
+  "asset": "ncwe\\custom\\rw_city_pole_kanji_9a8bdb\\rw_city_pole_kanji_9a8bdb.mesh",
+  "mesh_id": "rw_city_pole_kanji_9a8bdb"
+ },
+ {
+  "name": "pole_check",
+  "kind": "pole",
+  "png": "C:\\Users\\eveng\\Documents\\cyberpunk2077\\ncm\\ncwe\\art\\city\\rw_city_pole_check.png",
+  "w": 1.0,
+  "h": 2.3262,
+  "aspect": 0.43,
+  "asset": "ncwe\\custom\\rw_city_pole_check_646975\\rw_city_pole_check_646975.mesh",
+  "mesh_id": "rw_city_pole_check_646975"
+ },
+ {
+  "name": "pole_palm",
+  "kind": "pole",
+  "png": "C:\\Users\\eveng\\Documents\\cyberpunk2077\\ncm\\ncwe\\art\\city\\rw_city_pole_palm.png",
+  "w": 1.0,
+  "h": 2.3262,
+  "aspect": 0.43,
+  "asset": "ncwe\\custom\\rw_city_pole_palm_1267ee\\rw_city_pole_palm_1267ee.mesh",
+  "mesh_id": "rw_city_pole_palm_1267ee"
+ },
+ {
+  "name": "pole_oni",
+  "kind": "pole",
+  "png": "C:\\Users\\eveng\\Documents\\cyberpunk2077\\ncm\\ncwe\\art\\city\\rw_city_pole_oni.png",
+  "w": 1.0,
+  "h": 2.3262,
+  "aspect": 0.43,
+  "asset": "ncwe\\custom\\rw_city_pole_oni_705877\\rw_city_pole_oni_705877.mesh",
+  "mesh_id": "rw_city_pole_oni_705877"
+ },
+ {
+  "name": "pole_nodes",
+  "kind": "pole",
+  "png": "C:\\Users\\eveng\\Documents\\cyberpunk2077\\ncm\\ncwe\\art\\city\\rw_city_pole_nodes.png",
+  "w": 1.0,
+  "h": 2.3262,
+  "aspect": 0.43,
+  "asset": "ncwe\\custom\\rw_city_pole_nodes_74a0fc\\rw_city_pole_nodes_74a0fc.mesh",
+  "mesh_id": "rw_city_pole_nodes_74a0fc"
+ },
+ {
+  "name": "pole_yellow",
+  "kind": "pole",
+  "png": "C:\\Users\\eveng\\Documents\\cyberpunk2077\\ncm\\ncwe\\art\\city\\rw_city_pole_yellow.png",
+  "w": 1.0,
+  "h": 2.3262,
+  "aspect": 0.43,
+  "asset": "ncwe\\custom\\rw_city_pole_yellow_84907b\\rw_city_pole_yellow_84907b.mesh",
+  "mesh_id": "rw_city_pole_yellow_84907b"
+ },
+ {
+  "name": "pole_rider",
+  "kind": "pole",
+  "png": "C:\\Users\\eveng\\Documents\\cyberpunk2077\\ncm\\ncwe\\art\\city\\rw_city_pole_rider.png",
+  "w": 1.0,
+  "h": 2.3262,
+  "aspect": 0.43,
+  "asset": "ncwe\\custom\\rw_city_pole_rider_50bbc9\\rw_city_pole_rider_50bbc9.mesh",
+  "mesh_id": "rw_city_pole_rider_50bbc9"
+ },
+ {
+  "name": "sq_car",
+  "kind": "square",
+  "png": "C:\\Users\\eveng\\Documents\\cyberpunk2077\\ncm\\ncwe\\art\\city\\rw_city_sq_car.png",
+  "w": 2.0,
+  "h": 2.1289,
+  "aspect": 0.939,
+  "asset": "ncwe\\custom\\rw_city_sq_car_4f80d9\\rw_city_sq_car_4f80d9.mesh",
+  "mesh_id": "rw_city_sq_car_4f80d9"
+ },
+ {
+  "name": "sq_moves",
+  "kind": "square",
+  "png": "C:\\Users\\eveng\\Documents\\cyberpunk2077\\ncm\\ncwe\\art\\city\\rw_city_sq_moves.png",
+  "w": 2.0,
+  "h": 1.9648,
+  "aspect": 1.018,
+  "asset": "ncwe\\custom\\rw_city_sq_moves_9dd28c\\rw_city_sq_moves_9dd28c.mesh",
+  "mesh_id": "rw_city_sq_moves_9dd28c"
+ },
+ {
+  "name": "sq_rider",
+  "kind": "square",
+  "png": "C:\\Users\\eveng\\Documents\\cyberpunk2077\\ncm\\ncwe\\art\\city\\rw_city_sq_rider.png",
+  "w": 2.0,
+  "h": 1.9824,
+  "aspect": 1.009,
+  "asset": "ncwe\\custom\\rw_city_sq_rider_8469e6\\rw_city_sq_rider_8469e6.mesh",
+  "mesh_id": "rw_city_sq_rider_8469e6"
+ },
+ {
+  "name": "sq_nodes",
+  "kind": "square",
+  "png": "C:\\Users\\eveng\\Documents\\cyberpunk2077\\ncm\\ncwe\\art\\city\\rw_city_sq_nodes.png",
+  "w": 2.0,
+  "h": 1.9492,
+  "aspect": 1.026,
+  "asset": "ncwe\\custom\\rw_city_sq_nodes_1c3e42\\rw_city_sq_nodes_1c3e42.mesh",
+  "mesh_id": "rw_city_sq_nodes_1c3e42"
+ }
+]

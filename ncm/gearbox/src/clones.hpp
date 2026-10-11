@@ -35,8 +35,11 @@ void dumpModel(const std::string& vehicleRecord);
 /// a refused clone keeps the model's engine data, i.e. drives exactly like the automatic.
 bool buildClone(const CloneSpec& clone, bool reverseFirst, double gearHeadroom);
 
-/// 0.3.0, THE BAND: repoint a clone's long native gear `.maxSpeed` (m/s) and re-read the record, live. `.minSpeed`
-/// is never touched: it is a FLOOR the engine pushes the car up to (Carrier tweak.cpp). True when the write landed.
-bool retuneLongGear(uint64_t gearId, float maxSpeedMps, float minRpm, float maxRpm);
+/// The number of native gears a manual clone carries (0.4.0).
+constexpr int kSlices = 7;
+
+/// 0.4.0, THE SLICES: repoint one native gear's band (min/max speed m/s, rpm window, torque multiplier) and re-read the
+/// record, live. Never touches the live gearbox state (KB-330). True when the writes landed.
+bool retuneSlice(uint64_t gearId, float minSpeedMps, float maxSpeedMps, float minRpm, float maxRpm, float torque);
 
 }  // namespace ncm::gearbox

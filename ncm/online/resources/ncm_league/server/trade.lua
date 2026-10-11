@@ -104,6 +104,9 @@ local function hydrateSide(t,key)
           WHERE server_id=? AND asset_id=?]],{sid(),assetId})
         if not r or r.ncm_driver_id~=from then return nil,"machine_not_owned:"..tostring(assetId) end
         if materialized[assetId] then return nil,"store_machine_first:"..tostring(assetId) end
+        local cargo=tonumber(MySQL.scalar.await([[SELECT COUNT(*) FROM component_asset WHERE server_id=?
+          AND machine_asset_id=? AND location_kind='trunk']],{sid(),assetId})) or 0
+        if cargo>0 then return nil,"unload_trunk_before_trade:"..tostring(assetId) end
         local committed=tonumber(MySQL.scalar.await([[SELECT COUNT(*) FROM entry WHERE asset_id=? AND
           state IN ('checked_in','provisioned','gridded','racing','suspended','substituted')]],{assetId})) or 0
         if committed>0 then return nil,"machine_committed:"..tostring(assetId) end

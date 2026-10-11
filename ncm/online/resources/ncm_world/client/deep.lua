@@ -32,7 +32,8 @@ local KSA = { consent = nil, ask = false, activating = false, ready = false, why
 local TARGETS = nil
 local function targets()
     if not TARGETS then
-        TARGETS = { Guid.BORDER }
+        -- L351/L352: KSA is retired from the player path; the border is no longer a Guidance target
+        TARGETS = {}
         for _, v in ipairs(Venues.VENUES) do TARGETS[#TARGETS + 1] = v end
     end
     return TARGETS
@@ -60,7 +61,8 @@ local GD                        -- the guidance computer (below); exit() resets 
 local samples = {}              -- recent { t, x, y, z } of the car, for a velocity at the handoff
 local rig = true
 local camMode = 1
-local CAM_NAMES = { "chase", "high", "earth" }
+-- L352: "native" first -- the car in the game's own world (client/deepview.lua); the WebGL views stay for scale
+local CAM_NAMES = { "native", "chase", "high", "earth" }
 
 NcmClientDeepActive = false
 
@@ -191,7 +193,7 @@ local function enter(vid, pos, why, resumeRec)
     else
         if ASC and ASC.page then pcall(function() ASC.page:destroy() end); ASC = nil end
         ok, page, reason = pcall(Open77.webui.create, { entry = "web/deep.html", layer = "hud", zIndex = 950,
-            transparent = false, visible = true, fps = 60 })
+            transparent = true, visible = true, fps = 60 })   -- L352: the native view shows through it
     end
     if not ok or not page then log("could not open the deep surface (%s %s): staying in Night City", tostring(page), tostring(reason)); return end
     if not seamless then watchPage(page) end
@@ -223,6 +225,16 @@ local function enter(vid, pos, why, resumeRec)
     checkpoint("deep", true)
     log("ENTER (%s) at game (%.0f, %.0f, %.0f) v (%.1f, %.1f, %.1f) m/s | mass %.0f kg | devices %d",
         why, pos.x, pos.y, pos.z, vx, vy, vz, A.mass, EN and #EN.devices or 0)
+    do   -- KB-437: the Machine as it crosses -- tanks, heat, and which control drives which part
+        local d, b = {}, {}
+        for _, x in ipairs(EN and EN.devices or {}) do
+            local st = EN.state and EN.state.dev and EN.state.dev[x.componentId] or {}
+            d[#d + 1] = ("%s %s ..%s %.0f K%s"):format(x.code, x.kind, tostring(x.componentId):sub(-6), st.heatK or 0, st.hot and " HOT" or "")
+        end
+        for _, x in ipairs(EN and EN.bindings or {}) do b[#b + 1] = ("%s:%s->..%s.%s"):format(x.control, x.gesture, tostring(x.componentId):sub(-6), x.command) end
+        log("ENTER Machine: fuel %.1f kg fusion %.1f kg | %s | controls %s", EN and EN.fuelKg or 0, EN and EN.fusionKg or 0,
+            #d > 0 and table.concat(d, " | ") or "no devices", #b > 0 and table.concat(b, ", ") or "none")
+    end
 end
 
 local function exit(why, home)
@@ -245,6 +257,7 @@ local function exit(why, home)
     local yaw = math.deg((math.atan2 or math.atan)(-fEnu[1], fEnu[2]))
     local landKm = Deep.distance(lat, lon, Deep.ORIGIN.lat, Deep.ORIGIN.lon) / 1000
     send("deep:leave", {})
+    if NcmDeepView then pcall(NcmDeepView.clear) end
     TriggerServerEvent("ncm:deep.exit", { x = x, y = y, z = math.min(alt, cfg.exitZ), yaw = yaw, clamped = clamped, landKm = landKm, why = why })
     log("EXIT (%s) at %.4f, %.4f alt %.0f -> game (%.0f, %.0f)%s, %.1f km from Night City | v ENU (%.1f, %.1f, %.1f) | %.0f s out",
         why, lat, lon, alt, x, y, clamped and " CLAMPED" or "", landKm, vEnu[1], vEnu[2], vEnu[3], (ms() - A.startedAt) / 1000)
@@ -704,6 +717,8 @@ local function ksaPreflight()
         add(okB, "Delta-v to the border", ("%.0f km/s needed, %.0f available (%s)"):format(need / 1000, have / 1000, prop))
         local okP = Flight.canPoint(A.fm, NcmClientDevAttitude == true)
         add(okP, "Attitude authority", Flight.authorityText(A.fm))
+        local okT, twT, whyT = Guid.trimFeasible(A.fm, A.mass)
+        add(okT, "Thrust line", okT and "through the centre of mass, or trimmed" or tostring(whyT))
     end
     return allOk, list
 end
@@ -813,6 +828,7 @@ local function guidanceInput(now, dt)
                 local EN = NcmClientEngineering and NcmClientEngineering.get() or nil
                 local sus = Guid.thrustBudget(EN and EN.devices or {}, nil, NcmClientDevHeat)
                 local okF, tw, why = Guid.feasible(sus, A.mass)
+                if okF and A.fm then okF, tw, why = Guid.trimFeasible(A.fm, A.mass) end   -- KB-442: a thrust line off the centre of mass
                 if not okF then
                     GD.msg = ("Guidance cannot fly this Machine to %s: %s."):format(targets()[GD.sel].name, why)
                     log("GUIDANCE refused -> %s: %s", targets()[GD.sel].id, why)
@@ -938,6 +954,11 @@ local function tick()
     if EN and #devs > 0 then
         local pressed = {}
         for _, c in ipairs(EN.controls) do pressed[c] = down(c) end
+        -- KB-437: what the controls did, for the once-a-second line and the HUD (the 2026-10-10 stay had zero thrust
+        -- for 22 s and nothing said why)
+        local okC, cap = pcall(Open77.input.isCaptured)
+        A.captured = okC and cap == true
+        for c, d in pairs(pressed) do if d then A.pressedSeen = A.pressedSeen or {}; A.pressedSeen[c] = true end end
         local cmds = Controls.step(EN.ctl, EN.bindings, EN.devices, pressed, now)
         if GD.hold then for _, c in pairs(pressed) do if c then GD.hold, GD.route = nil, nil; GD.msg = "You have the Machine." break end end end
         for id, c in pairs(cmds) do
@@ -1000,6 +1021,11 @@ local function tick()
     A.dtMax = math.max(A.dtMax or 0, dt)   -- KB-376: the longest physics step this second (telemetry)
     ds, tel = Flight.step(m, ds, cmd, dt, opts)
     A.dyn = ds
+    A.ev = A.ev or {}
+    for _, ev in ipairs(tel.events or {}) do
+        local k = tostring(ev.device) .. ":" .. tostring(ev.what)
+        A.ev[k] = (A.ev[k] or 0) + 1
+    end
     if EN and not opts.devFuel then
         local usedF = math.max(0, (A.fusion0 or 0) - Dyn.propellantLeft(m, ds, "fusion"))
         EN.fusionKg = math.max(0, (EN.fusionKg or 0) - usedF)
@@ -1017,10 +1043,19 @@ local function tick()
             parts[#parts + 1] = d.kind == "pulse_reaction" and ((d.perf.code or d.key or "IA") .. ((ds.pulse and (ds.pulse[i] or 0) > 0) and " FIRING" or ""))
                 or ("%s %.0f%%%s"):format(tostring(d.key):sub(1, 8), ((ds.thr and ds.thr[i]) or 0) * 100, st.hot and " HOT" or "")
         end
+        local boundIds = {}
+        for _, x in ipairs(EN and EN.bindings or {}) do boundIds[tostring(x.componentId)] = true end
+        for i, md in ipairs(m.devices) do
+            local evs = A.evShown or {}
+            if (evs[tostring(md.key) .. ":starved"] or 0) > 0 then parts[i] = parts[i] .. " NO FUEL" end
+            if (evs[tostring(md.key) .. ":no_energy"] or 0) > 0 then parts[i] = parts[i] .. " NO ENERGY" end
+            if md.kind ~= "propellant_tank" and md.componentId and not boundIds[tostring(md.componentId)]
+                and (md.kind == "reaction_engine" or md.kind == "pulse_reaction") then parts[i] = parts[i] .. " NO CONTROL" end
+        end
         for _, d in ipairs(devs) do
             for i, md in ipairs(m.devices) do if md.componentId == d.componentId then parts[i] = parts[i]:gsub("^[^ ]+", d.code) end end
         end
-        devText = table.concat(parts, " | ")
+        devText = (A.captured and "CONTROLS BLOCKED (input captured) | " or "") .. table.concat(parts, " | ")
     elseif GD.engaged then
         GD.engaged, GD.msg = false, "Guidance cannot fly this Machine: it has no installed propulsion."
     end
@@ -1044,6 +1079,12 @@ local function tick()
         end
     end
     geoTick(A.page, A.s, now, GD.route and GD.route.venue and { lat = GD.route.venue.lat, lon = GD.route.venue.lon } or nil)
+    -- L352: what REDengine shows -- the held car in its stage, the bodies at their true angular size (guarded: a view
+    -- problem never ends a flight)
+    if NcmDeepView then
+        local okV, errV = pcall(NcmDeepView.update, A.s, utcNow(), now)
+        if not okV and not A.viewErr then A.viewErr = true; log("native view skipped: %s", tostring(errV)) end
+    end
     if now - A.lastSend >= 33 then
         A.lastSend = now
         local sel = targets()[GD.sel]
@@ -1082,9 +1123,21 @@ local function tick()
     if now - A.lastTele >= 1000 then
         checkpoint("deep", false)
         A.lastTele = now
+        do
+            local evs = {}
+            for k, n in pairs(A.ev or {}) do if not k:find(":fired$") then evs[#evs + 1] = ("%s x%d"):format(k, n) end end
+            table.sort(evs)
+            local pr = {}
+            for c in pairs(A.pressedSeen or {}) do pr[#pr + 1] = c end
+            table.sort(pr)
+            log("STAY t+%.0fs alt %.0f vz %.1f | thrust %.1f kN | fuel %.1f kg fusion %.1f kg | %s | pressed %s%s | events %s",
+                (now - A.startedAt) / 1000, alt, vs, (A.thrustN or 0) / 1000, EN and EN.fuelKg or 0, EN and EN.fusionKg or 0, devText,
+                #pr > 0 and table.concat(pr, ",") or "none", A.captured and " (INPUT CAPTURED)" or "", #evs > 0 and table.concat(evs, ", ") or "none")
+            A.evShown, A.ev, A.pressedSeen = A.ev or {}, {}, nil
+        end
         local ncKm = Deep.distance(lat, lon, Deep.ORIGIN.lat, Deep.ORIGIN.lon) / 1000
         TriggerServerEvent("ncm:deep.telemetry", { alt = alt, speed = speed, hspeed = hs, vspeed = vs, orbit = Deep.orbitSpeed(alt),
-            lat = lat, lon = lon, ncKm = ncKm, landing = A.impact, fuelKg = EN and EN.fuelKg or 0, thrust = A.thrustN, rig = rig,
+            lat = lat, lon = lon, ncKm = ncKm, landing = A.impact, fuelKg = EN and EN.fuelKg or 0, thrust = A.thrustN, rig = rig and NcmClientDevAttitude == true,   -- the waiver as APPLIED (Online never applies it)
             -- KB-376: how the Machine is pointing (alignment of its thrust with what Guidance wants, spin rate) and how the
             -- frames ran -- the live climb fell in bursts the simulation never shows
             devices = devText, guidance = gcmd and ("%s -> %s %.0f km eta %.0f s throttle %.2f | align %.2f spin %.2f rad/s | dt max %.0f ms skipped %d"):format(

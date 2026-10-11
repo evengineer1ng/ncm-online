@@ -105,6 +105,13 @@ Core.define("engineering.systems", function(C)
             required = { o2Kg = "suit oxygen (kg)" },
             optional = { packThrustN = "EVA pack thrust (N)", packN2Kg = "EVA pack propellant (kg)", packIspS = "EVA pack Isp (s)" },
         },
+        -- L356: a wake system reads another vehicle's aerodynamic wake (aero.wake) and actively exploits it
+        -- (aero.slipstream). It pushes nothing itself: its effect is drag the Machine no longer meets.
+        wake_system = {
+            required = { reliefMax = "active drag relief at a perfect wake and full lock (share of drag, 0..1)",
+                powerW = "electrical draw while running (W)" },
+            optional = { lockPerS = "lock gained per second at a perfect wake", acquireQ = "wake quality it starts to lock from (0..1)" },
+        },
     }
 
     --- L324: what a component of each kind can be TOLD to do. A command is the component's own input -- never a
@@ -116,6 +123,8 @@ Core.define("engineering.systems", function(C)
         propeller = { throttle = { type = "analog", desc = "fraction of full thrust (0..1)" } },
         pulse_reaction = { discharge = { type = "event", desc = "one stroke: forceN for pulseS" } },
         ground_ram = { discharge = { type = "event", desc = "one ram stroke against the ground" } },
+        -- stacked gearboxes: a box on a side mount drives only once engaged (engage it again to return to the car's box)
+        gearbox = { engage = { type = "event", desc = "make this box's path the one that drives (again: back to the car's own box)" } },
     }
     function M.commands(kind) return M.COMMANDS[kind] or {} end
 

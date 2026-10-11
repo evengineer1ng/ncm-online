@@ -416,6 +416,9 @@
     .vehicle-unknown { font:800 34px/1 var(--mono); letter-spacing:.16em; margin-top:27px; }
     .vehicle-owned { position:absolute; top:10px; right:10px; color:var(--ok); font:700 10px/1 var(--mono); letter-spacing:.1em; }
     .vehicle-dossier { border:1px solid var(--line); background:rgba(3,11,20,.8); padding:22px; overflow:auto; }
+    .repair-scalar { font:700 13px/1.4 var(--mono); padding:4px 0; }
+    .repair-scalar.good { color:var(--ok); }
+    .repair-scalar.bad { color:var(--red); }
     .dossier-silhouette { height:210px; margin:18px 0; border:1px solid var(--line); display:grid; place-items:center; color:var(--accent); font-size:72px; background:radial-gradient(circle at 50% 60%,rgba(34,216,226,.15),transparent 58%); }
     .dossier-label { font:700 11px/1 var(--mono); color:var(--dim); letter-spacing:.14em; text-transform:uppercase; margin-top:16px; }
     .dossier-value { font-size:20px; margin-top:5px; }
@@ -527,13 +530,11 @@
     body:not([data-ncm-input="mouse"]) .ncm-focused { background: rgba(34,216,226,.10); }
 
     /* ===== SESSION LANDING PANEL ========================================================== */
-    /* Owner, 2026-09-29: "quite ugly and dense, needs to be constrained". What's new and the changelog only;
-       the progression notice and the capability list were removed (the list went stale faster than it was
-       edited). A narrow centred column, not a full-screen wall. */
-    #landing { display: flex; flex-direction: column; gap: 14px; width: min(760px, 100%); max-height: 82vh;
+    /* Permanent player orientation: quick start first, controls second, optional tips last. */
+    #landing { display: flex; flex-direction: column; gap: 12px; width: min(1120px, 100%); max-height: 90vh;
       margin: 0 auto; box-sizing: border-box; }
     #landing.hidden { display: none; }
-    .landing-head h1 { margin: 4px 0 2px; font-size: 40px; }
+    .landing-head h1 { margin: 4px 0 2px; font-size: 38px; }
 
     .landing-new { margin-top: 6px; }
     .landing-new .row { padding: 6px 0; border-bottom: 1px solid var(--line); }
@@ -574,6 +575,26 @@
     .landing-go .key { font: 700 10px/1 var(--mono); letter-spacing: .08em; padding: 3px 6px;
       background: rgba(0,0,0,.28); border: 1px solid rgba(0,0,0,.35); }
     .landing-go:hover { background: #4ee6ee; }
+    .landing-steps { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; }
+    .landing-step { min-height:150px; padding:16px 15px; border:1px solid rgba(34,216,226,.42); background:linear-gradient(145deg,rgba(34,216,226,.12),rgba(255,255,255,.025)); }
+    .landing-step .num { color:var(--accent); font:800 13px/1 var(--mono); letter-spacing:.12em; }
+    .landing-step h2 { margin:12px 0 7px; font:800 21px/1 var(--display); letter-spacing:.04em; }
+    .landing-step p { margin:0; color:var(--text); font-size:14px; line-height:1.42; }
+    .landing-step i { display:block; margin-top:7px; color:var(--dim); font-size:12px; line-height:1.4; }
+    .landing-controls { padding:10px 12px; border:1px solid var(--line); background:rgba(0,0,0,.2); }
+    .landing-controls .eyebrow { margin-bottom:8px; }
+    .landing-control-row { display:flex; flex-wrap:wrap; gap:7px; }
+    .landing-control { padding:7px 10px; border-left:2px solid var(--accent); background:rgba(255,255,255,.035); font:600 11px/1.3 var(--mono); }
+    .landing-control b { color:var(--accent); }
+    .landing-tip { display:flex; align-items:center; gap:12px; min-height:38px; padding:0 2px; }
+    .landing-tip .eyebrow { flex:none; color:var(--accent); }
+    #landingTipText { color:var(--text); font-size:12px; }
+    .landing-patch { border:0; padding:0; color:var(--dim); background:none; cursor:pointer; text-decoration:underline; font:600 10px/1.3 var(--mono); }
+    .landing-patch:hover { color:var(--accent); }
+    #landingLog { max-height:30vh; overflow:auto; }
+    #landingLog.hidden { display:none; }
+    @media(max-width:850px) { .landing-steps { grid-template-columns:repeat(2,minmax(0,1fr)); } .landing-step { min-height:120px; } }
+    @media(max-width:540px) { #landing { max-height:94vh; overflow:auto; } .landing-steps { grid-template-columns:1fr; } .landing-step { min-height:0; } }
 
     /* THE PADDOCK (doc 44): the NPC motorsport world. pd- prefix; reuses the shell's tokens. */
     /* THE PADDOCK: the MARKET frame (1820 x 960) -- a section rail, the list, and a detail pane beside it. */
@@ -686,7 +707,7 @@
     <div id="collection" class="card hidden">
       <div class="close">ESC · close</div>
       <div class="collection-head"><div><div class="eyebrow">Night City Motorsports</div><h1 id="collectionTitle">Machine Index</h1><div class="sub">What you have learned. What you own. What the evidence can honestly say.</div></div><div class="collection-count" id="collectionCount"></div></div>
-      <div class="collection-tabs"><button id="machinesTab" class="active">MACHINES</button><button id="partsTab">PARTS INVENTORY</button></div>
+      <div class="collection-tabs"><button id="machinesTab" class="active">MACHINES</button><button id="partsTab" class="hidden" title="Parts moved to the Engineering panel (F9)">PARTS INVENTORY</button></div>
       <div class="collection-layout"><div class="collection-wall" id="collectionWall"></div><aside class="vehicle-dossier" id="collectionDetail"></aside></div>
       <div class="ncm-bottom" id="collectionNav"></div>
     </div>
@@ -741,20 +762,24 @@
          mouse/keyboard/gamepad parity -- the changelog is the hard case, so it is the one worth proving. -->
     <div id="landing" class="card hidden">
       <div class="landing-head">
-        <div class="eyebrow">NCM ONLINE // ALPHA</div>
-        <h1>What's new</h1>
-        <div class="sub" id="landingSub"></div>
+        <div class="eyebrow">NIGHT CITY MOTORSPORTS // ONLINE RACING</div>
+        <h1>HOW TO PLAY NCM</h1>
+        <div class="sub">Your first race is four steps away.</div>
       </div>
-
-      <section class="landing-new" id="landingNew" aria-label="Latest release"></section>
-
-      <section class="landing-log">
-        <div class="eyebrow">Changelog</div>
-        <div class="landing-scroll" id="landingScroll" tabindex="-1"></div>
+      <section class="landing-steps" aria-label="Quick start">
+        <article class="landing-step"><div class="num">01</div><h2>OPEN NCM</h2><p>Open the NCM Menu with F6 and buy a base car from the Market.</p><i>You can upgrade, trade and build from there.</i></article>
+        <article class="landing-step"><div class="num">02</div><h2>GET YOUR CAR</h2><p>Go to Machine Index and call a car you own.</p><i>It tracks your machines, ownership and what you have learned about them.</i></article>
+        <article class="landing-step"><div class="num">03</div><h2>FIND A RACE</h2><p>Use Race Guide to find an event that interests you.</p><i>Races cross Night City, with different routes, fields, entry fees and payouts.</i></article>
+        <article class="landing-step"><div class="num">04</div><h2>GO RACING</h2><p>Travel to the race node, enter, grid up and race.</p><i>Racing alone? NPC racers fill the grid around event start time.</i></article>
       </section>
+      <section class="landing-controls" aria-label="NCM controls"><div class="eyebrow">NCM CONTROLS</div><div class="landing-control-row">
+        <div class="landing-control"><b>F6 / PAD START</b> · NCM Menu</div><div class="landing-control"><b>F5</b> · Custom Race</div><div class="landing-control"><b>F9</b> · Engineering</div><div class="landing-control"><b>F10</b> · Machine Index</div><div class="landing-control"><b>F8</b> · Race Graph</div><div class="landing-control"><b>F7</b> · Grid Snap (at grid)</div>
+      </div><div class="landing-hint" style="margin-top:7px">CONTROLLER · Start opens NCM Menu · D-pad navigates · Confirm selects · Back closes</div></section>
+      <section class="landing-tip"><span class="eyebrow">TIPS & TRICKS</span><span id="landingTipText" aria-live="polite"></span><button id="tipPrev" class="landing-patch" aria-label="Previous tip">‹</button><button id="tipNext" class="landing-patch" aria-label="Next tip">›</button></section>
+      <section id="landingLog" class="hidden" aria-label="Patch notes"><div class="eyebrow">Patch notes</div><div class="landing-scroll" id="landingScroll" tabindex="-1"></div></section>
 
       <div class="landing-foot">
-        <div class="landing-hint" id="landingHint"></div>
+        <div class="landing-hint" id="landingHint"><button id="landingPatch" class="landing-patch">Patch notes</button></div>
         <button class="landing-go" id="landingDismiss" data-nav>
           <span class="key" data-ncm-prompt="back">ESC</span><span>CONTINUE</span>
         </button>
@@ -909,33 +934,91 @@
       // both authored data, so a release never touches markup. The payload still carries `contract` and
       // `capabilities`; the page no longer draws them (owner, 2026-09-29).
       let landingData = null;
+      const landingTips = [
+        "The Race Guide shows the route, start time, entry fee and payout so you can choose a race before setting out.",
+        "Marking an event Interested tracks it and points you toward the venue; it does not reserve a grid place.",
+        "To claim your place, travel to the event and enter at its venue before the grid fills.",
+        "Arrive early: qualifying or other event sessions may begin before the scheduled race start.",
+        "Qualifying helps determine grid order. Check the event panel for its session times and actions.",
+        "Practice and qualifying are for driving and preparation; they do not pay race prizes.",
+        "The event's listed entry fee is charged when you enter. Check the Race Guide before committing.",
+        "Scheduled race payouts depend on the event and your finish. Your settlement includes an itemised receipt.",
+        "If you enter the wrong event before it starts, use Withdraw at its venue.",
+        "Once a race has started, Forfeit retires you and records a DNF. Check before confirming.",
+        "Racing alone? NPC competitors can fill empty grid places around event start time.",
+        "F5 Custom Race lets you choose a start, finish and start time for a player made street race.",
+        "Custom Races are informal: they have no entry fee or prize payout.",
+        "F8 toggles the live race graph while you drive.",
+        "At the grid, F7 snaps you to your assigned starting position.",
+        "Use /ncm.gps to set your map route to your next race, or back to its course after entering.",
+        "F6 opens the NCM Menu: Race Guide, Market, Machine Index, Messages and more are in the hub.",
+        "On a controller, Start opens the NCM Menu; D-pad navigates, Confirm selects and Back closes.",
+        "F10 opens Machine Index directly. F6 also reaches it from the hub.",
+        "Machine Index separates cars you own from machines you have discovered.",
+        "Seeing a car in the Index does not mean you own it; ownership comes from acquiring that machine.",
+        "Select one of your owned cars in Machine Index and choose CALL VEHICLE to bring it out nearby.",
+        "Machine Index keeps the evidence behind what you know about a machine; unknown details stay unknown.",
+        "Use the Scanner deliberately to record a machine discovery; simply driving past does not add it.",
+        "The Market sells serialized cars: each listing is a specific machine, and sold stock is gone.",
+        "Buy a base car first. Upgrade and parts options are available as you build your garage.",
+        "Parts have fitment rules. Check the listed fit before buying a component for a build.",
+        "F9 opens Engineering for service and parts; Machine Index is for your machines and discoveries.",
+        "Engineering shows the condition of your car by area before you choose how to service it.",
+        "Your own hands do not charge labour for self repair; a workshop service quote can include labour.",
+        "Engineering workmanship can improve or reduce individual vehicle characteristics. Read the job sheet after service.",
+        "Use Route Me There in Engineering to navigate to the suggested workshop.",
+        "Fuel is tracked while you drive. The level appears beneath the odometer.",
+        "Need fuel? Park at a pump and use /ncm.refuel; /ncm.fuel routes you to the nearest station.",
+        "Autofixer terminals are local markets: connect at a terminal, then browse its stock from F6 Market.",
+        "Rain reduces grip and lengthens braking; give yourself more room when the road is wet.",
+        "Weather is shared across the session, and wet roads dry over time.",
+        "Your Driver File shows your licence, safety rating, reputation and achievements.",
+        "Messages carry conversations, invitations and notices addressed to you; open them from the F6 hub.",
+        "F6 Exchange supports direct trades of exact Machines, stored Parts and eddies with another online driver.",
+        "Both drivers must confirm the same Exchange offer before anything moves.",
+        "The Race Guide is the best place to check what is running tonight and where to go.",
+        "Race results can be observed or simulated. Result details identify how that event was completed.",
+        "Some events are time trials: you race the clock, even when no other driver is on the road.",
+        "Use the WHEEL tab in the NCM hub to review supported wheel and force feedback settings.",
+        "F6 works without a mouse: use keyboard focus, Enter to select, and arrow keys to move through controls.",
+        "Press Escape or the controller Back button to close an NCM panel quickly.",
+        "The world map marks NCM locations; use them to orient yourself around Night City.",
+        "If you lose track of a feature, open Help from the NCM hub for controls and player commands.",
+        "You can report a gameplay problem from NCM Help, with useful session context attached.",
+        "Your owned cars are persistent records in Machine Index; calling one out is a separate action from buying it.",
+        "Browse before you travel: routes, field sizes and requirements vary from event to event.",
+        "Interested is a useful reminder when you are planning a race night; venue entry is still required to grid up."
+      ];
+      let landingTipIndex = 0, landingTipTimer = null;
+      let landingTipOrder = landingTips.map((_, i) => i);
+      function shuffleLandingTips() {
+        const firstTip = landingTips.findIndex((tip) => tip.startsWith("Need fuel? Park at a pump"));
+        const rest = landingTips.map((_, i) => i).filter((i) => i !== firstTip);
+        for (let i = rest.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [rest[i], rest[j]] = [rest[j], rest[i]];
+        }
+        landingTipOrder = firstTip >= 0 ? [firstTip, ...rest] : rest;
+        landingTipIndex = 0;
+      }
+      function showLandingTip(step) {
+        landingTipIndex = (landingTipIndex + step + landingTipOrder.length) % landingTipOrder.length;
+        const target = document.getElementById("landingTipText");
+        if (target) target.textContent = landingTips[landingTipOrder[landingTipIndex]];
+      }
+      document.getElementById("tipPrev").addEventListener("click", () => showLandingTip(-1));
+      document.getElementById("tipNext").addEventListener("click", () => showLandingTip(1));
+      document.getElementById("landingPatch").addEventListener("click", () => {
+        const log = document.getElementById("landingLog");
+        log.classList.toggle("hidden");
+        if (!log.classList.contains("hidden")) log.scrollIntoView({ block: "nearest" });
+        if (window.NcmNav) NcmNav.refresh();
+      });
       function renderLanding(d) {
         if (d) landingData = d;
         const s = landingData || {};
         const el = (id) => document.getElementById(id);
-
-        const current = s.currentRelease;
-        el("landingSub").textContent = current
-          ? (current.title + " · " + current.date + (current.build ? " · " + current.build : ""))
-          : "Development build";
-
-        // What's new: the newest release's headed items, which is the human summary rather than the log.
-        const fresh = el("landingNew");
-        const items = (current && current.items) || [];
-        fresh.replaceChildren(...items.slice(0, 5).map((item) => {
-          const row = document.createElement("div"); row.className = "row";
-          if (item.heading) { const h = document.createElement("b"); h.textContent = item.heading; row.append(h); }
-          const p = document.createElement("p"); p.textContent = item.text || ""; row.append(p);
-          return row;
-        }));
-        if (!items.length) {
-          const row = document.createElement("div"); row.className = "row";
-          const p = document.createElement("p"); p.textContent = "No release notes yet."; row.append(p);
-          fresh.replaceChildren(row);
-        }
-
-        // Changelog. Newest expanded, the rest collapsed, each header a real focusable button so the whole
-        // history is reachable by keyboard and pad -- the reason this panel is the reference implementation.
+        // Patch notes stay available as a small opt-in section; orientation is the default landing content.
         const log = el("landingScroll");
         log.replaceChildren(...(s.releases || []).map((r) => {
           const wrap = document.createElement("div");
@@ -965,9 +1048,10 @@
           return wrap;
         }));
 
-        el("landingHint").textContent = s.newReleaseCount > 0
-          ? (s.newReleaseCount + " release" + (s.newReleaseCount === 1 ? "" : "s") + " since you were last here.")
-          : (s.firstSession ? "Welcome. F6 opens the Race Guide." : "Nothing new since your last session.");
+        shuffleLandingTips();
+        showLandingTip(0);
+        if (landingTipTimer) clearInterval(landingTipTimer);
+        landingTipTimer = setInterval(() => { if (mode === "landing") showLandingTip(1); }, 9000);
 
         // The watermark moves only once the panel has actually drawn, so an open that never rendered
         // cannot silently mark releases as read.
@@ -978,6 +1062,7 @@
       // the nav layer (it is first focus), and pad CONFIRM activates it the same way. Pad BACK and Escape
       // close through the host's own path instead, which is why neither is wired here.
       document.getElementById("landingDismiss").addEventListener("click", () => {
+        if (landingTipTimer) { clearInterval(landingTipTimer); landingTipTimer = null; }
         show(null);
         Open77.emit("panel:closed", { panel: "landing" });
       });
@@ -1232,6 +1317,11 @@
         b.append(grid);
         const field=e.fieldBonus||{};
         lineEl(b,"muted").textContent="FIELD +"+cash(field.perEntrant)+" / ENTRANT · CAP "+cash(field.max)+" · PRACTICE FREE";
+        if (e.dynamicsFrozen) {
+          const mood=Number(e.moodyPurseFactor||1).toFixed(2), intrigue=Number(e.intrigueFactor||1).toFixed(2);
+          const sample=Number(e.intrigueSample||0);
+          lineEl(b,"muted").textContent += " · SERIES "+String(e.intrigueBand||"alive").toUpperCase()+" ("+sample+" RECENT RACES) · PURSE ×"+(Number(mood)*Number(intrigue)).toFixed(2);
+        }
         return b;
       }
 
@@ -1522,6 +1612,17 @@
             callTimer=setTimeout(()=>{ if(callBtn===call) setCallState("fail","No answer from the server. Try again."); },12000);
           });
           collectionDetail.append(id,serial,call,note);
+          if(collectionData.onlineAnchorEnabled){
+            if(asset.anchorSource){const status=document.createElement("div");status.className="part-status";status.textContent=asset.anchorSource==="chosen"?"ANCHOR · CHOSEN FOR NEXT WEEK":"ANCHOR · LAST DRIVEN";collectionDetail.append(status);}
+            const anchor=document.createElement("button");anchor.className="detail-action";anchor.textContent=asset.anchorSource==="chosen"?"HOLD TO CLEAR ANCHOR":"HOLD TO ANCHOR THIS CAR";
+            holdAction(anchor,()=>{anchor.disabled=true;Open77.emit("panel:week.anchor",{assetId:asset.anchorSource==="chosen"?"":asset.assetId});});collectionDetail.append(anchor);
+          }
+          if(asset.weekCondition){
+            const c=asset.weekCondition;const state=document.createElement("div");state.className="dossier-value";
+            state.textContent=Number(c.severity||0)>0?"WEEK DAMAGE · "+Math.round(Number(c.severity)*100)+"% SEVERITY":"WEEK CONDITION · FULL";collectionDetail.append(state);
+            // Observation only (owner 2026-10-09): servicing a Machine and its parts lives in the Engineering panel (F9).
+            if(Number(c.severity||0)>0){const n=document.createElement("div");n.className="call-note";n.textContent="Service it in Engineering (F9).";collectionDetail.append(n);}
+          }
           const fitted=(componentData.parts||[]).filter(p=>p.machine_asset_id===asset.assetId&&p.location_kind==="installed");
           if(fitted.length){const label=document.createElement("div");label.className="dossier-label";label.textContent="INSTALLED CONFIGURATION";collectionDetail.append(label);for(const p of fitted){const x=document.createElement("div");x.className="dossier-value";x.textContent=(p.code||p.design_id)+" · "+String(p.family||"").replaceAll("_"," ").toUpperCase();collectionDetail.append(x);}}
           const obs=observedRows(asset);
@@ -1628,7 +1729,20 @@
         for(const pair of [["SERIAL",serialText(p)],["EFFECT",Number(p.effect||1).toFixed(2)+" · "+String(p.fidelity||"modelled").toUpperCase()],["STATUS",String(p.location_kind||"storage").toUpperCase()],["EXPOSURE",Number(p.exposure_m||0).toLocaleString()+" m"]]){const l=document.createElement("div");l.className="dossier-label";l.textContent=pair[0];const v=document.createElement("div");v.className="dossier-value";v.textContent=pair[1];collectionDetail.append(l,v);}
         const wear=p.wear||{status:"normal",conditions:[]};const wl=document.createElement("div");wl.className="dossier-label";wl.textContent="CONDITION";const wv=document.createElement("div");wv.className="dossier-value";wv.textContent=wear.status==="normal"?"NO ACTIVE CONDITION":String(wear.status||"attention").toUpperCase()+" · "+((wear.conditions&&wear.conditions[0]&&wear.conditions[0].label)||"SERVICE REQUIRED");collectionDetail.append(wl,wv);
         const sl=document.createElement("div");sl.className="dossier-label";sl.textContent="SERVICE HISTORY";const sv=document.createElement("div");sv.className="dossier-value";sv.textContent=Number(p.service_count||0).toLocaleString()+" RECORDED SERVICE"+(Number(p.service_count||0)===1?"":"S");collectionDetail.append(sl,sv);
-        if(p.service_quote){const q=p.service_quote;const canPay=Number(componentData.balance||0)>=Number(q.cost||0);const b=document.createElement("button");b.className="detail-action";b.disabled=!canPay;b.textContent=canPay?("HOLD TO SERVICE · €$"+Number(q.cost||0).toLocaleString()):("SERVICE €$"+Number(q.cost||0).toLocaleString()+" · INSUFFICIENT FUNDS");if(canPay)holdAction(b,()=>{b.disabled=true;b.textContent="SERVICING…";Open77.emit("panel:component.service",{componentAssetId:p.asset_id,conditionId:q.condition_id,idempotencyKey:uuid4()});});collectionDetail.append(b);}
+        if(p.service_quote&&p.location_kind!=="trunk"){const q=p.service_quote;const canPay=Number(componentData.balance||0)>=Number(q.cost||0);const b=document.createElement("button");b.className="detail-action";b.disabled=!canPay;b.textContent=canPay?("HOLD TO SERVICE · €$"+Number(q.cost||0).toLocaleString()):("SERVICE €$"+Number(q.cost||0).toLocaleString()+" · INSUFFICIENT FUNDS");if(canPay)holdAction(b,()=>{b.disabled=true;b.textContent="SERVICING…";Open77.emit("panel:component.service",{componentAssetId:p.asset_id,conditionId:q.condition_id,idempotencyKey:uuid4()});});collectionDetail.append(b);}
+        if(p.location_kind==="trunk"){
+          const b=document.createElement("button");b.className="detail-action";b.textContent="HOLD TO UNLOAD FROM TRUNK · "+String(p.machine_asset_id||"").slice(0,8);
+          holdAction(b,()=>{b.disabled=true;Open77.emit("panel:component.trunk",{componentAssetId:p.asset_id,machineAssetId:p.machine_asset_id,unload:true});});collectionDetail.append(b);
+          const hint=document.createElement("div");hint.className="call-note";hint.textContent="Stand beside the called Machine. NCM opens its trunk before unloading.";collectionDetail.append(hint);return;
+        }
+        if(p.location_kind==="storage"){
+          for(const m of (componentData.machines||[])){const b=document.createElement("button");b.className="detail-action";b.textContent="HOLD TO LOAD IN TRUNK · "+String(m.vehicle_key||"Machine")+" · "+String(m.asset_id).slice(0,8);
+            holdAction(b,()=>{b.disabled=true;Open77.emit("panel:component.trunk",{componentAssetId:p.asset_id,machineAssetId:m.asset_id,unload:false});});collectionDetail.append(b);}
+          const hint=document.createElement("div");hint.className="call-note";hint.textContent="Stand beside the called Machine. NCM opens its trunk before loading.";collectionDetail.append(hint);
+        }
+        // stacked gearboxes (owner, 2026-10-08: "mappable to buttons, not a hard button assigned"): pick the control that
+        // engages this box; engage it again to drive through the car's own box. Any control, the player's choice.
+        if(p.addOn&&p.location_kind==="installed"&&p.family==="gearbox"){const h=document.createElement("div");h.className="warning-box";h.textContent="ENGAGE THIS BOX WITH — hold a control below (tap it while driving; tap again for the car's own box).";collectionDetail.append(h);const ctls=[["LB","padLeftShoulder"],["RB","padRightShoulder"],["D-PAD UP","padUp"],["D-PAD DOWN","padDown"],["D-PAD LEFT","padLeft"],["D-PAD RIGHT","padRight"],["Y / TRIANGLE","padY"],["B / CIRCLE","padB"],["L-STICK CLICK","padLeftThumb"],["R-STICK CLICK","padRightThumb"],["KEY G","G"],["KEY H","H"],["KEY J","J"],["KEY K","K"],["KEY 1","1"],["KEY 2","2"],["KEY 3","3"],["KEY 4","4"]];for(const [label,ctl] of ctls){const b=document.createElement("button");b.className="detail-action";b.textContent="HOLD TO BIND ENGAGE · "+label;holdAction(b,()=>{b.disabled=true;b.textContent="BINDING…";Open77.emit("panel:engineering.bindpad",{componentAssetId:p.asset_id,control:ctl,gesture:"tap",command:"engage"});});collectionDetail.append(b);}const u=document.createElement("button");u.className="detail-action";u.textContent="HOLD TO CLEAR ITS BINDINGS";holdAction(u,()=>{u.disabled=true;u.textContent="CLEARING…";Open77.emit("panel:engineering.unbindpad",{componentAssetId:p.asset_id});});collectionDetail.append(u);}
         if(p.addOn&&p.location_kind==="installed"){const b=document.createElement("button");b.className="detail-action";b.textContent="HOLD TO REMOVE FROM ITS MOUNT";holdAction(b,()=>{b.disabled=true;b.textContent="REMOVING…";Open77.emit("panel:engineering.unmount",{componentAssetId:p.asset_id});});collectionDetail.append(b);const n=document.createElement("div");n.className="warning-box";n.textContent="ON MACHINE "+String(p.machine_asset_id).slice(0,8)+". Park it and get out first.";collectionDetail.append(n);return;}
         if(p.addOn){const machines=Array.isArray(componentData.machines)?componentData.machines:[];for(const m of machines){const row=document.createElement("div");const opts=(p.mounts&&p.mounts[m.asset_id])||[];row.className="fit-machine "+(opts.length?"ok":"no");row.textContent=(opts.length?"✓ ":"⊘ ")+String(m.vehicle_key||"Machine")+" · "+String(m.asset_id).slice(0,8)+" · "+(opts.length?opts.length+" MOUNT POSITIONS":"NO MOUNT TAKES IT");row.addEventListener("click",()=>{selectedFitMachine=m.asset_id;renderPartDetail(p);});if(selectedFitMachine===m.asset_id)row.style.boxShadow="inset 0 0 0 2px var(--accent)";collectionDetail.append(row);}
           const opts=(selectedFitMachine&&p.mounts&&p.mounts[selectedFitMachine])||[];for(const o of opts){const b=document.createElement("button");b.className="detail-action";b.textContent="HOLD TO MOUNT · "+String(o.mountId).replace(/^mount\./,"").toUpperCase()+" · FACING "+String(o.facing).toUpperCase();holdAction(b,()=>{b.disabled=true;b.textContent="MOUNTING…";Open77.emit("panel:engineering.mount",{componentAssetId:p.asset_id,machineAssetId:selectedFitMachine,mountId:o.mountId,facing:o.facing});});collectionDetail.append(b);}
@@ -1858,8 +1972,8 @@
         for(const p of parts){
           const card=document.createElement("div");card.tabIndex=0;card.className="market-item component-card"+(p.designId===selectedComponent?" selected":"");
           const maker=document.createElement("div");maker.className="vehicle-maker";maker.textContent=p.manufacturer||p.makerKey;
-          const name=document.createElement("h2");name.textContent=p.code||p.designId;
-          const meta=document.createElement("div");meta.className="sub";meta.textContent=String(p.tier||"").toUpperCase()+" · "+String(p.family||"").replaceAll("_"," ");
+          const name=document.createElement("h2");name.textContent=p.name||p.code||p.designId;
+          const meta=document.createElement("div");meta.className="sub";meta.textContent=(p.name?String(p.code)+" · ":"")+String(p.tier||"").toUpperCase()+" · "+String(p.family||"").replaceAll("_"," ");
           const stock=document.createElement("div");stock.className="stock"+(p.soldOut?" out":"");stock.textContent=p.soldOut?"SOLD OUT":("AVAILABLE "+p.available+" / "+p.ceiling);
           const price=document.createElement("div");price.className="price";price.textContent=eddies(p.price);card.append(maker,name,meta,stock,price);
           const choose=()=>{selectedComponent=p.designId;hoveredComponent=null;if(!selectedPreviewVehicle&&offers.length)selectedPreviewVehicle=offers[0].vehicleKey;renderMarket(null);};
@@ -2772,6 +2886,12 @@
       const pdAsk = (req) => { if (req.view && req.view !== "box" && req.view !== "profile") paddockView = req.view; Open77.emit("panel:paddock.request", req); };
       const pdTime = (t) => { if (!t) return ""; const d = new Date(Number(t) * 1000); return String(d.getUTCHours()).padStart(2, "0") + ":" + String(d.getUTCMinutes()).padStart(2, "0") + " UTC"; };
       const pdTags = (tags) => { const w = pdEl("span"); for (const t of pdArr(tags)) w.append(pdEl("span", "pd-tag", t)); return w; };
+      // A driver's scouting record (paddock.scouting): Paddock starts plus a simulated pre-Paddock career, counts only.
+      const pdRecord = (rec) => { if (!rec || rec.starts == null) return "";
+        return [rec.starts + " starts" + (rec.careerLevel ? " (mostly " + rec.careerLevel + ")" : ""), rec.wins ? rec.wins + "W" : "", (rec.podiums || 0) + " podiums", (rec.dnfs || 0) + " DNFs",
+          rec.bestRecent ? "best recent P" + rec.bestRecent : ""].filter(Boolean).join(" · "); };
+      const pdScout = (r) => { const w = pdTags(r.tags); if (r.knowledge) w.append(pdEl("span", "pd-dim", r.knowledge)); return w; };
+      const pdStop = (el) => { el.addEventListener("click", (e) => { if (e && e.stopPropagation) e.stopPropagation(); }); return el; };
       const pdCond = (r) => [r.weather || "", r.light === "night" ? "night" : "", Number(r.wet || 0) >= 0.5 ? "wet road" : ""].filter(Boolean).join(" · ");
       const pdMoney = (n) => "€$" + Number(n || 0).toLocaleString();
       function pdTable(cols, rows, onRow) {
@@ -2988,16 +3108,42 @@
         add("TREASURY", pdMoney(d.treasury)); add("OWNER", org.owner || "");
         add("ENGINEER", d.engineer || ""); add("STRATEGIST", d.strategist || "");
         head.append(kv);
+        // owner 2026-10-09: say how many can race, let a waiting move be taken back, show what the queue will leave
+        const lim = d.limits || { raceSeats: 1, maxContracted: 3 };
+        const seats = Number(lim.raceSeats) || 1;
+        const drivers = rows.filter(r => r.t === "driver");
+        const seatNote = pdEl("p", "pd-help", (org.tier || "Your tier") + ": " + seats + " race seat" + (seats === 1 ? "" : "s") +
+          " (the car" + (seats === 1 ? "" : "s") + " your team fields each race) · up to " + lim.maxContracted + " drivers under contract · you have " + drivers.length +
+          ". Everyone else is a reserve." + (String(org.tier || "").toLowerCase() === "street"
+            ? " On Street every contracted driver is in the league pool and may turn up to any league race; the race seat is the driver your team plans its race nights around." : ""));
+        head.append(seatNote);
+        const stop = (e) => { if (e && e.stopPropagation) e.stopPropagation(); };
         if (pdArr(d.pending).length) {
-          const p = pdBlock(paddockMain, "WAITING FOR THE CUP BOUNDARY", "Roster moves land when the week turns");
-          for (const x of pdArr(d.pending)) p.append(pdEl("div", "pd-dim", x.kind + " " + (x.driver || "") + (x.seat ? " -> " + x.seat : "")));
+          const p = pdBlock(paddockMain, "WAITING FOR THE CUP BOUNDARY", "Moves land in this order when the week turns" + (d.cupEndsAt ? " · " + ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][new Date(Number(d.cupEndsAt) * 1000).getUTCDay()] + " " + pdTime(d.cupEndsAt) : "") + " · until then, cancel any of them");
+          for (const x of pdArr(d.pending)) {
+            const line = pdEl("div", "pd-line");
+            line.append(pdEl("span", null, (x.index ? x.index + ". " : "") + (x.text || (x.kind + " " + (x.driver || "")))));
+            const c = pdEl("button", "pd-act small", "CANCEL");
+            c.addEventListener("click", (e) => { stop(e); act("cancel", { index: x.index, kind: x.kind, driverId: x.driverId }); });
+            line.append(c); p.append(line);
+          }
+          const pj = d.projection;
+          if (pj && pdArr(pj.roster).length + pdArr(pj.notes).length) {
+            p.append(pdEl("div", "pd-section", "AFTER THE BOUNDARY"));
+            for (const r of pdArr(pj.roster)) p.append(pdEl("div", r.seat && String(r.seat).indexOf("race") === 0 ? null : "pd-dim",
+              (r.seatText || r.seat || "") .toUpperCase() + " · " + r.name + (r.maybe ? " (if they say yes)" : "") + (r.was && r.was !== r.seat ? " · was " + String(r.was).replace("race", "race seat ") : "")));
+            for (const n of pdArr(pj.notes)) p.append(pdEl("div", "pd-dim", "· " + n));
+          }
         }
-        const r1 = pdBlock(paddockMain, "ROSTER");
-        r1.append(pdTable([["DRIVER", r => r.name], ["SEAT", r => r.seat], ["AGE", r => r.ageBand], ["WAGE", r => r.wage], ["RECORD", r => r.wins + "W / " + r.starts], ["", r => pdTags(r.tags)],
-          ["", r => { const w = pdEl("span"); const seat = pdEl("button", "pd-act small", r.seat === "reserve" ? "TO RACE SEAT" : "TO RESERVE");
-            seat.addEventListener("click", (e) => { if (e && e.stopPropagation) e.stopPropagation(); act("seat", { driverId: r.id, seat: r.seat === "reserve" ? "race1" : "reserve" }); });
-            const rel = pdEl("button", "pd-act small", "RELEASE"); rel.addEventListener("click", (e) => { if (e && e.stopPropagation) e.stopPropagation(); act("release", { driverId: r.id }); });
-            w.append(seat, rel); return w; }]], rows.filter(r => r.t === "driver")));
+        const r1 = pdBlock(paddockMain, "ROSTER", seats + " race seat" + (seats === 1 ? "" : "s") + " · seat moves wait for the Cup boundary; a new one for the same driver replaces the old");
+        r1.append(pdTable([["DRIVER", r => r.name], ["SEAT", r => r.seatText || r.seat], ["AGE", r => r.ageBand], ["WAGE", r => r.wage], ["RECORD", r => pdRecord(r.record) || (r.wins + "W / " + r.starts)], ["", r => pdScout(r)],
+          ["", r => { const w = pdEl("span");
+            const seatBtn = (label, seat) => { const b = pdEl("button", "pd-act small", label);
+              b.addEventListener("click", (e) => { stop(e); act("seat", { driverId: r.id, seat: seat }); }); w.append(b); };
+            for (let i = 1; i <= seats; i++) if (r.seat !== "race" + i) seatBtn(seats === 1 ? "TO RACE SEAT" : "TO RACE " + i, "race" + i);
+            if (r.seat !== "reserve") seatBtn("TO RESERVE", "reserve");
+            const rel = pdEl("button", "pd-act small", "RELEASE"); rel.addEventListener("click", (e) => { stop(e); act("release", { driverId: r.id }); });
+            w.append(rel); return w; }]], drivers, (r) => pdAsk({ view: "profile", kind: "person", id: r.id })));
         const c1 = pdBlock(paddockMain, "CAR DEVELOPMENT", "Money in, level out; each level costs more");
         for (const c of pdArr(d.car)) {
           const f = pdEl("div", "pd-form"); const amt = pdEl("input"); amt.type = "number"; amt.value = String(c.next || 0); amt.setAttribute("aria-label", c.area + " spend");
@@ -3005,11 +3151,11 @@
           f.append(pdEl("span", "pd-form-label", String(c.area || "").replace("_", " ").toUpperCase() + " · level " + c.level + " · next " + pdMoney(c.next)), amt, btn);
           c1.append(f);
         }
-        const fa = pdBlock(paddockMain, "FREE AGENTS", "Offers are decided at the Cup boundary");
-        fa.append(pdTable([["DRIVER", r => r.name], ["FROM", r => r.region], ["AGE", r => r.ageBand], ["ASKS", r => r.ask], ["", r => pdTags(r.tags)],
-          ["", r => { const w = pdEl("span"); const wage = pdEl("input"); wage.type = "number"; wage.value = String(r.ask); wage.setAttribute("aria-label", "Wage offer");
+        const fa = pdBlock(paddockMain, "FREE AGENTS", "Offers are decided at the Cup boundary · select a driver for the full report");
+        fa.append(pdTable([["DRIVER", r => r.name], ["FROM", r => r.region], ["AGE", r => r.ageBand], ["RECORD", r => pdRecord(r.record)], ["ASKS", r => r.ask], ["", r => pdScout(r)],
+          ["", r => { const w = pdStop(pdEl("span")); const wage = pdEl("input"); wage.type = "number"; wage.value = String(r.ask); wage.setAttribute("aria-label", "Wage offer");
             const btn = pdEl("button", "pd-act small", "OFFER 2 SEASONS"); btn.addEventListener("click", () => act("sign", { driverId: r.id, wage: Math.floor(Number(wage.value) || 0), seasons: 2 }));
-            w.append(wage, btn); return w; }]], rows.filter(r => r.t === "fa")));
+            w.append(wage, btn); return w; }]], rows.filter(r => r.t === "fa"), (r) => pdAsk({ view: "profile", kind: "person", id: r.id })));
         const sponsors = rows.filter(r => r.t === "sponsor");
         if (sponsors.length) {
           const s1 = pdBlock(paddockMain, "SPONSORS LOOKING");
@@ -3042,7 +3188,9 @@
           if (p.garage) add("GARAGE", p.garage.label + (p.garage.hours ? " · " + p.garage.hours : "") + (p.garage.here ? " · in now" : ""));
         } else {
           add("ROLE", p.role); add("TEAM", p.org); add("FROM", p.region); add("AGE", p.ageBand);
-          add("RECORD", (p.wins || 0) + " wins · " + (p.podiums || 0) + " podiums · " + (p.starts || 0) + " starts");
+          add("RECORD", pdRecord(p.record) || ((p.wins || 0) + " wins · " + (p.podiums || 0) + " podiums · " + (p.starts || 0) + " starts"));
+          if (p.record && p.record.careerStarts) add("CAREER", p.record.careerStarts + " starts before the Paddock (simulated) · " + (p.record.paddockStarts || 0) + " here");
+          add("SCOUTING", p.knowledge);
         }
         paddockDetail.append(kv, pdTags(p.tags));
         const rows = pdArr(d.rows);
@@ -3256,8 +3404,16 @@
       let rigMeters = [];          // [{ meter, devSel, axSel }]
       let lastRigShape = null;     // structural signature: devices and bindings, never axis values
 
+      function rigDevicesOf(dev) {
+        const raw = (dev.rig && dev.rig.devices) || dev.devices;
+        if (Array.isArray(raw)) return raw;
+        // The Lua WebUI hop serialises an empty array as {}; keep the no-device state drawable.
+        if (raw && typeof raw === "object") return Object.values(raw).filter((d) => d && typeof d === "object" && d.id);
+        return [];
+      }
+
       function rigShapeOf(dev) {
-        const devices = (dev.rig && dev.rig.devices) || [];
+        const devices = rigDevicesOf(dev);
         const roles = (dev.rig && dev.rig.roles) || {};
         return JSON.stringify([
           devices.map((d) => [d.id, d.name, d.wheel, d.gamepad, d.live]),
@@ -3271,7 +3427,7 @@
       // Returns true if it handled the frame without rebuilding anything.
       function updateRigMeters(dev) {
         if (!rigMeters.length) return false;
-        const devices = (dev.rig && dev.rig.devices) || [];
+        const devices = rigDevicesOf(dev);
         for (const m of rigMeters) {
           const d = devices.find((x) => x.id === m.devSel.value);
           const v = d && d.axes ? d.axes[m.axSel.value] : null;
@@ -3284,7 +3440,7 @@
       function renderRigBindings(host, dev) {
         rigMeters = [];
         lastRigShape = rigShapeOf(dev);
-        const devices = (dev.rig && dev.rig.devices) || dev.devices || [];
+        const devices = rigDevicesOf(dev);
         const roles = (dev.rig && dev.rig.roles) || dev.roles || {};
         if (!devices.length) {
           host.append(wheelRow("DEVICES", "none detected — is the wheel powered on?", "warn"));
@@ -3936,7 +4092,8 @@
         if (!s) return JSON.stringify(["error", padError]);
         const r = s.recording || {};
         return JSON.stringify([s.profile, s.profiles, s.variants.map((v) => [v.id, v.target, v.name, v.summary, v.context, v.effect, v.side, v.enabled]),
-          s.effects, (s.sdlDevices || []).map((d) => [d.key, d.hand, d.kind]), s.steering, s.rumble, s.mappings,
+          s.effects, (s.sdlDevices || []).map((d) => [d.key, d.hand, d.kind]),
+          Object.keys(s.sources || {}).filter((k) => k.indexOf("di:") === 0).sort(), s.steering, s.rumble, s.mappings,
           r.phase === "idle" ? ["idle", r.result, r.ok] : [r.phase, r.target, r.mode], padNotice, padError]);
       }
 
@@ -4065,6 +4222,16 @@
           padRoot.append(padBar((d.hand || "?").replace("_", " ").toUpperCase(), document.createTextNode(d.name + (d.battery >= 0 ? " · " + d.battery + "%" : "") + " "), val));
         }
         if (joysticks.length) padRoot.append(padBar("SDL JOYSTICKS", document.createTextNode(joysticks.map((j) => j.name + " (" + j.buttons + " btn)").join(" · "))));
+        // DirectInput devices (a wheel rim, button boxes, an ESP32 wheel): read by the Rig Bridge's DirectInput side and
+        // kept away from SDL (KB-209), so they were never listed here although their buttons reach the mapper as
+        // `di:VID:PID` b0..bN. Listed with their live buttons, so a press can be seen before it is recorded.
+        for (const key of Object.keys(s.sources || {}).filter((k) => k.indexOf("di:") === 0).sort()) {
+          const val = document.createElement("span"); val.className = "sum";
+          padLive.gyro[key] = val;
+          padRoot.append(padBar("DIRECTINPUT " + key.slice(3), document.createTextNode("buttons: "), val));
+        }
+        if (Object.keys(s.sources || {}).some((k) => k.indexOf("di:") === 0))
+          padRoot.append(padBar("WHEEL BUTTONS", document.createTextNode("Pick a target above, press RECORD, then press the wheel button. Shift up = X, shift down = A.")));
         if (!devices.length) padRoot.append(padBar("MOTION", document.createTextNode("No Joy-Con or motion pad connected. SDL: " + (s.sdl || "?"))));
         padRoot.append(padBar("CALIBRATE", document.createTextNode("Hold every motion controller still, then: "),
           padButton("CALIBRATE", () => padCmd({ op: "calibrate" }), "pad:calibrate")));
@@ -4164,6 +4331,43 @@
       // without a word and encoding them in Lua first blows the client script budget. Reassemble here, where
       // the work is free, then dispatch as if the payload had arrived whole.
       const pending = {};
+      let collectionJson = null, collectionJsonDoneId = null;
+      Open77.on("panel:collection.json.begin", (d) => {
+        const n = Number(d && d.n);
+        if (!d || typeof d.id !== "string" || !Number.isInteger(n) || n < 1 || n > 512) return;
+        if (!collectionJson || collectionJson.id !== d.id) {
+          collectionJson = { id: d.id, n, pieces: new Array(n), got: 0 };
+          headSeen = 1;
+          partsExpected += n;
+        }
+        Open77.emit("panel:collection.json.ack", { id: d.id, index: 0 });
+      });
+      Open77.on("panel:collection.json.part", (d) => {
+        const s = collectionJson;
+        const i = Number(d && d.index);
+        if (d && d.id === collectionJsonDoneId && Number.isInteger(i)) {
+          Open77.emit("panel:collection.json.ack", { id: d.id, index: i });
+          return;
+        }
+        if (!s || !d || d.id !== s.id || !Number.isInteger(i) || i < 1 || i > s.n || typeof d.text !== "string") return;
+        if (s.pieces[i - 1] !== undefined) {
+          Open77.emit("panel:collection.json.ack", { id: d.id, index: i });
+          return;
+        }
+        s.pieces[i - 1] = d.text;
+        s.got++;
+        partsSeen++;
+        Open77.emit("panel:collection.json.ack", { id: d.id, index: i });
+        if (s.got !== s.n) return;
+        collectionJsonDoneId = s.id;
+        collectionJson = null;
+        try {
+          const value = JSON.parse(s.pieces.join(""));
+          if (mode === "collection") guard("collection", () => renderCollection(value));
+        } catch (e) {
+          console.error("Machine Index stream decode failed", e);
+        }
+      });
       Open77.on("panel:list.begin", (d) => {
         if (!d || !d.id) return;
         pending[d.id] = { name: d.name, listKey: d.listKey, n: d.n, head: d.head || {}, items: [], got: 0 };

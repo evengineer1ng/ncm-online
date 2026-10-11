@@ -47,6 +47,7 @@ local fitted = {}
 -- Derived component state, keyed by Machine. It is rebuilt from exposure + append-only services and is
 -- never itself persisted. `{ contributor, warnings, components }` comes from pure `parts.wear`.
 local wear = {}
+local repair = {}
 -- Ephemeral delivery truth: playerId -> { assetId, vehicleId, sig }
 local delivered = {}
 local publishTyre   -- forward: defined below, called by publishBound
@@ -108,6 +109,7 @@ local function contributorsFor(assetId)
     -- Component condition is a named downward-only layer. Missing state is inert, never guessed.
     local lifecycle = wear[assetId]
     if lifecycle and lifecycle.contributor then out.wear = lifecycle.contributor end
+    if repair[assetId] then out.repair = repair[assetId] end
 
     -- Weather and the clock, from the live environment read `KB-151` added. Before that fix this was a
     -- console command and nothing else, so `wetness` was permanently zero in production.
@@ -424,6 +426,21 @@ function NcmHandling.setWear(assetId, state, why, publish)
     if NcmVehicleAccess and NcmVehicleAccess.operatorForAsset then
         local pid,binding=NcmVehicleAccess.operatorForAsset(assetId)
         if pid and binding then return publishBound(pid,binding,why or "setWear",true) end
+    end
+    return true
+end
+
+function NcmHandling.setRepair(assetId, work, publish)
+    if not validAssetId(assetId) then return false, "bad_asset" end
+    local s = type(work) == "table" and work.scalars or nil
+    repair[assetId] = type(s) == "table" and {
+        source = "vehicle_repair", gripScale = tonumber(s.gripScale) or 1,
+        driveScale = tonumber(s.driveScale) or 1, brakeScale = tonumber(s.brakeScale) or 1,
+        dragScale = tonumber(s.dragScale) or 1,
+    } or nil
+    if publish ~= false and NcmVehicleAccess and NcmVehicleAccess.operatorForAsset then
+        local pid, binding = NcmVehicleAccess.operatorForAsset(assetId)
+        if pid and binding then return publishBound(pid, binding, "setRepair", true) end
     end
     return true
 end

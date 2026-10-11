@@ -1,0 +1,22 @@
+{
+  "_comment": "Copy to chronicles.json (gitignored) and fill in. tape = the server_id whose world is narrated. player_driver_ids = your ncm_driver_id(s) (paddock_entry.ncm_driver_id). Pick ONE source block and rename it to 'source'.",
+  "tape": "ncm-dev",
+  "player_driver_ids": ["<your ncm_driver_id>"],
+  "player_name": "V",
+  "radio_preset": "talk_radio",
+  "model": "qwen3.5:latest",
+  "lookback_s": 21600,
+  "coalesce_s": 20,
+  "discovery": { "loop_named": false, "chrome_attribution": false },
+
+  "source": {
+    "kind": "mysql",
+    "dsn": { "host": "127.0.0.1", "port": 3306, "user": "<read-only user>", "password": "<password>", "database": "ncm" }
+  },
+
+  "source_online_over_ssh": {
+    "kind": "ssh",
+    "ssh": ["ssh", "-o", "BatchMode=yes", "-i", "C:/Users/eveng/.ssh/lightsail-ncm.pem", "ubuntu@52.60.225.137"],
+    "database": "ncm"
+  }
+}

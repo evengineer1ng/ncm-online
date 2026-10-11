@@ -5,8 +5,9 @@ ObserverSettings = {}
 local ok, settings = pcall(Open77.tunables.declare, {
     observerEnabled = { value = true, type = "boolean", apply = "live" },
     -- user ids (GetPlayerIdentifier) allowed to enter from their own client, comma-separated; "*" = everyone.
-    -- Empty = the server console only. Never a default-on: L307 O-4.
-    observerAllow = { value = "", type = "string", apply = "live" },
+    -- Empty = the server console only. Owner 2026-10-09: "we need to make observer player facing" -- so everyone may
+    -- ASK; entering is still the player's own explicit act (F3 -> ENTER OBSERVER, on foot), never automatic (L307 O-4).
+    observerAllow = { value = "*", type = "string", apply = "live" },
     directorTickSec = { value = 2, type = "integer", min = 1, max = 30, unit = "s", apply = "live" },
     minShotSec = { value = 12, type = "integer", min = 2, max = 300, unit = "s", apply = "live" },
     maxShotSec = { value = 45, type = "integer", min = 5, max = 900, unit = "s", apply = "live" },

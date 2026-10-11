@@ -205,6 +205,46 @@ return {
         T.ok(okS); T.ok(sign.willingness > 0 and sign.willingness <= 1)
     end,
 
+    -- owner 2026-10-09: "promoting 2, releasing driver 2 and signing driver 3 ... will i only have 1 driver?"
+    manager_queue_cancels_and_projects = function(T)
+        local M = T.Core.get("paddock.manager")
+        local L = M.limits("street")
+        T.eq(L.raceSeats, 1); T.eq(L.maxContracted, 3)
+        T.eq(M.limits("premier").raceSeats, 2)
+        local q = {}
+        T.ok(M.enqueue(q, { kind = "seat", driverId = "josh", seat = "race1" }))
+        T.eq(select(2, M.enqueue(q, { kind = "seat", driverId = "josh", seat = "reserve" })), "replaced")
+        T.eq(#q, 1); T.eq(q[1].seat, "reserve")
+        T.ok(M.enqueue(q, { kind = "release", driverId = "josh" }))
+        T.eq(select(2, M.enqueue(q, { kind = "release", driverId = "josh" })), "already_pending")
+        T.eq(select(2, M.cancel(q, 2, { kind = "seat" })), "queue_changed", "a stale button cancels nothing")
+        T.eq(select(2, M.cancel(q, 9, {})), "no_such_move")
+        local okC, gone = M.cancel(q, 1, { kind = "seat", driverId = "josh" })
+        T.ok(okC); T.eq(gone.kind, "seat"); T.eq(#q, 1); T.eq(q[1].kind, "release")
+        for i = 2, M.MAX_PENDING do M.enqueue(q, { kind = "sign", driverId = "fa" .. i }) end
+        T.eq(select(2, M.enqueue(q, { kind = "sign", driverId = "one_more" })), "too_many_pending")
+
+        -- the owner's queue on Online: promote Joshua, release Joshua, sign Arnaud
+        local strong, weak = { pace = 80, racecraft = 80, consistency = 80 }, { pace = 30, racecraft = 30, consistency = 30 }
+        local drivers = { { id = "claudio", display = "Claudio", seat = "race1", attrs = strong },
+            { id = "josh", display = "Joshua", seat = "reserve", attrs = weak } }
+        local plan = { { kind = "seat", driverId = "josh", seat = "race1" }, { kind = "release", driverId = "josh" },
+            { kind = "sign", driverId = "arnaud", willingness = 0.86, attrs = weak } }
+        local pj = M.project(drivers, plan, 1, { arnaud = "Arnaud" })
+        T.eq(#pj.roster, 2)
+        T.eq(pj.roster[1].id, "claudio"); T.eq(pj.roster[1].seat, "race1", "the empty race seat goes back to the best reserve")
+        T.eq(pj.roster[2].id, "arnaud"); T.eq(pj.roster[2].seat, "reserve"); T.ok(pj.roster[2].maybe)
+        T.eq(pj.emptySeats, 0)
+        T.eq(drivers[1].seat, "race1"); T.eq(drivers[2].seat, "reserve", "the preview changes nothing")
+        -- release the only driver and sign nobody: the seat is reported empty
+        local lone = M.project({ { id = "a", display = "A", seat = "race1", attrs = strong } }, { { kind = "release", driverId = "a" } }, 1, {})
+        T.eq(#lone.roster, 0); T.eq(lone.emptySeats, 1)
+        -- a seat swap: the promoted driver takes the seat, the holder takes theirs
+        local two = { { id = "a", seat = "race1" }, { id = "b", seat = "reserve" } }
+        M.applySeat(two, { kind = "seat", driverId = "b", seat = "race1" })
+        T.eq(two[1].seat, "reserve"); T.eq(two[2].seat, "race1")
+    end,
+
     spotlight_decays_and_arcs_resolve = function(T)
         local S = T.Core.get("paddock.spotlight")
         local g = S.earned({ position = 1, state = "finished", fieldSize = 6, gridPos = 4, streak = 2 })

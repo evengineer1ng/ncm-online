@@ -26,6 +26,10 @@ local settings = Open77.tunables.declare({
     serverId = { value = "ncm-dev", type = "string", apply = "live" },
     -- DEVELOPMENT one-shot engineering grant (`server/engineering.lua` devGrant): "<driverId>|<machineId>|<design>|<mount>|<facing>"
     devGrant = { value = "", type = "string", apply = "live" },
+    -- OWNER one-shot kit grant, any environment (`server/engineering.lua` ownerGrant, L352): "<driver id prefix>|<vehicle>|<kit>"
+    ownerGrant = { value = "", type = "string", apply = "live" },
+    -- Race Week scars (`server/scars.lua`): false removes every scar prop at the next sync (lag A/B, 2026-10-08)
+    scarsEnabled = { value = true, type = "boolean", apply = "live" },
 
     -- Ambient population (`server/ambient.lua`, `L177`). Budgets first, then placement, then the race
     -- corridor. Distances are metres.

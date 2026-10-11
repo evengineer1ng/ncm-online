@@ -2036,7 +2036,7 @@ must be rerun after session-close bookkeeping.
 | §BJ18 | Submit one Research item twice, then improve/refit the same Machine characteristic and try again. | First accepted contribution and reward commit together; repeats produce neither a second contribution nor money. | **NOT RUN** |
 | §BJ19 | Reconcile a settled Driver/session directly in SQL. | `session_result`, `session_settlement.receipt_json`, typed ledger references and `SUM(ledger.amount)` agree exactly. | **NOT RUN** |
 | §BJ20 | Inspect a completed qualifying session. | Its result persists for sporting use, but it has no non-zero payout ledger row and cannot consume the race opportunity. | **NOT RUN** |
-| §BJ21 | Compare one equivalent finish across Street, GT and Hypercar authored tiers. | The configured 1× / 10× / 100× scale is applied without code changes or overflow; exact values remain tuning data. | **NOT RUN** |
+| §BJ21 | Compare one equivalent finish across series and Paddock divisions; inspect a Guide quote, Moody-active event, and a resource restart. | Bedrock/MaiMai x1, City Cup/Street Drag x2, Night City Open x3, GT x25, Hypercar x250; Paddock divisions Street x1-x7, Regional x10-x25, Pro x50-x100, Premier x250. Guide shows frozen intrigue band and purse factor; entry debit matches quote after restart; DNF receives no finish payout. | **NOT RUN** |
 
 ### What a PASS establishes, and what it does not
 
@@ -2986,6 +2986,20 @@ Offline 2026-10-01: Release build, existing Pace state tests, five guard checks,
 | §SG1 | SEAM-1 install: game closed, `python tools/dev-hand-install-mods.py --only none --extra-zip dist/ncm-snowglobe-0.0.1.zip`; launch and join dev. | The game starts (redscript loads; no KB-182 close). `red4ext/plugins/ncm_snowglobe/ncm_snowglobe-<pid>.log` shows `config: loaded -- ... key=J ... offset=(0, 0, -2000) minZ=3000`, `redscript natives registered` and `reds: attached`. | **PASS (owner, 2026-10-05 00:54):** the game started; `config: loaded ... key=J ... minZ=3000`, `redscript natives registered`, `reds: attached`.
 | §SG2 | SEAM-1 at altitude: climb the Hella above 3,000 m with TRIANGLE; while it is still rising, press J once. | The log's `SEAM-1 move #1: from ... to ... velocity ...`, then `frame 1/2/3/5/10/30/60` lines, then `SEAM-1 RESULT`. **The question, not a pass band:** is `speed kept` near x1.00 (the teleport carries velocity) or near 0 (it zeroes it), and is `seat lost` 0 (the driver comes along)? Say what it looked like: a cut, a freeze, a stutter, or nothing at all. Open77's log shows whether the server revoked authority around the move (compare KB-338). | **RUN (owner, 2026-10-05 01:02-01:03): THE CLIENT TELEPORT IS VETOED BY THE SERVER.** Three J moves from about 3,100-3,300 m. In each, the car arrived exactly at the target (frames 1-2, `seated=true`), then was back at its starting height by frame 3 with speed 0, after a loading screen (owner: "saw loading screens and back to sky"). Every move coincided to the millisecond with `open77_vehicles authority ... owner=0 reason=serverrevoke` (01:02:51.178, 01:03:46.076, 01:03:52.577), with the lease regranted 2-15 s later. The platform treats a client jump as `motion_jump` and restores the server-approved transform (README: "the server owns ... physics authority"). Seat: kept in all three (0 frames lost). The 32,009 m/s in move #3 is the measurement catching the snap-back, not a real speed. |
 | §SG3 | SEAM-1 falling: the same, pressed while falling fast (no TRIANGLE). | The same verdict for a car moving down at speed; whether landing 2 km lower while falling changes anything. | **NOT RUN** |
+| §SG4 | (L360, NCM Gearbox 0.4.0) Hella m5 and Maimai m4w on Online after a fresh launch: 0-100 km/h, shifting at the limiter, then the same car as an automatic. | Gearbox log `7 native slices` per clone and `band: gear -> 7 native slices to ...` per shift; the driver still has 5 / 4 gears; each gear one rising sweep; 0-100 within the automatic's time or close. | **NOT RUN** |
+
+## §WS - The Workshop (L361, IDEA-1286..1289) - **DEPLOYED ONLINE 2026-10-10 21:30 UTC; LIVE NOT RUN**
+
+Offline: core `test_engineering_projects` (10), `tools/test-workshop-host.lua` (27 / 28 LuaJIT), engineering render (27).
+
+| Case | Do | Pass when | Result |
+|---|---|---|---|
+| §WS1 | Buy a physical add-on (e.g. an RP-16 at its Autofixer); F9 > WORKSHOP; hold TEAR DOWN. | It leaves your storage; materials are charged (2 %); the bench shows the job counting down (5-15 min). | **NOT RUN** |
+| §WS2 | Wait for it; COLLECT THE JOB SHEET. | The sheet inks each stage reached and stamps; WHAT YOU KNOW shows the design with facts (mass, thrust ±band ...). | **NOT RUN** |
+| §WS3 | Tear down more of the same design until stage 3; hold FABRICATE. | A prototype (good / neutral / poor) or a NONFUNCTIONAL part arrives in storage; a working one mounts in F9 PARTS; junk cannot be mounted. | **NOT RUN** |
+| §WS4 | Reach stage 4; hold PROMOTE TO MY DESIGN on a working prototype. | YOUR DESIGNS shows a maker-coded design (e.g. EAS-THR001); the prototype is still yours, unchanged. | **NOT RUN** |
+| §WS5 | MAKE 3 of your design. | Three units (rejects as nonfunctional) arrive; production skill word rises. | **NOT RUN** |
+| §WS6 | LIST a unit; buy it from the Base Market with a second identity. | It sells at your price; the seller's balance rises by that price; the buyer owns the unit. | **NOT RUN** |
 | §SG4 | SEAM-1b, the server-side move (after a dev restart): climb the Hella above about 2,500 m; in Warden `ncm.seam <pid> -2000`. | Warden logs `SEAM-1b move`, `setTransform -> true`, `flags restored`, then six samples (+100 ms to +8 s): z against the target, speed, owner, epoch, `seated`. Say what it looked like. **The questions:** does the car stay at the target? Is the speed kept or zeroed? Does `owner` come back to the driver, and how fast? Is the driver still seated? | **RUN (owner, 2026-10-05 01:20:07, `ncm.seam 1 -2000` from 2,826.3 m): THE SERVER MOVE HOLDS; SPEED IS ZEROED; A 3 s FREEZE.** `setTransform -> true`, flags restored (513). The car sat exactly at 826.3 m (+0.0 from the target) from +100 ms to +2 s, speed 0, `owner=0`, `seated=true` throughout. Authority churn inside 70 ms: owner=1 epoch 4, `serverrevoke` epoch 3, owner=1 epoch 6, **`validationfailed`** epoch 5, `serverrevoke` epoch 7. The lease came back at +3.0 s (epoch 8). From then the car fell from rest: 821.2 m at 10.7 m/s (+4 s), 711.9 m at 39.4 m/s (+8 s). Before the move, the speed had been **83.6 m/s**.
 | §SG5 | SEAM-1c, the velocity kick (Carrier 0.1.35 + Snowglobe 0.0.2, installed 01:41): climb the Hella above about 2,500 m and keep it climbing fast; in Warden `ncm.seam <pid> -2000`. | Carrier log `seam: NCM Snowglobe kick lever found` (soon after entering the game). Snowglobe log: `SEAM-1c jump #1 ... velocity before ...`, then after the freeze `SEAM-1c kick #1 after N frame(s) frozen ... asking for dv ...`, then `kick frame` lines and `SEAM-1c RESULT ... speed kept xK`. Carrier log `seam: kick #1 applied | dv ... | v before ... -> after ...`. PASS = speed kept near x1.00 and the car carries on in the direction it was going, after the freeze. The freeze itself is the next problem, not this one. | **RUN (owner, 2026-10-05 01:46:47, `ncm.seam 2 -2000` from 3,831 m while nearly hovering, 2.98 m/s): THE PIPELINE WORKS END TO END; THE KICK CAME BEFORE THE BINDING.** Snowglobe caught the server jump exactly (-1,999.2 m) and kept the velocity. It waited 334 frames, then published the kick (#1). Carrier had the lever (`found` 01:45:14) and received it, but refused: `not applied: no bound NCM car is seated`. Carrier's own log: `unbound by NCM` at 01:46:47 (the move), kick at :50, `BOUND to body` again only at :51. The binding returns with the platform lease. Fixed in Carrier 0.1.36 + Snowglobe 0.0.3 (§SG6).
 | §SG6 | SEAM-1c v2 (Carrier 0.1.36 + Snowglobe 0.0.3, installed 02:0x): climb the Hella above about 2,500 m and keep it climbing hard (mash TRIANGLE), then in Warden `ncm.seam <pid> -2000`. | Snowglobe: `SEAM-1c jump #1 ... target #1 sent to Carrier, held until the car is bound again`, then `moving again ...`, velocity lines, `SEAM-1c RESULT ... speed kept xK`. Carrier: `seam: target #1 applied after N ms held | target (...) | v at the bind (...) -> dv (...) -> after (...)`. PASS = Carrier says `applied` and its `after` matches the target within about 10 %, and the car carries on upward. A `not applied: the car was not bound again within the hold` line means the binding took longer than 8 s. | **ATTEMPTED, NOT RUN (owner, 14:02):** `ncm.seam 3 -2000` was refused (`target z=-512.3 is below 300 m`): typed while the car was at about 1,490 m and FALLING at 64.6 m/s. Owner: a manual trigger cannot be pulled at speed -- climbing on a gamepad, then alt-tabbing to Warden. Replaced by the automatic doorway (§SG7).
@@ -3170,3 +3184,206 @@ Headless evidence (2026-10-07): `tools/test-host-webui.lua` 14/14 (the real reso
 | §RN4 | Fly the bought Machine into Deep, disconnect and reconnect, then observe on another client. | The purchased spec produces its stated thrust/torque and fuel/heat use in every host; no attitude waiver on Online; restart keeps the design and install. | **NOT RUN** |
 | §RN5 | Run the dev soak across 100 seeded continuities through one Racing Week. | First buyable part by 48 h and complete stock kit within the Week at a measured acceptable rate; failures and no-candidate runs recorded. | **NOT RUN** |
 | §RN6 | Leave a single-player tape for 19 days, return, then open another tape. | Every missed physical run is resolved in order on the first tape; the second tape has independent IDs, outcomes and stock. | **NOT RUN** (host bench: PASS, live game owed) |
+
+## §HK - NPC racer quickhacking (L343) - **BUILT; DEPLOYED ONLINE + DEV; LIVE NOT RUN**
+
+| Case | Do | Pass when | Result |
+|---|---|---|---|
+| §HK1 | Join a street Paddock race (hackTest auto) and stand on the grid beside the field. | `[ncm_paddock/hack]` names the test offence/defence subjects; an NPC plans or starts an upload with a `why` (target, hack, utility). | **NOT RUN** |
+| §HK2 | Be the target: let an NPC upload onto your car. | INCOMING appears; PURGE stops it (`stopped N upload(s)`), or Self-ICE blocks it, or it lands with its real effect. | **NOT RUN** |
+| §HK3 | Hack an NPC with ICE / a defending NPC. | Self-ICE blocks or the NPC purges (`PURGE` line) and may abort its own upload. | **NOT RUN** |
+| §HK4 | Watch two NPCs with no human in range. | An NPC-vs-NPC upload and outcome in the log; a model exchange appears as `MODEL ... (simulated)` when nobody is near. | **NOT RUN** |
+| §HK5 | A TOTAL FAILURE lands in a race. | The car is classified a crash DNF; `DESTROYED` line; Race Week fact `vehicle_destroyed`; tape `vehicle_destroyed`. | **NOT RUN** |
+| §HK6 | Hack in a sanctioned (prohibited) race. | The physics happens; officials attribute it sometimes; an attributed offence costs time or a DSQ and writes `chrome_attack`. | **NOT RUN** |
+
+## §SG - Stacked gearboxes (L341 addendum 2) - **BUILT; DEPLOYED ONLINE + DEV; LIVE NOT RUN**
+
+| Case | Do | Pass when | Result |
+|---|---|---|---|
+| §SG1 | On a manual Machine, install an OD-6 inline (dev: fabricate). | Gearbox log `stack: [0] car+THO-OD6 ...`; the gear count climbs past the car's own top gear. | **NOT RUN** |
+| §SG2 | Install a CS-5 on a side mount and bind ENGAGE in Parts. | Pressing the bound control logs `stack: path 0 -> 1`; again returns to the car's box. | **NOT RUN** |
+| §SG3 | CR-2 inline. | A range change is refused while moving and allowed at a stop. | **NOT RUN** |
+
+## §NC - Night City Chronicles Race Week talk radio (L345) - **BUILT; FIXTURE BENCH RUN; CANONICAL NOT RUN (KB-401)**
+
+Run from `ncm/chronicles` (README). Evidence for every case is `out/<stamp>/trace.log`.
+
+| Case | Do | Pass when | Result |
+|---|---|---|---|
+| §NC0 | Fixture Week: `python -m ncc --fixture fixtures/race_week_demo.jsonl --speed 2 --fresh --ident`. | Ident, then Narrator/News/Race Control/Street/Garage play with their stingers; the reversal is one beat; two DEDUP lines; News says "No cause has been announced" without naming the hacker. | **BENCH PASS 2026-10-08** (fixture, not canonical) |
+| §NC1 | Point `chronicles.json` at dev's database (read-only user) and run. | A `FACT` line from a real `paddock_event` / `racing_week_*` row and a spoken segment whose FACTS trace back to it. | **NOT RUN** |
+| §NC2 | Online (configured 2026-10-08: `chronicles.json`, tape `ncm-dev`, driver baremetaleven): run Chronicles, enter a Paddock street race. | Talk-radio host voices treat the entry and result as substantial, curious conversations; factual assertions trace to the facts; nothing contradicts the Race Guide. | **NOT RUN** |
+| §NC3 | In that race, gain then lose a place inside ~20 s. | One coalesced reversal beat (`coalesced N position changes`), not two lines; silence for routine gates. | **NOT RUN** |
+| §NC4 | While you race, an NPC car is destroyed elsewhere (or a Week PA fires). | News or Race Control interrupts with its sting, then playback returns to silence or the Narrator; News never names an unattributed hacker. | **NOT RUN** |
+| §NC5 | Stop and restart Chronicles. | Nothing already spoken is spoken again (`DEDUP` / cursors). | **NOT RUN** |
+| §NC6 | Pick one silence you expected to hear. | The trace says which: no FACT (simulation), suppressed + reason (editorial), REJECTED/template (language), PERF (TTS), PLAY (playback). | **NOT RUN** |
+| §NC7 | Run with default `talk_radio`, then with `--preset lean`. | Default has the longer character-led voice and 24 s quiet / 60 s pulse cadence; `lean` restores the original short copy, thresholds and 60 s / 120 s cadence. | **NOT RUN** (blocked by KB-401) |
+
+## §RW - Race Week Live: the NCM Radio station (L348, doc 59) - **BUILT; HEADLESS GATE GREEN; LIVE NOT RUN**
+
+**Online first** (owner, 2026-10-08): deploy `ncm_radio` to `/opt/ncm/server/resources/ncm/` and publish `dist/ncm-radio-<version>.zip` with `--id ncm-radio` on Lightsail; dev later. Evidence: `[ncm_radio]` server lines and `red4ext/plugins/ncm_radio/ncm_radio-<pid>.log`.
+
+| Case | Do | Pass when | Result |
+|---|---|---|---|
+| §RW0 | Restart Online (players checked, owner OK); read `/opt/ncm/logs/server.log`. | `[ncm_radio] on the air: N beats ready ...`; `lexicon.json` appears in the resource data directory. | **PASS 2026-10-09 00:07 UTC (Online):** `on the air: 619 beats ready of 1088, pack 3b887e44f0b6; learned 456 facts`; `data/lexicon.json` present; the five radio blobs serve (206). |
+| §RW1 | Join; get into a car (first car of the session, never chose another station). | Race Week Live plays without touching the radio; the plugin log says `tuned in by default`; the server log says `pid N ... has the station`. | **NOT RUN** |
+| §RW2 | Open the radio popup. | "Race Week Live" is the first row after "No station", highlighted as current. | **NOT RUN** |
+| §RW3 | Pick a vanilla station; leave and re-enter the car; restart the game. | The vanilla station plays; Race Week Live never re-takes the radio (`prefs.txt` = `other`). | **NOT RUN** |
+| §RW4 | Pick Race Week Live again later, mid-beat. | Audio starts mid-sentence where the broadcast is, not at the top of a beat; no greeting. | **NOT RUN** |
+| §RW5 | Pause the game for 5 s. | Silence while paused; on resume the broadcast is further along, not rewound. | **NOT RUN** |
+| §RW6 | Finish a Paddock race. | A result beat names the winner and series correctly (or, if a name is not voiced yet, no beat that needs it airs); nothing contradicts the Race Guide. | **NOT RUN** |
+| §RW7 | Change the in-game car-radio volume. | The station follows it. | **NOT RUN** |
+
+## §WL - Online Week vehicle, repair, anchor and cargo (L349) - **LOCAL BUILD; LIVE NOT RUN**
+
+Run on an isolated test Week with a database backup. Confirm migration 073 before any test; `ncm_week_collapse` remains `dryrun` until a reviewed plan is deliberately tested in a disposable world. The native item bridge is outside this batch (IDEA-1252).
+
+| Case | Do | Pass when | Result |
+|---|---|---|---|
+| §WL0 | Call an owned car, damage health/body/tyre, store, call again, disconnect/rejoin and call. | The **same serialized asset** returns with matching canonical damage; no clean car is conjured by storage or reconnect. | **NOT RUN** |
+| §WL1 | Drive car A, then drive car B while moving; leave both unchosen. | The collapse plan names B as the sole `last_driven` anchor. Calling/sitting in A without moving does not change it. | **NOT RUN** |
+| §WL2 | In Machine Index, choose A; inspect collapse plan and clear the choice. | A is the sole chosen anchor; clearing returns to B. A second choice replaces the first; a condition-granted ineligible car is refused. | **NOT RUN** |
+| §WL3 | Load a loose serialized part into called B's trunk while beside it; try from far away or with another player's car; unload it. | NCM opens B's trunk, custody changes only for the near owner, and the part is never duplicated. The unloaded part returns to storage. | **NOT RUN** |
+| §WL4 | With damage on stored B, attempt self work far from a garage, then attend the nearest Machine Index garage/workshop and begin. | Out-of-range work is refused by host; the mapped site is reachable; materials/labour are quoted, the short bench interval elapses, eddies pay once, the `vehicle_repair` record stores before/after/workmanship, and restoration/chassis competency advances once. | **NOT RUN** |
+| §WL5 | Shop service on a stored damaged car, then service request repeated with the same key. | The booked bench service charges once, records material/labour and workmanship, restores chassis health/body/tyres/glass/lights, and leaves component exposure/service history separate. | **NOT RUN** |
+| §WL6 | With B anchored, another car C owned and a component in each trunk plus a loose component, inspect a live collapse plan, then execute on a disposable world. | Only B and its installed/trunk components remain on the base server ID. C, C's cargo and the loose component archive under `#Rnnn`; knowledge and observations remain. | **NOT RUN** |
+| §WL7 | End the Week with B damaged, an arbitrary Online wallet balance, and nondefault licence/rating/SR; call B after reset. | B's canonical health/body/glass/lights/tyres reset; the NCM wallet is exactly €$10,000; provisional standing policy gives rookie/1000/5 while old rows archive. Re-running the collapse adds no money and no second car. | **NOT RUN** |
+| §WL8 | Put an ordinary native item in a vanilla inventory/trunk UI and restart the Week. | NCM does **not** claim it as carryover until IDEA-1252's authoritative deposit/withdrawal bridge exists; the UI makes the supported NCM component cargo scope clear. | **NOT RUN** |
+| §WL9 | Be seated in the anchored car at the Week rewind, then repeat seated in a car that will archive. | The rewind removes the old runtime car and clears occupancy without leaving the player stuck, stranded, or in an archived car; the anchored asset can be called at full health, the other cannot. Repeat once in Deep and confirm the canonical location reset is safe. | **NOT RUN** |
+
+
+### L350 NPC chassis and engineering live cases (migration 074; all NOT RUN)
+
+| Case | Do | Pass when | Result |
+|---|---|---|---|
+| WL10 | Crash a serialized NPC car in a modelled race, then inspect its asset and enter the next race. | One `npc_vehicle_incident` with `simulated` provenance and persistent lower health; later model pace falls or the wreck misses the grid. Re-resolving the race does not double damage. | **NOT RUN** |
+| WL11 | Crash an NPC car in a physical bubble or staged race, remove it, and spawn it again. | One `physical` incident records only damage taken this race; the same asset spawns with prior damage and the next result is not marked as simulated. | **NOT RUN** |
+| WL12 | Let a funded independent and a pro team each damage a car. | Their own balances fund distinct material/labour quotes; the independent self job and team shop job have different ready times. The car cannot grid while booked; completed work clears physical damage and persists a skill-dependent handling outcome. | **NOT RUN** |
+| WL13 | Damage a low cash independent's car beyond affordable repair. | No booking or money debit; the damaged car loses pace, or a wreck misses the race. No free replacement is minted. | **NOT RUN** |
+| WL14 | Collapse a disposable Week with NPC incidents and queued/completed jobs. | NPC assets, condition, incidents and jobs archive with the old Paddock; new Week cars start undamaged. No orphan condition points to the base run. | **NOT RUN** |
+| WL15 | Crash an organiser-supplied MaiMai in the spec series and enter its next race. | The `paddock_spec_car` asset takes the incident and later damage/repair; the driver's personal car is untouched. The organiser's finite repair budget pays, and the supplied car archives at Week end. | **NOT RUN** |
+| WL16 | After migration 076, inspect the owner's already-paid self repair, then damage and self repair a stored car and call it again. Repeat with shop service. | The old partial paid job's residual damage is subtracted once while any later crash damage remains; `vehicle_repair_correction` audits the change. Each new paid job restores physical health/body/attachments to full on the same serialized car, and Machine Index shows actual grip/drive/brake/drag multipliers with green buffs or red nerfs that agree with the delivered handling setup. | **SERVER PASS 2026-10-08 22:17 UTC:** audit row 1; stored health 0.891 -> 0.948, glass mask 31 -> 4; workmanship present. **CLIENT AND NEW-REPAIR CASES NOT RUN.** |
+| WL17 | Open the damaged car in Machine Index while away from the nearest workshop; press Route Me There under the distance note. | The native GPS tracks the named mapped garage/workshop, including after entering a car; the place is reachable and self work is enabled within 25 m XY/12 m Z. | **NOT RUN** |
+| WL18 | Reconnect after the 22:52 UTC Machine Index transfer deployment; open Machine Index and inspect the full collection and repaired car. | All 45 slots arrive and draw, the selected car shows its chassis state and colored workmanship scalars, no malformed event occurs, and the client logs `collection JSON browser complete` with every part acknowledged. | **LOCAL PASS:** 45-slot browser reassembly, render, and fragment acknowledgement. **LIVE NOT RUN.** |
+
+## §EN - The Engineering panel (L353) - **DEPLOYED ONLINE 02:09 UTC; LIVE NOT RUN**
+
+| Case | Do | Pass when | Result |
+|---|---|---|---|
+| §EN0 | Press F9; drive a little with the panel open; press Esc; press F9 twice. | The panel docks on the right and the rest of the screen is the game. The mouse clicks the panel while the keyboard still drives. Esc closes it (pause menu as normal), and F9 toggles it. Never a stuck cursor. | **NOT RUN** |
+| §EN1 | SERVICE tab with a damaged car: read its condition, then go far from a workshop. | Severity is weighted (a hard race is well under 100%), with areas listed (chassis %, n windows ...). The self quote is materials only (labour 0). Away from a workshop, self service is refused with "Go to a workshop" and ROUTE ME THERE sets the GPS. | **NOT RUN** |
+| §EN2 | At the workshop with the car stored, hold SERVICE IT YOURSELF. | A bench timer runs, then a job sheet shows four sections written in ink one at a time, then the stamp. The values match the Machine's handling (Machine Index observation) and the money is debited once (materials only). | **NOT RUN** |
+| §EN3 | Call the repaired car, then crash it, store it, call it again. | It spawns looking damaged (KB-422), matching the stored damage. | **NOT RUN** |
+| §EN4 | PARTS tab: service a worn part, fit a part, load/unload a trunk, bind a stacked gearbox. | Each works as it did in Machine Index; Machine Index no longer shows Parts or service buttons. | **NOT RUN** |
+
+## §DY - Race Week Day 1 map and scars (L351, IDEA-1261/1262) - **DEPLOYED ONLINE; LIVE NOT RUN**
+
+The map is the `ncm_race_week_map` world package (required mod `ncm_race_week_map-assets`); scars are `ncm_world/server/scars.lua` props. Back up the database before any reset test.
+
+| Case | Do | Pass when | Result |
+|---|---|---|---|
+| §DY1 | Launch Online from the launcher. | The launcher installs `ncm_race_week_map-assets`; the game starts; ArchiveXL logs the NCWE archive with no errors. | **NOT RUN** |
+| §DY2 | Drive into Parque Del Mar from both directions, day and night. | Curb barriers, the four footbridge screens (START/FINISH + RACE WEEK, each way), lamp banners, the beach stand and lit stage, and the marquees render; no game ad shows through a screen. | **NOT RUN** |
+| §DY3 | Watch ambient traffic and an NPC race through Parque Del Mar, Downtown and one automated site. | No car or pedestrian is stopped by a barrier; crossings and junction mouths are open; nobody falls through the stand. | **NOT RUN** |
+| §DY4 | Visit three automated sites (Japantown Crossway, Pothole, Kabuki Bridge). | Barriers line the curbs at pavement height; site-named banners read correctly; no screen floats or is mirrored. | **NOT RUN** |
+| §DY5 | `ncm.scars` on the console, then visit a site at the current level and the place of a recorded incident. | Status matches the log; litter/wear appears behind the barriers; a person-contact incident shows a memorial on the pavement, not in the road. | **NOT RUN** |
+| §DY6 | Restart Online mid-run. | The same scars come back (same count, same places). | **NOT RUN** |
+| §DY7 | Rollover in a disposable Week (or a pinned test world). | Every scar of the old run is removed; the new run starts with Day 1 clean. | **NOT RUN** |
+
+## §SL - Space Lab: the native universe probe (L351, IDEA-1263) - **REMOVED (L352, KB-411); superseded by §NV**
+
+| Case | Do | Pass when | Result |
+|---|---|---|---|
+| §SL1 | Stand 2 s in the hologram column on the Parque Del Mar beach (beside the stand). | Faded teleport onto station A's black pad; you do not fall. | **NOT RUN** |
+| §SL2 | At A, look down, at the horizon and up, by day and by night. | Report: is the scaled Earth visible (or clipped), the atmosphere edge, does the 30 km starfield shell hide the day sky, any fog/water at the horizon. Screenshots. | **NOT RUN** |
+| §SL3 | Stand in A's second column (to B). | At B: whether the 200 m shell hides the sky, how the 100 m Earth below and the Moon read; walk to the pad edge to judge parallax. | **NOT RUN** |
+| §SL4 | Return home from A and from B. | Back on the Parque Del Mar beach each time. | **NOT RUN** |
+
+## §CT - The city takeover (L351 addendum, IDEA-1268) - **DEPLOYED ONLINE 21:00 UTC; LIVE NOT RUN**
+
+| Case | Do | Pass when | Result |
+|---|---|---|---|
+| §CT1 | Launch Online from the launcher. | It downloads the new Day 1 package (33.8 MB, sha256 2aa29870...) without error. | **NOT RUN** |
+| §CT2 | Drive Japantown, Downtown, Watson, Heywood, Santo Domingo, Pacifica and the Badlands edge. | Race Week signs on billboards, building screens and rooftops in most places; lamp banners here and there; never a wall of them; abandoned corners still abandoned. Screenshots. | **NOT RUN** |
+| §CT3 | Look closely at a few signs at street level and on rooftops. | Each faces the street, fills its frame, reads the right way round, no flicker with the game ad behind. Note any backwards, floating or inside-a-wall sign with its location. | **NOT RUN** |
+
+## §NV - NCM Deep in the game's own world (L352, IDEA-1265) - **DEPLOYED ONLINE 20:03 UTC; LIVE NOT RUN**
+
+| Case | Do | Pass when | Result |
+|---|---|---|---|
+| §NV0 | Launch Online from the launcher; Panel -> Parts on the Galena. | The launcher installs `ncm_world_layer-assets`; Parts shows PT-400 (front), FD-1 (floor, facing down, hold Triangle), AC-6 (roof) INSTALLED; IA-10 in storage (KB-413). | **NOT RUN** |
+| §NV1 | Hold Triangle in the Galena and climb through 12 km. | No portal, no teleport you did not fly into; at the seam the car is held in the native world, first person and chase cameras work, the HUD reads NCM DEEP - native view; server log `STAGE player=... -> near`. | **NOT RUN** |
+| §NV2 | Look down, at the horizon and up in the near stage, by day and by night. | Earth below at its true size (screenshots); report which face of the Earth is under you (calibrates IDEA-1266), whether the shell hides the day sky, the atmosphere edge. | **NOT RUN** |
+| §NV3 | Press V / R3 through the cameras. | native -> chase -> high -> earth (WebGL for scale) -> native; Guidance (D-pad up) still opens its map. | **NOT RUN** |
+| §NV4 | Climb past 6,000 km (Guidance or thrust). | A fade to the far stage; Earth and the Moon as bodies at their true size and direction; log `STAGE ... -> far`. | **NOT RUN** |
+| §NV5 | Come home (fall back through the bound, or hold B / X). | Back over Night City in your car; no props left behind. | **NOT RUN** |
+## §SC - Scouting reports for Paddock drivers (L355, IDEA-1277, KB-425) - **DEPLOYED ONLINE 2026-10-10 00:55 UTC; LIVE NOT RUN**
+
+| Case | Do | Pass when | Result |
+|---|---|---|---|
+| §SC0 | As a team manager, open PADDOCK -> MY TEAM and read FREE AGENTS. | Every free agent shows a pace word and at least two more tags, a RECORD ("N starts (mostly Tier) - n podiums - n DNFs - best recent Pn") and a knowledge level. No number that is a stat. | **NOT RUN** |
+| §SC1 | Select a free agent. | The profile shows RECORD, CAREER ("n starts before the Paddock (simulated) - n here") and SCOUTING; the same driver reads the same on a second open. | **NOT RUN** |
+| §SC2 | Compare a driver on your roster with a free agent of similar record. | Your own driver shows more tags ("Well known"); a fresh 18-year-old free agent shows a thin "Scouting report". | **NOT RUN** |
+| §SC3 | Sign a driver the report calls quick and one it calls limited (or watch two seasons of the roster). | Over a season the quick one finishes ahead more often than not (the report helped the decision). | **NOT RUN** |
+## §SS - The Slipstream Module (L356, IDEA-1278, KB-426) - **DEPLOYED ONLINE 21:18 UTC; LIVE NOT RUN**
+
+Offline: core `test_aero_slipstream.lua` (A, B, C, D rules, G, NPC factor, fitment; 10 tests) and `tools/test-slipstream-host.lua` (the relay: D1-D5, boot once, the switch; 23 checks). Live evidence is the server log: `SLIPTRACE` (each client, 1 Hz while a wake is in play), `LINK ON/OFF`, `SLIPRACE` (each NPC at a race's end).
+
+| Case | Do | Pass when | Result |
+|---|---|---|---|
+| §SS0 | Base Market -> parts. Buy the Eddywright Slipstream SL-1; F9 -> PARTS -> it -> mount on a Machine (ELECTRONICS · FACING FORE). | It is listed by name and maker at EUR$4,800; it mounts on any car's electronics bay and nowhere else. | **NOT RUN** |
+| §SS1 | Get in that Machine. | The unit speaks four lines in its own voice while its ink interface writes itself and shows its plan view once, then disappears. Get out and back in: no second boot. | **NOT RUN** |
+| §SS2 (A) | Unit OFF (F9 switch). Follow a moving car dead astern ~10 m at speed, then the same gap a lane over. | `SLIPTRACE unit=off` shows natural relief > 0 and towN > 0 astern, ~0 a lane over; no HUD. | **NOT RUN** |
+| §SS3 (B) | Unit ON, same runs. | The HUD goes detected -> acquiring -> SLIPSTREAM; `SLIPTRACE` towN about three times the §SS2 figure when locked; the car pulls up on the leader (owner feel + trace). | **NOT RUN** |
+| §SS4 (C) | Drift slowly across the wake and drop back. | The HUD dot moves across the drawn wake; q, lock and towN in the trace change smoothly; outside it, nothing. | **NOT RUN** |
+| §SS5 (D) | Two equipped humans, one following the other; then follow an equipped Paddock car (bubble). | Follower HUD: LINKED · name; leader HUD: IN YOUR WAKE · name; behind an unequipped car: SLIPSTREAM, no name; `LINK ON` lines match. | **NOT RUN** |
+| §SS6 (E) | Group qualifying with another car on course: time a run behind it. | The tow (trace) applies during qualifying exactly as in a race. | **NOT RUN** |
+| §SS7 (F) | An oval or a long straight in a race; a Paddock street run (platform backend). | Tow at speed; `SLIPRACE` lines with activeS > 0 for equipped NPCs and maxSpeedFactor > 1 for drafting NPCs. | **NOT RUN** |
+| §SS8 (G) | Switch the unit OFF mid-tow; then remove it. | Lock, HUD and network stop at once; `SLIPTRACE unit=off` still shows the natural draft. | **NOT RUN** |
+## §MQ - A manager's queue: cancel, seats, the roster it leaves (L357, IDEA-1279, KB-428) - **DEPLOYED ONLINE 2026-10-10 00:55 UTC; LIVE NOT RUN**
+
+Offline: core `test_paddock_business.manager_queue_cancels_and_projects` (incl. the owner's own queue).
+
+| Case | Do | Pass when | Result |
+|---|---|---|---|
+| §MQ1 | PADDOCK > MY ORG as a Street manager. | The header says 1 race seat, up to 3 under contract, and how many you have. | **NOT RUN** |
+| §MQ2 | Queue TO RACE SEAT for a reserve, then TO RESERVE for the same driver. | One waiting move (the second replaced the first); the result line says "Changed:". | **NOT RUN** |
+| §MQ3 | CANCEL a waiting move. | It disappears; "Cancelled: ... It will not happen."; AFTER THE BOUNDARY updates. | **NOT RUN** |
+| §MQ4 | Queue a release of the race-seat driver; let the Cup boundary pass. | AFTER THE BOUNDARY showed a reserve filling the seat; after the boundary that driver holds race seat 1 and a story says so. | **NOT RUN** |
+
+## §OB-T - The Observer for players, and your team (L357, IDEA-1280) - **DEPLOYED ONLINE 2026-10-10 00:55 UTC; LIVE NOT RUN**
+
+| Case | Do | Pass when | Result |
+|---|---|---|---|
+| §OB-T1 | On foot, F3 > ENTER OBSERVER (no console, no allow-list). | You become the flying camera; the ink how-to card writes itself and fades; the ink HUD shows OBSERVER, the shot and the keys. | **NOT RUN** |
+| §OB-T2 | While one of your Paddock drivers is racing: open F3. | YOUR TEAM lists them in gold; their race has a gold mark in RACES NOW; the running order says YOUR TEAM beside them. | **NOT RUN** |
+| §OB-T3 | Press Y (twice if two are racing). | The camera goes to your driver, then the next; the HUD name is gold with "your team". With nobody racing, Y says so. | **NOT RUN** |
+| §OB-T4 | Off duty (not observing), wait for one of your drivers' races to start. | One ink note top-right: YOUR DRIVER IS RACING, name, series, F3 > ENTER OBSERVER > Y. | **NOT RUN** |
+| §OB-T5 | EXIT OBSERVER. | You are back where you entered, visible, and nothing you did counted. | **NOT RUN** |
+## §SKY - NCM Sky (L358, IDEA-1281, KB-430) - **DEPLOYED ONLINE 2026-10-10 02:20 UTC (and DEV); LIVE NOT RUN**
+
+Offline: `ncm/sky` state tests (17), native-declaration check, redscript compiled against vanilla + every installed script (`tools/build-sky.ps1`). Evidence in game: `red4ext/plugins/ncm_sky/ncm_sky-<pid>.log` (`exEntitySpawner.Spawn(...)` signature, `body proof_earth -> 1/2`) and the client log's `[ncm_sky]` lines.
+
+| Case | Do | Pass when | Result |
+|---|---|---|---|
+| §SKY1 | Accept NCM Sky 0.2.0 and the new world layer at the consent gate (fresh game launch); fly through the 12 km seam into Deep. | The Earth fills the view below, Night City under you (Blue Marble), a real star sky above (the Milky Way band; Orion, Polaris north at ~35 deg), the Moon where it really is; pitching the Machine swings the whole universe. Client log: `[ncm_world/client/deepview] sky: sky_dome=2 earth=3 moon=..`, `[ncm_sky] body earth: spawned`. Thrust holds in Deep (KB-429): no `thrust 0 N` seconds in the DEEP lines. | **NOT RUN** |
+| §SKY2 | Stop the `ncm_sky` resource (or disconnect). | The Earth is gone within 3 s. | **NOT RUN** |
+| §SKY3 | (L360) After the Online restart, fresh launch (NCM Sky 0.2.2 + Codeware 1.20.3 at the consent gate), fly through 12 km. | `ncm_sky-<pid>.log`: `spawned ncm\sky\bodies\dome.ent through Codeware`; no REFUSED. Open77 client log: `staged once at ...`, **zero `vowner-loss` lines while in Deep**, the car never flips. | **NOT RUN** |
+| §SKY4 | (KB-437/436) Hold the propulsor's control in Deep, then fall back to Night City and fly again. | `[ncm_world/client/deep] ENTER Machine:` and `STAY` lines name thrust kN, fuel/fusion and pressed controls each second; the HUD names NO FUEL / NO CONTROL / CONTROLS BLOCKED if thrust is 0. Back in the city the propulsor still pushes (no `engineering.lua` error). | **NOT RUN** |
+| §SKY5 | (KB-442) With the FD-1 on the underside and a full PT-400 up front, press GUIDANCE to a venue in Deep; then remount the FD-1 rear/aft and try again. | Belly: Guidance refuses, naming the thrust line's miss distance and "rear, facing aft" (or flies trimmed without tumbling, if trimmed thrust holds it up). Rear/aft: Guidance turns the Machine, holds altitude and heads for the venue; GUIDE spin stays under ~1 rad/s. | **NOT RUN** |
+| §SKY6 | (L360 addendum 2) FD-1 underside/down + full PT-400: climb to 12 km on the FD-1 alone, then press GUIDANCE to a venue. | The climb goes straight up without pitching; Guidance accepts the Machine (no thrust-line refusal) and flies it level toward the venue with GUIDE spin under ~1 rad/s. | **NOT RUN** |
+| §SKY7 | (KB-444, KB-446, IDEA-1290; deployed 2026-10-11 02:42/02:50 UTC) The deep-space Galena: after the KB-444 deploy, fresh-launch and join Online while its record says `deep` (do NOT fly home first). | Server: `JOIN player=.. resumes deep`, then `ENTER`, then `STAGE player=.. -> near at (-12000, 12000, 8000): move true true` (an `arrived before ENTER` line first is fine). Client: `stage confirmed by the server after N request(s)`. In the native view: no Night City; stars all round; Earth a disc of the true angular diameter (15.0 deg at 42,300 km; `2 asin(6371 / r)`) in the direction the WebGL view shows it. The DEEP lines' altitude/speed continue from the persisted record (snapshot `docs/research/open77/snapshots/galena-deep-snapshot-20261011T020758Z.tsv`), not 12 km. | **NOT RUN** |
+| §SKY8 | (IDEA-1290) In the space stage, turn the Galena on the AC-6 only (no propulsor). | Earth and the stars swing around the car as it turns; the car never moves or flickers (zero `vowner-loss`); the DEEP lines show `thrust 0 N` and speed/vertical unchanged by the turn (only gravity's slow drift). | **NOT RUN** |
+| §SKY9 | (IDEA-1290) Only after §SKY7/§SKY8 and with the owner's go-ahead on spending the trajectory (or on a second Machine): a short FD-1 burn in the stage. | DEEP lines' speed/altitude change during the burn; the WebGL view and the native Earth's size/direction both follow the new trajectory; the presence row's `vel` changes. | **NOT RUN** |
+## §BLD - The Build primitive (L359, IDEA-1282, KB-431) - **ON DEV (01:51 UTC) AND DEPLOYED ONLINE (2026-10-10 02:02 UTC); LIVE NOT RUN**
+
+Offline: core `test_build_attach` (6), `tools/test-build-host.lua` (23: attach, bound to that vehicle at the composed transform, store/recall rebuilds from the database on a new vehicle, chains, move, remove as history, ownership / catalogue / reach / out-in-the-city / carry refusals). Live evidence: server `[ncm_build] ATTACH|EDIT|REMOVE|Machine .. out as vehicle .. rebuilt` lines; client `[ncm_build]` lines.
+
+| Case | Do (the brief's milestone) | Pass when | Result |
+|---|---|---|---|
+| §BLD1 | Call one of your Machines. F9 -> BUILD. | Your Machine is listed; the catalogue shows ten objects. | **NOT RUN** |
+| §BLD2 | Pick Small wing. Nudge it with + / - (COARSE then FINE) onto the rear deck; roll, pitch, yaw it. | A preview rides the car and moves with each press (only you see it). Note each alias's real size and whether it looks like what its label says (KB-431). | **NOT RUN** |
+| §BLD3 | HOLD · ATTACH. Get in, drive: accelerate, brake, turn, bumps, third person. | "Attached."; the object stays exactly where it was mounted through all of it. | **NOT RUN** |
+| §BLD4 | A second connected client (the tester identity) near the car. | They see the same object in the same place, moving with the car. | **NOT RUN** |
+| §BLD5 | Store the Machine, call another car, call the Machine back (or reconnect). | The wing returns on it, in the same place. | **NOT RUN** |
+| §BLD6 | MOVE it, save; then HOLD · REMOVE. Store and recall. | Moved for both clients; removed for both; it does not come back. | **NOT RUN** |

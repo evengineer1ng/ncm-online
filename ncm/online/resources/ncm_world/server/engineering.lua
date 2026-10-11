@@ -64,7 +64,9 @@ local function seedDesigns()
         local c = {} for _, d in ipairs(Install.DESIGNS) do c[#c + 1] = d.code end return table.concat(c, ", ") end)())
 end
 AddEventHandler("ncm:rnd:design", function(spec)
-    if type(spec) ~= "table" or spec.origin ~= "rnd_physical" then return end
+    -- L361: the Workshop's prototypes and player designs register the same way as R&D's
+    local PHYSICAL = { rnd_physical = true, prototype = true, player_design = true }
+    if type(spec) ~= "table" or not PHYSICAL[spec.origin] then return end
     local registered, why = Install.register(spec)
     if not registered then log("physical R&D Design refused: %s", tostring(why)) end
 end)
@@ -300,7 +302,8 @@ RegisterNetEvent("ncm:engineering.burn", function(r)
         if ml > 0 and NcmFuel and NcmFuel.draw then left, cap = NcmFuel.draw(machineId, ml, pid, b.vehicleId) end
         local t = type(r.t) == "table" and r.t or {}
         local off = NcmSnowglobe and NcmSnowglobe.offset and NcmSnowglobe.offset(b.vehicleId) or 0
-        log(("TELEMETRY player=%d machine=..%s | %s | F world (%.0f, %.0f, %.0f) N |F| %.0f | fwd (%.2f, %.2f, %.2f) up (%.2f, %.2f, %.2f) | "
+        -- KB-445: already formatted -- through log() a '%' in the device text (Deep's "ZTC-FD1 6%") was formatted twice and threw
+        print("[ncm_world/engineering] " .. ("TELEMETRY player=%d machine=..%s | %s | F world (%.0f, %.0f, %.0f) N |F| %.0f | fwd (%.2f, %.2f, %.2f) up (%.2f, %.2f, %.2f) | "
             .. "speed %.1f m/s | z %.0f (+%.0f snowglobe = %.0f) | burned %.3f kg = %.0f ml%s (claimed %.3f, cap %.3f) | fuel %s/%s ml%s | loss: %s"):format(
             pid, short(machineId), tostring(t.devices or "-"),
             tonumber(t.fx) or 0, tonumber(t.fy) or 0, tonumber(t.fz) or 0, tonumber(t.f) or 0,
@@ -379,8 +382,15 @@ function NcmEngineering.install(pid, ref, mountId, facing, onMachine)
     if not part then return nil, "no component " .. tostring(ref) .. " (see /ncm.eng)" end
     if part.location_kind ~= "storage" then return nil, serial(part) .. " is not in storage (remove it first)" end
     local m = machineRow(machineId)
-    local verdict = Install.check(Install.design(part.design_id), m and m.vehicle_key, mountId, facing)
+    local design = Install.design(part.design_id)
+    local verdict = Install.check(design, m and m.vehicle_key, mountId, facing)
     if not verdict.ok then return nil, verdict.reason end
+    -- stacked gearboxes stack on a manual (owner, 2026-10-08: "if car has manual gearbox it is manual. if car has auto
+    -- it is auto"): NCM Gearbox drives the boxes, and it drives only a manual
+    if design and design.perf and Install.isDriveline(design.perf.kind) then
+        local kind = MySQL.scalar.await("SELECT gearbox_kind FROM vehicle_asset WHERE asset_id=?", { machineId })
+        if tostring(kind or "") ~= "manual" then return nil, "a driveline box stacks on a manual gearbox; this Machine is an automatic" end
+    end
     local okPark, whyPark = parkCheck(machineId)
     if not okPark then return nil, whyPark end
     local old, why = currentConfig(machineId)
@@ -400,6 +410,10 @@ function NcmEngineering.install(pid, ref, mountId, facing, onMachine)
         serial(part), part.asset_id, mountId, facing, verdict.axis[1], verdict.axis[2], verdict.axis[3], rev, displaced and (" | displaced .." .. short(displaced)) or "")
     NcmComponentInstall.apply(machineId, "engineering mount")
     if pid > 0 then TriggerEvent("ncm:component.changed", pid, machineId) end
+    if verdict.mount.driveline then
+        return true, ("%s in the %s. %s Configuration revision %d."):format(serial(part), verdict.mount.label,
+            verdict.mount.driveline == "side" and "Bind a control to its ENGAGE in Parts to drive through it." or "It is part of the car's gear ladder now.", rev)
+    end
     return true, ("%s on the %s, facing %s: it pushes the Machine (%g, %g, %g) in its own frame. Configuration revision %d."):format(
         serial(part), verdict.mount.label, facing, verdict.axis[1], verdict.axis[2], verdict.axis[3], rev)
 end
@@ -645,6 +659,28 @@ RegisterNetEvent("ncm:engineering.mount", function(componentId, machineId, mount
     CreateThread(function()
         local ok, m = NcmEngineering.install(pid, tostring(componentId or ""), tostring(mountId or ""), tostring(facing or ""):lower(), tostring(machineId or ""))
         padResult(pid, ok, ok and "MOUNTED" or "MOUNT REFUSED", m)
+        -- L361: fitting a part is Installation work; the Workshop keeps the engineer's competency
+        if ok then TriggerEvent("ncm:workshop.credit", driverOf(pid), "fitment", 10, nil) end
+    end)
+end)
+-- Bindings from the pad (stacked gearboxes, owner 2026-10-08: "mappable to buttons, not a hard button assigned"): the
+-- Parts panel offers the controls; the player holds the one they want. Unbinding clears that component's binding.
+RegisterNetEvent("ncm:engineering.bindpad", function(componentId, control, gesture, command)
+    local pid = tonumber(source) or 0
+    CreateThread(function()
+        local ok, m = NcmEngineering.bind(pid, tostring(control or ""), tostring(gesture or "tap"), tostring(componentId or ""), tostring(command or ""))
+        padResult(pid, ok, ok and "BOUND" or "BIND REFUSED", m)
+    end)
+end)
+RegisterNetEvent("ncm:engineering.unbindpad", function(componentId)
+    local pid = tonumber(source) or 0
+    CreateThread(function()
+        local driverId = driverOf(pid)
+        local part = driverId and findComponent(driverId, tostring(componentId or ""))
+        if not (part and part.machine_asset_id) then padResult(pid, false, "REFUSED", "that component is not installed"); return end
+        MySQL.query.await("DELETE FROM machine_control_binding WHERE machine_asset_id=? AND component_asset_id=?", { part.machine_asset_id, part.asset_id })
+        NcmEngineering.changed(part.machine_asset_id, "unbind")
+        padResult(pid, true, "UNBOUND", serial(part) .. " answers no control now.")
     end)
 end)
 RegisterNetEvent("ncm:engineering.unmount", function(componentId)
@@ -734,6 +770,115 @@ devGrantOne = function(spec)
         tostring(ok1), tostring(m1), tostring(ok2), tostring(m2))
 end
 
+-- L352 (owner, 2026-10-08: "equip my anchored galena with the same flight package equipped to my dev server hella"):
+-- an OWNER one-shot that works on Online too. Tunable ncm_world.ownerGrant = "<driver id prefix>|<vehicle>|<kit>"
+-- (short on purpose: KB-371). <vehicle> is a catalogue word ("galena": the driver's anchored one first) or an asset id
+-- suffix. A kit is the dev Hella's fit, part for part. Each part already on the Machine is skipped; one in the driver's
+-- storage is used; otherwise it is minted with provenance `owner_grant` (never `dev_fabricate`). Logged per part.
+local KITS = {
+    flight = {   -- the dev Hella (..0003) after L331/L334/KB-373: PT-400 front, FD-1 rear aft on HOLD Triangle, AC-6 roof, IA-10 hop on TAP
+        { code = "ZTC-PT500", mount = "mount.front", facing = "up" },
+        { code = "ZTC-FD1", mount = "mount.rear", facing = "aft", bind = { "triangle", "hold", "throttle" } },
+        { code = "ZTC-AC6", mount = "mount.roof", facing = "up" },
+        { code = "ARC-IA10", mount = "mount.underside", facing = "down", bind = { "triangle", "tap", "discharge" } },
+    },
+    -- KB-413 (owner ruling 2026-10-08: "FD-1 under floor"): on Online fuel the IA-10 hop cannot reach the seam; the FD-1
+    -- under the floor facing down lifts on fusion. It displaces the IA-10 to storage (the floor is its only rated mount).
+    climb = {
+        { code = "ZTC-FD1", mount = "mount.underside", facing = "down", bind = { "triangle", "hold", "throttle" }, refit = true },
+    },
+}
+
+local function ownerMachine(driverId, which)
+    if which:match("^%x+$") or which:find("-", 1, true) then
+        return MySQL.scalar.await("SELECT asset_id FROM vehicle_asset WHERE server_id=? AND ncm_driver_id=? AND asset_id LIKE ? LIMIT 1",
+            { serverId(), driverId, "%" .. which })
+    end
+    local rows = MySQL.query.await([[SELECT v.asset_id, MAX(a.asset_id IS NOT NULL) AS anchored FROM vehicle_asset v
+        LEFT JOIN racing_week_anchor a ON a.server_id=v.server_id AND a.asset_id=v.asset_id
+        WHERE v.server_id=? AND v.ncm_driver_id=? AND v.vehicle_key LIKE ? GROUP BY v.asset_id ORDER BY anchored DESC, v.asset_id]],
+        { serverId(), driverId, "%" .. which:lower() .. "%" }) or {}
+    if #rows == 0 then return nil, "the driver has no " .. which end
+    if #rows > 1 and tonumber(rows[1].anchored) ~= 1 then return nil, ("%d %s(s) and none anchored: name one by id suffix"):format(#rows, which) end
+    return rows[1].asset_id
+end
+
+local function ownerGrantPart(driverId, machineId, item)
+    local d
+    for _, x in ipairs(Install.DESIGNS) do if x.code == item.code then d = x end end
+    if not d then return "no design " .. item.code end
+    local on = MySQL.scalar.await([[SELECT asset_id FROM component_asset WHERE machine_asset_id=? AND design_id=? AND location_kind='installed'
+        AND lifecycle='active' LIMIT 1]], { machineId, d.designId })
+    if on and item.refit then
+        -- a refit moves the part: where is it now in the current configuration?
+        local cur = MySQL.single.await([[SELECT i.interface_id, i.install_json FROM machine_configuration_current x
+            JOIN machine_configuration_item i ON i.configuration_id=x.configuration_id
+            WHERE x.machine_asset_id=? AND i.component_asset_id=?]], { machineId, on })
+        local facing = cur and tostring(cur.install_json or ""):match('"facing"%s*:%s*"(%a+)"')
+        if cur and cur.interface_id == item.mount and facing == item.facing then
+            return ("%s already on %s facing %s: kept"):format(d.code, item.mount, item.facing)
+        end
+        local okR, mR = NcmEngineering.remove(0, on)
+        if not okR then return ("%s refit refused at remove: %s"):format(d.code, tostring(mR)) end
+        on = nil
+    end
+    if on then return ("%s already on the Machine (..%s): kept"):format(d.code, short(on)) end
+    local part = MySQL.scalar.await([[SELECT asset_id FROM component_asset WHERE server_id=? AND ncm_driver_id=? AND design_id=?
+        AND location_kind='storage' AND lifecycle='active' ORDER BY created_at LIMIT 1]], { serverId(), driverId, d.designId })
+    local how = "from storage"
+    if not part then
+        part, how = ids.uuid4(hostRng), "minted (owner_grant)"
+        local t = now()
+        local ok, err = MySQL.transaction.await({
+            { query = [[INSERT INTO component_asset (asset_id,server_id,design_id,run_id,ncm_driver_id,manufacturer_key,location_kind,machine_asset_id,
+                global_ordinal,maker_ordinal,design_ordinal,factory_original,acquired_via,acquired_at,exposure_m,created_at,lifecycle)
+                SELECT ?,?,?,NULL,?,?,'storage',NULL,NULL,NULL,COALESCE(MAX(design_ordinal),0)+1,0,'owner_grant',?,0,?,'active'
+                FROM component_asset WHERE server_id=? AND design_id=?]],
+              values = { part, serverId(), d.designId, driverId, d.makerKey, t, t, serverId(), d.designId } },
+            { query = [[INSERT INTO component_asset_transfer (transfer_id,idem_key,server_id,asset_id,from_driver_id,to_driver_id,kind,market_id,amount,occurred_at)
+                VALUES (?,?,?,?,NULL,?,'owner_grant',NULL,NULL,?)]], values = { ids.uuid4(hostRng), "eng_owner:" .. part, serverId(), part, driverId, t } },
+        })
+        if not ok then return ("%s mint failed: %s"):format(d.code, tostring(err)) end
+        if d.perf and d.perf.kind == "propellant_tank" then   -- a new tank comes full (L334)
+            MySQL.insert.await("INSERT IGNORE INTO component_state (asset_id, propellant_kg, updated_at) VALUES (?,?,?)", { part, d.perf.capacityKg or 0, t })
+        end
+    end
+    local okM, mM = NcmEngineering.install(0, part, item.mount, item.facing, machineId)
+    local out = ("%s %s -> %s %s: mount %s (%s)"):format(d.code, how, item.mount, item.facing, tostring(okM), tostring(mM))
+    if okM and item.bind then
+        local okB, mB = NcmEngineering.bind(0, item.bind[1], item.bind[2], part, item.bind[3])
+        out = out .. (" | bind %s %s: %s (%s)"):format(item.bind[1], item.bind[2], tostring(okB), tostring(mB))
+    end
+    return out
+end
+
+local function ownerGrant()
+    local okS, v = pcall(function() return NcmIdentity and NcmIdentity.settings and NcmIdentity.settings.ownerGrant end)
+    local spec = tostring(okS and v or "")
+    if spec == "" then return end
+    for _ = 1, 60 do   -- the server identity arrives from ncm_league a little after start (KB-363)
+        local ok, id = pcall(function() return GlobalState.ncmIdentity end)
+        if ok and type(id) == "table" and id.serverId then break end
+        Wait(1000)
+    end
+    local dPre, which, kitName = spec:match("^([%w%-]+)|([%w%-]+)|(%w+)$")
+    local kit = kitName and KITS[kitName]
+    if not kit then log("OWNER GRANT ignored: bad spec %q (driver prefix|vehicle|kit; kits: flight, climb)", spec); return end
+    local drv = MySQL.scalar.await("SELECT ncm_driver_id FROM ncm_driver WHERE ncm_driver_id LIKE ? LIMIT 2", { dPre .. "%" })
+    if not drv then log("OWNER GRANT: no driver %s*", dPre); return end
+    local mac, why = ownerMachine(drv, which)
+    if not mac then log("OWNER GRANT: driver ..%s: %s", short(drv), tostring(why)); return end
+    log("OWNER GRANT kit %s -> driver ..%s Machine ..%s (%s)", kitName, short(drv), short(mac), which)
+    local saved = driverOf
+    driverOf = function() return drv end
+    for _, item in ipairs(kit) do
+        local okP, msg = pcall(ownerGrantPart, drv, mac, item)
+        log("OWNER GRANT %s", tostring(msg))
+        Wait(0)
+    end
+    driverOf = saved
+end
+
 AddEventHandler("onResourceStart", function(name)
     if name ~= "ncm_world" then return end
     CreateThread(function()
@@ -741,7 +886,7 @@ AddEventHandler("onResourceStart", function(name)
         local ok, err = pcall(seedDesigns)
         if not ok then log("design seed failed: %s", tostring(err)) end
         local okR, errR = pcall(function()
-            local rows = MySQL.query.await("SELECT spec_json FROM component_design WHERE spec_json IS NOT NULL AND origin_kind='rnd_physical'") or {}
+            local rows = MySQL.query.await("SELECT spec_json FROM component_design WHERE spec_json IS NOT NULL AND origin_kind IN ('rnd_physical','prototype','player_design')") or {}
             for _, row in ipairs(rows) do
                 local spec = dec(row.spec_json)
                 local registered, why = Install.register(spec)
@@ -751,5 +896,7 @@ AddEventHandler("onResourceStart", function(name)
         if not okR then log("physical Design load failed: %s", tostring(errR)) end
         local okG, errG = pcall(devGrant)
         if not okG then log("DEV GRANT failed: %s", tostring(errG)) end
+        local okO, errO = pcall(ownerGrant)
+        if not okO then log("OWNER GRANT failed: %s", tostring(errO)) end
     end)
 end)

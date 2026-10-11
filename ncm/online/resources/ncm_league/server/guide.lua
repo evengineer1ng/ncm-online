@@ -266,6 +266,9 @@ local function pushGuide(pid)
                 placement={p1=r.economy.placement[1],p2=r.economy.placement[2],p3=r.economy.placement[3]}, fieldBonus=r.economy.fieldBonus,
                 repeatFloor=r.economy.repeatFloor, tagBounties=r.economy.tagBounties,
                 maxTagBounty=r.economy.maxTagBounty,
+                intrigueScore=r.economy.intrigueScore, intrigueBand=r.economy.intrigueBand,
+                intrigueSample=r.economy.intrigueSample, intrigueFactor=r.economy.intrigueFactor,
+                moodyPurseTier=r.economy.moodyPurseTier, moodyPurseFactor=r.economy.moodyPurseFactor,
             } or nil,
             weather = eventWeather(wx, r.startsAt) }
         -- L250: a Paddock race -- QUALIFY (a time enters you) / WITHDRAW until T-11, NPCs fill the field

@@ -202,6 +202,57 @@ Core.define("space.guidance", function(C)
         return sustained, now, caps
     end
 
+    --- KB-442 (owner's guided flight 2026-10-10 07:07 UTC): an engine whose thrust line misses the centre of mass turns the
+    --- Machine as it pushes. The FD-1 on the underside with 354 kg of pellets in a front tank passed 0.25 m behind the
+    --- centre of mass: ~7.4 kN m at full thrust against the AC-6's 1.5 and the gimbal's ~0.7, so Guidance tumbled it (spin
+    --- 5 -> 17 rad/s) and fell. Guidance now runs each engine only as hard as the attitude parts can hold it straight
+    --- (TRIM_SHARE of their torque, the rest left for steering), and says so when that is not enough to stay up.
+    M.TRIM_SHARE = 0.7
+
+    --- Per-engine throttle ceilings (by flight-model device index) from the thrust line's miss distance, the engines'
+    --- trimmed total (N), and the worst offender { name, armM, fullNm, holdNm } (nil when every line is close enough).
+    function M.trimCaps(m)
+        local att = 0
+        for _, at in ipairs(m.attitude or {}) do att = att + (at.perf.torqueNm or 0) end
+        local excess, n = {}, 0
+        for i, d in ipairs(m.devices or {}) do
+            if d.kind == "reaction_engine" and d.at and d.dir then
+                local r = V.add(d.at, V.scale(m.com or { 0, 0, 0 }, -1))
+                local perp = V.len(V.cross(r, V.unit(d.dir)))
+                local gimbal = V.len(r) * math.sin(math.rad(d.perf.gimbalDeg or 0))
+                local ex = perp - gimbal
+                if ex > 0.005 then excess[i] = ex; n = n + 1 end
+            end
+        end
+        local caps, trimmedN, worst = {}, 0, nil
+        for i, d in ipairs(m.devices or {}) do
+            if d.kind == "reaction_engine" then
+                local T = d.perf.thrustN or 0
+                local cap = 1
+                if excess[i] then
+                    local holdNm = att * M.TRIM_SHARE / n
+                    cap = T > 0 and math.min(1, holdNm / excess[i] / T) or 0
+                    if cap < 1 and (not worst or cap < worst.cap) then
+                        worst = { name = d.perf.code or d.key, armM = excess[i], fullNm = excess[i] * T, holdNm = holdNm, cap = cap }
+                    end
+                end
+                caps[i] = cap
+                trimmedN = trimmedN + T * cap
+            end
+        end
+        return caps, trimmedN, worst
+    end
+
+    --- Can guidance hold this Machine up once every engine is trimmed? (true when the thrust lines are not the limit)
+    function M.trimFeasible(m, massKg)
+        local _, trimmedN, worst = M.trimCaps(m)
+        if not worst then return true end
+        local tw = trimmedN / (math.max(1, massKg) * M.G_SURFACE)
+        if tw >= M.SUSTAIN_MIN_TW then return true, tw end
+        return false, tw, ("the %s's thrust line passes %.2f m from the centre of mass: at full thrust it turns the Machine with %.1f kN m and the attitude parts hold %.1f, so Guidance may use only %.0f kN (thrust/weight %.2f, needs %.2f). Mount it on the centre line (rear, facing aft), move the heavy tank, or add attitude parts")
+            :format(tostring(worst.name), worst.armM, worst.fullNm / 1000, worst.holdNm / 1000, trimmedN / 1000, tw, M.SUSTAIN_MIN_TW)
+    end
+
     --- Can guidance fly this Machine at all? It has to hold the Machine up on thrust it can keep making.
     function M.feasible(sustainedN, massKg)
         local tw = sustainedN / (math.max(1, massKg) * M.G_SURFACE)
@@ -292,6 +343,7 @@ Core.define("space.guidance", function(C)
         local F = C.get("engineering.flightmodel")
         local mass = Dyn.mass(m, s)
         local nowN, caps = 0, {}
+        local trim = opts.waiver and {} or M.trimCaps(m)   -- KB-442: never push harder than the Machine can be held straight
         for i, d in ipairs(m.devices) do
             if d.kind == "reaction_engine" then
                 local th, heat, st = d.thermal, d.perf.heatKw or 0, s.dev and s.dev[i]
@@ -300,6 +352,7 @@ Core.define("space.guidance", function(C)
                 if not opts.devHeat and st and th and th.limitK then
                     if st.hot then cap = 0 elseif st.heatK >= M.HEAT_RESERVE * th.limitK then cap = frac end
                 end
+                cap = math.min(cap, trim[i] or 1)
                 caps[i] = cap
                 nowN = nowN + (d.perf.thrustN or 0) * cap
             end

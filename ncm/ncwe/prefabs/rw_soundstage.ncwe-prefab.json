@@ -1,0 +1,571 @@
+{
+  "name": "rw_soundstage",
+  "description": "Race Week floating/beach soundstage: q303 round stage \u002B runway, 13 m NCM screen, black truss towers, speaker stacks, cyan/pink/white lights. Runway points along the prefab\u0027s audience direction.",
+  "saved": "2026-10-08T08:43:02.2143581-04:00",
+  "items": 15,
+  "prefab": {
+    "Version": 1,
+    "Name": "rw_soundstage",
+    "Items": [
+      {
+        "Kind": "mesh",
+        "Name": "pdm_soundstage",
+        "Transform": {
+          "Position": {
+            "X": 5.379883,
+            "Y": 3.9533691,
+            "Z": 0
+          },
+          "Rotation": {
+            "IsIdentity": false,
+            "X": 0,
+            "Y": 0,
+            "Z": 0.89841115,
+            "W": 0.4391553
+          },
+          "Scale": {
+            "X": 0.99999994,
+            "Y": 0.99999994,
+            "Z": 1
+          }
+        },
+        "Mesh": {
+          "Hash": 16862804411737354946,
+          "Path": "ep1\\fx\\quest\\q303\\paradise_hotel\\concert\\concert_stage.mesh",
+          "Appearance": "default"
+        },
+        "Shapes": [],
+        "CookedSector": 0
+      },
+      {
+        "Kind": "mesh",
+        "Name": "pdm_stage_screen",
+        "Transform": {
+          "Position": {
+            "X": -2.920166,
+            "Y": -2.5466309,
+            "Z": 1.45
+          },
+          "Rotation": {
+            "IsIdentity": false,
+            "X": 0,
+            "Y": 0,
+            "Z": -0.4391553,
+            "W": 0.89841115
+          },
+          "Scale": {
+            "X": 1.6,
+            "Y": 1.6,
+            "Z": 1.6
+          }
+        },
+        "Mesh": {
+          "Hash": 3612606769755676794,
+          "Path": "ncwe\\custom\\rw_screen_welcome_430026\\rw_screen_welcome_430026.mesh",
+          "Appearance": "default"
+        },
+        "Shapes": [],
+        "CookedSector": 0
+      },
+      {
+        "Kind": "mesh",
+        "Name": "pdm_stage_truss_L1",
+        "Transform": {
+          "Position": {
+            "X": 1.6799316,
+            "Y": -8.446655,
+            "Z": 1.4000001
+          },
+          "Rotation": {
+            "IsIdentity": false,
+            "X": 0,
+            "Y": 0,
+            "Z": -0.4391553,
+            "W": 0.89841115
+          },
+          "Scale": {
+            "X": 1,
+            "Y": 1,
+            "Z": 1
+          }
+        },
+        "Mesh": {
+          "Hash": 11752674468989789703,
+          "Path": "base\\environment\\decoration\\industrial\\platform\\stage\\stage_a_truss_l400_a.mesh",
+          "Appearance": "black"
+        },
+        "Shapes": [],
+        "CookedSector": 0
+      },
+      {
+        "Kind": "mesh",
+        "Name": "pdm_stage_truss_L2",
+        "Transform": {
+          "Position": {
+            "X": 1.6799316,
+            "Y": -8.446655,
+            "Z": 5.3999996
+          },
+          "Rotation": {
+            "IsIdentity": false,
+            "X": 0,
+            "Y": 0,
+            "Z": -0.4391553,
+            "W": 0.89841115
+          },
+          "Scale": {
+            "X": 1,
+            "Y": 1,
+            "Z": 1
+          }
+        },
+        "Mesh": {
+          "Hash": 11752674468989789703,
+          "Path": "base\\environment\\decoration\\industrial\\platform\\stage\\stage_a_truss_l400_a.mesh",
+          "Appearance": "black"
+        },
+        "Shapes": [],
+        "CookedSector": 0
+      },
+      {
+        "Kind": "mesh",
+        "Name": "pdm_stage_truss_R1",
+        "Transform": {
+          "Position": {
+            "X": -7.5200195,
+            "Y": 3.3533936,
+            "Z": 1.4000001
+          },
+          "Rotation": {
+            "IsIdentity": false,
+            "X": 0,
+            "Y": 0,
+            "Z": -0.4391553,
+            "W": 0.89841115
+          },
+          "Scale": {
+            "X": 1,
+            "Y": 1,
+            "Z": 1
+          }
+        },
+        "Mesh": {
+          "Hash": 11752674468989789703,
+          "Path": "base\\environment\\decoration\\industrial\\platform\\stage\\stage_a_truss_l400_a.mesh",
+          "Appearance": "black"
+        },
+        "Shapes": [],
+        "CookedSector": 0
+      },
+      {
+        "Kind": "mesh",
+        "Name": "pdm_stage_truss_R2",
+        "Transform": {
+          "Position": {
+            "X": -7.5200195,
+            "Y": 3.3533936,
+            "Z": 5.3999996
+          },
+          "Rotation": {
+            "IsIdentity": false,
+            "X": 0,
+            "Y": 0,
+            "Z": -0.4391553,
+            "W": 0.89841115
+          },
+          "Scale": {
+            "X": 1,
+            "Y": 1,
+            "Z": 1
+          }
+        },
+        "Mesh": {
+          "Hash": 11752674468989789703,
+          "Path": "base\\environment\\decoration\\industrial\\platform\\stage\\stage_a_truss_l400_a.mesh",
+          "Appearance": "black"
+        },
+        "Shapes": [],
+        "CookedSector": 0
+      },
+      {
+        "Kind": "mesh",
+        "Name": "pdm_stage_speaker_L1",
+        "Transform": {
+          "Position": {
+            "X": 2.2797852,
+            "Y": -5.9466553,
+            "Z": 1.4000001
+          },
+          "Rotation": {
+            "IsIdentity": false,
+            "X": 0,
+            "Y": 0,
+            "Z": -0.4391553,
+            "W": 0.89841115
+          },
+          "Scale": {
+            "X": 1,
+            "Y": 1,
+            "Z": 1
+          }
+        },
+        "Mesh": {
+          "Hash": 8160518342521577217,
+          "Path": "base\\environment\\decoration\\misc\\music\\speaker\\speaker_a_array_a.mesh",
+          "Appearance": "default"
+        },
+        "Shapes": [],
+        "CookedSector": 0
+      },
+      {
+        "Kind": "mesh",
+        "Name": "pdm_stage_speaker_L2",
+        "Transform": {
+          "Position": {
+            "X": 2.2797852,
+            "Y": -5.9466553,
+            "Z": 3.3500001
+          },
+          "Rotation": {
+            "IsIdentity": false,
+            "X": 0,
+            "Y": 0,
+            "Z": -0.4391553,
+            "W": 0.89841115
+          },
+          "Scale": {
+            "X": 1,
+            "Y": 1,
+            "Z": 1
+          }
+        },
+        "Mesh": {
+          "Hash": 8160518342521577217,
+          "Path": "base\\environment\\decoration\\misc\\music\\speaker\\speaker_a_array_a.mesh",
+          "Appearance": "default"
+        },
+        "Shapes": [],
+        "CookedSector": 0
+      },
+      {
+        "Kind": "mesh",
+        "Name": "pdm_stage_speaker_R1",
+        "Transform": {
+          "Position": {
+            "X": -5.3200684,
+            "Y": 3.8533936,
+            "Z": 1.4000001
+          },
+          "Rotation": {
+            "IsIdentity": false,
+            "X": 0,
+            "Y": 0,
+            "Z": -0.4391553,
+            "W": 0.89841115
+          },
+          "Scale": {
+            "X": 1,
+            "Y": 1,
+            "Z": 1
+          }
+        },
+        "Mesh": {
+          "Hash": 8160518342521577217,
+          "Path": "base\\environment\\decoration\\misc\\music\\speaker\\speaker_a_array_a.mesh",
+          "Appearance": "default"
+        },
+        "Shapes": [],
+        "CookedSector": 0
+      },
+      {
+        "Kind": "mesh",
+        "Name": "pdm_stage_speaker_R2",
+        "Transform": {
+          "Position": {
+            "X": -5.3200684,
+            "Y": 3.8533936,
+            "Z": 3.3500001
+          },
+          "Rotation": {
+            "IsIdentity": false,
+            "X": 0,
+            "Y": 0,
+            "Z": -0.4391553,
+            "W": 0.89841115
+          },
+          "Scale": {
+            "X": 1,
+            "Y": 1,
+            "Z": 1
+          }
+        },
+        "Mesh": {
+          "Hash": 8160518342521577217,
+          "Path": "base\\environment\\decoration\\misc\\music\\speaker\\speaker_a_array_a.mesh",
+          "Appearance": "default"
+        },
+        "Shapes": [],
+        "CookedSector": 0
+      },
+      {
+        "Kind": "element",
+        "Name": "pdm_stage_light_cyan_L",
+        "Transform": {
+          "Position": {
+            "X": 1.6799316,
+            "Y": -8.446655,
+            "Z": 9.2
+          },
+          "Rotation": {
+            "IsIdentity": true,
+            "X": 0,
+            "Y": 0,
+            "Z": 0,
+            "W": 1
+          },
+          "Scale": {
+            "X": 1,
+            "Y": 1,
+            "Z": 1
+          }
+        },
+        "Element": {
+          "Kind": 0,
+          "LightType": 0,
+          "Color": {
+            "X": 0.34,
+            "Y": 0.93,
+            "Z": 1
+          },
+          "Temperature": -1,
+          "Intensity": 6000,
+          "Radius": 22,
+          "InnerAngle": 30,
+          "OuterAngle": 45,
+          "Shadows": false,
+          "Resource": "",
+          "Appearance": "",
+          "Alpha": 1,
+          "OccluderType": "Default",
+          "AutohideScale": 255,
+          "ResourceExtension": "",
+          "DisplayColor": {
+            "X": 0.34,
+            "Y": 0.93,
+            "Z": 1
+          }
+        },
+        "Shapes": [],
+        "CookedSector": 0
+      },
+      {
+        "Kind": "element",
+        "Name": "pdm_stage_light_pink_R",
+        "Transform": {
+          "Position": {
+            "X": -7.5200195,
+            "Y": 3.3533936,
+            "Z": 9.2
+          },
+          "Rotation": {
+            "IsIdentity": true,
+            "X": 0,
+            "Y": 0,
+            "Z": 0,
+            "W": 1
+          },
+          "Scale": {
+            "X": 1,
+            "Y": 1,
+            "Z": 1
+          }
+        },
+        "Element": {
+          "Kind": 0,
+          "LightType": 0,
+          "Color": {
+            "X": 1,
+            "Y": 0.18,
+            "Z": 0.59
+          },
+          "Temperature": -1,
+          "Intensity": 6000,
+          "Radius": 22,
+          "InnerAngle": 30,
+          "OuterAngle": 45,
+          "Shadows": false,
+          "Resource": "",
+          "Appearance": "",
+          "Alpha": 1,
+          "OccluderType": "Default",
+          "AutohideScale": 255,
+          "ResourceExtension": "",
+          "DisplayColor": {
+            "X": 1,
+            "Y": 0.18,
+            "Z": 0.59
+          }
+        },
+        "Shapes": [],
+        "CookedSector": 0
+      },
+      {
+        "Kind": "element",
+        "Name": "pdm_stage_light_wash",
+        "Transform": {
+          "Position": {
+            "X": 4.879883,
+            "Y": 4.5533447,
+            "Z": 4.7
+          },
+          "Rotation": {
+            "IsIdentity": true,
+            "X": 0,
+            "Y": 0,
+            "Z": 0,
+            "W": 1
+          },
+          "Scale": {
+            "X": 1,
+            "Y": 1,
+            "Z": 1
+          }
+        },
+        "Element": {
+          "Kind": 0,
+          "LightType": 0,
+          "Color": {
+            "X": 1,
+            "Y": 1,
+            "Z": 1
+          },
+          "Temperature": 5600,
+          "Intensity": 4000,
+          "Radius": 16,
+          "InnerAngle": 30,
+          "OuterAngle": 45,
+          "Shadows": false,
+          "Resource": "",
+          "Appearance": "",
+          "Alpha": 1,
+          "OccluderType": "Default",
+          "AutohideScale": 255,
+          "ResourceExtension": "",
+          "DisplayColor": {
+            "X": 1,
+            "Y": 0.938374,
+            "Z": 0.88348985
+          }
+        },
+        "Shapes": [],
+        "CookedSector": 0
+      },
+      {
+        "Kind": "element",
+        "Name": "pdm_runway_light",
+        "Transform": {
+          "Position": {
+            "X": 10.879883,
+            "Y": 9.553345,
+            "Z": 2.7
+          },
+          "Rotation": {
+            "IsIdentity": true,
+            "X": 0,
+            "Y": 0,
+            "Z": 0,
+            "W": 1
+          },
+          "Scale": {
+            "X": 1,
+            "Y": 1,
+            "Z": 1
+          }
+        },
+        "Element": {
+          "Kind": 0,
+          "LightType": 0,
+          "Color": {
+            "X": 0.34,
+            "Y": 0.93,
+            "Z": 1
+          },
+          "Temperature": -1,
+          "Intensity": 2500,
+          "Radius": 12,
+          "InnerAngle": 30,
+          "OuterAngle": 45,
+          "Shadows": false,
+          "Resource": "",
+          "Appearance": "",
+          "Alpha": 1,
+          "OccluderType": "Default",
+          "AutohideScale": 255,
+          "ResourceExtension": "",
+          "DisplayColor": {
+            "X": 0.34,
+            "Y": 0.93,
+            "Z": 1
+          }
+        },
+        "Shapes": [],
+        "CookedSector": 0
+      },
+      {
+        "Kind": "collision",
+        "Name": "pdm_soundstage collision",
+        "Transform": {
+          "Position": {
+            "X": 5.3796387,
+            "Y": 3.9533691,
+            "Z": 0
+          },
+          "Rotation": {
+            "IsIdentity": false,
+            "X": 0,
+            "Y": 0,
+            "Z": 0.89841115,
+            "W": 0.4391553
+          },
+          "Scale": {
+            "X": 1,
+            "Y": 1,
+            "Z": 1
+          }
+        },
+        "Shapes": [
+          {
+            "Kind": 0,
+            "Position": {
+              "X": 0.025075436,
+              "Y": 4.673004E-05,
+              "Z": -1.0728836E-05
+            },
+            "Rotation": {
+              "IsIdentity": true,
+              "X": 0,
+              "Y": 0,
+              "Z": 0,
+              "W": 1
+            },
+            "Size": {
+              "X": 5.2473307,
+              "Y": 10.090235,
+              "Z": 1.3848433
+            },
+            "MeshHash": 0,
+            "Preset": "World Static",
+            "Material": "concrete.physmat",
+            "IsMesh": false,
+            "HalfExtents": {
+              "X": 5.2473307,
+              "Y": 10.090235,
+              "Z": 1.3848433
+            }
+          }
+        ],
+        "CookedSector": 0
+      }
+    ]
+  }
+}

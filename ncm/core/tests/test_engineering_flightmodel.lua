@@ -71,7 +71,8 @@ return {
         local gdv = 9.7 * 0.32   -- gravity over the same 0.32 s, straight against the stroke
         local expect = 53000 * 0.2 / m.wetMassKg
         T.ok(math.abs(dv - (expect - gdv)) < 0.2, ("one stroke up against gravity: %.2f m/s (impulse %.2f, gravity %.2f)"):format(dv, expect, gdv))
-        T.ok(math.abs(s.omega[1]) > 1e-4, "an underside stroke off the CoM pitches it a little")
+        -- L360 addendum: the floor pan is centred, so an underside stroke goes through the centre of mass
+        T.ok(math.abs(s.omega[1]) < 1e-6, ("an underside stroke does not pitch it (%.2e rad/s)"):format(s.omega[1]))
     end,
 
     air_thins_with_altitude = function(T)

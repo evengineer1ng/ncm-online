@@ -41,6 +41,8 @@ Current content-rights register: [NCM server-mod licensing catalog](NCM_SERVER_M
 package-by-package distinction between server-hosted delivery, written-permission candidates and content that
 is off the table today; Cohort 1 and its hard dependencies are the first audited batch.
 
+Current Week vehicle API check: [damage, trunk state and item custody boundary](WEEK_VEHICLE_API_2026-10-08.md) - current official web docs checked on 2026-10-08 for L349; the build-pinned MCP was unreachable here and no live experiment passed.
+
 Current presentation research: [presentation capability audit](PRESENTATION_CAPABILITY_AUDIT.md) — the visual,
 spatial, motion and audio vocabulary actually available to NCM Online: shipped OPEN//77 presentation services, the
 eight-CEF-surface ceiling, native/WebUI hybrid projection, world-space mechanisms (markers, props, world televisions,

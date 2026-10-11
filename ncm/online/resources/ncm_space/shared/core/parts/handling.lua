@@ -152,7 +152,7 @@ Core.define("parts.handling", function(C)
     -- the contact patch delivers. The trace then reads top to bottom as the story of how grip got here.
     -- `fuel` (`L208`): the mass of what is in the tank, a property of THIS Machine right now, so it sits
     -- with `wear` before the world layers.
-    M.LAYERS = { "parts", "wear", "fuel", "weather", "surface", "thermal", "chrome", "ruleset" }
+    M.LAYERS = { "parts", "wear", "repair", "fuel", "weather", "surface", "thermal", "chrome", "ruleset" }
 
     --- Contributors other than `parts` supply plain per-lever multipliers. They are quantised before they
     --- reach a lever, and that is load-bearing rather than tidy: `signature()` formats at `%.4f` and

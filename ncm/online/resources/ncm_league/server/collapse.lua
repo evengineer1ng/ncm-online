@@ -30,6 +30,11 @@ local function cfg() return Week.config(GetConvar or function(_, d) return d end
 local function mode() return (GetConvar and GetConvar("ncm_week_collapse", "dryrun")) or "dryrun" end
 local function enc(v) local ok, x = pcall(Json.encode, v); return ok and x or "{}" end
 
+local function singlePlayer()
+    local ok, h = pcall(function() return Open77.runtime.host and Open77.runtime.host() end)
+    return ok and h == "ncm_sp"
+end
+
 local CROWN_GRACE_S = 25 * 60
 
 -- the timeline (doc 47): runIndex -> { endUtc, endKind, survived }, from ncm_world's rows
@@ -73,7 +78,7 @@ local function drivers(base)
 end
 
 local function carsOf(base, driverId)
-    local cars = MySQL.query.await([[SELECT asset_id, record, odometer_m, acquired_via, granted_by FROM vehicle_asset
+    local cars = MySQL.query.await([[SELECT asset_id, record, odometer_m, last_driven_at, acquired_via, granted_by FROM vehicle_asset
         WHERE server_id = ? AND ncm_driver_id = ?]], { base, driverId }) or {}
     local raced = {}
     for _, r in ipairs(MySQL.query.await([[SELECT sr.asset_id, COUNT(*) AS n, SUM(sr.state = 'finished' AND sr.position = 1) AS wins
@@ -84,7 +89,7 @@ local function carsOf(base, driverId)
     for _, c in ipairs(cars) do
         local r = raced[c.asset_id] or { n = 0, wins = 0 }
         out[#out + 1] = { assetId = c.asset_id, record = c.record, races = r.n, sanctionedWins = r.wins,
-            odometerM = tonumber(c.odometer_m) or 0,
+            odometerM = tonumber(c.odometer_m) or 0, lastDrivenAt = tonumber(c.last_driven_at),
             -- a car a run condition granted (doc 45 §G) -- none exist yet; the rule is in place for when they do
             conditionGrant = c.acquired_via == "grant" and tostring(c.granted_by or ""):match("^condition:") ~= nil }
     end
@@ -108,8 +113,19 @@ end
 local function chosenFor(base, run, driverId)
     local out = {}
     for _, r in ipairs(MySQL.query.await([[SELECT asset_id FROM racing_week_anchor WHERE server_id = ? AND run_index = ?
-        AND ncm_driver_id = ? AND source = 'chosen' ORDER BY chosen_at]], { base, run, driverId }) or {}) do out[#out + 1] = r.asset_id end
+        AND ncm_driver_id = ? AND source = 'chosen' ORDER BY chosen_at DESC, asset_id]], { base, run, driverId }) or {}) do out[#out + 1] = r.asset_id end
     return out
+end
+
+function NcmCollapse.anchorStatus(driverId)
+    if singlePlayer() then return nil end
+    local at = weekAt(cfg(), now())
+    if not at then return nil end
+    local cars = carsOf(sid(), driverId)
+    local chosen = chosenFor(sid(), at.runIndex, driverId)
+    local selected = K.onlineAnchor(cars, chosen)
+    return { runIndex = at.runIndex, assetId = selected[1] and selected[1].assetId or nil,
+        source = selected[1] and selected[1].source or nil }
 end
 
 --- The full plan for run `run` -- read-only.
@@ -120,15 +136,18 @@ function NcmCollapse.plan(run)
     for i, d in ipairs(drivers(base)) do
         local cars = carsOf(base, d)
         local h = history(base, d, c)
-        local slots = K.anchorSlots(h)
-        local anchors, refused = K.anchors(cars, chosenFor(base, run, d), slots)
+        local slots = singlePlayer() and K.anchorSlots(h) or 1
+        local anchors, refused
+        if singlePlayer() then anchors, refused = K.anchors(cars, chosenFor(base, run, d), slots)
+        else anchors, refused = K.onlineAnchor(cars, chosenFor(base, run, d)) end
         local keep = {}
         for _, a in ipairs(anchors) do keep[a.assetId] = true end
         local move = {}
         for _, car in ipairs(cars) do if not keep[car.assetId] then move[#move + 1] = car.assetId end end
         local sr = tonumber(MySQL.scalar.await("SELECT sr FROM driver_sr WHERE ncm_driver_id = ? AND server_id = ?", { d, base }))
         plan.drivers[#plan.drivers + 1] = { driverId = d, balance = NcmEconomy.balanceOf(d) or 0, slots = slots, history = h,
-            anchors = anchors, refused = refused, moveCars = move, cars = #cars, sr = sr, srAfter = sr and K.srReset(sr) or nil,
+            anchors = anchors, refused = refused, moveCars = move, cars = #cars, sr = sr,
+            srAfter = sr and (singlePlayer() and K.srReset(sr) or 5.0) or nil,
             wallet = K.wallet(NcmEconomy.balanceOf(d) or 0, Markets.STARTER_GRANT) }
         if i % 10 == 0 then Wait(0) end
     end
@@ -155,12 +174,7 @@ end
 
 -- ---------------------------------------------------------------------------------------------------- execute
 
--- Single player (the NCM Host, L338): money is the player's eddies and the owner ruled it does NOT reset at rollover.
--- OPEN//77 has no `Open77.runtime.host`, so on every server this is false and nothing changes there.
-local function singlePlayer()
-    local ok, h = pcall(function() return Open77.runtime.host and Open77.runtime.host() end)
-    return ok and h == "ncm_sp"
-end
+-- Single player keeps its earlier wallet and anchor policy (L338); this new rule is for Online.
 
 local function executeDrivers(plan, t)
     local base, archive = plan.server, plan.archive
@@ -182,12 +196,27 @@ local function executeDrivers(plan, t)
         for _, assetId in ipairs(d.moveCars) do
             tx[#tx + 1] = { query = "UPDATE component_asset SET server_id = ? WHERE server_id = ? AND machine_asset_id = ?", values = { archive, base, assetId } }
             tx[#tx + 1] = { query = "UPDATE vehicle_asset SET server_id = ? WHERE server_id = ? AND asset_id = ?", values = { archive, base, assetId } }
+            tx[#tx + 1] = { query = "UPDATE vehicle_week_condition SET server_id = ? WHERE server_id = ? AND asset_id = ?", values = { archive, base, assetId } }
+        end
+        if not keepMoney then
+            for _, a in ipairs(d.anchors) do
+                tx[#tx + 1] = { query = "UPDATE vehicle_week_condition SET damage_json = NULL, repair_json = NULL, recorded_at = NULL WHERE server_id = ? AND asset_id = ?", values = { base, a.assetId } }
+            end
         end
         -- loose parts (not fitted to any machine) are physical inventory: they go with the run
         tx[#tx + 1] = { query = "UPDATE component_asset SET server_id = ? WHERE server_id = ? AND ncm_driver_id = ? AND machine_asset_id IS NULL",
             values = { archive, base, d.driverId } }
+        if not keepMoney then
+            tx[#tx + 1] = { query = "UPDATE driver_licence SET server_id=? WHERE ncm_driver_id=? AND server_id=?", values = { archive,d.driverId,base } }
+            tx[#tx + 1] = { query = "UPDATE driver_rating SET server_id=? WHERE ncm_driver_id=? AND server_id=?", values = { archive,d.driverId,base } }
+        end
         if d.srAfter then
-            tx[#tx + 1] = { query = "UPDATE driver_sr SET sr = ?, updated_at = ? WHERE ncm_driver_id = ? AND server_id = ?", values = { d.srAfter, t, d.driverId, base } }
+            if keepMoney then
+                tx[#tx + 1] = { query = "UPDATE driver_sr SET sr = ?, updated_at = ? WHERE ncm_driver_id = ? AND server_id = ?", values = { d.srAfter, t, d.driverId, base } }
+            else
+                tx[#tx + 1] = { query = "UPDATE driver_sr SET sr = ?, incidents=0, clean_sessions=0, updated_at = ? WHERE ncm_driver_id = ? AND server_id = ?",
+                    values = { d.srAfter, t, d.driverId, base } }
+            end
         end
         tx[#tx + 1] = { query = [[UPDATE team_affiliation SET effective_to = ?, end_reason = 'reconstruction' WHERE server_id = ?
             AND ncm_driver_id = ? AND circuit = 'npc' AND effective_to IS NULL]], values = { t, base, d.driverId } }
@@ -215,6 +244,7 @@ function NcmCollapse.run(run, m, force)
         local done = MySQL.single.await("SELECT state FROM racing_week_collapse WHERE server_id = ? AND run_index = ? AND mode = ?", { base, run, m })
         if done and not force and (done.state == "done" or done.state == "executing") then return nil, "already " .. done.state end
         local t = now()
+        if m == "live" then TriggerEvent("ncm:week:collapse.prepare", run) end
         local plan = NcmCollapse.plan(run)
         log("%s PLAN %s", m:upper(), summary(plan))
         for _, d in ipairs(plan.drivers) do
@@ -231,8 +261,9 @@ function NcmCollapse.run(run, m, force)
             return true
         end
         record(plan, m, "executing", nil, t)
+        TriggerEvent("ncm:week:collapse.begin", run)
         local okD, why = executeDrivers(plan, t)
-        if not okD then record(plan, m, "failed", { error = why }, t); log("LIVE collapse FAILED (drivers): %s", why); return nil, why end
+        if not okD then TriggerEvent("ncm:week:collapse.abort", run); record(plan, m, "failed", { error = why }, t); log("LIVE collapse FAILED (drivers): %s", why); return nil, why end
         -- the Paddock moves its world and restarts into the historical seed; every called car goes home
         TriggerEvent("ncm:week:collapse.paddock", run, plan.archive)
         TriggerEvent("ncm:week:collapsed", run, plan.archive)
@@ -296,6 +327,10 @@ end, false)
 RegisterCommand("ncm.anchor", function(source, args)
     local pid = tonumber(source) or 0
     if pid <= 0 then return end
+    if not singlePlayer() then
+        pcall(Open77.chat.send, pid, "[NCM] Choose your one anchor in Machine Index.")
+        return
+    end
     CreateThread(function()
         local d = NcmCalendar.resolveDriver(pid)
         if not d then return end
@@ -337,5 +372,42 @@ RegisterCommand("ncm.anchor", function(source, args)
         if not next(chosen) then pcall(Open77.chat.send, pid, "  (nothing marked: your most-raced car is kept)") end
     end)
 end, false)
+
+-- The Machine Index is the Online anchor control. A client supplies only an asset id; title,
+-- eligibility and run are read again on the server. Empty id clears an explicit choice and
+-- returns to the last-driven default.
+local anchorBusy = {}
+RegisterNetEvent("ncm:week.anchor.select", function(assetId)
+    local pid = tonumber(source) or 0
+    if pid <= 0 or anchorBusy[pid] then return end
+    anchorBusy[pid] = true
+    CreateThread(function()
+        local ok, err = pcall(function()
+            if singlePlayer() then return end
+            local d = NcmCalendar.resolveDriver(pid)
+            local at = weekAt(cfg(), now())
+            if not d or not at then return end
+            local id = tostring(assetId or "")
+            if id ~= "" then
+                local car
+                for _, c in ipairs(carsOf(sid(), d.ncmDriverId)) do if c.assetId == id then car = c; break end end
+                if not car or not K.anchorable(car) then return end
+            end
+            local tx = { { query = "DELETE FROM racing_week_anchor WHERE server_id=? AND run_index=? AND ncm_driver_id=? AND source='chosen'",
+                values = { sid(), at.runIndex, d.ncmDriverId } } }
+            if id ~= "" then tx[#tx + 1] = { query = [[INSERT INTO racing_week_anchor
+                (server_id,run_index,ncm_driver_id,asset_id,source,chosen_at) VALUES (?,?,?,?,'chosen',?)]],
+                values = { sid(), at.runIndex, d.ncmDriverId, id, now() } } end
+            local committed, why = MySQL.transaction.await(tx)
+            if not committed then error(tostring(why)) end
+            if NcmCollection and NcmCollection.payload then
+                local payload = NcmCollection.payload(pid)
+                if payload then NcmStream.send(pid, "ncm:collection", payload, "slots") end
+            end
+        end)
+        anchorBusy[pid] = nil
+        if not ok then log("anchor selection failed: %s", tostring(err)) end
+    end)
+end)
 
 log("ready: collapse mode %s (dryrun until the owner says live)", mode())

@@ -22,6 +22,10 @@ Core.define("parts.rnd",function(C)
         ["archer:impulse"]={makerKey="archer",root="eng:archer:ia10:r1",offsetSec=24*3600},
         ["zetatech:tank"]={makerKey="zetatech",root="eng:zetatech:pt500:r1",offsetSec=30*3600},
         ["zetatech:fusion"]={makerKey="zetatech",root="eng:zetatech:fd1:r1",offsetSec=36*3600},
+        -- stacked gearboxes (owner, 2026-10-08): driveline boxes reach markets through the makers' own research
+        ["thorton:overdrive"]={makerKey="thorton",root="eng:thorton:od6:r1",offsetSec=6*3600},
+        ["archer:range"]={makerKey="archer",root="eng:archer:cr2:r1",offsetSec=9*3600},
+        ["thorton:closeratio"]={makerKey="thorton",root="eng:thorton:cs5:r1",offsetSec=15*3600},
     }
     M.PHYSICAL_CADENCE_SEC=48*3600
     local function hash(s) local h=2166136261 for i=1,#s do h=(h*16777619+s:byte(i))%4294967296 end return h end

@@ -245,7 +245,6 @@ bool buildClone(const CloneSpec& clone, bool reverseFirst, double gearHeadroom)
     manual::VirtualSpec vspec;
     vspec.spec = clone.spec;
     vspec.audio = audioPrefixOf(clone.base);
-    vspec.longGear = RED4ext::TweakDBID(engineName + "_long").value;
     vspec.shiftMs = clone.shiftMs;
     vspec.idleRpm = forward.front().minRpm > 0.0f ? forward.front().minRpm : 800.0f;
     vspec.maxRpm = maxRpm > vspec.idleRpm ? maxRpm : vspec.idleRpm + 4000.0f;
@@ -257,6 +256,10 @@ bool buildClone(const CloneSpec& clone, bool reverseFirst, double gearHeadroom)
         std::sort(tops.begin(), tops.end());
         vspec.audioMaxRpm = tops.empty() ? vspec.maxRpm : tops[tops.size() / 2];
     }
+    // 0.4.0: the model's own gears, stretched to the reference top the way Carrier stretches the automatic -- the
+    // torque a slice gets is the torque the automatic has at that slice's speed
+    const float stretch = refTop / nativeTop;
+    for (const auto& g : forward) { vspec.modelTopMps.push_back(g.maxSpeed * stretch); vspec.modelTorque.push_back(g.torque); }
     float top = 0.0f;
     for (size_t i = 0; i < clone.ratios.size(); ++i) {
         const float ceiling = static_cast<float>(clone.ratios[i] * refTop);
@@ -266,41 +269,50 @@ bool buildClone(const CloneSpec& clone, bool reverseFirst, double gearHeadroom)
         vg.share = std::clamp(tpl.torque / nativeTorque, 0.05f, 1.0f);
         vspec.gears.push_back(vg);
         top = std::max(top, ceiling);
-        vspec.longTopMps = top * 1.02f;
         GBX_INFO("  %s virtual gear %zu: to %.0f km/h, %.0f%% of the long gear's torque (model band %.0f km/h, torqueMul %.3f)",
                  clone.spec.c_str(), i + 1, ceiling * 3.6, vg.share * 100.0, tpl.maxSpeed * 3.6, tpl.torque);
     }
 
+    vspec.longTopMps = top * 1.02f;   // a hair past the top virtual gear's limiter
+    for (int k = 0; k < kSlices; ++k) vspec.slices.push_back(RED4ext::TweakDBID(engineName + "_s" + std::to_string(k + 1)).value);
     if (alreadyBuilt) { manual::registerSpec(vehicle.value, std::move(vspec)); return true; }
 
     RED4ext::DynArray<RED4ext::TweakDBID> gearIds;
     if (reverse) gearIds.EmplaceBack(reverse->id);   // the model's own reverse, shared
     {
+        // 0.4.0: SEVEN native gears, laid out over the full range here; manual.cpp re-slices them to the selected gear
         const auto gearProps = propertiesOf("gamedataVehicleGear_Record");
         const Gear& tpl = forward.front();
-        const RED4ext::TweakDBID gid(engineName + "_long");
-        float minSpeed = 0.0f, maxSpeed = top * 1.02f;        // a hair past the top virtual gear's limiter
-        float minRpm = vspec.idleRpm, maxRpmV = vspec.maxRpm, torque = nativeTorque;
-        for (const auto& prop : gearProps) {
-            int32_t off = 0;
-            if (offsetOf(tdb, RED4ext::TweakDBID(tpl.id, "." + prop), off)) addFlatAt(tdb, RED4ext::TweakDBID(gid, "." + prop), off);
+        for (int k = 0; k < kSlices; ++k) {
+            const RED4ext::TweakDBID gid(engineName + "_s" + std::to_string(k + 1));
+            // every slice starts at 0 km/h: `.minSpeed` is a FLOOR the engine pushes the car up to (Carrier tweak.cpp),
+            // and `.minEngineRPM` is the rpm at 0 km/h -- so every slice is the same rpm line, cut at its own top, and
+            // the revs never jump at a slice boundary
+            float minSpeed = 0.0f, maxSpeed = vspec.longTopMps * (k + 1) / kSlices;
+            float minRpm = vspec.idleRpm;
+            float maxRpmV = vspec.idleRpm + (vspec.maxRpm - vspec.idleRpm) * (k + 1) / kSlices;
+            float torque = templateFor(forward, maxSpeed / stretch).torque;
+            for (const auto& prop : gearProps) {
+                int32_t off = 0;
+                if (offsetOf(tdb, RED4ext::TweakDBID(tpl.id, "." + prop), off)) addFlatAt(tdb, RED4ext::TweakDBID(gid, "." + prop), off);
+            }
+            auto put = [&](const char* suffix, float& v) {
+                const RED4ext::TweakDBID flat(gid, suffix);
+                int32_t probe = 0;
+                if (offsetOf(tdb, flat, probe)) return repoint(tdb, flat, "Float", v);
+                const int32_t off = newValue(tdb, "Float", v);
+                return off >= 0 && addFlatAt(tdb, flat, off);
+            };
+            const bool ok = put(".minSpeed", minSpeed) && put(".maxSpeed", maxSpeed) && put(".minEngineRPM", minRpm)
+                            && put(".maxEngineRPM", maxRpmV) && put(".torqueMultiplier", torque);
+            if (!ok || !tdb->CreateRecord(gid, gearClass)) {
+                if (!tdb->GetRecord(gid)) { GBX_ERR("%s: native slice %d was refused", clone.record.c_str(), k + 1); return false; }
+            }
+            tdb->UpdateRecord(gid);
+            gearIds.EmplaceBack(gid);
         }
-        auto put = [&](const char* suffix, float& v) {
-            const RED4ext::TweakDBID flat(gid, suffix);
-            int32_t probe = 0;
-            if (offsetOf(tdb, flat, probe)) return repoint(tdb, flat, "Float", v);
-            const int32_t off = newValue(tdb, "Float", v);
-            return off >= 0 && addFlatAt(tdb, flat, off);
-        };
-        const bool ok = put(".minSpeed", minSpeed) && put(".maxSpeed", maxSpeed) && put(".minEngineRPM", minRpm)
-                        && put(".maxEngineRPM", maxRpmV) && put(".torqueMultiplier", torque);
-        if (!ok || !tdb->CreateRecord(gid, gearClass)) {
-            if (!tdb->GetRecord(gid)) { GBX_ERR("%s: the long gear was refused", clone.record.c_str()); return false; }
-        }
-        tdb->UpdateRecord(gid);
-        gearIds.EmplaceBack(gid);
-        GBX_INFO("  %s native: ONE long gear 0-%.0f km/h, rpm %.0f-%.0f, torqueMul %.3f", clone.spec.c_str(), maxSpeed * 3.6,
-                 minRpm, maxRpmV, torque);
+        GBX_INFO("  %s native: %d slices over 0-%.0f km/h, rpm %.0f-%.0f", clone.spec.c_str(), kSlices, vspec.longTopMps * 3.6,
+                 vspec.idleRpm, vspec.maxRpm);
     }
 
     // ---- the engine data: the model's, property by property, with our gears
@@ -311,6 +323,10 @@ bool buildClone(const CloneSpec& clone, bool reverseFirst, double gearHeadroom)
         if (offsetOf(tdb, RED4ext::TweakDBID(baseEngine, "." + prop), off)
             && addFlatAt(tdb, RED4ext::TweakDBID(newEngine, "." + prop), off)) ++copied;
     }
+    // 0.4.1 (owner 2026-10-10, 0.4.0 live: "manual car stuck at 0"): 0.4.0 set the clone's gearChangeTime to 0 and
+    // its cooldown to 0.05 to remove the gap between slices; in gear the engine then sat at ~5,000 rpm at 0 km/h with
+    // nothing reaching the wheels (ncm_gearbox-87580.log). The clone keeps the model's own shift timing again, as
+    // every 0.3.x manual did.
     const int32_t gearsOff = newValue(tdb, "array:TweakDBID", gearIds);
     if (gearsOff < 0 || !addFlatAt(tdb, RED4ext::TweakDBID(newEngine, ".gears"), gearsOff)) {
         GBX_ERR("%s: could not write the gear list", clone.record.c_str());
@@ -330,24 +346,26 @@ bool buildClone(const CloneSpec& clone, bool reverseFirst, double gearHeadroom)
     }
     tdb->UpdateRecord(vehicle);
     manual::registerSpec(vehicle.value, std::move(vspec));
-    GBX_INFO("%s: %zu-speed %s built (%zu engine properties shared, one long native gear, gears against %s top %.0f km/h, model top %.0f km/h, reverse %s)",
-             clone.record.c_str(), clone.ratios.size(), clone.spec.c_str(), copied, refTop > nativeTop ? "automatic-reach" : "model",
+    GBX_INFO("%s: %zu-speed %s built (%zu engine properties shared, %d native slices, gears against %s top %.0f km/h, model top %.0f km/h, reverse %s)",
+             clone.record.c_str(), clone.ratios.size(), clone.spec.c_str(), copied, kSlices, refTop > nativeTop ? "automatic-reach" : "model",
              refTop * 3.6, nativeTop * 3.6, reverse ? "shared" : "none");
     return true;
 }
 
-bool retuneLongGear(uint64_t gearId, float maxSpeedMps, float minRpm, float maxRpm)
+bool retuneSlice(uint64_t gearId, float minSpeedMps, float maxSpeedMps, float minRpm, float maxRpm, float torque)
 {
     auto* tdb = RED4ext::TweakDB::Get();
-    if (!tdb || !gearId || !(maxSpeedMps > 0.5f)) return false;
+    if (!tdb || !gearId || !(maxSpeedMps > minSpeedMps)) return false;
     const RED4ext::TweakDBID gid(gearId);
-    float v = maxSpeedMps, lo = minRpm, hi = maxRpm;
-    if (!repoint(tdb, RED4ext::TweakDBID(gid, ".maxSpeed"), "Float", v)) return false;
-    // 0.3.1: the rpm window -- `.minEngineRPM` is the rpm at 0 km/h, `.maxEngineRPM` at the band's top
+    float b = maxSpeedMps, lo = minRpm, hi = maxRpm, t = torque;
+    (void)minSpeedMps;   // `.minSpeed` stays 0: a floor the engine would push the car up to (Carrier tweak.cpp)
+    if (!repoint(tdb, RED4ext::TweakDBID(gid, ".maxSpeed"), "Float", b)) return false;
+    // the rpm window -- `.minEngineRPM` at 0 km/h, `.maxEngineRPM` at the slice's top
     if (std::isfinite(lo) && std::isfinite(hi) && hi > lo) {
         repoint(tdb, RED4ext::TweakDBID(gid, ".minEngineRPM"), "Float", lo);
         repoint(tdb, RED4ext::TweakDBID(gid, ".maxEngineRPM"), "Float", hi);
     }
+    if (std::isfinite(t) && t > 0.0f) repoint(tdb, RED4ext::TweakDBID(gid, ".torqueMultiplier"), "Float", t);
     tdb->UpdateRecord(gid);
     return true;
 }

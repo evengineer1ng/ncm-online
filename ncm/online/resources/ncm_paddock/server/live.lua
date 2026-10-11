@@ -248,14 +248,14 @@ end
 
 -- -------------------------------------------------------------------------------------------------------- stage
 
-local function recordFor(org, tier, oval, person, seriesId)
+local function recordFor(org, tier, oval, person, seriesId, assetId)
     -- L303: a spec series races the organisers' car, whatever the driver owns (the MaiMai Cup is MaiMais)
     local spec = seriesId and Season.specFor(seriesId)
     if spec then return NcmCore.get("economy.npc_garage").racerRecord(spec.record, 0, oval) end
     -- L298: a racer with a real car races it -- its own model, in the Pace performance variant its parts compose to
     -- (`npcRacerVariants` waits for the Pace build that carries the variant clones)
-    if person and person.raceCarId and PaddockCars then
-        local okC, c = pcall(PaddockCars.load, person.raceCarId)
+    if person and (assetId or person.raceCarId) and PaddockCars then
+        local okC, c = pcall(PaddockCars.load, assetId or person.raceCarId)
         if okC and c and c.record then
             local variant = PaddockSettings.get("npcRacerVariants", true) and (c.variant or 0) or 0
             return NcmCore.get("economy.npc_garage").racerRecord(c.record, variant, oval)
@@ -287,6 +287,7 @@ local function removeCars(lr)
     for _, c in ipairs(lr.cars or {}) do
         if c.vehicleId then
             byVehicle[c.vehicleId] = nil
+            if PaddockSlip then PaddockSlip.detach(c) end
             pcall(Open77.vehicles.ai.removeDriver, c.vehicleId)
             pcall(Open77.vehicles.remove, c.vehicleId)
         end
@@ -376,16 +377,23 @@ local function stage(race, host, t)
         local org = w.orgs[e.orgId or ""]
         -- The vanilla record: the race profile is every vehicle record's own `drivingParamsRace`, which the engine's racing
         -- command uses (L246). No custom records -- nothing the platform could refuse.
-        local record = recordFor(org, race.tier, route.oval ~= nil, nil, race.seriesId)
+        local record = recordFor(org, race.tier, route.oval ~= nil, w.people[e.id], race.seriesId, e.assetId)
         local okV, vid, reason = pcall(Open77.vehicles.create, { record = record,
             position = { x = s.x, y = s.y, z = (s.z or 0) + 0.6 }, yaw = s.yaw, bucket = lr.bucket })
         if not okV or not vid then
             log("stage %s: car %d (%s) refused: %s", race.raceId, i, e.id, tostring(reason or vid))
             return cancel(lr, "the grid could not be built")
         end
-        local car = { personId = e.id, orgId = e.orgId, vehicleId = vid, slot = i, row = s.row, recoveries = 0, resets = 0 }
+        if e.assetId and PaddockCars then
+            local condition = PaddockCars.condition(e.assetId)
+            if condition and (tonumber(condition.health) or 1) < 1 then pcall(Open77.vehicles.setDamage, vid, condition) end
+        end
+        local okStart, startHealth = pcall(Open77.vehicles.getHealth, vid)
+        local car = { personId = e.id, orgId = e.orgId, vehicleId = vid, slot = i, row = s.row, recoveries = 0, resets = 0,
+            startHealth = okStart and tonumber(startHealth) or 1 }
         lr.cars[#lr.cars + 1] = car
         byVehicle[vid] = { raceId = race.raceId, personId = e.id }
+        if PaddockSlip then PaddockSlip.attach(car, vid, e.id) end   -- L356: the wake, and an SL-1 if the team runs one
         log("TRACE race=%s stage slot=%d person=%s vid=%s record=%s host=%s bucket=%s backend=%s",
             race.raceId, i, e.id, tostring(vid), record, tostring(host and host.pid), tostring(lr.bucket), backend)
         if backend == "platform" or npcDrivers then
@@ -469,8 +477,8 @@ local function drive(lr, c, from)
     while #route > 64 do table.remove(route, 1) end
     c.base = #pts + 1 - #route
     local okF, st, why = pcall(Open77.vehicles.ai.followRoute, c.vehicleId, { points = route,
-        speed = c.plan[math.max(1, c.base)] or c.plan[#c.plan] or 20, behavior = "aggressive", arrivalRadius = 12,
-        timeoutMilliseconds = math.min(3600000, lr.deadlineMs + 120000) })
+        speed = (PaddockSlip and PaddockSlip.leg(c, c.plan[math.max(1, c.base)] or c.plan[#c.plan] or 20)) or c.plan[math.max(1, c.base)] or c.plan[#c.plan] or 20,
+        behavior = "aggressive", arrivalRadius = 12, timeoutMilliseconds = math.min(3600000, lr.deadlineMs + 120000) })
     if not okF or not st then log("%s: followRoute for %s refused: %s", lr.raceId, c.personId, tostring(why or st)) return false end
     return true
 end
@@ -658,6 +666,7 @@ local function finish(lr, race)
         if not ok then lr.verdict, lr.reason = "fallback", "write-back failed: " .. tostring(err) end
     end
     storeCrossings(lr)
+    if PaddockSlip then pcall(PaddockSlip.report, lr.cars, lr.raceId) end
     lr.state = "finished"
     local help = {}
     for _, car in ipairs(lr.cars) do help[car.personId] = { resends = car.recoveries, resets = car.resets } end
@@ -687,8 +696,21 @@ function PaddockLive.sample(lr, race)
             for _, c in ipairs(lr.cars) do
                 if not lr.out[c.personId] and not lr.timing.cars[c.personId].done then
                     local okP, pos = pcall(Open77.vehicles.getPosition, c.vehicleId)
+                    local okH, hp = pcall(Open77.vehicles.getHealth, c.vehicleId)
+                    if okH and type(hp) == "number" and hp >= 0 then
+                        race.carDamage = race.carDamage or {}
+                        local damage = race.carDamage[c.personId] or { frac = 0 }
+                        damage.frac = math.max(damage.frac, math.max(0, (c.startHealth or 1) - hp))
+                        if hp <= 0 then damage.wrecked = true end
+                        race.carDamage[c.personId] = damage
+                    end
                     if not okP or type(pos) ~= "table" then
                         lr.out[c.personId] = "lost"
+                    elseif okH and type(hp) == "number" and hp <= 0 then
+                        -- destroyed (2026-10-08: this path never checked; a wreck ran on as "stalled" after 180 s): a crash
+                        -- DNF, and a physical incident whatever caused it
+                        lr.out[c.personId] = "crash"
+                        if PaddockHack then pcall(PaddockHack.destroyed, race, c.personId, c.vehicleId, pos) end
                     else
                         L.observe(lr.timing, c.personId, pos, tMs)
                         persevere(lr, c, pos, tMs)
@@ -715,6 +737,12 @@ function PaddockLive.sample(lr, race)
                     end
                 end
             end
+        end
+        -- L356: every car in every other car's wake; the server-driven ones towed through their leg speed
+        if PaddockSlip and tMs >= 0 then
+            pcall(PaddockSlip.step, lr.cars, set("liveSampleMs", 250) / 1000, function(c)
+                return lr.backend == "platform" and not lr.out[c.personId] and not lr.timing.cars[c.personId].done
+            end)
         end
         local leader = L.leaderMs(lr.timing)
         if leader and not lr.closeMs then
@@ -774,7 +802,7 @@ if Open77.vehicles and Open77.vehicles.ai and Open77.vehicles.ai.on then
                 -- or 1, so this picks the leg after the one just ended or the one after that -- one leg early is harmless
                 local leg = (c.base or 2) + (tonumber(state.routeIndex) or 0)
                 local v = c.plan and (c.plan[leg] or c.plan[#c.plan])
-                if v then pcall(Open77.vehicles.ai.setSpeed, vid, v) end
+                if v then pcall(Open77.vehicles.ai.setSpeed, vid, PaddockSlip and PaddockSlip.leg(c, v) or v) end
                 return
             end
         end

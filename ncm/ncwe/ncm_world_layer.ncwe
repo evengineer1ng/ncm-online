@@ -1,0 +1,114 @@
+{
+  "SchemaVersion": 1,
+  "Id": "5673244a-08f6-4c29-a24e-3d1f7714790f",
+  "Name": "NCM World Layer",
+  "ArchiveProfile": "vanilla-content-v1",
+  "Sources": {},
+  "Changes": {
+    "Modified": {},
+    "Added": {
+      "a:6016cd30d5c54f97ae8a48db3a902c9a": {
+        "Id": "a:6016cd30d5c54f97ae8a48db3a902c9a",
+        "Name": "wl_carrier_dome",
+        "Mesh": {
+          "Hash": 14284810797012672994,
+          "Path": "ncwe\\custom\\wl_dome_a313d3\\wl_dome_a313d3.mesh",
+          "Appearance": "default"
+        },
+        "Transform": {
+          "Position": {
+            "X": -12000,
+            "Y": 12000,
+            "Z": 7000
+          },
+          "Rotation": {
+            "IsIdentity": true,
+            "X": 0,
+            "Y": 0,
+            "Z": 0,
+            "W": 1
+          },
+          "Scale": {
+            "X": 0.01,
+            "Y": 0.01,
+            "Z": 0.01
+          }
+        },
+        "Template": null,
+        "Replaces": [],
+        "Occluder": null
+      },
+      "a:8c1456b1e75b458ea77c99e407510137": {
+        "Id": "a:8c1456b1e75b458ea77c99e407510137",
+        "Name": "wl_carrier_m",
+        "Mesh": {
+          "Hash": 7665668744631163158,
+          "Path": "ncwe\\custom\\wl_body_m_2477ca\\wl_body_m_2477ca.mesh",
+          "Appearance": "default"
+        },
+        "Transform": {
+          "Position": {
+            "X": -12000,
+            "Y": 12000,
+            "Z": 7000.2
+          },
+          "Rotation": {
+            "IsIdentity": true,
+            "X": 0,
+            "Y": 0,
+            "Z": 0,
+            "W": 1
+          },
+          "Scale": {
+            "X": 0.01,
+            "Y": 0.01,
+            "Z": 0.01
+          }
+        },
+        "Template": null,
+        "Replaces": [],
+        "Occluder": null
+      },
+      "a:f2c950994bee487aa5c000a2080320cd": {
+        "Id": "a:f2c950994bee487aa5c000a2080320cd",
+        "Name": "wl_carrier_e",
+        "Mesh": {
+          "Hash": 6483339781045413188,
+          "Path": "ncwe\\custom\\wl_body_e_33d782\\wl_body_e_33d782.mesh",
+          "Appearance": "default"
+        },
+        "Transform": {
+          "Position": {
+            "X": -12000,
+            "Y": 12000,
+            "Z": 7000.1
+          },
+          "Rotation": {
+            "IsIdentity": true,
+            "X": 0,
+            "Y": 0,
+            "Z": 0,
+            "W": 1
+          },
+          "Scale": {
+            "X": 0.01,
+            "Y": 0.01,
+            "Z": 0.01
+          }
+        },
+        "Template": null,
+        "Replaces": [],
+        "Occluder": null
+      }
+    },
+    "Roads": {},
+    "Elements": {},
+    "Collisions": {},
+    "Outliner": {
+      "Folders": {},
+      "Entries": {}
+    },
+    "Traffic": {},
+    "Elevators": {}
+  }
+}

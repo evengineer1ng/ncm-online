@@ -1,0 +1,71 @@
+{
+  "Id": "rw_city_sq_car_4f80d9",
+  "Name": "rw_city_sq_car",
+  "Version": 2,
+  "SourceFile": "rw_city_sq_car.obj",
+  "SourceModel": "rw_city_sq_car.obj",
+  "Created": "2026-10-08T16:20:02.9555907-04:00",
+  "Modified": "2026-10-08T16:20:02.9628588-04:00",
+  "Import": {
+    "Scale": 1,
+    "UpAxis": "Z",
+    "Pivot": "BottomCenter",
+    "Yaw": 0,
+    "ImportMaterials": true,
+    "MaxTextureSize": 1024
+  },
+  "Materials": [
+    {
+      "Name": "banner",
+      "Kind": "Standard",
+      "GameMaterial": null,
+      "BaseColor": {
+        "X": 1,
+        "Y": 1,
+        "Z": 1,
+        "W": 1
+      },
+      "BaseColorTexture": "rw_city_sq_car.png",
+      "Roughness": 0.6,
+      "RoughnessTexture": null,
+      "RoughnessChannel": 0,
+      "InvertRoughness": false,
+      "Metalness": 0,
+      "MetalnessTexture": null,
+      "MetalnessChannel": 0,
+      "NormalTexture": null,
+      "NormalStrength": 1,
+      "FlipNormalGreen": false,
+      "EmissiveColor": {
+        "X": 1,
+        "Y": 1,
+        "Z": 1
+      },
+      "EmissiveEV": 4,
+      "EmissiveTexture": "rw_city_sq_car_2.png",
+      "AlphaCutout": false,
+      "AlphaThreshold": 0.5,
+      "DoubleSided": false,
+      "GlassOpacity": 0.25
+    }
+  ],
+  "Bounds": {
+    "Min": {
+      "X": -1,
+      "Y": 0,
+      "Z": 0
+    },
+    "Max": {
+      "X": 1,
+      "Y": 2.1289,
+      "Z": 0
+    }
+  },
+  "Vertices": 4,
+  "Triangles": 2,
+  "Submeshes": 1,
+  "Warnings": [],
+  "Credits": "",
+  "MeshPath": "ncwe\\custom\\rw_city_sq_car_4f80d9\\rw_city_sq_car_4f80d9.mesh",
+  "Hash": 8353837253386030700
+}

@@ -34,8 +34,15 @@ struct VirtualSpec {
     float audioMaxRpm = 4500.0f;   // the engine note's top: where the model's own gears shift (clones.cpp)
     int shiftMs = 250;
     std::string audio;   // the car's sound-event prefix, e.g. v_car_archer_hella (its _gear_up / _gear_down)
-    uint64_t longGear = 0;       // 0.3.0: the clone's one native gear record (`<clone>_engine_long`), for the band
-    float longTopMps = 0.0f;     // its built maxSpeed (the top virtual gear + 2 %), restored when the band is not in use
+    // 0.4.0 (owner 2026-10-10: "apply our 1 gear chop over all 7 gears"): the clone's native box is SEVEN gear
+    // records, `<clone>_engine_s1..s7`. Each shift re-slices the selected virtual gear's band 0..limiter across them --
+    // rpm continuous from landing to redline, so a 4-speed is still four sweeps -- and each slice takes the torque the
+    // model's own automatic has at that speed. 0.3.x had ONE long gear: always the game's "final" gear (its
+    // finalGearTorqueDecimationScalor ~0.9 on everything) and always the strongest gear's torque spread over the band.
+    std::vector<uint64_t> slices;
+    float longTopMps = 0.0f;     // the top virtual gear + 2 %: the full-range layout, restored when the band is not in use
+    std::vector<float> modelTopMps;    // the model's forward gears, their tops stretched to the reference top (as Carrier does the automatic)
+    std::vector<float> modelTorque;    // ... and their torque multipliers
 };
 
 /// Called by clones.cpp for every manual clone it builds (keyed by the clone record's TweakDBID value).
@@ -76,6 +83,8 @@ void setCurve(float lo, float hi, float gamma, float follow, float smoothMs);
 /// 0.3.1: the band's rpm window (`manual.band`): where an upshift lands, where the limiter is, and how far below zero
 /// the computed minimum may go.
 void setBand(float landingRpm, float redlineRpm, float minRpmFloor);
+/// 0.4.0: how many of the seven native gears a selected gear is sliced over (`manual.band.slices`, 1..7, default 7).
+void setSlices(int slices);
 std::string audioMode();
 /// 0.2.9: one HUD line under the rev bar -- the live curve values, a warning when follow switches the curve off, or
 /// CONFIG ERROR when the last save did not parse.

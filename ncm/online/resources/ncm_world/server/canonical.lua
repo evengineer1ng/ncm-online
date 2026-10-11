@@ -111,12 +111,21 @@ CreateThread(function()
     Wait(8000)
     -- the world's identity first (ncm_league publishes it): before it, sid() is the fallback and the boot would read
     -- nobody's presence -- a Machine left in Deep would never be found by the loop (KB-379, found by the NCM Host)
-    for _ = 1, 120 do
+    -- KB-446: wait for it however long it takes. The 60 s limit ran out on 2026-10-11 02:42 (ncm_league's calendar
+    -- published the identity at 118 s); the environment then read `unknown`, this thread returned without a word, and the
+    -- deep-space Galena's row was never loaded (no BOOT line, nobody flying it, a join would have surface-restored).
+    local waited = 0
+    while true do
         local okI, id = pcall(function() return GlobalState.ncmIdentity end)
         if okI and type(id) == "table" and id.serverId then break end
         Wait(500)
+        waited = waited + 1
+        if waited % 60 == 0 then log("BOOT waiting for the world identity (%d s): presence not loaded yet -- do not join", math.floor(waited / 2)) end
     end
-    if not enabled() or not MySQL then return end
+    if not enabled() or not MySQL then
+        log("BOOT presence NOT loaded: environment %s, database %s", tostring((GlobalState.ncmIdentity or {}).environment), tostring(MySQL ~= nil))
+        return
+    end
     for _ = 1, 60 do if MySQL.isReady and MySQL.isReady() then break end; Wait(500) end
     local okQ, list = pcall(MySQL.query.await, "SELECT driver_id, place, host, location_id, state_json, race_week_run, updated_at FROM ncm_presence WHERE server_id=?", { sid() })
     log("BOOT %s presence row(s) for server %s%s", okQ and type(list) == "table" and tostring(#list) or "NO", sid(), okQ and "" or (" -- " .. tostring(list)))
@@ -264,6 +273,10 @@ local function resume(pid, r)
         local okW, warped, whyW = pcall(Open77.players.warpIntoVehicle, pid, vid, "driver")
         log("JOIN player=%d resumes %s%s: Hella %s, seated %s %s", pid, r.place, prompt and (" over " .. prompt) or "", tostring(vid),
             tostring(okW and warped), tostring(okW and whyW or warped))
+        -- KB-448: this car is frozen by the server, so the player never proves its physics binding; deep.lua's ENTER
+        -- accepts the vehicle named here instead (one claim per player, cleared at ENTER or when they leave)
+        NcmDeepResumeClaims = NcmDeepResumeClaims or {}
+        NcmDeepResumeClaims[pid] = { vid = vid, asset = rec.asset }
         TriggerClientEvent("ncm:deep.resumeCanonical", pid, { vid = vid, rec = rec, prompt = prompt })
     end)
 end

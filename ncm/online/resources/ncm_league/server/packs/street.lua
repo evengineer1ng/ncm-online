@@ -28,7 +28,7 @@
 local function economy(scale, id)
     scale = scale or 1
     return {
-        id = id, version = 1,
+        id = id, version = 1, scale = scale,
         entryFee = 50 * scale,
         timeTrialCompletion = 250 * scale,
         raceCompletion = 300 * scale,
@@ -59,7 +59,7 @@ NcmPackStreet = {
             -- entry-performance road machinery: the ordinary classes, nothing exotic. Bikes and Nomad-only cars
             -- are out because this is the road-car championship, not because they are unwelcome elsewhere.
             eligibility = { classes = { "Muscle", "Sport", "Tech" }, prestigeMax = 2 },
-            economy = economy(1, "city_cup_v1"),
+            economy = economy(2, "city_cup_v2"),
             capacity = 20,
             -- L236: most slots race a generated route (course.generator) from the owner's hand-picked nodes, under
             -- this distance filter, with up to two checkpoints; the named routes below keep the rest
@@ -114,7 +114,7 @@ NcmPackStreet = {
             cadence = { everyMinutes = 20, offsetMinutes = 16 },   -- L238: was 60
             disciplineId = "street_sprint", formatId = "sprint", classId = "street_open", laps = 1,
             eligibility = { classes = { "Sport", "Muscle" }, prestigeMin = 3, prestigeMax = 4 },
-            economy = economy(10, "night_city_gt_v1"),
+            economy = economy(25, "night_city_gt_v2"),
             capacity = 20,
             -- L236: most slots race a generated route (course.generator) from the owner's hand-picked nodes, under
             -- this distance filter, with up to two checkpoints; the named routes below keep the rest
@@ -139,7 +139,7 @@ NcmPackStreet = {
             cadence = { everyMinutes = 20, offsetMinutes = 16 },   -- L238: was 180
             disciplineId = "street_sprint", formatId = "sprint", classId = "street_open", laps = 1,
             eligibility = { classes = { "Sport" }, prestigeMin = 5 },
-            economy = economy(100, "hypercar_v1"),
+            economy = economy(250, "hypercar_v2"),
             capacity = 20,
             -- L236: most slots race a generated route (course.generator) from the owner's hand-picked nodes, under
             -- this distance filter, with up to two checkpoints; the named routes below keep the rest
@@ -188,7 +188,7 @@ NcmPackStreet = {
             cadence = { everyMinutes = 20, offsetMinutes = 6 },
             disciplineId = "street_sprint", formatId = "sprint", classId = "street_open", laps = 1,
             eligibility = { classes = { "Muscle", "Sport", "Tech", "Nomad" } },
-            economy = economy(2, "night_city_open_v1"),
+            economy = economy(3, "night_city_open_v2"),
             capacity = 20,
             generator = { minM = 1500, maxM = 5500, checkpoints = 2, checkpointShare = 0.5, share = 0.75 },
             routes = {
@@ -212,7 +212,7 @@ NcmPackStreet = {
             -- the pool contains the RB15, so an open series would quietly let an NCX Formula car into a street
             -- drag race. Naming the classes is the fix; Formula is entered through NCX and nowhere else.
             eligibility = { classes = { "Muscle", "Sport", "Tech", "Nomad", "Bike" } },
-            economy = economy(1, "street_drag_v1"),
+            economy = economy(2, "street_drag_v2"),
             capacity = 20,
             routes = {
                 { rootId = "root_vista_del_drag_900_751__to__japantown_crossway_373_0" },       -- B-line

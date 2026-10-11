@@ -181,6 +181,129 @@ NcmCalendar.publishIdentity = publishIdentity
 -- ---------------------------------------------------------------------------------------------
 -- Persistence helpers
 -- ---------------------------------------------------------------------------------------------
+local function copyTree(v)
+    if type(v) ~= "table" then return v end
+    local out = {}; for k, x in pairs(v) do out[k] = copyTree(x) end; return out
+end
+
+local function clamp(v, lo, hi) return math.max(lo, math.min(hi, v)) end
+
+-- Twelve-race rolling signal, measured within the actual Paddock series. Neutral history prices at the
+-- authored baseline. Betting is an optional signal: it contributes only when real win slips exist.
+local intrigueCache = {}
+local function seriesIntrigue(e)
+    local series = e.paddockSeriesId or e.seriesId
+    if not series then return 0.5, "warming up", 0 end
+    local cached=intrigueCache[series]
+    if cached and now()-cached.at<60 then return cached.score,cached.band,cached.sample end
+    local ok, rows = pcall(MySQL.query.await, [[
+        SELECT x.race_id,x.person_id,x.position,x.state,x.gap_ms,x.finish_ms,x.points,x.dnf_reason,x.at
+        FROM paddock_result x JOIN (
+            SELECT race_id,MAX(at) AS at FROM paddock_result
+            WHERE server_id=? AND series_id=? GROUP BY race_id ORDER BY MAX(at) DESC LIMIT 12
+        ) recent ON recent.race_id=x.race_id
+        WHERE x.server_id=? AND x.series_id=? ORDER BY recent.at DESC,x.position ASC
+    ]], {serverId(), series, serverId(), series})
+    if not ok or type(rows) ~= "table" or #rows == 0 then
+        local out={at=now(),score=0.5,band="warming up",sample=0}; intrigueCache[series]=out
+        return out.score,out.band,out.sample
+    end
+    local races, order, seen = {}, {}, {}
+    for _, r in ipairs(rows) do
+        local id = tostring(r.race_id)
+        if not races[id] then races[id] = {rows={}, at=tonumber(r.at) or 0}; order[#order+1]=id end
+        races[id].rows[#races[id].rows+1]=r
+    end
+    table.sort(order, function(a,b) return races[a].at > races[b].at end)
+    local closeness, clean, winners, points, crashRaces, raceN = 0, 0, {}, {}, 0, 0
+    for _, id in ipairs(order) do
+        local rr = races[id].rows; raceN=raceN+1
+        local first, second, crashed, winner
+        for _, r in ipairs(rr) do
+            local p=tonumber(r.position) or 999
+            if r.state == "finished" then
+                points[tostring(r.person_id)] = (points[tostring(r.person_id)] or 0) + (tonumber(r.points) or math.max(0, 12-p))
+                if p==1 then first=r; winner=tostring(r.person_id) end
+                if p==2 then second=r end
+            end
+            local why=tostring(r.dnf_reason or ""):lower()
+            if why=="crash" or why=="contact" or why=="wreck" then crashed=true end
+        end
+        if first and second then
+            local gap=tonumber(second.gap_ms) or tonumber(second.finish_ms) and ((tonumber(second.finish_ms) or 0)-(tonumber(first.finish_ms) or 0)) or 999999
+            closeness=closeness+(1-clamp(gap/10000,0,1))
+        end
+        if crashed then crashRaces=crashRaces+1 else clean=clean+1 end
+        if winner then winners[winner]=(winners[winner] or 0)+1 end
+    end
+    local winnerKinds, maxWins=0,0
+    for _, n in pairs(winners) do winnerKinds=winnerKinds+1; maxWins=math.max(maxWins,n) end
+    local diversity=raceN>1 and clamp((winnerKinds-1)/(math.min(raceN,6)-1),0,1) or 0.5
+    local dominance=raceN>1 and (1-clamp((maxWins/raceN-0.25)/0.75,0,1)) or 0.5
+    local tablePts={}; for _, n in pairs(points) do tablePts[#tablePts+1]=n end; table.sort(tablePts,function(a,b)return a>b end)
+    local titleFight=(tablePts[1] and tablePts[2]) and (1-clamp((tablePts[1]-tablePts[2])/math.max(1,tablePts[1]),0,1)) or 0.5
+    local tok, standings=pcall(MySQL.query.await, [[SELECT person_id,SUM(points) AS points FROM paddock_result
+        WHERE server_id=? AND series_id=?
+          AND season_id=(SELECT season_id FROM paddock_race WHERE server_id=? AND series_id=? ORDER BY window_opens_at DESC LIMIT 1)
+          AND cup_id=(SELECT cup_id FROM paddock_race WHERE server_id=? AND series_id=? ORDER BY window_opens_at DESC LIMIT 1)
+        GROUP BY person_id ORDER BY points DESC LIMIT 2]], {serverId(),series,serverId(),series,serverId(),series})
+    if tok and type(standings)=="table" and standings[1] and standings[2] then
+        local a,b=tonumber(standings[1].points) or 0,tonumber(standings[2].points) or 0
+        if a>0 then titleFight=1-clamp((a-b)/a,0,1) end
+    end
+    local close=closeness/math.max(1,raceN)
+    local cleanRate=clean/math.max(1,raceN)
+    local score=(0.34*close)+(0.25*titleFight)+(0.16*diversity)+(0.10*dominance)+(0.15*cleanRate)
+
+    -- Betting splits are server-side evidence from actual Billie win slips, never predicted odds.
+    local bok, bets=pcall(MySQL.query.await, [[SELECT s.subject_a,SUM(s.stake) AS stake FROM paddock_slip s
+        JOIN (SELECT race_id FROM paddock_race WHERE server_id=? AND series_id=? ORDER BY window_opens_at DESC LIMIT 12) recent
+          ON recent.race_id=s.race_id
+        WHERE s.server_id=? AND s.market='win' AND s.state IN ('won','lost','open') GROUP BY s.subject_a]],
+        {serverId(),series,serverId()})
+    local stakeBySubject,total,subjects={},0,0
+    if bok and type(bets)=="table" then for _,b in ipairs(bets) do local n=tonumber(b.stake) or 0; if n>0 then stakeBySubject[b.subject_a]=n;total=total+n;subjects=subjects+1 end end end
+    if total>0 and subjects>1 then
+        local hhi=0; for _,n in pairs(stakeBySubject) do hhi=hhi+(n/total)^2 end
+        local balance=clamp((1-hhi)/(1-1/subjects),0,1)
+        score=score*0.85+balance*0.15
+    end
+    score=clamp(score,0,1)
+    local band=score>=0.68 and "electric" or score<=0.32 and "cooling" or "alive"
+    intrigueCache[series]={at=now(),score=score,band=band,sample=raceN}
+    return score,band,raceN
+end
+
+local function freezeEconomy(e)
+    if type(e.economy)~="table" or e.economy.dynamicsFrozen then return end
+    local econ=copyTree(e.economy)
+    local score,band,sample=seriesIntrigue(e)
+    local intrigue=0.70+0.60*score -- bounded 0.70x..1.30x; no history yields exactly 1x
+    local wkfx={}; pcall(function() wkfx=GlobalState.ncmWeekFx or {} end)
+    local scale=tonumber(econ.scale) or 1
+    local tier=econ.purseTier or tostring(e.paddockSeriesId or ""):match("^(%a+)")
+    if tier~="street" and tier~="regional" and tier~="pro" and tier~="premier" then
+        tier=(scale>=200 and "premier") or (scale>=20 and "pro") or (scale>=2 and "regional") or "street"
+    end
+    local moody=clamp(tonumber(wkfx.purse and wkfx.purse[tier]) or 1,0.5,2.5)
+    local purseFactor=intrigue*moody
+    local function mul(v,f) return math.floor((tonumber(v) or 0)*f+0.5) end
+    econ.entryFee=mul(econ.entryFee,intrigue)
+    econ.timeTrialCompletion=mul(econ.timeTrialCompletion,purseFactor)
+    econ.raceCompletion=mul(econ.raceCompletion,purseFactor)
+    econ.repeatFloor=mul(econ.repeatFloor,purseFactor)
+    econ.maxTagBounty=mul(econ.maxTagBounty,purseFactor)
+    for k,v in pairs(econ.placement or {}) do econ.placement[k]=mul(v,purseFactor) end
+    for k,v in pairs(econ.fieldBonus or {}) do econ.fieldBonus[k]=mul(v,purseFactor) end
+    for k,v in pairs(econ.tagBounties or {}) do econ.tagBounties[k]=mul(v,purseFactor) end
+    for _,v in ipairs(econ.targets or {}) do v.amount=mul(v.amount,purseFactor) end
+    econ.intrigueScore=math.floor(score*100+0.5); econ.intrigueBand=band; econ.intrigueSample=raceN
+    econ.intrigueFactor=math.floor(intrigue*100+0.5)/100; econ.moodyPurseTier=tier
+    econ.moodyPurseFactor=math.floor(moody*100+0.5)/100; econ.dynamicsFrozen=true
+    econ.id=tostring(econ.id or e.seriesId).."_live"; econ.version=(tonumber(econ.version) or 1)+1
+    e.economy=econ
+end
+
 local function persistEvent(e)
     MySQL.insert.await(
         "INSERT IGNORE INTO event (event_id, server_id, class, series_id, series_name, ruleset_id, route_id, route_name, " ..
@@ -199,11 +322,22 @@ end
 --- Adopt a one-off event (organized/invitation) into the calendar: persist, index, publish.
 function NcmCalendar.adopt(e)
     if events[e.eventId] then return nil, "duplicate_event" end
+    local saved=MySQL.single.await("SELECT economy_json FROM event WHERE server_id=? AND event_id=?",{serverId(),e.eventId})
+    local frozen=saved and type(saved.economy_json)=="string" and Json.decode(saved.economy_json) or nil
+    local hasEntries=type(e.entries)=="table" and next(e.entries)~=nil
+    if type(frozen)=="table" and (frozen.dynamicsFrozen or hasEntries) then e.economy=frozen else freezeEconomy(e) end
+    -- The await above yields: a second adopt of the same id can pass the first check meanwhile, and a
+    -- duplicate in `order` later wedges every tick (KB: calendar.lua:545 from 2026-10-09 07:24).
+    if events[e.eventId] then return nil, "duplicate_event" end
     events[e.eventId] = e
     order[#order + 1] = e.eventId
     table.sort(order, byStart)
     local ok, err = pcall(persistEvent, e)
     if not ok then log("adopt: persist failed: %s", tostring(err)) end
+    if saved and type(e.economy)=="table" and e.economy.dynamicsFrozen and not (type(frozen)=="table" and frozen.dynamicsFrozen) and not hasEntries then
+        pcall(MySQL.update.await,"UPDATE event SET economy_id=?,economy_version=?,economy_json=? WHERE server_id=? AND event_id=?",
+            {e.economy.id,e.economy.version,Json.encode(e.economy),serverId(),e.eventId})
+    end
     publish(now(), true)
     return true
 end
@@ -407,6 +541,15 @@ local function tick()
             if posted % 4 == 0 then Wait(0) end
             log("posted %s | %s · %s | start in %s | venue %s", slot.eventId, slot.seriesName, slot.routeName, Entry.countdown(slot.startsAt - t), slot.venue.name)
         end
+    end
+    -- Self-heal `order`: drop ids with no event and any duplicate, so one bad id cannot wedge the calendar.
+    do
+        local clean, have = {}, {}
+        for _, eid in ipairs(order) do
+            if events[eid] and not have[eid] then have[eid] = true; clean[#clean + 1] = eid end
+        end
+        if #clean ~= #order then log("order repaired: %d stale/duplicate id(s) dropped", #order - #clean) end
+        order = clean
     end
     -- State advance.
     for _, eid in ipairs(order) do

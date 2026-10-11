@@ -1028,7 +1028,18 @@ local function tick()
     -- Form the first session of events about to start.
     for eid, e in pairs(NcmCalendar.events or {}) do
         local formLead = e.class == "paddock" and (Mixed.FREEZE_LEAD_SEC - 10) or setting("raceFormAtSec", 60)
-        if not byEvent[eid] and e.state ~= "cancelled" and e.state ~= "closed" and e.startsAt - t <= formLead and e.startsAt > t - 5 then
+        -- A mixed race forms on the Paddock's frozen grid, never before it: formed without it, the session is a field
+        -- of the humans alone -- the owner placed "P1 of 1" and a one-car timing tower until the grid landed, 8 s
+        -- later (2026-10-09, the Paddock froze at T-42 instead of T-60). Wait for it; only at T-15 fall back.
+        local gridLate = e.class == "paddock" and not e.paddockGrid and e.startsAt - t > 15
+        if gridLate and e.startsAt - t <= formLead and not e.gridWaitLogged then
+            e.gridWaitLogged = true
+            log("%s: waiting for the Paddock's grid before forming (T-%d s)", e.eventId, math.floor(e.startsAt - t))
+        end
+        if not gridLate and not byEvent[eid] and e.state ~= "cancelled" and e.state ~= "closed" and e.startsAt - t <= formLead and e.startsAt > t - 5 then
+            if e.class == "paddock" and not e.paddockGrid then
+                log("%s: no Paddock grid by T-15; forming with the humans alone", e.eventId)
+            end
             local n = 0
             for _, en in pairs(e.entries or {}) do if en.state ~= "interested" and en.state ~= "withdrawn" then n = n + 1 end end   -- interest alone is not a grid
             if n > 0 then formPlan(e, t) elseif practices[eid] then NcmRace.practiceClose(eid, t, "no_entrants") end

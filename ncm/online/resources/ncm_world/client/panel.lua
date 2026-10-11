@@ -11,6 +11,7 @@ local function log(fmt, ...) print(("[ncm_world/client/panel] " .. fmt):format(.
 
 local page, pageReady = nil, false
 local open = nil            -- F6 shell mode, questionnaire/landing, or nil
+local collectionJsonWire = nil
 local inputSeen = false
 local pendingQuestionnaire = false
 local lastInbox = nil
@@ -287,13 +288,13 @@ end
 
 local function showCollection()
     if not page or not pageReady then return end
+    setOpen("collection")
+    page:send("panel:show", { panel = "collection" })
     TriggerServerEvent("ncm:collection")
     TriggerServerEvent("ncm:component.inventory.request")
     TriggerServerEvent("ncm:market")
     TriggerServerEvent("ncm:vehicle.active.request")
-    setOpen("collection")   -- BEFORE the send: the page can answer panel:drawn faster than the next line runs
-    page:send("panel:show", { panel = "collection" })
-    sendBig("panel:collection", lastCollection or { slots = {}, loading = true }, "slots")
+    sendBig("panel:collection", lastCollection or { slots = {}, loading = true }, "slots", 1)
     if lastComponents then sendBig("panel:components",lastComponents,"parts") end
     if lastMarket then sendBig("panel:market.components",{componentOfferings=lastMarket.componentOfferings or {}},"componentOfferings",1) end
     if lastCalled then page:send("panel:vehicle.active", lastCalled) end
@@ -401,6 +402,19 @@ AddEventHandler("onClientResourceStart", function(name)
         log("panel ready")
         if pendingQuestionnaire then showQuestionnaire() end
     end)
+    page:on("panel:collection.json.ack", function(d)
+        local wire = collectionJsonWire
+        if not wire or type(d) ~= "table" or d.id ~= wire.id then return end
+        local index = tonumber(d.index)
+        if not index then return end
+        if index ~= wire.awaiting then return end
+        wire.ack = index
+        wire.awaiting = nil
+        if index == wire.n then
+            log("collection JSON browser complete id=%s packets=%d", wire.id, wire.n)
+            collectionJsonWire = nil
+        end
+    end)
     page:on("panel:pointer", function() if not inputSeen then inputSeen = true; log("panel input: yes") end end)
     page:on("panel:answer", function(d)
         inputSeen = true
@@ -487,11 +501,40 @@ AddEventHandler("onClientResourceStart", function(name)
             TriggerServerEvent("ncm:engineering.mount",tostring(d.componentAssetId),tostring(d.machineAssetId),tostring(d.mountId),tostring(d.facing))
         end
     end)
+    page:on("panel:engineering.bindpad",function(d)
+        if type(d)=="table" and d.componentAssetId and d.control then
+            TriggerServerEvent("ncm:engineering.bindpad",tostring(d.componentAssetId),tostring(d.control),tostring(d.gesture or "tap"),tostring(d.command or "engage"))
+        end
+    end)
+    page:on("panel:engineering.unbindpad",function(d)
+        if type(d)=="table" and d.componentAssetId then TriggerServerEvent("ncm:engineering.unbindpad",tostring(d.componentAssetId)) end
+    end)
     page:on("panel:engineering.unmount",function(d)
         if type(d)=="table" and d.componentAssetId then TriggerServerEvent("ncm:engineering.unmount",tostring(d.componentAssetId)) end
     end)
     page:on("panel:component.service",function(d)
         if type(d)=="table" and d.componentAssetId and d.conditionId then TriggerServerEvent("ncm:component.service",tostring(d.componentAssetId),tostring(d.conditionId),tostring(d.idempotencyKey or "")) end
+    end)
+    page:on("panel:week.anchor",function(d)
+        if type(d)=="table" and type(d.assetId)=="string" then TriggerServerEvent("ncm:week.anchor.select",d.assetId) end
+    end)
+    page:on("panel:vehicle.repair",function(d)
+        if type(d)=="table" and d.assetId and (d.provider=="self" or d.provider=="shop") then
+            TriggerServerEvent("ncm:vehicle.repair",tostring(d.assetId),d.provider,tostring(d.idempotencyKey or ""))
+        end
+    end)
+    page:on("panel:workshop.route",function(d)
+        if type(d)~="table" or type(d.siteId)~="string" then return end
+        local garages=NcmCore.get("paddock.garages")
+        local site=garages.site(d.siteId)
+        if site and (site.kind=="garage" or site.kind=="workshop") then
+            NcmNav.to({x=site.x,y=site.y,z=site.z,name=garages.label(site)},"workshop")
+        end
+    end)
+    page:on("panel:component.trunk",function(d)
+        if type(d)=="table" and d.componentAssetId and d.machineAssetId then
+            TriggerServerEvent("ncm:component.trunk",tostring(d.componentAssetId),tostring(d.machineAssetId),d.unload==true)
+        end
     end)
     page:on("panel:trade.invite",function(d)
         if type(d)=="table" and d.playerId then TriggerServerEvent("ncm:trade.invite",tonumber(d.playerId)) end
@@ -704,7 +747,49 @@ end)
 
 receiveStream("ncm:collection", "slots", function(value)
     lastCollection = value
-    if page and pageReady and open == "collection" then sendBig("panel:collection", value, "slots") end
+    if page and pageReady and open == "collection" then sendBig("panel:collection", value, "slots", 1) end
+end)
+
+-- Machine Index travels as short JSON string fragments. Forward them without re-encoding the full collection
+-- in client Lua (which exceeds the Open77 script slice); the browser assembles and parses it.
+RegisterNetEvent("ncm:collection.json.begin", function(meta)
+    if type(meta) ~= "table" or type(meta.id) ~= "string" then return end
+    local n = tonumber(meta.n)
+    if not n or n < 1 or n > 512 or n ~= math.floor(n) then return end
+    collectionJsonWire = { id = meta.id, n = n, pieces = {}, got = 0, ack = -1, awaiting = nil, sentAt = 0 }
+    local wire = collectionJsonWire
+    log("collection JSON begin id=%s packets=%d", meta.id, n)
+    wantChunks = wantChunks + n
+    CreateThread(function()
+        while collectionJsonWire == wire and open == "collection" do
+            if page and pageReady and (wire.awaiting == nil or GetGameTimer() - wire.sentAt >= 500) then
+                local index = wire.awaiting or (wire.ack + 1)
+                if index == 0 then
+                    page:send("panel:collection.json.begin", { id = wire.id, n = wire.n })
+                elseif wire.pieces[index] then
+                    page:send("panel:collection.json.part", { id = wire.id, index = index, text = wire.pieces[index] })
+                    sentChunks = sentChunks + 1
+                else
+                    index = nil -- wait for the corresponding server fragment
+                end
+                if index then wire.awaiting = index; wire.sentAt = GetGameTimer() end
+            end
+            Wait(30)
+        end
+        if collectionJsonWire == wire and open ~= "collection" then collectionJsonWire = nil end
+    end)
+end)
+RegisterNetEvent("ncm:collection.json.part", function(part)
+    local wire = collectionJsonWire
+    if not wire or type(part) ~= "table" or part.id ~= wire.id then return end
+    local i = tonumber(part.index)
+    if not i or i < 1 or i > wire.n or i ~= math.floor(i) or type(part.text) ~= "string" or #part.text > 768 then return end
+    if wire.pieces[i] then return end
+    wire.pieces[i] = part.text
+    wire.got = wire.got + 1
+    if wire.got == wire.n then
+        log("collection JSON network complete id=%s packets=%d", wire.id, wire.n)
+    end
 end)
 
 receiveStream("ncm:component.inventory", "parts", function(value)
@@ -753,7 +838,7 @@ end)
 RegisterNetEvent("ncm:collection.payload", function(value)
     if type(value) ~= "table" then return end
     lastCollection = value
-    if page and pageReady and open == "collection" then sendBig("panel:collection", value, "slots") end
+    if page and pageReady and open == "collection" then sendBig("panel:collection", value, "slots", 1) end
 end)
 
 RegisterNetEvent("ncm:component.inventory",function(value)
@@ -766,6 +851,14 @@ end)
 RegisterNetEvent("ncm:component.state",function(value) if page and pageReady then page:send("panel:component.states",type(value)=="table" and value or {}) end end)
 RegisterNetEvent("ncm:component.install.result",function(value) if page and pageReady then page:send("panel:component.install.result",type(value)=="table" and value or {}) end end)
 RegisterNetEvent("ncm:component.service.result",function(value) if page and pageReady then page:send("panel:component.service.result",type(value)=="table" and value or {}) end end)
+RegisterNetEvent("ncm:vehicle.repair.result",function(value)
+    TriggerServerEvent("ncm:collection")
+    if page and pageReady then page:send("panel:vehicle.repair.result",type(value)=="table" and value or {}) end
+end)
+RegisterNetEvent("ncm:component.trunk.result",function(value)
+    TriggerServerEvent("ncm:component.inventory.request")
+    if page and pageReady then page:send("panel:component.trunk.result",type(value)=="table" and value or {}) end
+end)
 RegisterNetEvent("ncm:market.purchase.result",function(value) if page and pageReady then page:send("panel:market.purchase.result",type(value)=="table" and value or {}) end end)
 RegisterNetEvent("ncm:component.purchase.result",function(value) if page and pageReady then page:send("panel:component.purchase.result",type(value)=="table" and value or {}) end end)
 RegisterNetEvent("ncm:trade.result",function(value) if page and pageReady then page:send("panel:trade.result",type(value)=="table" and value or {}) end end)
@@ -908,15 +1001,21 @@ local PAD_HUB = "padStart"
 local PAD_HUB_TICK_MS = 50
 CreateThread(function()
     local wasDown = false
+    local failedRead = false
     while true do
-        local okP, down = pcall(Open77.input.isDown, PAD_HUB)
+        local okP, down, reason = pcall(Open77.input.isDown, PAD_HUB)
+        if not okP or (down == nil and reason) then
+            if not failedRead then log("hub Start read failed: %s", tostring(okP and reason or down)); failedRead = true end
+        else failedRead = false end
         down = okP and down == true
         if down and not wasDown then
             if open then
+                log("hub Start pressed: closing %s", tostring(open))
                 hide()
             else
                 local captured = false
                 pcall(function() captured = Open77.input.isCaptured() == true end)
+                log("hub Start pressed: captured=%s", tostring(captured))
                 if not captured then showGuide() end
             end
         end

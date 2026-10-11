@@ -1,0 +1,7 @@
+.venv/
+__pycache__/
+voices/
+out/
+data/
+probe_out/
+chronicles.json

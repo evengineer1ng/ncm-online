@@ -18,6 +18,8 @@ Core.define("paddock.tape", function(C)
         release = 40, retirement = 65, fold = 80, founded = 55, promotion = 70, relegation = 65, cup_title = 70,
         season_title = 95, human_mention = 50, callout = 75, manager_hired = 55, manager_fired = 70,
         sponsor_signed = 30, sponsor_left = 35, rookie_debut = 30,
+        -- a race car destroyed (any cause, physical), and a quickhack attributed to its source (2026-10-08)
+        vehicle_destroyed = 45, chrome_attack = 35,
     }
     -- Kinds kept forever (doc 44 §14.1 pruning: titles, folds and retirements).
     M.RETAIN = { season_title = true, cup_title = true, fold = true, retirement = true, founded = true,

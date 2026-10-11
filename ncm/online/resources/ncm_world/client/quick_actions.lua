@@ -19,6 +19,24 @@ NcmQuickActions.map = function()
     return true
 end
 
+-- The Engineering panel (`ncm_engineering`) routes to a workshop through NCM's own navigation, never a second one:
+-- `NcmNav.to` keeps the GPS selected across getting in and out of a car, which a bare waypoint does not.
+exports("routeTo", function(p, why)
+    if type(p) ~= "table" or type(p.x) ~= "number" or type(p.y) ~= "number" then return false, "bad_point" end
+    if not (NcmNav and NcmNav.to) then return false, "nav_unavailable" end
+    local ok, routed = pcall(NcmNav.to, { x = p.x, y = p.y, z = tonumber(p.z) or 0, name = tostring(p.name or "Workshop") }, tostring(why or "workshop"))
+    if not ok then return false, tostring(routed) end
+    return routed ~= false
+end)
+
+-- Engineering on the quick menu, when the wheel ships: the panel lives in its own resource, so the wheel's call
+-- comes here and is passed on -- the same F9 path, never a second one.
+NcmQuickActions.engineering = function()
+    local promise, reason = Open77.exports.call("ncm_engineering", "toggle")
+    if not promise and reason then return false, tostring(reason) end
+    return true
+end
+
 exports("quickAction", function(id)
     local fn = NcmQuickActions[tostring(id or "")]
     if type(fn) ~= "function" then

@@ -1,6 +1,7 @@
 #include "manual.hpp"
 
 #include "clones.hpp"
+#include "gearing_shm.hpp"
 #include "levers_shm.hpp"
 #include "log.hpp"
 
@@ -10,6 +11,8 @@
 #include <algorithm>
 #include <cctype>
 #include <cmath>
+#include <cstdlib>
+#include <cstring>
 #include <mutex>
 #include <unordered_map>
 #include <vector>
@@ -51,8 +54,10 @@ float g_bandAppliedLo = 0.0f, g_bandAppliedHi = 0.0f;
 // `redlineRpm`: minEngineRPM = landing - (redline - landing) * f0 / (1 - f0), f0 = previous limiter / this limiter.
 // For a close box that minimum goes far below zero; `minRpmFloor` clamps it if the game dislikes negatives.
 float g_landingRpm = 2600.0f, g_redlineRpm = 5300.0f, g_minRpmFloor = -30000.0f;
-uint64_t g_bandGear = 0;
+uint64_t g_bandGear = 0;          // the record whose slices were last written (0 = none)
 int g_bandFails = 0;
+int g_slices = 7;                  // 0.4.0: native slices per selected gear (`manual.band.slices`, 1..7)
+int g_bandSlicesApplied = 0;
 float g_audioRpm = 0.0f;           // the engine note's rpm this frame (scale rpm)
 float g_audioIdle = 800.0f, g_audioTop = 4500.0f;
 int g_cycleVk = VK_PRIOR;          // PAGEUP: cycle the engine-sound scale live (0.2.6 experiment)
@@ -90,6 +95,172 @@ HANDLE g_mapping = nullptr;
 ncm::gearbox_levers::Block* g_block = nullptr;
 
 uint64_t nowMs() { return GetTickCount64(); }
+
+// ---- STACKED GEARBOXES (owner, 2026-10-08; doc 50 R4) ------------------------------------------------------------
+// The Machine's driveline paths arrive from the server through NCM Carrier (gearing_shm.hpp), written relative to the
+// car's own box: `A*m` each of the car's gears times m, `T*m` its top gear times m (core engineering.gearing). A gear
+// with ratio factor m keeps the car gear's force-speed trade: its ceiling divides by m, its share multiplies by m (and
+// by the path's efficiency) -- capped at 1, because Carrier's levers only take drive away. Path 0 is the car's box plus
+// any inline boxes; each side box is its own path, engaged by the driver's bound control. Stale = the car's box alone.
+struct StackEntry { bool all = true; float m = 1.0f; int group = 0; };
+struct StackPath {
+    std::string when = "any", rangeWhen = "any", label;
+    int shiftMs = 0, rangeMs = 0;
+    float efficiency = 1.0f;
+    std::vector<StackEntry> entries;
+};
+HANDLE g_gearingMap = nullptr;
+const ncm::gearing_shm::Block* g_gearing = nullptr;
+uint64_t g_gearingTryMs = 0;
+uint32_t g_textSeq = 0;
+bool g_selectKnown = false;
+uint32_t g_selectSeq = 0;
+std::vector<StackPath> g_paths;     // empty = no stacked boxes
+bool g_stackLive = false;
+int g_path = 0;
+std::vector<int> g_groups;          // the active ladder's range group per gear (parallel to the effective gears)
+
+int whenRank(const std::string& w) { return w == "stationary" ? 2 : (w == "neutral" ? 1 : 0); }
+
+std::vector<std::string> split(const std::string& s, char c)
+{
+    std::vector<std::string> out;
+    size_t at = 0;
+    for (;;) {
+        const size_t k = s.find(c, at);
+        out.push_back(s.substr(at, k == std::string::npos ? std::string::npos : k - at));
+        if (k == std::string::npos) break;
+        at = k + 1;
+    }
+    return out;
+}
+
+/// engineering.gearing wire text -> paths. Anything malformed refuses the whole text (the car's own box drives).
+bool parseStack(const std::string& text, std::vector<StackPath>& out)
+{
+    out.clear();
+    if (text.empty()) return true;
+    const auto paths = split(text, ';');
+    if (paths.empty() || paths[0] != "v1") return false;
+    for (size_t i = 1; i < paths.size() && out.size() < 4; ++i) {
+        const auto parts = split(paths[i], '|');
+        const auto head = split(parts[0], ',');
+        if (head.size() < 7 || head[0] != "P") return false;
+        StackPath p;
+        p.when = head[1];
+        p.shiftMs = std::atoi(head[2].c_str());
+        p.rangeWhen = head[3];
+        p.rangeMs = std::atoi(head[4].c_str());
+        p.efficiency = std::clamp(static_cast<float>(std::atof(head[5].c_str())), 0.0f, 1.0f);
+        p.label = head[6];
+        for (size_t k = 1; k < parts.size() && p.entries.size() < 32; ++k) {
+            const std::string& e = parts[k];   // A*2.4@1
+            const size_t star = e.find('*'), at = e.find('@');
+            if (e.size() < 4 || star != 1 || at == std::string::npos || at < star) return false;
+            StackEntry x;
+            x.all = e[0] == 'A';
+            if (!x.all && e[0] != 'T') return false;
+            x.m = static_cast<float>(std::atof(e.substr(star + 1, at - star - 1).c_str()));
+            x.group = std::atoi(e.substr(at + 1).c_str());
+            if (!(x.m > 0.05f && x.m < 20.0f)) return false;
+            p.entries.push_back(x);
+        }
+        if (p.entries.empty()) return false;
+        out.push_back(std::move(p));
+    }
+    return true;
+}
+
+/// Read the relayed block (once a second until NCM Carrier has created it). Returns true while stacked boxes are live.
+bool pollStack(uint64_t now)
+{
+    if (!g_gearing) {
+        if (now - g_gearingTryMs < 1000) return false;
+        g_gearingTryMs = now;
+        wchar_t name[96];
+        ncm::gearing_shm::name(name, 96, GetCurrentProcessId());
+        HANDLE h = OpenFileMappingW(FILE_MAP_READ, FALSE, name);
+        if (!h) return false;
+        void* view = MapViewOfFile(h, FILE_MAP_READ, 0, 0, sizeof(ncm::gearing_shm::Block));
+        if (!view) { CloseHandle(h); return false; }
+        const auto* b = static_cast<const ncm::gearing_shm::Block*>(view);
+        if (b->magic != ncm::gearing_shm::kMagic || b->version != ncm::gearing_shm::kVersion) {
+            GBX_WARN("stack: NCM Carrier's gearing block has the wrong magic/version; stacked gearboxes off");
+            UnmapViewOfFile(view); CloseHandle(h); g_gearingTryMs = now + 60000; return false;
+        }
+        g_gearingMap = h;
+        g_gearing = b;
+        GBX_INFO("stack: reading stacked-gearbox paths relayed by NCM Carrier");
+    }
+    const uint64_t at = g_gearing->stampMs;
+    const bool fresh = at != 0 && now >= at && now - at <= ncm::gearing_shm::kStaleMs;
+    if (fresh && g_gearing->textSeq != g_textSeq) {
+        char copy[ncm::gearing_shm::kTextBytes];
+        uint32_t len = 0, seq = 0;
+        for (int tries = 0; tries < 3; ++tries) {
+            seq = g_gearing->seq;
+            len = std::min<uint32_t>(static_cast<uint32_t>(g_gearing->textLen), ncm::gearing_shm::kTextBytes - 1);
+            std::memcpy(copy, g_gearing->text, len);
+            if (seq == g_gearing->seq && (seq % 2) == 0) break;
+        }
+        copy[len] = 0;
+        g_textSeq = g_gearing->textSeq;
+        std::vector<StackPath> parsed;
+        if (parseStack(copy, parsed)) {
+            g_paths = std::move(parsed);
+            if (g_path >= static_cast<int>(g_paths.size())) g_path = 0;
+            std::string desc;
+            for (size_t i = 0; i < g_paths.size(); ++i) {
+                char b[160];
+                std::snprintf(b, sizeof b, "%s[%zu] %s: %zu stage(s), engage %s%s", desc.empty() ? "" : " | ", i, g_paths[i].label.c_str(),
+                              g_paths[i].entries.size(), g_paths[i].when.c_str(), g_paths[i].rangeWhen != "any" ? (", range " + g_paths[i].rangeWhen).c_str() : "");
+                desc += b;
+            }
+            GBX_INFO("stack: %s", g_paths.empty() ? "no stacked boxes (the car's own box)" : desc.c_str());
+        } else {
+            g_paths.clear();
+            GBX_WARN("stack: could not read the paths (%s); the car's own box drives", copy);
+        }
+    }
+    if (fresh != g_stackLive) {
+        g_stackLive = fresh;
+        if (!fresh) { g_path = 0; GBX_INFO("stack: no word from NCM Carrier for %llu ms; the car's own box drives", static_cast<unsigned long long>(ncm::gearing_shm::kStaleMs)); }
+    }
+    return g_stackLive && !g_paths.empty();
+}
+
+/// The effective box this frame: the car's spec, or the active path laddered from it (sorted by ceiling, duplicates
+/// within one path dropped -- never across paths).
+VirtualSpec effective(const VirtualSpec& spec, bool stacked)
+{
+    g_groups.assign(spec.gears.size(), 0);
+    if (!stacked || spec.gears.empty() || g_path < 0 || g_path >= static_cast<int>(g_paths.size())) return spec;
+    const StackPath& p = g_paths[static_cast<size_t>(g_path)];
+    struct G { VirtualGear vg; int group; };
+    std::vector<G> ladder;
+    auto add = [&](const VirtualGear& base, float m, int group) {
+        VirtualGear vg;
+        vg.ceilingMps = base.ceilingMps / m;
+        vg.share = std::min(1.0f, base.share * m * p.efficiency);
+        ladder.push_back({vg, group});
+    };
+    for (const auto& e : p.entries) {
+        if (e.all) for (const auto& g : spec.gears) add(g, e.m, e.group);
+        else add(spec.gears.back(), e.m, e.group);
+    }
+    std::stable_sort(ladder.begin(), ladder.end(), [](const G& a, const G& b) { return a.vg.ceilingMps < b.vg.ceilingMps; });
+    VirtualSpec out = spec;
+    out.gears.clear();
+    g_groups.clear();
+    for (const auto& g : ladder) {
+        if (!out.gears.empty() && std::fabs(g.vg.ceilingMps - out.gears.back().ceilingMps) <= out.gears.back().ceilingMps * 0.005f) continue;
+        if (out.gears.size() >= 32) break;
+        out.gears.push_back(g.vg);
+        g_groups.push_back(g.group);
+    }
+    out.shiftMs = std::max(spec.shiftMs, p.shiftMs);
+    return out;
+}
 
 int vkOf(std::string name, int fallback)
 {
@@ -180,16 +351,44 @@ void publish(float drive, float ceiling)
 }  // namespace
 
 namespace {
-/// Point the long gear's ceiling at `mps` once (no write when it is already there).
-void applyBand(const VirtualSpec& spec, float mps, float lo, float hi, const char* why)
+/// The model's torque multiplier at road speed `mps`: its first forward gear reaching it (the automatic's gear there).
+float modelTorqueAt(const VirtualSpec& spec, float mps)
 {
-    if (!spec.longGear || !(mps > 0.5f)) return;
-    if (g_bandGear == spec.longGear && std::fabs(g_bandAppliedMps - mps) < 0.01f && std::fabs(g_bandAppliedLo - lo) < 0.5f
-        && std::fabs(g_bandAppliedHi - hi) < 0.5f) return;
-    const bool ok = ncm::gearbox::retuneLongGear(spec.longGear, mps, lo, hi);
-    if (ok) { g_bandGear = spec.longGear; g_bandAppliedMps = mps; g_bandAppliedLo = lo; g_bandAppliedHi = hi; }
-    else if (++g_bandFails <= 5) GBX_WARN("band: could not repoint the long gear (%s)", why);
-    GBX_INFO("band: %s -> native gear 0-%.0f km/h, rpm %.0f..%.0f%s", why, mps * 3.6f, lo, hi, ok ? "" : " FAILED");
+    for (size_t i = 0; i < spec.modelTopMps.size() && i < spec.modelTorque.size(); ++i)
+        if (spec.modelTopMps[i] >= mps) return spec.modelTorque[i];
+    return spec.modelTorque.empty() ? 1.0f : spec.modelTorque.back();
+}
+
+/// 0.4.0, THE SLICES: the selected gear's band 0..`mps`, rpm `lo`..`hi`, cut across the clone's seven native gears
+/// once (no write when it is already there). Every slice starts at 0 km/h on the same rpm line and ends at its own top,
+/// so the game's own engine moves up through them without a jump in the revs; each takes the model's torque at its top.
+/// Slices past `g_slices` sit just above the limiter, where Carrier's ceiling never lets the car go.
+void applyBand(const VirtualSpec& spec, uint64_t record, float mps, float lo, float hi, const char* why)
+{
+    if (spec.slices.size() != static_cast<size_t>(ncm::gearbox::kSlices) || !(mps > 0.5f)) return;
+    if (g_bandGear == record && g_bandSlicesApplied == g_slices && std::fabs(g_bandAppliedMps - mps) < 0.01f
+        && std::fabs(g_bandAppliedLo - lo) < 0.5f && std::fabs(g_bandAppliedHi - hi) < 0.5f) return;
+    const int n = std::clamp(g_slices, 1, ncm::gearbox::kSlices);
+    bool ok = true;
+    char tops[160] = "";
+    for (int k = 0; k < ncm::gearbox::kSlices; ++k) {
+        float top, rpmTop;
+        if (k < n) {
+            top = mps * static_cast<float>(k + 1) / static_cast<float>(n);
+            rpmTop = lo + (hi - lo) * static_cast<float>(k + 1) / static_cast<float>(n);
+        } else {   // unused: just past the limiter, the same line continued
+            top = mps * (1.0f + 0.01f * static_cast<float>(k - n + 1));
+            rpmTop = lo + (hi - lo) * top / mps;
+        }
+        ok = ncm::gearbox::retuneSlice(spec.slices[static_cast<size_t>(k)], 0.0f, top, lo, rpmTop, modelTorqueAt(spec, top)) && ok;
+        if (k < n) {
+            const size_t used = std::strlen(tops);
+            std::snprintf(tops + used, sizeof tops - used, "%s%.0f", k ? "/" : "", top * 3.6f);
+        }
+    }
+    if (ok) { g_bandGear = record; g_bandSlicesApplied = g_slices; g_bandAppliedMps = mps; g_bandAppliedLo = lo; g_bandAppliedHi = hi; }
+    else if (++g_bandFails <= 5) GBX_WARN("band: could not re-slice the native gears (%s)", why);
+    GBX_INFO("band: %s -> %d native slices to %s km/h, rpm %.0f..%.0f%s", why, n, tops, lo, hi, ok ? "" : " FAILED");
 }
 
 /// The rpm window for gear index `idx` (0-based) of `spec`: landing at the previous limiter, redline at this one.
@@ -225,8 +424,47 @@ int32_t tick(uint64_t record, float speedMps, int32_t nativeHudGear)
     g_event = 0;
     auto it = g_specs.find(record);
     if (it == g_specs.end()) { g_record = 0; return -2; }
-    const VirtualSpec& spec = it->second;
+    const uint64_t nowStack = nowMs();
+    const bool stacked = pollStack(nowStack);
+    if (record != g_record) g_path = 0;
+    // an engage press (the driver's bound control on a side box): that path, or -- pressed for the path already
+    // driving -- back to the car's own box. The stricter `when` of the two paths decides whether it may happen now.
+    if (g_gearing) {
+        const uint32_t sel = g_gearing->selectSeq;
+        if (!g_selectKnown) { g_selectKnown = true; g_selectSeq = sel; }
+        else if (sel != g_selectSeq) {
+            g_selectSeq = sel;
+            const int asked = g_gearing->selectPath;
+            const int target = (asked == g_path) ? 0 : asked;
+            if (stacked && target >= 0 && target < static_cast<int>(g_paths.size()) && target != g_path) {
+                const std::string& rule = whenRank(g_paths[g_path].when) >= whenRank(g_paths[target].when) ? g_paths[g_path].when : g_paths[target].when;
+                const float speedNow = std::fabs(speedMps);
+                const bool allowed = rule == "stationary" ? speedNow < 1.0f : (rule == "neutral" ? g_gear == 0 : true);
+                if (!allowed) {
+                    ++g_refused;
+                    GBX_INFO("stack: engage %s refused (%s first) at %.0f km/h, gear %d", g_paths[target].label.c_str(),
+                             rule == "stationary" ? "stop" : "neutral", speedNow * 3.6f, g_gear);
+                } else {
+                    const int from = g_path;
+                    g_path = target;
+                    const VirtualSpec next = effective(it->second, true);
+                    if (g_gear > 0) {   // land in the lowest gear that does not over-rev at this speed
+                        int land = static_cast<int>(next.gears.size());
+                        for (size_t i = 0; i < next.gears.size(); ++i) if (next.gears[i].ceilingMps >= speedNow * 1.03f) { land = static_cast<int>(i) + 1; break; }
+                        g_gear = std::max(1, land);
+                        g_cutUntilMs = nowStack + static_cast<uint64_t>(std::max(0, next.shiftMs));
+                        g_event = 1;
+                    }
+                    ++g_shifts;
+                    GBX_INFO("stack: path %d (%s) -> %d (%s), %zu gears, now in %d at %.0f km/h", from, g_paths[from].label.c_str(), target,
+                             g_paths[target].label.c_str(), next.gears.size(), g_gear, speedNow * 3.6f);
+                }
+            }
+        }
+    }
+    const VirtualSpec spec = effective(it->second, stacked);
     const int32_t n = static_cast<int32_t>(spec.gears.size());
+    if (g_gear > n) g_gear = n;
     if (record != g_record) {
         g_record = record;
         g_gear = 0;
@@ -254,9 +492,26 @@ int32_t tick(uint64_t record, float speedMps, int32_t nativeHudGear)
     // the selector: R (-1) - N (0) - 1..n. R only from N at a standstill, as a real box (owner QA 2026-10-04: reverse
     // "has multiple gears and doesnt get refused in drive gear")
     constexpr float kStill = 1.0f;   // m/s
-    if (wantUp && g_gear < n) {
+    // a range box's own procedure: moving between ranges (a change of group in the ladder) follows `rangeWhen`, and
+    // takes the range box's own time
+    const StackPath* path = (stacked && g_path < static_cast<int>(g_paths.size())) ? &g_paths[static_cast<size_t>(g_path)] : nullptr;
+    auto rangeBlocked = [&](int32_t from, int32_t to) -> bool {
+        if (!path || from < 1 || to < 1 || from > n || to > n || g_groups.size() != static_cast<size_t>(n)) return false;
+        if (g_groups[static_cast<size_t>(from - 1)] == g_groups[static_cast<size_t>(to - 1)]) return false;
+        if (path->rangeWhen == "stationary" && speed >= kStill) return true;
+        if (path->rangeWhen == "neutral") return true;   // a sequential step never passes through N
+        return false;
+    };
+    auto rangeMs = [&](int32_t from, int32_t to) -> int {
+        if (!path || from < 1 || to < 1 || g_groups.size() != static_cast<size_t>(n)) return 0;
+        return g_groups[static_cast<size_t>(from - 1)] != g_groups[static_cast<size_t>(to - 1)] ? path->rangeMs : 0;
+    };
+    if (wantUp && g_gear < n && rangeBlocked(g_gear, g_gear + 1)) {
+        ++g_refused;
+        GBX_INFO("stack: range change refused at %.0f km/h (%s)", speed * 3.6f, path->rangeWhen == "neutral" ? "neutral first" : "stop first");
+    } else if (wantUp && g_gear < n) {
         ++g_gear;
-        g_cutUntilMs = g_gear >= 1 ? now + static_cast<uint64_t>(std::max(0, spec.shiftMs)) : 0;
+        g_cutUntilMs = g_gear >= 1 ? now + static_cast<uint64_t>(std::max({0, spec.shiftMs, rangeMs(g_gear - 1, g_gear)})) : 0;
         g_event = g_gear >= 1 ? 1 : 0; ++g_shifts;
     }
     if (wantDown && g_gear == 0) {
@@ -272,9 +527,12 @@ int32_t tick(uint64_t record, float speedMps, int32_t nativeHudGear)
             ++g_refused;
             static uint64_t lastLog = 0;
             if (now - lastLog > 1000) { lastLog = now; GBX_INFO("manual: downshift to %d refused at %.0f km/h (over-rev)", target, speed * 3.6f); }
+        } else if (rangeBlocked(g_gear, target)) {
+            ++g_refused;
+            GBX_INFO("stack: range change refused at %.0f km/h (%s)", speed * 3.6f, path->rangeWhen == "neutral" ? "neutral first" : "stop first");
         } else {
+            g_cutUntilMs = now + static_cast<uint64_t>(std::max({0, spec.shiftMs * 2 / 3, rangeMs(g_gear, target)}));
             g_gear = target;
-            g_cutUntilMs = now + static_cast<uint64_t>(std::max(0, spec.shiftMs * 2 / 3));
             g_event = -1; ++g_shifts;
         }
     }
@@ -293,8 +551,13 @@ int32_t tick(uint64_t record, float speedMps, int32_t nativeHudGear)
     } else {
         const VirtualGear& vg = spec.gears[static_cast<size_t>(g_gear - 1)];
         const bool cut = now < g_cutUntilMs;
+        // 0.4.0: with the slices live the native gears already carry the model's torque at each speed -- the old share
+        // (this gear's model torque against the strongest) would count the taller gears' weakness twice. A stacked
+        // path still loses its own efficiency.
+        const bool sliced = g_engineAudio && g_audioScale == "band" && g_bandGear == record;
+        const float share = sliced ? (path ? std::clamp(path->efficiency, 0.0f, 1.0f) : 1.0f) : vg.share;
         // a forward gear never reverses the car: S brakes to a stop and holds
-        publish((cut || backwards) ? 0.0f : vg.share, vg.ceilingMps);
+        publish((cut || backwards) ? 0.0f : share, vg.ceilingMps);
         g_frac = vg.ceilingMps > 0.0f ? std::clamp(speed / vg.ceilingMps, 0.0f, 1.05f) : 0.0f;
     }
     if (g_engineAudio && g_audioScale == "band") {
@@ -303,10 +566,11 @@ int32_t tick(uint64_t record, float speedMps, int32_t nativeHudGear)
         if (idx < spec.gears.size()) {
             float lo = 0.0f, hi = 0.0f;
             bandWindow(spec, idx, lo, hi);
-            applyBand(spec, spec.gears[idx].ceilingMps, lo, hi, g_gear >= 1 ? "gear" : "N/R");
+            applyBand(spec, record, spec.gears[idx].ceilingMps, lo, hi, g_gear >= 1 ? "gear" : "N/R");
         }
-    } else if (g_bandGear == spec.longGear && g_bandAppliedMps >= 0.0f) {
-        applyBand(spec, spec.longTopMps, spec.idleRpm, spec.maxRpm, "full band (mode not band)");
+    } else if (g_bandGear == record && g_bandAppliedMps >= 0.0f) {
+        applyBand(spec, record, spec.longTopMps, spec.idleRpm, spec.maxRpm, "full band (mode not band)");
+        g_bandGear = 0;
     }
     g_rpm = spec.idleRpm + std::min(g_frac, 1.0f) * (spec.maxRpm - spec.idleRpm);
     g_audioRpm = g_audioIdle + std::min(g_frac, 1.0f) * (g_audioTop - g_audioIdle);
@@ -400,6 +664,12 @@ void setBand(float landingRpm, float redlineRpm, float minRpmFloor)
     GBX_INFO("audio: band landing %.0f rpm, redline %.0f rpm, min floor %.0f", g_landingRpm, g_redlineRpm, g_minRpmFloor);
 }
 
+void setSlices(int slices)
+{
+    g_slices = std::clamp(slices, 1, ncm::gearbox::kSlices);
+    GBX_INFO("audio: band sliced over %d native gear(s)", g_slices);
+}
+
 void setCurve(float lo, float hi, float gamma, float follow, float smoothMs)
 {
     g_curveLo = std::max(0.0f, lo);
@@ -423,7 +693,7 @@ std::string audioDetail()
     if (!g_configError.empty()) return "CONFIG ERROR - not loaded, last good values kept";
     if (g_audioScale == "band") {
         char b[96];
-        if (g_bandAppliedMps >= 0.0f) std::snprintf(b, sizeof b, "band to %.0f km/h, rpm %.0f..%.0f (land %.0f red %.0f)", g_bandAppliedMps * 3.6f, g_bandAppliedLo, g_bandAppliedHi, g_landingRpm, g_redlineRpm);
+        if (g_bandAppliedMps >= 0.0f) std::snprintf(b, sizeof b, "%d slices to %.0f km/h, rpm %.0f..%.0f (land %.0f red %.0f)", g_bandSlicesApplied, g_bandAppliedMps * 3.6f, g_bandAppliedLo, g_bandAppliedHi, g_landingRpm, g_redlineRpm);
         else std::snprintf(b, sizeof b, "game voice: band not applied");
         return b;
     }
@@ -471,7 +741,8 @@ void leave()
     std::lock_guard<std::mutex> _(g_mutex);
     if (g_record && g_bandAppliedMps >= 0.0f) {
         auto it = g_specs.find(g_record);
-        if (it != g_specs.end()) applyBand(it->second, it->second.longTopMps, it->second.idleRpm, it->second.maxRpm, "left the car: full band");
+        if (it != g_specs.end()) applyBand(it->second, g_record, it->second.longTopMps, it->second.idleRpm, it->second.maxRpm, "left the car: full band");
+        g_bandGear = 0;
     }
     if (g_block) g_block->stampMs = 0;
     if (g_record) GBX_INFO("manual: out of the car after %llu shift(s), %llu refused", static_cast<unsigned long long>(g_shifts),
@@ -481,7 +752,8 @@ void leave()
 
 std::string status()
 {
-    return "manual specs=" + std::to_string(g_specs.size()) + " gear=" + std::to_string(g_gear) + " shifts=" + std::to_string(g_shifts);
+    return "manual specs=" + std::to_string(g_specs.size()) + " gear=" + std::to_string(g_gear) + " shifts=" + std::to_string(g_shifts) +
+           " stack=" + (g_stackLive ? std::to_string(g_paths.size()) + " path(s), on " + std::to_string(g_path) : std::string("off"));
 }
 
 }  // namespace ncm::gearbox::manual

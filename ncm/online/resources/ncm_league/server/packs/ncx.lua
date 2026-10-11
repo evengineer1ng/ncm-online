@@ -11,7 +11,7 @@ NcmPackNcx = {
         venueRadiusM = 40,
         -- Sponsor-funded invitational: no participant entry debit, marquee purses.
         economy = {
-            id="ncx_invitational_v1",version=1,entryFee=0,timeTrialCompletion=25000,raceCompletion=50000,
+            id="ncx_invitational_v1",version=1,scale=250,purseTier="premier",entryFee=0,timeTrialCompletion=25000,raceCompletion=50000,
             repeatWindowSec=604800,fullRateCompletions=1,repeatFloor=5000,
             placement={[1]=100000,[2]=50000,[3]=25000},fieldBonus={perEntrant=10000,max=100000},targets={},
             tagBounties={clean_run=10000,clean_race=15000},maxTagBounty=20000,

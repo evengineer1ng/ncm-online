@@ -208,6 +208,62 @@ RegisterNetEvent("ncm:component.state.request",function(machineIds)
     end;TriggerClientEvent("ncm:component.state",pid,out) end)
 end)
 
+-- Physical cargo: a loose serialized component must be loaded into a called Machine's open trunk.
+-- The Machine ID is the custody link; a second car or the player's garage inventory will not follow an anchor.
+function NcmComponentInstall.trunk(pid,componentId,machineId,unload)
+    local profile=NcmIdentity.get(pid);if not profile then return nil,"no_driver" end
+    local machine=MySQL.single.await("SELECT asset_id FROM vehicle_asset WHERE asset_id=? AND server_id=? AND ncm_driver_id=?",
+        {machineId,serverId(),profile.ncmDriverId})
+    local part=MySQL.single.await([[SELECT asset_id,location_kind,machine_asset_id FROM component_asset
+        WHERE asset_id=? AND server_id=? AND ncm_driver_id=?]],{componentId,serverId(),profile.ncmDriverId})
+    if not machine or not part then return nil,"not_owned" end
+    if unload then
+        if part.location_kind~="trunk" or part.machine_asset_id~=machineId then return nil,"not_in_this_trunk" end
+    elseif part.location_kind~="storage" or part.machine_asset_id~=nil then return nil,"not_loose_storage" end
+    local live=NcmVehicleAccess and NcmVehicleAccess.liveAsset(machineId)
+    if not live then return nil,"call_car_first" end
+    local okV,v=pcall(Open77.vehicles.get,live.vehicleId)
+    local okP,p=pcall(Open77.players.get,pid)
+    if not okV or type(v)~="table" or not okP or type(p)~="table" or type(p.position)~="table" then return nil,"position_unavailable" end
+    if tonumber(v.bucket)~=tonumber(p.bucket) then return nil,"different_world" end
+    local x,y,z=tonumber(v.x),tonumber(v.y),tonumber(v.z)
+    if not x or not y or not z then return nil,"vehicle_position_unavailable" end
+    local q=p.position
+    local dx,dy,dz=(tonumber(q.x) or math.huge)-x,(tonumber(q.y) or math.huge)-y,(tonumber(q.z) or math.huge)-z
+    if dx*dx+dy*dy+dz*dz>16 then return nil,"stand_near_trunk" end
+    local okDoor,open=pcall(Open77.vehicles.isDoorOpen,live.vehicleId,Open77.vehicles.doors.trunk)
+    if not okDoor then return nil,"trunk_state_unavailable" end
+    if open~=true then
+        local okOpen,opened=pcall(Open77.vehicles.openDoor,live.vehicleId,Open77.vehicles.doors.trunk)
+        if not okOpen or opened~=true then return nil,"trunk_could_not_open" end
+    end
+    if not unload then
+        local count=tonumber(MySQL.scalar.await("SELECT COUNT(*) FROM component_asset WHERE server_id=? AND machine_asset_id=? AND location_kind='trunk'",
+            {serverId(),machineId})) or 0
+        if count>=10 then return nil,"trunk_full" end
+    end
+    local changed
+    if unload then changed=MySQL.update.await([[UPDATE component_asset SET location_kind='storage',machine_asset_id=NULL
+        WHERE asset_id=? AND server_id=? AND ncm_driver_id=? AND location_kind='trunk' AND machine_asset_id=?]],
+        {componentId,serverId(),profile.ncmDriverId,machineId})
+    else changed=MySQL.update.await([[UPDATE component_asset SET location_kind='trunk',machine_asset_id=?
+        WHERE asset_id=? AND server_id=? AND ncm_driver_id=? AND location_kind='storage' AND machine_asset_id IS NULL]],
+        {machineId,componentId,serverId(),profile.ncmDriverId}) end
+    return (tonumber(changed) or 0)>0,(tonumber(changed) or 0)>0 and nil or "custody_changed"
+end
+
+RegisterNetEvent("ncm:component.trunk",function(componentId,machineId,unload)
+    local pid=tonumber(source) or 0;if pid<=0 then return end
+    CreateThread(function()
+        local ok,result,reason=pcall(NcmComponentInstall.trunk,pid,tostring(componentId or ""),tostring(machineId or ""),unload==true)
+        local success=ok and result==true
+        local why=success and "Cargo moved." or tostring(ok and reason or result)
+        TriggerClientEvent("ncm:component.trunk.result",pid,{ok=success,message=why})
+        pcall(Open77.notifications.send,pid,{type=success and "success" or "error",title=success and "TRUNK UPDATED" or "TRUNK REFUSED",
+            message=why,icon="NCM",durationMs=5000})
+    end)
+end)
+
 AddEventHandler("onResourceStart",function(name) if name~="ncm_world" then return end CreateThread(function()
     Wait(10000);local rows=MySQL.query.await([[SELECT machine_asset_id FROM machine_configuration_current]]) or {}
     for _,r in ipairs(rows) do local ok,why=pcall(NcmComponentInstall.apply,r.machine_asset_id,"resource hydration");if not ok then log("hydrate %s failed: %s",tostring(r.machine_asset_id),tostring(why)) end end

@@ -141,6 +141,27 @@ SIGKILLs it, then starts the new process — a restart is ~100 s end to end, not
 has usually already issued the restart; check `journalctl -u ncm-server` before assuming nothing happened.
 
 ## Deploying NCM code
+
+**`publish-carrier.py --id X` drops every declared package whose id starts with X (KB-420 deploy, 2026-10-09).**
+Publishing `ncm-radio` removed `ncm-radio-voices-1..4` from requiredMods. Publish the main package first, then each
+voice package, and read the final `declared:` line before restarting.
+
+
+**A new resource ships WHOLE (KB-423, 2026-10-09).** A hash diff that skips `*/data/*` drops a vendored
+`shared/core/data/`, and OPEN//77 then refuses to start ("Resource pattern ... matched no files") and crash-loops.
+For a new resource, tar its entire directory. After a restart, wait for `systemctl is-active` = active and the
+resource's `started` line; never treat a timeout as success.
+
+**Required-mod size cap: 64 MiB per archive (KB-418).** A larger hosted blob shows in `/mods/v1/manifest` but its
+`/mods/v1/blobs/<sha>` returns 404. Split it (`tools/split-radio-pack.py` for NCM Radio). After `publish-carrier.py
+--import-blob` (which runs as root), `chown ubuntu:ubuntu /opt/ncm/server/.open77/mods/*`, then after the restart
+check every blob with `curl -r 0-99` for a 206.
+
+**2026-10-09 00:07 UTC, Online:** `ncm_radio` resource and NCM Radio 0.1.1 (five packages) plus the IDEA-1272 purse
+files. Backup `/opt/ncm/backups/pre-carrier-prod-20261008T235833Z`. 17 required mods, digest `6ba4aa05...`.
+Rollback for the radio: `publish-carrier.py /opt/ncm/server --id <each radio id> --remove`; set `radioEnabled=false`
+or remove `ncm_radio`; restart.
+
 From the repo, in PowerShell (only needed when `ncm/online/resources/**` or `ncm/core/**` changed):
 ```
 powershell -NoProfile -ExecutionPolicy Bypass -File tools\deploy-staging.ps1          # build core → sync → config touches → restart → grep log
@@ -342,3 +363,8 @@ Deployment artifacts and rollback:
 4. `tools\deploy-staging.ps1` — applies `database.enabled=true` and `"ncm/*"` to `resources.load`, syncs, restarts.
 5. Publish the current NCM-owned package set from release artifacts; do not restore deleted RB15/livery or
    obsolete loader declarations from historical backups.
+### 2026-10-08 22:17 UTC - repair-only overlay (L350, migration 076)
+
+Owner authorized Online deployment of the paid chassis repair correction, handling workmanship readout and workshop routing. Backup `/opt/ncm/backups/pre-carrier-prod-20261008T221006Z` has verified `ncm.sql.gz`, `operator-state.tar.gz`, `resources-ncm.tar.gz` and a first-overlay rollback archive. The initial upload was a 24-file overlay limited to shared repair/handling core, `ncm_league` migration/collection/collapse and `ncm_world` condition/handling/client Panel/web Panel. The follow-up changed only nine repair service/condition files so an older paid repair could shed its residual damage without erasing a later crash. Every live file hash matched the reviewed preflight before upload and the expected hash after it. The full local gate was green (1224 core tests per interpreter and host/SQL/panel/docs gates).
+
+Online restarted active, schema version 76, no new startup script error. All 12 required mods retained manifest digest `9468c86929977d7a415d1d29e1faaab647b84782ccc1b0bf3958eac1914ce3f3` across the pre/post boots. `server.jsonc` SHA-256 remained `c8f38956708d602de59b65b397bb4fb1239a0432972ae7e537df4594eba2be28`, and the mod file count remained 31; no required-mod declaration, package or world asset was changed. The single older paid repair produced one `vehicle_repair_correction` audit row: canonical health 0.891 -> 0.948, glass mask 31 -> 4, and `repair_json` present. This is server evidence only; MASTER_TEST §WL16-§WL17 still need an owner client run. For resource rollback, restore `resources-ncm.tar.gz` to `/opt/ncm/resources` from the backup and restart; migration 076 is additive and may remain. Do not restore the SQL dump over later live activity without a reviewed recovery plan.

@@ -65,9 +65,13 @@ local MANAGER_REASONS = {
     one_team_rule = "You already hold a team role. One team at a time.", cooldown = "Your last team folded. Wait out the season.",
     name_too_short = "The name is too short.", name_too_long = "The name is too long.", name_characters = "Letters, numbers and simple punctuation only.",
     name_taken = "That name is taken.", insufficient_funds = "Not enough eddies.", not_a_manager = "You don't run a team.",
-    roster_full = "The roster is full.", under_contract = "That driver is under contract and happy where they are.",
+    roster_full = "No room: counting the moves already waiting, the roster would be over its limit.", under_contract = "That driver is under contract and happy where they are.",
     cannot_afford = "The treasury can't cover it.", over_weekly_cap = "That's past this week's withdrawal limit.",
-    too_many_pending = "Six moves are already waiting for the Cup boundary.",
+    too_many_pending = "Six moves are already waiting for the Cup boundary. Cancel one first.",
+    already_pending = "That move is already waiting. Cancel it, or leave it.",
+    no_such_move = "That move is gone already.", queue_changed = "The list changed. Look again.",
+    invalid_seat = "Your tier has no such seat.", cannot_afford_severance = "The treasury can't cover the severance.",
+    not_your_driver = "That driver isn't on your team.",
 }
 
 RegisterNetEvent("ncm:paddock.manager", function(req)

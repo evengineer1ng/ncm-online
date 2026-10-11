@@ -9,7 +9,7 @@
     * dist/<plugin>/  -- the build scripts' staged, game-shaped copies you hand-install from (Broadcast, Pace, Rig Bridge,
                          Vision, Snowglobe): files missing in the game are copied; differing non-config files replaced
     * the launcher's own quarantine (modstore blobs, by sha256) -- for what has no staged copy (gearbox scripts + tweaks,
-                         NCM Clock, IWN braking, Pace diag)
+                         NCM Clock, IWN braking; NOT the Pace diag -- it needs Codeware, which world sessions do not load)
     * install-records/ncm3-kimiko/solo-adjust-backup -- the original ncm_thrust / ncm_snowglobe configs (enabled)
   Never touched: NCM 3.0 (ncm_host), ncm_radial (parked, KB-182), existing plugin configs other than those two, and the
   third-party mods the launcher keeps out of world sessions. Everything replaced is backed up; the record lists it all.
@@ -60,7 +60,8 @@ foreach ($p in @('ncm_broadcast', 'ncm_pace', 'ncm_rig_bridge', 'ncm_vision', 'n
 $store = Join-Path $env:LOCALAPPDATA 'Open77\modstore'
 $q = Get-Content -Raw (Join-Path $store 'state\quarantine.json') | ConvertFrom-Json
 foreach ($m in $q.mods) {
-    if ($m.key -notmatch 'ncm_gearbox|ncm_clock|ncm_iwn_braking|ncm_pace_diag') { continue }
+    # not ncm_pace_diag: it needs Codeware, which world sessions do not load, so every server failed the compile check
+    if ($m.key -notmatch 'ncm_gearbox|ncm_clock|ncm_iwn_braking') { continue }
     foreach ($f in $m.files) {
         $blob = Join-Path $store ("blobs\" + $f.sha256.Substring(0, 2) + "\" + $f.sha256)
         if (-not (Test-Path -LiteralPath $blob)) { Write-Host "  MISSING blob for $($f.path)"; continue }

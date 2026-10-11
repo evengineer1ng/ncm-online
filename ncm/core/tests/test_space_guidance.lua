@@ -54,7 +54,67 @@ local function flyHot(T, venueId, n, z, vz, maxS)
     return false, t, lowest, hot
 end
 
+-- KB-442: the owner's guided Machine -- FD-1 underside/down, a full PT-400 on the front, an AC-6 on the roof
+local function bellyMachine(T, mountId, facing)
+    local C = T.Core
+    local I, F = C.get("engineering.installation"), C.get("engineering.flightmodel")
+    local ids = {}
+    for _, d in ipairs(I.DESIGNS) do ids[d.code] = d.designId end
+    local devices = I.resolve({
+        { componentId = "fd", designId = ids["ZTC-FD1"], mountId = mountId or "mount.underside", facing = facing or "down" },
+        { componentId = "pt", designId = ids["ZTC-PT500"], mountId = "mount.front", facing = "up", fillKg = 354 },
+        { componentId = "ac", designId = ids["ZTC-AC6"], mountId = "mount.roof", facing = "up" },
+    }, "archer_hella")
+    return F.build(devices, { vehicleKey = "archer_hella", fuelKg = 23.5 })
+end
+
 return {
+    -- L360 addendum: the floor pan is centred -- the owner's exact build (full tank up front) now flies on Guidance
+    the_underside_drive_sits_under_the_centre_of_mass = function(T)
+        local G = T.Core.get("space.guidance")
+        local m = bellyMachine(T)
+        local fd
+        for _, d in ipairs(m.devices) do if d.key == "fd" then fd = d end end
+        T.ok(math.abs(fd.at[1] - m.com[1]) < 1e-6 and math.abs(fd.at[2] - m.com[2]) < 1e-6, "the drive is directly under the balance point")
+        local _, trimmedN, worst = G.trimCaps(m)
+        T.ok(not worst and trimmedN >= 29999, ("no trim limit: all %.1f kN usable"):format(trimmedN / 1000))
+        T.ok(G.trimFeasible(m, 2400), "Guidance may fly it")
+    end,
+
+    an_off_centre_drive_is_trimmed_and_refused_with_the_reason = function(T)
+        local G = T.Core.get("space.guidance")
+        local m = bellyMachine(T, "mount.front", "down")   -- a lift drive on the front bumper: 2 m ahead of the balance point
+        local caps, trimmedN, worst = G.trimCaps(m)
+        T.ok(worst and worst.armM > 0.15, ("the belly drive misses the centre of mass (%.2f m)"):format(worst and worst.armM or 0))
+        T.ok(trimmedN < 30000 * 0.5, ("Guidance may use only %.1f kN of 30"):format(trimmedN / 1000))
+        local ok, tw, why = G.trimFeasible(m, 2400)
+        T.ok(not ok and tostring(why):find("centre of mass", 1, true) and tostring(why):find("rear, facing aft", 1, true),
+            "refused, naming the thrust line and the fix: " .. tostring(why))
+    end,
+
+    a_centre_line_drive_is_not_limited_by_its_line = function(T)
+        local G = T.Core.get("space.guidance")
+        local m = bellyMachine(T, "mount.rear", "aft")
+        local ok = G.trimFeasible(m, 2400)
+        T.ok(ok, "FD-1 rear facing aft: Guidance may fly it")
+    end,
+
+    guidance_never_tumbles_the_belly_machine = function(T)
+        local C = T.Core
+        local D, G, F = C.get("space.deep"), C.get("space.guidance"), C.get("engineering.flightmodel")
+        local m = bellyMachine(T)
+        local e, n, u = D.enu(35.36, -120.857)
+        local s = F.state(m, { p = D.llaToEcef(35.36, -120.857, 12369), v = D.vec.scale(u, -2), basis = { right = e, forward = n, up = u } })
+        local route = G.plan(F.deep(s), C.get("space.venues").get("monza_1966"))
+        local maxSpin = 0
+        for _ = 1, 20 * 30 do
+            local cmd = G.fly(route, m, s, {})
+            s = F.step(m, s, cmd, 1 / 30, {})
+            maxSpin = math.max(maxSpin, D.vec.len(s.omega))
+        end
+        T.ok(maxSpin < 1.0, ("trimmed, it turns but never tumbles (max spin %.2f rad/s; the live flight reached 17)"):format(maxSpin))
+    end,
+
     the_registry_is_real_places_only = function(T)
         local V = VN(T)
         T.ok(#V.VENUES >= 17, "17 real venues installed")

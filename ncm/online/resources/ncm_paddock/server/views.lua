@@ -9,6 +9,7 @@ PaddockViews = {}
 local U = PaddockUtil
 local P = NcmCore.get("paddock.projection")
 local Tags = NcmCore.get("paddock.tags")
+local Scouting = NcmCore.get("paddock.scouting")
 local World = NcmCore.get("paddock.world")
 local Season = NcmCore.get("paddock.season")
 local Contracts = NcmCore.get("paddock.contracts")
@@ -17,9 +18,46 @@ local Clock = NcmCore.get("world.clock")
 
 local function w() return PaddockStore.world end
 
-local function driverTags(p)
-    if not p then return {} end
-    return Tags.labels(Tags.driver(p, p.evidence or {}, { age = World.age(w(), p) }))
+--- The scouting report for an NPC driver (`paddock.scouting`): earned tags over the Paddock record plus a simulated
+--- career, then impressions up to what the viewing team knows. opts = { own = on the viewer's team, tier = the tier
+--- pace is read against (the viewer's, else the driver's team's, else their own level) }.
+local function driverReport(p, opts)
+    if not p then return { tags = {}, record = {} } end
+    opts = opts or {}
+    local world = w()
+    local org = p.orgId and world.orgs[p.orgId]
+    return Scouting.report(p, { age = World.age(world, p), seed = world.seed, own = opts.own, level = opts.tier or (org and org.tier),
+        cacheOnly = true })
+end
+
+-- Simulated careers are computed here, in the background, never in a view: one career is ~260k VM instructions, and
+-- a view must fit one slice (KB-211). Free agents first (the hiring list), then everyone else; a rescan every minute
+-- picks up drivers born since (rookies, a founded team's pair). Deterministic, so a restart recomputes the same.
+CreateThread(function()
+    while not PaddockWorld.ready do Wait(1000) end
+    local yield = function() Wait(0) end
+    while true do
+        local world = w()
+        local list, done = {}, 0
+        for _, p in ipairs(World.freeAgents(world)) do list[#list + 1] = p end
+        for _, pid in ipairs(world.personOrder) do
+            local p = world.people[pid]
+            if p and p.role == "driver" and p.state == "active" then list[#list + 1] = p end
+        end
+        for _, p in ipairs(list) do
+            if not Scouting.cachedHistory(p) then
+                Scouting.history(p, { age = World.age(world, p), seed = world.seed, yield = yield })
+                done = done + 1
+                Wait(0)
+            end
+        end
+        if done > 0 then print(("[ncm_paddock/scouting] %d career(s) scouted"):format(done)) end
+        Wait(60000)
+    end
+end)
+
+local function driverTags(p, opts)
+    return driverReport(p, opts).tags
 end
 
 local function orgTags(o)
@@ -28,7 +66,7 @@ local function orgTags(o)
     e.seasonsActive, e.lowCashDays = o.seasonsActive, o.lowCashDays
     return Tags.labels(Tags.org(owner and owner.principal, e))
 end
-PaddockViews.driverTags, PaddockViews.orgTags = driverTags, orgTags
+PaddockViews.driverTags, PaddockViews.orgTags, PaddockViews.driverReport = driverTags, orgTags, driverReport
 
 local function seriesList()
     local out = {}
@@ -187,7 +225,7 @@ function PaddockViews.directory()
     return { view = "directory", rows = out }
 end
 
-function PaddockViews.profile(_, args)
+function PaddockViews.profile(pid, args)
     local world = w()
     if args.kind == "org" then
         local o = world.orgs[args.id or ""]
@@ -210,10 +248,14 @@ function PaddockViews.profile(_, args)
     local p = world.people[args.id or ""]
     if not p then return { view = "profile", error = "unknown", rows = {} } end
     local e = p.evidence or {}
+    local viewer = pid and PaddockPlayers.driver(pid)
+    local mine = viewer and PaddockWorld.orgManagedBy(viewer.ncmDriverId)
+    local rep = p.role == "driver" and driverReport(p, { own = mine and mine.id == p.orgId, tier = mine and mine.tier }) or nil
     local head = P.personProfile(p, { orgName = p.orgId and PaddockWorld.orgName(p.orgId) or (p.state == "free_agent" and "free agent")
             or (p.leagueId and "Independent") or nil,
         regionLabel = P.REGION_LABELS[p.region], ageBand = P.ageBand(World.age(world, p)),
-        tags = p.role == "driver" and driverTags(p) or {}, wins = e.wins or 0, starts = e.starts or 0, podiums = e.podiums or 0 })
+        tags = rep and rep.tags or {}, wins = e.wins or 0, starts = e.starts or 0, podiums = e.podiums or 0 })
+    if rep then head.knowledge, head.record = rep.knowledge, rep.record end
     local rows = {}
     for _, r in ipairs(MySQL.query.await([[SELECT x.race_id, x.position, x.state, x.grid, r.series_id, r.route_id, r.window_opens_at
         FROM paddock_result x JOIN paddock_race r ON r.server_id = x.server_id AND r.race_id = x.race_id
@@ -289,16 +331,19 @@ function PaddockViews.myorg(pid)
             balance = PaddockWallet.balance(d.ncmDriverId), rows = rows }
     end
     for _, p in ipairs(World.drivers(world, org.id)) do
-        rows[#rows + 1] = { t = "driver", id = p.id, name = p.display, seat = p.seat, tags = driverTags(p), wage = p.wage,
+        local rep = driverReport(p, { own = true, tier = org.tier })
+        rows[#rows + 1] = { t = "driver", id = p.id, name = p.display, seat = p.seat, seatText = PaddockManager.seatWord(p.seat), tags = rep.tags, wage = p.wage,
             contractEnds = p.contractEnds, ageBand = P.ageBand(World.age(world, p)), region = P.REGION_LABELS[p.region],
-            starts = (p.evidence or {}).starts or 0, wins = (p.evidence or {}).wins or 0 }
+            starts = (p.evidence or {}).starts or 0, wins = (p.evidence or {}).wins or 0, knowledge = rep.knowledge, record = rep.record }
     end
     local fas = World.freeAgents(world)
     table.sort(fas, function(a, b) return a.id < b.id end)
     for i = 1, math.min(25, #fas) do
         local p = fas[i]
-        rows[#rows + 1] = { t = "fa", id = p.id, name = p.display, tags = driverTags(p), ask = Contracts.askingWage(p, org.tier),
-            ageBand = P.ageBand(World.age(world, p)), region = P.REGION_LABELS[p.region], starts = (p.evidence or {}).starts or 0 }
+        local rep = driverReport(p, { tier = org.tier })
+        rows[#rows + 1] = { t = "fa", id = p.id, name = p.display, tags = rep.tags, ask = Contracts.askingWage(p, org.tier),
+            ageBand = P.ageBand(World.age(world, p)), region = P.REGION_LABELS[p.region], starts = (p.evidence or {}).starts or 0,
+            knowledge = rep.knowledge, record = rep.record }
     end
     local offered = 0
     for _, sid in ipairs(world.sponsorOrder) do
@@ -314,16 +359,30 @@ function PaddockViews.myorg(pid)
     end
     local car = {}
     for _, a in ipairs(Car.AREAS) do car[#car + 1] = { area = a, level = org.car[a], next = Car.stepCost(org.car[a] or 1) } end
-    local pending = {}
+    local pending, names = {}, {}
     for i, pl in ipairs(org.pending or {}) do
-        pending[i] = { kind = pl.kind, driver = pl.driverId and PaddockWorld.personName(pl.driverId), seat = pl.seat }
+        pending[i] = { index = i, kind = pl.kind, driverId = pl.driverId, driver = pl.driverId and PaddockWorld.personName(pl.driverId),
+            seat = pl.seat, text = PaddockManager.describe(pl) }
+        if pl.driverId then names[pl.driverId] = PaddockWorld.personName(pl.driverId) end
     end
+    -- the roster the queue leaves behind (signings assumed accepted; the same seat rules as the boundary)
+    local Mgr = NcmCore.get("paddock.manager")
+    local limits = Mgr.limits(org.tier)
+    local plans = {}
+    for i, pl in ipairs(org.pending or {}) do
+        local c = {}
+        for k, v in pairs(pl) do c[k] = v end
+        if pl.kind == "sign" and world.people[pl.driverId] then c.attrs = world.people[pl.driverId].attrs end
+        plans[i] = c
+    end
+    local projection = Mgr.project(World.drivers(world, org.id), plans, limits.raceSeats, names)
+    for _, r in ipairs(projection.roster) do r.seatText = PaddockManager.seatWord(r.seat) end
     local cup = Season.cupOf(U.now())
     local withdrawn = -(tonumber(MySQL.scalar.await([[SELECT COALESCE(SUM(amount),0) FROM paddock_treasury WHERE server_id = ? AND org_id = ?
         AND kind = 'withdrawal' AND at >= ?]], { U.sid(), org.id, cup.cupStartUtc })) or 0)
     return { view = "myorg", manager = true, org = P.orgProfile(org, { seriesName = PaddockWorld.seriesName(org.seriesId),
         ownerName = PaddockWorld.personName(org.ownerId), tags = orgTags(org) }), treasury = math.floor(org.cash or 0),
-        car = car, pending = pending, cupEndsAt = cup.cupEndUtc, withdrawnThisWeek = withdrawn,
+        car = car, pending = pending, projection = projection, limits = limits, cupEndsAt = cup.cupEndUtc, withdrawnThisWeek = withdrawn,
         weeklyCap = PaddockSettings.get("managerWithdrawWeeklyCap", 2000), tax = PaddockSettings.get("managerWithdrawTax", 0.30),
         engineer = PaddockWorld.personName(org.engineerId), strategist = PaddockWorld.personName(org.strategistId),
         balance = PaddockWallet.balance(d.ncmDriverId), rows = rows }

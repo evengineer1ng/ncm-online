@@ -1,0 +1,18 @@
+{
+  "_doc": "How each concrete slot is spoken (doc 59 §4). A slot's CLASS decides its spoken domain; the render tool voices every value of a finite domain for every speaker who says that slot, and the director binds a slot only to a value whose clip exists. Classes: name (a person), org (a team or sponsor), series, route, number, ordinal, day, margin, clock, odds, phrase (NCM's own public sentences: Moody lines, Week PA steps, DNF causes). A slot not listed here is ABSTRACT: its line is optional when it is nothing but the slot, otherwise its beat waits for an authored fill.",
+  "classes": {
+    "name": ["DRIVER", "WINNER", "P2", "P3", "LEADER", "FAVORITE", "A", "B", "ATTACKER", "TARGET", "CHAMPION", "DRIVER_A", "DRIVER_B",
+             "CHASER", "OTHER_DRIVER", "NEW_WINNER", "WINNER_A", "WINNER_B", "PLAYER_NAME", "R1_WINNER", "R2_WINNER", "WINNER_1",
+             "WINNER_2", "WINNER_3", "POLE", "RIVAL", "VICTIM", "HACKER", "AFFECTED_DRIVER", "SUPPORTED_DRIVER", "PREVIOUS_WINNER"],
+    "org": ["TEAM", "SPONSOR", "DRIVER_OR_TEAM", "ORG", "MANUFACTURER"],
+    "series": ["EVENT_NAME", "EVENT", "SERIES", "EVENT_A", "EVENT_B", "TITLE", "OTHER_EVENT", "NEXT_EVENT"],
+    "route": ["LOCATION", "ROUTE", "VENUE_OR_ROUTE", "DISTRICT"],
+    "number": ["FIELD_SIZE", "COUNT", "STREAK", "WINS", "PODIUMS", "STARTS", "DNFS", "LAPS", "POINTS", "WINNER_COUNT", "SUPPORTED_START_COUNT"],
+    "ordinal": ["POSITION", "GRID_POSITION", "FINISH_POSITION", "POSITION_IF_KNOWN"],
+    "day": ["DAY"],
+    "margin": ["MARGIN", "GAP", "SUPPORTED_GAP"],
+    "clock": ["TIME", "START_TIME", "HOUR"],
+    "odds": ["ODDS", "SUPPORTED_ODDS"],
+    "phrase": ["SUPPORTED_DNF_REASON", "SUPPORTED_REASON", "PUBLISHED_MOODY_CHANGE", "PUBLISHED_POLICY_CHANGE", "PUBLISHED_CHANGE"]
+  }
+}

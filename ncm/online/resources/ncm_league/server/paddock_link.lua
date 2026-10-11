@@ -51,9 +51,25 @@ local function packFor(seriesName)
     return nil
 end
 
-local function fallbackEconomy()
+local function fallbackEconomy(row)
+    local series=tostring(row and row.seriesId or "")
+    local tier=tostring(row and row.tier or series:match("^(%a+)") or "street")
+    local division=series:match("_([a-g])$") or series:match("_([a-d])$") or series:match("_([a-c])$")
+    local d=division and (division:byte()-96) or 1
+    local scale=(tier=="regional" and (10+5*(d-1))) or (tier=="pro" and (50+25*(d-1)))
+        or (tier=="premier" and 250) or (1+(d-1))
     for _, s in ipairs(NcmPackStreet and NcmPackStreet.series or {}) do
-        if s.seriesId == "city_cup" then return s.economy end
+        if s.seriesId == "city_cup" then
+            local base=s.economy; local out={}
+            for k,v in pairs(base or {}) do
+                if type(v)=="table" then local t={} for a,b in pairs(v) do t[a]=b end; out[k]=t else out[k]=v end
+            end
+            local ratio=scale/(tonumber(out.scale) or 2)
+            out.scale=scale; out.id="paddock_"..series.."_v1"
+            for _,k in ipairs({"entryFee","timeTrialCompletion","raceCompletion","repeatFloor","maxTagBounty"}) do out[k]=math.floor((tonumber(out[k]) or 0)*ratio+0.5) end
+            for _,field in ipairs({"placement","fieldBonus","tagBounties"}) do for a,b in pairs(out[field] or {}) do out[field][a]=math.floor((tonumber(b) or 0)*ratio+0.5) end end
+            return out
+        end
     end
     return nil
 end
@@ -135,7 +151,7 @@ function NcmPaddockLink.adoptAll(t)
                     n = n + 1
                 end
             elseif route then
-                local e = Mixed.eventFromRow(row, route, t, packFor(row.seriesName), fallbackEconomy())
+                local e = Mixed.eventFromRow(row, route, t, packFor(row.seriesName), fallbackEconomy(row))
                 if e then
                     restore(e)
                     local ok, why = NcmCalendar.adopt(e)

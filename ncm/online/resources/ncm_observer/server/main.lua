@@ -162,13 +162,61 @@ local function directorPass()
                 tell(pid, ("%s is done; watching the leader."):format(tostring(o.target.name)))
                 setTarget(pid, o, t, "target done")
             else
-                tell(pid, "That race is over. /ncm.observe auto, battle, leader, race <name> ...")
+                tell(pid, "That race is over. F3: pick another race, or press N for the director or Y for your team.")
                 o.target = nil
                 TriggerClientEvent("ncm:observer:target", pid, false)
             end
         end
     end
 end
+
+-- ---------------------------------------------------------------------------------------------------------------
+-- Your team (owner 2026-10-09: "helpful instructions for using it to spot your team")
+-- ---------------------------------------------------------------------------------------------------------------
+-- The Paddock team this player manages and its contracted drivers, read from the database by the player's user id.
+-- It never goes through the resolvers (which, by design, resolve no driver for an observer), so it works in mode.
+-- The client marks those drivers wherever they appear in the racer snapshot (car key = person id).
+
+local teamAsked = {}
+
+local function serverId()
+    local ok, id = pcall(function() return GlobalState.ncmIdentity and GlobalState.ncmIdentity.serverId end)
+    return (ok and id) or "ncm-dev"
+end
+
+function NcmObserver.teamOf(pid)
+    if not (MySQL and MySQL.isReady and MySQL.isReady()) then return nil, "database" end
+    local okU, userId = pcall(GetPlayerIdentifier, pid)
+    if not okU or type(userId) ~= "string" or userId == "" then return nil, "no_user" end
+    local sid = serverId()
+    local b = MySQL.single.await("SELECT ncm_driver_id FROM ncm_driver_binding WHERE server_id = ? AND user_id = ?", { sid, userId })
+    if not (b and b.ncm_driver_id) then return { none = true } end
+    local a = MySQL.single.await([[SELECT a.paddock_org_id, a.role, o.name, o.tier FROM team_affiliation a
+        JOIN paddock_org o ON o.server_id = a.server_id AND o.org_id = a.paddock_org_id
+        WHERE a.server_id = ? AND a.ncm_driver_id = ? AND a.effective_to IS NULL AND a.paddock_org_id IS NOT NULL]], { sid, tostring(b.ncm_driver_id) })
+    if not a then return { none = true } end
+    local drivers = {}
+    for _, r in ipairs(MySQL.query.await([[SELECT person_id, display, seat FROM paddock_person WHERE server_id = ? AND org_id = ?
+        AND role = 'driver' AND state = 'active' ORDER BY seat, person_id]], { sid, a.paddock_org_id }) or {}) do
+        drivers[#drivers + 1] = { k = tostring(r.person_id), name = tostring(r.display or r.person_id), seat = r.seat }
+    end
+    return { orgId = a.paddock_org_id, name = a.name, tier = a.tier, role = a.role, drivers = drivers }
+end
+
+RegisterNetEvent("ncm:observer:team.ask", function()
+    local pid = tonumber(source) or 0
+    if pid <= 0 then return end
+    local t = now()
+    if teamAsked[pid] and t - teamAsked[pid] < 5 then return end
+    teamAsked[pid] = t
+    CreateThread(function()
+        local ok, team, why = pcall(NcmObserver.teamOf, pid)
+        if not ok then log("team lookup FAILED for player=%d: %s", pid, tostring(team)); return end
+        if not team then return end
+        TriggerClientEvent("ncm:observer:team", pid, team)
+        log("team player=%d -> %s", pid, team.none and "none" or (("%s (%d driver(s))"):format(tostring(team.name), #team.drivers)))
+    end)
+end)
 
 -- ---------------------------------------------------------------------------------------------------------------
 -- Events and commands
@@ -221,6 +269,7 @@ end)
 AddEventHandler("onPlayerDisconnected", function(playerId)
     local pid = tonumber(playerId) or 0
     armed[pid] = nil
+    teamAsked[pid] = nil
     NcmObserver.exit(pid, "disconnected")
 end)
 

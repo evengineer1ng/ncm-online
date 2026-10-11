@@ -1,0 +1,99 @@
+{
+  "_doc": "Race Week Live cast voices (doc 59 §5). `instruct` is OmniVoice voice design (gender, age, pitch, accent). `pick` names the designed take(s) in D:/ncm-radio/pack/voices/<SPEAKER>/ every line is cloned from; several picks = several voices for that role (DRIVER: different drivers), one chosen per beat. `pick_reference` is the line a pick was designed from when it differs from `reference`. Owner picks 2026-10-08; MARA aud_0_0 (first designs were noise, KB-403; re-auditioned with audition.py, Whisper-verified). Changing a pick re-renders exactly that speaker's clips.",
+  "speakers": {
+    "MARA": {
+      "instruct": "female, middle-aged, moderate pitch, american accent",
+      "room": "studio",
+      "speed": 1.04,
+      "reference": "And here we go. Welcome to Race Week Live. Night City's very first Race Week is officially underway, and honestly? I have been waiting for this my whole life. I'm Mara Velez.",
+      "pick": [
+        "aud_0_2.wav"
+      ],
+      "pick_reference": "Welcome to Race Week Live. I'm Mara Velez. Seven days of racing all over Night City, and I have been waiting for this for a very long time."
+    },
+    "JULES": {
+      "instruct": "male, middle-aged, low pitch, american accent",
+      "room": "studio",
+      "speed": 0.98,
+      "reference": "Julian Mercer. Technically, it worked. I didn't say it was a good idea. Those are different questions, and I'd like to see it come back before we call this a success.",
+      "pick": [
+        "cand1.wav"
+      ]
+    },
+    "IMANI": {
+      "instruct": "female, young adult, high pitch, american accent",
+      "room": "narrator",
+      "speed": 1.0,
+      "reference": "This is the Race Week news desk. Officials have confirmed the change takes effect immediately. We'll bring you more as it is published.",
+      "pick": [
+        "cand0.wav"
+      ]
+    },
+    "TOMMY": {
+      "instruct": "male, young adult, moderate pitch, american accent",
+      "room": "rw_trackside",
+      "speed": 1.08,
+      "reference": "Tommy Rhee, trackside, and I cannot hear myself think! They're on the grid, engines are up, and the lights are about to go out!",
+      "pick": [
+        "cand2.wav"
+      ]
+    },
+    "NIA": {
+      "instruct": "female, middle-aged, low pitch, british accent",
+      "room": "rw_garage",
+      "speed": 0.97,
+      "reference": "Nia Okafor in the garage. We don't know yet. What we can observe is the behaviour, not the configuration underneath it, and those are not the same thing.",
+      "pick": [
+        "cand0.wav"
+      ]
+    },
+    "DARNELL": {
+      "instruct": "male, middle-aged, very low pitch, american accent",
+      "room": "rw_street",
+      "speed": 0.96,
+      "reference": "Darnell Price, Watson. Out here nobody cares about lap times. They care whether they can get across the intersection before the next barrier goes up.",
+      "pick": [
+        "cand0.wav"
+      ]
+    },
+    "CELESTE": {
+      "instruct": "female, young adult, moderate pitch, british accent",
+      "room": "studio",
+      "speed": 1.03,
+      "reference": "Celeste Ward on the money desk. A purse is a promise with a number attached, and today somebody collected on it.",
+      "pick": [
+        "cand2.wav"
+      ]
+    },
+    "DRIVER": {
+      "instruct": "male, young adult, moderate pitch, canadian accent",
+      "room": "rw_trackside",
+      "speed": 1.0,
+      "reference": "Yeah. I don't really know what to say yet. The car was good, the team was good, and I just tried not to mess it up.",
+      "pick": [
+        "cand0.wav",
+        "cand1.wav",
+        "cand2.wav"
+      ]
+    },
+    "SECOND REMOTE FEED": {
+      "instruct": "male, middle-aged, moderate pitch, australian accent",
+      "room": "rw_trackside",
+      "speed": 1.05,
+      "reference": "Second remote feed here. We have the finish on the other side of the city, stand by for the order.",
+      "pick": [
+        "cand2.wav"
+      ],
+      "lexicon": false
+    }
+  },
+  "stingers": {
+    "IMANI STINGER": "news",
+    "TRACKSIDE STINGER": "race_control",
+    "NIA STINGER": "garage",
+    "DARNELL STINGER": "street",
+    "CELESTE STINGER": "ident",
+    "STATION IDENT": "ident"
+  },
+  "gap_ms": 260
+}

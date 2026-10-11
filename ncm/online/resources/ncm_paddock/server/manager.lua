@@ -176,17 +176,27 @@ function PaddockManager.act(pid, action, args)
     if not org then return false, "not_a_manager" end
     local world = w()
     local t = U.now()
+    if action == "cancel" then
+        org.pending = org.pending or {}
+        local okC, gone = Manager.cancel(org.pending, args and args.index, { kind = args and args.kind, driverId = args and args.driverId })
+        if not okC then return false, gone end
+        PaddockStore.markOrg(org.id)
+        PaddockStore.flush()
+        log("CANCEL %s %s %s", org.id, gone.kind, tostring(gone.driverId))
+        return true, ("Cancelled: %s. It will not happen."):format(PaddockManager.describe(gone))
+    end
     local ok, plan = Manager.validate(action, { org = org, world = world, managerDriverId = d.ncmDriverId,
         treasury = org.cash or 0, args = args or {}, withdrawnThisWeek = (action == "withdraw") and withdrawnThisWeek(org) or 0,
         caps = { weeklyCap = PaddockSettings.get("managerWithdrawWeeklyCap", 2000), tax = PaddockSettings.get("managerWithdrawTax", 0.30) } })
     if not ok then return false, plan end
     if plan.kind == "sign" or plan.kind == "release" or plan.kind == "seat" then
         org.pending = org.pending or {}
-        if #org.pending >= 6 then return false, "too_many_pending" end
-        org.pending[#org.pending + 1] = plan
+        local okQ, how = Manager.enqueue(org.pending, plan)
+        if not okQ then return false, how end
         PaddockStore.markOrg(org.id)
         PaddockStore.flush()
-        return true, "queued: takes effect at the next Cup boundary"
+        return true, (how == "replaced" and "Changed: " or "Waiting for the Cup boundary: ") .. PaddockManager.describe(plan)
+            .. ". Cancel it any time before then."
     elseif plan.kind == "develop" then
         local _, gained, spent = Car.invest(org.car, plan.area, plan.eddies)
         org.cash = (org.cash or 0) - spent
@@ -254,6 +264,23 @@ function PaddockManager.act(pid, action, args)
     return false, "unsupported"
 end
 
+local SEAT_WORDS = { reserve = "reserve" }
+local function seatWord(seat)
+    if SEAT_WORDS[seat] then return SEAT_WORDS[seat] end
+    local n = tostring(seat or ""):match("^race(%d+)$")
+    return n and ("race seat " .. n) or tostring(seat)
+end
+PaddockManager.seatWord = seatWord
+
+--- One queued move in words ("Joshua Taylor to race seat 1").
+function PaddockManager.describe(plan)
+    local name = plan.driverId and PaddockWorld.personName(plan.driverId) or "?"
+    if plan.kind == "seat" then return name .. " to " .. seatWord(plan.seat) end
+    if plan.kind == "release" then return "release " .. name .. ((plan.severance or 0) > 0 and (" (" .. plan.severance .. " severance)") or "") end
+    if plan.kind == "sign" then return ("sign %s at %d/day for %d season(s)"):format(name, plan.wage or 0, plan.seasons or 1) end
+    return tostring(plan.kind)
+end
+
 --- Apply a human org's queued roster moves (Cup boundary). Returns tape events.
 function PaddockManager.applyPending(org, t)
     local world = w()
@@ -283,17 +310,24 @@ function PaddockManager.applyPending(org, t)
         elseif plan.kind == "seat" then
             local dr = world.people[plan.driverId]
             if dr and dr.orgId == org.id then
-                for _, other in ipairs(World.drivers(world, org.id)) do
-                    if other.id ~= dr.id and other.seat == plan.seat and plan.seat ~= "reserve" then other.seat = dr.seat; PaddockStore.markPerson(other.id) end
-                end
-                dr.seat = plan.seat
-                PaddockStore.markPerson(dr.id)
+                local drivers = World.drivers(world, org.id)
+                Manager.applySeat(drivers, plan)
+                for _, p in ipairs(drivers) do PaddockStore.markPerson(p.id) end
             end
         end
         for id, delta in pairs(Manager.reactions(plan, world, org)) do
             local p = world.people[id]
             if p then p.morale = Attr.clamp((p.morale or 50) + delta, 5, 95); PaddockStore.markPerson(id) end
         end
+    end
+    -- a race seat a release (or a swap) left empty goes to the best reserve; the manager is told who
+    local drivers = World.drivers(world, org.id)
+    local moved = Manager.fillRaceSeats(drivers, Season.TIERS[org.tier].carsPerOrg)
+    for _, id in ipairs(moved) do
+        PaddockStore.markPerson(id)
+        PaddockStory.push(org.humanManagerDriverId, PaddockWorld.personName(id) .. " takes the empty race seat",
+            "Nobody was in it after this week's moves, so the best of your reserves moved up. Change it on MY ORG.",
+            { solicited = true, thread = "paddock:org", fromId = org.id })
     end
     org.pending = {}
     PaddockStore.markOrg(org.id)

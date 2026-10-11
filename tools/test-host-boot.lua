@@ -132,7 +132,7 @@ if h then
     check(type(snap) == "table" and snap.running and #(snap.tower or {}) == 6, "a six-car %s field is on the grid (%s)", tostring(mineKey),
         type(snap) == "table" and tostring(#(snap.tower or {})) or tostring(snap))
     local maxAltKm, legs = 0, {}
-    for _ = 1, 120 do
+    for _ = 1, 150 do
         h:advance(10, 1)
         local s = app.aero
         for _, o in ipairs((s and s.tower) or {}) do

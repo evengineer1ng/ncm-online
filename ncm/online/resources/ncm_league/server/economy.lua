@@ -91,6 +91,8 @@ local function previousBest(driverId,routeId,sessionId)
 end
 local function receiptText(receipt)
     local parts={}
+    if receipt.intrigueBand then parts[#parts+1]=("Series %s · %d-race signal · purse x%.2f"):format(
+        tostring(receipt.intrigueBand),tonumber(receipt.intrigueSample) or 0,tonumber(receipt.purseFactor) or 1) end
     for _,x in ipairs(receipt.lines or {}) do parts[#parts+1]=(x.amount>=0 and "+€$" or "-€$")..math.abs(x.amount).." "..x.label end
     parts[#parts+1]="NET "..(receipt.net>=0 and "+€$" or "-€$")..math.abs(receipt.net)
     return table.concat(parts," · ")
@@ -132,7 +134,10 @@ function NcmEconomy.settle(rec,results,reason,t)
             local resolved,rwhy=Settle.resolve({economy=econ,fieldSize=field,fieldBonusCount=#results,result=r,tags=qualified,
                 repeatCompletion=paid>=(tonumber(econ.fullRateCompletions) or 1)})
             if not resolved then return nil,"resolve:"..tostring(rwhy) end
+            local intrigue=(tonumber(econ.intrigueFactor) or 1); local moody=(tonumber(econ.moodyPurseFactor) or 1)
             local receipt={sessionId=rec.s.sessionId,eventId=rec.eventId,timeTrial=resolved.timeTrial,
+                intrigueBand=econ.intrigueBand,intrigueScore=econ.intrigueScore,intrigueSample=econ.intrigueSample,
+                purseFactor=intrigue*moody,moodyPurseTier=econ.moodyPurseTier,
                 lines={},gross=resolved.gross,entryFee=resolved.entryFee,net=resolved.net,tags=(tagOut.drivers[i] and tagOut.drivers[i].tags) or {}}
             receipt.lines[#receipt.lines+1]={kind="event_entry",label="Entry",amount=-resolved.entryFee}
             for _,line in ipairs(resolved.lines) do

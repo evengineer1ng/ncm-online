@@ -1,12 +1,14 @@
 #include "bridge/server.hpp"
 
 #include "log.hpp"
+#include "vehicle/gearing_shm.hpp"
 
 #include <nlohmann/json.hpp>
 
 #include <winsock2.h>
 #include <ws2tcpip.h>
 
+#include <algorithm>
 #include <array>
 #include <charconv>
 #include <cstring>
@@ -68,6 +70,8 @@ const char* kBridgeHtml = R"HTML(<!doctype html>
     Open77.on("ncm:machine.handling", function (p) { relay({ cmd: "handling", handling: p || {} }); });
     // L324: installed components (a propulsor, an impulse actuator) as a force on the bound Machine.
     Open77.on("ncm:machine.wrench", function (p) { relay({ cmd: "wrench", wrench: p || {} }); });
+    // Stacked gearboxes: the Machine's driveline paths, relayed to NCM Gearbox (vehicle/gearing_shm.hpp).
+    Open77.on("ncm:machine.gearing", function (p) { relay({ cmd: "gearing", gearing: p || {} }); });
     // IDEA-507: a read-only request for the game's own drive-model data. Mutates nothing.
     Open77.on("ncm:machine.archdump", function (p) { relay({ cmd: "archdump", records: (p && p.records) || [] }); });
     // The gear chain, read-only. **The resource sandbox has no `TweakDB` global** -- that is a CET thing and
@@ -387,6 +391,40 @@ double num(const json& obj, const char* key, bool& has)
     if (it == obj.end() || !it->is_number()) { has = false; return 0.0; }
     has = true;
     return it->get<double>();
+}
+
+/// Stacked gearboxes: copy the client's driveline text and select request into NCM Gearbox's block (gearing_shm.hpp).
+void relayGearing(const std::string& text, uint32_t selectSeq, int32_t path)
+{
+    static HANDLE mapping = nullptr;
+    static ncm::gearing_shm::Block* block = nullptr;
+    if (!block) {
+        wchar_t name[96];
+        ncm::gearing_shm::name(name, 96, GetCurrentProcessId());
+        mapping = CreateFileMappingW(INVALID_HANDLE_VALUE, nullptr, PAGE_READWRITE, 0, sizeof(ncm::gearing_shm::Block), name);
+        if (!mapping) { static bool warned = false; if (!warned) { warned = true; NCM_ERR("gearing: could not create the Gearbox block"); } return; }
+        block = static_cast<ncm::gearing_shm::Block*>(MapViewOfFile(mapping, FILE_MAP_ALL_ACCESS, 0, 0, sizeof(ncm::gearing_shm::Block)));
+        if (!block) { CloseHandle(mapping); mapping = nullptr; return; }
+        block->magic = ncm::gearing_shm::kMagic;
+        block->version = ncm::gearing_shm::kVersion;
+        NCM_INFO("gearing: relaying stacked-gearbox paths to NCM Gearbox");
+    }
+    const size_t n = std::min<size_t>(text.size(), ncm::gearing_shm::kTextBytes - 1);
+    const bool changed = n != block->textLen || std::memcmp(block->text, text.data(), n) != 0;
+    if (changed) {
+        block->seq = block->seq + 1;
+        std::memcpy(block->text, text.data(), n);
+        block->text[n] = 0;
+        block->textLen = static_cast<uint32_t>(n);
+        block->textSeq = block->textSeq + 1;
+        block->seq = block->seq + 1;
+        NCM_INFO("gearing: %s", n ? block->text : "(car's own box)");
+    }
+    if (block->selectSeq != selectSeq) {
+        block->selectPath = path;
+        block->selectSeq = selectSeq;
+    }
+    block->stampMs = GetTickCount64();
 }
 
 }  // namespace
@@ -717,6 +755,14 @@ void Server::dispatch(const std::string& payload)
         }
         if (out.assetId.empty()) return;
         onWrench_(out);
+        return;
+    }
+
+    if (cmd == "gearing") {
+        // Stacked gearboxes: a relay and nothing more (vehicle/gearing_shm.hpp). NCM Gearbox decides what the text means.
+        const auto& g = msg["gearing"];
+        if (!g.is_object() || g.value("v", 0) != 1) return;
+        relayGearing(g.value("text", std::string()), g.value("selectSeq", 0u), g.value("path", 0));
         return;
     }
 

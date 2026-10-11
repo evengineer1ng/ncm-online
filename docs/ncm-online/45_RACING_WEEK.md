@@ -607,6 +607,8 @@ racing is money is unusually high, people are thinking its a gold mine, but its 
 
 ## P. The collapse and the ending (L303; BUILT ON DEV, DRY-RUN ONLY, no live PASS)
 
+> **Online amendment (L349, 2026-10-08):** the anchor bullets below record the earlier W-4 build. Online now keeps **one** chosen car, otherwise the last car the owner actually drove; Machine Index replaces chat selection. The car's Week damage clears at rollover and the Online wallet still reopens at €$10,000. Installed components and physical trunk cargo follow the anchor; loose components and other cars archive. See §Q and MASTER_TEST §WL. The single-player L338 policy is separate.
+
 **A reconstruction is a server-id namespace.** At the collapse, everything run-local is re-keyed from `<server>` to
 `<server>#R<nnn>`. Nothing is deleted, and a finished run stays queryable under its own key.
 
@@ -663,3 +665,29 @@ racing is money is unusually high, people are thinking its a gold mine, but its 
 - **W-6** The Online rollout: a public server's first collapse wipes wallets and cars. That needs an announcement and
   probably a one-time "founding anchor" grandfathering for existing Online garages.
 - **W-7** Is the condition cadence two slots a Day (recommended) right, or one?
+
+## Q. Online one-car and damage amendment (L349; locally built, live PASS owed)
+
+| During a Week | At its end |
+|---|---|
+| Canonical health, body grid, glass/lights/tyres and detached-part masks are checkpointed per serialized Machine across storage and reconnect. Component exposure and repair history remain on each physical component. | The sole surviving car's Week damage snapshot clears. The next call is full health. Its installed Parts and NCM components physically loaded into its trunk remain. |
+| Machine Index lets the owner choose one anchor. Without a choice, NCM records which owned car they most recently **drove while moving**; simply calling or sitting in it does not count. | The selected/last-driven car stays. Every other car and its fitted Parts and trunk cargo move to the run archive. Loose garage components also archive. No uncertain "most raced" inference. |
+| The Machine Index offers a paid shop service or a cheaper self service at the bench after storing the car. Self work has a partial, recorded outcome and advances restoration/chassis competency on completion. Component conditions use the existing Parts service path. | The Online NCM ledger closes the old balance and opens at €$10,000, idempotently. Knowledge/observations stay. The local build provisionally archives licence/rating and resets SR to 5; the owner clarification against L303/W-3 is recorded in L349. |
+
+**Cargo scope today:** a serialized NCM component changes custody only when the owner is beside their called Machine and NCM opens its trunk. `component_asset.location_kind='trunk'` and `machine_asset_id` make that physical link. No server-authoritative bridge yet transfers ordinary vanilla items, so those do not qualify for rollover. IDEA-1252 owns that gap. A component in a second car is not saved by the first car's anchor.
+
+**Live proof:** MASTER_TEST §WL covers damage across a call/store/reconnect, self versus shop work, owner-only anchor selection, moving-owner last drive, physical cargo, the rollover balance/health and idempotency. Until live PASS, this is a local build, not a finished release.
+
+## R. NPC cars and engineering during the Week (L350; local build, live PASS owed)
+
+An NPC's serialized `vehicle_asset` takes damage from a modelled crash/mechanical DNF or measured physical damage. `npc_vehicle_incident` records race, asset, fraction and provenance once. `vehicle_week_condition` holds current condition. The next race reads it: reduced condition reduces model pace, the physical spawn receives saved damage, and a wreck or car on the lift cannot grid. A crash does not cause an automatic repair debit.
+
+The car's owner pays: team treasury for team cars, personal balance for independents. A quote splits materials and labour and states bench seconds plus shop/access/parts lead time. The autonomous garage pass books work only when the payer has enough. A booked car is unavailable until ready; completed work restores physical health and clears broken chassis attachments. Skill and a persisted workmanship roll instead affect handling scalars: low skill has a higher botch chance, most outcomes carry a penalty, and a rare excellent job gives a bounded gain. A pro/premier team prefers a contracted shop; a street independent uses self work. These are first pass mechanisms, not fixed universal timelines. At Week reset, NPC cars, conditions, incidents and work move to the archived run with the Paddock world.
+
+Migration 075 gives each spec-series entrant a separate organiser car and a finite 5,000-eddy repair budget. A spec crash damages that supplied asset, never the driver's private car. It receives the same incident, service, physical-spawn and Week-archive treatment. Team repair rolls use the team's actual engineer staff attribute, which grows slightly on completed work; independent self repair builds personal engineering experience.
+
+Known gap: teams do not yet loan another serialized car during repair (IDEA-1256). Human repair workmanship is now a named per-Machine handling layer, pending a live PASS. Nothing in this amendment has a live PASS.
+
+For human self repair, the owner must store the Machine and physically attend a garage/workshop pin; Machine Index shows the nearest one and disables self work out of range. The server verifies proximity both before and after the short bench interval. Materials and labour are quoted separately and paid once on completion. Shop service costs more and can be booked remotely. This uses mapped site pins; accessibility is part of WL4's live proof.
+
+The nearest site's note now carries a Route Me There button using the existing routable navigation. After either repair, Machine Index displays the stored grip, drive, brake and drag multipliers in green or red according to whether each helps or hurts. Migration 076 audits a correction for an older paid partial repair, subtracting only the old residual damage while retaining any damage acquired afterward; a completed Week reset prevents carrying that correction into another run. §WL16-§WL17 remain client live gates.

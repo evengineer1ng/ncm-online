@@ -67,7 +67,7 @@ Core.define("engineering.flightmodel", function(C)
             parts[#parts + 1] = {
                 key = d.componentId or d.code, componentId = d.componentId, thermal = d.thermal,
                 body = { massKg = d.massKg or 0, perf = perf, loads = { { kind = "thrust", pos = { 0, 0, 0 }, dir = d.axis or { 0, 1, 0 } } } },
-                pos = d.pos or { 0, 0, 0.5 }, dir = d.axis,
+                pos = d.pos or { 0, 0, 0.5 }, dir = d.axis, centred = d.centred,
             }
         end
         local m = Mach.assemble({

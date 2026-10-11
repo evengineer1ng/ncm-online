@@ -73,4 +73,22 @@ return {
         T.eq(with("firstKnownAt", 1000.5), "bad_first_known_at")
         T.eq(with("sourceRef", string.rep("x", 161)), "bad_source_ref")
     end,
+
+    -- owner 2026-10-10: flight hardware is dispersed across the Autofixers; the SL-1 and everything else stay put
+    flight_hardware_lives_at_autofixers_one_line_per_home = function(T)
+        local M = T.Core.get("economy.markets")
+        local lines = { "eng:zetatech:fd1", "eng:zetatech:rp16", "eng:zetatech:ac6", "eng:archer:ia10", "eng:zetatech:pt500" }
+        local fam = { "propulsor", "propulsor", "attitude", "impulse_actuator", "tank" }
+        local homes = {}
+        for i, l in ipairs(lines) do
+            local h = M.homeFor({ family = fam[i], lineageId = l })
+            T.ok(M.byId(h) and M.byId(h).kind == "autofixer", l .. " is sold at an Autofixer, not the Base Market")
+            homes[h] = true
+            T.eq(M.homeFor({ family = fam[i], code = l .. "-R007" }), M.homeFor({ family = fam[i], code = l }), "a revision lives where its line does")
+        end
+        local n = 0; for _ in pairs(homes) do n = n + 1 end
+        T.ok(n >= 4, "the lines are dispersed, not stacked in one shop")
+        T.eq(M.homeFor({ family = "slipstream", lineageId = "eng:eddywright:sl1" }), M.BASE_ID, "the SL-1 stays in the Base Market")
+        T.eq(M.homeFor({ family = "gearbox", lineageId = "eng:archer:cr2" }), M.BASE_ID)
+    end,
 }

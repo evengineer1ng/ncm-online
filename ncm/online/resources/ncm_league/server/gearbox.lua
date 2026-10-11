@@ -4,9 +4,10 @@
 -- (`gearbox_*` on `vehicle_asset`, schema 063): a factory roll from its model's mix, deterministic in its assetId, or
 -- an explicit spec for a grant. Every surface that offers a car names its gearbox (`NcmGearbox.label`).
 --
--- MANUAL SALES ARE GATED (`ncm_gearbox_manual_sales`, default off) until the NCM Gearbox package can drive a manual
--- clone (L306 phase 3). Manual stock is produced and listed as arriving, never sold: nobody may own a manual that
--- cannot spawn as one.
+-- MANUALS ARE MANUALS where NCM Gearbox is a required mod (development and online; owner 2026-10-08: "if car has
+-- manual gearbox it is manual"): manual clones spawn and manual stock is sold. Anywhere else manual stock is listed as
+-- arriving, never sold: nobody may own a manual that cannot spawn as one. `ncm_gearbox_manual_sales` true/false
+-- overrides.
 NcmGearbox = {}
 
 local Gearbox = NcmCore.get("machine.gearbox")
@@ -17,8 +18,16 @@ local function now() return math.floor(Open77.time.unix()) end
 
 local cache = {}                  -- assetId -> gearbox (a stamped gearbox never changes, so it never goes stale)
 
+--- The worlds that require NCM Gearbox, so a manual there always drives as one.
+local function gearboxWorld()
+    local env = NcmCalendar and NcmCalendar.environment and NcmCalendar.environment() or "unknown"
+    return env == "development" or env == "online"
+end
+
 function NcmGearbox.manualSales()
-    return GetConvar and GetConvar("ncm_gearbox_manual_sales", "false") == "true" or false
+    local set = GetConvar and GetConvar("ncm_gearbox_manual_sales", "") or ""
+    if set == "true" or set == "false" then return set == "true" end
+    return gearboxWorld()
 end
 
 --- The gearbox a new machine is born with: `spec` given (a grant), else the model's factory roll.
@@ -141,13 +150,13 @@ RegisterCommand("ncm.gearbox", function(source, args)
 end, false)
 
 -- Manual clones at boot (owner, 2026-10-04: "its dev server its ok" -- no console command every session): a saved
--- `ncm.gearbox clones on|off` wins; otherwise ON in development, OFF everywhere else (Online until NCM Gearbox ships).
+-- `ncm.gearbox clones on|off` wins; otherwise ON where NCM Gearbox is required (development, online), OFF elsewhere.
 CreateThread(function()
     Wait(1000)
     local okK, saved = pcall(Open77.kvp.get, "gearbox.clones")
     local env = NcmCalendar and NcmCalendar.environment and NcmCalendar.environment() or "online"
     local on
-    if okK and type(saved) == "boolean" then on = saved else on = env == "development" end
+    if okK and type(saved) == "boolean" then on = saved else on = gearboxWorld() end
     pcall(SetConvar, "ncm_gearbox_spawn_clones", on and "true" or "false")
     log("manual clones %s at boot (%s)", on and "ON" or "OFF", (okK and type(saved) == "boolean") and "saved setting" or ("default for " .. tostring(env)))
 end)
