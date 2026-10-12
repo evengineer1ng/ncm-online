@@ -59,6 +59,9 @@ RegisterNetEvent("ncm:deep.config.request", function()
         ascentZ = tonumber(GetConvar("ncm_deep_ascent_z", "4000")) or 4000,
         maskNearM = tonumber(GetConvar("ncm_deep_mask_near", "9000")) or 9000,
         maskFarM = tonumber(GetConvar("ncm_deep_mask_far", "16000")) or 16000,
+        -- the ascent ring (NCM Sky kinds 10-14): from this game z up to the seam; its far edge kept this close to the eye
+        ringOnZ = tonumber(GetConvar("ncm_deep_ring_z", "1500")) or 1500,
+        ringFarM = tonumber(GetConvar("ncm_deep_ring_far", "6000")) or 6000,
         -- KB-377: the measurement build -- the ascent draws no Earth and logs the game's real camera (development only)
         ascentProbe = development() and tostring(GetConvar("ncm_deep_ascent_probe", "0")) == "1" })   -- off: IDEA-1174 reads the camera live
 end)

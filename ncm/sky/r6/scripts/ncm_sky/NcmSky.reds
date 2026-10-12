@@ -74,7 +74,7 @@ public class NcmSkySystem extends ScriptableSystem {
 
   // The templates this package ships. A kind Lua names that is not here is refused, never guessed.
   // 1 the q201 Earth (SKY-1); 2 the star dome; 3-6 the Earth at 1000 / 100 / 10 / 1 m; 7-9 the Moon at 100 / 10 / 1 m
-  // (core space.sky's KIND / EARTH / MOON tables name the same numbers).
+  // (core space.sky's KIND / EARTH / MOON tables name the same numbers); 10-14 the ascent ring at k 0.04 .. 0.01.
   private func Template(kind: Int32) -> String {
     switch kind {
       case 1: return "ncm\\sky\\bodies\\earth_1km.ent";
@@ -86,12 +86,43 @@ public class NcmSkySystem extends ScriptableSystem {
       case 7: return "ncm\\sky\\bodies\\moon_r100.ent";
       case 8: return "ncm\\sky\\bodies\\moon_r10.ent";
       case 9: return "ncm\\sky\\bodies\\moon_r1.ent";
+      case 10: return "ncm\\sky\\bodies\\ring_k040.ent";
+      case 11: return "ncm\\sky\\bodies\\ring_k028.ent";
+      case 12: return "ncm\\sky\\bodies\\ring_k020.ent";
+      case 13: return "ncm\\sky\\bodies\\ring_k014.ent";
+      case 14: return "ncm\\sky\\bodies\\ring_k010.ent";
     }
     return "";
   }
 
   private func Known(kind: Int32) -> Bool {
-    return kind >= 1 && kind <= 9;
+    return kind >= 1 && kind <= 14;
+  }
+
+  // The ascent rings (kinds 10-14): the Earth Underlay mesh at scale k. The scene names the ring's TRUE anchor (its
+  // pivot over the map); each tick it is placed at  eye + k * (anchor - eye),  the true Earth shrunk about the game's own
+  // camera: the same picture, k times nearer, inside the draw distance. Moved every tick, so it never lags the climb.
+  private func RingScale(kind: Int32) -> Float {
+    switch kind {
+      case 10: return 0.04;
+      case 11: return 0.028;
+      case 12: return 0.02;
+      case 13: return 0.014;
+      case 14: return 0.01;
+    }
+    return 0.0;
+  }
+
+  private func Where(i: Int32, game: GameInstance) -> Vector4 {
+    let k: Float = this.RingScale(this.m_kinds[i]);
+    if k <= 0.0 {
+      return this.m_pos[i];
+    }
+    let eye: Transform;
+    GameInstance.GetCameraSystem(game).GetActiveCameraWorldTransform(eye);
+    let e: Vector4 = eye.position;
+    let a: Vector4 = this.m_pos[i];
+    return new Vector4(e.X + k * (a.X - e.X), e.Y + k * (a.Y - e.Y), e.Z + k * (a.Z - e.Z), 1.0);
   }
 
   private func IndexOf(id: String) -> Int32 {
@@ -163,12 +194,14 @@ public class NcmSkySystem extends ScriptableSystem {
       }
       return;
     }
-    GameInstance.GetTeleportationFacility(game).Teleport(o, this.m_pos[i], this.m_rot[i]);
+    GameInstance.GetTeleportationFacility(game).Teleport(o, this.Where(i, game), this.m_rot[i]);
     if !this.m_placed[i] {
       this.m_placed[i] = true;
       NcmSky_Report(this.m_ids[i], 1, NcmSkyHash(this.m_ents[i]), "");
     } else {
-      NcmSky_Report(this.m_ids[i], 2, NcmSkyHash(this.m_ents[i]), "");
+      if this.RingScale(this.m_kinds[i]) <= 0.0 {   // a ring moves every tick: not reported each time
+        NcmSky_Report(this.m_ids[i], 2, NcmSkyHash(this.m_ents[i]), "");
+      }
     }
   }
 
@@ -239,10 +272,10 @@ public class NcmSkySystem extends ScriptableSystem {
       return;
     }
     this.Apply(NcmSky_Scene());
-    // a body spawned this tick (or one still streaming in) is placed as soon as it exists
+    // a body spawned this tick (or one still streaming in) is placed as soon as it exists; a ring follows the eye
     let i: Int32 = 0;
     while i < ArraySize(this.m_ids) {
-      if !this.m_placed[i] {
+      if !this.m_placed[i] || this.RingScale(this.m_kinds[i]) > 0.0 {
         this.Place(i);
       }
       i += 1;

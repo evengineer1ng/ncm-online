@@ -38,6 +38,15 @@ BODIES = {
     "moon_r1": (MOON, 1.0, "default", 1.0, None, False),
 }
 
+# The ascent ring (2 km .. the 12 km seam): the Earth Underlay's holed Blue Marble annulus (`ncm_earth_underlay`, project
+# `ncm/ncwe/ncm_earth_underlay.ncwe`), true size, origin at its pivot 6 km over the map. Each ring template is that mesh
+# at a fixed scale k; redscript places it about the viewer (viewer + k * (pivot - viewer)), which draws exactly the true
+# Earth beyond the map, only k times nearer -- inside the game's draw distance. Kinds 10-14 (NcmSky.reds RingScale).
+UNDERLAY = "ncwe\\custom\\ncm_earth_underlay_5a1366\\ncm_earth_underlay_5a1366.mesh"
+RING_K = (0.04, 0.028, 0.02, 0.014, 0.01)
+for _k in RING_K:
+    BODIES["ring_k%03d" % round(_k * 1000)] = (UNDERLAY, 1.0, "default", _k, None, False)
+
 
 def cname(c):
     n = c.get("name")
@@ -115,6 +124,13 @@ def main():
     os.makedirs(out_dir, exist_ok=True)
     for body, (mesh, meshR, app, radius, air, shadows) in BODIES.items():
         d = author(src, mesh, meshR, app, radius, air, shadows)
+        if mesh == UNDERLAY:
+            # the q201 Globe component is yawed -41 deg in its entity; the ring's mesh frame IS the game's (x east, y north)
+            cd = d["Data"]["RootChunk"]["compiledData"]["Data"]["Chunks"]
+            for c in d["Data"]["RootChunk"]["components"] + cd:
+                lt = c.get("localTransform") if c.get("$type") == "entMeshComponent" else None
+                if lt and lt.get("Orientation"):
+                    lt["Orientation"].update({"i": 0, "j": 0, "k": 0, "r": 1})
         with io.open(os.path.join(out_dir, body + ".ent.json"), "w", encoding="utf-8", newline="") as f:
             json.dump(d, f, indent=1)
         kept = [cname(c) or c["$type"] for c in d["Data"]["RootChunk"]["compiledData"]["Data"]["Chunks"]]

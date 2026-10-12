@@ -52,7 +52,8 @@ local RETURN_DV_MAX = 80        -- m/s: 150 kN x 1 s on 1.8 t (the Carrier's cla
 local GROUND_M = 300            -- KB-349: Deep has no terrain; below this the trip ends (home over Night City)
 local EXIT_SAFE_M = 3000        -- KB-349: a return from lower than this comes home at the bound, at rest
 
-local cfg = { enabled = false, enterZ = 12000, exitZ = 11500, ascentZ = 4000, maskNearM = 9000, maskFarM = 16000, ascentProbe = false }
+local cfg = { enabled = false, enterZ = 12000, exitZ = 11500, ascentZ = 4000, maskNearM = 9000, maskFarM = 16000, ascentProbe = false,
+    ringOnZ = 1500, ringFarM = 6000 }
 --- NCM's one clock on this client: the server's UTC at config time, advanced by the game timer
 local utcBase, utcAtMs = nil, 0
 local function utcNow() return utcBase and (utcBase + (GetGameTimer() - utcAtMs) / 1000) or nil end
@@ -404,6 +405,7 @@ RegisterNetEvent("ncm:deep.config", function(c)
     cfg.ascentZ = tonumber(c.ascentZ) or cfg.ascentZ
     cfg.maskNearM, cfg.maskFarM = tonumber(c.maskNearM) or cfg.maskNearM, tonumber(c.maskFarM) or cfg.maskFarM
     cfg.ascentProbe = c.ascentProbe == true
+    cfg.ringOnZ, cfg.ringFarM = tonumber(c.ringOnZ) or cfg.ringOnZ, tonumber(c.ringFarM) or cfg.ringFarM
     -- and no part overheats (owner, 2026-10-06: dev heat waiver, IDEA-1143)
     NcmClientDevHeat = c.devHeat == true
     NcmClientDevAttitude = c.devAttitude == true   -- L331: the labelled attitude waiver (development only)
@@ -676,6 +678,72 @@ CreateThread(function()
         end
     end
 end)
+
+-- ------------------------------------------------------------------------------------------------ the ascent ring
+-- 2026-10-12 (owner: "make ascent from 2 km to the 12 km handoff as seamless and visually consistent as possible"). The
+-- Earth Underlay (a holed Blue Marble annulus, 9..420 km around the map, true size) is beyond REDengine's draw distance
+-- from altitude: climbing showed the game's black void instead. NCM Sky draws the SAME mesh shrunk by k about the game's
+-- own camera (kinds 10-14, NcmSky.reds places it at eye + k (anchor - eye) every tick): the identical picture, k times
+-- nearer. k is the largest template that keeps the visible horizon within ringFarM of the eye; its inner edge stays
+-- hundreds of metres out, in directions where the map has nothing. On a change of k the next template is spawned beside
+-- the old one (identical picture, no gap) and the old one goes a moment later. At the seam Deep's own sky takes over.
+local RING_ANCHOR = { 0.0, -1750.0, 6000.0 }            -- the underlay's pivot (tools/deep/ncwe/build-earth-underlay.py)
+local RING_K = { { kind = 10, k = 0.04 }, { kind = 11, k = 0.028 }, { kind = 12, k = 0.02 }, { kind = 13, k = 0.014 },
+    { kind = 14, k = 0.01 } }
+local RING_OVERLAP_MS = 1500
+local RING_ID = { 0.0, 0.0, 0.0, 1.0 }
+local RING = nil                                         -- { kind, prev, prevUntil }
+
+local function ringScene(bodies)
+    pcall(Open77.exports.call, "ncm_sky", "scene", "ascent", bodies)
+end
+
+local function ringKind(h)
+    local horizon = math.sqrt(2 * Deep.R * math.max(h, 1) + h * h)
+    for _, t in ipairs(RING_K) do
+        if t.k * horizon <= cfg.ringFarM then return t.kind end
+    end
+    return RING_K[#RING_K].kind
+end
+
+CreateThread(function()
+    Wait(15000)
+    while true do
+        Wait(100)
+        local p
+        if cfg.enabled and not A and not NcmClientDeepActive then
+            local vid = seat()
+            local okV, v = pcall(Open77.vehicles.get, vid)
+            p = vid and okV and type(v) == "table" and v.position or nil
+        end
+        local z = p and tonumber(p.z) or nil
+        local on = z and z < cfg.enterZ and z >= (RING and cfg.ringOnZ - 200 or cfg.ringOnZ)
+        if on then
+            local kind = ringKind(z)
+            local now = GetGameTimer()
+            if not RING then
+                RING = { kind = kind }
+                log("ASCENT RING on at game z %.0f: kind %d", z, kind)
+            elseif kind ~= RING.kind then
+                RING.prev, RING.prevUntil, RING.kind = RING.kind, now + RING_OVERLAP_MS, kind
+                log("ASCENT RING z %.0f: kind %d -> %d", z, RING.prev, kind)
+            end
+            local bodies = { { id = "ascent_ring_" .. RING.kind, kind = RING.kind, p = RING_ANCHOR, q = RING_ID } }
+            if RING.prev and now < (RING.prevUntil or 0) then
+                bodies[2] = { id = "ascent_ring_" .. RING.prev, kind = RING.prev, p = RING_ANCHOR, q = RING_ID }
+            else
+                RING.prev = nil
+            end
+            ringScene(bodies)
+        elseif RING then
+            RING = nil
+            ringScene({})
+            log("ASCENT RING off%s", z and (" at game z %.0f"):format(z) or " (Deep, or out of the car)")
+        end
+    end
+end)
+
+AddEventHandler("onClientResourceStop", function(name) if name == GetCurrentResourceName() then ringScene({}) end end)
 
 -- ------------------------------------------------------------------------------------------------ guidance (L327)
 -- The NCM guidance computer, driven with the pad (owner: no chat commands). D-pad up / G opens it (the camera goes to an

@@ -6948,3 +6948,13 @@ Supersedes IDEA-1291's open question.
 **Owner:** "fix f3 f5 f6 f9 webui panels at 2176x1812 resolution client".
 
 **LOCKED:** the F3 observer, F5 race builder (race HUD page), F6 hub and F9 engineering surfaces are created without a fixed size (1920x1080 only if the platform refuses), and each page scales its authored 1920x1080 canvas UNIFORMLY to the screen and centres it. Never stretched. Deployed to Online 2026-10-12 07:04 UTC.
+
+## L366 - THE ASCENT RING: THE TRUE EARTH, SHRUNK ABOUT THE CAMERA, FROM 1.5 KM TO THE SEAM (2026-10-12)
+
+**Owner:** "lets use whatever tricks in the book to make ascent from 2 km to 12km handoff as seamless and visually consistent as possible" (after rejecting both covering the black disk with ground geometry and the KB-430 ball under the car).
+
+**PROVISIONAL (built, not yet live):** while the Machine climbs from game z 1,500 m (`ncm_deep_ring_z`) to the seam, `ncm_world` hands NCM Sky one body: the Earth Underlay mesh (a holed Blue Marble annulus, 9..420 km around the map, true size) at a fixed scale k. `NcmSky.reds` places it every tick at eye + k (anchor - eye) from the game's own camera. That is the same picture as the true Earth, only k times nearer. k is the largest of 0.04 / 0.028 / 0.02 / 0.014 / 0.01 (kinds 10-14) that keeps the visible horizon within `ncm_deep_ring_far` (6,000 m) of the eye. Its inner edge then stays 200-370 m out, in directions where the map has nothing.
+- On a change of k the new template is spawned next to the old one for 1.5 s (identical picture, no gap). At the seam the ring goes and Deep's own sky takes over.
+- NCM Sky 0.2.3 = DLL 0.2.2 unchanged + the new redscript and archive (ring templates with identity local orientation).
+- Found while authoring: the q201 Globe component the templates are cut from is yawed -41 deg in its entity. The ring overrides this; the Deep Earth bodies (kinds 3-6) still carry it. This is unverified against what the native Deep Earth shows.
+- Install: `bash tools/deep/ops/install-ascent-ring.sh` (backs up, restarts only with nobody online), then relaunch.

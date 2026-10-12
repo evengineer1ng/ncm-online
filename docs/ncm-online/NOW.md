@@ -1,3 +1,8 @@
+**LATEST 2026-10-12 12:10 UTC - L366 THE ASCENT RING BUILT (NCM SKY 0.2.3), NOT YET LIVE; KB-457 UNDERLAY v2 LIVE BUT OUT OF DRAW RANGE FROM ALTITUDE.**
+- Owner flew back to Earth after the KB-457 install: no Earth on the descent. The true-size underlay is too far away to draw from altitude (v2 is installed and was merged at game start).
+- L366: NCM Sky draws the underlay shrunk about the camera from 1.5 km to the seam (kinds 10-14). The redscript compiles against vanilla plus every installed script. Package `dist/ncm-sky-0.2.3.zip` (sha 3701a128...).
+- **THE ONE NEXT ACTION:** owner runs `bash tools/deep/ops/install-ascent-ring.sh` with nobody online, relaunches (accept NCM Sky 0.2.3), climbs from Night City: Earth beyond the map from 1.5 km, then the handoff at 12 km. Tune with `ncm_deep_ring_far` if the horizon is clipped (lower) or too near (higher).
+
 **LATEST 2026-10-12 11:20 UTC - KB-457: THE EARTH UNDERLAY'S BLACK VOID FOUND AND FIXED IN THE PACKAGE (v2, NOT YET LIVE); GITHUB MAIN = LIVE SINCE PR #1.**
 - PR #1 is merged (main `25b3d62`), and the old branches are deleted. The working repo is the Proxmox clone `~/projects/ncm-online`.
 - KB-457: the underlay's streaming box ended at z +9,991 m, below the 12 km Deep seam. v2 adds a pivot marker, and the box now reaches +16 km. The NCWE project and mesh are now in the repo: `ncm/ncwe/ncm_earth_underlay.ncwe`, `ncm/ncwe/custom_meshes/ncm_earth_underlay_5a1366`, `tools/deep/ncwe/build-earth-underlay.py`.
