@@ -1,0 +1,61 @@
+{
+  "SchemaVersion": 1,
+  "Id": "fb44d084-ab51-4fe0-95b7-679a5828fa6a",
+  "Name": "NCM Earth Underlay",
+  "ArchiveProfile": "vanilla-content-v1",
+  "Sources": {},
+  "Changes": {
+    "Modified": {},
+    "Added": {
+      "a:f389d02467d34901834e18ca5ef01fd5": {
+        "Id": "a:f389d02467d34901834e18ca5ef01fd5",
+        "Name": "NCM Earth Underlay v1",
+        "Mesh": {
+          "Hash": 17231970727059424032,
+          "Path": "ncwe\\custom\\ncm_earth_underlay_5a1366\\ncm_earth_underlay_5a1366.mesh",
+          "Appearance": "default"
+        },
+        "Transform": {
+          "Position": {
+            "X": 0,
+            "Y": -1750,
+            "Z": 6000
+          },
+          "Rotation": {
+            "IsIdentity": true,
+            "X": 0,
+            "Y": 0,
+            "Z": 0,
+            "W": 1
+          },
+          "Scale": {
+            "X": 1,
+            "Y": 1,
+            "Z": 1
+          }
+        },
+        "Template": null,
+        "Replaces": [],
+        "Materials": [],
+        "Occluder": {
+          "Type": "None",
+          "AutohideScale": 255
+        },
+        "StreamingDistance": 10000,
+        "MeshEdit": null
+      }
+    },
+    "Roads": {},
+    "Elements": {},
+    "Collisions": {},
+    "Outliner": {
+      "Folders": {},
+      "Entries": {}
+    },
+    "Traffic": {},
+    "Elevators": {},
+    "Terrain": {},
+    "Materials": {},
+    "Notes": {}
+  }
+}

@@ -1,0 +1,77 @@
+{
+  "Id": "ncm_earth_underlay_5a1366",
+  "Name": "ncm_earth_underlay",
+  "Version": 5,
+  "SourceFile": "ncm_earth_underlay.obj",
+  "SourceModel": "ncm_earth_underlay.obj",
+  "Created": "2026-10-11T16:19:56.2775029-04:00",
+  "Modified": "2026-10-12T07:07:13.0311304-04:00",
+  "Import": {
+    "Scale": 1,
+    "UpAxis": "Z",
+    "Pivot": "Original",
+    "Yaw": 0,
+    "ImportMaterials": true,
+    "MaxTextureSize": 2048
+  },
+  "Materials": [
+    {
+      "Name": "earth",
+      "Kind": "Standard",
+      "GameMaterial": null,
+      "MultilayerSetup": null,
+      "MultilayerMask": null,
+      "BaseColor": {
+        "X": 1,
+        "Y": 1,
+        "Z": 1,
+        "W": 1
+      },
+      "BaseColorTexture": "ncm_earth_underlay_d_2.png",
+      "Roughness": 0.96837723,
+      "RoughnessTexture": null,
+      "RoughnessChannel": 0,
+      "InvertRoughness": false,
+      "Metalness": 0,
+      "MetalnessTexture": null,
+      "MetalnessChannel": 0,
+      "NormalTexture": null,
+      "NormalStrength": 1,
+      "FlipNormalGreen": false,
+      "EmissiveColor": {
+        "X": 0,
+        "Y": 0,
+        "Z": 0
+      },
+      "EmissiveEV": 0,
+      "EmissiveTexture": null,
+      "AlphaCutout": false,
+      "AlphaThreshold": 0.5,
+      "DoubleSided": false,
+      "GlassOpacity": 0.25,
+      "BaseMaterial": null,
+      "Parameters": []
+    }
+  ],
+  "Bounds": {
+    "Min": {
+      "X": -420000,
+      "Y": -19979.914,
+      "Z": -420000
+    },
+    "Max": {
+      "X": 420000,
+      "Y": 0,
+      "Z": 420000
+    }
+  },
+  "Vertices": 10947,
+  "Triangles": 21505,
+  "Submeshes": 1,
+  "Warnings": [
+    "Texture not found: ncm_earth_underlay_d.png"
+  ],
+  "Credits": "",
+  "MeshPath": "ncwe\\custom\\ncm_earth_underlay_5a1366\\ncm_earth_underlay_5a1366.mesh",
+  "Hash": 17231970727059424032
+}

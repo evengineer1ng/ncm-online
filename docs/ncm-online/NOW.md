@@ -1,3 +1,10 @@
+**LATEST 2026-10-12 11:20 UTC - KB-457: THE EARTH UNDERLAY'S BLACK VOID FOUND AND FIXED IN THE PACKAGE (v2, NOT YET LIVE); GITHUB MAIN = LIVE SINCE PR #1.**
+- PR #1 is merged (main `25b3d62`), and the old branches are deleted. The working repo is the Proxmox clone `~/projects/ncm-online`.
+- KB-457: the underlay's streaming box ended at z +9,991 m, below the 12 km Deep seam. v2 adds a pivot marker, and the box now reaches +16 km. The NCWE project and mesh are now in the repo: `ncm/ncwe/ncm_earth_underlay.ncwe`, `ncm/ncwe/custom_meshes/ncm_earth_underlay_5a1366`, `tools/deep/ncwe/build-earth-underlay.py`.
+- The live convar `ncm_deep_ascent_z` is still "99999" (the WebGL ascent overlay is off, so the underlay is the only Earth below the seam).
+- Still owed: §DRV1-§DRV3, §DRV7; the Sun and planets in the native Deep view (new ncm-sky body kinds plus World Layer meshes).
+- **THE ONE NEXT ACTION:** owner runs `bash tools/deep/ops/install-underlay.sh` with nobody online, relaunches, and climbs out of Night City: Earth should show all the way to the seam.
+
 **LATEST 2026-10-12 10:40 UTC - ONE REPO AGAIN: THE PROXMOX VM'S WORK (SUBSTRATE, PROPULSION STABLE, PANELS) RECONCILED WITH THE BARE-METAL CHECKPOINT ON ONE BRANCH (IDEA-1300).**
 - Since the bare-metal baseline (checkpoint branch 06c3f8b, 2026-10-11 00:46) everything was built on the Proxmox VM and deployed to Online: the astronomical substrate (L363, doc 60), the experimental propulsion stable (L364, doc 61; §DRV4-§DRV6 PASS: Alcubierre to Barnard's Star, jump to Proxima, wormhole home), the panel fit (L365), KB-449..KB-456. The branch `reconcile/proxmox-live-2026-10-12` carries the live tree; `tools/ncm-build.ps1` keeps a resource's own core data (star chunks).
 - The lab Hella (Alabino, ..560c94) carries the XLB-WH1 kit; the Galena (baremetaleven) coasts at ~290,000 km. L362: the Racing Week reset applies to both.
