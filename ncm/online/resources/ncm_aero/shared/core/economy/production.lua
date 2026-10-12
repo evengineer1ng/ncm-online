@@ -158,7 +158,10 @@ Core.define("economy.production", function(C)
                 local pMean = pSum / #market.vehicles
                 local pool = {}
                 for _, e in ipairs(all) do
-                    if classes[e.category or ""] and not have[e.vehicleKey] and e.prestige then
+                    local aerial = false
+                    for _, tag in ipairs(e.tags or {}) do if tag == "aerial" then aerial = true end end
+                    -- an AV is a granted machine until one has flown on NCM's propulsion (2026-10-12)
+                    if classes[e.category or ""] and not have[e.vehicleKey] and e.prestige and not aerial then
                         pool[#pool + 1] = { key = e.vehicleKey, weight = 1 / (1 + math.abs((e.prestige or 3) - pMean)) }
                     end
                 end
