@@ -9,12 +9,13 @@ local assetByVehicle = {}
 local seq = 0
 -- This first clearance envelope is only for the Base Market's small starter cars.
 -- Larger models need their own validated envelope, not a guess based on category.
-local supported = {
-    ["Vehicle.v_standard2_makigai_maimai"]=true,
-    ["Vehicle.v_standard2_thorton_galena"]=true,
-    ["Vehicle.v_standard2_archer_hella"]=true,
-    ["Vehicle.av_trauma"]=true,   -- 2026-10-12: the Trauma Team AV (owner's flying-to-space video); first call is the test
-}
+-- 2026-10-12 (owner: "only 3 vehicles whitelisted??? how do i call other 40+ vehicles from index"): every model NCM's
+-- catalogue knows can be called (data.vehicle_catalogue resolves the stored record, gearbox clones and liveries included).
+-- The three founding models stood here alone since the first call slice; the markets have sold forty more since.
+local Catalogue = NcmCore.get("data.vehicle_catalogue")
+local supported = setmetatable({}, { __index = function(_, record)
+    return type(record) == "string" and Catalogue.resolveRecord(record) ~= nil
+end })
 local function clock() return Open77.time.unix() end
 local function finite(n) return type(n) == "number" and n == n and math.abs(n) < 1000000 end
 local function position(p) return type(p) == "table" and finite(p.x) and finite(p.y) and finite(p.z) end
