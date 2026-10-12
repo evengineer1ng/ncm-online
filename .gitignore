@@ -96,7 +96,10 @@ tools/openspace/
 prototypes/ncm_deep/web/sprites/
 
 # L326 NCM Deep local assets: NASA Blue Marble (public domain, fetched) + the Machine sprite (player's own game art) -- tools/fetch-deep-assets.py
-ncm/online/resources/ncm_world/web/deep/
+ncm/online/resources/ncm_world/web/deep/*
+# doc 61: the drive layer and its generated Hipparcos sky are source, not fetched assets
+!ncm/online/resources/ncm_world/web/deep/drivefx.js
+!ncm/online/resources/ncm_world/web/deep/skystars.js
 
 # L327 Assetto Corsa: Content Manager (owner-downloaded, third-party) -- placed by tools/assetto-install-csp.py, never tracked
 tools/assetto/
