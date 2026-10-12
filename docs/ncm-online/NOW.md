@@ -1,3 +1,9 @@
+**LATEST 2026-10-12 - L367 BUILT, NOT YET LIVE: NCM FX + NCM AUDIO, BUILD YOU CAN SEE (KIT + KB-443), MARKETS + EXCHANGE, KB-458 EARTH YAW.**
+- Toolchain on the Proxmox VM (VS Build Tools, CMake, Ninja, WolvenKit 8.20): NCM Sky and NCM Audio build from source.
+- New: `ncm-audio` (required mod), `ncm_audio`, `ncm_build_kit` (required mod), NCM Sky 0.2.4, migration 081. Underlay v3 (L366 amendment) is also still waiting to be installed.
+- Not yet built: working parts on kit pieces; markets back to opening stock at the Week reset; a market soak simulation; players posting their own cars.
+- **THE ONE NEXT ACTION:** owner runs `bash tools/deep/ops/install-l367.sh` with nobody online, relaunches, and walks §FX1-§FX3, §BLD7, §MKT1-§MKT3 and §SKY10.
+
 **LATEST 2026-10-12 13:00 UTC - L366 LIVE (NCM SKY 0.2.3, 12:15 UTC); UNDERLAY v3 (HOLE = THE MAP'S EDGE) BUILT, READY TO DEPLOY; NEXT: THE ENGINEERING RECONCILIATION.**
 - The first live climb showed the ring only as a lip far beyond the edge (the 9 km circular hole). v3 cuts the hole to the terrain square: `ncm_earth_underlay` 1.0.2, `dist/ncm-earth-underlay.zip` in the resource.
 - **THE ONE NEXT ACTION:** owner runs `bash tools/deep/ops/install-underlay.sh` with nobody online and relaunches. Then the engineering conversation (design docs vs what exists; Race Week resets; wardrobe; VFX/SFX; Nessie; Bennu; PvE last).

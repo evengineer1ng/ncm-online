@@ -3398,3 +3398,20 @@ Offline: core `test_build_attach` (6), `tools/test-build-host.lua` (23: attach, 
 | §BLD4 | A second connected client (the tester identity) near the car. | They see the same object in the same place, moving with the car. | **NOT RUN** |
 | §BLD5 | Store the Machine, call another car, call the Machine back (or reconnect). | The wing returns on it, in the same place. | **NOT RUN** |
 | §BLD6 | MOVE it, save; then HOLD · REMOVE. Store and recall. | Moved for both clients; removed for both; it does not come back. | **NOT RUN** |
+
+## §FX - NCM FX and NCM Audio (L367) - **BUILT, NOT YET LIVE**
+| ID | Steps | Expected | Result |
+|---|---|---|---|
+| §FX1 | On the Hella in Night City: tap the IA-10, hold the FD-1. | A burst and thump at each stroke; a plume at the FD-1 that grows with throttle, roar pitch and loudness following it; `[ncm_world/client/fx] asset ... PLAYING` for each asset. | **NOT RUN** |
+| §FX2 | Climb out with the FD-1 lit. | The plume widens as the air thins; wind falls away. | **NOT RUN** |
+| §FX3 | A second client watches. | The same plume and stroke on the other car. | **NOT RUN** |
+| §FX4 | Deep: run a jump and a wormhole. | Charge/arc effects and the rising drive tone; a shockwave/warp on the jump. | **NOT RUN** |
+
+## §MKT - Markets and the Exchange (L367) - **BUILT, NOT YET LIVE**
+| ID | Steps | Expected | Result |
+|---|---|---|---|
+| §MKT1 | Visit two autofixers. | 8+ models each; no NPC used cars on manufacturer shelves. | **NOT RUN** |
+| §MKT2 | F6 Exchange: filter CARS. | NPC used cars with distance, class, new price and asking price; NPC bids appear on posts over passes. | **NOT RUN** |
+| §MKT3 | Bid on a used car near its ask. | The NPC accepts within a pass; the car is yours in Machine Index. | **NOT RUN** |
+| §BLD7 | F9 -> BUILD (KB-443). Attach a kit wing and a strut. | The palette lists the kit; the wing shows on the car (real mesh) and rides it while driving; a second client sees it. | **NOT RUN** |
+| §SKY10 | Fly into Deep over Night City (KB-458). | Night City's coast is where the Earth shows it, not in the ocean. | **NOT RUN** |
