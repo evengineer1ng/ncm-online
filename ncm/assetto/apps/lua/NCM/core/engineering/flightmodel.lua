@@ -18,6 +18,15 @@ Core.define("engineering.flightmodel", function(C)
     local D = C.get("space.deep")
     local V = D.vec
 
+    -- doc 58: the experimental drives (space.drives) step after the dynamics on every host; a host without the module
+    -- (or without a clock) flies exactly as before
+    local DrivesMod = false
+    local function drives()
+        if DrivesMod == false then local ok, Dm = pcall(C.get, "space.drives"); DrivesMod = ok and Dm or nil end
+        return DrivesMod
+    end
+    M.drives = drives
+
     -- Chassis by vehicle key: mass, centre of mass, bounds (for inertia) and body drag. The Hella is the one flown today;
     -- others fall back to its class until they are measured.
     M.CHASSIS = {
@@ -76,6 +85,9 @@ Core.define("engineering.flightmodel", function(C)
         })
         m.vehicleKey = opts.vehicleKey
         m.flightBody = opts.body and { family = opts.body.family, prov = opts.body.prov } or nil
+        -- doc 58: drive parts are mass to the dynamics (no push mechanism); space.drives runs them
+        local Dm = drives()
+        m.drives = Dm and Dm.fromDevices(devices) or {}
         return m
     end
 
@@ -109,10 +121,29 @@ Core.define("engineering.flightmodel", function(C)
     end
     M.rotFromBasis, M.basisFromRot = rotFromBasis, basisFromRot
 
+    -- doc 57 §5 (2026-10-11): the astronomical substrate. With a UTC on the state, gravity is every relevant catalogue
+    -- body (space.frames / space.gravity) and the state is integrated in the frame space.frames chooses (Earth-fixed
+    -- near home, inertial beyond); without one (a host that does not pass `utc`) everything is exactly as before.
+    local FramesMod = false
+    local function frames()
+        if FramesMod == false then local ok, F = pcall(C.get, "space.frames"); FramesMod = ok and F or nil end
+        return FramesMod
+    end
+    M.FRAME_CHECK_S = 120         -- how often (simulated seconds) the frame policy is consulted
+
+
     --- A dynamics state for a Deep state ({ p, v, basis }) on this machine; `carry` = a previous dynamics state or a
-    --- canonical record's `dyn` (omega, per-device heat, throttle, strokes, attitude heat) to continue from.
-    function M.state(m, deep, carry)
-        local s = Dyn.init(m, { pos = { deep.p[1], deep.p[2], deep.p[3] }, vel = { deep.v[1], deep.v[2], deep.v[3] }, rot = rotFromBasis(deep.basis) })
+    --- canonical record's `dyn` (omega, per-device heat, throttle, strokes, attitude heat) to continue from. `utc`
+    --- (optional) turns on the astronomical substrate; a Deep state in an inertial frame (`frame`, `ip`, `iv`, `ibasis`)
+    --- resumes in that frame.
+    function M.state(m, deep, carry, utc)
+        local Fr = frames()
+        local inertial = Fr and type(deep.frame) == "table" and deep.ip and deep.iv and deep.ibasis
+        local p, v, b = deep.p, deep.v, deep.basis
+        if inertial then p, v, b = deep.ip, deep.iv, deep.ibasis end
+        local s = Dyn.init(m, { pos = { p[1], p[2], p[3] }, vel = { v[1], v[2], v[3] }, rot = rotFromBasis(b) })
+        if inertial then s.frame = Fr.load_(deep.frame) end
+        s.utc = tonumber(utc) or tonumber(deep.utc)
         if type(carry) == "table" then
             if carry.omega then s.omega = { carry.omega[1] or 0, carry.omega[2] or 0, carry.omega[3] or 0 } end
             s.dev, s.thr, s.pulse, s.att = carry.dev or s.dev, carry.thr or s.thr, carry.pulse or s.pulse, carry.att or s.att
@@ -121,27 +152,94 @@ Core.define("engineering.flightmodel", function(C)
                 for i in ipairs(m.tanks) do if tonumber(carry.tanks[i]) then s.tanks[i] = tonumber(carry.tanks[i]) end end
             end
         end
+        -- doc 58: each drive's state, the travel ledger and an open conventional burn carry on
+        local Dm = drives()
+        if Dm then
+            s.drv = Dm.init(m, type(carry) == "table" and carry.drv or nil)
+            s.travel = C.get("space.travel").load(type(carry) == "table" and carry.travel or nil)
+            if type(carry) == "table" and type(carry.conv) == "table" then s.conv = carry.conv end
+        end
         return s
     end
 
-    --- The Deep view of a dynamics state.
-    function M.deep(s) return { p = s.pos, v = s.vel, basis = basisFromRot(s.rot), t = s.t } end
+    --- The Deep view of a dynamics state: Earth-fixed p, v, basis for every reader (an exact mirror when the state flies
+    --- in an inertial frame), plus the frame and the authoritative state in it.
+    function M.deep(s)
+        local Fr = frames()
+        if Fr and s.utc and s.frame then
+            local p, v, R = Fr.mirror(s, s.utc)
+            return { p = p, v = v, basis = basisFromRot(R), t = s.t, utc = s.utc, frame = Fr.save(s.frame),
+                     ip = { s.pos[1], s.pos[2], s.pos[3] }, iv = { s.vel[1], s.vel[2], s.vel[3] }, ibasis = basisFromRot(s.rot) }
+        end
+        return { p = s.pos, v = s.vel, basis = basisFromRot(s.rot), t = s.t, utc = s.utc }
+    end
 
     --- What to carry in a canonical record (JSON-safe).
-    function M.carry(s) return { omega = s.omega, dev = s.dev, thr = s.thr, pulse = s.pulse, att = s.att, tanks = s.tanks } end
+    --- compact = true for a persisted record (doc 58: drive states without their activation record and checkpoint).
+    function M.carry(s, compact)
+        local Dm = drives()
+        return { omega = s.omega, dev = s.dev, thr = s.thr, pulse = s.pulse, att = s.att, tanks = s.tanks,
+                 drv = Dm and Dm.save(s.drv, compact) or nil, travel = s.travel and C.get("space.travel").save(s.travel) or nil,
+                 conv = (not compact) and s.conv or nil }
+    end
 
     --- The environment at a state: real gravity plus the rotating Earth's Coriolis and centrifugal terms (L334), air by
     --- altitude.
     function M.env(s, extra)
-        local _, _, alt = D.ecefToLla(s.pos)
-        local e = { g = V.add(D.gravity(s.pos), D.fictitious(s.pos, s.vel or { 0, 0, 0 })), rho = M.density(alt) }
+        local Fr = frames()
+        local e, alt
+        if Fr and s.utc then
+            if Fr.isEarthFixed(s.frame) then
+                -- doc 57: the home planet exact plus every other relevant body (third-body form), then the rotating
+                -- frame's own terms as before
+                alt = select(3, D.ecefToLla(s.pos))
+                e = { g = V.add(Fr.accel(s, s.utc), D.fictitious(s.pos, s.vel or { 0, 0, 0 })), rho = M.density(alt) }
+            else
+                -- an inertial frame: no fictitious terms, no air (frames switch out of Earth-fixed only far from it)
+                e = { g = Fr.accel(s, s.utc), rho = 0 }
+            end
+        else
+            alt = select(3, D.ecefToLla(s.pos))
+            e = { g = V.add(D.gravity(s.pos), D.fictitious(s.pos, s.vel or { 0, 0, 0 })), rho = M.density(alt) }
+        end
         for k, v in pairs(extra or {}) do e[k] = v end
         return e, alt
     end
 
-    --- One step. opts = { devFuel = bool, devHeat = bool, waiver = { dir, axis, rate } | nil, rig = { pitch, yaw, roll } | nil }.
+    --- Put a state back in the Earth-fixed frame now (exact): for code that reads s.pos as Earth-fixed (guidance).
+    function M.toEarthFixed(s)
+        local Fr = frames()
+        if Fr and s.utc and s.frame then Fr.update(s, s.utc, { earthFixed = true }) end
+        return s
+    end
+
+    --- Altitude above the home planet for any frame (Earth-fixed: as before; inertial: through the exact mirror).
+    function M.altitude(s)
+        local Fr = frames()
+        if Fr and s.utc and s.frame then
+            -- centred on home: |p| is the distance from its centre, exactly as in the Earth-fixed frame
+            if not s.frame.anchor and s.frame.body == Fr.home().id then return V.len(s.pos) - D.R end
+            -- elsewhere (the Sun's frame, between the stars) the mirror costs an ephemeris: refresh it with the frame check
+            if not s.altAt or math.abs(s.utc - s.altAt) >= M.FRAME_CHECK_S then
+                s.altAt, s.altCache = s.utc, select(3, D.ecefToLla((Fr.mirror(s, s.utc))))
+            end
+            return s.altCache
+        end
+        return select(3, D.ecefToLla(s.pos))
+    end
+
+    --- One step. opts = { devFuel = bool, devHeat = bool, waiver = { dir, axis, rate } | nil, rig = { pitch, yaw, roll } | nil,
+    --- utc = seconds (the step's start: turns on the astronomical substrate), earthFixed = bool (keep / return to the
+    --- Earth-fixed frame: guidance, landing) }.
     function M.step(m, s, cmd, dt, opts)
         opts = opts or {}
+        if tonumber(opts.utc) then s.utc = tonumber(opts.utc) end
+        local Fr = frames()
+        if Fr and s.utc and (opts.earthFixed and s.frame or (s.frameCheckAt == nil or math.abs(s.utc - s.frameCheckAt) >= M.FRAME_CHECK_S)) then
+            s.frameCheckAt = s.utc
+            local switched = Fr.update(s, s.utc, { earthFixed = opts.earthFixed })
+            if switched then s.frameSwitched = { to = switched, utc = s.utc } end
+        end
         local env = M.env(s, { attitudeWaiver = opts.waiver, attitudeRig = opts.rig })
         if opts.devHeat then
             for _, st in pairs(s.dev or {}) do st.heatK, st.hot = 0, false end
@@ -149,8 +247,18 @@ Core.define("engineering.flightmodel", function(C)
             s.heatK = 0
         end
         local s2, tel = Dyn.step(m, s, env, cmd, dt)
+        if s2.utc then s2.utc = s2.utc + dt end
         if opts.devFuel then for i, t in ipairs(m.tanks) do s2.tanks[i] = t.kg end end   -- dev fuel: nothing burns
-        tel.alt, tel.mass = select(3, D.ecefToLla(s2.pos)), Dyn.mass(m, s2)
+        -- doc 58: the drives (and the activation record of an impulse / fusion burn, and the travel ledger)
+        local Dm = drives()
+        if Dm and s2.utc then
+            local okD, evs = pcall(Dm.step, m, s2, cmd, dt, opts)
+            if not okD and tostring(evs):find("budget exceeded", 1, true) then error(evs, 0) end
+            if okD then tel.driveEvents = evs else tel.driveEvents = { { type = "error", error = tostring(evs):sub(1, 300), utc = s2.utc } } end
+            if s2.frameSwitched and not tel.frameSwitched then tel.frameSwitched = s2.frameSwitched end
+        end
+        tel.alt, tel.mass = M.altitude(s2), Dyn.mass(m, s2)
+        tel.frame = Fr and Fr.key(s2.frame) or "earth_fixed"
         return s2, tel
     end
 

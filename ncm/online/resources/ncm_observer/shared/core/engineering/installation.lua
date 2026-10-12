@@ -66,7 +66,8 @@ Core.define("engineering.installation", function(C)
 
     --- Families that install on a mount (add-ons), as opposed to the effect-scalar families that replace a
     --- factory component at a fixed interface (parts.catalogue). Handling composition must never see these.
-    M.FAMILIES = { propulsor = true, impulse_actuator = true, attitude = true, tank = true, gearbox = true, slipstream = true }
+    M.FAMILIES = { propulsor = true, impulse_actuator = true, attitude = true, tank = true, gearbox = true, slipstream = true,
+        exotic_drive = true }   -- doc 58: the lab-only experimental drives
     function M.isAddOnFamily(family) return M.FAMILIES[family] == true end
 
     --- Driveline kinds (engineering.drivetrain's vocabulary): they change ratios, never push. NCM Gearbox drives them.
@@ -197,6 +198,52 @@ Core.define("engineering.installation", function(C)
             perf = { kind = "wake_system", reliefMax = 0.30, powerW = 180, lockPerS = 0.9, acquireQ = 0.20 },
             sale = { market = "base", tier = "sport" },
         },
+        -- Doc 58 (owner, 2026-10-12: "first, make the toys"): the EXPERIMENTAL propulsion stable. `lab = true`: no `sale`,
+        -- no R&D programme, no supply -- never on a market. They reach a Machine only through an owner grant kit
+        -- (server/engineering.lua, lab_*). Every number below is a prototype setting, not balance. Each carries its own
+        -- charge store (`store`, in charge units: component_state.propellant_kg holds what is left) sized for about two
+        -- test activations. The physics and the fiction of each are in its space.drive.* module.
+        {
+            designId = "eng:ncmlab:wd1:r1", lineageId = "eng:ncmlab:wd1", revision = 1, lab = true,
+            manufacturer = "NCM Experimental", makerKey = "ncmlab", code = "XLB-WD1", family = "exotic_drive",
+            name = "Warp Field Generator WD-1",
+            subtitle = "EXPERIMENTAL. Continuous superluminal drift along the Machine's nose; steer by pointing.",
+            interface = "hardpoint.h1", massKg = 90, envelope = { 0.8, 0.8, 0.5 }, price = 1,
+            perf = { kind = "warp_drive", factorMin = 1, factorMax = 9, factorStart = 3, expo = 5 / 8, spoolS = 6, rampS = 1.5,
+                disengageS = 3, abortS = 0.6, cooldownS = 10, wellRadii = 20, chargePerS = 1, spoolCost = 150,
+                store = { capacity = 12000, unit = "charge" } },
+        },
+        {
+            designId = "eng:ncmlab:ab1:r1", lineageId = "eng:ncmlab:ab1", revision = 1, lab = true,
+            manufacturer = "NCM Experimental", makerKey = "ncmlab", code = "XLB-AB1", family = "exotic_drive",
+            name = "Alcubierre Bubble Projector AB-1",
+            subtitle = "EXPERIMENTAL. Carries the Machine inside a spacetime bubble along a locked solution.",
+            interface = "hardpoint.h1", massKg = 140, envelope = { 1.0, 1.0, 0.6 }, price = 1,
+            perf = { kind = "alcubierre_drive", vsC = 1e6, accelS = 10, formS = 15, settleS = 2, collapseS = 2.5, cooldownS = 30,
+                R = 6, sigma = 8, decayPerS = 0.0015, tidalRef = 1e-3, failBelow = 0.15, errorFrac = 2e-6, quality = 0.8,
+                maxLy = 100, formCost = 1500, perLyCost = 60, defaultTarget = "hip:87937",
+                store = { capacity = 4000, unit = "charge" } },
+        },
+        {
+            designId = "eng:ncmlab:jd1:r1", lineageId = "eng:ncmlab:jd1", revision = 1, lab = true,
+            manufacturer = "NCM Experimental", makerKey = "ncmlab", code = "XLB-JD1", family = "exotic_drive",
+            name = "Jump Drive JD-1",
+            subtitle = "EXPERIMENTAL. Charges, then the Machine is somewhere else. Finite range.",
+            interface = "hardpoint.h1", massKg = 120, envelope = { 0.9, 0.9, 0.6 }, price = 1,
+            perf = { kind = "jump_drive", maxRangeLy = 10, chargeS0 = 10, chargePerLyS = 1, errorFrac = 1e-6, cooldownS = 60,
+                arriveS = 1.2, baseCost = 800, perLyCost = 300, defaultTarget = "hip:70890",
+                store = { capacity = 4500, unit = "charge" } },
+        },
+        {
+            designId = "eng:ncmlab:wh1:r1", lineageId = "eng:ncmlab:wh1", revision = 1, lab = true,
+            manufacturer = "NCM Experimental", makerKey = "ncmlab", code = "XLB-WH1", family = "exotic_drive",
+            name = "Wormhole Generator WH-1",
+            subtitle = "EXPERIMENTAL. Opens a throat to a far mouth pinned on a catalogued mass. Fly through it.",
+            interface = "hardpoint.h1", massKg = 160, envelope = { 1.0, 1.0, 0.7 }, price = 1,
+            perf = { kind = "wormhole_drive", throatR = 15, lifetimeS = 180, openS = 6, collapseS = 4, mouthAheadM = 400,
+                approachMS = 15, throatS = 1.5, openCost = 2500, precisionAU = 0.01, cooldownS = 45, returnable = true,
+                defaultTarget = "hip:91262", store = { capacity = 5000, unit = "charge" } },
+        },
     }
     local designById = {}
     for _, d in ipairs(M.DESIGNS) do designById[d.designId] = d end
@@ -295,7 +342,7 @@ Core.define("engineering.installation", function(C)
                     centred = v.mount.centred == true,
                     axis = v.axis, commands = cmds,
                     -- L334: a tank part's own propellant (kg), as the server last recorded it
-                    fillKg = d.perf.kind == "propellant_tank" and tonumber(it.fillKg) or nil,
+                    fillKg = (d.perf.kind == "propellant_tank" or d.perf.store) and tonumber(it.fillKg) or nil,   -- doc 58: a drive's charge
                 }
             else
                 refused[#refused + 1] = { componentId = it.componentId, reason = v.reason }

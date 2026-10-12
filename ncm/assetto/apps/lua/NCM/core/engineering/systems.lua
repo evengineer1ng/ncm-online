@@ -107,6 +107,12 @@ Core.define("engineering.systems", function(C)
         },
         -- L356: a wake system reads another vehicle's aerodynamic wake (aero.wake) and actively exploits it
         -- (aero.slipstream). It pushes nothing itself: its effect is drag the Machine no longer meets.
+        -- doc 58: the experimental drives. They push nothing through engineering.dynamics -- space.drives moves the
+        -- Machine by drift (warp, alcubierre) or translation (jump, wormhole) -- and run on their own charge store.
+        warp_drive = { required = {}, optional = { factorMax = "highest warp factor", chargePerS = "charge per second at W1 (x W^2)" } },
+        alcubierre_drive = { required = {}, optional = { vsC = "bubble coordinate speed (c)", R = "bubble radius (m)", sigma = "wall sharpness (1/m)" } },
+        jump_drive = { required = {}, optional = { maxRangeLy = "longest jump (ly)", chargeS0 = "charge time at zero range (s)" } },
+        wormhole_drive = { required = {}, optional = { throatR = "throat radius (m)", lifetimeS = "throat lifetime (s)" } },
         wake_system = {
             required = { reliefMax = "active drag relief at a perfect wake and full lock (share of drag, 0..1)",
                 powerW = "electrical draw while running (W)" },
@@ -126,6 +132,18 @@ Core.define("engineering.systems", function(C)
         -- stacked gearboxes: a box on a side mount drives only once engaged (engage it again to return to the car's box)
         gearbox = { engage = { type = "event", desc = "make this box's path the one that drives (again: back to the car's own box)" } },
     }
+    -- doc 58: every experimental drive takes the same commands (each drive decides what they mean in its state)
+    do
+        local DRIVE = {
+            engage = { type = "event", desc = "advance: lock / spool / engage / disengage" },
+            abort = { type = "analog", desc = "held: abort (unlock, cancel, collapse)" },
+            up = { type = "event", desc = "more (warp factor)" },
+            down = { type = "event", desc = "less (warp factor)" },
+            next = { type = "event", desc = "next destination" },
+            prev = { type = "event", desc = "previous destination" },
+        }
+        for _, k in ipairs({ "warp_drive", "alcubierre_drive", "jump_drive", "wormhole_drive" }) do M.COMMANDS[k] = DRIVE end
+    end
     function M.commands(kind) return M.COMMANDS[kind] or {} end
 
     --- Propellant spent by one discharge of a pulse device (kg): impulse / (Isp g0).

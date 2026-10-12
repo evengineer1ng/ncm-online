@@ -24,18 +24,29 @@ Core.define("space.canonical", function(C)
 
     --- A record from a live Deep state. `extra` carries identity and context (asset, driver, massKg, devices, devState,
     --- fuelKg, devFuel, devHeat, guidance = { venueId, engaged }, host, origin, destination, journeyId, raceWeek).
+    local function copyBasis(b) return b and { right = copy3(b.right), forward = copy3(b.forward), up = copy3(b.up) } or nil end
+
+    --- A record from a live Deep state. `extra` carries identity and context (asset, driver, massKg, devices, devState,
+    --- fuelKg, devFuel, devHeat, guidance = { venueId, engaged }, host, origin, destination, journeyId, raceWeek).
+    --- doc 57 §5: p / vel / basis stay Earth-fixed for every reader; a state flying in an inertial frame also carries
+    --- `frame` and its authoritative `ip` / `iv` / `ibasis` (and the `futc` they hold at).
     function M.fromDeep(s, utc, extra)
-        local r = { v = 1, place = "deep", p = copy3(s.p), vel = copy3(s.v),
-            basis = { right = copy3(s.basis.right), forward = copy3(s.basis.forward), up = copy3(s.basis.up) },
+        local r = { v = 1, place = "deep", p = copy3(s.p), vel = copy3(s.v), basis = copyBasis(s.basis),
             utc = tonumber(utc) or 0, provenance = { "observed" } }
+        if type(s.frame) == "table" and s.ip then
+            r.frame, r.ip, r.iv, r.ibasis, r.futc = s.frame, copy3(s.ip), copy3(s.iv), copyBasis(s.ibasis), tonumber(s.utc)
+        end
         for k, x in pairs(type(extra) == "table" and extra or {}) do r[k] = x end
         return r
     end
 
     --- A live Deep state from a record (for a host that resumes it).
     function M.toDeep(r)
-        return { p = copy3(r.p), v = copy3(r.vel), t = 0,
-            basis = { right = copy3(r.basis.right), forward = copy3(r.basis.forward), up = copy3(r.basis.up) } }
+        local d = { p = copy3(r.p), v = copy3(r.vel), t = 0, basis = copyBasis(r.basis) }
+        if type(r.frame) == "table" and r.ip and r.iv and r.ibasis then
+            d.frame, d.ip, d.iv, d.ibasis, d.utc = r.frame, copy3(r.ip), copy3(r.iv), copyBasis(r.ibasis), tonumber(r.futc or r.utc)
+        end
+        return d
     end
 
     --- Where the record says the Machine is: lat, lon, alt.
@@ -66,12 +77,19 @@ Core.define("space.canonical", function(C)
         if r.place ~= "deep" then r.utc = math.max(r.utc or 0, toUtc); return r, true, info end
         local F = C.get("engineering.flightmodel")
         local m = F.build(r.devices or {}, { vehicleKey = r.vehicleKey, fuelKg = r.devFuel and 40 or (tonumber(r.fuelKg) or 0) })
-        local s = F.state(m, M.toDeep(r), r.dyn)
+        local s = F.state(m, M.toDeep(r), r.dyn, r.utc)
+        -- doc 58: nobody is flying -- an experimental drive in progress ends where the Machine is (`pilot_lost`)
+        local Dm = F.drives and F.drives()
+        info.driveEvents = {}
+        if Dm and s.utc and s.drv then
+            for _, e in ipairs(Dm.pilotLost(m, s)) do info.driveEvents[#info.driveEvents + 1] = e end
+        end
         -- L334: the target may be the KSA border (Earth's sphere of influence) as well as an Earth venue
         local venue = r.guidance and r.guidance.engaged and r.guidance.venueId and G.target(r.guidance.venueId, VN) or nil
         local canPoint = F.canPoint(m, r.devAttitude)
         if venue and not canPoint then info.cannotPoint = true end
         local route = (venue and canPoint and F.mainAxis(m)) and G.planTo(M.toDeep(r), venue) or nil
+        if route then F.toEarthFixed(s) end   -- doc 57: guidance reads s.pos as Earth-fixed
         -- the waiver turns the body directly (stable at 1 s); a physical attitude law needs finer steps
         local dt = (route and not r.devAttitude) and 0.25 or M.DT
         local budget = maxSteps or math.huge
@@ -91,18 +109,27 @@ Core.define("space.canonical", function(C)
                     end
                 end
             end
-            s = F.step(m, s, cmd, dt, { devFuel = r.devFuel, devHeat = r.devHeat, waiver = waiver })
+            -- doc 57: the step's UTC turns on the astronomical substrate; guidance flies Earth-fixed (its plan is)
+            local tel
+            s, tel = F.step(m, s, cmd, dt, { devFuel = r.devFuel, devHeat = r.devHeat, waiver = waiver, utc = r.utc, earthFixed = route ~= nil, pilot = false })
+            if tel and tel.driveEvents and #info.driveEvents < 50 then
+                for _, e in ipairs(tel.driveEvents) do info.driveEvents[#info.driveEvents + 1] = e end
+            end
             if route and not r.devFuel and F.fuelKg(m, s) <= 1e-6 then r.guidance.engaged, route, info.fuelOut = false, nil, true end
             r.utc = r.utc + dt
             info.steps = info.steps + 1
-            local la, lo, alt = D.ecefToLla(s.pos)
+            if s.frameSwitched then info.frame, s.frameSwitched = s.frameSwitched, nil end
+            local alt = F.altitude(s)
+            local la, lo = 0, 0
+            if alt <= 1e6 then la, lo = D.ecefToLla((F.deep(s)).p) end   -- lat/lon only matter near the ground
             if alt <= (route and G.groundBelow(route, la, lo) + 25 or M.GROUND_M) then
                 r.place, r.landed, info.landed = "landed", { lat = la, lon = lo, utc = r.utc }, true
                 break
             end
         end
         local dv = F.deep(s)
-        r.p, r.vel, r.basis, r.dyn = dv.p, dv.v, dv.basis, F.carry(s)
+        r.p, r.vel, r.basis, r.dyn = dv.p, dv.v, dv.basis, F.carry(s, true)
+        r.frame, r.ip, r.iv, r.ibasis, r.futc = dv.frame, dv.ip, dv.iv, dv.ibasis, dv.frame and dv.utc or nil
         if not r.devFuel then r.fuelKg = F.fuelKg(m, s) end
         local done = r.place ~= "deep" or (r.utc or 0) + dt > toUtc
         if info.steps > 0 then r.provenance = { "simulated" } end

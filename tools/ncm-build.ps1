@@ -55,8 +55,16 @@ foreach ($res in $resources) {
     if ($text -notmatch '(?s)-- ncm-core:begin.*?-- ncm-core:end') { continue }
 
     $target = Join-Path $res.FullName 'shared\core'
+    # Core DATA a resource loads itself, outside the generated block (doc 60: the star catalogue as server_script lines,
+    # the naked-eye sky as a client_script line): copied from ncm/core like the block's files and never "stale".
+    $own = @()
+    $outside = [regex]::Replace($text, '(?s)-- ncm-core:begin.*?-- ncm-core:end', '')
+    foreach ($m in [regex]::Matches($outside, '"shared/core/([^"]+\.lua)"')) {
+        $f = $m.Groups[1].Value
+        if (Test-Path (Join-Path $CoreRoot $f)) { $own += $f }
+    }
     # 1. Files.
-    foreach ($f in $coreFiles) {
+    foreach ($f in ($coreFiles + $own)) {
         $src = Join-Path $CoreRoot $f
         $dst = Join-Path $target ($f -replace '/', '\')
         if (-not (Same-Bytes $src $dst)) {
@@ -71,7 +79,7 @@ foreach ($res in $resources) {
     # 2. Stale files.
     if (Test-Path $target) {
         $wanted = @{}
-        foreach ($f in $coreFiles) { $wanted[($f -replace '/', '\')] = $true }
+        foreach ($f in ($coreFiles + $own)) { $wanted[($f -replace '/', '\')] = $true }
         Get-ChildItem -LiteralPath $target -Recurse -File | ForEach-Object {
             $rel = $_.FullName.Substring($target.Length + 1)
             if (-not $wanted.ContainsKey($rel)) {

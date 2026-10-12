@@ -110,6 +110,18 @@ Core.define("space.sky", function(C)
         return nil
     end
 
+    --- The Moon's Earth-fixed position (m) from space.catalogue, or nil when the substrate is not loaded on this host.
+    function M.catalogueMoon(utc)
+        local ok, p = pcall(function()
+            local A, Cat = C.get("space.astro"), C.get("space.catalogue")
+            Cat.load()
+            local home
+            for _, r in ipairs(Cat.list()) do if r.home then home = r end end
+            return A.eciToEcefVec(A.delta(Cat.stateAt("moon", utc), Cat.stateAt(home, utc)), utc)
+        end)
+        return ok and p or nil
+    end
+
     --- The scene for a Deep state `s` at `utc`, the held car at game point `centre` (default: the NEAR stage centre) and,
     --- when given, held at game heading `heldYaw` (deg).
     --- Returns { car = {x,y,z}, yaw = deg, bodies = { { id, kind, p = {x,y,z}, q = {i,j,k,r} } }, notes }.
@@ -128,8 +140,9 @@ Core.define("space.sky", function(C)
             local dir = mv(G, unit(toEarth))
             out.bodies[#out.bodies + 1] = { id = "earth", kind = t.kind, p = add(out.car, sc(dir, d)), q = M.quat(G), r = t.r, d = d }
         end
-        -- the Moon: near side (+X of its mesh) to the Earth, its pole near the Earth's
-        local m = Stage.moonEcef(utc)
+        -- the Moon: near side (+X of its mesh) to the Earth, its pole near the Earth's. doc 57 §5.4: where the catalogue
+        -- says (the same Moon NCM's gravity pulls with); space.stage's own series only when the catalogue is absent
+        local m = M.catalogueMoon and M.catalogueMoon(utc) or Stage.moonEcef(utc)
         local rel = sub(m, s.p)
         local dm = len(rel)
         local u = sc(rel, 1 / dm)
