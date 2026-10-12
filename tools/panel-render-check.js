@@ -444,7 +444,7 @@ fire("panel:exchange.board", { view:"exchange", signedIn:true, balance:12500, fa
   {t:"part",id:"asset-1",item:"Makigai TIR-ST",family:"tires",tier:"street",list:600}
 ]});
 let xt=tradeText();
-check("the idle Exchange opens on the posted board", /THE BOARD · 2 OPEN/.test(xt) && /FOR SALE/.test(xt) && /WANTED/.test(xt) && /Kabuki Midnight Racing/.test(xt), xt.slice(0, 400));
+check("the idle Exchange opens on the posted board", /THE BOARD · 2 SHOWN OF 2 OPEN/.test(xt) && /FOR SALE/.test(xt) && /WANTED/.test(xt) && /Kabuki Midnight Racing/.test(xt), xt.slice(0, 400));
 check("the board offers to post a stored part and to ask for one", /POST FOR SALE/.test(xt) && /POST WANTED/.test(xt) && /Makigai TIR-ST/.test(xt), xt.slice(0, 600));
 const rowA=document.getElementById("tradeBody").querySelectorAll("button").find(c=>/Thorton PWR-ST/.test(dump(c).join(" ")));
 if(rowA)rowA.click();

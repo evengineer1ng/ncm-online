@@ -2664,39 +2664,90 @@
       // Posted wants and offers from players, Paddock teams and independent racers; bids against them; the poster
       // accepts one and the server settles it in one transaction. Served by ncm_paddock (view "exchange").
       let tradeMode = "board", boardData = null, boardPick = null;
+      // 2026-10-12 (owner: "make exchange ux experience coherent"): what the board shows, how it is ordered, a search
+      let boardFilter = "all", boardSort = "new", boardSearch = "";
       const xbEl = (tag, cls, txt) => { const e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = String(txt); return e; };
       const xbMoney = (n) => "€$" + Number(n || 0).toLocaleString();
       const xbAsk = (action, args) => { Open77.emit("panel:paddock.exchange", { action: action, args: args || {} }); tradeNotice = { ok: true, text: "Working…" }; renderTrade(null); };
-      const xbWhat = (r) => r.item ? r.item + " · " + String(r.family || "").replaceAll("_", " ") + " · " + (r.tier || "")
+      const xbWhat = (r) => r.assetKind === "vehicle" ? (r.item || "A car") + (r.car ? " · " + Number(r.car.km || 0).toLocaleString() + " km" : "")
+        : r.item ? r.item + " · " + String(r.family || "").replaceAll("_", " ") + " · " + (r.tier || "")
         : String(r.family || "").replaceAll("_", " ") + " · " + (r.tier || "");
+      const xbBadge = (r) => r.kind === "want" ? ["WANTED", " want"] : r.assetKind === "vehicle" ? ["CAR FOR SALE", " car"] : ["PART FOR SALE", ""];
       function xbLeft(r) { const s = Math.max(0, Number(r.expiresAt || 0) - Math.floor(Date.now() / 1000)); return s > 3600 ? Math.floor(s / 3600) + "h" : Math.floor(s / 60) + "m"; }
       function xbSelect(options, value) { const s = xbEl("select"); for (const o of options) { const op = xbEl("option", null, o[1]); op.value = o[0]; if (o[0] === value) op.selected = true; s.append(op); } return s; }
       function xbCash(v) { const i = xbEl("input"); i.type = "number"; i.min = "0"; i.step = "1"; i.value = String(v || 0); i.style.width = "110px"; return i; }
       function renderBoard(host) {
         const d = boardData || { rows: [], loading: true };
         const rows = Array.isArray(d.rows) ? d.rows : [];
-        const posts = rows.filter(r => r.t === "post"), parts = rows.filter(r => r.t === "part"), myBids = rows.filter(r => r.t === "mybid");
+        const all = rows.filter(r => r.t === "post"), parts = rows.filter(r => r.t === "part"), myBids = rows.filter(r => r.t === "mybid");
+        const sales = rows.filter(r => r.t === "sale");
         const cols = xbEl("div", "xb-cols"), left = xbEl("div", "xb-list"), side = xbEl("div", "xb-side");
         cols.append(left, side); host.append(cols);
         if (d.loading) { left.append(xbEl("div", "xb-dim", "Loading the board…")); return; }
         if (d.error) { left.append(xbEl("div", "xb-dim", "The board is unavailable (" + d.error + ").")); return; }
-        left.append(xbEl("div", "xb-h", "THE BOARD · " + posts.length + " OPEN"));
-        if (!posts.length) left.append(xbEl("div", "xb-dim", "Nothing posted yet. Post a part you don't need, or what you're looking for."));
+        // the controls: what to show, in what order, and a search over names
+        const bar = xbEl("div", "xb-form");
+        const counts = { all: all.length, cars: all.filter(r => r.assetKind === "vehicle").length,
+          parts: all.filter(r => r.assetKind !== "vehicle" && r.kind === "offer").length, wanted: all.filter(r => r.kind === "want").length,
+          mine: all.filter(r => r.mine).length };
+        for (const f of [["all", "ALL"], ["cars", "CARS"], ["parts", "PARTS"], ["wanted", "WANTED"], ["mine", "MINE"]]) {
+          const b = xbEl("button", "xb-act" + (boardFilter === f[0] ? " sel" : ""), f[1] + " " + counts[f[0]]);
+          b.addEventListener("click", () => { boardFilter = f[0]; boardPick = null; renderTrade(null); });
+          bar.append(b);
+        }
+        const sort = xbSelect([["new", "newest"], ["cheap", "cheapest"], ["dear", "dearest"], ["ending", "ending soon"], ["bids", "most bids"]], boardSort);
+        sort.addEventListener("change", () => { boardSort = sort.value; renderTrade(null); });
+        const search = xbEl("input"); search.placeholder = "search"; search.value = boardSearch; search.style.width = "140px";
+        search.addEventListener("change", () => { boardSearch = search.value; renderTrade(null); });
+        bar.append(sort, search);
+        left.append(bar);
+        let posts = all.filter(r => boardFilter === "all" || (boardFilter === "cars" && r.assetKind === "vehicle")
+          || (boardFilter === "parts" && r.assetKind !== "vehicle" && r.kind === "offer") || (boardFilter === "wanted" && r.kind === "want")
+          || (boardFilter === "mine" && r.mine));
+        const q = boardSearch.trim().toLowerCase();
+        if (q) posts = posts.filter(r => (xbWhat(r) + " " + (r.by || "")).toLowerCase().includes(q));
+        const by = { new: (a, b) => b.createdAt - a.createdAt, cheap: (a, b) => a.cash - b.cash, dear: (a, b) => b.cash - a.cash,
+          ending: (a, b) => a.expiresAt - b.expiresAt, bids: (a, b) => (b.bids || 0) - (a.bids || 0) };
+        posts.sort(by[boardSort] || by.new);
+        left.append(xbEl("div", "xb-h", "THE BOARD · " + posts.length + " SHOWN OF " + all.length + " OPEN"));
+        if (!posts.length) left.append(xbEl("div", "xb-dim", all.length ? "Nothing matches." : "Nothing posted yet. Post a part you don't need, or what you're looking for."));
         for (const r of posts) {
           const b = xbEl("button", "xb-row" + (boardPick === r.id ? " sel" : ""));
-          b.append(xbEl("span", "xb-kind" + (r.kind === "want" ? " want" : ""), r.kind === "want" ? "WANTED" : "FOR SALE"), xbEl("span", null, xbWhat(r)),
-            xbEl("span", "xb-dim", (r.mine ? "YOU" : r.by) + " · " + r.who), xbEl("span", null, (r.kind === "want" ? "up to " : "") + xbMoney(r.cash)),
-            xbEl("span", "xb-dim", (r.bids || 0) + " bid · " + xbLeft(r)));
+          const badge = xbBadge(r);
+          const price = (r.kind === "want" ? "up to " : "") + xbMoney(r.cash)
+            + (r.car && r.car.firstAsk && r.car.firstAsk > r.cash ? " (was " + xbMoney(r.car.firstAsk) + ")" : "")
+            + (r.list && r.kind === "offer" ? " · list " + xbMoney(r.list) : "");
+          b.append(xbEl("span", "xb-kind" + badge[1], badge[0]), xbEl("span", null, xbWhat(r)),
+            xbEl("span", "xb-dim", (r.mine ? "YOU" : r.by) + " · " + r.who), xbEl("span", null, price),
+            xbEl("span", "xb-dim", (r.bids || 0) + " bid" + (r.top ? " · top " + xbMoney(r.top) : "") + " · " + xbLeft(r)));
           b.addEventListener("click", () => { boardPick = boardPick === r.id ? null : r.id; renderTrade(null); });
           left.append(b);
         }
-        const pick = posts.find(r => r.id === boardPick);
+        if (sales.length) {
+          left.append(xbEl("div", "xb-h", "SOLD IN THE LAST DAY"));
+          for (const s of sales.slice(0, 12)) {
+            const ago = Math.max(0, Math.floor(Date.now() / 1000) - Number(s.at || 0));
+            left.append(xbEl("div", "xb-dim", (s.assetKind === "vehicle" ? "CAR · " : "PART · ") + (s.item || "") + " · " + xbMoney(s.cash) + " · "
+              + (ago > 3600 ? Math.floor(ago / 3600) + "h ago" : Math.floor(ago / 60) + "m ago")));
+          }
+        }
+        const pick = all.find(r => r.id === boardPick);
         if (pick) xbPostDetail(side, pick, parts);
         else xbPostForms(side, d, parts, myBids);
       }
       function xbPostDetail(side, r, parts) {
-        side.append(xbEl("div", "eyebrow", r.kind === "want" ? "Wanted" : "For sale"), xbEl("h2", null, xbWhat(r)));
+        side.append(xbEl("div", "eyebrow", r.kind === "want" ? "Wanted" : r.assetKind === "vehicle" ? "Car for sale" : "For sale"), xbEl("h2", null, xbWhat(r)));
         side.append(xbEl("div", "xb-dim", (r.mine ? "Your post" : r.by + " · " + r.who) + " · " + (r.kind === "want" ? "pays up to " : "asking ") + xbMoney(r.cash) + " · " + xbLeft(r) + " left"));
+        if (r.car) {
+          const facts = xbEl("div", "xb-form");
+          facts.append(xbEl("span", "xb-dim", "DISTANCE " + Number(r.car.km || 0).toLocaleString() + " km"),
+            xbEl("span", "xb-dim", "CLASS " + "★".repeat(Math.max(1, Math.min(5, Number(r.car.prestige || 1))))),
+            xbEl("span", "xb-dim", "NEW " + xbMoney(r.car.newPrice)));
+          side.append(facts);
+          side.append(xbEl("p", "xb-dim", "A used car from " + (r.mine ? "you" : r.by) + ". Its parts come with it. The price comes down every 12 hours it stands unsold"
+            + (r.car.firstAsk ? " (first asked " + xbMoney(r.car.firstAsk) + ")" : "") + "; the seller takes a fair bid."));
+        } else if (r.list && r.kind === "offer") side.append(xbEl("div", "xb-dim", "List price new " + xbMoney(r.list)));
+        if (r.top) side.append(xbEl("div", "xb-dim", "Highest bid so far " + xbMoney(r.top)));
         if (r.note) side.append(xbEl("p", "xb-dim", r.note));
         if (r.mine) {
           side.append(xbEl("div", "xb-h", "BIDS"));
@@ -2714,6 +2765,13 @@
         }
         side.append(xbEl("div", "xb-h", "YOUR BID"));
         const f = xbEl("div", "xb-form");
+        if (r.kind === "offer" && r.assetKind === "vehicle") {
+          const cash = xbCash(r.cash);
+          const go = xbEl("button", null, "BID"); go.addEventListener("click", () => xbAsk("bid", { postId: r.id, revision: r.revision, cash: Math.floor(Number(cash.value) || 0), assetId: null }));
+          f.append(xbEl("span", "xb-dim", "CASH"), cash, go);
+          side.append(f, xbEl("p", "xb-dim", "Money moves only if the seller accepts. The car then waits for you in Machine Index."));
+          return;
+        }
         if (r.kind === "offer") {
           const cash = xbCash(r.cash);
           const extra = xbSelect([["", "no part"]].concat(parts.map(p => [p.id, p.item + " · " + p.tier])), "");

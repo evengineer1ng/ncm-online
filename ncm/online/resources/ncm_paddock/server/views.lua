@@ -581,16 +581,28 @@ function PaddockViews.exchange(pid)
     local d = PaddockPlayers.driver(pid)
     local me = d and EX.principal("driver", d.ncmDriverId) or nil
     local rows = {}
-    local posts = MySQL.query.await([[SELECT * FROM exchange_post WHERE server_id = ? AND state = 'open' ORDER BY created_at DESC LIMIT 60]], { U.sid() }) or {}
+    -- 2026-10-12 (owner: "currently only shows recent listings, no details"): the whole open board (up to 200), each post
+    -- with what a buyer needs to judge it -- a car's model, distance, prestige, its price new and its first ask (so the
+    -- markdown shows), a part's list price -- and the last day's settled prices for context.
+    local posts = MySQL.query.await([[SELECT * FROM exchange_post WHERE server_id = ? AND state = 'open' ORDER BY created_at DESC LIMIT 200]], { U.sid() }) or {}
+    local Y = U.yielder(4)
     for _, r in ipairs(posts) do
         local key = EX.principal(r.principal_kind, r.principal_id)
-        local part = r.asset_id and PaddockExchange.part(r.asset_id) or nil
+        local isCar = r.asset_kind == "vehicle"
+        local part = (not isCar) and r.asset_id and PaddockExchange.part(r.asset_id) or nil
+        local car = isCar and PaddockExchange.vehicle(r.asset_id) or nil
         local bids = PaddockExchange.bidsOn(r.post_id)
-        local row = { t = "post", id = r.post_id, kind = r.kind, by = PaddockExchange.nameOf(key),
+        local ask0 = tonumber(tostring(r.note or ""):match("ask0=(%d+)"))
+        local row = { t = "post", id = r.post_id, kind = r.kind, assetKind = isCar and "vehicle" or "part", by = PaddockExchange.nameOf(key),
             who = r.principal_kind == "org" and "team" or (r.principal_kind == "person" and "racer" or "driver"),
-            item = part and part.name or nil, family = part and part.family or r.want_family, tier = part and part.tier or r.want_tier,
-            cash = tonumber(r.cash) or 0, revision = tonumber(r.revision) or 1, expiresAt = tonumber(r.expires_at) or 0,
-            bids = #bids, mine = (key == me) or nil, note = r.note }
+            item = (car and car.name) or (part and part.name) or nil, family = part and part.family or r.want_family, tier = part and part.tier or r.want_tier,
+            list = part and part.price or nil,
+            car = car and { vehicleKey = car.vehicleKey, km = math.floor(car.odometerM / 1000), prestige = car.prestige, newPrice = car.newPrice,
+                firstAsk = ask0 } or nil,
+            cash = tonumber(r.cash) or 0, revision = tonumber(r.revision) or 1, createdAt = tonumber(r.created_at) or 0,
+            expiresAt = tonumber(r.expires_at) or 0, bids = #bids, top = (#bids > 0) and EX.best({ kind = r.kind }, bids).cash or nil,
+            mine = (key == me) or nil, note = (r.note and not tostring(r.note):match("^ask0=")) and r.note or nil }
+        Y()
         if key == me then
             local list = {}
             for _, b in ipairs(bids) do
@@ -614,6 +626,16 @@ function PaddockViews.exchange(pid)
             rows[#rows + 1] = { t = "part", id = r.asset_id, item = ("%s %s"):format(r.display_manufacturer or "", r.code or ""),
                 family = r.family, tier = r.tier, list = tonumber(r.price) or 0 }
         end
+    end
+    -- the last day's sales: what changed hands for how much (prices, never who paid whom)
+    for _, r in ipairs(MySQL.query.await([[SELECT s.cash, s.settled_at, p.asset_kind, p.asset_id, p.want_family, p.want_tier, p.kind FROM exchange_settlement s
+        JOIN exchange_post p ON p.post_id = s.post_id WHERE s.server_id = ? AND s.settled_at > ? ORDER BY s.settled_at DESC LIMIT 30]],
+        { U.sid(), U.now() - 86400 }) or {}) do
+        local isCar = r.asset_kind == "vehicle"
+        local what = isCar and PaddockExchange.vehicle(r.asset_id) or (r.asset_id and PaddockExchange.part(r.asset_id)) or nil
+        rows[#rows + 1] = { t = "sale", cash = tonumber(r.cash) or 0, at = tonumber(r.settled_at) or 0, assetKind = isCar and "vehicle" or "part",
+            item = what and what.name or (tostring(r.want_family or "") .. " · " .. tostring(r.want_tier or "")) }
+        Y()
     end
     return { view = "exchange", rows = rows, balance = d and PaddockWallet.balance(d.ncmDriverId) or 0, signedIn = me ~= nil,
         families = NcmCore.get("parts.catalogue").FAMILIES, tiers = { "street", "sport", "premium" } }

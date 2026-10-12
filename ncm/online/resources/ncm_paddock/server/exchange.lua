@@ -433,6 +433,7 @@ function PaddockExchange.settle(post, bid, t)
     if car then
         local bk, bid_ = EX.split(bid.principal)
         if bk == "driver" then TriggerEvent("ncm:ownership:changed", bid_) end
+        if bk == "person" and PaddockMarkets and PaddockMarkets.adoptCar then pcall(PaddockMarkets.adoptCar, bid_, post.assetId, t) end
     end
     return true
 end
@@ -489,6 +490,7 @@ local function listPrice(family, tier)
 end
 
 local cursor = 0
+local carCursor = 0   -- which racers were last asked about a used car
 --- One trading pass: NPCs post their surplus and their wants, settle the best bids on their posts, and bid on what
 --- players post. Bounded per pass.
 function PaddockExchange.trade(t)
@@ -628,7 +630,32 @@ function PaddockExchange.trade(t)
         if budget <= 0 then break end
         local post = postRow(r)
         if post.assetKind == "vehicle" then
-            -- an NPC whose race car is worse bids on a better used car it can afford (EX.npcCarBid)
+            -- an independent racer whose race car is worse bids on a better used car it can afford (EX.npcCarBid)
+            local car = PaddockExchange.vehicle(post.assetId)
+            if car then
+                local order = PaddockStore.world.personOrder
+                local tried = 0
+                carCursor = (carCursor or 0) % math.max(1, #order)
+                for k = 1, #order do
+                    local pid = order[(carCursor + k - 1) % #order + 1]
+                    local q = PaddockStore.world.people[pid]
+                    if q and q.role == "driver" and q.state == "active" and not q.orgId and q.raceCarId then
+                        tried = tried + 1
+                        if tried > 12 then break end
+                        if tried % 4 == 0 then Wait(0) end
+                    end
+                    local key = EX.principal("person", pid)
+                    if q and q.role == "driver" and q.state == "active" and not q.orgId and q.raceCarId and key ~= post.principal then
+                        local own = PaddockCars.load(q.raceCarId)
+                        local bid = EX.npcCarBid(post.cash, car.prestige, own and own.prestige or 5, cashOf(key))
+                        if bid and PaddockExchange.bidFor(key, { postId = post.postId, revision = post.revision, cash = bid }, t) then
+                            stats.npcBids = stats.npcBids + 1; budget = budget - 1
+                            break
+                        end
+                    end
+                end
+                carCursor = carCursor + 12
+            end
         elseif post.kind == "offer" then
             local part = PaddockExchange.part(post.assetId)
             if part and PaddockMarkets and PaddockMarkets.wouldFit then

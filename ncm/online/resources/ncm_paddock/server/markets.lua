@@ -235,6 +235,25 @@ local function tradeIn(pr, old, t)
     return 0
 end
 
+--- An independent racer bought a used car on the Exchange (2026-10-12): it races it from now on, and the car it raced
+--- becomes a spare the Exchange offers in turn. Returns true when adopted.
+function PaddockMarkets.adoptCar(personId, assetId, t)
+    local p = PaddockStore.world.people[personId]
+    if not p or p.orgId then return false end
+    local okU = MySQL.update.await([[UPDATE vehicle_asset SET lifecycle = 'active', lifecycle_at = ?, lifecycle_cause = 'exchange_bought'
+        WHERE asset_id = ? AND owner_principal_kind = 'person' AND owner_principal_id = ?]], { t, assetId, personId })
+    if (tonumber(okU) or 0) < 1 then return false end
+    local old = p.raceCarId and PaddockCars.load(p.raceCarId) or nil
+    p.raceCarId = assetId
+    PaddockStore.markPerson(p.id)
+    PaddockCars.invalidate(assetId)
+    local c = PaddockCars.load(assetId)
+    if c then PaddockCars.derive(p, c) end
+    if old and old.assetId ~= assetId then tradeIn({ kind = "person", id = personId, obj = p }, old, t) end
+    log("person %s now races %s bought on the Exchange%s", personId, assetId:sub(1, 8), old and (" (old " .. old.vehicleKey .. " to the Exchange)") or "")
+    return true
+end
+
 --- A better car off a market shelf: a model of the racer's band of higher class than the one they race, affordable,
 --- listed long enough for players to have had first claim. The aftermarket parts move across where they fit; the old
 --- car is traded in. Returns the new car or nil, why.

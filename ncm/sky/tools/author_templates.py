@@ -136,8 +136,11 @@ def main():
     os.makedirs(out_dir, exist_ok=True)
     for body, (mesh, meshR, app, radius, air, shadows) in BODIES.items():
         d = author(src, mesh, meshR, app, radius, air, shadows)
-        if mesh == UNDERLAY or mesh in KIT_MESHES:
-            # the q201 Globe component is yawed -41 deg in its entity; the ring's mesh frame IS the game's (x east, y north)
+        if mesh != Q201_GLOBE:
+            # KB-458 (2026-10-12, owner: "saw night city in the ocean a couple times"): the q201 Globe component is yawed
+            # -41 deg in its entity. Every NCWE mesh's frame IS its body's own (the Earth: longitude 0 on +X, the pole on
+            # +Z; the dome: J2000; the ring and kit: the game's x east, y north), so that yaw put Night City 41 deg of
+            # longitude off (into the Pacific) and turned the star dome with it. Only the retired q201 proof keeps it.
             cd = d["Data"]["RootChunk"]["compiledData"]["Data"]["Chunks"]
             for c in d["Data"]["RootChunk"]["components"] + cd:
                 lt = c.get("localTransform") if c.get("$type") == "entMeshComponent" else None
