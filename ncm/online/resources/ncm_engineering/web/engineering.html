@@ -107,6 +107,24 @@
   @keyframes fade { to { opacity: 1; } }
   @keyframes stamp { to { opacity: 0.9; transform: scale(1) rotate(-4deg); } }
 </style>
+<script>
+// 2026-10-12: this page is authored on a fixed 1920x1080 canvas. Its surface follows the screen (any size, any aspect --
+// 2176x1812 streamed), so the canvas is scaled UNIFORMLY to fit and centred: never stretched. 1920x1080: scale 1.
+(function () {
+  function fit() {
+    var W = window.innerWidth, H = window.innerHeight, r = document.documentElement;
+    if (!W || !H || !r) return;
+    var s = Math.min(W / 1920, H / 1080);
+    r.style.zoom = String(s);
+    r.style.position = "relative";
+    r.style.left = Math.max(0, (W / s - 1920) / 2) + "px";
+    r.style.top = Math.max(0, (H / s - 1080) / 2) + "px";
+  }
+  window.addEventListener("resize", fit);
+  document.addEventListener("DOMContentLoaded", fit);
+  fit();
+})();
+</script>
 </head>
 <body>
 <div id="dock" class="hidden">

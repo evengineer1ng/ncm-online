@@ -261,9 +261,19 @@ end
 
 -- ------------------------------------------------------------------------------------------------- the page
 
+
+-- 2026-10-12: the surface follows the screen (the page fits its 1920x1080 canvas uniformly); 1920x1080 if refused
+local function createFitted(opts)
+    local p, why = WebUI.create(opts)
+    if p then return p, why end
+    local fixed = {}
+    for k, v in pairs(opts) do fixed[k] = v end
+    fixed.width, fixed.height = 1920, 1080
+    return WebUI.create(fixed)
+end
 local function bringUp()
     if page then return end
-    local p, why = WebUI.create({ entry = "web/observer.html", layer = "menu", width = 1920, height = 1080,
+    local p, why = createFitted({ entry = "web/observer.html", layer = "menu",
         fps = 30, zIndex = 880, transparent = true, visible = true })
     if not p then log("WebUI failed: %s", tostring(why)); return end
     page = p

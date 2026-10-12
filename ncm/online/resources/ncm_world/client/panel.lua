@@ -389,11 +389,21 @@ function hide()
     setOpen(nil)
 end
 
+
+-- 2026-10-12: the surface follows the screen (the page fits its 1920x1080 canvas uniformly); 1920x1080 if refused
+local function createFitted(opts)
+    local p, why = WebUI.create(opts)
+    if p then return p, why end
+    local fixed = {}
+    for k, v in pairs(opts) do fixed[k] = v end
+    fixed.width, fixed.height = 1920, 1080
+    return WebUI.create(fixed)
+end
 AddEventHandler("onClientResourceStart", function(name)
     if name ~= GetCurrentResourceName() then return end
     local reason
-    page, reason = WebUI.create({
-        entry = "web/panel.html", layer = "menu", width = 1920, height = 1080,
+    page, reason = createFitted({
+        entry = "web/panel.html", layer = "menu",
         fps = 30, zIndex = 900, transparent = true, visible = true,
     })
     if not page then log("panel WebUI failed: %s", tostring(reason)); return end
@@ -1001,21 +1011,15 @@ local PAD_HUB = "padStart"
 local PAD_HUB_TICK_MS = 50
 CreateThread(function()
     local wasDown = false
-    local failedRead = false
     while true do
-        local okP, down, reason = pcall(Open77.input.isDown, PAD_HUB)
-        if not okP or (down == nil and reason) then
-            if not failedRead then log("hub Start read failed: %s", tostring(okP and reason or down)); failedRead = true end
-        else failedRead = false end
+        local okP, down = pcall(Open77.input.isDown, PAD_HUB)
         down = okP and down == true
         if down and not wasDown then
             if open then
-                log("hub Start pressed: closing %s", tostring(open))
                 hide()
             else
                 local captured = false
                 pcall(function() captured = Open77.input.isCaptured() == true end)
-                log("hub Start pressed: captured=%s", tostring(captured))
                 if not captured then showGuide() end
             end
         end
