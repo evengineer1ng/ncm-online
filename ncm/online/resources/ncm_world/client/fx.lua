@@ -21,6 +21,9 @@ local held = {}          -- activation key -> { handle, asset, owner }
 local tried = {}         -- asset key -> true (first play logged)
 local owners = {}        -- owner -> { acts (selected), frame, pos, at = ms }
 local audioDown = false
+local PLAN_MS, AUDIO_MS, STALE_MS = 100, 100, 500
+local plannedAt, audioAt = 0, 0
+local placed = {}        -- activation key -> the activation last planned (moved every frame between plans)
 
 NcmFx = {}
 
@@ -54,10 +57,13 @@ local function placement(a, frame, pos)
     local at = toWorld(a.at or { 0, 0, 0 }, frame)
     local dir = toWorld(a.dir or { 0, 0, 1 }, frame)
     local out = a.exhaust and { -dir[1], -dir[2], -dir[3] } or { 0, 0, 1 }
-    local lift = a.exhaust and 0.35 or 0          -- just clear of the housing, along the exhaust
+    local lift = a.exhaust and 0.45 or 0          -- clear of the housing, along the exhaust
+    -- the effect's authored emission axis (ASSETS.orient): a thruster fires down its own -Z, so -Z is turned onto `out`
+    local asset = Cues.ASSETS[a.asset or ""]
+    local axis = (asset and asset.orient == "-z") and { -out[1], -out[2], -out[3] } or out
     return {
         position = { x = pos.x + at[1] + out[1] * lift, y = pos.y + at[2] + out[2] * lift, z = pos.z + at[3] + out[3] * lift },
-        orientation = quatFromZ(out),
+        orientation = quatFromZ(axis),
     }
 end
 
@@ -81,6 +87,9 @@ end
 
 local function audio()
     if audioDown then return end
+    local tnow = GetGameTimer()
+    if tnow - audioAt < AUDIO_MS then return end
+    audioAt = tnow
     local voices = {}
     for owner, o in pairs(owners) do
         for _, a in ipairs(o.acts or {}) do
@@ -106,9 +115,24 @@ function NcmFx.frame(owner, emitters, frame, pos, isRemote)
     if type(frame) ~= "table" or type(pos) ~= "table" or not frame.forward then return end
     owners[owner] = { emitters = emitters, frame = frame, pos = pos, at = GetGameTimer() }
     if not isRemote then NcmFx.localOwner = owner end
+    local now = GetGameTimer()
+    -- 2026-10-12 (the first Deep flight died on the client script budget): the PLAN runs ten times a second (sooner when
+    -- a stroke or boom happened); between plans only the held effects move with their cars
+    local edge = false
+    for _, e in ipairs(emitters or {}) do if e.edge and next(e.edge) then edge = true break end end
+    if not edge and now - plannedAt < PLAN_MS then
+        for key, a in pairs(placed) do
+            local h, o = held[key], owners[a.owner]
+            if h and h.handle and o then
+                local t = placement(a, o.frame, o.pos)
+                pcall(Open77.vfx.update, h.handle, { position = t.position, orientation = t.orientation })
+            end
+        end
+        return
+    end
+    plannedAt = now
     -- the whole budget is shared across owners: plan over every live owner's emitters
     local all, ownerOf = {}, {}
-    local now = GetGameTimer()
     for o, rec in pairs(owners) do
         if now - rec.at > 500 then owners[o] = nil
         else
@@ -120,15 +144,18 @@ function NcmFx.frame(owner, emitters, frame, pos, isRemote)
     local keep = Fx.plan(all, hk)
     local want = {}
     for o in pairs(owners) do owners[o].acts = {} end
+    placed = {}
     for _, a in ipairs(keep) do
         local o = owners[ownerOf[a.emitter]]
         if o then
+            a.owner = ownerOf[a.emitter]
             o.acts[#o.acts + 1] = a
             local t = placement(a, o.frame, o.pos)
             if a.edge then
                 play(a, t, false)
             else
                 want[a.key] = true
+                placed[a.key] = a
                 local h = held[a.key]
                 if h and h.asset == a.asset and h.handle then
                     local okU, moved = pcall(Open77.vfx.update, h.handle, { position = t.position, orientation = t.orientation })
@@ -207,6 +234,7 @@ end)
 CreateThread(function()
     while true do
         Wait(0)
+        local okR = pcall(function()
         local now = GetGameTimer()
         for owner, r in pairs(remote) do
             if now - r.at > REMOTE_TTL_MS then
@@ -230,13 +258,27 @@ CreateThread(function()
                 end
             end
         end
+        end)
+        if not okR then Wait(100) end    -- a budget overrun here never kills the watcher
+    end
+end)
+
+-- A car whose updates stop (its flight thread died, it left Deep, the player got out) loses its effects half a second
+-- later: nothing NCM drew outlives what drives it (the first Deep flight's plume kept burning after the flight froze).
+CreateThread(function()
+    while true do
+        Wait(250)
+        local now = GetGameTimer()
+        for o, rec in pairs(owners) do
+            if now - (rec.at or 0) > STALE_MS then NcmFx.clear(o) end
+        end
     end
 end)
 
 --- An owner went away (left Deep, out of the car, a remote Machine streamed out).
 function NcmFx.clear(owner)
     owners[owner] = nil
-    for k in pairs(held) do if k:sub(1, #owner + 1) == owner .. ":" then stop(k) end end
+    for k in pairs(held) do if k:sub(1, #owner + 1) == owner .. ":" then stop(k); placed[k] = nil end end
 end
 
 AddEventHandler("onClientResourceStop", function(name)

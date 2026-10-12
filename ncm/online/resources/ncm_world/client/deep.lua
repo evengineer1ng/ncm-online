@@ -1325,20 +1325,32 @@ local function tick()
     end
     -- NCM FX (presentation.fx): the parts, the body and the drives, drawn natively on the held car. Every frame (a
     -- stroke is an edge of ONE step); the drive views are refreshed ten times a second. Guarded like the rest.
-    if NcmFx and tel then
+    -- 2026-10-12: the first Deep flight died on the script budget with this running whole every frame. Now: emitters
+    -- ten times a second (or at once when a stroke happened), the drive views four times a second, the held car's pose
+    -- read once a second (it is held still), all of it skipped in a frame that is already running long.
+    local fxEdge = tel and tel.events and #tel.events > 0
+    if NcmFx and tel and (fxEdge or now - (A.fxAt or 0) >= 100) then
+        A.fxAt = now
         local okFx, errFx = pcall(function()
             local em = Fx.fromDynamics(A.asset or "deep", m, ds, tel, {})
             local body = Fx.machine(A.asset or "deep", { speed = Deep.vec.len(ds.vel or { 0, 0, 0 }), rho = tel.rho,
                 qPa = tel.qPa, aeroHeatKw = tel.aeroHeatKw }, A.fxBody)
             A.fxBody = body[1].q
             em[#em + 1] = body[1]
-            if now - (A.fxViewsAt or 0) >= 100 then A.fxViewsAt, A.fxViews = now, Fx.fromDrives(A.asset or "deep", Drives.view(m, ds)) end
+            if #(m.drives or {}) > 0 and now - (A.fxViewsAt or 0) >= 250 then
+                A.fxViewsAt, A.fxViews = now, Fx.fromDrives(A.asset or "deep", Drives.view(m, ds))
+            end
             for _, e in ipairs(A.fxViews or {}) do em[#em + 1] = e end
-            local okF, f = pcall(Open77.character.frame, { vehicleId = A.vid })
-            local okP, v = pcall(Open77.vehicles.get, A.vid)
-            if okF and type(f) == "table" and okP and type(v) == "table" and v.position then
+            if now - (A.fxPoseAt or 0) >= 1000 or not A.fxPose then
+                local okF, f = pcall(Open77.character.frame, { vehicleId = A.vid })
+                local okP, v = pcall(Open77.vehicles.get, A.vid)
+                if okF and type(f) == "table" and okP and type(v) == "table" and v.position then
+                    A.fxPose, A.fxPoseAt = { f = f, p = v.position }, now
+                end
+            end
+            if A.fxPose then
                 NcmFx.publish(A.asset or "deep", A.vid, em)
-                NcmFx.frame(A.asset or "deep", em, f, v.position)
+                NcmFx.frame(A.asset or "deep", em, A.fxPose.f, A.fxPose.p)
             end
         end)
         if not okFx and not A.fxNativeErr then A.fxNativeErr = true; log("native FX skipped: %s", tostring(errFx)) end

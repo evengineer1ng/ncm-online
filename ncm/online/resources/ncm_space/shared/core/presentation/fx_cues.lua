@@ -104,28 +104,31 @@ Core.define("presentation.fx_cues", function(C)
     }
 
     -- Candidates from the game's 3,426 cooked effects (WolvenKit listing, 2026-10-12). `seen = false` until looked at in
-    -- game; a host may prefer a seen asset of the same role. `orient`: the effect's authored forward axis.
+    -- game; a host may prefer a seen asset of the same role. `orient`: the axis the effect is authored to emit along --
+    -- "-z" for thrusters (an AV's thrusters fire down; first flight 2026-10-12: drawn as +z, the FD-1's plume went up
+    -- through the cabin), "z" for bursts that rise. The q112 parade-barge thruster was a pillar the size of a building:
+    -- not used.
     M.ASSETS = {
-        plume_s      = { effect = "base\\fx\\quest\\q000\\q000_cargo_av_thruster.effect", orient = "z", seen = false },
-        plume_m      = { effect = "base\\fx\\quest\\q104\\q104_av_thrusters.effect", orient = "z", seen = false },
-        plume_l      = { effect = "base\\fx\\quest\\q000\\q000_cargo_av_main_engine.effect", orient = "z", seen = false },
-        plume_vac_s  = { effect = "base\\fx\\quest\\q000\\q000_cargo_av_thruster.effect", orient = "z", seen = false },
-        plume_vac_m  = { effect = "base\\fx\\quest\\q112\\q112_av_parade_barge_thruster.effect", orient = "z", seen = false },
-        plume_vac_l  = { effect = "base\\fx\\quest\\q104\\q104_rocket_trail.effect", orient = "z", seen = false },
-        fusion_s     = { effect = "base\\fx\\quest\\q203\\v_av_rayfield_excalibur_thruster_ground.effect", orient = "z", seen = false },
-        fusion_l     = { effect = "base\\fx\\quest\\q112\\q112_av_parade_barge_thruster.effect", orient = "z", seen = false },
-        jet_s        = { effect = "base\\fx\\quest\\q000\\q000_cargo_av_thruster.effect", orient = "z", seen = false },
-        jet_l        = { effect = "base\\fx\\quest\\q104\\q104_av_thrusters.effect", orient = "z", seen = false },
+        plume_s      = { effect = "base\\fx\\quest\\q000\\q000_cargo_av_thruster.effect", orient = "-z", seen = false },
+        plume_m      = { effect = "base\\fx\\quest\\q104\\q104_av_thrusters.effect", orient = "-z", seen = false },
+        plume_l      = { effect = "base\\fx\\quest\\q000\\q000_cargo_av_main_engine.effect", orient = "-z", seen = false },
+        plume_vac_s  = { effect = "base\\fx\\quest\\q000\\q000_cargo_av_thruster.effect", orient = "-z", seen = false },
+        plume_vac_m  = { effect = "base\\fx\\quest\\q104\\q104_av_thrusters.effect", orient = "-z", seen = false },
+        plume_vac_l  = { effect = "base\\fx\\quest\\q104\\q104_rocket_trail.effect", orient = "-z", seen = false },
+        fusion_s     = { effect = "base\\fx\\quest\\q000\\q000_cargo_av_thruster.effect", orient = "-z", seen = false },
+        fusion_l     = { effect = "base\\fx\\quest\\q104\\q104_av_thrusters.effect", orient = "-z", seen = false },
+        jet_s        = { effect = "base\\fx\\quest\\q000\\q000_cargo_av_thruster.effect", orient = "-z", seen = false },
+        jet_l        = { effect = "base\\fx\\quest\\q104\\q104_av_thrusters.effect", orient = "-z", seen = false },
         fan_wash     = { effect = "weather.dust", orient = "z", seen = false },
-        heat_shimmer = { effect = "base\\fx\\quest\\q112\\q112_10_safe_house\\e_steam_jet_hot_small_q112.effect", orient = "z", seen = false },
+        heat_shimmer = { effect = "base\\fx\\quest\\q112\\q112_10_safe_house\\e_steam_jet_hot_small_q112.effect", orient = "-z", seen = false },
         heat_smoke   = { effect = "smoke.machine", orient = "z", seen = false },
         cough        = { effect = "sparks.burst.small", orient = "z", seen = false },
-        pulse_s      = { effect = "base\\fx\\devices\\boot_thrusters\\d_boot_thruster_burst.effect", orient = "z", seen = false },
-        pulse_l      = { effect = "base\\fx\\devices\\boot_thrusters\\d_boot_thruster_holo_jump.effect", orient = "z", seen = false },
+        pulse_s      = { effect = "base\\fx\\devices\\boot_thrusters\\d_boot_thruster_burst.effect", orient = "-z", seen = false },
+        pulse_l      = { effect = "base\\fx\\devices\\boot_thrusters\\d_boot_thruster_holo_jump.effect", orient = "-z", seen = false },
         ground_dust  = { effect = "base\\fx\\environment\\debris\\av_landing_debris_and_dust.effect", orient = "z", seen = false },
         ram_s        = { effect = "impact.ground_slam", orient = "z", seen = false },
         ram_l        = { effect = "base\\fx\\gameplay\\player\\landing_very_hard.effect", orient = "z", seen = false },
-        rcs_puff     = { effect = "base\\fx\\quest\\q112\\q112_10_safe_house\\e_steam_jet_hot_small_q112.effect", orient = "z", seen = false },
+        rcs_puff     = { effect = "base\\fx\\quest\\q112\\q112_10_safe_house\\e_steam_jet_hot_small_q112.effect", orient = "-z", seen = false },
         entry_s      = { effect = "fire.small", orient = "z", seen = false },
         entry_m      = { effect = "vehicle.fire", orient = "z", seen = false },
         entry_l      = { effect = "fire.large", orient = "z", seen = false },
