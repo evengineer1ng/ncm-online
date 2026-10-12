@@ -42,6 +42,14 @@ local function persist(asset,s)
  MySQL.update.await("UPDATE machine_fuel SET fuel_ml=?,capacity_ml=?,updated_at=? WHERE asset_id=?",{s.fuelMl,s.capacityMl,now(),asset})
  s.dirtyMl=0;s.lastWrite=now()
 end
+-- Doc 58: an owner-grant kit fills the tank. Through the loaded state, never around it: a database write alone is
+-- overwritten by the next persist of the cached level (2026-10-12: the lab_alcubierre kit's "full" became 18,121 ml again).
+NcmFuel.refill=function(asset)
+ local s=load(asset);local before=s.fuelMl
+ s.fuelMl=s.capacityMl;s.remainderMl=0
+ persist(asset,s)
+ return before,s.fuelMl
+end
 local function notifyEmpty(pid)
  local msg="Stuck? Type /ncm.nofuel for help."
  pcall(Open77.chat.send,pid,"[NCM] "..msg)

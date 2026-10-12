@@ -25,8 +25,22 @@ local STAGE_RETRY_MS = 500
 local STAGE_TRIES = 40       -- 20 s, then it is said once, loudly
 
 local V = nil                -- { sentAt, sent = { x, y, z, yaw, seq }, acked, tries, stageAt, kinds = "..." }
+local domeHidden = false     -- doc 58: a drive is redrawing the whole sky (client/drivefx.lua)
 
 NcmDeepView = {}
+
+--- Doc 58: where the held car is in the game's world (the stage) and its held heading, for the drive layer's cockpit
+--- rotation and the game-camera measurement. nil until the stage is chosen.
+function NcmDeepView.stage()
+    if not (V and V.sent) then return nil end
+    return { x = V.sent.x, y = V.sent.y, z = V.sent.z, yaw = V.sent.yaw }
+end
+
+--- Doc 58: hide (true) or restore the game's own star dome while a drive draws the sky itself.
+function NcmDeepView.hideDome(hide)
+    domeHidden = hide == true
+    if V then V.sentAt = 0 end   -- the next update sends the scene at once
+end
 
 local function requestStage(now)
     V.tries, V.stageAt = (V.tries or 0) + 1, now
@@ -68,8 +82,10 @@ function NcmDeepView.update(s, utc, now)
     end
     local bodies, kinds = {}, {}
     for _, b in ipairs(view.bodies) do
-        bodies[#bodies + 1] = { id = b.id, kind = b.kind, p = { b.p[1], b.p[2], b.p[3] }, q = b.q }
-        kinds[#kinds + 1] = b.id .. "=" .. b.kind
+        if not (domeHidden and b.id == "sky_dome") then
+            bodies[#bodies + 1] = { id = b.id, kind = b.kind, p = { b.p[1], b.p[2], b.p[3] }, q = b.q }
+            kinds[#kinds + 1] = b.id .. "=" .. b.kind
+        end
     end
     kinds = table.concat(kinds, " ")
     if kinds ~= V.kinds then
@@ -83,6 +99,7 @@ end
 function NcmDeepView.clear()
     scene({})
     V = nil
+    domeHidden = false
 end
 
 AddEventHandler("onClientResourceStop", function(name) if name == GetCurrentResourceName() then NcmDeepView.clear() end end)

@@ -14,7 +14,7 @@ local Places = NcmCore.get("space.places")
 local Json = NcmCore.get("vocabulary.json")
 local BRIDGE = "http://127.0.0.1:47710"
 local UNHOSTED_S = 15
-local SLICE = 400
+local SLICE = 300   -- doc 57: multi-body gravity costs ~20 % more per step; 300 keeps a call under the 400-step cost it replaced
 -- KB-358 (KB-347's shape): a nil in the middle of a Lua parameter list is a hole -- the insert silently failed for every
 -- unresolved place (no lat/lon). NULL is spelled out in the statement for each nil value instead.
 local function sqlValues(cols, vals, n)
@@ -62,6 +62,41 @@ local function persist(driverId)
     end)
 end
 
+--- Doc 58: an owner grant changed this driver's Machine (server/engineering.lua): the presence record's copy of its
+--- parts is rewritten so the unhosted flight flies the real configuration. Where the Machine is, how it moves and turns,
+--- and its travel ledger are untouched; per-device states (indexed by the old part list) and drive states are dropped.
+function NcmCanonical.refreshMachine(driverId, assetId, devices, fuelKg)
+    local r = rows[driverId]
+    local fromDb = false
+    if not r and MySQL then
+        local okQ, row = pcall(MySQL.single.await, "SELECT place, host, location_id, state_json, race_week_run, updated_at FROM ncm_presence WHERE driver_id=? AND server_id=?", { driverId, sid() })
+        if okQ and row then
+            local okD, rec = pcall(Json.decode, row.state_json or "")
+            r = { place = row.place, host = row.host, locationId = row.location_id, rec = okD and rec or nil, run = tonumber(row.race_week_run),
+                  updatedAt = tonumber(row.updated_at) or 0 }
+            fromDb = true
+        end
+    end
+    if not r or type(r.rec) ~= "table" then return "presence: no record for this driver (nothing to refresh)" end
+    local rec = r.rec
+    if rec.asset and assetId and tostring(rec.asset) ~= tostring(assetId) then return ("presence: the record is another Machine's (..%s): untouched"):format(tostring(rec.asset):sub(-6)) end
+    local before = rec.p and ("%.3f,%.3f,%.3f"):format(rec.p[1], rec.p[2], rec.p[3]) or "-"
+    rec.devices = devices or rec.devices
+    if fuelKg then rec.fuelKg = fuelKg end
+    if type(rec.dyn) == "table" then
+        rec.dyn.tanks, rec.dyn.dev, rec.dyn.thr, rec.dyn.pulse, rec.dyn.att, rec.dyn.drv, rec.dyn.conv = nil, nil, nil, nil, nil, nil, nil
+    end
+    if fromDb then
+        rows[driverId] = r
+        r.hostedAt, r.persistedAt = 0, r.updatedAt
+    end
+    persist(driverId)
+    local after = rec.p and ("%.3f,%.3f,%.3f"):format(rec.p[1], rec.p[2], rec.p[3]) or "-"
+    log("PRESENCE driver ..%s: Machine ..%s parts refreshed after an owner grant (%d device(s), fuel %s kg); position %s (unchanged: %s)",
+        tostring(driverId):sub(-6), tostring(assetId):sub(-6), #(devices or {}), tostring(fuelKg and ("%.1f"):format(fuelKg) or "-"), after, tostring(before == after))
+    return ("presence refreshed: %d device(s), fuel %s kg, position unchanged"):format(#(devices or {}), tostring(fuelKg and ("%.1f"):format(fuelKg) or "-"))
+end
+
 --- Where is this driver? (cached; loaded at boot)
 function NcmCanonical.get(driverId) return driverId and rows[driverId] or nil end
 
@@ -102,6 +137,10 @@ RegisterNetEvent("ncm:canonical.save", function(m)
     if pid <= 0 or type(m) ~= "table" or not enabled() then return end
     local d = driverOf(pid)
     if not d then return end
+    if type(m.json) == "string" then   -- doc 58: the record as one JSON string (the net serializer dropped some tables)
+        local okJ, rec = pcall(Json.decode, m.json)
+        if okJ and type(rec) == "table" then m.rec = rec else log("checkpoint from player=%d unreadable: %s", pid, tostring(rec)); return end
+    end
     if type(m.rec) == "table" then m.rec.utc = now(); m.rec.driver = d end   -- the server's clock, never a host's
     NcmCanonical.set(d, tostring(m.place or "deep"), "cyberpunk", m.locationId, type(m.rec) == "table" and m.rec or nil, m.transition == true)
 end)
@@ -137,6 +176,7 @@ CreateThread(function()
         log("BOOT driver ..%s is %s%s (written %.0f s ago)", tostring(row.driver_id):sub(-6), row.place,
             row.location_id and (" at " .. row.location_id) or "", now() - (tonumber(row.updated_at) or now()))
     end
+    NcmCanonical.booted = true   -- doc 58: an owner grant refreshing a record waits for this (never races the boot load)
     while true do
         Wait(5000)
         local t = now()
@@ -149,11 +189,18 @@ CreateThread(function()
                 -- nobody is flying it: the server does (in slices so the instruction quota is never the limit)
                 local from = r.rec.utc or t
                 local rec, done, info, arrived, landed, border = r.rec, false, nil, false, false, false
+                local driveEvents = {}
                 repeat
                     rec, done, info = Canon.propagate(rec, t, SLICE)
                     arrived, landed, border = arrived or info.arrived, landed or info.landed, border or info.border
+                    for _, e in ipairs(info.driveEvents or {}) do if #driveEvents < 100 then driveEvents[#driveEvents + 1] = e end end
                     Wait(0)
                 until done
+                -- doc 58: what the drives did while the server flew (an activation ended `pilot_lost`, a throat crossed)
+                if #driveEvents > 0 and NcmDeepDrives and NcmDeepDrives.record then
+                    pcall(NcmDeepDrives.record, d, rec.asset, nil, "server", driveEvents)
+                end
+                if NcmDeepDrives and NcmDeepDrives.travel and rec.dyn and rec.dyn.travel then pcall(NcmDeepDrives.travel, d, rec.asset, rec.dyn.travel) end
                 r.rec, r.host = rec, nil
                 if from < t - 30 or arrived or landed then
                     log("UNHOSTED driver ..%s flown %.0f s by the server%s%s", tostring(d):sub(-6), t - from,

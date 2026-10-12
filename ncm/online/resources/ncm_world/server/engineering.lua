@@ -171,7 +171,9 @@ end
 -- ------------------------------------------------------------------------------------------------ tank fill (L334)
 -- A tank PART's own propellant (schema 069). No row = full (a fresh tank); the row is created on first read.
 local function tankFill(assetId, design)
-    local cap = design and design.perf and tonumber(design.perf.capacityKg) or 0
+    -- doc 58: an experimental drive's charge store is kept the same way (in charge units, not kg)
+    local perf = design and design.perf or {}
+    local cap = tonumber(perf.capacityKg) or (type(perf.store) == "table" and tonumber(perf.store.capacity)) or 0
     local kg = MySQL.scalar.await("SELECT propellant_kg FROM component_state WHERE asset_id=?", { assetId })
     if kg == nil then
         MySQL.insert.await("INSERT IGNORE INTO component_state (asset_id, propellant_kg, updated_at) VALUES (?,?,?)", { assetId, cap, now() })
@@ -211,7 +213,7 @@ local function payload(machineId)
         local d = Install.design(it.designId)
         local copy = {}
         for k, v in pairs(it) do copy[k] = v end
-        if d and d.perf and d.perf.kind == "propellant_tank" then copy.fillKg = tankFill(it.componentId, d) end
+        if d and d.perf and (d.perf.kind == "propellant_tank" or d.perf.store) then copy.fillKg = tankFill(it.componentId, d) end
         items[i] = copy
     end
     local specs, seen = {}, {}
@@ -771,10 +773,40 @@ devGrantOne = function(spec)
 end
 
 -- L352 (owner, 2026-10-08: "equip my anchored galena with the same flight package equipped to my dev server hella"):
--- an OWNER one-shot that works on Online too. Tunable ncm_world.ownerGrant = "<driver id prefix>|<vehicle>|<kit>"
+-- an OWNER one-shot that works on Online too. Tunable ncm_world.ownerGrant = "<driver id prefix>|<vehicle>|<kit>[#nonce]"
 -- (short on purpose: KB-371). <vehicle> is a catalogue word ("galena": the driver's anchored one first) or an asset id
--- suffix. A kit is the dev Hella's fit, part for part. Each part already on the Machine is skipped; one in the driver's
--- storage is used; otherwise it is minted with provenance `owner_grant` (never `dev_fabricate`). Logged per part.
+-- suffix. A kit is a fit, part for part. Each part already on the Machine is skipped; one in the driver's storage is
+-- used; otherwise it is minted with provenance `owner_grant` (never `dev_fabricate`). Logged per part.
+--
+-- Doc 58 (2026-10-12) -- THE ENGINEERING-PERSISTENCE FIX. On 2026-10-11 a `flight` grant left in tunables.json re-ran
+-- at every restart (two deploys and a crash) and put the Hella's parts back into an obsolete layout each time. A grant
+-- is now ONE-SHOT BY CONSTRUCTION: every applied spec is written to `owner_grant_ledger` before anything is touched, and
+-- a spec already in the ledger is never applied again -- a leftover tunable logs "skipped" and changes nothing. To apply
+-- a kit again, change the nonce (`#<anything>`; dist/deeplab.sh stamps the UTC time). If the ledger cannot be read the
+-- grant is REFUSED. A player's normal engineering (the panel, the pad) never passes through here.
+--
+-- Kit items:
+--   { code, mount, facing, refit = true, bind = {control, gesture, command} | binds = { {...}, ... }, charge = true }
+--                                fit a part (refit: move it if it is elsewhere); charge: fill its store (doc 58 drives)
+--   { code, stow = true }        take a part off the Machine into storage (if it is on)
+--   { family, stow = true }      every installed part of a family to storage (`except` a code)
+--   { clear = { controls } }     unbind every component from those controls on this Machine (no button fires two systems)
+--   { fuel = "full" }            the Machine's own fuel tank to capacity (attitude sets and the IA-10 burn it)
+--   { fusionMinKg = n }          the fusion tank parts topped up to at least n kg
+local LAB_BINDS_TARGET = { { "triangle", "tap", "engage" }, { "triangle", "hold", "abort" }, { "rb", "tap", "next" }, { "lb", "tap", "prev" } }
+local LAB_CLEAR = { clear = { "triangle", "lb", "rb" } }
+local LAB_BASE = {   -- the Hella's flight hardware kept installed (fusion unbound) under an exotic drive
+    { code = "ZTC-FD1", mount = "mount.underside", facing = "down", refit = true },
+    { code = "ZTC-PT500", mount = "mount.rear", facing = "left", refit = true },
+    { code = "ZTC-AC6", mount = "mount.roof", facing = "up", refit = true },
+    { fuel = "full" },
+}
+local function labKit(code, binds)
+    local k = { LAB_CLEAR, { family = "exotic_drive", stow = true, except = code } }
+    for _, it in ipairs(LAB_BASE) do k[#k + 1] = it end
+    k[#k + 1] = { code = code, mount = "mount.front", facing = "fore", refit = true, charge = true, binds = binds }
+    return k
+end
 local KITS = {
     flight = {   -- the dev Hella (..0003) after L331/L334/KB-373: PT-400 front, FD-1 rear aft on HOLD Triangle, AC-6 roof, IA-10 hop on TAP
         { code = "ZTC-PT500", mount = "mount.front", facing = "up" },
@@ -784,10 +816,38 @@ local KITS = {
     },
     -- KB-413 (owner ruling 2026-10-08: "FD-1 under floor"): on Online fuel the IA-10 hop cannot reach the seam; the FD-1
     -- under the floor facing down lifts on fusion. It displaces the IA-10 to storage (the floor is its only rated mount).
+    -- 2026-10-11 (owner): the Hella as it flew before the leftover `flight` grant moved its parts at restarts
+    restore = {
+        { code = "ZTC-FD1", mount = "mount.underside", facing = "down", bind = { "triangle", "hold", "throttle" }, refit = true },
+        { code = "ZTC-PT500", mount = "mount.rear", facing = "left", refit = true },
+        { code = "ZTC-AC6", mount = "mount.roof", facing = "up", refit = true },
+    },
     climb = {
         { code = "ZTC-FD1", mount = "mount.underside", facing = "down", bind = { "triangle", "hold", "throttle" }, refit = true },
     },
+    -- Doc 58: the propulsion laboratory (owner, 2026-10-12: Alabino's Hella, one drive at a time). Each kit leaves
+    -- EXACTLY ONE system on Triangle; the others stay fitted (or go to storage) but answer nothing.
+    lab_impulse = {   -- the IA-10 needs the floor-pan hardpoint: the FD-1 goes to storage for this test
+        LAB_CLEAR, { family = "exotic_drive", stow = true },
+        { code = "ZTC-FD1", stow = true },
+        { code = "ARC-IA10", mount = "mount.underside", facing = "down", refit = true, bind = { "triangle", "tap", "discharge" } },
+        { code = "ZTC-PT500", mount = "mount.rear", facing = "left", refit = true },
+        { code = "ZTC-AC6", mount = "mount.roof", facing = "up", refit = true },
+        { fuel = "full" },
+    },
+    lab_fusion = {    -- the Hella as it flies: FD-1 under the floor on HOLD Triangle (the IA-10 displaced to storage)
+        LAB_CLEAR, { family = "exotic_drive", stow = true },
+        { code = "ZTC-FD1", mount = "mount.underside", facing = "down", refit = true, bind = { "triangle", "hold", "throttle" } },
+        { code = "ZTC-PT500", mount = "mount.rear", facing = "left", refit = true },
+        { code = "ZTC-AC6", mount = "mount.roof", facing = "up", refit = true },
+        { fuel = "full" }, { fusionMinKg = 300 },
+    },
+    lab_warp = labKit("XLB-WD1", { { "triangle", "tap", "engage" }, { "triangle", "hold", "abort" }, { "rb", "tap", "up" }, { "lb", "tap", "down" } }),
+    lab_alcubierre = labKit("XLB-AB1", LAB_BINDS_TARGET),
+    lab_jump = labKit("XLB-JD1", LAB_BINDS_TARGET),
+    lab_wormhole = labKit("XLB-WH1", LAB_BINDS_TARGET),
 }
+NcmEngineering.KITS = KITS
 
 local function ownerMachine(driverId, which)
     if which:match("^%x+$") or which:find("-", 1, true) then
@@ -803,12 +863,67 @@ local function ownerMachine(driverId, which)
     return rows[1].asset_id
 end
 
+local function designByCode(code) for _, x in ipairs(Install.DESIGNS) do if x.code == code then return x end end end
+
+local function installedOf(machineId, designId)
+    return MySQL.scalar.await([[SELECT asset_id FROM component_asset WHERE machine_asset_id=? AND design_id=? AND location_kind='installed'
+        AND lifecycle='active' LIMIT 1]], { machineId, designId })
+end
+
 local function ownerGrantPart(driverId, machineId, item)
-    local d
-    for _, x in ipairs(Install.DESIGNS) do if x.code == item.code then d = x end end
-    if not d then return "no design " .. item.code end
-    local on = MySQL.scalar.await([[SELECT asset_id FROM component_asset WHERE machine_asset_id=? AND design_id=? AND location_kind='installed'
-        AND lifecycle='active' LIMIT 1]], { machineId, d.designId })
+    -- the kit's non-part items
+    if item.clear then
+        local out = {}
+        for _, c in ipairs(item.clear) do
+            local ctl = Controls.normalize(c)
+            if ctl then
+                local n = MySQL.update.await("DELETE FROM machine_control_binding WHERE machine_asset_id=? AND control_key=?", { machineId, ctl })
+                out[#out + 1] = ("%s (%s binding(s))"):format(ctl, tostring(n or 0))
+            end
+        end
+        NcmEngineering.changed(machineId, "owner grant: controls cleared")
+        return "controls cleared: " .. table.concat(out, ", ")
+    end
+    if item.fuel == "full" then
+        -- through the fuel module's loaded tank (a bare database write is overwritten by its cached level)
+        if not (NcmFuel and NcmFuel.refill) then return "fuel: no fuel module (left as it is)" end
+        local before, after = NcmFuel.refill(machineId)
+        return ("fuel: %.0f -> %.0f ml (full)"):format(tonumber(before) or 0, tonumber(after) or 0)
+    end
+    if item.fusionMinKg then
+        local out = {}
+        for _, row in ipairs(MySQL.query.await([[SELECT a.asset_id, a.design_id FROM component_asset a WHERE a.machine_asset_id=? AND a.location_kind='installed'
+            AND a.lifecycle='active']], { machineId }) or {}) do
+            local d = Install.design(row.design_id)
+            if d and d.perf and d.perf.kind == "propellant_tank" and d.perf.propellant == "fusion" then
+                local have = tankFill(row.asset_id, d)
+                local want = math.min(d.perf.capacityKg or 0, math.max(have, item.fusionMinKg))
+                if want > have then MySQL.update.await("UPDATE component_state SET propellant_kg=?, updated_at=? WHERE asset_id=?", { want, now(), row.asset_id }) end
+                out[#out + 1] = ("%s %.1f -> %.1f kg"):format(d.code, have, want)
+            end
+        end
+        return "fusion: " .. (#out > 0 and table.concat(out, ", ") or "no fusion tank fitted")
+    end
+    if item.family and item.stow then
+        local out = {}
+        for _, row in ipairs(MySQL.query.await([[SELECT a.asset_id, d.code FROM component_asset a JOIN component_design d ON d.design_id=a.design_id
+            WHERE a.machine_asset_id=? AND a.location_kind='installed' AND a.lifecycle='active' AND d.family=?]], { machineId, item.family }) or {}) do
+            if row.code ~= item.except then
+                local okR, mR = NcmEngineering.remove(0, row.asset_id)
+                out[#out + 1] = ("%s stowed %s (%s)"):format(row.code, tostring(okR), tostring(mR))
+            end
+        end
+        return ("%s: %s"):format(item.family, #out > 0 and table.concat(out, "; ") or "none to stow")
+    end
+    local d = designByCode(item.code)
+    if not d then return "no design " .. tostring(item.code) end
+    local on = installedOf(machineId, d.designId)
+    if item.stow then
+        if not on then return d.code .. " not fitted: nothing to stow" end
+        local okR, mR = NcmEngineering.remove(0, on)
+        return ("%s stowed: %s (%s)"):format(d.code, tostring(okR), tostring(mR))
+    end
+    local out
     if on and item.refit then
         -- a refit moves the part: where is it now in the current configuration?
         local cur = MySQL.single.await([[SELECT i.interface_id, i.install_json FROM machine_configuration_current x
@@ -816,40 +931,75 @@ local function ownerGrantPart(driverId, machineId, item)
             WHERE x.machine_asset_id=? AND i.component_asset_id=?]], { machineId, on })
         local facing = cur and tostring(cur.install_json or ""):match('"facing"%s*:%s*"(%a+)"')
         if cur and cur.interface_id == item.mount and facing == item.facing then
-            return ("%s already on %s facing %s: kept"):format(d.code, item.mount, item.facing)
+            out = ("%s already on %s facing %s: kept"):format(d.code, item.mount, item.facing)
+        else
+            local okR, mR = NcmEngineering.remove(0, on)
+            if not okR then return ("%s refit refused at remove: %s"):format(d.code, tostring(mR)) end
+            on = nil
         end
-        local okR, mR = NcmEngineering.remove(0, on)
-        if not okR then return ("%s refit refused at remove: %s"):format(d.code, tostring(mR)) end
-        on = nil
+    elseif on then
+        out = ("%s already on the Machine (..%s): kept"):format(d.code, short(on))
     end
-    if on then return ("%s already on the Machine (..%s): kept"):format(d.code, short(on)) end
-    local part = MySQL.scalar.await([[SELECT asset_id FROM component_asset WHERE server_id=? AND ncm_driver_id=? AND design_id=?
-        AND location_kind='storage' AND lifecycle='active' ORDER BY created_at LIMIT 1]], { serverId(), driverId, d.designId })
-    local how = "from storage"
-    if not part then
-        part, how = ids.uuid4(hostRng), "minted (owner_grant)"
-        local t = now()
-        local ok, err = MySQL.transaction.await({
-            { query = [[INSERT INTO component_asset (asset_id,server_id,design_id,run_id,ncm_driver_id,manufacturer_key,location_kind,machine_asset_id,
-                global_ordinal,maker_ordinal,design_ordinal,factory_original,acquired_via,acquired_at,exposure_m,created_at,lifecycle)
-                SELECT ?,?,?,NULL,?,?,'storage',NULL,NULL,NULL,COALESCE(MAX(design_ordinal),0)+1,0,'owner_grant',?,0,?,'active'
-                FROM component_asset WHERE server_id=? AND design_id=?]],
-              values = { part, serverId(), d.designId, driverId, d.makerKey, t, t, serverId(), d.designId } },
-            { query = [[INSERT INTO component_asset_transfer (transfer_id,idem_key,server_id,asset_id,from_driver_id,to_driver_id,kind,market_id,amount,occurred_at)
-                VALUES (?,?,?,?,NULL,?,'owner_grant',NULL,NULL,?)]], values = { ids.uuid4(hostRng), "eng_owner:" .. part, serverId(), part, driverId, t } },
-        })
-        if not ok then return ("%s mint failed: %s"):format(d.code, tostring(err)) end
-        if d.perf and d.perf.kind == "propellant_tank" then   -- a new tank comes full (L334)
-            MySQL.insert.await("INSERT IGNORE INTO component_state (asset_id, propellant_kg, updated_at) VALUES (?,?,?)", { part, d.perf.capacityKg or 0, t })
+    local part = on
+    if not on then
+        part = MySQL.scalar.await([[SELECT asset_id FROM component_asset WHERE server_id=? AND ncm_driver_id=? AND design_id=?
+            AND location_kind='storage' AND lifecycle='active' ORDER BY created_at LIMIT 1]], { serverId(), driverId, d.designId })
+        local how = "from storage"
+        if not part then
+            part, how = ids.uuid4(hostRng), "minted (owner_grant)"
+            local t = now()
+            local ok, err = MySQL.transaction.await({
+                { query = [[INSERT INTO component_asset (asset_id,server_id,design_id,run_id,ncm_driver_id,manufacturer_key,location_kind,machine_asset_id,
+                    global_ordinal,maker_ordinal,design_ordinal,factory_original,acquired_via,acquired_at,exposure_m,created_at,lifecycle)
+                    SELECT ?,?,?,NULL,?,?,'storage',NULL,NULL,NULL,COALESCE(MAX(design_ordinal),0)+1,0,'owner_grant',?,0,?,'active'
+                    FROM component_asset WHERE server_id=? AND design_id=?]],
+                  values = { part, serverId(), d.designId, driverId, d.makerKey, t, t, serverId(), d.designId } },
+                { query = [[INSERT INTO component_asset_transfer (transfer_id,idem_key,server_id,asset_id,from_driver_id,to_driver_id,kind,market_id,amount,occurred_at)
+                    VALUES (?,?,?,?,NULL,?,'owner_grant',NULL,NULL,?)]], values = { ids.uuid4(hostRng), "eng_owner:" .. part, serverId(), part, driverId, t } },
+            })
+            if not ok then return ("%s mint failed: %s"):format(d.code, tostring(err)) end
+            if d.perf and d.perf.kind == "propellant_tank" then   -- a new tank comes full (L334)
+                MySQL.insert.await("INSERT IGNORE INTO component_state (asset_id, propellant_kg, updated_at) VALUES (?,?,?)", { part, d.perf.capacityKg or 0, t })
+            end
         end
+        local okM, mM = NcmEngineering.install(0, part, item.mount, item.facing, machineId)
+        out = ("%s %s -> %s %s: mount %s (%s)"):format(d.code, how, item.mount, item.facing, tostring(okM), tostring(mM))
+        if not okM then return out end
     end
-    local okM, mM = NcmEngineering.install(0, part, item.mount, item.facing, machineId)
-    local out = ("%s %s -> %s %s: mount %s (%s)"):format(d.code, how, item.mount, item.facing, tostring(okM), tostring(mM))
-    if okM and item.bind then
-        local okB, mB = NcmEngineering.bind(0, item.bind[1], item.bind[2], part, item.bind[3])
-        out = out .. (" | bind %s %s: %s (%s)"):format(item.bind[1], item.bind[2], tostring(okB), tostring(mB))
+    local binds = item.binds or (item.bind and { item.bind }) or {}
+    for _, b in ipairs(binds) do
+        local okB, mB = NcmEngineering.bind(0, b[1], b[2], part, b[3])
+        out = out .. (" | bind %s %s %s: %s (%s)"):format(b[1], b[2], b[3], tostring(okB), tostring(mB))
+    end
+    if item.charge and d.perf and d.perf.store then
+        -- doc 58: the drive's store, full (about two test activations)
+        local cap = tonumber(d.perf.store.capacity) or 0
+        MySQL.query.await([[INSERT INTO component_state (asset_id, propellant_kg, updated_at) VALUES (?,?,?)
+            ON DUPLICATE KEY UPDATE propellant_kg=VALUES(propellant_kg), updated_at=VALUES(updated_at)]], { part, cap, now() })
+        out = out .. (" | charge %.0f (full)"):format(cap)
     end
     return out
+end
+
+-- Doc 58: the server's unhosted flight reads the Machine from its PRESENCE RECORD (devices, tanks, drive states). After
+-- a kit changes the Machine, that record is rewritten from the new configuration -- otherwise the server would keep
+-- flying the old parts (the second half of the 2026-10-11 collision). Position, velocity, attitude, spin and the
+-- travel ledger are kept exactly; per-device states (indexed by the old device list) are dropped.
+local function refreshPresence(driverId, machineId)
+    for _ = 1, 240 do if NcmCanonical and NcmCanonical.booted then break end Wait(500) end
+    if not (NcmCanonical and NcmCanonical.refreshMachine) then return "presence: canonical not available" end
+    cache[machineId] = nil
+    local p = payload(machineId)
+    if not p then return "presence: no payload" end
+    local devices = Install.resolve(p.items or {}, p.vehicleKey)
+    local fuelKg = p.fuel and tonumber(p.fuel.ml) and (tonumber(p.fuel.ml) / 1000 * Install.FUEL_KG_PER_L) or nil
+    return NcmCanonical.refreshMachine(driverId, machineId, devices, fuelKg)
+end
+
+local function ledgerRead(spec)
+    local ok, row = pcall(MySQL.single.await, "SELECT applied_at, result_json FROM owner_grant_ledger WHERE spec=?", { spec })
+    if not ok then return nil, tostring(row) end
+    return row or false
 end
 
 local function ownerGrant()
@@ -861,22 +1011,54 @@ local function ownerGrant()
         if ok and type(id) == "table" and id.serverId then break end
         Wait(1000)
     end
-    local dPre, which, kitName = spec:match("^([%w%-]+)|([%w%-]+)|(%w+)$")
+    local dPre, which, kitName, nonce = spec:match("^([%w%-]+)|([%w%-]+)|([%w_]+)#?([%w%-%.:]*)$")
     local kit = kitName and KITS[kitName]
-    if not kit then log("OWNER GRANT ignored: bad spec %q (driver prefix|vehicle|kit; kits: flight, climb)", spec); return end
+    if not kit then
+        local names = {}
+        for k in pairs(KITS) do names[#names + 1] = k end
+        table.sort(names)
+        log("OWNER GRANT ignored: bad spec %q (driver prefix|vehicle|kit[#nonce]; kits: %s)", spec, table.concat(names, ", "))
+        return
+    end
+    -- the ledger: one application per spec, ever
+    local prior, whyL = ledgerRead(spec)
+    if prior == nil then log("OWNER GRANT REFUSED %q: the grant ledger is unreadable (%s) -- a grant that cannot prove it is new is never applied", spec, tostring(whyL)); return end
+    if prior then
+        log("OWNER GRANT skipped %q: already applied (ledger, applied_at %s) -- nothing touched. Remove ownerGrant from tunables.json, or change its #nonce to apply the kit again.",
+            spec, tostring(prior.applied_at))
+        return
+    end
     local drv = MySQL.scalar.await("SELECT ncm_driver_id FROM ncm_driver WHERE ncm_driver_id LIKE ? LIMIT 2", { dPre .. "%" })
     if not drv then log("OWNER GRANT: no driver %s*", dPre); return end
     local mac, why = ownerMachine(drv, which)
     if not mac then log("OWNER GRANT: driver ..%s: %s", short(drv), tostring(why)); return end
-    log("OWNER GRANT kit %s -> driver ..%s Machine ..%s (%s)", kitName, short(drv), short(mac), which)
+    -- claim the spec BEFORE touching anything: a crash part-way through is not re-run by the next restart either
+    local okI, errI = pcall(MySQL.insert.await, "INSERT INTO owner_grant_ledger (spec, server_id, driver_id, asset_id, kit, applied_at, result_json) VALUES (?,?,?,?,?,?,?)",
+        { spec, serverId(), drv, mac, kitName, now(), "[]" })
+    if not okI then log("OWNER GRANT REFUSED %q: could not claim it in the ledger (%s)", spec, tostring(errI)); return end
+    local lab = kitName:match("^lab_(.+)$")
+    log("OWNER GRANT kit %s -> driver ..%s Machine ..%s (%s)%s", kitName, short(drv), short(mac), which,
+        lab and (" | DEEP LAB: developer test-drive override for `%s` (not a player refit)"):format(lab) or "")
     local saved = driverOf
     driverOf = function() return drv end
+    local results = {}
     for _, item in ipairs(kit) do
         local okP, msg = pcall(ownerGrantPart, drv, mac, item)
+        results[#results + 1] = tostring(msg)
         log("OWNER GRANT %s", tostring(msg))
         Wait(0)
     end
     driverOf = saved
+    cache[mac] = nil
+    local okR, pres = pcall(refreshPresence, drv, mac)
+    results[#results + 1] = tostring(pres)
+    log("OWNER GRANT %s", tostring(okR and pres or ("presence refresh failed: " .. tostring(pres))))
+    pcall(MySQL.update.await, "UPDATE owner_grant_ledger SET result_json=? WHERE spec=?", { enc(results), spec })
+    if lab then
+        pcall(MySQL.insert.await, "INSERT INTO deep_lab_log (server_id, driver_id, asset_id, drive, spec, applied_at, detail_json) VALUES (?,?,?,?,?,?,?)",
+            { serverId(), drv, mac, lab, spec, now(), enc(results) })
+        log("DEEP LAB %s applied to Machine ..%s (driver ..%s) -- developer override, spec %q, nonce %s", lab, short(mac), short(drv), spec, nonce ~= "" and nonce or "(none)")
+    end
 end
 
 AddEventHandler("onResourceStart", function(name)
