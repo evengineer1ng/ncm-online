@@ -13,6 +13,7 @@ local supported = {
     ["Vehicle.v_standard2_makigai_maimai"]=true,
     ["Vehicle.v_standard2_thorton_galena"]=true,
     ["Vehicle.v_standard2_archer_hella"]=true,
+    ["Vehicle.av_trauma"]=true,   -- 2026-10-12: the Trauma Team AV (owner's flying-to-space video); first call is the test
 }
 local function clock() return Open77.time.unix() end
 local function finite(n) return type(n) == "number" and n == n and math.abs(n) < 1000000 end
