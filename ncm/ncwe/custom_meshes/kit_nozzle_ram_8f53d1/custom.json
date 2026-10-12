@@ -1,0 +1,77 @@
+{
+  "Id": "kit_nozzle_ram_8f53d1",
+  "Name": "kit_nozzle_ram",
+  "Version": 2,
+  "SourceFile": "kit_nozzle_ram.obj",
+  "SourceModel": "kit_nozzle_ram.obj",
+  "Created": "2026-10-12T10:14:32.1723272-04:00",
+  "Modified": "2026-10-12T10:15:02.417491-04:00",
+  "Import": {
+    "Scale": 1,
+    "UpAxis": "Z",
+    "Pivot": "Original",
+    "Yaw": 0,
+    "ImportMaterials": true,
+    "MaxTextureSize": 2048
+  },
+  "Materials": [
+    {
+      "Name": "steel",
+      "Kind": "Standard",
+      "GameMaterial": null,
+      "MultilayerSetup": null,
+      "MultilayerMask": null,
+      "BaseColor": {
+        "X": 0.55,
+        "Y": 0.57,
+        "Z": 0.6,
+        "W": 1
+      },
+      "BaseColorTexture": null,
+      "Roughness": 0.35,
+      "RoughnessTexture": null,
+      "RoughnessChannel": 0,
+      "InvertRoughness": false,
+      "Metalness": 0.8,
+      "MetalnessTexture": null,
+      "MetalnessChannel": 0,
+      "NormalTexture": null,
+      "NormalStrength": 1,
+      "FlipNormalGreen": false,
+      "EmissiveColor": {
+        "X": 0,
+        "Y": 0,
+        "Z": 0
+      },
+      "EmissiveEV": 0,
+      "EmissiveTexture": null,
+      "AlphaCutout": false,
+      "AlphaThreshold": 0.5,
+      "DoubleSided": true,
+      "GlassOpacity": 0.25,
+      "BaseMaterial": null,
+      "Parameters": []
+    }
+  ],
+  "Bounds": {
+    "Min": {
+      "X": -0.3,
+      "Y": -0.05,
+      "Z": -0.3
+    },
+    "Max": {
+      "X": 0.3,
+      "Y": 0.3,
+      "Z": 0.3
+    }
+  },
+  "Vertices": 40,
+  "Triangles": 72,
+  "Submeshes": 1,
+  "Warnings": [
+    "The model has no texture coordinates: textures cannot be applied."
+  ],
+  "Credits": "",
+  "MeshPath": "ncwe\\custom\\kit_nozzle_ram_8f53d1\\kit_nozzle_ram_8f53d1.mesh",
+  "Hash": 10953162422750507692
+}

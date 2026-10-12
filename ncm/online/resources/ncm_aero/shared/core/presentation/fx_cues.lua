@@ -141,25 +141,25 @@ Core.define("presentation.fx_cues", function(C)
         mouth        = { effect = "base\\fx\\characters\\npc\\cyberspace_teleport\\ch_cyberspace_teleport_medium.effect", orient = "z", seen = false },
     }
 
-    -- NCM Audio pack files (ncm/audio/pack, rendered by tools/audio/render-pack.py); `event`: a vanilla stand-in when
+    -- NCM Audio pack files (ncm/audio/pack, rendered by ncm/audio/tools/render_pack.py); `event`: a vanilla stand-in when
     -- the pack is not installed (no pitch or gain: the engine event carries neither).
     M.VOICES = {
-        rocket_roar = { file = "rocket_roar.ogg", loop = true },
-        fusion_hum  = { file = "fusion_hum.ogg", loop = true },
-        jet_whine   = { file = "jet_whine.ogg", loop = true },
-        fan         = { file = "fan.ogg", loop = true },
-        sputter     = { file = "sputter.ogg", loop = true },
-        pulse_thump = { file = "pulse_thump.ogg", loop = false },
-        ram_thump   = { file = "ram_thump.ogg", loop = false },
-        click       = { file = "click.ogg", loop = false },
-        cold_gas    = { file = "cold_gas.ogg", loop = true },
-        entry_roar  = { file = "entry_roar.ogg", loop = true },
-        wind        = { file = "wind.ogg", loop = true },
-        boom        = { file = "boom.ogg", loop = false },
-        impact      = { file = "impact.ogg", loop = false },
-        drive_rise  = { file = "drive_rise.ogg", loop = true },
-        drive_field = { file = "drive_field.ogg", loop = true },
-        mouth_hum   = { file = "mouth_hum.ogg", loop = true },
+        rocket_roar = { file = "rocket_roar.wav", loop = true },
+        fusion_hum  = { file = "fusion_hum.wav", loop = true },
+        jet_whine   = { file = "jet_whine.wav", loop = true },
+        fan         = { file = "fan.wav", loop = true },
+        sputter     = { file = "sputter.wav", loop = true },
+        pulse_thump = { file = "pulse_thump.wav", loop = false },
+        ram_thump   = { file = "ram_thump.wav", loop = false },
+        click       = { file = "click.wav", loop = false },
+        cold_gas    = { file = "cold_gas.wav", loop = true },
+        entry_roar  = { file = "entry_roar.wav", loop = true },
+        wind        = { file = "wind.wav", loop = true },
+        boom        = { file = "boom.wav", loop = false },
+        impact      = { file = "impact.wav", loop = false },
+        drive_rise  = { file = "drive_rise.wav", loop = true },
+        drive_field = { file = "drive_field.wav", loop = true },
+        mouth_hum   = { file = "mouth_hum.wav", loop = true },
     }
 
     --- Every asset and voice a cue names exists (the load-time check the tests also run).

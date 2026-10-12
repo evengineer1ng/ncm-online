@@ -47,6 +47,18 @@ RING_K = (0.04, 0.028, 0.02, 0.014, 0.01)
 for _k in RING_K:
     BODIES["ring_k%03d" % round(_k * 1000)] = (UNDERLAY, 1.0, "default", _k, None, False)
 
+# The Build kit (kinds 15-29, core build.attach KIT_ORDER; NCWE project ncm/ncwe/ncm_build_kit.ncwe -> required mod
+# ncm_build_kit-assets): true size, origin at the attachment point, identity orientation. Cast shadows: they are parts
+# of a car, not of the sky.
+KIT = ["kit_strut_d6cac0", "kit_beam_9efd40", "kit_panel_s_97233f", "kit_panel_m_a01c30", "kit_panel_l_01f755",
+       "kit_wall_2f4248", "kit_wing_s_74c011", "kit_wing_l_a6dd30", "kit_fin_0c3cb5", "kit_wheel_pod_eb5105",
+       "kit_nozzle_bell_9ac09b", "kit_nozzle_ram_8f53d1", "kit_nozzle_cold_e6a403", "kit_tank_e63cbb", "kit_controller_1da79e"]
+KIT_MESHES = set()
+for _m in KIT:
+    _path = "ncwe\\custom\\%s\\%s.mesh" % (_m, _m)
+    KIT_MESHES.add(_path)
+    BODIES[_m.rsplit("_", 1)[0]] = (_path, 1.0, "default", 1.0, None, True)
+
 
 def cname(c):
     n = c.get("name")
@@ -124,7 +136,7 @@ def main():
     os.makedirs(out_dir, exist_ok=True)
     for body, (mesh, meshR, app, radius, air, shadows) in BODIES.items():
         d = author(src, mesh, meshR, app, radius, air, shadows)
-        if mesh == UNDERLAY:
+        if mesh == UNDERLAY or mesh in KIT_MESHES:
             # the q201 Globe component is yawed -41 deg in its entity; the ring's mesh frame IS the game's (x east, y north)
             cd = d["Data"]["RootChunk"]["compiledData"]["Data"]["Chunks"]
             for c in d["Data"]["RootChunk"]["components"] + cd:

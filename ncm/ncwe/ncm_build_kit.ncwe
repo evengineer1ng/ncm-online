@@ -1,0 +1,534 @@
+{
+  "SchemaVersion": 1,
+  "Id": "2fb133e4-3df4-4f35-a28b-5dc36ee05434",
+  "Name": "NCM Build Kit",
+  "ArchiveProfile": "vanilla-content-v1",
+  "Sources": {},
+  "Changes": {
+    "Modified": {},
+    "Added": {
+      "a:39cdc245e7714d3baf5e962deb2a5f1f": {
+        "Id": "a:39cdc245e7714d3baf5e962deb2a5f1f",
+        "Name": "kit_nozzle_cold",
+        "Mesh": {
+          "Hash": 17158929205378945444,
+          "Path": "ncwe\\custom\\kit_nozzle_cold_e6a403\\kit_nozzle_cold_e6a403.mesh",
+          "Appearance": "default"
+        },
+        "Transform": {
+          "Position": {
+            "X": 11.5,
+            "Y": 4,
+            "Z": -999.85
+          },
+          "Rotation": {
+            "IsIdentity": true,
+            "X": 0,
+            "Y": 0,
+            "Z": 0,
+            "W": 1
+          },
+          "Scale": {
+            "X": 1,
+            "Y": 1,
+            "Z": 1
+          }
+        },
+        "Template": null,
+        "Replaces": [],
+        "Materials": [],
+        "Occluder": null,
+        "StreamingDistance": null,
+        "MeshEdit": null
+      },
+      "a:a70fc7b4da524ed78073b64a9364242e": {
+        "Id": "a:a70fc7b4da524ed78073b64a9364242e",
+        "Name": "kit_fin",
+        "Mesh": {
+          "Hash": 6732434588574814738,
+          "Path": "ncwe\\custom\\kit_fin_0c3cb5\\kit_fin_0c3cb5.mesh",
+          "Appearance": "default"
+        },
+        "Transform": {
+          "Position": {
+            "X": 6,
+            "Y": 4,
+            "Z": -1000
+          },
+          "Rotation": {
+            "IsIdentity": true,
+            "X": 0,
+            "Y": 0,
+            "Z": 0,
+            "W": 1
+          },
+          "Scale": {
+            "X": 1,
+            "Y": 1,
+            "Z": 1
+          }
+        },
+        "Template": null,
+        "Replaces": [],
+        "Materials": [],
+        "Occluder": null,
+        "StreamingDistance": null,
+        "MeshEdit": null
+      },
+      "a:08ed3cdf08b74fb2a3e20f73fd18cd7c": {
+        "Id": "a:08ed3cdf08b74fb2a3e20f73fd18cd7c",
+        "Name": "kit_nozzle_ram",
+        "Mesh": {
+          "Hash": 10953162422750507692,
+          "Path": "ncwe\\custom\\kit_nozzle_ram_8f53d1\\kit_nozzle_ram_8f53d1.mesh",
+          "Appearance": "default"
+        },
+        "Transform": {
+          "Position": {
+            "X": 10.5,
+            "Y": 4,
+            "Z": -999.95
+          },
+          "Rotation": {
+            "IsIdentity": true,
+            "X": 0,
+            "Y": 0,
+            "Z": 0,
+            "W": 1
+          },
+          "Scale": {
+            "X": 1,
+            "Y": 1,
+            "Z": 1
+          }
+        },
+        "Template": null,
+        "Replaces": [],
+        "Materials": [],
+        "Occluder": null,
+        "StreamingDistance": null,
+        "MeshEdit": null
+      },
+      "a:2eff130403854802ada6f93817ebf179": {
+        "Id": "a:2eff130403854802ada6f93817ebf179",
+        "Name": "kit_wing_s",
+        "Mesh": {
+          "Hash": 8207474222456482512,
+          "Path": "ncwe\\custom\\kit_wing_s_74c011\\kit_wing_s_74c011.mesh",
+          "Appearance": "default"
+        },
+        "Transform": {
+          "Position": {
+            "X": 0,
+            "Y": 4,
+            "Z": -999.5
+          },
+          "Rotation": {
+            "IsIdentity": true,
+            "X": 0,
+            "Y": 0,
+            "Z": 0,
+            "W": 1
+          },
+          "Scale": {
+            "X": 1,
+            "Y": 1,
+            "Z": 1
+          }
+        },
+        "Template": null,
+        "Replaces": [],
+        "Materials": [],
+        "Occluder": null,
+        "StreamingDistance": null,
+        "MeshEdit": null
+      },
+      "a:83d86e253db0452a876aa30e5c4fdd2f": {
+        "Id": "a:83d86e253db0452a876aa30e5c4fdd2f",
+        "Name": "kit_beam",
+        "Mesh": {
+          "Hash": 17476651978702417464,
+          "Path": "ncwe\\custom\\kit_beam_9efd40\\kit_beam_9efd40.mesh",
+          "Appearance": "default"
+        },
+        "Transform": {
+          "Position": {
+            "X": 1.5,
+            "Y": 0,
+            "Z": -1000
+          },
+          "Rotation": {
+            "IsIdentity": true,
+            "X": 0,
+            "Y": 0,
+            "Z": 0,
+            "W": 1
+          },
+          "Scale": {
+            "X": 1,
+            "Y": 1,
+            "Z": 1
+          }
+        },
+        "Template": null,
+        "Replaces": [],
+        "Materials": [],
+        "Occluder": null,
+        "StreamingDistance": null,
+        "MeshEdit": null
+      },
+      "a:4b45209658484c4aa4f847eea9d51519": {
+        "Id": "a:4b45209658484c4aa4f847eea9d51519",
+        "Name": "kit_controller",
+        "Mesh": {
+          "Hash": 15602501109447754012,
+          "Path": "ncwe\\custom\\kit_controller_1da79e\\kit_controller_1da79e.mesh",
+          "Appearance": "default"
+        },
+        "Transform": {
+          "Position": {
+            "X": 13.5,
+            "Y": 4,
+            "Z": -1000
+          },
+          "Rotation": {
+            "IsIdentity": true,
+            "X": 0,
+            "Y": 0,
+            "Z": 0,
+            "W": 1
+          },
+          "Scale": {
+            "X": 1,
+            "Y": 1,
+            "Z": 1
+          }
+        },
+        "Template": null,
+        "Replaces": [],
+        "Materials": [],
+        "Occluder": null,
+        "StreamingDistance": null,
+        "MeshEdit": null
+      },
+      "a:72828a6b806b4d7cb531aa9a9714a06b": {
+        "Id": "a:72828a6b806b4d7cb531aa9a9714a06b",
+        "Name": "kit_wing_l",
+        "Mesh": {
+          "Hash": 7327962987078225780,
+          "Path": "ncwe\\custom\\kit_wing_l_a6dd30\\kit_wing_l_a6dd30.mesh",
+          "Appearance": "default"
+        },
+        "Transform": {
+          "Position": {
+            "X": 3.5,
+            "Y": 4,
+            "Z": -999.5
+          },
+          "Rotation": {
+            "IsIdentity": true,
+            "X": 0,
+            "Y": 0,
+            "Z": 0,
+            "W": 1
+          },
+          "Scale": {
+            "X": 1,
+            "Y": 1,
+            "Z": 1
+          }
+        },
+        "Template": null,
+        "Replaces": [],
+        "Materials": [],
+        "Occluder": null,
+        "StreamingDistance": null,
+        "MeshEdit": null
+      },
+      "a:3aa4462f8ea242ec95fb43c0a1d98dd7": {
+        "Id": "a:3aa4462f8ea242ec95fb43c0a1d98dd7",
+        "Name": "kit_wheel_pod",
+        "Mesh": {
+          "Hash": 9044718541332143150,
+          "Path": "ncwe\\custom\\kit_wheel_pod_eb5105\\kit_wheel_pod_eb5105.mesh",
+          "Appearance": "default"
+        },
+        "Transform": {
+          "Position": {
+            "X": 7.5,
+            "Y": 4,
+            "Z": -999.67
+          },
+          "Rotation": {
+            "IsIdentity": true,
+            "X": 0,
+            "Y": 0,
+            "Z": 0,
+            "W": 1
+          },
+          "Scale": {
+            "X": 1,
+            "Y": 1,
+            "Z": 1
+          }
+        },
+        "Template": null,
+        "Replaces": [],
+        "Materials": [],
+        "Occluder": null,
+        "StreamingDistance": null,
+        "MeshEdit": null
+      },
+      "a:b59ddea81bc84b40837fbf482af2eae8": {
+        "Id": "a:b59ddea81bc84b40837fbf482af2eae8",
+        "Name": "kit_panel_m",
+        "Mesh": {
+          "Hash": 16645746339953442312,
+          "Path": "ncwe\\custom\\kit_panel_m_a01c30\\kit_panel_m_a01c30.mesh",
+          "Appearance": "default"
+        },
+        "Transform": {
+          "Position": {
+            "X": 4.5,
+            "Y": 0,
+            "Z": -1000
+          },
+          "Rotation": {
+            "IsIdentity": true,
+            "X": 0,
+            "Y": 0,
+            "Z": 0,
+            "W": 1
+          },
+          "Scale": {
+            "X": 1,
+            "Y": 1,
+            "Z": 1
+          }
+        },
+        "Template": null,
+        "Replaces": [],
+        "Materials": [],
+        "Occluder": null,
+        "StreamingDistance": null,
+        "MeshEdit": null
+      },
+      "a:df69b828193d40489d7505abcaff05cb": {
+        "Id": "a:df69b828193d40489d7505abcaff05cb",
+        "Name": "kit_tank",
+        "Mesh": {
+          "Hash": 10083353008432377764,
+          "Path": "ncwe\\custom\\kit_tank_e63cbb\\kit_tank_e63cbb.mesh",
+          "Appearance": "default"
+        },
+        "Transform": {
+          "Position": {
+            "X": 12.5,
+            "Y": 4,
+            "Z": -1000
+          },
+          "Rotation": {
+            "IsIdentity": true,
+            "X": 0,
+            "Y": 0,
+            "Z": 0,
+            "W": 1
+          },
+          "Scale": {
+            "X": 1,
+            "Y": 1,
+            "Z": 1
+          }
+        },
+        "Template": null,
+        "Replaces": [],
+        "Materials": [],
+        "Occluder": null,
+        "StreamingDistance": null,
+        "MeshEdit": null
+      },
+      "a:4b32b08fde9d4f7c9351dbfdc565e85a": {
+        "Id": "a:4b32b08fde9d4f7c9351dbfdc565e85a",
+        "Name": "kit_panel_s",
+        "Mesh": {
+          "Hash": 10445652862181321012,
+          "Path": "ncwe\\custom\\kit_panel_s_97233f\\kit_panel_s_97233f.mesh",
+          "Appearance": "default"
+        },
+        "Transform": {
+          "Position": {
+            "X": 3,
+            "Y": 0,
+            "Z": -1000
+          },
+          "Rotation": {
+            "IsIdentity": true,
+            "X": 0,
+            "Y": 0,
+            "Z": 0,
+            "W": 1
+          },
+          "Scale": {
+            "X": 1,
+            "Y": 1,
+            "Z": 1
+          }
+        },
+        "Template": null,
+        "Replaces": [],
+        "Materials": [],
+        "Occluder": null,
+        "StreamingDistance": null,
+        "MeshEdit": null
+      },
+      "a:3029d3df28a2454e91ff3954acfd1342": {
+        "Id": "a:3029d3df28a2454e91ff3954acfd1342",
+        "Name": "kit_nozzle_bell",
+        "Mesh": {
+          "Hash": 2467266447829402036,
+          "Path": "ncwe\\custom\\kit_nozzle_bell_9ac09b\\kit_nozzle_bell_9ac09b.mesh",
+          "Appearance": "default"
+        },
+        "Transform": {
+          "Position": {
+            "X": 9,
+            "Y": 4,
+            "Z": -999.3
+          },
+          "Rotation": {
+            "IsIdentity": true,
+            "X": 0,
+            "Y": 0,
+            "Z": 0,
+            "W": 1
+          },
+          "Scale": {
+            "X": 1,
+            "Y": 1,
+            "Z": 1
+          }
+        },
+        "Template": null,
+        "Replaces": [],
+        "Materials": [],
+        "Occluder": null,
+        "StreamingDistance": null,
+        "MeshEdit": null
+      },
+      "a:a435e691441e47bd98b7fa2bcb583b88": {
+        "Id": "a:a435e691441e47bd98b7fa2bcb583b88",
+        "Name": "kit_strut",
+        "Mesh": {
+          "Hash": 5538715016781419454,
+          "Path": "ncwe\\custom\\kit_strut_d6cac0\\kit_strut_d6cac0.mesh",
+          "Appearance": "default"
+        },
+        "Transform": {
+          "Position": {
+            "X": 0,
+            "Y": 0,
+            "Z": -1000
+          },
+          "Rotation": {
+            "IsIdentity": true,
+            "X": 0,
+            "Y": 0,
+            "Z": 0,
+            "W": 1
+          },
+          "Scale": {
+            "X": 1,
+            "Y": 1,
+            "Z": 1
+          }
+        },
+        "Template": null,
+        "Replaces": [],
+        "Materials": [],
+        "Occluder": null,
+        "StreamingDistance": null,
+        "MeshEdit": null
+      },
+      "a:4a47eb84e60b42bdbe556302092931a9": {
+        "Id": "a:4a47eb84e60b42bdbe556302092931a9",
+        "Name": "kit_wall",
+        "Mesh": {
+          "Hash": 7323598779732292692,
+          "Path": "ncwe\\custom\\kit_wall_2f4248\\kit_wall_2f4248.mesh",
+          "Appearance": "default"
+        },
+        "Transform": {
+          "Position": {
+            "X": 10.5,
+            "Y": 0,
+            "Z": -1000
+          },
+          "Rotation": {
+            "IsIdentity": true,
+            "X": 0,
+            "Y": 0,
+            "Z": 0,
+            "W": 1
+          },
+          "Scale": {
+            "X": 1,
+            "Y": 1,
+            "Z": 1
+          }
+        },
+        "Template": null,
+        "Replaces": [],
+        "Materials": [],
+        "Occluder": null,
+        "StreamingDistance": null,
+        "MeshEdit": null
+      },
+      "a:cfad66ce37344a68ac9167296b87c9ca": {
+        "Id": "a:cfad66ce37344a68ac9167296b87c9ca",
+        "Name": "kit_panel_l",
+        "Mesh": {
+          "Hash": 5196752612402380890,
+          "Path": "ncwe\\custom\\kit_panel_l_01f755\\kit_panel_l_01f755.mesh",
+          "Appearance": "default"
+        },
+        "Transform": {
+          "Position": {
+            "X": 7,
+            "Y": 0,
+            "Z": -1000
+          },
+          "Rotation": {
+            "IsIdentity": true,
+            "X": 0,
+            "Y": 0,
+            "Z": 0,
+            "W": 1
+          },
+          "Scale": {
+            "X": 1,
+            "Y": 1,
+            "Z": 1
+          }
+        },
+        "Template": null,
+        "Replaces": [],
+        "Materials": [],
+        "Occluder": null,
+        "StreamingDistance": null,
+        "MeshEdit": null
+      }
+    },
+    "Roads": {},
+    "Elements": {},
+    "Collisions": {},
+    "Outliner": {
+      "Folders": {},
+      "Entries": {}
+    },
+    "Traffic": {},
+    "Elevators": {},
+    "Terrain": {},
+    "Materials": {},
+    "Notes": {}
+  }
+}

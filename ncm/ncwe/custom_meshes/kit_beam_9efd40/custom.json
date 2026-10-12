@@ -1,0 +1,77 @@
+{
+  "Id": "kit_beam_9efd40",
+  "Name": "kit_beam",
+  "Version": 2,
+  "SourceFile": "kit_beam.obj",
+  "SourceModel": "kit_beam.obj",
+  "Created": "2026-10-12T10:14:24.0478062-04:00",
+  "Modified": "2026-10-12T10:15:02.2789297-04:00",
+  "Import": {
+    "Scale": 1,
+    "UpAxis": "Z",
+    "Pivot": "Original",
+    "Yaw": 0,
+    "ImportMaterials": true,
+    "MaxTextureSize": 2048
+  },
+  "Materials": [
+    {
+      "Name": "steel",
+      "Kind": "Standard",
+      "GameMaterial": null,
+      "MultilayerSetup": null,
+      "MultilayerMask": null,
+      "BaseColor": {
+        "X": 0.55,
+        "Y": 0.57,
+        "Z": 0.6,
+        "W": 1
+      },
+      "BaseColorTexture": null,
+      "Roughness": 0.35,
+      "RoughnessTexture": null,
+      "RoughnessChannel": 0,
+      "InvertRoughness": false,
+      "Metalness": 0.8,
+      "MetalnessTexture": null,
+      "MetalnessChannel": 0,
+      "NormalTexture": null,
+      "NormalStrength": 1,
+      "FlipNormalGreen": false,
+      "EmissiveColor": {
+        "X": 0,
+        "Y": 0,
+        "Z": 0
+      },
+      "EmissiveEV": 0,
+      "EmissiveTexture": null,
+      "AlphaCutout": false,
+      "AlphaThreshold": 0.5,
+      "DoubleSided": true,
+      "GlassOpacity": 0.25,
+      "BaseMaterial": null,
+      "Parameters": []
+    }
+  ],
+  "Bounds": {
+    "Min": {
+      "X": -0.04,
+      "Y": 0,
+      "Z": -0.04
+    },
+    "Max": {
+      "X": 0.04,
+      "Y": 1,
+      "Z": 0.04
+    }
+  },
+  "Vertices": 8,
+  "Triangles": 12,
+  "Submeshes": 1,
+  "Warnings": [
+    "The model has no texture coordinates: textures cannot be applied."
+  ],
+  "Credits": "",
+  "MeshPath": "ncwe\\custom\\kit_beam_9efd40\\kit_beam_9efd40.mesh",
+  "Hash": 17476651978702417464
+}

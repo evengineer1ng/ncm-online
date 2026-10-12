@@ -5,14 +5,33 @@ local function nearV(a, b, eps) return near(a[1], b[1], eps) and near(a[2], b[2]
 return {
     every_catalogue_item_has_a_stable_id_and_what_physics_will_need = function(T)
         local B = T.Core.get("build.attach")
-        T.eq(#B.ORDER, 10)
+        T.eq(#B.ORDER, 20)
         for _, id in ipairs(B.ORDER) do
             local it = B.CATALOGUE[id]
             T.ok(it, id .. " is in the catalogue")
             T.ok(id:match("^NCM_[A-Z_]+_%d%d$"), id .. " is a stable id")
-            T.ok(type(it.model) == "string" and not it.model:find("[\\/]"), id .. " names an approved alias, never a path")
+            if it.kit then
+                T.ok(it.kit:match("^kit_[a-z_]+$") and it.skyKind >= 15 and it.skyKind <= 29, id .. " names a kit mesh and an NCM Sky kind")
+                T.eq(it.model, nil, id .. " is not a platform prop")
+            else
+                T.ok(type(it.model) == "string" and not it.model:find("[\\/]"), id .. " names an approved alias, never a path")
+                T.ok(not it.standIn, id .. ": no stand-in in the palette")
+            end
             T.ok(it.massKg > 0 and it.areaM2 > 0 and (it.surface == "lifting" or it.surface == "bluff" or it.surface == "structural"))
         end
+    end,
+
+    every_kit_piece_has_its_own_sky_kind_and_panels_carry = function(T)
+        local B = T.Core.get("build.attach")
+        local seen = {}
+        for _, id in ipairs(B.KIT_ORDER) do
+            local k = B.CATALOGUE[id].skyKind
+            T.ok(not seen[k], "kind " .. k .. " used once")
+            seen[k] = true
+        end
+        T.eq(#B.KIT_ORDER, 15)
+        T.ok(B.canCarry("NCM_KIT_PANEL_L_01") and B.canCarry("NCM_KIT_WALL_01") and B.canCarry("NCM_KIT_STRUT_01"))
+        T.ok(not B.canCarry("NCM_KIT_WING_S_01"), "a wing carries nothing")
     end,
 
     euler_survives_a_round_trip = function(T)

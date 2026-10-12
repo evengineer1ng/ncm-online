@@ -42,6 +42,11 @@ public class NcmSkySystem extends ScriptableSystem {
   private let m_rot: array<EulerAngles>;
   private let m_placed: array<Bool>;
   private let m_waits: array<Int32>;
+  // attached bodies (the Build kit, kinds 15-29): the scene's appearance field says "attach_mine" -- the body rides
+  // the player's own Machine; m_pos is then its offset in the car's frame and m_q its rotation in the car's frame
+  private let m_attach: array<Bool>;
+  private let m_parent: array<EntityID>;
+  private let m_q: array<Quaternion>;
 
   private func OnPlayerAttach(request: ref<PlayerAttachRequest>) -> Void {
     let player: ref<PlayerPuppet> = request.owner as PlayerPuppet;
@@ -74,7 +79,8 @@ public class NcmSkySystem extends ScriptableSystem {
 
   // The templates this package ships. A kind Lua names that is not here is refused, never guessed.
   // 1 the q201 Earth (SKY-1); 2 the star dome; 3-6 the Earth at 1000 / 100 / 10 / 1 m; 7-9 the Moon at 100 / 10 / 1 m
-  // (core space.sky's KIND / EARTH / MOON tables name the same numbers); 10-14 the ascent ring at k 0.04 .. 0.01.
+  // (core space.sky's KIND / EARTH / MOON tables name the same numbers); 10-14 the ascent ring at k 0.04 .. 0.01;
+  // 15-29 the Build kit (core build.attach KIT_ORDER skyKind).
   private func Template(kind: Int32) -> String {
     switch kind {
       case 1: return "ncm\\sky\\bodies\\earth_1km.ent";
@@ -91,12 +97,27 @@ public class NcmSkySystem extends ScriptableSystem {
       case 12: return "ncm\\sky\\bodies\\ring_k020.ent";
       case 13: return "ncm\\sky\\bodies\\ring_k014.ent";
       case 14: return "ncm\\sky\\bodies\\ring_k010.ent";
+      case 15: return "ncm\\sky\\bodies\\kit_strut.ent";
+      case 16: return "ncm\\sky\\bodies\\kit_beam.ent";
+      case 17: return "ncm\\sky\\bodies\\kit_panel_s.ent";
+      case 18: return "ncm\\sky\\bodies\\kit_panel_m.ent";
+      case 19: return "ncm\\sky\\bodies\\kit_panel_l.ent";
+      case 20: return "ncm\\sky\\bodies\\kit_wall.ent";
+      case 21: return "ncm\\sky\\bodies\\kit_wing_s.ent";
+      case 22: return "ncm\\sky\\bodies\\kit_wing_l.ent";
+      case 23: return "ncm\\sky\\bodies\\kit_fin.ent";
+      case 24: return "ncm\\sky\\bodies\\kit_wheel_pod.ent";
+      case 25: return "ncm\\sky\\bodies\\kit_nozzle_bell.ent";
+      case 26: return "ncm\\sky\\bodies\\kit_nozzle_ram.ent";
+      case 27: return "ncm\\sky\\bodies\\kit_nozzle_cold.ent";
+      case 28: return "ncm\\sky\\bodies\\kit_tank.ent";
+      case 29: return "ncm\\sky\\bodies\\kit_controller.ent";
     }
     return "";
   }
 
   private func Known(kind: Int32) -> Bool {
-    return kind >= 1 && kind <= 14;
+    return kind >= 1 && kind <= 29;
   }
 
   // The ascent rings (kinds 10-14): the Earth Underlay mesh at scale k. The scene names the ring's TRUE anchor (its
@@ -111,6 +132,27 @@ public class NcmSkySystem extends ScriptableSystem {
       case 14: return 0.01;
     }
     return 0.0;
+  }
+
+  // The car an attached body rides: the Machine the player is in when it is first resolved, kept by its EntityID so the
+  // parts stay on the car after the player gets out.
+  private func Parent(i: Int32, game: GameInstance) -> ref<GameObject> {
+    if EntityID.IsDefined(this.m_parent[i]) {
+      let known: ref<GameObject> = GameInstance.FindEntityByID(game, this.m_parent[i]) as GameObject;
+      if IsDefined(known) {
+        return known;
+      }
+    }
+    let player: ref<PlayerPuppet> = this.m_player;
+    if !IsDefined(player) {
+      return null;
+    }
+    let v: wref<VehicleObject> = GetMountedVehicle(player);
+    if !IsDefined(v) {
+      return null;
+    }
+    this.m_parent[i] = v.GetEntityID();
+    return v;
   }
 
   private func Where(i: Int32, game: GameInstance) -> Vector4 {
@@ -153,6 +195,9 @@ public class NcmSkySystem extends ScriptableSystem {
     ArrayErase(this.m_rot, i);
     ArrayErase(this.m_placed, i);
     ArrayErase(this.m_waits, i);
+    ArrayErase(this.m_attach, i);
+    ArrayErase(this.m_parent, i);
+    ArrayErase(this.m_q, i);
   }
 
   private func RemoveAll() -> Void {
@@ -161,8 +206,14 @@ public class NcmSkySystem extends ScriptableSystem {
     }
   }
 
-  private func Spawn(id: String, kind: Int32, app: String, pos: Vector4, rot: EulerAngles) -> Void {
-    let eid: EntityID = NcmSky_Spawn(this.Template(kind), app, pos.X, pos.Y, pos.Z);
+  private func Spawn(id: String, kind: Int32, app: String, pos: Vector4, rot: EulerAngles, q: Quaternion) -> Void {
+    let attached: Bool = StrBeginsWith(app, "attach_");
+    let start: Vector4 = pos;
+    let player: ref<PlayerPuppet> = this.m_player;
+    if attached && IsDefined(player) {
+      start = player.GetWorldPosition();      // spawned beside the player; the first tick puts it on the car
+    }
+    let eid: EntityID = NcmSky_Spawn(this.Template(kind), attached ? "" : app, start.X, start.Y, start.Z);
     ArrayPush(this.m_ids, id);
     ArrayPush(this.m_kinds, kind);
     ArrayPush(this.m_apps, app);
@@ -171,6 +222,10 @@ public class NcmSkySystem extends ScriptableSystem {
     ArrayPush(this.m_rot, rot);
     ArrayPush(this.m_placed, false);
     ArrayPush(this.m_waits, 0);
+    ArrayPush(this.m_attach, attached);
+    let none: EntityID;
+    ArrayPush(this.m_parent, none);
+    ArrayPush(this.m_q, q);
     NcmSky_Log("spawn " + id + " kind " + IntToString(kind) + " entity " + ToString(NcmSkyHash(eid)));
   }
 
@@ -194,12 +249,22 @@ public class NcmSkySystem extends ScriptableSystem {
       }
       return;
     }
-    GameInstance.GetTeleportationFacility(game).Teleport(o, this.Where(i, game), this.m_rot[i]);
+    if this.m_attach[i] {
+      let parent: ref<GameObject> = this.Parent(i, game);
+      if !IsDefined(parent) {
+        return;                               // no car to ride yet: stay where it is until there is one
+      }
+      let pq: Quaternion = parent.GetWorldOrientation();
+      let at: Vector4 = parent.GetWorldPosition() + Quaternion.Transform(pq, this.m_pos[i]);
+      GameInstance.GetTeleportationFacility(game).Teleport(o, at, Quaternion.ToEulerAngles(pq * this.m_q[i]));
+    } else {
+      GameInstance.GetTeleportationFacility(game).Teleport(o, this.Where(i, game), this.m_rot[i]);
+    }
     if !this.m_placed[i] {
       this.m_placed[i] = true;
       NcmSky_Report(this.m_ids[i], 1, NcmSkyHash(this.m_ents[i]), "");
     } else {
-      if this.RingScale(this.m_kinds[i]) <= 0.0 {   // a ring moves every tick: not reported each time
+      if this.RingScale(this.m_kinds[i]) <= 0.0 && !this.m_attach[i] {   // rings and attached parts move every tick
         NcmSky_Report(this.m_ids[i], 2, NcmSkyHash(this.m_ents[i]), "");
       }
     }
@@ -244,10 +309,11 @@ public class NcmSkySystem extends ScriptableSystem {
               i = -1;
             }
             if i < 0 {
-              this.Spawn(id, kind, app, pos, rot);
+              this.Spawn(id, kind, app, pos, rot, q);
             } else {
               this.m_pos[i] = pos;
               this.m_rot[i] = rot;
+              this.m_q[i] = q;
               this.Place(i);
             }
           }
@@ -275,7 +341,7 @@ public class NcmSkySystem extends ScriptableSystem {
     // a body spawned this tick (or one still streaming in) is placed as soon as it exists; a ring follows the eye
     let i: Int32 = 0;
     while i < ArraySize(this.m_ids) {
-      if !this.m_placed[i] || this.RingScale(this.m_kinds[i]) > 0.0 {
+      if !this.m_placed[i] || this.RingScale(this.m_kinds[i]) > 0.0 || this.m_attach[i] {
         this.Place(i);
       }
       i += 1;

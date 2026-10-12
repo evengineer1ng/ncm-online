@@ -177,9 +177,12 @@ BUILD_OPS = { refresh = true, begin = true, edit = true, nudge = true, step = tr
 function buildCall(fn, ...)
     local promise, why = Open77.exports.call("ncm_build", fn, ...)
     if not promise then return nil, why end
-    local okP, v = promise:await()
-    if okP then return v end
-    return nil, v
+    -- KB-443: await() returns (result, err) -- as ncm_paddock/client/presence.lua and ncm_world/client/arrival.lua read
+    -- it -- not (ok, value). Read as (ok, value), Build's state table was taken for the flag and the answer was the
+    -- empty second value: every call looked unanswered and the tab said Build was not running.
+    local v, err = promise:await()
+    if v ~= nil then return v end
+    return nil, err or "no answer"
 end
 local lastBuildWhy = nil
 function pushBuild()
@@ -253,8 +256,8 @@ AddEventHandler("onClientResourceStart", function(name)
         CreateThread(function()
             local promise, why = Open77.exports.call("ncm_world", "routeTo", { x = d.x, y = d.y, z = d.z, name = d.name }, "workshop")
             if not promise then log("route: ncm_world unreachable (%s)", tostring(why)); return end
-            local ok, routed = promise:await()
-            send("eng:routed", { ok = ok and routed ~= false, name = d.name })
+            local routed, err = promise:await()   -- KB-443: (result, err)
+            send("eng:routed", { ok = routed ~= nil and routed ~= false and err == nil, name = d.name })
         end)
     end)
     -- PARTS (the same server events Machine Index used)

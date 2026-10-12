@@ -1,0 +1,77 @@
+{
+  "Id": "kit_nozzle_cold_e6a403",
+  "Name": "kit_nozzle_cold",
+  "Version": 2,
+  "SourceFile": "kit_nozzle_cold.obj",
+  "SourceModel": "kit_nozzle_cold.obj",
+  "Created": "2026-10-12T10:14:32.1360436-04:00",
+  "Modified": "2026-10-12T10:15:02.4002072-04:00",
+  "Import": {
+    "Scale": 1,
+    "UpAxis": "Z",
+    "Pivot": "Original",
+    "Yaw": 0,
+    "ImportMaterials": true,
+    "MaxTextureSize": 2048
+  },
+  "Materials": [
+    {
+      "Name": "nozzle",
+      "Kind": "Standard",
+      "GameMaterial": null,
+      "MultilayerSetup": null,
+      "MultilayerMask": null,
+      "BaseColor": {
+        "X": 0.32,
+        "Y": 0.27,
+        "Z": 0.22,
+        "W": 1
+      },
+      "BaseColorTexture": null,
+      "Roughness": 0.4,
+      "RoughnessTexture": null,
+      "RoughnessChannel": 0,
+      "InvertRoughness": false,
+      "Metalness": 0.9,
+      "MetalnessTexture": null,
+      "MetalnessChannel": 0,
+      "NormalTexture": null,
+      "NormalStrength": 1,
+      "FlipNormalGreen": false,
+      "EmissiveColor": {
+        "X": 0,
+        "Y": 0,
+        "Z": 0
+      },
+      "EmissiveEV": 0,
+      "EmissiveTexture": null,
+      "AlphaCutout": false,
+      "AlphaThreshold": 0.5,
+      "DoubleSided": true,
+      "GlassOpacity": 0.25,
+      "BaseMaterial": null,
+      "Parameters": []
+    }
+  ],
+  "Bounds": {
+    "Min": {
+      "X": -0.05,
+      "Y": -0.15,
+      "Z": -0.05
+    },
+    "Max": {
+      "X": 0.05,
+      "Y": 0,
+      "Z": 0.05
+    }
+  },
+  "Vertices": 36,
+  "Triangles": 48,
+  "Submeshes": 1,
+  "Warnings": [
+    "The model has no texture coordinates: textures cannot be applied."
+  ],
+  "Credits": "",
+  "MeshPath": "ncwe\\custom\\kit_nozzle_cold_e6a403\\kit_nozzle_cold_e6a403.mesh",
+  "Hash": 17158929205378945444
+}

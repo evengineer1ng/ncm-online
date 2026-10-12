@@ -51,12 +51,47 @@ Core.define("build.attach", function(C)
         NCM_BOX_CASE_01    = { category = "equipment", label = "Equipment case",               model = "container.ammo_case",
             massKg = 9,  surface = "bluff", areaM2 = 0.15 },
     }
-    M.ORDER = { "NCM_WING_SMALL_01", "NCM_WING_LARGE_01", "NCM_SPOILER_01", "NCM_SPLITTER_01", "NCM_AERO_PANEL_01",
+    -- The props era's palette, kept for the rows and history that name it (the stand-ins stay retired from the palette).
+    M.PROPS_ORDER = { "NCM_WING_SMALL_01", "NCM_WING_LARGE_01", "NCM_SPOILER_01", "NCM_SPLITTER_01", "NCM_AERO_PANEL_01",
         "NCM_BAR_01", "NCM_BEAM_01", "NCM_PANEL_FLAT_01", "NCM_BOX_SMALL_01", "NCM_BOX_CASE_01" }
-    -- What may carry what. Every item may sit on a Machine; members (structural) may carry anything.
+
+    -- THE KIT (2026-10-12, owner: "i cant see any evidence of build at all anywhere"): NCM's own meshes, authored for
+    -- Build (`tools/deep/ncwe/build-build-kit.py` -> NCWE project `ncm/ncwe/ncm_build_kit.ncwe` -> required mod
+    -- `ncm_build_kit-assets`), drawn by NCM Sky as bodies with full orientation that follow their Machine every frame
+    -- (`skyKind`: NcmSky.reds' template table). Each piece's origin is its attachment point. `kit` names the mesh;
+    -- there is no platform prop. `carries`: may hold other pieces (members, panels, walls -- the TotK grammar).
+    local function kit(id, mesh, kind, cat, label, kg, surface, area, carries)
+        M.CATALOGUE[id] = { category = cat, label = label, kit = mesh, skyKind = kind, massKg = kg, surface = surface,
+            areaM2 = area, carries = carries or nil }
+        return id
+    end
+    M.KIT_ORDER = {
+        kit("NCM_KIT_STRUT_01", "kit_strut", 15, "member", "Strut (1 m)", 4, "structural", 0.04, true),
+        kit("NCM_KIT_BEAM_01", "kit_beam", 16, "member", "Beam (1 m)", 8, "structural", 0.08, true),
+        kit("NCM_KIT_PANEL_S_01", "kit_panel_s", 17, "panel", "Panel 0.5 m", 2, "bluff", 0.25, true),
+        kit("NCM_KIT_PANEL_M_01", "kit_panel_m", 18, "panel", "Panel 1 m", 6, "bluff", 1.0, true),
+        kit("NCM_KIT_PANEL_L_01", "kit_panel_l", 19, "panel", "Panel 2 m", 20, "bluff", 4.0, true),
+        kit("NCM_KIT_WALL_01", "kit_wall", 20, "wall", "Wall 2 x 2.5 m", 40, "bluff", 5.0, true),
+        kit("NCM_KIT_WING_S_01", "kit_wing_s", 21, "wing", "Wing 2.4 m", 8, "lifting", 0.7),
+        kit("NCM_KIT_WING_L_01", "kit_wing_l", 22, "wing", "Wing 2 m, end plates", 18, "lifting", 0.84),
+        kit("NCM_KIT_FIN_01", "kit_fin", 23, "fin", "Fin", 2, "lifting", 0.2),
+        kit("NCM_KIT_WHEEL_POD_01", "kit_wheel_pod", 24, "running_gear", "Wheel pod", 18, "bluff", 0.17),
+        kit("NCM_KIT_NOZZLE_BELL_01", "kit_nozzle_bell", 25, "housing", "Engine bell housing", 15, "structural", 0.2),
+        kit("NCM_KIT_NOZZLE_RAM_01", "kit_nozzle_ram", 26, "housing", "Ram plate housing", 12, "structural", 0.36),
+        kit("NCM_KIT_NOZZLE_COLD_01", "kit_nozzle_cold", 27, "housing", "Cold-gas nozzle", 1, "structural", 0.01),
+        kit("NCM_KIT_TANK_01", "kit_tank", 28, "tank", "Tank (1 m)", 25, "bluff", 0.2),
+        kit("NCM_KIT_CONTROLLER_01", "kit_controller", 29, "controller", "Controller", 3, "bluff", 0.03),
+    }
+    -- The palette: the kit, then the platform props that are real things (no stand-ins).
+    M.ORDER = {}
+    for _, id in ipairs(M.KIT_ORDER) do M.ORDER[#M.ORDER + 1] = id end
+    for _, id in ipairs({ "NCM_AERO_PANEL_01", "NCM_BAR_01", "NCM_BEAM_01", "NCM_BOX_SMALL_01", "NCM_BOX_CASE_01" }) do M.ORDER[#M.ORDER + 1] = id end
+
+    -- What may carry what. Every item may sit on a Machine; members, panels and walls may carry anything.
     M.PARENTS = { machine = true, attachment = true }
     function M.canCarry(parentAsset)
-        return parentAsset == nil or (M.CATALOGUE[parentAsset] and M.CATALOGUE[parentAsset].surface == "structural") or false
+        local it = parentAsset and M.CATALOGUE[parentAsset]
+        return parentAsset == nil or (it and (it.surface == "structural" or it.carries == true)) or false
     end
 
     -- ------------------------------------------------------------------------------------------------------- limits

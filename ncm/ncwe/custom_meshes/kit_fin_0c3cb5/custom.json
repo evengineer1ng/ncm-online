@@ -1,0 +1,77 @@
+{
+  "Id": "kit_fin_0c3cb5",
+  "Name": "kit_fin",
+  "Version": 2,
+  "SourceFile": "kit_fin.obj",
+  "SourceModel": "kit_fin.obj",
+  "Created": "2026-10-12T10:14:24.1219587-04:00",
+  "Modified": "2026-10-12T10:15:02.342257-04:00",
+  "Import": {
+    "Scale": 1,
+    "UpAxis": "Z",
+    "Pivot": "Original",
+    "Yaw": 0,
+    "ImportMaterials": true,
+    "MaxTextureSize": 2048
+  },
+  "Materials": [
+    {
+      "Name": "carbon",
+      "Kind": "Standard",
+      "GameMaterial": null,
+      "MultilayerSetup": null,
+      "MultilayerMask": null,
+      "BaseColor": {
+        "X": 0.07,
+        "Y": 0.07,
+        "Z": 0.08,
+        "W": 1
+      },
+      "BaseColorTexture": null,
+      "Roughness": 0.8,
+      "RoughnessTexture": null,
+      "RoughnessChannel": 0,
+      "InvertRoughness": false,
+      "Metalness": 0,
+      "MetalnessTexture": null,
+      "MetalnessChannel": 0,
+      "NormalTexture": null,
+      "NormalStrength": 1,
+      "FlipNormalGreen": false,
+      "EmissiveColor": {
+        "X": 0,
+        "Y": 0,
+        "Z": 0
+      },
+      "EmissiveEV": 0,
+      "EmissiveTexture": null,
+      "AlphaCutout": false,
+      "AlphaThreshold": 0.5,
+      "DoubleSided": true,
+      "GlassOpacity": 0.25,
+      "BaseMaterial": null,
+      "Parameters": []
+    }
+  ],
+  "Bounds": {
+    "Min": {
+      "X": -0.015,
+      "Y": 0,
+      "Z": -0.2
+    },
+    "Max": {
+      "X": 0.015,
+      "Y": 0.5,
+      "Z": 0.2
+    }
+  },
+  "Vertices": 8,
+  "Triangles": 12,
+  "Submeshes": 1,
+  "Warnings": [
+    "The model has no texture coordinates: textures cannot be applied."
+  ],
+  "Credits": "",
+  "MeshPath": "ncwe\\custom\\kit_fin_0c3cb5\\kit_fin_0c3cb5.mesh",
+  "Hash": 6732434588574814738
+}

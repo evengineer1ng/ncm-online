@@ -1,0 +1,114 @@
+{
+  "Id": "kit_controller_1da79e",
+  "Name": "kit_controller",
+  "Version": 3,
+  "SourceFile": "kit_controller.obj",
+  "SourceModel": "kit_controller.obj",
+  "Created": "2026-10-12T10:14:24.0770722-04:00",
+  "Modified": "2026-10-12T10:15:02.3167505-04:00",
+  "Import": {
+    "Scale": 1,
+    "UpAxis": "Z",
+    "Pivot": "Original",
+    "Yaw": 0,
+    "ImportMaterials": true,
+    "MaxTextureSize": 2048
+  },
+  "Materials": [
+    {
+      "Name": "carbon",
+      "Kind": "Standard",
+      "GameMaterial": null,
+      "MultilayerSetup": null,
+      "MultilayerMask": null,
+      "BaseColor": {
+        "X": 0.07,
+        "Y": 0.07,
+        "Z": 0.08,
+        "W": 1
+      },
+      "BaseColorTexture": null,
+      "Roughness": 0.8,
+      "RoughnessTexture": null,
+      "RoughnessChannel": 0,
+      "InvertRoughness": false,
+      "Metalness": 0,
+      "MetalnessTexture": null,
+      "MetalnessChannel": 0,
+      "NormalTexture": null,
+      "NormalStrength": 1,
+      "FlipNormalGreen": false,
+      "EmissiveColor": {
+        "X": 0,
+        "Y": 0,
+        "Z": 0
+      },
+      "EmissiveEV": 0,
+      "EmissiveTexture": null,
+      "AlphaCutout": false,
+      "AlphaThreshold": 0.5,
+      "DoubleSided": true,
+      "GlassOpacity": 0.25,
+      "BaseMaterial": null,
+      "Parameters": []
+    },
+    {
+      "Name": "glass",
+      "Kind": "Standard",
+      "GameMaterial": null,
+      "MultilayerSetup": null,
+      "MultilayerMask": null,
+      "BaseColor": {
+        "X": 0.15,
+        "Y": 0.55,
+        "Z": 0.65,
+        "W": 1
+      },
+      "BaseColorTexture": null,
+      "Roughness": 0.7,
+      "RoughnessTexture": null,
+      "RoughnessChannel": 0,
+      "InvertRoughness": false,
+      "Metalness": 0,
+      "MetalnessTexture": null,
+      "MetalnessChannel": 0,
+      "NormalTexture": null,
+      "NormalStrength": 1,
+      "FlipNormalGreen": false,
+      "EmissiveColor": {
+        "X": 0.2,
+        "Y": 0.9,
+        "Z": 1
+      },
+      "EmissiveEV": 4,
+      "EmissiveTexture": null,
+      "AlphaCutout": false,
+      "AlphaThreshold": 0.5,
+      "DoubleSided": true,
+      "GlassOpacity": 0.25,
+      "BaseMaterial": null,
+      "Parameters": []
+    }
+  ],
+  "Bounds": {
+    "Min": {
+      "X": -0.15,
+      "Y": 0,
+      "Z": -0.105
+    },
+    "Max": {
+      "X": 0.15,
+      "Y": 0.1,
+      "Z": 0.1
+    }
+  },
+  "Vertices": 16,
+  "Triangles": 24,
+  "Submeshes": 2,
+  "Warnings": [
+    "The model has no texture coordinates: textures cannot be applied."
+  ],
+  "Credits": "",
+  "MeshPath": "ncwe\\custom\\kit_controller_1da79e\\kit_controller_1da79e.mesh",
+  "Hash": 15602501109447754012
+}

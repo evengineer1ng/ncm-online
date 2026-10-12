@@ -1,0 +1,114 @@
+{
+  "Id": "kit_nozzle_bell_9ac09b",
+  "Name": "kit_nozzle_bell",
+  "Version": 3,
+  "SourceFile": "kit_nozzle_bell.obj",
+  "SourceModel": "kit_nozzle_bell.obj",
+  "Created": "2026-10-12T10:14:24.1488707-04:00",
+  "Modified": "2026-10-12T10:15:02.3828137-04:00",
+  "Import": {
+    "Scale": 1,
+    "UpAxis": "Z",
+    "Pivot": "Original",
+    "Yaw": 0,
+    "ImportMaterials": true,
+    "MaxTextureSize": 2048
+  },
+  "Materials": [
+    {
+      "Name": "steel",
+      "Kind": "Standard",
+      "GameMaterial": null,
+      "MultilayerSetup": null,
+      "MultilayerMask": null,
+      "BaseColor": {
+        "X": 0.55,
+        "Y": 0.57,
+        "Z": 0.6,
+        "W": 1
+      },
+      "BaseColorTexture": null,
+      "Roughness": 0.35,
+      "RoughnessTexture": null,
+      "RoughnessChannel": 0,
+      "InvertRoughness": false,
+      "Metalness": 0.8,
+      "MetalnessTexture": null,
+      "MetalnessChannel": 0,
+      "NormalTexture": null,
+      "NormalStrength": 1,
+      "FlipNormalGreen": false,
+      "EmissiveColor": {
+        "X": 0,
+        "Y": 0,
+        "Z": 0
+      },
+      "EmissiveEV": 0,
+      "EmissiveTexture": null,
+      "AlphaCutout": false,
+      "AlphaThreshold": 0.5,
+      "DoubleSided": true,
+      "GlassOpacity": 0.25,
+      "BaseMaterial": null,
+      "Parameters": []
+    },
+    {
+      "Name": "nozzle",
+      "Kind": "Standard",
+      "GameMaterial": null,
+      "MultilayerSetup": null,
+      "MultilayerMask": null,
+      "BaseColor": {
+        "X": 0.32,
+        "Y": 0.27,
+        "Z": 0.22,
+        "W": 1
+      },
+      "BaseColorTexture": null,
+      "Roughness": 0.4,
+      "RoughnessTexture": null,
+      "RoughnessChannel": 0,
+      "InvertRoughness": false,
+      "Metalness": 0.9,
+      "MetalnessTexture": null,
+      "MetalnessChannel": 0,
+      "NormalTexture": null,
+      "NormalStrength": 1,
+      "FlipNormalGreen": false,
+      "EmissiveColor": {
+        "X": 0,
+        "Y": 0,
+        "Z": 0
+      },
+      "EmissiveEV": 0,
+      "EmissiveTexture": null,
+      "AlphaCutout": false,
+      "AlphaThreshold": 0.5,
+      "DoubleSided": true,
+      "GlassOpacity": 0.25,
+      "BaseMaterial": null,
+      "Parameters": []
+    }
+  ],
+  "Bounds": {
+    "Min": {
+      "X": -0.27,
+      "Y": -0.6,
+      "Z": -0.27
+    },
+    "Max": {
+      "X": 0.27,
+      "Y": 0.06,
+      "Z": 0.27
+    }
+  },
+  "Vertices": 128,
+  "Triangles": 204,
+  "Submeshes": 2,
+  "Warnings": [
+    "The model has no texture coordinates: textures cannot be applied."
+  ],
+  "Credits": "",
+  "MeshPath": "ncwe\\custom\\kit_nozzle_bell_9ac09b\\kit_nozzle_bell_9ac09b.mesh",
+  "Hash": 2467266447829402036
+}

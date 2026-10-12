@@ -89,9 +89,47 @@ local function countBy(builder)
 end
 local function totalLive()
     local n = 0
-    for _, a in pairs(rows) do if a.propId then n = n + 1 end end
+    for _, a in pairs(rows) do if a.propId or a.kitDrawn then n = n + 1 end end
     return n
 end
+
+-- ------------------------------------------------------------------------------------------------ the kit, for everyone
+-- A kit piece (build.attach `kit`) is not a platform prop: every client draws it through NCM Sky, riding its Machine
+-- (client/build.lua). The server says which pieces sit on which out-in-the-city Machine, at which composed transform,
+-- to every player whenever that changes (and to a player who asks, on joining).
+local worldDirty = true
+local function worldList()
+    local list = {}
+    for _, a in pairs(rows) do
+        local item = B.CATALOGUE[a.assetId]
+        local m = machines[a.root]
+        if a.kitDrawn and item and item.kit and m then
+            local root = B.resolve(rows, a.id, set("buildMaxDepth", B.LIMITS.maxDepth))
+            if root then
+                list[#list + 1] = { id = a.id, machineId = a.root, vehicleId = tostring(m.vid), kind = item.skyKind,
+                    pos = root.pos, rot = root.rot }
+            end
+        end
+    end
+    table.sort(list, function(x, y) return x.id < y.id end)
+    return list
+end
+CreateThread(function()
+    while true do
+        Wait(250)
+        if worldDirty then
+            worldDirty = false
+            local okJ, blob = pcall(NcmCore.get("vocabulary.json").encode, worldList())
+            if okJ then TriggerClientEvent("ncm:build.world", -1, blob) end   -- KB-452: tables as a JSON string
+        end
+    end
+end)
+RegisterNetEvent("ncm:build.worldRequest", function()
+    local pid = tonumber(source) or 0
+    if pid <= 0 then return end
+    local okJ, blob = pcall(NcmCore.get("vocabulary.json").encode, worldList())
+    if okJ then TriggerClientEvent("ncm:build.world", pid, blob) end
+end)
 
 -- Prop ids are decimal strings; the attach card types the id as an integer. Try the string, then the number.
 local function bind(id, binding)
@@ -102,6 +140,7 @@ end
 
 local function unprop(a)
     if a and a.propId then pcall(Open77.props.remove, a.propId); a.propId = nil end
+    if a and a.kitDrawn then a.kitDrawn = nil; worldDirty = true end
 end
 
 --- Draw one attachment on its Machine's current vehicle, at its composed transform.
@@ -112,6 +151,11 @@ local function draw(a)
     if not item then return false, "unknown_asset" end
     local root, why = B.resolve(rows, a.id, set("buildMaxDepth", B.LIMITS.maxDepth))
     if not root then return false, why end
+    if item.kit then              -- drawn by every client through NCM Sky (the kit): nothing to mint here
+        a.kitDrawn = true
+        worldDirty = true
+        return true
+    end
     local okV, v = pcall(Open77.vehicles.get, m.vid)
     if not (okV and type(v) == "table" and type(v.position) == "table") then return false, "vehicle_unreadable" end
     local binding = { parentType = "vehicle", parentId = tostring(m.vid), bone = "",
@@ -206,8 +250,8 @@ local function stateFor(pid)
     local cat = {}
     for _, id in ipairs(B.ORDER) do
         local it = B.CATALOGUE[id]
-        cat[#cat + 1] = { id = id, label = it.label, category = it.category, model = it.model, massKg = it.massKg,
-            surface = it.surface, standIn = it.standIn or nil, carries = it.surface == "structural" or nil }
+        cat[#cat + 1] = { id = id, label = it.label, category = it.category, model = it.model, kit = it.kit, skyKind = it.skyKind,
+            massKg = it.massKg, surface = it.surface, standIn = it.standIn or nil, carries = B.canCarry(id) or nil }
     end
     local mine, list = {}, {}
     if d then
@@ -220,7 +264,8 @@ local function stateFor(pid)
                         local root = B.resolve(rows, a.id)
                         list[#list + 1] = { id = a.id, assetId = a.assetId, label = (B.CATALOGUE[a.assetId] or {}).label,
                             parent = a.parent, pos = a.pos, rot = a.rot, machineId = mid, vehicleId = tostring(m.vid),
-                            rootPos = root and root.pos, rootRot = root and root.rot, drawn = a.propId ~= nil, mine = a.builder == d.ncmDriverId }
+                            rootPos = root and root.pos, rootRot = root and root.rot, drawn = a.propId ~= nil or a.kitDrawn == true,
+                            mine = a.builder == d.ncmDriverId }
                     end
                 end
             end
@@ -336,7 +381,9 @@ RegisterCommand("ncm.build", function(src)
     for _, a in pairs(rows) do n = n + 1; if a.propId then drawn = drawn + 1 end end
     local out = 0
     for _ in pairs(machines) do out = out + 1 end
-    log("%d Machine(s) out, %d attachment(s) loaded, %d drawn", out, n, drawn)
+    local kits = 0
+    for _, a in pairs(rows) do if a.kitDrawn then kits = kits + 1 end end
+    log("%d Machine(s) out, %d attachment(s) loaded, %d drawn as props, %d kit piece(s) drawn by NCM Sky", out, n, drawn, kits)
 end, false)
 
 AddEventHandler("onResourceStop", function(name)

@@ -1,0 +1,29 @@
+{
+  "generator": "NCWE Studio",
+  "project": "NCM Build Kit",
+  "projectId": "2fb133e4-3df4-4f35-a28b-5dc36ee05434",
+  "exportedUtc": "2026-10-12T14:15:50.166672+00:00",
+  "game": "2.31",
+  "archiveXl": "1.27.1",
+  "resource": "ncm_build_kit",
+  "version": "1.0.0",
+  "requiredMod": "ncm_build_kit-assets",
+  "package": "dist/ncm-build-kit.zip",
+  "sha256": "587519b9365531ffc6d1c996933bde8913f0f2e46be6a327b05baa5015560b72",
+  "bytes": 36672,
+  "entries": [
+    "archive/pc/mod/ncwe_2fb133e43df44f35a28b5dc36ee05434.archive",
+    "archive/pc/mod/ncwe_2fb133e43df44f35a28b5dc36ee05434.archive.xl"
+  ],
+  "changes": {
+    "Transformed": 0,
+    "Deleted": 0,
+    "Added": 15,
+    "Roads": 0,
+    "Elements": 0
+  },
+  "sounds": [],
+  "soundEmitters": 0,
+  "syncedSounds": 0,
+  "sourceExport": "C:\\Users\\eveng\\AppData\\Local\\NCWE\\Open77Exports\\ncwe-2fb133e43df44f35a28b5dc36ee05434-20261012-141550-d4cd59cf"
+}

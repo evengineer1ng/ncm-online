@@ -43,7 +43,7 @@ end
 
 local function dropPreview()
     if placing and placing.propId then pcall(Open77.props.remove, placing.propId) end
-    if placing then placing.propId = nil end
+    if placing then placing.propId, placing.kitPose = nil, nil end
 end
 
 local function showPreview()
@@ -52,6 +52,10 @@ local function showPreview()
     if not item then return end
     local ppos, prot = parentFrame(placing.parent)
     local pos, rot = B.compose(ppos, prot, placing.pos, placing.rot)
+    if item.kit then          -- the kit: NCM Sky draws the preview (below), exactly as the real piece will look
+        placing.kitPose = { kind = item.skyKind, pos = pos, rot = rot }
+        return
+    end
     local binding = { parentType = "vehicle", parentId = tostring(placing.vehicleId), bone = "",
         offset = { x = pos[1], y = pos[2], z = pos[3] }, rotation = { x = rot[1], y = rot[2], z = rot[3] } }
     if not placing.propId then
@@ -154,6 +158,78 @@ exports("remove", function(attachmentId) TriggerServerEvent("ncm:build.remove", 
 -- a called car changes what is buildable: the panel asks when it opens, and this keeps it current
 RegisterNetEvent("ncm:vehicle.active", function() TriggerServerEvent("ncm:build.request") end)
 
+-- ------------------------------------------------------------------------------------------------ the kit, drawn
+-- Kit pieces are NCM Sky bodies (NcmSky.reds kinds 15-29), not platform props. The server says which piece sits on
+-- which Machine at which composed transform (ncm:build.world, a JSON string). On the car this player is driving a
+-- piece rides it every frame inside the game ("attach_mine": NcmSky.reds composes the car's transform with the
+-- piece's); on any other car it is placed in world space ten times a second from that car's pose.
+local Sky = NcmCore.get("space.sky")
+local Json = NcmCore.get("vocabulary.json")
+local world = {}
+
+RegisterNetEvent("ncm:build.world", function(blob)
+    local okD, list = pcall(Json.decode, blob)
+    if okD and type(list) == "table" then world = list end
+end)
+
+local function seatVehicle()
+    local ok, seat = pcall(Open77.vehicles.getPlayerSeat)
+    if not ok or type(seat) ~= "table" then return nil end
+    return tostring(seat.vehicleId or seat.vehicle or seat.id)
+end
+
+-- NCM Sky ids are [a-z0-9_], at most 24 characters (ncm_sky.dll state.cpp validId): "b_" + 20 hex of the attachment id
+local function skyId(attachmentId)
+    return "b_" .. tostring(attachmentId):lower():gsub("[^0-9a-f]", ""):sub(1, 20)
+end
+
+local function c(a, i, k) return tonumber(a and (a[k] or a[i])) or 0 end
+
+-- a piece at (pos, rot) in its car's frame -> the body NCM Sky draws
+local function body(id, kind, pos, rot, vid, mine)
+    local Rl = B.matrix(rot)
+    if mine then
+        return { id = id, kind = kind, app = "attach_mine", p = { pos[1], pos[2], pos[3] }, q = Sky.quat(Rl) }
+    end
+    local okP, v = pcall(Open77.vehicles.get, vid)
+    local okF, f = pcall(Open77.character.frame, { vehicleId = vid })
+    if not (okP and type(v) == "table" and v.position and okF and type(f) == "table" and f.forward) then return nil end
+    local r, fw, u = f.right, f.forward, f.up
+    local Rc = { { c(r, 1, "x"), c(fw, 1, "x"), c(u, 1, "x") }, { c(r, 2, "y"), c(fw, 2, "y"), c(u, 2, "y") },
+        { c(r, 3, "z"), c(fw, 3, "z"), c(u, 3, "z") } }
+    local w = Sky.mv(Rc, pos)
+    return { id = id, kind = kind, p = { v.position.x + w[1], v.position.y + w[2], v.position.z + w[3] }, q = Sky.quat(Sky.mm(Rc, Rl)) }
+end
+
+CreateThread(function()
+    Wait(6000)
+    TriggerServerEvent("ncm:build.worldRequest")
+    local warned = false
+    while true do
+        Wait(100)
+        local bodies = {}
+        local mineVid = seatVehicle()
+        for _, a in ipairs(world) do
+            local b = body(skyId(a.id), tonumber(a.kind) or 0, a.pos or { 0, 0, 0 }, a.rot or { 0, 0, 0 },
+                a.vehicleId, mineVid ~= nil and tostring(a.vehicleId) == mineVid)
+            if b then bodies[#bodies + 1] = b end
+        end
+        if placing and placing.kitPose then
+            local kp = placing.kitPose
+            local b = body("b_preview", kp.kind, kp.pos, kp.rot, placing.vehicleId, mineVid ~= nil and tostring(placing.vehicleId) == mineVid)
+            if b then bodies[#bodies + 1] = b end
+        end
+        local okC, promise, why = pcall(Open77.exports.call, "ncm_sky", "scene", "build", bodies)
+        if not (okC and promise) and not warned then
+            warned = true
+            log("ncm_sky unreachable (%s): kit pieces are not drawn", tostring(okC and why or promise))
+        end
+    end
+end)
+
 AddEventHandler("onClientResourceStop", function(name)
-    if name == GetCurrentResourceName() then dropPreview() end
+    if name == GetCurrentResourceName() then
+        dropPreview()
+        pcall(Open77.exports.call, "ncm_sky", "scene", "build", {})
+    end
 end)

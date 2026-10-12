@@ -1,0 +1,77 @@
+{
+  "Id": "kit_strut_d6cac0",
+  "Name": "kit_strut",
+  "Version": 2,
+  "SourceFile": "kit_strut.obj",
+  "SourceModel": "kit_strut.obj",
+  "Created": "2026-10-12T10:14:24.0173081-04:00",
+  "Modified": "2026-10-12T10:15:02.2570659-04:00",
+  "Import": {
+    "Scale": 1,
+    "UpAxis": "Z",
+    "Pivot": "Original",
+    "Yaw": 0,
+    "ImportMaterials": true,
+    "MaxTextureSize": 2048
+  },
+  "Materials": [
+    {
+      "Name": "steel",
+      "Kind": "Standard",
+      "GameMaterial": null,
+      "MultilayerSetup": null,
+      "MultilayerMask": null,
+      "BaseColor": {
+        "X": 0.55,
+        "Y": 0.57,
+        "Z": 0.6,
+        "W": 1
+      },
+      "BaseColorTexture": null,
+      "Roughness": 0.35,
+      "RoughnessTexture": null,
+      "RoughnessChannel": 0,
+      "InvertRoughness": false,
+      "Metalness": 0.8,
+      "MetalnessTexture": null,
+      "MetalnessChannel": 0,
+      "NormalTexture": null,
+      "NormalStrength": 1,
+      "FlipNormalGreen": false,
+      "EmissiveColor": {
+        "X": 0,
+        "Y": 0,
+        "Z": 0
+      },
+      "EmissiveEV": 0,
+      "EmissiveTexture": null,
+      "AlphaCutout": false,
+      "AlphaThreshold": 0.5,
+      "DoubleSided": true,
+      "GlassOpacity": 0.25,
+      "BaseMaterial": null,
+      "Parameters": []
+    }
+  ],
+  "Bounds": {
+    "Min": {
+      "X": -0.06,
+      "Y": 0,
+      "Z": -0.06
+    },
+    "Max": {
+      "X": 0.06,
+      "Y": 1,
+      "Z": 0.06
+    }
+  },
+  "Vertices": 32,
+  "Triangles": 56,
+  "Submeshes": 1,
+  "Warnings": [
+    "The model has no texture coordinates: textures cannot be applied."
+  ],
+  "Credits": "",
+  "MeshPath": "ncwe\\custom\\kit_strut_d6cac0\\kit_strut_d6cac0.mesh",
+  "Hash": 5538715016781419454
+}
