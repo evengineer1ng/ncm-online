@@ -1,4 +1,4 @@
-"""NCM Earth Underlay v2: a curved annulus of Earth under and around Night City.
+"""NCM Earth Underlay v3: a curved annulus of Earth under and around Night City.
 Game frame (= NCM core space.deep): x east, y north, z up, metres; (0,0) = 35.37 N, 120.85 W; x/y are arc lengths.
 The mesh's origin is its PIVOT, placed in NCWE at PIVOT below: high above the city, so every point a player reaches
 over the map (ground to the 12 km Deep seam) is within NCWE's 10 km streaming distance of it."""
@@ -7,8 +7,14 @@ from PIL import Image
 R = 6371000.0
 ORIGIN = (35.37, -120.85)
 PIVOT = (0.0, -1750.0, 6000.0)          # map centre, 6 km up
-CENTRE = (0.0, -1750.0)                 # the hole is centred on the map
-R_IN, R_OUT = 9000.0, 420000.0          # hole under the playable map .. near the 12 km horizon (391 km)
+CENTRE = (0.0, -1750.0)                 # the texture's centre (unchanged since v1)
+# v3 (2026-10-12, owner: "start at the edge of the map bound"): the hole is the map's own terrain square, read from
+# NCWE Studio top-down (x -7,970..+8,000, y -8,180..+8,115), plus HOLE_PAD. v1/v2's 9 km circle about (0,-1750) left
+# a band of void between the map and the Earth, and missed the map's north side and corners.
+HOLE = (-7970.0, 8000.0, -8180.0, 8115.0)   # x0, x1, y0, y1
+HOLE_PAD = 100.0
+HOLE_C = ((HOLE[0] + HOLE[1]) / 2, (HOLE[2] + HOLE[3]) / 2)
+R_OUT = 420000.0                        # out to near the 12 km horizon (391 km)
 Z0 = -5.0                               # just below sea level
 RINGS, SEGS = 56, 192
 TEX_HALF = 430000.0                     # texture covers +-430 km of game x/y
@@ -46,11 +52,23 @@ tex.save('ncm_earth_underlay_d.png')
 
 # ---- mesh: rings spaced geometrically (dense near the city, sparse at the horizon)
 verts, uvs, norms, faces = [], [], [], []
+hx0, hx1, hy0, hy1 = HOLE[0] - HOLE_PAD, HOLE[1] + HOLE_PAD, HOLE[2] - HOLE_PAD, HOLE[3] + HOLE_PAD
+def hole_r(a):
+    """Distance from HOLE_C to the padded hole rectangle along angle a."""
+    c, s = math.cos(a), math.sin(a)
+    tx = ((hx1 if c > 0 else hx0) - HOLE_C[0]) / c if abs(c) > 1e-12 else float("inf")
+    ty = ((hy1 if s > 0 else hy0) - HOLE_C[1]) / s if abs(s) > 1e-12 else float("inf")
+    return min(tx, ty)
+# the segment angles, with the rectangle's four corners among them (so every edge between them runs along a side)
+ANG = sorted(set([2 * math.pi * s / SEGS for s in range(SEGS)] +
+                 [math.atan2(y - HOLE_C[1], x - HOLE_C[0]) % (2 * math.pi) for x in (hx0, hx1) for y in (hy0, hy1)]))
+SEGS = len(ANG)
 for r_i in range(RINGS + 1):
-    rad = R_IN * (R_OUT / R_IN) ** (r_i / RINGS)
     for s in range(SEGS):
-        a = 2 * math.pi * s / SEGS
-        gx, gy = CENTRE[0] + rad * math.cos(a), CENTRE[1] + rad * math.sin(a)
+        a = ANG[s]
+        r_in = hole_r(a)
+        rad = r_in * (R_OUT / r_in) ** (r_i / RINGS)
+        gx, gy = HOLE_C[0] + rad * math.cos(a), HOLE_C[1] + rad * math.sin(a)
         gz = surface_z(gx, gy)
         verts.append((gx - PIVOT[0], gy - PIVOT[1], gz - PIVOT[2]))
         uvs.append(((gx - (CENTRE[0] - TEX_HALF)) / (2 * TEX_HALF), (gy - (CENTRE[1] - TEX_HALF)) / (2 * TEX_HALF)))
@@ -71,11 +89,10 @@ faces.append((m0, m0 + 1, m0 + 2))
 with open('ncm_earth_underlay.mtl', 'w') as f:
     f.write('newmtl earth\nKd 1 1 1\nKa 0 0 0\nKs 0 0 0\nNs 1\nmap_Kd ncm_earth_underlay_d.png\n')
 with open('ncm_earth_underlay.obj', 'w') as f:
-    f.write('# NCM Earth Underlay v2 -- origin = pivot at game (%.0f, %.0f, %.0f), z up\nmtllib ncm_earth_underlay.mtl\no ncm_earth_underlay\n' % PIVOT)
+    f.write('# NCM Earth Underlay v3 -- origin = pivot at game (%.0f, %.0f, %.0f), z up\nmtllib ncm_earth_underlay.mtl\no ncm_earth_underlay\n' % PIVOT)
     for v in verts: f.write('v %.3f %.3f %.3f\n' % v)
     for t in uvs: f.write('vt %.6f %.6f\n' % t)
     for n in norms: f.write('vn %.5f %.5f %.5f\n' % n)
     f.write('usemtl earth\ns 1\n')
     for (a, b, c) in faces: f.write('f %d/%d/%d %d/%d/%d %d/%d/%d\n' % (a+1, a+1, a+1, b+1, b+1, b+1, c+1, c+1, c+1))
-zs = [surface_z(CENTRE[0] + rr, CENTRE[1]) for rr in (R_IN, 50000, 200000, R_OUT)]
-print('verts', len(verts), 'tris', len(faces), 'surface z at 9/50/200/420 km:', [round(z) for z in zs])
+print('verts', len(verts), 'tris', len(faces), 'segments', SEGS, 'hole', (hx0, hx1, hy0, hy1))

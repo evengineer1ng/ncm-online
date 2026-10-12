@@ -2,15 +2,15 @@
   "generator": "NCWE Studio",
   "project": "NCM Earth Underlay",
   "projectId": "fb44d084-ab51-4fe0-95b7-679a5828fa6a",
-  "exportedUtc": "2026-10-12T11:07:17.5776287+00:00",
+  "exportedUtc": "2026-10-12T12:56:40.2633373+00:00",
   "game": "2.31",
   "archiveXl": "1.27.1",
   "resource": "ncm_earth_underlay",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "requiredMod": "ncm_earth_underlay-assets",
   "package": "dist/ncm-earth-underlay.zip",
-  "sha256": "898d84cdb68f08b89f661eb8d82095a7659d848dc62c1fa86cd894ba249f94fc",
-  "bytes": 839863,
+  "sha256": "7626115ff86c365a5bc19f5324c758106ef08b6d4ca869e35be47511f9fe5f0b",
+  "bytes": 861174,
   "entries": [
     "archive/pc/mod/ncwe_fb44d084ab514fe095b7679a5828fa6a.archive",
     "archive/pc/mod/ncwe_fb44d084ab514fe095b7679a5828fa6a.archive.xl"
@@ -25,5 +25,5 @@
   "sounds": [],
   "soundEmitters": 0,
   "syncedSounds": 0,
-  "sourceExport": "C:\\Users\\eveng\\AppData\\Local\\NCWE\\Open77Exports\\ncwe-fb44d084ab514fe095b7679a5828fa6a-20261012-110717-a0a55d65"
+  "sourceExport": "C:\\Users\\eveng\\AppData\\Local\\NCWE\\Open77Exports\\ncwe-fb44d084ab514fe095b7679a5828fa6a-20261012-125640-96008383"
 }

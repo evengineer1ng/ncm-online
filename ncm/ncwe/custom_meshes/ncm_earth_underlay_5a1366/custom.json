@@ -1,11 +1,11 @@
 {
   "Id": "ncm_earth_underlay_5a1366",
   "Name": "ncm_earth_underlay",
-  "Version": 5,
+  "Version": 6,
   "SourceFile": "ncm_earth_underlay.obj",
   "SourceModel": "ncm_earth_underlay.obj",
   "Created": "2026-10-11T16:19:56.2775029-04:00",
-  "Modified": "2026-10-12T07:07:13.0311304-04:00",
+  "Modified": "2026-10-12T08:56:32.5767402-04:00",
   "Import": {
     "Scale": 1,
     "UpAxis": "Z",
@@ -55,18 +55,18 @@
   ],
   "Bounds": {
     "Min": {
-      "X": -420000,
-      "Y": -19979.914,
-      "Z": -420000
+      "X": -419985,
+      "Y": -19866.42,
+      "Z": -421717.5
     },
     "Max": {
-      "X": 420000,
+      "X": 420015,
       "Y": 0,
-      "Z": 420000
+      "Z": 418282.5
     }
   },
-  "Vertices": 10947,
-  "Triangles": 21505,
+  "Vertices": 11175,
+  "Triangles": 21953,
   "Submeshes": 1,
   "Warnings": [
     "Texture not found: ncm_earth_underlay_d.png"

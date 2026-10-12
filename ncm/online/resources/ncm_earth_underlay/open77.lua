@@ -2,7 +2,7 @@
 -- The package is preloaded as the required mod "ncm_earth_underlay-assets": the launcher installs it
 -- before Cyberpunk starts. Changing it needs a dedicated-server restart, then a fresh game launch.
 resource "ncm_earth_underlay"
-version "1.0.1"
+version "1.0.2"
 auto_start true
 
 -- (KB-409: the exported `dependency "archivexl"` line is removed -- it aborts every resource's auto-start; ArchiveXL is a required mod already)

@@ -1,3 +1,7 @@
+**LATEST 2026-10-12 13:00 UTC - L366 LIVE (NCM SKY 0.2.3, 12:15 UTC); UNDERLAY v3 (HOLE = THE MAP'S EDGE) BUILT, READY TO DEPLOY; NEXT: THE ENGINEERING RECONCILIATION.**
+- The first live climb showed the ring only as a lip far beyond the edge (the 9 km circular hole). v3 cuts the hole to the terrain square: `ncm_earth_underlay` 1.0.2, `dist/ncm-earth-underlay.zip` in the resource.
+- **THE ONE NEXT ACTION:** owner runs `bash tools/deep/ops/install-underlay.sh` with nobody online and relaunches. Then the engineering conversation (design docs vs what exists; Race Week resets; wardrobe; VFX/SFX; Nessie; Bennu; PvE last).
+
 **LATEST 2026-10-12 12:10 UTC - L366 THE ASCENT RING BUILT (NCM SKY 0.2.3), NOT YET LIVE; KB-457 UNDERLAY v2 LIVE BUT OUT OF DRAW RANGE FROM ALTITUDE.**
 - Owner flew back to Earth after the KB-457 install: no Earth on the descent. The true-size underlay is too far away to draw from altitude (v2 is installed and was merged at game start).
 - L366: NCM Sky draws the underlay shrunk about the camera from 1.5 km to the seam (kinds 10-14). The redscript compiles against vanilla plus every installed script. Package `dist/ncm-sky-0.2.3.zip` (sha 3701a128...).
