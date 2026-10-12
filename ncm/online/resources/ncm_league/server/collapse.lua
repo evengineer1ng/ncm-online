@@ -61,6 +61,11 @@ end
 AddEventHandler("ncm:week:timeline", function(r) runs, runsAt = normRuns(r), now() end)
 --- Where an instant sits in the week: week.clock fields over the recorded ends.
 local function weekAt(c, utc) return Week.nowIn(c, timeline(), math.floor(tonumber(utc) or 0)) end
+--- The Racing Week run this instant belongs to (markets rotate their line-ups per run, 2026-10-12).
+function NcmCollapse.runIndex()
+    local ok, at = pcall(weekAt, cfg(), now())
+    return ok and type(at) == "table" and tonumber(at.runIndex) or nil
+end
 local crowned = {}                 -- run -> true once the Paddock announced its champions
 local busy = false
 

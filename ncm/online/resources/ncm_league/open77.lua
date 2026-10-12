@@ -322,6 +322,7 @@ server_script "server/schema/077_slipstream.lua"
 server_script "server/schema/078_build_attachment.lua"
 server_script "server/schema/079_workshop.lua"
 server_script "server/schema/080_deep_drives.lua"   -- doc 58: the experimental propulsion stable
+server_script "server/schema/081_exchange_vehicles.lua"   -- cars on the Exchange; NPC used cars leave manufacturer shelves
 server_script "server/migrations.lua"
 server_script "server/stream.lua"
 server_script "server/packs/street.lua"

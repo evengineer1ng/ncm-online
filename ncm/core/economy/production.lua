@@ -91,12 +91,25 @@ Core.define("economy.production", function(C)
     -- Every discovered physical terminal owns its own shelves. Values are conservative launch balancing;
     -- identity and placement are authored, while quantities can be tuned after live population evidence.
     local priceByPrestige={ [1]=6000,[2]=12000,[3]=28000,[4]=52000,[5]=90000 }
+    M.PRICE_BY_PRESTIGE = priceByPrestige
+
+    --- One autofixer shelf for a model. 2026-10-12 (owner: "most if not every good car is sold out"; live: Type-66 and
+    --- Shion refilled at 1 per 16 h, steady_hand barely moved): wanted cars restock within hours -- volume_responsive
+    --- below halo prestige, cadence (1 + p) h, ceiling 7 - p (at least 2), intervals between 30 min and (6 + 6p) h;
+    --- halo cars (prestige 5) keep their scarcity but still come back.
+    function M.autofixerLine(marketId, vehicleKey, rotating)
+        local entry = Catalogue.byKey(vehicleKey)
+        local prestige = math.max(1, math.min(5, (entry and entry.prestige) or 3))
+        return { marketId = marketId, vehicleKey = vehicleKey, price = priceByPrestige[prestige],
+            ceiling = math.max(2, 7 - prestige), initialAllocation = rotating and 1 or 2, batch = 1,
+            cadenceSec = (1 + prestige) * 3600, rotating = rotating or nil,
+            profile = prestige >= 5 and "scarcity_keeper" or "volume_responsive",
+            envelope = { batchMin = 1, batchMax = math.max(1, 4 - math.floor(prestige / 2)), intervalMin = 1800,
+                intervalMax = (6 + prestige * 6) * 3600 } }
+    end
     for _,market in ipairs(Markets.MARKETS) do
         for _,vehicleKey in ipairs(market.vehicles or {}) do
-            local entry=Catalogue.byKey(vehicleKey); local prestige=(entry and entry.prestige) or 3
-            M.LINES[#M.LINES+1]={marketId=market.marketId,vehicleKey=vehicleKey,price=priceByPrestige[prestige],
-                ceiling=math.max(1,6-prestige),initialAllocation=1,batch=1,cadenceSec=(2+prestige)*3600,
-                envelope={batchMin=1,batchMax=math.max(1,3-math.floor(prestige/2)),intervalMin=3600,intervalMax=(12+prestige*12)*3600}}
+            M.LINES[#M.LINES+1]=M.autofixerLine(market.marketId, vehicleKey)
         end
     end
 
@@ -116,6 +129,60 @@ Core.define("economy.production", function(C)
         local cadence = (type(line) == "table" and tonumber(line.cadenceSec)) or 3600
         -- A line with no envelope cannot move: bounds equal to its authored schedule.
         return { batchMin = batch, batchMax = batch, intervalMin = cadence, intervalMax = cadence }
+    end
+
+    --- THE ROTATION (2026-10-12, live: no market had ever carried more than 3 models). Each autofixer keeps its
+    --- authored specialty lines and takes `ROTATION_SIZE` more, drawn deterministically for one tape and one Week
+    --- (`seedKey` = server id + run index): the same catalogue class as its specialty (cars stay cars, bikes stay
+    --- bikes), weighted toward its specialty's prestige, never a model it already sells. A new Week, a new line-up;
+    --- the cars already standing on a rotated-out shelf stay for sale until sold or marked down. Idempotent per key.
+    M.ROTATION_SIZE = 6
+    local rotatedFor = nil
+    function M.rotate(seedKey)
+        seedKey = tostring(seedKey or "")
+        if rotatedFor == seedKey then return 0 end
+        local Hash = C.get("vocabulary.hash")
+        local kept = {}
+        for _, l in ipairs(M.LINES) do if not l.rotating then kept[#kept + 1] = l end end
+        M.LINES = kept
+        local all = Catalogue.entries()
+        local added = 0
+        for _, market in ipairs(Markets.MARKETS) do
+            if market.kind == "autofixer" and market.vehicles and #market.vehicles > 0 then
+                local have, classes, pSum = {}, {}, 0
+                for _, k in ipairs(market.vehicles) do
+                    have[k] = true
+                    local e = Catalogue.byKey(k)
+                    if e then classes[e.category or ""] = true; pSum = pSum + (e.prestige or 3) end
+                end
+                local pMean = pSum / #market.vehicles
+                local pool = {}
+                for _, e in ipairs(all) do
+                    if classes[e.category or ""] and not have[e.vehicleKey] and e.prestige then
+                        pool[#pool + 1] = { key = e.vehicleKey, weight = 1 / (1 + math.abs((e.prestige or 3) - pMean)) }
+                    end
+                end
+                local r = Hash.stream("market_rotation", seedKey, market.marketId)
+                for _ = 1, math.min(M.ROTATION_SIZE, #pool) do
+                    local pick, i = r:weighted(pool)
+                    if not pick then break end
+                    table.remove(pool, i)
+                    M.LINES[#M.LINES + 1] = M.autofixerLine(market.marketId, pick.key, true)
+                    added = added + 1
+                end
+            end
+        end
+        rotatedFor = seedKey
+        return added
+    end
+
+    --- The price a car standing on a shelf asks after `ageS` unsold: the full line price for a day, then 8 % less
+    --- for every further 12 h, never below 60 %. (Dead stock no longer sits at list price forever.)
+    function M.markdown(price, ageS)
+        price = tonumber(price) or 0
+        local steps = math.max(0, math.floor(((tonumber(ageS) or 0) - 24 * 3600) / (12 * 3600)) + 1)
+        if (tonumber(ageS) or 0) < 24 * 3600 then steps = 0 end
+        return math.floor(price * math.max(0.6, 0.92 ^ steps))
     end
 
     function M.linesFor(marketId)

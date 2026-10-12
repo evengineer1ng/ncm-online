@@ -53,6 +53,22 @@ local function ownerSet(key, t)
     return [[ncm_driver_id = NULL, owner_principal_kind = ?, owner_principal_id = ?, location_kind = 'npc_storage',
         machine_asset_id = NULL, acquired_via = 'exchange', acquired_at = ?]], { kind, id, t }
 end
+-- a car: an NPC's spare goes to its buyer ready to drive (lifecycle back to 'active' for a player; an NPC buyer keeps it
+-- as a spare until its garage takes it up)
+local function vehicleFrom(key)
+    local kind, id = EX.split(key)
+    if kind == "driver" then return "ncm_driver_id = ?", { id } end
+    return "ncm_driver_id IS NULL AND owner_principal_kind = ? AND owner_principal_id = ? AND lifecycle = 'npc_spare'", { kind, id }
+end
+local function vehicleSet(key, t)
+    local kind, id = EX.split(key)
+    if kind == "driver" then
+        return [[ncm_driver_id = ?, owner_principal_kind = NULL, owner_principal_id = NULL, lifecycle = 'active',
+            acquired_via = 'exchange', acquired_at = ?]], { id, t }
+    end
+    return [[ncm_driver_id = NULL, owner_principal_kind = ?, owner_principal_id = ?, lifecycle = 'npc_spare',
+        acquired_via = 'exchange', acquired_at = ?]], { kind, id, t }
+end
 local function cat(...)
     local out = {}
     for _, list in ipairs({ ... }) do for _, v in ipairs(list) do out[#out + 1] = v end end
@@ -77,13 +93,32 @@ function PaddockExchange.part(assetId)
         price = tonumber(r.price) or 0, name = ("%s %s"):format(r.display_manufacturer or "", r.code or "") }
 end
 
+--- A car's facts for the Exchange: { assetId, owner (key), spare (an NPC's retired car), vehicleKey, prestige, newPrice,
+--- odometerM, name }. Only NPC spares are offered today (2026-10-12); players buy them.
+local Production = NcmCore.get("economy.production")
+local Vehicles = NcmCore.get("data.vehicle_catalogue")
+function PaddockExchange.vehicle(assetId)
+    local r = MySQL.single.await([[SELECT asset_id, ncm_driver_id, owner_principal_kind, owner_principal_id, lifecycle, vehicle_key, odometer_m
+        FROM vehicle_asset WHERE asset_id = ? AND server_id = ?]], { tostring(assetId or ""), U.sid() })
+    if not r then return nil end
+    local owner = r.ncm_driver_id and EX.principal("driver", r.ncm_driver_id)
+        or (r.owner_principal_id and EX.principal(r.owner_principal_kind, r.owner_principal_id)) or nil
+    local e = Vehicles.byKey(r.vehicle_key)
+    local prestige = math.max(1, math.min(5, (e and e.prestige) or 3))
+    local line = nil
+    for _, l in ipairs(Production.LINES) do if l.vehicleKey == r.vehicle_key then line = l break end end
+    return { assetId = r.asset_id, owner = owner, spare = r.lifecycle == "npc_spare", vehicleKey = r.vehicle_key, prestige = prestige,
+        newPrice = (line and line.price) or Production.PRICE_BY_PRESTIGE[prestige], odometerM = tonumber(r.odometer_m) or 0,
+        name = e and (e.manufacturer .. " " .. e.displayName) or r.vehicle_key }
+end
+
 local function reservedBy(assetId)
     return MySQL.single.await("SELECT holder_kind, holder_id FROM exchange_reservation WHERE asset_id = ?", { assetId })
 end
 
 local function postRow(r)
     if not r then return nil end
-    return { postId = r.post_id, kind = r.kind, principal = EX.principal(r.principal_kind, r.principal_id), assetId = r.asset_id,
+    return { postId = r.post_id, kind = r.kind, assetKind = r.asset_kind or "part", principal = EX.principal(r.principal_kind, r.principal_id), assetId = r.asset_id,
         family = r.want_family, tier = r.want_tier, cash = tonumber(r.cash) or 0, state = r.state, revision = tonumber(r.revision) or 1,
         note = r.note, createdAt = tonumber(r.created_at) or 0, expiresAt = tonumber(r.expires_at) or 0 }
 end
@@ -128,11 +163,16 @@ PaddockExchange.cashOf = cashOf
 function PaddockExchange.postFor(key, p, t)
     p = type(p) == "table" and p or {}
     local spec = { kind = p.kind, principal = key, assetId = p.assetId, family = p.family, tier = p.tier,
-        cash = math.floor(tonumber(p.cash) or 0), note = p.note }
+        cash = math.floor(tonumber(p.cash) or 0), note = p.note, assetKind = p.assetKind }
     local ok, why = EX.validatePost(spec)
     if not ok then return nil, why end
     if openCount("exchange_post", key) >= EX.MAX_OPEN_POSTS then return nil, "too_many_posts" end
-    if spec.kind == "offer" then
+    if spec.assetKind == "vehicle" then
+        local car = PaddockExchange.vehicle(spec.assetId)
+        if not car or car.owner ~= key then return nil, "not_your_car" end
+        if not car.spare then return nil, "car_in_use" end
+        if reservedBy(spec.assetId) then return nil, "car_already_promised" end
+    elseif spec.kind == "offer" then
         local part = PaddockExchange.part(spec.assetId)
         if not part or part.owner ~= key then return nil, "not_your_part" end
         if not part.stored then return nil, "part_not_in_storage" end
@@ -142,8 +182,9 @@ function PaddockExchange.postFor(key, p, t)
     local postId = ids.uuid4(rng)
     local tx = {
         { query = [[INSERT INTO exchange_post (post_id, server_id, kind, principal_kind, principal_id, asset_id, want_family, want_tier,
-            cash, state, revision, note, created_at, expires_at) VALUES (?, ?, ?, ?, ?, NULLIF(?, ''), NULLIF(?, ''), NULLIF(?, ''), ?, 'open', 1, NULLIF(?, ''), ?, ?)]],
-          values = { postId, U.sid(), spec.kind, kind, id, spec.assetId or "", spec.family or "", spec.tier or "", spec.cash, spec.note or "", t, t + EX.POST_TTL_SEC } },
+            cash, state, revision, note, created_at, expires_at, asset_kind) VALUES (?, ?, ?, ?, ?, NULLIF(?, ''), NULLIF(?, ''), NULLIF(?, ''), ?, 'open', 1, NULLIF(?, ''), ?, ?, ?)]],
+          values = { postId, U.sid(), spec.kind, kind, id, spec.assetId or "", spec.family or "", spec.tier or "", spec.cash, spec.note or "", t,
+              t + (spec.assetKind == "vehicle" and EX.VEHICLE_TTL_SEC or EX.POST_TTL_SEC), spec.assetKind or "part" } },
     }
     if spec.kind == "offer" then
         tx[#tx + 1] = { query = "INSERT INTO exchange_reservation (asset_id, server_id, holder_kind, holder_id, created_at) VALUES (?, ?, 'post', ?, ?)",
@@ -235,18 +276,25 @@ function PaddockExchange.settlementTx(post, bid, t)
     local sid = ids.uuid4(rng)
     local GATE = "EXISTS (SELECT 1 FROM exchange_settlement WHERE settlement_id = ?)"
     local tx = {}
-    -- 2. the parts, each only from where it is expected
+    -- 2. the parts (and a car), each only from where it is expected
     for _, a in ipairs(legs.assets) do
-        local setSql, setV = ownerSet(a.to, t)
-        local fromSql, fromV = ownerStored(a.from)
-        tx[#tx + 1] = { query = ("UPDATE component_asset SET %s WHERE asset_id = ? AND server_id = ? AND %s"):format(setSql, fromSql),
-            values = cat(setV, { a.assetId, U.sid() }, fromV) }
+        if a.kind == "vehicle" then
+            local setSql, setV = vehicleSet(a.to, t)
+            local fromSql, fromV = vehicleFrom(a.from)
+            tx[#tx + 1] = { query = ("UPDATE vehicle_asset SET %s WHERE asset_id = ? AND server_id = ? AND %s"):format(setSql, fromSql),
+                values = cat(setV, { a.assetId, U.sid() }, fromV) }
+        else
+            local setSql, setV = ownerSet(a.to, t)
+            local fromSql, fromV = ownerStored(a.from)
+            tx[#tx + 1] = { query = ("UPDATE component_asset SET %s WHERE asset_id = ? AND server_id = ? AND %s"):format(setSql, fromSql),
+                values = cat(setV, { a.assetId, U.sid() }, fromV) }
+        end
     end
     -- 3. the gate
     local conds, cv = {}, {}
     for _, a in ipairs(legs.assets) do
         local isSql, isV = ownerIs(a.to)
-        conds[#conds + 1] = ("EXISTS (SELECT 1 FROM component_asset WHERE asset_id = ? AND %s)"):format(isSql)
+        conds[#conds + 1] = ("EXISTS (SELECT 1 FROM %s WHERE asset_id = ? AND %s)"):format(a.kind == "vehicle" and "vehicle_asset" or "component_asset", isSql)
         cv = cat(cv, { a.assetId }, isV)
     end
     local amount = legs.cash and legs.cash.amount or 0
@@ -271,12 +319,29 @@ function PaddockExchange.settlementTx(post, bid, t)
     tx[#tx + 1] = { query = ([[INSERT INTO exchange_settlement (settlement_id, server_id, post_id, bid_id, cash, payer_kind, payer_id, payee_kind,
         payee_id, detail_json, settled_at) SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ? FROM DUAL WHERE %s]]):format(table.concat(conds, " AND ")),
         values = cat({ sid, U.sid(), post.postId, bid.bidId, amount, pk, pi, qk, qi, detail, t }, cv) }
-    -- 4. a part moved without the gate goes back
+    -- 4. a part (or car) moved without the gate goes back; behind the gate, a car's installed parts follow it and the
+    --    car's history records the sale
     for _, a in ipairs(legs.assets) do
-        local setSql, setV = ownerSet(a.from, t)
         local isSql, isV = ownerIs(a.to)
-        tx[#tx + 1] = { query = ("UPDATE component_asset SET %s WHERE asset_id = ? AND %s AND NOT %s"):format(setSql, isSql, GATE),
-            values = cat(setV, { a.assetId }, isV, { sid }) }
+        if a.kind == "vehicle" then
+            local setSql, setV = vehicleSet(a.from, t)
+            tx[#tx + 1] = { query = ("UPDATE vehicle_asset SET %s WHERE asset_id = ? AND %s AND NOT %s"):format(setSql, isSql, GATE),
+                values = cat(setV, { a.assetId }, isV, { sid }) }
+            local tk, tid = EX.split(a.to)
+            tx[#tx + 1] = { query = ([[UPDATE component_asset SET ncm_driver_id = ?, owner_principal_kind = ?, owner_principal_id = ?
+                WHERE machine_asset_id = ? AND location_kind = 'installed' AND %s]]):format(GATE),
+                values = { tk == "driver" and tid or nil, tk ~= "driver" and tk or nil, tk ~= "driver" and tid or nil, a.assetId, sid } }
+            local fk, fid = EX.split(a.from)
+            tx[#tx + 1] = { query = ([[INSERT IGNORE INTO vehicle_asset_transfer (transfer_id, idem_key, server_id, asset_id, from_driver_id,
+                to_driver_id, kind, market_id, amount, occurred_at, from_principal, reason) SELECT ?, ?, ?, ?, ?, ?, 'exchange', '', ?, ?, ?,
+                'exchange_sale' FROM DUAL WHERE %s]]):format(GATE),
+                values = { ids.uuid4(rng), "exchange:" .. sid .. ":" .. a.assetId, U.sid(), a.assetId, fk == "driver" and fid or nil,
+                    tk == "driver" and tid or nil, legs.cash and legs.cash.amount or 0, t, a.from, sid } }
+        else
+            local setSql, setV = ownerSet(a.from, t)
+            tx[#tx + 1] = { query = ("UPDATE component_asset SET %s WHERE asset_id = ? AND %s AND NOT %s"):format(setSql, isSql, GATE),
+                values = cat(setV, { a.assetId }, isV, { sid }) }
+        end
     end
     -- 5. money, behind the gate
     local function moneyStep(key, signed, what)
@@ -357,12 +422,18 @@ function PaddockExchange.settle(post, bid, t)
     -- an NPC that received a part it can use fits it
     for _, a in ipairs(legs.assets) do
         local kind, id = EX.split(a.to)
-        if kind ~= "driver" then pcall(PaddockMarkets.fitOwned, kind, id, PaddockExchange.part(a.assetId)) end
+        if kind ~= "driver" and a.kind ~= "vehicle" then pcall(PaddockMarkets.fitOwned, kind, id, PaddockExchange.part(a.assetId)) end
     end
-    log("SETTLED post %s with bid %s: %s -> %s, %d eddies, %d part(s)", post.postId, bid.bidId, tostring(legs.cash and legs.cash.from),
-        tostring(legs.cash and legs.cash.to), legs.cash and legs.cash.amount or 0, #legs.assets)
-    PaddockExchange.tell(bid.principal, "Trade done", "Your bid was accepted. The part has moved.")
-    PaddockExchange.tell(post.principal, "Trade done", "Your post was filled. The part has moved.")
+    local car = post.assetKind == "vehicle"
+    log("SETTLED post %s with bid %s: %s -> %s, %d eddies, %d %s", post.postId, bid.bidId, tostring(legs.cash and legs.cash.from),
+        tostring(legs.cash and legs.cash.to), legs.cash and legs.cash.amount or 0, #legs.assets, car and "car" or "part(s)")
+    PaddockExchange.tell(bid.principal, "Trade done", car and "Your bid was accepted. The car is yours: call it from Machine Index."
+        or "Your bid was accepted. The part has moved.")
+    PaddockExchange.tell(post.principal, "Trade done", car and "Your car was sold." or "Your post was filled. The part has moved.")
+    if car then
+        local bk, bid_ = EX.split(bid.principal)
+        if bk == "driver" then TriggerEvent("ncm:ownership:changed", bid_) end
+    end
     return true
 end
 
@@ -423,8 +494,37 @@ local cursor = 0
 function PaddockExchange.trade(t)
     if not set("npcExchangeEnabled", true) then return end
     PaddockExchange.sweep(t)
-    local y = U.yielder(3)
+    local y = U.yielder(2)
     local budget = set("npcExchangeActionsPerPass", 6)
+    -- 0. 2026-10-12: spares (an NPC's replaced car) are offered at a used price; a car post nobody took comes down
+    --    (EX.markdown on its first ask, kept in the note) unless someone is bidding on it
+    local spares = MySQL.query.await([[SELECT a.asset_id, a.owner_principal_kind, a.owner_principal_id FROM vehicle_asset a
+        LEFT JOIN exchange_reservation r ON r.asset_id = a.asset_id
+        WHERE a.server_id = ? AND a.lifecycle = 'npc_spare' AND a.ncm_driver_id IS NULL AND a.owner_principal_kind IS NOT NULL AND r.asset_id IS NULL
+        LIMIT 3]], { U.sid() }) or {}
+    for _, r in ipairs(spares) do
+        local car = PaddockExchange.vehicle(r.asset_id)
+        if car then
+            local ask = EX.usedAsk(car.newPrice, car.odometerM, 0)
+            local key = EX.principal(r.owner_principal_kind, r.owner_principal_id)
+            if PaddockExchange.postFor(key, { kind = "offer", assetKind = "vehicle", assetId = r.asset_id, cash = ask,
+                note = ("ask0=%d"):format(ask) }, t) then stats.npcPosts = stats.npcPosts + 1 end
+        end
+        y()
+    end
+    Wait(0)
+    for _, r in ipairs(MySQL.query.await([[SELECT p.* FROM exchange_post p WHERE p.server_id = ? AND p.state = 'open' AND p.asset_kind = 'vehicle'
+        AND p.principal_kind <> 'driver' AND NOT EXISTS (SELECT 1 FROM exchange_bid b WHERE b.post_id = p.post_id AND b.state = 'open')
+        AND p.created_at < ? LIMIT 6]], { U.sid(), t - 12 * 3600 }) or {}) do
+        local ask0 = tonumber(tostring(r.note or ""):match("ask0=(%d+)")) or tonumber(r.cash) or 0
+        local want = EX.markdown(ask0, t - (tonumber(r.created_at) or t))
+        if want < (tonumber(r.cash) or 0) then
+            MySQL.update.await("UPDATE exchange_post SET cash = ?, revision = revision + 1 WHERE post_id = ? AND state = 'open' AND cash > ?",
+                { want, r.post_id, want })
+        end
+        y()
+    end
+    Wait(0)
     -- 1. NPC posts: surplus parts in storage, offered a little above what they would take
     local surplus = MySQL.query.await([[SELECT a.asset_id, a.owner_principal_kind, a.owner_principal_id, d.family, d.tier, d.price
         FROM component_asset a JOIN component_design d ON d.design_id = a.design_id
@@ -470,7 +570,9 @@ function PaddockExchange.trade(t)
         local best = EX.best(post, PaddockExchange.bidsOn(post.postId))
         if best then
             local fine
-            if post.kind == "offer" then
+            if post.assetKind == "vehicle" then
+                fine = best.cash >= math.floor(post.cash * 0.9)      -- a fair bid on a car: within 10 % of today's ask
+            elseif post.kind == "offer" then
                 local part = PaddockExchange.part(post.assetId)
                 fine = part and best.cash >= NM.askFloor(part, 50)
             else
@@ -480,6 +582,7 @@ function PaddockExchange.trade(t)
         end
         y()
     end
+    Wait(0)
     -- 4. players' posts: an NPC that values an offered part bids its asking price; one with a matching surplus part
     --    fills a player's want
     local theirs = MySQL.query.await([[SELECT p.* FROM exchange_post p WHERE p.server_id = ? AND p.state = 'open' AND p.principal_kind = 'driver'
@@ -514,6 +617,7 @@ function PaddockExchange.trade(t)
         end
         y()
     end
+    Wait(0)
     -- 5. L298 (audit L297: 225 posts, zero settlements -- NPC offers and NPC wants never met, step 4 served players
     --    only). NPC to NPC: a racer whose car a posted part fits and improves bids the ask; a stored part that matches
     --    an NPC's want is offered to it. Step 3 settles both on the next pass.
@@ -523,7 +627,9 @@ function PaddockExchange.trade(t)
     for _, r in ipairs(npcPosts) do
         if budget <= 0 then break end
         local post = postRow(r)
-        if post.kind == "offer" then
+        if post.assetKind == "vehicle" then
+            -- an NPC whose race car is worse bids on a better used car it can afford (EX.npcCarBid)
+        elseif post.kind == "offer" then
             local part = PaddockExchange.part(post.assetId)
             if part and PaddockMarkets and PaddockMarkets.wouldFit then
                 for _, n in ipairs(npcs) do
@@ -552,6 +658,7 @@ function PaddockExchange.trade(t)
         end
         y()
     end
+    Wait(0)
     -- 6. L298 SCRAP: a part that has sat unsold in an NPC's storage for `npcScrapAfterDays` leaves service -- scrapped
     --    for a fraction of its list price (the sink beside the Exchange: parts circulate, they do not pile up)
     local old = MySQL.query.await([[SELECT a.asset_id, a.owner_principal_kind, a.owner_principal_id, d.price FROM component_asset a

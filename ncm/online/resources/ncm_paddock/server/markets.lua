@@ -216,43 +216,23 @@ local Production = NcmCore.get("economy.production")
 local Vehicles = NcmCore.get("data.vehicle_catalogue")
 local Season = NcmCore.get("paddock.season")
 
---- The old car leaves: traded in to the market that sells its model (listed USED, its owner the market's again, for
---- the next buyer -- player or NPC), or scrapped when no market sells it. Returns the trade-in value paid to the owner.
+--- The old car leaves the racer's garage -- but never back to a manufacturer (2026-10-12, owner: NPC resales "should
+--- never have been able to sell back to manufacturer to begin with"). It stays its owner's as a SPARE (lifecycle
+--- 'npc_spare', its parts with it) and the Exchange pass offers it to players and NPCs at a used price
+--- (`economy.exchange_posts.usedAsk`); the owner is paid when it sells. Returns 0: nothing is paid now.
 local function tradeIn(pr, old, t)
-    local line
-    for _, l in ipairs(Production.LINES) do if l.vehicleKey == old.vehicleKey then line = l break end end
     local tx = {
-        { query = [[UPDATE component_asset SET owner_principal_kind = NULL, owner_principal_id = NULL WHERE machine_asset_id = ?
-            AND location_kind = 'installed']], values = { old.assetId } },
+        { query = [[UPDATE vehicle_asset SET lifecycle = 'npc_spare', lifecycle_at = ?, lifecycle_cause = 'npc_replaced' WHERE asset_id = ?]],
+          values = { t, old.assetId } },
+        { query = [[INSERT IGNORE INTO vehicle_asset_transfer (transfer_id, idem_key, server_id, asset_id, from_driver_id, to_driver_id, kind,
+            market_id, amount, occurred_at, from_principal, reason) VALUES (?, ?, ?, ?, NULL, NULL, 'retired_spare', '', 0, ?, ?, 'replace_car')]],
+          values = { ids.uuid4(rng), ("npc_spare:%s:%s:%d"):format(U.sid(), old.assetId, t), U.sid(), old.assetId, t, NM.principal(pr.kind, pr.id) } },
     }
-    local value, how
-    if line then
-        value = math.floor((tonumber(line.price) or old.value) * set("npcTradeInShare", 0.40))
-        how = "traded_in"
-        tx[#tx + 1] = { query = [[UPDATE vehicle_asset SET owner_principal_kind = NULL, owner_principal_id = NULL WHERE asset_id = ?]], values = { old.assetId } }
-        tx[#tx + 1] = { query = [[INSERT INTO market_inventory (market_id, asset_id, price, state, listed_at) VALUES (?, ?, ?, 'available', ?)
-            ON DUPLICATE KEY UPDATE price = VALUES(price), state = 'available', listed_at = VALUES(listed_at), sold_at = NULL,
-            sold_to_driver_id = NULL, sold_to_principal = NULL]],
-            values = { line.marketId, old.assetId, math.floor((tonumber(line.price) or old.value) * set("npcUsedPriceShare", 0.55)), t } }
-    else
-        value = math.floor(old.value * set("npcScrapShare", 0.15))
-        how = "scrapped"
-        tx[#tx + 1] = { query = [[UPDATE vehicle_asset SET lifecycle = 'scrapped', lifecycle_at = ?, lifecycle_cause = 'npc_replaced' WHERE asset_id = ?]],
-            values = { t, old.assetId } }
-    end
-    tx[#tx + 1] = { query = [[INSERT IGNORE INTO vehicle_asset_transfer (transfer_id, idem_key, server_id, asset_id, from_driver_id, to_driver_id, kind,
-        market_id, amount, occurred_at, from_principal, reason) VALUES (?, ?, ?, ?, NULL, NULL, ?, ?, ?, ?, ?, 'replace_car')]],
-        values = { ids.uuid4(rng), ("npc_%s:%s:%s:%d"):format(how, U.sid(), old.assetId, t), U.sid(), old.assetId, how,
-            line and line.marketId or "", value, t, NM.principal(pr.kind, pr.id) } }
-    for _, st in ipairs(PaddockMarkets.moneyStatements(pr.kind, pr.id, value, how, old.assetId, t, Garage.REASON.CAR, old.vehicleKey)) do tx[#tx + 1] = st end
     local ok, err = PaddockMarkets.atomic(tx)
-    if not ok then log("trade-in of %s FAILED: %s", old.assetId:sub(1, 8), tostring(err)) return 0 end
-    pr.obj.cash = cashOf(pr) + value
-    mark(pr)
+    if not ok then log("retiring %s FAILED: %s", old.assetId:sub(1, 8), tostring(err)) return 0 end
     PaddockCars.invalidate(old.assetId)
-    log("%s %s's old %s %s %s for %d%s", pr.kind, pr.id, old.vehicleKey, old.assetId:sub(1, 8), how, value,
-        line and (" (listed used at " .. line.marketId .. ")") or "")
-    return value
+    log("%s %s's old %s %s kept as a spare for the Exchange", pr.kind, pr.id, old.vehicleKey, old.assetId:sub(1, 8))
+    return 0
 end
 
 --- A better car off a market shelf: a model of the racer's band of higher class than the one they race, affordable,

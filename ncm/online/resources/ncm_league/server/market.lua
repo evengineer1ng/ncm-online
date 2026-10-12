@@ -325,10 +325,50 @@ local function runDue(line, state, t)
 end
 
 --- One pass over every authored line. Safe to call repeatedly and cheap when nothing is due.
+-- 2026-10-12: the line-up rotates per tape and Week (core economy.production.rotate), and cars nobody buys come down
+-- (Production.markdown: full price for a day, then 8 % per 12 h, never below 60 %). Used cars are never listed here:
+-- NPC resales go to the Exchange (ncm_paddock/server/markets.lua).
+local rotationKey = nil
+local function rotate()
+    local run = NcmCollapse and NcmCollapse.runIndex and NcmCollapse.runIndex() or 0
+    local key = serverId() .. "#" .. tostring(run or 0)
+    if key ~= rotationKey then
+        local added = Production.rotate(key)
+        rotationKey = key
+        log("line-up for Week run %s: %d rotating line(s), %d in all", tostring(run), added, #Production.LINES)
+    end
+end
+
+local markdownAt = 0
+local function markdown(t)
+    if t - markdownAt < 600 then return end
+    markdownAt = t
+    local rows = MySQL.query.await([[SELECT mi.market_id, mi.asset_id, mi.price, mi.listed_at, a.vehicle_key FROM market_inventory mi
+        JOIN vehicle_asset a ON a.asset_id = mi.asset_id WHERE mi.state = 'available' AND mi.listed_at < ?]], { t - 24 * 3600 }) or {}
+    local n = 0
+    for _, r in ipairs(rows) do
+        local line = Production.line(r.market_id, r.vehicle_key)
+        local entry = Catalogue.byKey(r.vehicle_key)
+        local list = line and line.price or (entry and Production.PRICE_BY_PRESTIGE[math.max(1, math.min(5, entry.prestige or 3))]) or tonumber(r.price)
+        local listedAt = tonumber(r.listed_at) or t
+        if listedAt > 1e11 then listedAt = math.floor(listedAt / 1000) end
+        local want = Production.markdown(list, t - listedAt)
+        if want < (tonumber(r.price) or 0) then
+            MySQL.update.await("UPDATE market_inventory SET price = ? WHERE market_id = ? AND asset_id = ? AND state = 'available' AND price > ?",
+                { want, r.market_id, r.asset_id, want })
+            n = n + 1
+        end
+    end
+    if n > 0 then log("markdown: %d unsold car(s) came down in price", n) end
+end
+
 function NcmMarket.produce()
+    pcall(rotate)
     local valid, why = Production.validate()
     if not valid then log("PRODUCTION DATA INVALID: %s -- no production will run", tostring(why)); return 0 end
     local t = now()
+    local okM, errM = pcall(markdown, t)
+    if not okM then log("markdown pass failed: %s", tostring(errM)) end
     local total = 0
     for _, line in ipairs(Production.LINES) do
         local okLine, minted = pcall(function()
@@ -397,7 +437,19 @@ end
 function NcmMarket.offerings(marketId)
     local t = now()
     local out = {}
-    for _, line in ipairs(Production.linesFor(marketId)) do
+    -- 2026-10-12: a model whose line rotated out of this shop still has cars standing here: they stay on sale (as a
+    -- LEFTOVER offering -- no production promised) until sold or marked down
+    local lines, have = {}, {}
+    for _, l in ipairs(Production.linesFor(marketId)) do lines[#lines + 1] = l; have[l.vehicleKey] = true end
+    for _, r in ipairs(MySQL.query.await([[SELECT DISTINCT a.vehicle_key FROM market_inventory mi JOIN vehicle_asset a ON a.asset_id = mi.asset_id
+        WHERE mi.market_id = ? AND mi.state = 'available' ORDER BY a.vehicle_key]], { marketId }) or {}) do
+        if r.vehicle_key and not have[r.vehicle_key] and Catalogue.byKey(r.vehicle_key) then
+            local l = Production.autofixerLine(marketId, r.vehicle_key, true)
+            l.leftover = true
+            lines[#lines + 1] = l
+        end
+    end
+    for _, line in ipairs(lines) do
         -- The LIVE committed plan, not the authored starting one: what a player sees is this manufacturer's
         -- current intention. The profile that chose it and the envelope it moves in stay server-side.
         local st = MySQL.single.await([[SELECT next_tick_at, batch, interval_sec FROM market_supply_state
@@ -411,6 +463,7 @@ function NcmMarket.offerings(marketId)
             -- measured (`L157`) -- the panel labels it so, because section 5 of the capability audit shows
             -- the rated figure and the observed one disagree in a known direction. nil leaves the slot
             -- reading `Not rated`.
+            if line.leftover then o.leftover, o.nextProductionAt, o.nextBatch = true, nil, nil end
             local entry = Catalogue.byKey(line.vehicleKey)
             o.declaredTopSpeedKph = entry and Catalogue.declaredTopSpeedKph(entry) or nil
             o.lastBatch = NcmMarket.lastBatch(marketId, line.vehicleKey)
