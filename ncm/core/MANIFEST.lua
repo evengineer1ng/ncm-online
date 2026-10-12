@@ -106,6 +106,8 @@ return {
     "space/drive_jump.lua",
     "space/drive_wormhole.lua",
     "space/data_navstars.lua",
+    "presentation/fx_cues.lua",
+    "presentation/fx.lua",
     "space/places.lua",
     "space/embodiment.lua",
     "space/raceworld.lua",

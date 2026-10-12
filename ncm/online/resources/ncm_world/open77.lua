@@ -28,7 +28,7 @@ auto_start true
 --   ring had never drawn -- every create was refused `permission_denied:world.markers`, ten times a second.
 -- world.prevention: the console-only `ncm.wanted` probe for IDEA-677 (`Open77.players.setWanted`). Declared
 --   so a live test cannot fail on a missing permission; the card lists none, the client plugin checks this one.
-permissions { "database.access", "network.events", "state.write", "world.vehicles", "ui.vanilla.map", "ui.nameplates", "input.actions", "map.control", "players.teleport", "players.life.read", "players.life.respawn", "http.request", "world.props", "world.npcs", "vehicles.read", "world.query", "world.environment", "world.population", "players.stats.apply", "world.prevention", "world.timescale", "players.screenfx", "players.hacking.define", "players.hacking.read", "players.hacking.activate", "players.hacking.cancel", "players.cyberware.define", "players.cyberware.read", "players.cyberware.manage", "combat.scope.control", "combat.config", "player.travel", "screen.effects", "world.markers", "world.transform", "local.events" }
+permissions { "database.access", "network.events", "state.write", "world.vehicles", "ui.vanilla.map", "ui.nameplates", "input.actions", "map.control", "players.teleport", "players.life.read", "players.life.respawn", "http.request", "world.props", "world.npcs", "vehicles.read", "world.query", "world.environment", "world.population", "players.stats.apply", "world.prevention", "world.timescale", "players.screenfx", "players.hacking.define", "players.hacking.read", "players.hacking.activate", "players.hacking.cancel", "players.cyberware.define", "players.cyberware.read", "players.cyberware.manage", "combat.scope.control", "combat.config", "player.travel", "screen.effects", "world.markers", "world.transform", "local.events", "world.effects" }
 
 -- Race HUD (M3.2): light tree, banner and race strip as our own WebUI page.
 web_ui_page "web/race.html"
@@ -150,6 +150,8 @@ shared_script "shared/core/space/drive_alcubierre.lua"
 shared_script "shared/core/space/drive_jump.lua"
 shared_script "shared/core/space/drive_wormhole.lua"
 shared_script "shared/core/space/data_navstars.lua"
+shared_script "shared/core/presentation/fx_cues.lua"
+shared_script "shared/core/presentation/fx.lua"
 shared_script "shared/core/space/places.lua"
 shared_script "shared/core/space/embodiment.lua"
 shared_script "shared/core/space/raceworld.lua"
@@ -294,6 +296,7 @@ server_script "server/journey.lua"      -- schema 067: a Machine's physical jour
 server_script "server/passport.lua"     -- L336: the Machine Passport; each host expresses a Machine through it
 server_script "server/deep.lua"         -- L326: the handoff to NCM's own universe (development only)
 server_script "server/deep_drives.lua"  -- doc 58: drive activations, checkpoints, travel, wormholes
+server_script "server/fx_relay.lua"     -- NCM FX: everyone sees a Machine's plumes, strokes and drives
 server_script "server/life.lua"         -- KB-350: a dead player comes back (NCM loads no freeroam)
 server_script "shared/core/space/stars/data_stars.lua"
 server_script "shared/core/space/stars/data_stars_01.lua"
@@ -355,6 +358,7 @@ client_script "client/telemetry.lua"
 client_script "client/ghost.lua"
 -- After telemetry.lua: the bridge reuses its `NcmClientOwnVehicle` reader rather than duplicating it.
 client_script "client/carrier_bridge.lua"
+client_script "client/fx.lua"            -- NCM FX: the native renderer (before engineering.lua and deep.lua, which feed it)
 client_script "client/engineering.lua"    -- L324: installed components -> world force (after carrier_bridge)
 client_script "client/gearing.lua"        -- stacked gearboxes: driveline paths -> Carrier -> NCM Gearbox (after engineering)
 client_script "client/deepview.lua"      -- L352: Deep shown in the game's own world (before deep.lua, which calls it)

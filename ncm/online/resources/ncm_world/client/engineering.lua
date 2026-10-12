@@ -19,6 +19,7 @@
 local Core = NcmCore
 local Install = Core.get("engineering.installation")
 local Controls = Core.get("engineering.controls")
+local Fx = Core.get("presentation.fx")
 
 local function log(fmt, ...) print(("[ncm_world/client/engineering] " .. fmt):format(...)) end
 
@@ -220,6 +221,23 @@ local function deviceFrame(E, dt, t)
                 E.lastSend, E.lastF = t, mag
             end
             E.lastW, E.lastFrame, E.hot = w, frame, hot
+
+            -- NCM FX (presentation.fx): what the devices just did, drawn at their mounts (client/fx.lua)
+            if NcmFx and frame then
+                local okV, v = pcall(Open77.vehicles.get, boundVehicle)
+                local pos = okV and type(v) == "table" and v.position or nil
+                if pos then
+                    local z = tonumber(pos.z) or 0
+                    local env = { rho = 1.225 * math.exp(-math.max(0, z) / 8500), contact = v.onGround == true, altitude = z }
+                    local em = Fx.fromInstall(E.assetId, E.devices, r.out, E.state, env)
+                    local body = Fx.machine(E.assetId, { speed = tonumber(v.speed) or 0, rho = env.rho, contact = env.contact,
+                        altitude = z }, E.fxBody)
+                    E.fxBody = body[1].q
+                    em[#em + 1] = body[1]
+                    NcmFx.publish(E.assetId, boundVehicle, em)
+                    NcmFx.frame(E.assetId, em, frame, pos)
+                end
+            end
 
             if t - E.report.since >= REPORT_MS then
                 local active = E.report.kg > 0 or (E.report.fusionKg or 0) > 0 or mag > 0

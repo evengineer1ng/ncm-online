@@ -23,6 +23,7 @@ local GeoLod = Core.get("space.geolod")   -- L332: which real imagery the Deep p
 local Dyn = Core.get("engineering.dynamics")
 local Drives = Core.get("space.drives")   -- doc 58: the experimental propulsion stable
 local Travel = Core.get("space.travel")
+local Fx = Core.get("presentation.fx")   -- NCM FX: physics -> native effects (client/fx.lua draws)
 -- KB-375 (owner, 2026-10-07: "cant have ksa opening way before you know its there ... a consent screen saying that there is
 -- a deeper simulation layer and activating it ... on demand when approaching the border of ncm deep"): nothing about KSA is
 -- asked, probed or launched until the player consents, approaching the border. `consent` nil = not asked yet, true =
@@ -1321,6 +1322,27 @@ local function tick()
         local okX, errX = pcall(NcmDriveFx.update, { page = A.page, m = m, dyn = ds, s = A.s, utc = utcNow(), now = now,
             native = CAM_NAMES[camMode] == "native" and not GD.open, conv = conv })
         if not okX and not A.fxErr then A.fxErr = true; log("drive layer skipped: %s", tostring(errX)) end
+    end
+    -- NCM FX (presentation.fx): the parts, the body and the drives, drawn natively on the held car. Every frame (a
+    -- stroke is an edge of ONE step); the drive views are refreshed ten times a second. Guarded like the rest.
+    if NcmFx and tel then
+        local okFx, errFx = pcall(function()
+            local em = Fx.fromDynamics(A.asset or "deep", m, ds, tel, {})
+            local body = Fx.machine(A.asset or "deep", { speed = Deep.vec.len(ds.vel or { 0, 0, 0 }), rho = tel.rho,
+                qPa = tel.qPa, aeroHeatKw = tel.aeroHeatKw }, A.fxBody)
+            A.fxBody = body[1].q
+            em[#em + 1] = body[1]
+            if now - (A.fxViewsAt or 0) >= 100 then A.fxViewsAt, A.fxViews = now, Fx.fromDrives(A.asset or "deep", Drives.view(m, ds)) end
+            for _, e in ipairs(A.fxViews or {}) do em[#em + 1] = e end
+            local okF, f = pcall(Open77.character.frame, { vehicleId = A.vid })
+            local okP, v = pcall(Open77.vehicles.get, A.vid)
+            if okF and type(f) == "table" and okP and type(v) == "table" and v.position then
+                NcmFx.publish(A.asset or "deep", A.vid, em)
+                NcmFx.frame(A.asset or "deep", em, f, v.position)
+            end
+        end)
+        if not okFx and not A.fxNativeErr then A.fxNativeErr = true; log("native FX skipped: %s", tostring(errFx)) end
+        prof("fx")
     end
     -- doc 58: each drive's store, to the server (it only ever lowers it) every two seconds when it changed
     if #(m.drives or {}) > 0 and now - (A.chargeAt or 0) >= 2000 then
