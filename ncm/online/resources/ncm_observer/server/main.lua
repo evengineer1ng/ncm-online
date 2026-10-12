@@ -88,7 +88,7 @@ function NcmObserver.exit(pid, why)
             if not (ok and p) then log("exit: teleport home refused: %s", tostring(ok and r or p)) end
         end
     end
-    log("EXIT player=%d after %d s (%s)", pid, now() - (o.since or now()), tostring(why))
+    log("EXIT player=%d after %d s (%s)", pid, math.floor(now() - (o.since or now())), tostring(why))
 end
 
 function NcmObserver.is(pid) return observers[tonumber(pid) or 0] ~= nil end
@@ -142,7 +142,7 @@ end)
 
 local function directorPass()
     if not lastSnap then return end
-    local opts = { minShotSec = set("minShotSec", 12), maxShotSec = set("maxShotSec", 45), battleGapMs = set("battleGapMs", 1500) }
+    local opts = { minShotSec = set("minShotSec", 12), maxShotSec = set("maxShotSec", 45), battleGapMs = set("battleGapMs", 1500), nearM = set("jumpM", 200) }
     for pid, o in pairs(observers) do
         if o.auto then
             local t, why = D.step({ target = o.target, since = o.shotSince }, lastSnap, now(), opts)
@@ -292,10 +292,10 @@ RegisterCommand("ncm.observer", function(source, args)
         local n = 0
         for p, o in pairs(observers) do
             n = n + 1
-            log("observer player=%d (%s) for %d s, %s, target %s", p, tostring(GetPlayerName(p)), now() - o.since,
+            log("observer player=%d (%s) for %d s, %s, target %s", p, tostring(GetPlayerName(p)), math.floor(now() - o.since),
                 o.auto and "auto" or "manual", o.target and (tostring(o.target.name) .. " in " .. tostring(o.target.raceId)) or "none")
         end
-        log("%d observer(s); racer snapshot %s", n, lastSnap and ("%d s old, %d race(s)"):format(now() - lastSnapAt, #(lastSnap.races or {})) or "never received")
+        log("%d observer(s); racer snapshot %s", n, lastSnap and ("%d s old, %d race(s)"):format(math.floor(now() - lastSnapAt), #(lastSnap.races or {})) or "never received")
         if verb ~= "list" then log("usage: ncm.observer on|off <pid> | list") end
     end
 end, false)

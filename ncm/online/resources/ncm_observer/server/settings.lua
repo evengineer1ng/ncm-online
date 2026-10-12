@@ -9,12 +9,12 @@ local ok, settings = pcall(Open77.tunables.declare, {
     -- ASK; entering is still the player's own explicit act (F3 -> ENTER OBSERVER, on foot), never automatic (L307 O-4).
     observerAllow = { value = "*", type = "string", apply = "live" },
     directorTickSec = { value = 2, type = "integer", min = 1, max = 30, unit = "s", apply = "live" },
-    minShotSec = { value = 12, type = "integer", min = 2, max = 300, unit = "s", apply = "live" },
-    maxShotSec = { value = 45, type = "integer", min = 5, max = 900, unit = "s", apply = "live" },
-    battleGapMs = { value = 1500, type = "integer", min = 100, max = 10000, unit = "ms", apply = "live" },
+    minShotSec = { value = 30, type = "integer", min = 2, max = 300, unit = "s", apply = "live" },
+    maxShotSec = { value = 90, type = "integer", min = 5, max = 900, unit = "s", apply = "live" },
+    battleGapMs = { value = 1000, type = "integer", min = 100, max = 10000, unit = "ms", apply = "live" },
     -- a server teleport (it settles streaming) when the target is this far from the ghost; nearer, the client hops
     -- must stay below the client's 240 m ask (client/observer.lua), or a ghost 240-jumpM m away is never moved
-    jumpM = { value = 200, type = "integer", min = 100, max = 230, unit = "m", apply = "live" },
+    jumpM = { value = 230, type = "integer", min = 100, max = 230, unit = "m", apply = "live" },
 })
 if not ok then print("[ncm_observer/settings] tunables.declare FAILED: " .. tostring(settings)) settings = nil end
 
