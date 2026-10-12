@@ -17,6 +17,10 @@
       --sim: #8a97a6;
       --danger: #ff5d6c;
       --street: #ff9a3c; --regional: #39d5ff; --pro: #b07bff; --premier: #ffd24a;
+      /* the ink (owner 2026-10-09: "some ink hud related to using it"): the Engineering job sheet's / SL-1's language */
+      --ink: #efe6d2; --ink-dim: rgba(239, 230, 210, 0.5); --ink-gold: #f5c95c; --ink-live: #7fe0c0;
+      --mono: "IBM Plex Mono", "Cascadia Mono", "Consolas", ui-monospace, monospace;
+      --hand: "Segoe Script", "Bradley Hand", "Ink Free", "Comic Sans MS", cursive;
     }
     * { box-sizing: border-box; }
     html, body { margin: 0; width: 1920px; height: 1080px; overflow: hidden; background: transparent;
@@ -24,13 +28,46 @@
     .hidden { display: none !important; }
 
     /* ---------------------------------------------------------------- the strip (panel closed) */
-    #strip { position: absolute; left: 32px; bottom: 30px; display: flex; align-items: stretch; gap: 0;
-      background: var(--bg); border: 1px solid var(--line); border-left: 4px solid var(--accent); font-size: 22px; }
-    #strip .cell { padding: 8px 16px; border-right: 1px solid var(--line); display: flex; align-items: center; gap: 10px; }
-    #strip .cell:last-child { border-right: 0; }
-    #strip .tag { color: var(--accent); font-weight: 700; letter-spacing: 2px; }
-    #strip .pos { color: var(--hot); font-weight: 700; }
-    #strip .hint { color: var(--dim); font-size: 17px; }
+    /* the ink HUD: no box, written straight onto the picture */
+    .inkt { color: var(--ink); text-shadow: 0 1px 3px rgba(0,0,0,0.9), 0 0 1px rgba(0,0,0,0.9); }
+    #strip { position: absolute; left: 44px; bottom: 40px; max-width: 1100px; }
+    #strip .eyebrow { font: 700 13px var(--mono); letter-spacing: 0.42em; color: var(--ink-dim); }
+    #strip .who { font: 34px var(--hand); margin: 2px 0 0; white-space: nowrap; }
+    #strip .who.mine { color: var(--ink-gold); }
+    #strip .who .pos { font: 700 26px var(--mono); margin-right: 12px; }
+    #strip .where { font: 600 15px var(--mono); letter-spacing: 0.12em; color: var(--ink-dim); text-transform: uppercase; margin-top: 2px; }
+    #strip svg.rule { display: block; margin: 6px 0 8px; }
+    #strip svg.rule path { fill: none; stroke: var(--ink); stroke-width: 1.6; stroke-linecap: round; opacity: 0.7; }
+    #strip .team { font: 600 15px var(--mono); letter-spacing: 0.08em; color: var(--ink-gold); margin-bottom: 6px; }
+    #strip .team .dim { color: var(--ink-dim); }
+    #strip .keys { font: 600 13px var(--mono); letter-spacing: 0.14em; color: var(--ink-dim); text-transform: uppercase; }
+    #strip .keys b { color: var(--ink); font-weight: 700; }
+    #strip .dir { color: var(--ink-gold); font: 700 13px var(--mono); letter-spacing: 0.3em; margin-left: 10px; }
+
+    /* the how-to card and the off-duty note, in the same ink */
+    #guide { position: absolute; left: 44px; top: 120px; width: 620px; padding: 22px 26px 18px; color: var(--ink);
+      background: rgba(10, 9, 7, 0.62); border: 1.5px solid rgba(239, 230, 210, 0.35); border-radius: 3px;
+      text-shadow: 0 1px 2px rgba(0,0,0,0.8); transition: opacity 0.5s ease; }
+    #guide h3 { margin: 0; font: 30px var(--hand); font-weight: normal; }
+    #guide .sub { font: 700 12px var(--mono); letter-spacing: 0.36em; color: var(--ink-dim); margin: 2px 0 12px; }
+    #guide ol { margin: 0; padding-left: 26px; }
+    #guide li { font: 500 16px/1.42 var(--mono); margin: 0 0 7px; }
+    #guide li b { color: var(--ink-gold); font-weight: 700; }
+    #guide li i { color: var(--ink-live); font-style: normal; }
+    #guide .close { font: 600 12px var(--mono); letter-spacing: 0.2em; color: var(--ink-dim); margin-top: 10px; }
+    #nudge { position: absolute; right: 52px; top: 150px; width: 470px; text-align: right; transition: opacity 0.6s ease; }
+    #nudge .eyebrow { font: 700 12px var(--mono); letter-spacing: 0.42em; color: var(--ink-gold); }
+    #nudge .who { font: 30px var(--hand); color: var(--ink-gold); }
+    #nudge .what { font: 600 14px var(--mono); letter-spacing: 0.1em; color: var(--ink-dim); text-transform: uppercase; }
+    #nudge .how { font: 600 14px var(--mono); letter-spacing: 0.12em; margin-top: 4px; }
+    .fade { opacity: 0; }
+    /* your team inside the panel */
+    .mine-mark { color: var(--ink-gold); font-weight: 700; margin-left: 8px; font-size: 16px; letter-spacing: 1px; }
+    .row.mine .grow { color: var(--ink-gold); }
+    .team-box { border-bottom: 1px solid var(--line); padding: 4px 0 8px; }
+    .team-box .row { font-size: 19px; }
+    .team-box .note2 { padding: 6px 18px; color: var(--dim); font-size: 16px; line-height: 1.35; }
+    .team-box .note2 b { color: var(--ink-gold); font-weight: 600; }
     .dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; background: var(--sim); }
     .dot.live { background: var(--live); box-shadow: 0 0 8px var(--live); }
 
@@ -80,14 +117,55 @@
     #toast { position: absolute; left: 50%; top: 40px; transform: translateX(-50%); background: var(--bg); border: 1px solid var(--line);
       border-left: 4px solid var(--hot); padding: 10px 18px; font-size: 21px; }
   </style>
+<script>
+// 2026-10-12: this page is authored on a fixed 1920x1080 canvas. Its surface follows the screen (any size, any aspect --
+// 2176x1812 streamed), so the canvas is scaled UNIFORMLY to fit and centred: never stretched. 1920x1080: scale 1.
+(function () {
+  function fit() {
+    var W = window.innerWidth, H = window.innerHeight, r = document.documentElement;
+    if (!W || !H || !r) return;
+    var s = Math.min(W / 1920, H / 1080);
+    r.style.zoom = String(s);
+    r.style.position = "relative";
+    r.style.left = Math.max(0, (W / s - 1920) / 2) + "px";
+    r.style.top = Math.max(0, (H / s - 1080) / 2) + "px";
+  }
+  window.addEventListener("resize", fit);
+  document.addEventListener("DOMContentLoaded", fit);
+  fit();
+})();
+</script>
 </head>
 <body>
-  <div id="strip" class="hidden">
-    <div class="cell"><span class="tag">OBSERVER</span></div>
-    <div class="cell"><span class="dot" id="s-dot"></span><span class="pos" id="s-pos"></span><span id="s-name">Nothing yet</span></div>
-    <div class="cell"><span id="s-series" class="meta"></span></div>
-    <div class="cell"><span id="s-cam"></span><span id="s-auto" class="tag hidden">DIRECTOR</span></div>
-    <div class="cell hint" id="s-hint">F3 panel · 1-8 camera · PgUp/PgDn car · Home leader · B battle · N director · H clean</div>
+  <div id="strip" class="hidden inkt">
+    <div class="eyebrow">OBSERVER · <span id="s-cam"></span><span id="s-auto" class="dir hidden">DIRECTOR</span></div>
+    <div class="who" id="s-who"><span class="pos" id="s-pos"></span><span id="s-name">Nothing yet</span></div>
+    <div class="where"><span class="dot" id="s-dot"></span> <span id="s-series"></span></div>
+    <svg class="rule" width="420" height="10" viewBox="0 0 420 10"><path d="M2 6 C 60 2, 120 9, 200 5 S 340 3, 418 6"/></svg>
+    <div class="team" id="s-team"></div>
+    <div class="keys" id="s-hint"><b>F3</b> panel · <b>Y</b> your team · <b>N</b> director · <b>1-8</b> camera · <b>PgUp/PgDn</b> car · <b>B</b> battle · <b>H</b> clean</div>
+  </div>
+
+  <div id="guide" class="hidden">
+    <h3>Watching the races</h3>
+    <div class="sub">NCM OBSERVER · HOW IT WORKS</div>
+    <ol>
+      <li><b>F3</b> opens the Observer panel. <b>ENTER OBSERVER</b> turns you into an invisible flying camera. Step out of your car first. Nothing you do while observing counts: no racing, no money.</li>
+      <li>Your team's drivers are marked in <b>gold</b>: in YOUR TEAM and RACES NOW, in the running order, and down here on the screen.</li>
+      <li>Press <b>Y</b> to jump to your drivers, one after another. If none is racing, it tells you, and the gold appears as soon as one starts.</li>
+      <li>Click a race, then a driver to watch. Or press <b>N</b> and the director picks the story: it holds a shot and cuts to battles.</li>
+      <li><b>1-8</b> camera · <b>PgUp/PgDn</b> the car ahead or behind · <b>Home</b> the leader · <b>B</b> the closest battle · <b>H</b> a clean screen.</li>
+      <li><i>Green dot</i>: the car is really on the road. Grey: it is still in the simulation and arrives as the camera gets close.</li>
+      <li><b>EXIT OBSERVER</b> (F3) puts you back where you started.</li>
+    </ol>
+    <div class="close">THIS CARD FADES ON ITS OWN · F3 &gt; HOW IT WORKS BRINGS IT BACK</div>
+  </div>
+
+  <div id="nudge" class="hidden inkt">
+    <div class="eyebrow">YOUR DRIVER IS RACING</div>
+    <div class="who" id="n-who"></div>
+    <div class="what" id="n-what"></div>
+    <div class="how">F3 &gt; ENTER OBSERVER &gt; Y</div>
   </div>
 
   <div id="panel" class="hidden">
@@ -98,6 +176,8 @@
     </header>
     <div class="cols">
       <div class="col">
+        <h2 id="team-title">YOUR TEAM</h2>
+        <div class="team-box" id="teambox"></div>
         <h2>RACES NOW</h2>
         <div class="list" id="races"></div>
       </div>
@@ -112,7 +192,7 @@
         <div class="note" id="note"></div>
       </div>
     </div>
-    <footer><b>Click</b> a race to see its order · <b>click</b> a driver to watch · <b>1-8</b> camera · <b>PgUp/PgDn</b> previous/next car · <b>Home</b> leader · <b>B</b> closest battle · <b>N</b> director · <b>H</b> clean HUD · <b>Esc/F3</b> close</footer>
+    <footer><b>Click</b> a race to see its order · <b>click</b> a driver to watch · <b>Y</b> your team · <b>1-8</b> camera · <b>PgUp/PgDn</b> previous/next car · <b>Home</b> leader · <b>B</b> closest battle · <b>N</b> director · <b>H</b> clean HUD · <b>Esc/F3</b> close</footer>
   </div>
 
   <div id="toast" class="hidden"></div>
@@ -123,7 +203,8 @@
         ["chase", "CHASE"], ["far", "FAR CHASE"], ["drone", "DRONE"], ["onboard", "ONBOARD"],
         ["orbit", "ORBIT"], ["side", "SIDE"], ["front", "FRONT"], ["low", "LOW"]
       ];
-      var st = { on: false, open: false, mode: "chase", auto: false, clean: false, target: null, races: [], field: [], selected: null, allowed: true };
+      var st = { on: false, open: false, mode: "chase", auto: false, clean: false, target: null, races: [], field: [], selected: null, allowed: true, team: false };
+      var wasOn = false, guideTimer = null, nudgeTimer = null;
       var $ = function (id) { return document.getElementById(id); };
       var emit = function (ev, p) { try { Open77.emit(ev, p || {}); } catch (e) {} };
       var toastTimer = null;
@@ -142,12 +223,41 @@
         if (!show) return;
         var t = st.target;
         $("s-pos").textContent = t && t.p ? "P" + t.p : "";
-        $("s-name").textContent = t ? t.name : "Pick a race: F3";
-        $("s-series").textContent = (t && t.series ? t.series : "") + (t && !t.live ? " · in the simulation, arriving as you get close" : "");
+        $("s-name").textContent = t ? t.name : "Pick a race: F3, or Y for your team";
+        $("s-who").className = "who" + (t && t.mine ? " mine" : "");
+        $("s-series").textContent = (t && t.mine ? "your team · " : "") + (t && t.series ? t.series : "") + (t && !t.live ? " · in the simulation, arriving as you get close" : "");
         $("s-dot").className = "dot" + (t && t.live ? " live" : "");
         $("s-cam").textContent = camName(st.mode);
         $("s-auto").classList.toggle("hidden", !st.auto);
         $("s-hint").classList.toggle("hidden", st.clean);
+        $("s-team").classList.toggle("hidden", st.clean);
+        $("s-team").innerHTML = teamLine();
+      }
+
+      function teamLine() {
+        var tm = st.team;
+        if (!tm) return "";
+        if (tm.none) return '<span class="dim">NO PADDOCK TEAM · PADDOCK &gt; MY ORG</span>';
+        var parts = (tm.racing || []).map(function (r) { return esc(r.name) + (r.p ? " P" + esc(r.p) : "") + ' <span class="dim">' + esc(r.series) + "</span>"; });
+        if (!parts.length) return esc(String(tm.name || "").toUpperCase()) + ' <span class="dim">· nobody racing right now</span>';
+        return "&#9670; " + esc(String(tm.name || "").toUpperCase()) + " · " + parts.join(" · ");
+      }
+
+      function drawTeam() {
+        var el = $("teambox"), tm = st.team;
+        $("team-title").textContent = tm && tm.name ? "YOUR TEAM · " + String(tm.name).toUpperCase() : "YOUR TEAM";
+        if (!tm) { el.innerHTML = '<div class="note2">Looking up your team...</div>'; return; }
+        if (tm.none) { el.innerHTML = '<div class="note2">You don\'t run a Paddock team. Found one on <b>PADDOCK &gt; MY ORG</b>; its drivers are marked here in gold whenever they race.</div>'; return; }
+        var h = "";
+        (tm.racing || []).forEach(function (r) {
+          var watching = st.target && st.target.raceId === r.raceId && st.target.key === r.k;
+          h += '<div class="row mine' + (watching ? " watching sel" : "") + '" data-mine-race="' + esc(r.raceId) + '" data-mine-car="' + esc(r.k) + '"><span class="p">' + esc(r.p || "") +
+            '</span><span class="dot' + (r.live ? " live" : "") + '"></span><span class="grow">' + esc(r.name) + '</span><span class="meta">' + esc(r.series) + '</span></div>';
+        });
+        if (!(tm.racing || []).length) h += '<div class="note2">None of your ' + esc(tm.size || 0) + ' driver(s) is racing right now. When one starts, they appear here in <b>gold</b>; press <b>Y</b> to jump to them.</div>';
+        else if (!st.on) h += '<div class="note2"><b>ENTER OBSERVER</b> below, then click a gold driver or press <b>Y</b>.</div>';
+        if ((tm.idle || []).length && (tm.racing || []).length) h += '<div class="note2">Not racing: ' + esc(tm.idle.join(", ")) + '</div>';
+        el.innerHTML = h;
       }
 
       function drawRaces() {
@@ -157,7 +267,7 @@
         st.races.forEach(function (r) {
           var cls = "row" + (r.r === st.selected ? " sel" : "") + (st.target && st.target.raceId === r.r ? " watching" : "");
           h += '<div class="' + cls + '" data-race="' + esc(r.r) + '"><span class="tier ' + esc(r.tier) + '">' + esc(String(r.tier || "").toUpperCase()) +
-            '</span><span class="grow">' + esc(r.series) + '</span><span class="meta">' + esc(r.n) + ' cars</span></div>';
+            '</span><span class="grow">' + esc(r.series) + (r.mine ? '<span class="mine-mark">&#9670; ' + esc(r.mine) + '</span>' : "") + '</span><span class="meta">' + esc(r.n) + ' cars</span></div>';
         });
         el.innerHTML = h;
       }
@@ -171,9 +281,9 @@
         var h = "";
         st.field.forEach(function (c) {
           var watching = st.target && st.target.raceId === st.selected && st.target.key === c.k;
-          h += '<div class="row' + (watching ? " watching sel" : "") + '" data-car="' + esc(c.k) + '"><span class="p">' + esc(c.p || "") +
+          h += '<div class="row' + (c.mine ? " mine" : "") + (watching ? " watching sel" : "") + '" data-car="' + esc(c.k) + '"><span class="p">' + esc(c.p || "") +
             '</span><span class="dot' + (c.live ? " live" : "") + '" title="' + (c.live ? "on the road" : "in the simulation") + '"></span><span class="grow">' + esc(c.n) +
-            (c.h ? '<span class="human">PLAYER</span>' : "") + '</span><span class="gap">' + esc(gap(c.g, c.p)) + '</span></div>';
+            (c.h ? '<span class="human">PLAYER</span>' : "") + (c.mine ? '<span class="mine-mark">YOUR TEAM</span>' : "") + '</span><span class="gap">' + esc(gap(c.g, c.p)) + '</span></div>';
         });
         el.innerHTML = h;
       }
@@ -190,9 +300,12 @@
           a += '<button class="btn" data-act="battle">BATTLE<span class="k">B</span></button>';
           a += '<button class="btn" data-act="leader">LEADER<span class="k">HOME</span></button>';
           a += '<button class="btn' + (st.clean ? " on" : "") + '" data-act="clean">CLEAN HUD<span class="k">H</span></button>';
+          a += '<button class="btn" data-act="team">MY TEAM<span class="k">Y</span></button>';
+          a += '<button class="btn" data-act="guide">HOW IT WORKS</button>';
           a += '<button class="btn wide danger" data-act="exit">EXIT OBSERVER</button>';
         } else {
           a += '<button class="btn wide big go" data-act="enter">ENTER OBSERVER</button>';
+          a += '<button class="btn wide" data-act="guide">HOW IT WORKS</button>';
         }
         $("actions").innerHTML = a;
         $("note").textContent = st.on
@@ -210,7 +323,33 @@
       function draw() {
         $("panel").classList.toggle("hidden", !st.open);
         drawStrip();
-        if (st.open) { drawHeader(); drawRaces(); drawField(); drawControls(); }
+        if (st.open) { drawHeader(); drawTeam(); drawRaces(); drawField(); drawControls(); }
+        // the card writes itself the first time a session enters, then fades; HOW IT WORKS brings it back
+        if (st.on && !wasOn) showGuide(16000);
+        if (!st.on && wasOn) hideGuide();
+        wasOn = st.on;
+      }
+
+      function showGuide(ms) {
+        var g = $("guide");
+        g.classList.remove("hidden"); g.classList.remove("fade");
+        if (guideTimer) clearTimeout(guideTimer);
+        guideTimer = setTimeout(hideGuide, ms || 16000);
+      }
+      function hideGuide() {
+        var g = $("guide");
+        g.classList.add("fade");
+        if (guideTimer) clearTimeout(guideTimer);
+        guideTimer = setTimeout(function () { g.classList.add("hidden"); }, 600);
+      }
+      function nudge(p) {
+        if (st.on) return;
+        var n = $("nudge");
+        $("n-who").textContent = p.name || "";
+        $("n-what").textContent = [p.team, p.series, p.p ? "P" + p.p : ""].filter(Boolean).join(" · ");
+        n.classList.remove("hidden"); n.classList.remove("fade");
+        if (nudgeTimer) clearTimeout(nudgeTimer);
+        nudgeTimer = setTimeout(function () { n.classList.add("fade"); nudgeTimer = setTimeout(function () { n.classList.add("hidden"); }, 700); }, 9000);
       }
 
       function toast(text) {
@@ -221,10 +360,15 @@
       }
 
       document.addEventListener("click", function (e) {
-        var n = e.target.closest ? e.target.closest("[data-race],[data-car],[data-cam],[data-act]") : null;
+        var n = e.target.closest ? e.target.closest("[data-mine-car],[data-race],[data-car],[data-cam],[data-act]") : null;
         if (e.target.id === "p-close") { emit("obs:close"); return; }
         if (!n) return;
-        if (n.dataset.race) {
+        if (n.dataset.mineCar) {
+          emit("obs:select", { raceId: n.dataset.mineRace });
+          if (st.on) emit("obs:watch", { text: "car " + n.dataset.mineRace + " " + n.dataset.mineCar });
+          else toast("ENTER OBSERVER first, then click your driver.");
+        } else if (n.dataset.act === "guide") { if ($("guide").classList.contains("hidden")) showGuide(30000); else hideGuide();
+        } else if (n.dataset.race) {
           if (n.dataset.race === st.selected && st.on) emit("obs:watch", { text: "race " + n.dataset.race });
           emit("obs:select", { raceId: n.dataset.race });
         } else if (n.dataset.car) { emit("obs:watch", { text: "car " + st.selected + " " + n.dataset.car });
@@ -245,6 +389,7 @@
         if (l === "b") emit("obs:act", { act: "battle" });
         else if (l === "n") emit("obs:act", { act: "auto" });
         else if (l === "h") emit("obs:act", { act: "clean" });
+        else if (l === "y") emit("obs:act", { act: "team" });
       });
 
       Open77.on("obs:state", function (p) {
@@ -256,6 +401,7 @@
         if (p.open) emit("obs:drawn", { at: Date.now() });
       });
       Open77.on("obs:toast", function (p) { if (p && p.text) toast(p.text); });
+      Open77.on("obs:nudge", function (p) { if (p) nudge(p); });
 
       draw();
       emit("obs:ready", {});

@@ -1,0 +1,71 @@
+{
+  "Id": "rw_marquee_quadra_9ef05f",
+  "Name": "rw_marquee_quadra",
+  "Version": 1,
+  "SourceFile": "rw_marquee_quadra.obj",
+  "SourceModel": "rw_marquee_quadra.obj",
+  "Created": "2026-10-08T08:41:37.7660134-04:00",
+  "Modified": "2026-10-08T08:41:37.7660134-04:00",
+  "Import": {
+    "Scale": 1,
+    "UpAxis": "Z",
+    "Pivot": "BottomCenter",
+    "Yaw": 0,
+    "ImportMaterials": true,
+    "MaxTextureSize": 2048
+  },
+  "Materials": [
+    {
+      "Name": "marquee",
+      "Kind": "Standard",
+      "GameMaterial": null,
+      "BaseColor": {
+        "X": 1,
+        "Y": 1,
+        "Z": 1,
+        "W": 1
+      },
+      "BaseColorTexture": "rw_marquee_quadra.png",
+      "Roughness": 0.6,
+      "RoughnessTexture": null,
+      "RoughnessChannel": 0,
+      "InvertRoughness": false,
+      "Metalness": 0,
+      "MetalnessTexture": null,
+      "MetalnessChannel": 0,
+      "NormalTexture": null,
+      "NormalStrength": 1,
+      "FlipNormalGreen": false,
+      "EmissiveColor": {
+        "X": 0,
+        "Y": 0,
+        "Z": 0
+      },
+      "EmissiveEV": 0,
+      "EmissiveTexture": null,
+      "AlphaCutout": false,
+      "AlphaThreshold": 0.5,
+      "DoubleSided": false,
+      "GlassOpacity": 0.25
+    }
+  ],
+  "Bounds": {
+    "Min": {
+      "X": -4.7,
+      "Y": 0,
+      "Z": -3.3
+    },
+    "Max": {
+      "X": 4.7,
+      "Y": 4.6,
+      "Z": 3.3
+    }
+  },
+  "Vertices": 26,
+  "Triangles": 14,
+  "Submeshes": 1,
+  "Warnings": [],
+  "Credits": "",
+  "MeshPath": "ncwe\\custom\\rw_marquee_quadra_9ef05f\\rw_marquee_quadra_9ef05f.mesh",
+  "Hash": 12866469978248237302
+}

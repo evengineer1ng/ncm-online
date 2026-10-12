@@ -858,6 +858,14 @@ check("market displays all three distinct full authoritative IDs",assetIds.every
 check("three assets of one model give three purchase actions",
   (identityText.match(/PURCHASE/g)||[]).length===3,identityText.slice(0,300));
 fire("panel:show",{panel:"collection"});
+const collectionWireValue={label:"Machine Index",total:45,discovered:45,owned:1,slots:Array.from({length:45},(_,i)=>({slot:i+1,discovered:true,owned:i===0,displayName:i===44?"Hella Épreuve":"Machine "+(i+1),assets:i===0?[{assetId:assetIds[0]}]:[]}))};
+const collectionWireText=JSON.stringify(collectionWireValue);
+const collectionWireParts=collectionWireText.match(/.{1,700}/gu);
+emitted.length=0;
+fire("panel:collection.json.begin",{id:"collection-json-45",n:collectionWireParts.length});
+collectionWireParts.forEach((part,i)=>fire("panel:collection.json.part",{id:"collection-json-45",index:i+1,text:part}));
+check("Machine Index reassembles all 45 JSON fragments and draws",/45 \/ 45 DISCOVERED/.test(document.getElementById("collectionCount")._innerHTML||document.getElementById("collectionCount").innerHTML||""));
+check("Machine Index acknowledges the head and every browser fragment",emitted.filter(e=>e.name==="panel:collection.json.ack").length===collectionWireParts.length+1);
 fire("panel:collection",{label:"Machine Index",slots:[{slot:1,discovered:true,owned:true,displayName:"MaiMai",assets:assetIds.slice(0,2).map(assetId=>({assetId}))}]});
 const ownedButtons=document.getElementById("collectionDetail").children.filter(x=>x._text==="CALL VEHICLE");
 check("two examples of one model have two owner actions",ownedButtons.length===2);
@@ -1030,6 +1038,10 @@ drawWheel("wheel panel draws for a companion with no device at all",{enabled:tru
 drawWheel("wheel panel draws for a companion sending only the old fields",
   {enabled:true,connected:true,sent:12,device:{name:"Wheel",class:"belt",rung:3,
     rungs:[0.02,0.04,0.06,0.08,0.10,0.12,0.14,0.16,0.18,0.20],armed:false}});
+// A zero-device array crosses the Lua WebUI boundary as {}. This exact state closed the owner's panel.
+drawWheel("wheel panel draws when Lua sends an empty device object",
+  {enabled:true,connected:true,sent:1,device:{name:"BOUND DEVICE NOT CONNECTED",class:"unknown",armed:false,
+    rig:{devices:{},roles:{}}}});
 
 const FULL={enabled:true,connected:true,sent:900,device:{
   name:"Thrustmaster T128",class:"belt",rung:4,
@@ -1147,12 +1159,16 @@ check("the landing panel no longer carries the progression notice",
   !/id="landingContract"/.test(html), "markup");
 check("the landing panel no longer carries the capability list",
   !/id="landingCaps"/.test(html) && !/What you can do today/.test(html), "markup");
-const newText = dump(document.getElementById("landingNew")).join(" | ");
-check("what's new shows the newest release's items", /Events now pay out/.test(newText), newText);
-
-const hintText = dump(document.getElementById("landingHint")).join(" ");
-check("the hint counts releases since the player was last here, not total releases",
-  /2 releases since/.test(hintText), hintText);
+// 2026-10-09: the landing panel is HOW TO PLAY -- four quick-start steps, the controls, rotating tips; the patch
+// notes are one press away rather than the whole screen.
+check("the landing panel teaches how to play in four steps",
+  /HOW TO PLAY NCM/.test(html) && (html.match(/class="landing-step"/g) || []).length === 4, "markup");
+check("the controls strip names every NCM key, Engineering included",
+  /F6 \/ PAD START/.test(html) && /F9<\/b> · Engineering/.test(html) && /F10<\/b> · Machine Index/.test(html), "markup");
+check("a tip is shown", dump(document.getElementById("landingTipText")).join(" ").length > 20,
+  dump(document.getElementById("landingTipText")).join(" "));
+check("patch notes stay one press away, hidden until asked for",
+  /id="landingPatch"/.test(html) && /id="landingLog" class="hidden"/.test(html), "markup");
 
 const relRows = document.getElementById("landingScroll").children || [];
 check("every release is listed", relRows.length === 3, relRows.length + " rows");
@@ -1190,12 +1206,9 @@ emitted.length = 0;
 fire("panel:show", { panel: "landing", landing: { contract: LANDING.contract, capabilities: [], releases: [],
   offeredCount: 0, newReleaseCount: 0, firstSession: true } });
 check("an unconfigured landing panel still draws rather than a blank card",
-  emitted.some(e => e.name === "panel:drawn")
-    && /No release notes yet/.test(dump(document.getElementById("landingNew")).join(" ")),
-  emitted.map(e => e.name).join(","));
-check("a first session says what to do rather than 'nothing new'",
-  /Race Guide/.test(dump(document.getElementById("landingHint")).join(" ")),
-  dump(document.getElementById("landingHint")).join(" "));
+  emitted.some(e => e.name === "panel:drawn"), emitted.map(e => e.name).join(","));
+check("a first session says what to do: the steps point at the Race Guide",
+  /Use Race Guide to find an event/.test(html), "markup");
 
 // ---- THE PADDOCK (doc 44) --------------------------------------------------------------------------
 // Every sub-view the server can stream, including the empty, loading, error and refused shapes. What matters

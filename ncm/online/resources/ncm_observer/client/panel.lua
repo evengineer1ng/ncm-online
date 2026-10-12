@@ -5,7 +5,8 @@
 --   F3            the panel: RACES NOW (click to see its order; click again to watch its leader), RUNNING ORDER (click a
 --                 driver to watch), CAMERA (eight shots), DIRECTOR / BATTLE / LEADER / CLEAN HUD, ENTER / EXIT OBSERVER
 --   the strip     while observing with the panel closed: who, where, which shot, the keys
---   hotkeys       while observing: 1-8 camera, PgUp/PgDn previous/next car, Home leader, B battle, N director, H clean.
+--   hotkeys       while observing: 1-8 camera, PgUp/PgDn previous/next car, Home leader, B battle, N director, H clean,
+--                 Y your team (owner 2026-10-09: your drivers are marked in gold wherever they race).
 --                 Rebindable (Settings -> KEY BINDINGS); a mapped key never fires while the panel holds the keyboard, so
 --                 the page answers the same keys itself.
 --
@@ -37,10 +38,40 @@ end
 
 -- ------------------------------------------------------------------------------------------------- the state
 
+-- your team (owner 2026-10-09: "spot your team"): the set of your drivers' keys, and where each is racing now
+local function teamKeys()
+    local t = NcmObs.team and NcmObs.team()
+    local keys = {}
+    for _, d in ipairs((t and t.drivers) or {}) do keys[tostring(d.k)] = d end
+    return keys, t
+end
+
+local function teamView(snap)
+    local keys, t = teamKeys()
+    if not t then return nil end
+    if t.none then return { none = true } end
+    local racing, at = {}, {}
+    for _, race in ipairs((snap and snap.races) or {}) do
+        for _, c in ipairs(race.cars or {}) do
+            if keys[tostring(c.k)] then
+                racing[#racing + 1] = { k = tostring(c.k), name = c.n, p = c.p, raceId = race.r, series = race.series or race.r,
+                    live = c.v ~= nil or nil, n = #(race.cars or {}) }
+                at[tostring(c.k)] = true
+            end
+        end
+    end
+    local idle = {}
+    for _, d in ipairs(t.drivers or {}) do if not at[tostring(d.k)] then idle[#idle + 1] = d.name end end
+    return { name = t.name, tier = t.tier, racing = racing, idle = idle, size = #(t.drivers or {}) }
+end
+
 local function races(snap)
     local out = {}
+    local keys = teamKeys()
     for _, race in ipairs((snap and snap.races) or {}) do
-        out[#out + 1] = { r = race.r, series = race.series or race.r, tier = race.tier or "street", n = #(race.cars or {}) }
+        local mine = 0
+        for _, c in ipairs(race.cars or {}) do if keys[tostring(c.k)] then mine = mine + 1 end end
+        out[#out + 1] = { r = race.r, series = race.series or race.r, tier = race.tier or "street", n = #(race.cars or {}), mine = mine > 0 and mine or nil }
     end
     table.sort(out, function(a, b)
         local ra, rb = TIER_RANK[a.tier] or 9, TIER_RANK[b.tier] or 9
@@ -53,8 +84,9 @@ end
 local function fieldOf(snap, raceId)
     local race = raceId and D.findRace(snap, raceId)
     local out = {}
+    local keys = teamKeys()
     for _, c in ipairs((race and race.cars) or {}) do
-        out[#out + 1] = { k = c.k, n = c.n, p = c.p, g = c.g, live = c.v ~= nil or nil, h = c.h }
+        out[#out + 1] = { k = c.k, n = c.n, p = c.p, g = c.g, live = c.v ~= nil or nil, h = c.h, mine = keys[tostring(c.k)] and true or nil }
     end
     table.sort(out, function(a, b) return (a.p or 999) < (b.p or 999) end)
     while #out > 30 do out[#out] = nil end
@@ -70,9 +102,25 @@ local function targetView(snap)
         series = race and race.series or nil, live = car and car.v ~= nil or nil }
 end
 
+-- off duty: one ink note when one of your drivers starts a race, so the player learns there is something to watch
+local nudged = {}
+local function nudge(snap)
+    local tv = teamView(snap)
+    if not (tv and tv.racing and #tv.racing > 0) then return end
+    for _, r in ipairs(tv.racing) do
+        local key = r.raceId .. ":" .. r.k
+        if not nudged[key] then
+            nudged[key] = true
+            pcall(function() page:send("obs:nudge", { name = r.name, series = r.series, p = r.p, team = tv.name }) end)
+            return
+        end
+    end
+end
+
 local function push(force)
     if not (page and ready) then return end
     local on = NcmObs.isOn and NcmObs.isOn() or false
+    if not on and not open then pcall(nudge, NcmObs.snapshot and NcmObs.snapshot() or nil) end
     if not on and not open then
         if lastPushKey ~= "off" then lastPushKey = "off"; pcall(function() page:send("obs:state", { on = false, open = false }) end) end
         return
@@ -82,11 +130,14 @@ local function push(force)
     local t = targetView(snap)
     if not selected or not (snap and D.findRace(snap, selected)) then selected = (t and t.raceId) or (list[1] and list[1].r) or nil end
     local tgt = NcmObs.target and NcmObs.target()
+    local tv = teamView(snap)
+    if t then t.mine = teamKeys()[tostring(t.key)] and true or nil end
     local state = { on = on, open = open, mode = NcmObs.mode(), auto = tgt and tgt.auto or false, clean = NcmObs.isClean(),
-        target = t, races = list, selected = selected, field = open and fieldOf(snap, selected) or {} }
+        target = t, races = list, selected = selected, field = open and fieldOf(snap, selected) or {}, team = tv or false }
     -- the strip changes rarely; the panel redraws on every snapshot while it is open
     local key = table.concat({ tostring(on), tostring(open), tostring(state.mode), tostring(state.auto), tostring(state.clean),
-        t and (t.key .. ":" .. tostring(t.p) .. ":" .. tostring(t.live)) or "-", tostring(selected), tostring(#list) }, "|")
+        t and (t.key .. ":" .. tostring(t.p) .. ":" .. tostring(t.live)) or "-", tostring(selected), tostring(#list),
+        tv and tv.racing and (function() local x = {} for _, r in ipairs(tv.racing) do x[#x + 1] = r.k .. "@" .. tostring(r.p) end return table.concat(x, ",") end)() or "-" }, "|")
     if not force and not open and key == lastPushKey then return end
     lastPushKey = key
     pcall(function() page:send("obs:state", state) end)
@@ -119,6 +170,7 @@ local function openPanel()
     open = true
     openToken = openToken + 1
     local token = openToken
+    if NcmObs.askTeam then NcmObs.askTeam() end
     push(true)
     -- KB-61: no confirmation, no focus
     CreateThread(function()
@@ -173,9 +225,27 @@ local function stepCar(step)
     NcmObs.watch(("car %s %s"):format(race.r, cars[nextI].k))
 end
 
+--- Y: your team. Watches your drivers in turn (each press, the next one racing); says plainly when none is.
+local function watchTeam()
+    local snap, t = current()
+    local tv = teamView(snap)
+    if not tv then NcmObs.askTeam(); NcmObs.toast("Looking up your team..."); return end
+    if tv.none then NcmObs.toast("You don't run a Paddock team. PADDOCK > MY ORG founds one; its drivers show here in gold."); return end
+    if #tv.racing == 0 then
+        NcmObs.toast(("None of %s's drivers is racing right now. The moment one starts, they show here in gold."):format(tostring(tv.name)))
+        return
+    end
+    local at = 0
+    for i, r in ipairs(tv.racing) do if t and t.raceId == r.raceId and tostring(t.key) == r.k then at = i end end
+    local r = tv.racing[(at % #tv.racing) + 1]
+    selected = r.raceId
+    NcmObs.watch(("car %s %s"):format(r.raceId, r.k))
+end
+
 local function act(a)
     local on = NcmObs.isOn()
     if a == "enter" then NcmObs.enter(); return end
+    if a == "team" then if on then watchTeam() else NcmObs.toast("ENTER OBSERVER first, then Y.") end return end
     if not on then return end
     if a == "exit" then NcmObs.exit()
     elseif a == "auto" then
@@ -191,13 +261,24 @@ end
 
 -- ------------------------------------------------------------------------------------------------- the page
 
+
+-- 2026-10-12: the surface follows the screen (the page fits its 1920x1080 canvas uniformly); 1920x1080 if refused
+local function createFitted(opts)
+    local p, why = WebUI.create(opts)
+    if p then return p, why end
+    local fixed = {}
+    for k, v in pairs(opts) do fixed[k] = v end
+    fixed.width, fixed.height = 1920, 1080
+    return WebUI.create(fixed)
+end
 local function bringUp()
     if page then return end
-    local p, why = WebUI.create({ entry = "web/observer.html", layer = "menu", width = 1920, height = 1080,
+    local p, why = createFitted({ entry = "web/observer.html", layer = "menu",
         fps = 30, zIndex = 880, transparent = true, visible = true })
     if not p then log("WebUI failed: %s", tostring(why)); return end
     page = p
     page:on("obs:ready", function() ready = true; log("panel ready"); push(true) end)
+    page:on("obs:team", function() NcmObs.askTeam() end)
     page:on("obs:drawn", function()
         if open and not focused then focus(true) end
     end)
@@ -239,6 +320,8 @@ map("ncm.observer.leader", "NCM Observer: leader", "HOME", function() act("leade
 map("ncm.observer.battle", "NCM Observer: closest battle", "B", function() act("battle") end)
 map("ncm.observer.director", "NCM Observer: director on/off", "N", function() act("auto") end)
 map("ncm.observer.clean", "NCM Observer: clean HUD", "H", function() act("clean") end)
+-- Y, not T: T is the game's phone
+map("ncm.observer.team", "NCM Observer: your team", "Y", function() act("team") end)
 
 AddEventHandler("onResourceStop", function(name)
     if name ~= "ncm_observer" then return end

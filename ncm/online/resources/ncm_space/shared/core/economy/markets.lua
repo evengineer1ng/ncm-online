@@ -44,6 +44,36 @@ Core.define("economy.markets", function(C)
         return nil
     end
 
+    -- ---------------------------------------------------------------------------------------------
+    -- Where flight hardware is sold (owner, 2026-10-10: "space is a secret in nature yes that does not mean
+    -- inaccessible ... distribute the space kind of parts around the different autofixer enabled markets, not in
+    -- base market ... keep slipstream in base market. disperse the rest throughout economy").
+    -- ---------------------------------------------------------------------------------------------
+    -- Each line (lineage) of flight hardware lives at ONE Autofixer, chosen by a stable hash of its lineage, so a
+    -- revision is found where its predecessor was and different lines land in different corners of the city. Every
+    -- other part keeps its own market (the SL-1 and the gearboxes stay in the Base Market).
+    M.FLIGHT_FAMILIES = { propulsor = true, attitude = true, impulse_actuator = true, tank = true, propellant_tank = true }
+
+    function M.autofixers()
+        local out = {}
+        for _, m in ipairs(M.MARKETS) do if m.kind == "autofixer" then out[#out + 1] = m.marketId end end
+        table.sort(out)
+        return out
+    end
+
+    --- The market a design is sold in: an Autofixer for flight hardware, the Base Market otherwise.
+    --- `design` = { family, lineageId? , code? }.
+    function M.homeFor(design)
+        if type(design) ~= "table" or not M.FLIGHT_FAMILIES[design.family or ""] then return M.BASE_ID end
+        local list = M.autofixers()
+        if #list == 0 then return M.BASE_ID end
+        -- the line, not the revision: "eng:zetatech:fd1" and the R&D "...-R002" codes of one lineage share a home
+        local key = tostring(design.lineageId or design.code or design.designId or ""):lower():gsub("%-r%d+$", "")
+        local h = 2166136261
+        for i = 1, #key do h = (h * 403 + (h * 256 % 65536) * 65536 + key:byte(i)) % 4294967296 end   -- exact in 5.4 and LuaJIT
+        return list[(h % #list) + 1]
+    end
+
     function M.known(markets, grants)
         local out, seen = {}, {}
         for _, market in ipairs(markets or M.MARKETS) do

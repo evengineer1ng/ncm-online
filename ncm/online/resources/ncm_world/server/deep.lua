@@ -13,16 +13,29 @@ local inDeep = {}   -- pid -> { vid, at, flags }
 
 local function environment()
     local ok, id = pcall(function() return GlobalState.ncmIdentity end)
-    return tostring(ok and type(id) == "table" and id.environment or "development")
+    return tostring(ok and type(id) == "table" and id.environment or "unknown")
 end
 -- L341: Deep runs on Online too. What a Machine can do out there is what its owner bought and installed.
 local function enabled() local env = environment(); return env == "development" or env == "online" end
 -- The development waivers (dev heat, dev attitude, the ascent probe, the KSA rehearsal): never on Online.
 local function development() return environment() == "development" end
 
+-- KB-448: a join that resumes Deep (canonical.lua) materializes the Machine and freezes it on the SERVER before seating the
+-- player, so the player never holds its physics and `bindingForAuthority` finds nothing: the 2026-10-11 02:57 rejoin's
+-- ENTER was refused, every stage after it too, and the car stayed frozen at the 12,100 m spawn over Night City. The resume
+-- leaves a claim on the vehicle it made for this player; ENTER accepts that one vehicle when no binding is proven.
+NcmDeepResumeClaims = NcmDeepResumeClaims or {}   -- pid -> { vid, asset } (set by canonical.lua's resume)
 local function driving(pid)
-    local b = NcmVehicleAccess and NcmVehicleAccess.bindingForAuthority and NcmVehicleAccess.bindingForAuthority(pid)
-    return b and b.vehicleId and tonumber(b.vehicleId) or nil, b
+    local b, why = nil, nil
+    if NcmVehicleAccess and NcmVehicleAccess.bindingForAuthority then b, why = NcmVehicleAccess.bindingForAuthority(pid) end
+    if b and b.vehicleId then return tonumber(b.vehicleId), b end
+    local c = NcmDeepResumeClaims[pid]
+    if c and tonumber(c.vid) then
+        local okO, o = pcall(Open77.vehicles.owner, tonumber(c.vid))
+        return tonumber(c.vid), { vehicleId = c.vid, assetId = c.asset, resumed = true,
+            seat = okO and type(o) == "table" and ("driver %s, physics %s"):format(tostring(o.driver), tostring(o.physicsOwner or o.authorityPlayerId)) or "owner unknown" }
+    end
+    return nil, why
 end
 
 -- Owner, 2026-10-06 (IDEA-1143, option 1): on the DEVELOPMENT server installed parts never overheat, the way dev fuel
@@ -54,7 +67,11 @@ RegisterNetEvent("ncm:deep.enter", function(r)
     local pid = tonumber(source) or 0
     if pid <= 0 or not enabled() then return end
     local vid, b = driving(pid)
-    if not vid then log("player=%d enter refused: not driving a bound Machine", pid); return end
+    if not vid then log("player=%d enter refused: not driving a bound Machine (%s)", pid, tostring(b)); return end
+    if b.resumed then
+        NcmDeepResumeClaims[pid] = nil
+        log("ENTER player=%d: the resumed Machine ..%s (vehicle %d, %s) taken from the join's claim", pid, tostring(b.assetId):sub(-6), vid, tostring(b.seat))
+    end
     local okV, v = pcall(Open77.vehicles.get, vid)
     local okF, frozen, why = pcall(Open77.vehicles.setFrozen, vid, true)
     inDeep[pid] = { vid = vid, at = Open77.time.unix(), flags = okV and type(v) == "table" and v.flags or nil, asset = b and b.assetId }
@@ -82,6 +99,55 @@ RegisterNetEvent("ncm:deep.exit", function(r)
         tostring(okT and moved), tostring(okT and why or moved), tostring(okF))
     TriggerClientEvent("ncm:deep.released", pid, { vid = st.vid })
     if NcmJourney then NcmJourney.finish(pid, tostring(r.why or "returned"), { landKm = tonumber(r.landKm), back = { x = x, y = y, z = z } }) end
+end)
+
+-- L352: Deep in the game's own world. The client asks for its held car to be shown at a point of a stage of the
+-- `ncm_world_layer` package (core space.stage); the server moves the frozen car there and keeps it frozen. Only points
+-- inside a stage's shell are accepted, so this can never be used to move a car anywhere else.
+local Stage = NcmCore.get("space.stage")
+-- KB-444: Open77 does not keep the order of different net events (PRESENCE, sent after ENTER, was logged before it).
+-- The client's one stage request, sent in ENTER's frame, could land before `inDeep` existed and was dropped without a
+-- word, so the car stayed frozen at the seam over Night City while the sky was drawn at the stage. The client now
+-- repeats the request until this handler acknowledges it (`ncm:deep.staged`, echoing its `seq`).
+local earlyStage = {}   -- pid -> true once an early request has been logged for this wait
+RegisterNetEvent("ncm:deep.stage", function(r)
+    local pid = tonumber(source) or 0
+    local st = inDeep[pid]
+    if type(r) ~= "table" then return end
+    if not st then
+        if not earlyStage[pid] then
+            earlyStage[pid] = true
+            log("STAGE player=%d arrived before ENTER (net events are not ordered): the client repeats it", pid)
+        end
+        return
+    end
+    earlyStage[pid] = nil
+    local function ack() TriggerClientEvent("ncm:deep.staged", pid, { seq = r.seq, stage = st.stage }) end
+    local stage = Stage.STAGES[tostring(r.stage or "")]
+    local x, y, z = tonumber(r.x), tonumber(r.y), tonumber(r.z)
+    if not stage or not x or not y or not z then return end
+    local dx, dy, dz = x - stage.center[1], y - stage.center[2], z - stage.center[3]
+    if dx * dx + dy * dy + dz * dz > (stage.shellR - 50) ^ 2 then
+        log("STAGE player=%d refused: (%.0f, %.0f, %.0f) is outside the %s shell", pid, x, y, z, tostring(r.stage))
+        return
+    end
+    -- KB-438: ONE move per Deep entry. Every setTransform hands the car to the server and back (the 2026-10-10 stay
+    -- flipped ownership 126 times in 22 s: the flicker); an older client that still re-stages on every turn is ignored.
+    if st.staged then
+        st.restageRefused = (st.restageRefused or 0) + 1
+        if st.restageRefused == 1 then log("STAGE player=%d: already staged for this entry; further moves ignored", pid) end
+        return ack()   -- a repeat whose acknowledgement was lost: say so again, never move again
+    end
+    st.staged = true
+    local okT, moved, why = pcall(Open77.vehicles.setTransform, st.vid, { position = { x = x, y = y, z = z }, yaw = tonumber(r.yaw) or 0 })
+    if st.flags ~= nil then pcall(Open77.vehicles.update, st.vid, { flags = st.flags }) end   -- setTransform clears flags
+    pcall(Open77.vehicles.setFrozen, st.vid, true)
+    if st.stage ~= r.stage then
+        st.stage = r.stage
+        log("STAGE player=%d vehicle=%d -> %s at (%.0f, %.0f, %.0f): move %s %s", pid, st.vid, tostring(r.stage), x, y, z,
+            tostring(okT and moved), tostring(okT and why or moved))
+    end
+    ack()
 end)
 
 -- L332: the Deep page's render probes (WebGL facts, the render scale, whether imagery tiles arrive), one line each
@@ -355,11 +421,65 @@ AddEventHandler("playerDropped", function()
     local pid = tonumber(source) or 0
     if NcmJourney then NcmJourney.finish(pid, "player_left") end
     embodied[pid] = nil   -- KB-354: a stale entry got the next player's AC departure (RESUME player=1 at 13:20)
+    NcmDeepResumeClaims[pid] = nil   -- KB-448: a claim never outlives its player
     local st = inDeep[pid]
     if st then
         pcall(Open77.vehicles.setFrozen, st.vid, false)
         inDeep[pid] = nil
         log("player=%d left while in deep: vehicle %d released where it was frozen", pid, st.vid)
+    end
+end)
+
+-- IDEA-1294 (owner, 2026-10-11: "instrument ... observationally; do not perturb the Galena"): once a minute, every
+-- Machine whose stored presence says `deep` (flown by its client or by the server) is logged in BOTH frames. Read-only:
+-- it decodes the stored record and writes a log line, nothing else. EARTH-FIXED = the rotating frame the HUD's SPEED /
+-- horizontal / vertical use; INERTIAL = Earth-fixed velocity + W x p, the frame the orbit (energy, h, apo/peri) uses.
+local DeepCore = NcmCore.get("space.deep")
+local function frameLine(row)
+    local Json = NcmCore.get("vocabulary.json")
+    local ok, rec = pcall(Json.decode, tostring(row.state_json or ""))
+    if not ok or type(rec) ~= "table" or type(rec.p) ~= "table" or type(rec.vel) ~= "table" then return end
+    local V = DeepCore.vec
+    local p, v = rec.p, rec.vel
+    local r = V.len(p)
+    local lat, lon, alt = DeepCore.ecefToLla(p)
+    local e, n, u = DeepCore.enu(lat, lon)
+    local vs, sp = V.dot(v, u), V.len(v)
+    local vi = DeepCore.inertialVel(p, v)
+    local rad = V.dot(vi, V.scale(p, 1 / r))
+    local tan = math.sqrt(math.max(0, V.dot(vi, vi) - rad * rad))
+    local o = DeepCore.orbit(p, v)
+    local rho2 = p[1] ^ 2 + p[2] ^ 2
+    local dyn = type(rec.dyn) == "table" and rec.dyn or {}
+    local thr = type(dyn.thr) == "table" and dyn.thr or {}
+    local thrTxt = {}
+    for _, x in ipairs(thr) do thrTxt[#thrTxt + 1] = ("%.2f"):format(tonumber(x) or 0) end
+    log("FRAME driver ..%s %s via %s, record %.0f s old (%s) | r %.0f km alt %.0f km at %.4f, %.4f | p ECEF (%.0f, %.0f, %.0f) km"
+        .. " | EARTH-FIXED v (%.1f, %.1f, %.1f) |v| %.1f = horizontal %.1f (E %+.1f N %+.1f) + vertical %+.1f, frame sweep W*rho %.1f"
+        .. " | INERTIAL |v| %.1f = radial %+.1f tangential %.1f | g %.4f, coriolis+centrifugal %.4f m/s^2 | thrust state [%s], spin %.4f rad/s"
+        .. " | energy %.1f J/kg h %.6e m2/s e %.6f apo %s km peri %.0f km | Jacobi %.2f J/kg",
+        tostring(row.driver_id):sub(-6), tostring(row.place), tostring(row.host or "server"), Open77.time.unix() - (tonumber(rec.utc) or 0),
+        type(rec.provenance) == "table" and tostring(rec.provenance[1]) or "?", r / 1000, alt / 1000, lat, lon, p[1] / 1000, p[2] / 1000, p[3] / 1000,
+        v[1], v[2], v[3], sp, math.sqrt(math.max(0, sp * sp - vs * vs)), V.dot(v, e), V.dot(v, n), vs, DeepCore.OMEGA * math.sqrt(rho2),
+        V.len(vi), rad, tan, V.len(DeepCore.gravity(p)), V.len(DeepCore.fictitious(p, v)), table.concat(thrTxt, ","),
+        type(dyn.omega) == "table" and V.len(dyn.omega) or 0,
+        o.energy, V.len(V.cross(p, vi)), o.e, o.apoM and ("%.0f"):format(o.apoM / 1000) or "ESCAPE", o.periM / 1000,
+        V.dot(v, v) / 2 - DeepCore.GM / r - DeepCore.OMEGA ^ 2 * rho2 / 2)
+end
+CreateThread(function()
+    Wait(30000)
+    while true do
+        if enabled() and MySQL and MySQL.query then
+            local okI, id = pcall(function() return GlobalState.ncmIdentity end)
+            local sid = okI and type(id) == "table" and id.serverId or nil
+            local okQ, rows = pcall(MySQL.query.await, "SELECT driver_id, place, host, state_json FROM ncm_presence WHERE server_id=? AND place='deep'", { sid })
+            for _, row in ipairs(okQ and type(rows) == "table" and rows or {}) do
+                local okF, err = pcall(frameLine, row)
+                if not okF then log("FRAME driver ..%s not readable: %s", tostring(row.driver_id):sub(-6), tostring(err)) end
+                Wait(0)
+            end
+        end
+        Wait(60000)
     end
 end)
 

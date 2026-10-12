@@ -1,0 +1,14 @@
+mtllib rw_screen_north_oak_ramp_2__31_2084.mtl
+o rw_screen_north_oak_ramp_2__31_2084
+v -4.2000 0 0.0000
+v 4.2000 0 0.0000
+v 4.2000 0 3.6000
+v -4.2000 0 3.6000
+vt 1 0
+vt 0 0
+vt 0 1
+vt 1 1
+vn 0 1 0
+usemtl banner
+f 1/1/1 4/4/1 3/3/1
+f 1/1/1 3/3/1 2/2/1

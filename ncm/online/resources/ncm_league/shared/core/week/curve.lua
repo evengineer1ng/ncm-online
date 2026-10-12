@@ -78,12 +78,13 @@ Core.define("week.curve", function()
         civilian_contact = -0.015,
         wreck = -0.008,
         race_crash = -0.003,
-        chrome_impact = -0.004,
+        chrome_impact = -0.004,     -- retired 2026-10-08 (no longer sent): Race Week counts what physically happened
+        vehicle_destroyed = -0.012, -- a car blown up or burnt out in the street or a race, whatever caused it
         clean_race = 0.004,
     }
     -- Which reservoir each fact feeds (L309 Q5). Momentum is fed by races run, not by this table.
     M.RESERVOIR = { speeding = "enforcement", civilian_contact = "safety", wreck = "safety", race_crash = "safety",
-        chrome_impact = "safety", clean_race = "safety" }
+        chrome_impact = "safety", vehicle_destroyed = "safety", clean_race = "safety" }
     M.RESERVOIRS = { "safety", "enforcement", "momentum" }
     -- one race above (or below) this server's normal rate, per race: a fuller calendar is a livelier festival
     M.MOMENTUM_PER_RACE = 0.0012

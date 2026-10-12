@@ -298,6 +298,15 @@ local function spawnOwned(pid, assetId, row, profile, pose, bucket)
     -- have been cleared. At materialise time we certainly know who asked; at disconnect we
     -- certainly know who left. Nothing in between needs to still be true.
     active[assetId] = {vehicleId=vid,driverId=profile.ncmDriverId,record=row.record,pid=pid}
+    if NcmVehicleCondition and NcmVehicleCondition.restore then
+        local okCondition, applied, whyCondition = pcall(NcmVehicleCondition.restore, assetId, vid)
+        if not okCondition or applied == false then
+            print(("[ncm_world/access] damage restore asset=%s refused: %s"):format(assetId:sub(1,8), tostring(okCondition and whyCondition or applied)))
+            pcall(Open77.vehicles.remove, vid)
+            active[assetId] = nil
+            return nil, "damage_restore_failed"
+        end
+    end
     assetByVehicle[vehicleIndexKey(vid)] = assetId
     TriggerEvent("ncm:vehicle:materialized", assetId, vid, pid)
     TriggerEvent("ncm:collection:registerVehicle",vid,row.record,"owned_call",profile.ncmDriverId,"owned",assetId)
@@ -418,6 +427,10 @@ RegisterNetEvent("ncm:vehicle.store", function(assetId)
             end
             -- Its kilometres must be durable before the live vehicle disappears (same order as `reclaim`).
             if NcmOdometer and NcmOdometer.release then pcall(NcmOdometer.release, assetId) end
+            if NcmVehicleCondition and NcmVehicleCondition.save then
+                local okCondition, saved = pcall(NcmVehicleCondition.save, assetId, cur.vehicleId)
+                if not okCondition or saved == false then storeFeedback(pid, "Vehicle damage could not be saved. Try again."); return end
+            end
             TriggerEvent("ncm:collection:unregisterVehicle", cur.vehicleId)
             pcall(Open77.vehicles.remove, cur.vehicleId)
             forgetActive(assetId, "stored by owner")
@@ -463,7 +476,7 @@ CreateThread(function() Wait(0);TriggerEvent("ncm:trade:requestReservationSnapsh
 ---
 --- Ownership is untouched: the asset stays theirs and CALL brings it back in seconds. An OCCUPIED car is left
 --- alone, because removing a vehicle somebody is sitting in is the one outcome worse than accumulation.
-local function reclaim(pid, why)
+local function reclaim(pid, why, force)
     pid = tonumber(pid) or 0
     if pid <= 0 then return end
     local looked = 0
@@ -472,16 +485,27 @@ local function reclaim(pid, why)
         if cur.pid == pid then
             local okSnap, snap = pcall(Open77.vehicles.get, cur.vehicleId)
             local occupied = okSnap and type(snap) == "table" and snap.occupants and next(snap.occupants) ~= nil
-            if occupied then
+            if occupied and not force then
                 print(("[ncm_world/access] left asset=%s in the world: occupied"):format(tostring(assetId):sub(1,8)))
             else
                 -- Its kilometres must be durable before the live vehicle disappears.
                 if NcmOdometer and NcmOdometer.release then pcall(NcmOdometer.release, assetId) end
-                TriggerEvent("ncm:collection:unregisterVehicle", cur.vehicleId)
-                pcall(Open77.vehicles.remove, cur.vehicleId)
-                forgetActive(assetId, why)
-                print(("[ncm_world/access] reclaimed asset=%s (%s); ownership unchanged")
-                    :format(tostring(assetId):sub(1,8), tostring(why)))
+                local checkpointOkay = true
+                if not tostring(why):match("^Racing Week ") and NcmVehicleCondition and NcmVehicleCondition.save then
+                    local okCondition, saved = pcall(NcmVehicleCondition.save, assetId, cur.vehicleId)
+                    if not okCondition or saved == false then
+                        print(("[ncm_world/access] reclaim held asset=%s: damage checkpoint failed"):format(tostring(assetId):sub(1,8)))
+                        -- The live representation holds the only trustworthy damage snapshot.
+                        checkpointOkay = false
+                    end
+                end
+                if checkpointOkay then
+                    TriggerEvent("ncm:collection:unregisterVehicle", cur.vehicleId)
+                    pcall(Open77.vehicles.remove, cur.vehicleId)
+                    forgetActive(assetId, why)
+                    print(("[ncm_world/access] reclaimed asset=%s (%s); ownership unchanged")
+                        :format(tostring(assetId):sub(1,8), tostring(why)))
+                end
             end
         end
     end
@@ -528,10 +552,18 @@ function NcmVehicleAccess.liveAsset(assetId)
              driverId = cur.driverId, record = cur.record }
 end
 
+function NcmVehicleAccess.assetForVehicle(vehicleId)
+    return assetByVehicle[vehicleIndexKey(vehicleId)]
+end
+
 --- Emergency recovery after an authoritative dismount (fuel/tow). Ownership is untouched.
 function NcmVehicleAccess.recoveryStore(assetId, reason)
     local cur=type(assetId)=="string" and active[assetId] or nil;if not cur then return false,"not_materialized" end
     if NcmOdometer and NcmOdometer.release then local ok,why=NcmOdometer.release(assetId);if ok==false then return false,why end end
+    if NcmVehicleCondition and NcmVehicleCondition.save then
+        local okCondition, saved = pcall(NcmVehicleCondition.save, assetId, cur.vehicleId)
+        if not okCondition or saved == false then return false, "damage_checkpoint_failed" end
+    end
     TriggerEvent("ncm:collection:unregisterVehicle",cur.vehicleId)
     pcall(Open77.vehicles.remove,cur.vehicleId);forgetActive(assetId,reason or "emergency recovery")
     if cur.pid then sendActive(cur.pid) end
@@ -584,6 +616,43 @@ function NcmVehicleAccess.operatorForAsset(assetId)
     return pid, binding
 end
 
+-- Record an actual drive, including a short one with no odometer interval yet. A called or
+-- passenger-occupied car is not the owner's "last driven" car.
+local lastDriveWrite, lastDrivenAsset = {}, {}
+CreateThread(function()
+    while true do
+        Wait(5000)
+        local t = math.floor(Open77.time.unix())
+        for assetId, cur in pairs(active) do
+            if t - (lastDriveWrite[assetId] or 0) >= 30 or lastDrivenAsset[cur.pid] ~= assetId then
+                local driver = NcmVehicleAccess.operatorForAsset(assetId)
+                local okMotion, motion = pcall(Open77.vehicles.get, cur.vehicleId)
+                local speed = okMotion and type(motion)=="table" and (tonumber(motion.speed) or ((tonumber(motion.speedKph) or 0)/3.6)) or 0
+                if driver and driver == cur.pid and speed > 0.5 then
+                    local ok, err = pcall(MySQL.update.await,
+                        "UPDATE vehicle_asset SET last_driven_at=? WHERE asset_id=? AND ncm_driver_id=? AND server_id=?",
+                        { t, assetId, cur.driverId, (GlobalState.ncmIdentity or {}).serverId })
+                    if ok then lastDriveWrite[assetId], lastDrivenAsset[cur.pid] = t, assetId
+                    else print("[ncm_world/access] last drive checkpoint failed: " .. tostring(err)) end
+                end
+            end
+        end
+    end
+end)
+
+AddEventHandler("ncm:week:collapse.prepare", function()
+    local t = math.floor(Open77.time.unix())
+    for assetId, cur in pairs(active) do
+        local driver = NcmVehicleAccess.operatorForAsset(assetId)
+        local okMotion, motion = pcall(Open77.vehicles.get, cur.vehicleId)
+        local speed = okMotion and type(motion)=="table" and (tonumber(motion.speed) or ((tonumber(motion.speedKph) or 0)/3.6)) or 0
+        if driver == cur.pid and speed > 0.5 then
+            MySQL.update.await("UPDATE vehicle_asset SET last_driven_at=? WHERE asset_id=? AND ncm_driver_id=?",
+                { t, assetId, cur.driverId })
+        end
+    end
+end)
+
 AddEventHandler("onPlayerDisconnected", function(pid)
     pid=tonumber(pid) or 0
     if pending[pid] then clear(pid,pending[pid]) end
@@ -601,7 +670,9 @@ end)
 AddEventHandler("ncm:week:collapsed", function(run)
     local pids = {}
     for _, cur in pairs(active) do if cur.pid then pids[cur.pid] = true end end
-    for pid in pairs(pids) do pcall(reclaim, pid, "Racing Week " .. tostring(run) .. " ended") end
+    -- A rewind has a hard custody boundary. Open77.vehicles.remove clears canonical occupancy;
+    -- leaving an occupied, now-archived car in the new Week would defeat both the anchor and damage reset.
+    for pid in pairs(pids) do pcall(reclaim, pid, "Racing Week " .. tostring(run) .. " ended", true) end
     print(("[ncm_world/access] Racing Week %s collapsed: called cars reclaimed for %d player(s)"):format(tostring(run),
         (function() local n = 0 for _ in pairs(pids) do n = n + 1 end return n end)()))
 end)

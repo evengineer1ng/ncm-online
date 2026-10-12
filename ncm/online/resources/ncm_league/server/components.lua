@@ -36,6 +36,15 @@ local function hash(s) local h=2166136261 for i=1,#s do h=(h*403+(h*256%65536)*6
 local function stableId(s) return ids.uuid4(ids.seededRng(hash(s))) end
 
 local function seedDesign(d,t)
+    if d.origin=="rnd_physical" then
+        MySQL.insert.await([[INSERT IGNORE INTO component_design
+          (design_id,lineage_id,revision,manufacturer_key,display_manufacturer,code,subtitle,family,tier,effect,
+           price,fidelity,distribution,origin_kind,positions_json,fitment_json,spec_json,created_at)
+          VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)]],
+          {d.designId,d.lineageId,d.revision,d.makerKey,d.manufacturer,d.code,d.subtitle,d.family,d.tier,1,
+           d.price,"physical",Markets.homeFor(d)==Markets.BASE_ID and "base" or "autofixer","rnd_physical","[]",enc({standard=d.interface}),enc(d),t})
+        return
+    end
     MySQL.insert.await([[INSERT IGNORE INTO component_design
       (design_id,lineage_id,revision,manufacturer_key,display_manufacturer,code,subtitle,family,tier,effect,
        price,fidelity,distribution,origin_kind,positions_json,fitment_json,created_at)
@@ -52,6 +61,35 @@ local function ensureSupply(d,t)
       VALUES (?,?,?,0,?,?,?,0,?)]],{serverId(),marketId,d.designId,t,s.batch,s.cadenceSec,t})
 end
 
+--- Owner, 2026-10-10: "space is a secret in nature yes that does not mean inaccessible ... distribute the space kind of
+--- parts around the different autofixer enabled markets, not in base market ... keep slipstream in base market."
+--- Every flight-hardware design stocked in the Base Market moves -- its production schedule and its unsold units -- to
+--- its line's Autofixer (core `economy.markets.homeFor`). Sold and installed units are untouched. Idempotent.
+function NcmComponents.disperseFlightHardware(t)
+    local moved,units=0,0
+    for _,r in ipairs(MySQL.query.await([[SELECT d.design_id,d.lineage_id,d.code,d.family FROM component_design d
+      JOIN component_supply_state s ON s.design_id=d.design_id
+      WHERE s.server_id=? AND s.market_id=?]],{serverId(),Markets.BASE_ID}) or {}) do
+        local home=Markets.homeFor({family=r.family,lineageId=r.lineage_id,code=r.code})
+        if home~=Markets.BASE_ID then
+            MySQL.insert.await([[INSERT IGNORE INTO component_supply_state
+              (server_id,market_id,design_id,next_tick_index,next_tick_at,batch,interval_sec,initial_done,updated_at)
+              SELECT server_id,?,design_id,next_tick_index,next_tick_at,batch,interval_sec,initial_done,? FROM component_supply_state
+              WHERE server_id=? AND market_id=? AND design_id=?]],{home,t,serverId(),Markets.BASE_ID,r.design_id})
+            MySQL.update.await("DELETE FROM component_supply_state WHERE server_id=? AND market_id=? AND design_id=?",
+              {serverId(),Markets.BASE_ID,r.design_id})
+            local n=MySQL.update.await([[UPDATE component_market_inventory mi JOIN component_asset a ON a.asset_id=mi.asset_id
+              SET mi.market_id=? WHERE mi.market_id=? AND mi.state='available' AND a.server_id=? AND a.design_id=?]],
+              {home,Markets.BASE_ID,serverId(),r.design_id})
+            MySQL.update.await("UPDATE component_design SET distribution='autofixer' WHERE design_id=?",{r.design_id})
+            moved=moved+1; units=units+(tonumber(n) or 0)
+            log("flight hardware %s (%s) now sold at %s; %s unsold unit(s) moved",tostring(r.code),tostring(r.family),home,tostring(n or 0))
+        end
+    end
+    if moved>0 then log("dispersed %d flight-hardware design(s) out of the Base Market (%d unit(s))",moved,units) end
+    return moved,units
+end
+
 function NcmComponents.seed()
     local t=now()
     pcall(function() GlobalState.ncmPartsEnabled=enabled() end)
@@ -60,11 +98,42 @@ function NcmComponents.seed()
         for _,family in ipairs(Cat.FAMILIES) do seedDesign(Cat.factoryDesign(entry.vehicleKey,family),t) end
     end
     local release=math.floor(tonumber(settings.partsReleaseEpoch) or 0); if release<=0 then release=t end
+    -- Physical research begins when this build first boots for the continuity, not at the older scalar launch epoch.
+    local physicalRelease=t
     for makerKey,m in pairs(Rnd.MAKERS) do
         MySQL.insert.await([[INSERT IGNORE INTO component_rnd_state
           (server_id,maker_key,release_epoch,next_run_index,next_run_at,logic_version,updated_at)
           VALUES (?,?,?,0,?,?,?)]],{serverId(),makerKey,release,release+m.offsetSec,Rnd.logicVersion,t})
     end
+    for programmeKey,m in pairs(Rnd.PHYSICAL) do
+        MySQL.insert.await([[INSERT IGNORE INTO component_rnd_state
+          (server_id,maker_key,release_epoch,next_run_index,next_run_at,logic_version,updated_at)
+          VALUES (?,?,?,0,?,2,?)]],{serverId(),programmeKey,physicalRelease,physicalRelease+m.offsetSec,t})
+        MySQL.insert.await([[INSERT IGNORE INTO component_rnd_competency
+          (server_id,programme_key,design_score,updated_at) VALUES (?,?,0,?)]],{serverId(),programmeKey,t})
+    end
+    for _,row in ipairs(MySQL.query.await("SELECT spec_json FROM component_design WHERE origin_kind IN ('rnd_physical','prototype','player_design') AND spec_json IS NOT NULL") or {}) do
+        local spec=dec(row.spec_json)
+        if spec then Install.register(spec) end
+    end
+    -- L356: physical add-ons a maker SELLS (`sale` on the design, e.g. the Eddywright SL-1) are ordinary market stock:
+    -- a Base Market listing with serialized supply like any part. ncm_world seeds every engineering design as
+    -- 'engineering' (not sold); a design with `sale` is upgraded here to its market distribution.
+    for _,d in ipairs(Install.DESIGNS) do
+        if type(d.sale)=="table" then
+            local tier=d.sale.tier or "sport"
+            MySQL.insert.await([[INSERT IGNORE INTO component_design
+              (design_id,lineage_id,revision,manufacturer_key,display_manufacturer,code,subtitle,family,tier,effect,
+               price,fidelity,distribution,origin_kind,positions_json,fitment_json,spec_json,created_at)
+              VALUES (?,?,?,?,?,?,?,?,?,1,?,'physical','base','design','[]',?,?,?)]],
+              {d.designId,d.lineageId,d.revision,d.makerKey,d.manufacturer,d.code,d.subtitle,d.family,tier,d.price,
+               enc({standard=d.interface}),enc(d),t})
+            MySQL.update.await("UPDATE component_design SET distribution='base',tier=?,price=?,spec_json=? WHERE design_id=?",
+              {tier,d.price,enc(d),d.designId})
+            ensureSupply({designId=d.designId,tier=tier,distribution="base",marketId=d.sale.market~="base" and d.sale.market or nil},t)
+        end
+    end
+    NcmComponents.disperseFlightHardware(t)
     local n,why=NcmComponents.ensureFactoryAll()
     log("seeded %d launch Designs; factory configurations=%s; enabled=%s%s",#Cat.designs(),tostring(n),tostring(enabled()),why and (" ("..why..")") or "")
     return true
@@ -155,10 +224,24 @@ local function available(designId,marketId)
 end
 
 local function designFromRow(r)
+    local spec=dec(r.spec_json)
+    if (r.origin_kind=="rnd_physical" or r.origin_kind=="prototype" or r.origin_kind=="player_design") and spec then
+        local d=Install.design(r.design_id) or Install.register(spec)
+        if d then return d end
+    end
     return {designId=r.design_id,lineageId=r.lineage_id,revision=tonumber(r.revision),makerKey=r.manufacturer_key,
       manufacturer=r.display_manufacturer,code=r.code,subtitle=r.subtitle,family=r.family,tier=r.tier,
       effect=tonumber(r.effect),price=tonumber(r.price),fidelity=r.fidelity,distribution=r.distribution,
       origin=r.origin_kind,positions=dec(r.positions_json) or {},supportedVehicles=dec(r.fitment_json) or {}}
+end
+local function fitFor(d,key)
+    if Install.isAddOnFamily(d.family) then
+        for _, option in ipairs(Install.options(Install.design(d.designId) or d,key)) do
+            if option.ok then return {outcome="fits",compatible=true,reason="a rated hardpoint accepts this component"} end
+        end
+        return {outcome="mismatch",compatible=false,reason="no compatible rated hardpoint"}
+    end
+    return Cat.resolve(d,key)
 end
 
 local function produceLine(d,state,t)
@@ -212,6 +295,45 @@ local function isNovel(c)
     end
     return true
 end
+local function isNovelPhysical(c)
+    local tag=c.designId:match("^rndp:([^:]+):")
+    local rows=MySQL.query.await([[SELECT spec_json FROM component_design
+        WHERE origin_kind='rnd_physical' AND design_id LIKE ? AND family=?]],{"rndp:"..tostring(tag)..":%",c.family}) or {}
+    local p=c.perf or {}
+    local key=p.thrustN and "thrustN" or (p.forceN and "forceN" or (p.torqueNm and "torqueNm" or "capacityKg"))
+    for _,row in ipairs(rows) do
+        local d=dec(row.spec_json)
+        local q=d and d.perf
+        if q and q.kind==p.kind and q.propellant==p.propellant and
+            (tonumber(q[key]) or 0)>=(tonumber(p[key]) or 0) and
+            (tonumber(q.ispS) or 0)>=(tonumber(p.ispS) or 0) and
+            (tonumber(q.heatKw) or 0)<=(tonumber(p.heatKw) or 0) and
+            (tonumber(d.massKg) or math.huge)<=(tonumber(c.massKg) or 0) and
+            (tonumber(d.price) or math.huge)<=(tonumber(c.price) or 0) then return false end
+    end
+    return true
+end
+local function announcePhysical(c, at)
+    local p=c.perf or {}
+    local measure=p.thrustN and ("%.0f kN thrust"):format(p.thrustN/1000)
+        or p.forceN and ("%.0f kN pulse"):format(p.forceN/1000)
+        or p.torqueNm and ("%.0f N m torque"):format(p.torqueNm)
+        or p.capacityKg and ("%.0f kg capacity"):format(p.capacityKg) or "physical hardware"
+    local body=("%s: %s%s. Base Market price: €$%d."):format(c.name,measure,
+        p.ispS and (", %.0f s specific impulse"):format(p.ispS) or "",c.price)
+    local eventId="rnd-release:"..c.designId
+    local ok, why=MySQL.transaction.await({
+        {query=[[INSERT IGNORE INTO paddock_event
+          (server_id,event_id,at,kind,entities,cause_refs,effect_refs,facts,public_summary,salience,retain,provenance)
+          VALUES (?,?,?,'rnd_release','[]','[]','[]',?,?,4,0,'simulated')]],
+          values={serverId(),eventId,at,enc({designId=c.designId,makerKey=c.makerKey}),body}},
+        {query=[[INSERT IGNORE INTO paddock_news
+          (server_id,story_id,event_id,at,kind,template_id,headline,body,prominence,subjects)
+          VALUES (?,?,?,?,'rnd_release','physical_v1',?,?,4,?)]],
+          values={serverId(),eventId,eventId,at,c.manufacturer.." releases "..c.code,body,enc({c.makerKey})}},
+    })
+    if not ok then log("physical R&D news failed %s: %s",c.designId,tostring(why)) end
+end
 
 local function runRnd(t)
     for makerKey in pairs(Rnd.MAKERS) do
@@ -240,6 +362,50 @@ local function runRnd(t)
             -- No catch-up burst: one evaluation, then a new full cadence from now.
             MySQL.update.await([[UPDATE component_rnd_state SET next_run_index=?,next_run_at=?,updated_at=?
               WHERE server_id=? AND maker_key=?]],{index+1,t+Rnd.CADENCE_SEC,t,serverId(),makerKey})
+        end
+    end
+    for programmeKey in pairs(Rnd.PHYSICAL) do
+        local st=MySQL.single.await("SELECT * FROM component_rnd_state WHERE server_id=? AND maker_key=?",{serverId(),programmeKey})
+        local singlePlayer=tostring(settings.environment or "")=="single_player"
+        while st and t>=(tonumber(st.next_run_at) or 0) do
+            local index=tonumber(st.next_run_index) or 0; local nonce=ids.uuid4(hostRng)
+            local evaluatedAt=singlePlayer and tonumber(st.next_run_at) or t
+            MySQL.insert.await([[INSERT IGNORE INTO component_rnd_run
+              (server_id,maker_key,run_index,evaluated_at,claim_nonce,logic_version,outcome,reason)
+              VALUES (?,?,?,?,?,2,'pending','pending')]],{serverId(),programmeKey,index,evaluatedAt,nonce})
+            local held=MySQL.scalar.await("SELECT claim_nonce FROM component_rnd_run WHERE server_id=? AND maker_key=? AND run_index=?",{serverId(),programmeKey,index})
+            if held==nonce then
+                local score=tonumber(MySQL.scalar.await("SELECT design_score FROM component_rnd_competency WHERE server_id=? AND programme_key=?",{serverId(),programmeKey})) or 0
+                local result=Rnd.evaluatePhysical({programmeKey=programmeKey,runIndex=index,competency=score,serverId=serverId(),
+                    secret=tostring(settings.partsRndSecret or "")..":"..serverId()})
+                if result and result.outcome=="accepted" and not isNovelPhysical(result.candidate) then
+                    result.outcome="no_design"; result.reason="dominated"
+                end
+                if result and result.outcome=="accepted" then
+                    local c=result.candidate
+                    seedDesign(c,evaluatedAt)
+                    Install.register(c)
+                    TriggerEvent("ncm:rnd:design",c)
+                    announcePhysical(c,evaluatedAt)
+                    local s=Cat.SUPPLY[c.tier]
+                    -- flight hardware is sold at its line's Autofixer, never the Base Market (owner 2026-10-10)
+                    MySQL.insert.await([[INSERT IGNORE INTO component_supply_state
+                      (server_id,market_id,design_id,next_tick_index,next_tick_at,batch,interval_sec,initial_done,updated_at)
+                      VALUES (?,?,?,0,?,?,?,0,?)]],{serverId(),Markets.homeFor(c),c.designId,evaluatedAt,s.batch,s.cadenceSec,t})
+                end
+                if result then
+                    MySQL.update.await([[UPDATE component_rnd_run SET outcome=?,reason=?,design_id=NULLIF(?,''),result_json=?
+                      WHERE server_id=? AND maker_key=? AND run_index=?]],{result.outcome,result.reason,
+                        result.candidate and result.candidate.designId or "",enc({result=result,competency=score}),serverId(),programmeKey,index})
+                    MySQL.update.await("UPDATE component_rnd_competency SET design_score=LEAST(1000,design_score+?),updated_at=? WHERE server_id=? AND programme_key=?",
+                        {result.outcome=="accepted" and 16 or 4,t,serverId(),programmeKey})
+                end
+            end
+            local nextAt=singlePlayer and (tonumber(st.next_run_at)+Rnd.PHYSICAL_CADENCE_SEC) or (t+Rnd.PHYSICAL_CADENCE_SEC)
+            MySQL.update.await([[UPDATE component_rnd_state SET next_run_index=?,next_run_at=?,updated_at=?
+              WHERE server_id=? AND maker_key=?]],{index+1,nextAt,t,serverId(),programmeKey})
+            st.next_run_index=index+1; st.next_run_at=nextAt
+            if not singlePlayer then break end
         end
     end
 end
@@ -284,13 +450,18 @@ function NcmComponents.marketOfferings(driverId,marketId,vehicleKeys)
           WHERE mi.market_id=? AND mi.state='available' AND a.server_id=? AND a.design_id=?
           ORDER BY mi.listed_at,a.design_ordinal LIMIT 1]],{marketId,serverId(),d.designId})
         local fit,ownedFit={},false
-        for _,key in ipairs(vehicleKeys or Cat.STARTER_VEHICLES) do local x=Cat.resolve(d,key);fit[key]={compatible=x.compatible,reason=x.reason} end
-        for _,key in ipairs(ownedKeys) do if Cat.resolve(d,key).compatible then ownedFit=true end end
+        for _,key in ipairs(vehicleKeys or Cat.STARTER_VEHICLES) do local x=fitFor(d,key);fit[key]={compatible=x.compatible,reason=x.reason} end
+        for _,key in ipairs(ownedKeys) do if fitFor(d,key).compatible then ownedFit=true end end
         d.available=available(d.designId,marketId);d.ceiling=s.ceiling;d.soldOut=d.available==0;d.nextBatch=tonumber(r.batch) or 0
         d.cadenceSec=tonumber(r.interval_sec);d.nextProductionAt=tonumber(r.next_tick_at);d.nextAsset=nextAsset
         d.fitment=fit;d.ownedCompatible=ownedFit;d.marketId=marketId;out[#out+1]=d
-        local setup=Handling.compose({vehicle="market-preview",parts={{id=d.designId,family=d.family,effect=d.effect}}},{at=now()})
-        if setup then d.projection={levers=setup.levers,topSpeedScale=setup.topSpeedScale,limited=setup.limited} end
+        -- a physical add-on is a product with a name (L356: "Slipstream SL-1", not only "EDW-SL1")
+        local inst=Install.isAddOnFamily(d.family) and Install.design(d.designId)
+        if inst then d.name=inst.name;d.subtitle=inst.subtitle end
+        if not Install.isAddOnFamily(d.family) then
+            local setup=Handling.compose({vehicle="market-preview",parts={{id=d.designId,family=d.family,effect=d.effect}}},{at=now()})
+            if setup then d.projection={levers=setup.levers,topSpeedScale=setup.topSpeedScale,limited=setup.limited} end
+        end
     end
     return out
 end
@@ -306,8 +477,26 @@ function NcmComponents.inventory(pid)
       FROM component_service s JOIN component_asset a ON a.asset_id=s.component_asset_id
       WHERE a.server_id=? AND a.ncm_driver_id=? ORDER BY s.occurred_at,s.service_id]],{serverId(),d.ncmDriverId}) or {}
     local services={} for _,s in ipairs(serviceRows) do local k=tostring(s.component_asset_id);services[k]=services[k] or {};services[k][#services[k]+1]=s end
+    local bindingRows=MySQL.query.await([[SELECT b.component_asset_id,b.control_key,b.gesture,b.command
+      FROM machine_control_binding b JOIN component_asset a ON a.asset_id=b.component_asset_id
+      WHERE a.server_id=? AND a.ncm_driver_id=? AND a.location_kind='installed' AND a.machine_asset_id=b.machine_asset_id
+      ORDER BY b.control_key,b.gesture]],{serverId(),d.ncmDriverId}) or {}
+    local bindings={} for _,b in ipairs(bindingRows) do
+        local k=tostring(b.component_asset_id);bindings[k]=bindings[k] or {}
+        bindings[k][#bindings[k]+1]={control=b.control_key,gesture=b.gesture,command=b.command}
+    end
+    local mountRows=MySQL.query.await([[SELECT i.component_asset_id,i.interface_id,i.install_json
+      FROM machine_configuration_current x JOIN vehicle_asset v ON v.asset_id=x.machine_asset_id
+      JOIN machine_configuration_item i ON i.configuration_id=x.configuration_id
+      WHERE v.server_id=? AND v.ncm_driver_id=?]],{serverId(),d.ncmDriverId}) or {}
+    local mounted={} for _,i in ipairs(mountRows) do mounted[tostring(i.component_asset_id)]=i end
     for _,p in ipairs(parts) do
         p.effect=tonumber(p.effect);p.exposure_m=tonumber(p.exposure_m) or 0;p.positions=dec(p.positions_json) or {};p.supportedVehicles=dec(p.fitment_json) or {};p.positions_json=nil;p.fitment_json=nil
+        p.bindings=bindings[tostring(p.asset_id)] or {}
+        local installed=mounted[tostring(p.asset_id)]
+        if installed and p.location_kind=='installed' then
+            p.mountId=installed.interface_id;p.facing=(dec(installed.install_json) or {}).facing
+        end
         local history=services[tostring(p.asset_id)] or {};local state=Wear.evaluate(p,history)
         p.wear=Wear.publicState(state);p.service_count=#history
         if state and state.conditions[1] then
@@ -317,10 +506,23 @@ function NcmComponents.inventory(pid)
     end
     local machines=MySQL.query.await([[SELECT asset_id,vehicle_key,record,production_ordinal,maker_ordinal,model_ordinal,odometer_m
       FROM vehicle_asset WHERE server_id=? AND ncm_driver_id=? ORDER BY acquired_at,asset_id]],{serverId(),d.ncmDriverId}) or {}
-    for _,m in ipairs(machines) do m.fitment={};for _,p in ipairs(parts) do m.fitment[p.asset_id]=Cat.resolve({supportedVehicles=p.supportedVehicles},m.vehicle_key) end end
+    for _,m in ipairs(machines) do m.fitment={};for _,p in ipairs(parts) do
+        m.fitment[p.asset_id]=Install.isAddOnFamily(p.family) and fitFor(Install.design(p.design_id) or {family=p.family},m.vehicle_key)
+            or Cat.resolve({supportedVehicles=p.supportedVehicles},m.vehicle_key)
+    end end
     -- the pad's engineering bench: where each add-on can go on each Machine (only the fits that mate), and on
     -- DEVELOPMENT the designs that can be fabricated (the one acquisition shortcut; Online buys them)
+    -- L356: a Slipstream unit's switch (its own runtime state, not configuration)
+    local units={}
+    for _,u in ipairs(MySQL.query.await([[SELECT u.component_asset_id,u.machine_asset_id,u.enabled FROM slipstream_unit u
+      JOIN component_asset a ON a.asset_id=u.component_asset_id WHERE a.server_id=? AND a.ncm_driver_id=?]],{serverId(),d.ncmDriverId}) or {}) do
+        units[tostring(u.component_asset_id):lower()..":"..tostring(u.machine_asset_id):lower()]=tonumber(u.enabled)~=0
+    end
     for _,p in ipairs(parts) do
+        if p.family=="slipstream" and p.location_kind=="installed" and p.machine_asset_id then
+            local on=units[tostring(p.asset_id):lower()..":"..tostring(p.machine_asset_id):lower()]
+            p.unitEnabled=on~=false        -- a unit with no row yet is on (it boots on first drive)
+        end
         if Install.isAddOnFamily(p.family) then
             p.addOn=true
             local design=Install.design(p.design_id)
@@ -334,7 +536,7 @@ function NcmComponents.inventory(pid)
     end
     local fabricable=nil
     local okId,ident=pcall(function() return GlobalState.ncmIdentity end)
-    local dev=true
+    local dev=false
     if okId and type(ident)=="table" then dev=tostring(ident.environment or "development")=="development" end
     if dev then
         fabricable={}
@@ -373,6 +575,11 @@ function NcmComponents.purchase(pid,marketId,assetId,idemKey)
         (transfer_id,idem_key,server_id,asset_id,to_driver_id,kind,market_id,amount,occurred_at)
         SELECT ?,?,?,asset_id,?,'primary_purchase',market_id,price,? FROM component_market_inventory
         WHERE market_id=? AND asset_id=? AND state='sold' AND sold_to_driver_id=?]],values={ids.uuid4(hostRng),idem,serverId(),d.ncmDriverId,t,marketId,assetId,d.ncmDriverId}},
+      -- L361: a unit an engineer listed pays its seller, in the same transaction as the buyer's debit
+      {query=[[INSERT IGNORE INTO ledger (ncm_driver_id,server_id,kind,amount,currency,ref,note,idem_key,market_id,asset_id)
+        SELECT seller_driver_id,?,'component_sale',price,'eddies',asset_id,'Workshop unit sold',?,market_id,asset_id
+        FROM component_market_inventory WHERE market_id=? AND asset_id=? AND state='sold' AND sold_to_driver_id=?
+        AND seller_driver_id IS NOT NULL]],values={serverId(),"sale:"..idem,marketId,assetId,d.ncmDriverId}},
     }
     local ok=MySQL.transaction.await(NcmEconomy.withBalanceLocks(tx,{d.ncmDriverId}))
     if not ok then return nil,"transaction_failed" end

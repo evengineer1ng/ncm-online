@@ -1,0 +1,22 @@
+{
+ "lines": {
+  "sl1_boot_1": {
+   "ms": 2540,
+   "text": "Eddywright Slipstream. Installation verified."
+  },
+  "sl1_boot_2": {
+   "ms": 6320,
+   "text": "Wake acquisition is live. Close on a moving vehicle and hold its line. The cleaner your position, the harder this unit works."
+  },
+  "sl1_boot_3": {
+   "ms": 5820,
+   "text": "Slipstream units recognise one another. Take a wake, and its owner will know. When someone takes yours, so will you."
+  },
+  "sl1_boot_4": {
+   "ms": 2270,
+   "text": "Eddywright. Let someone else break the air."
+  }
+ },
+ "seed": 2077,
+ "voice": "male, middle-aged, low pitch, british accent"
+}

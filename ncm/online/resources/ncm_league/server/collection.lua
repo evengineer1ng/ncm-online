@@ -8,6 +8,7 @@ local Discoveries = NcmCore.get("competition.discoveries")
 local Knowledge = NcmCore.get("competition.machine_knowledge")
 local Observation = NcmCore.get("competition.observation")
 local Json = NcmCore.get("vocabulary.json")
+local VehicleService = NcmCore.get("engineering.vehicle_service")
 local ids = NcmCore.get("vocabulary.ids")
 local Seasons = NcmCore.get("competition.seasons")
 local Scanner = NcmCore.get("competition.scanner")
@@ -124,6 +125,36 @@ function NcmCollection.payload(playerId)
     if not found then return nil, "collection_unavailable" end
     local examples = {}
     local observed = observationsFor(driver.ncmDriverId)
+    local anchor = NcmCollapse and NcmCollapse.anchorStatus and NcmCollapse.anchorStatus(driver.ncmDriverId) or nil
+    local condition = {}
+    local serviceSite
+    do
+        local ok, player = pcall(Open77.players.get, tonumber(playerId) or 0)
+        if ok and type(player) == "table" and type(player.position) == "table" then
+            local garages = NcmCore.get("paddock.garages")
+            local best
+            for _, site in ipairs(garages.sites()) do
+                if site.kind == "garage" or site.kind == "workshop" then
+                    local d = garages.distance(site,player.position)
+                    if not best or d < best.distance then best = { siteId=site.id,label=garages.label(site),distance=d,
+                        usable=d<=25 and math.abs((tonumber(player.position.z) or math.huge)-(tonumber(site.z) or 0))<=12 } end
+                end
+            end
+            serviceSite = best
+        end
+    end
+    for _, row in ipairs(MySQL.query.await([[SELECT c.asset_id,c.damage_json,c.repair_json,a.vehicle_key FROM vehicle_week_condition c
+        JOIN vehicle_asset a ON a.asset_id=c.asset_id WHERE a.server_id=? AND a.ncm_driver_id=?]],
+        { serverId(),driver.ncmDriverId }) or {}) do
+        local damage = row.damage_json and (function() local ok,d=pcall(Json.decode,row.damage_json);return ok and d or nil end)() or nil
+        local workmanship = row.repair_json and (function() local ok,d=pcall(Json.decode,row.repair_json);return ok and d or nil end)() or nil
+        local model = NcmCore.get("data.vehicle_catalogue").byKey(row.vehicle_key)
+        local value = 8000 * (model and tonumber(model.prestige) or 1)
+        condition[row.asset_id] = { severity = damage and VehicleService.severity(damage) or 0,
+            selfQuote = damage and VehicleService.quote(damage,"self",value) or nil,
+            shopQuote = damage and VehicleService.quote(damage,"shop",value) or nil, serviceSite=serviceSite,
+            workmanship = workmanship }
+    end
     for _, asset in ipairs(NcmOwnership.list(driver.ncmDriverId)) do
         if asset.vehicleKey then
             examples[asset.vehicleKey] = examples[asset.vehicleKey] or {}
@@ -131,6 +162,8 @@ function NcmCollection.payload(playerId)
             table.insert(examples[asset.vehicleKey], { assetId = asset.assetId,
                 globalOrdinal=p and p.globalOrdinal or nil,makerOrdinal=p and p.makerOrdinal or nil,
                 modelOrdinal=p and p.modelOrdinal or nil,odometerM=p and p.odometerM or 0,
+                anchorSource=anchor and anchor.assetId==asset.assetId and anchor.source or nil,
+                weekCondition=condition[asset.assetId],
                 performance={topSpeedKph=false,zeroTo100S=false,braking100To0M=false,lateralGripG=false,massKg=false,powerToWeightKwT=false},
                 observations = observed[asset.assetId] })
         end
@@ -157,19 +190,44 @@ function NcmCollection.payload(playerId)
         slots[#slots + 1] = slot
     end
     return { label = "Machine Index", generation = Catalogue.generation, discovered = discovered,
-        total = Catalogue.count(), owned = ownedCount, slots = slots }
+        total = Catalogue.count(), owned = ownedCount, onlineAnchorEnabled = anchor ~= nil, slots = slots }
 end
 
 -- IDEA-595. The Machine Index is the largest list NCM sends: one slot per known machine, growing with the
--- catalogue and with every discovery. It crossed the wire whole, which is the shape that produced KB-59, KB-86,
--- KB-153 and KB-160 -- a payload that grows until it silently stops arriving. Bounded through `NcmStream`.
+-- catalogue and with every discovery. Encode on the server and carry bounded strings: one nested slot table
+-- can itself exceed the network event serializer even when byte-based row packing is used.
+local collectionWireSeq = 0
 local function sendPayload(pid, payload)
     if payload == nil then
-        local ok, p = pcall(NcmCollection.payload, pid)
-        if not ok or not p then return end
+        local ok, p, why = pcall(NcmCollection.payload, pid)
+        if not ok then log("payload failed player=%d: %s", pid, tostring(p)); return end
+        if not p then log("payload unavailable player=%d: %s", pid, tostring(why)); return end
         payload = p
     end
-    NcmStream.send(pid, "ncm:collection", payload, "slots")
+    local ok, encoded = pcall(Json.encode, payload)
+    if not ok or type(encoded) ~= "string" then
+        log("payload encode failed player=%d: %s", pid, tostring(encoded))
+        return
+    end
+    local pieces, at = {}, 1
+    while at <= #encoded do
+        local stop = math.min(at + 767, #encoded)
+        -- Every event string must be valid UTF-8 independently. Never cut before a continuation byte.
+        while stop < #encoded do
+            local nextByte = encoded:byte(stop + 1)
+            if nextByte < 128 or nextByte > 191 then break end
+            stop = stop - 1
+        end
+        pieces[#pieces + 1] = encoded:sub(at, stop)
+        at = stop + 1
+    end
+    collectionWireSeq = collectionWireSeq + 1
+    local id = ("%d:%d:%s"):format(now(), collectionWireSeq, tostring(pid))
+    TriggerClientEvent("ncm:collection.json.begin", pid, { id = id, n = #pieces })
+    for i, piece in ipairs(pieces) do
+        TriggerClientEvent("ncm:collection.json.part", pid, { id = id, index = i, text = piece })
+    end
+    log("JSON stream player=%d id=%s bytes=%d parts=%d", pid, id, #encoded, #pieces)
 end
 
 -- **The authoritative position, or nothing** (IDEA-329, IDEA-361).

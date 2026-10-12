@@ -212,9 +212,23 @@ end)
 
 RegisterNetEvent("ncm:observer:say", function(text) say(text) end)
 
+-- the Paddock team this player manages (server/main.lua `teamOf`): its drivers are marked wherever they race
+local team = nil
+RegisterNetEvent("ncm:observer:team", function(t)
+    if type(t) == "table" then team = t; changed() end
+end)
+CreateThread(function()
+    Wait(8000)
+    TriggerServerEvent("ncm:observer:team.ask")
+    while true do                  -- a roster changes at the Cup boundary; a slow refresh keeps the marks honest
+        Wait(300000)
+        TriggerServerEvent("ncm:observer:team.ask")
+    end
+end)
+
 -- armed by the console or an allowed request: confirm only on foot (the server sets the mode on this reply)
 RegisterNetEvent("ncm:observer:armed", function()
-    if seated() then say("Step out of the car first, then /ncm.observe on again."); return end
+    if seated() then say("Step out of the car first, then ENTER OBSERVER again (F3)."); return end
     TriggerServerEvent("ncm:observer:enter")
 end)
 
@@ -224,7 +238,8 @@ RegisterNetEvent("ncm:observer:mode", function(m)
     if not (ok and r ~= false) then log("setNoclip(%s) refused: %s", tostring(on), tostring(ok and why or r)) end
     if on then
         st = { hops = 0, jumps = 0, refusals = 0, src = "none" }
-        say("Observer ON -- F3 opens the panel: pick a race, click a driver, choose a camera.")
+        say("Observer ON. F3 opens the panel · Y finds your team · N lets the director choose.")
+        TriggerServerEvent("ncm:observer:team.ask")
     else
         target = nil
         release()
@@ -285,6 +300,8 @@ end, false)
 -- What the panel (client/panel.lua) drives
 -- ---------------------------------------------------------------------------------------------------------------
 function NcmObs.isOn() return on end
+function NcmObs.team() return team end
+function NcmObs.askTeam() TriggerServerEvent("ncm:observer:team.ask") end
 function NcmObs.target() return target end
 function NcmObs.mode() return mode end
 function NcmObs.isClean() return clean end

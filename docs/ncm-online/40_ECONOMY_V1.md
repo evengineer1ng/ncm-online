@@ -589,3 +589,11 @@ The contract is build-authorised without pretending these numbers are final:
 - whether later player trades carry a listing/transaction tax.
 
 Each has an explicit configuration or later work-package seam. None justifies delaying Slice A.
+
+## 18A. Authored championship scale (2026-10-08)
+
+The series use distinct authored multipliers: Bedrock and MaiMai ×1, City Cup and Street Drag ×2, Night City Open ×3, Night City GT ×25, and Hypercar ×250. These multiply entry fees and all authored base, placement and field payout lines together. Gritty entry points remain available while higher classes carry greater fees and purses. GT/Hypercar values remain provisional pending wallet/acquisition telemetry. DNF/DNS/DSQ keeps the entry debit and earns no finish line.
+
+Series intrigue is now frozen into each newly adopted event from that Paddock series' last 12 races: close gaps, the current Cup's top-two points margin, winner variety, crash/contact DNFs and real win-slip stake balance. No-history events use neutral x1.00. The resulting 0.70-1.30 intrigue factor scales entry and purse; Moody's active fx.purse separately scales purse only (bounded x0.50-x2.50). The Guide quote and settlement use the event's persisted economy_json; a restart does not reprice it. Missing betting splits are omitted, never invented. Master Test BJ21 and the pending live validation still govern acceptance.
+
+Implementation note (IDEA-1272): each Paddock division also has its own authored fallback scale: Street x1-x7, Regional x10-x25, Pro x50-x100, Premier x250. The event-time intrigue factor combines closeness, current Cup fight, winner repeat, crash/contact DNFs and available Billie win-slip split balance. Moody's tier purse factor composes with intrigue on payouts only. No-history events stay at the authored baseline, and persisted event economics keep quotes stable across restart.

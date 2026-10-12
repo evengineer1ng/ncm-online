@@ -333,8 +333,8 @@ local function drive(race, car, from)
     end
     car.base, car.windowEnd = from, last
     local okF, st, why = pcall(Open77.vehicles.ai.followRoute, car.vid, { points = route,
-        speed = car.plan[math.max(1, car.base)] or car.plan[#car.plan] or 20, behavior = "aggressive", arrivalRadius = 12,
-        timeoutMilliseconds = 900000 })
+        speed = (PaddockSlip and PaddockSlip.leg(car, car.plan[math.max(1, car.base)] or car.plan[#car.plan] or 20)) or car.plan[math.max(1, car.base)] or car.plan[#car.plan] or 20,
+        behavior = "aggressive", arrivalRadius = 12, timeoutMilliseconds = 900000 })
     if not okF or not st then log("%s: followRoute for %s refused: %s", race.raceId, car.id, tostring(why or st)) return false end
     return true
 end
@@ -357,6 +357,8 @@ local function remove(car, race)
     local mc = race and race.model and race.model.cars[car.id]
     if mc and mc.live then R.anchor(race.model, car.id, mc.live.t, mc.live.d) end
     byVehicle[car.vid] = nil
+    if PaddockSlip then PaddockSlip.detach(car) end
+    if PaddockHack then pcall(PaddockHack.carRemoved, race, car.id, car.vid) end
     pcall(Open77.vehicles.ai.removeDriver, car.vid)
     pcall(Open77.vehicles.remove, car.vid)
     if car.npc then pcall(Open77.npcs.remove, car.npc) end
@@ -377,12 +379,17 @@ local function spawn(race, id, p, tMs, bucket, pid)
     -- Bubble cars are the ones physically beside the player: NCM Pace's racer clone, street and oval (KB-287).
     -- L298: the car this NPC actually owns (its model, in the Pace variant its installed parts compose to); before
     -- the car exists, the old team-hashed record
-    local record = PaddockLive.recordFor(w.orgs[(person and person.orgId) or ""], race.tier, ovalRace, person, race.seriesId)
+    local assetId = race.frozen and race.frozen.carOf and race.frozen.carOf[id]
+    local record = PaddockLive.recordFor(w.orgs[(person and person.orgId) or ""], race.tier, ovalRace, person, race.seriesId, assetId)
     race.cloneLogged = race.cloneLogged or {}
     if not race.cloneLogged[id] then race.cloneLogged[id] = true; log("%s: bubble %s spawning racer clone %s", race.raceId, id, record) end
     local okV, vid, why = pcall(Open77.vehicles.create, { record = record,
         position = { x = p.x, y = p.y, z = z + 0.8 }, yaw = p.yaw, bucket = bucket or 0 })
     if not okV or not vid then stats.refused = stats.refused + 1; log("%s: %s refused: %s", race.raceId, id, tostring(why or vid)) return nil end
+    if assetId and PaddockCars then
+        local condition = PaddockCars.condition(assetId)
+        if condition and (tonumber(condition.health) or 1) < 1 then pcall(Open77.vehicles.setDamage, vid, condition) end
+    end
     local pace = (raceRoute and raceRoute.oval) and paceForOval(pid) or paceOf(pid)
     -- KB-238 (02:06, 00:46, 00:54): every new car goes through the engine's own physics cycle in the host's game --
     -- observed ~1.0 s after it appears, unobserved ~0.5 s later -- and the NPC's seat mount landed inside that cycle every
@@ -401,6 +408,8 @@ local function spawn(race, id, p, tMs, bucket, pid)
         plan = speedPlanFor(race, id) }
     byVehicle[vid] = { raceId = race.raceId, id = id }
     car.pace = pace
+    if PaddockSlip then PaddockSlip.attach(car, vid, id) end     -- L356: the wake, and an SL-1 if the team runs one
+    if PaddockHack then pcall(PaddockHack.carSpawned, race, id, vid) end
     local sent
     if car.pace then
         sendPlan(race, state(race.raceId), car.pace)
@@ -494,17 +503,19 @@ local function persevere(race, b, car, pos, tMs)
     local idle = tMs - car.progressT
     if idle > set("liveRetireSec", 180) * 1000 then return handBack(race, b, car, tMs, true, "stuck for good") end
     local resetMs = set("liveResetSec", 20) * 1000
-    -- A Pace car is Pace's: its stall rule kicks it (SP's), and a server reset only drags it about -- at 05:22 nine
-    -- wrecks were moved 10 m BACK every 20 s for minutes. A car the engine has destroyed is out of the race.
-    if car.pace then
-        local okH, health = pcall(Open77.vehicles.getHealth, car.vid)
-        if okH and type(health) == "number" and health <= 0 then
-            race.carDamage = race.carDamage or {}
-            race.carDamage[car.id] = { frac = 1, wrecked = true }      -- L298: a wreck is a repair bill and a tow
-            return handBack(race, b, car, tMs, true, "wrecked")
-        end
-        return
+    -- A car the engine has destroyed is out of the race -- EVERY car, Pace's or not (2026-10-08: only Pace cars were
+    -- checked, so a destroyed platform-AI car was reset and re-sent for 180 s). The destruction is a physical incident
+    -- whatever caused it (a crash, a chain explosion, a quickhack): Race Week and the tape hear it here.
+    local okH, health = pcall(Open77.vehicles.getHealth, car.vid)
+    if okH and type(health) == "number" and health <= 0 then
+        race.carDamage = race.carDamage or {}
+        race.carDamage[car.id] = { frac = 1, wrecked = true }      -- L298: a wreck is a repair bill and a tow
+        if PaddockHack then pcall(PaddockHack.destroyed, race, car.id, car.vid, pos) end
+        return handBack(race, b, car, tMs, true, "wrecked")
     end
+    -- A Pace car is Pace's: its stall rule kicks it (SP's), and a server reset only drags it about -- at 05:22 nine
+    -- wrecks were moved 10 m BACK every 20 s for minutes.
+    if car.pace then return end
     -- never on the grid (a car there is at 0 m, and "10 m back" put every stuck car on the one start point, on top of
     -- each other: 04:31 Corpo), and never onto another car
     local backD = math.max(0, (car.lastD or 0) - 10)
@@ -637,6 +648,7 @@ function PaddockBubble.tick()
         end
     end
     local spawns, cap = 0, set("bubbleSpawnsPerPass", 3)
+    if PaddockHack then pcall(PaddockHack.prune) end
     for _, race in pairs(PaddockRaces.byId) do
         local lr = PaddockLive.byRace[race.raceId]
         local street = lr and (lr.state == "staging" or lr.state == "running" or lr.state == "finished")
@@ -686,6 +698,8 @@ function PaddockBubble.tick()
                         end
                     end
                 end
+                -- the pre-grid: racers can already be choosing their moment for the lights
+                if PaddockHack then pcall(PaddockHack.step, race, b, players) end
             elseif next(b.cars) then
                 -- nobody with Pace near the start any more: the held grid goes (nothing to anchor, the race has not begun)
                 for id, car in pairs(b.cars) do remove(car, race); b.cars[id] = nil end
@@ -777,6 +791,19 @@ function PaddockBubble.tick()
                             hostD < math.huge and ("%.0f"):format(hostD) or "gone", raceOut))
                     else persevere(race, b, car, pos, tMs) end
                 end
+            end
+            -- L356: the physical field in each other's wakes (and players'); server-driven cars towed through their leg speed
+            if PaddockSlip and next(b.cars) then
+                local field = {}
+                for _, car in pairs(b.cars) do field[#field + 1] = car end
+                table.sort(field, function(x, y) return tostring(x.id) < tostring(y.id) end)
+                pcall(PaddockSlip.step, field, set("bubbleTickMs", 500) / 1000, function(car) return not car.pace end)
+            end
+            -- NPC racers' quickhacking: the physical field on the real chrome machinery, the rest on the model
+            if PaddockHack then
+                pcall(PaddockHack.step, race, b, players)
+                local okM, errM = pcall(PaddockHack.modelStep, race, b)
+                if not okM then log("%s: hack model step failed: %s", race.raceId, tostring(errM)) end
             end
             -- model cars coming into a player's range become physical
             for ppid, pp in pairs(players) do
@@ -878,7 +905,7 @@ function PaddockBubble.onAi(ev, st)
     if not race or not car then return end
     if ev == "waypointReached" then
         local v = car.plan[(car.base or 2) + (tonumber(st.routeIndex) or 0)] or car.plan[#car.plan]
-        if v then pcall(Open77.vehicles.ai.setSpeed, vid, v) end
+        if v then pcall(Open77.vehicles.ai.setSpeed, vid, PaddockSlip and PaddockSlip.leg(car, v) or v) end
     elseif ev == "failed" then
         -- NOT on "cancelled": issuing a route cancels the car's previous task, so answering a cancel with a re-send
         -- is a loop -- 2,117 cancels in 30 s and every car stood still (03:54 Corpo, KB-223). A stuck car is the

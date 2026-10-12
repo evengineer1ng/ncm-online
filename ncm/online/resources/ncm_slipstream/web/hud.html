@@ -1,0 +1,156 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Slipstream</title>
+<style>
+  /* L356: the Eddywright SL-1's interface. Ink (the Engineering job sheet's language): a hand-drawn plan view of the
+     air behind the car ahead, plotted from the real wake geometry -- where the air is, and where you are in it. */
+  :root {
+    --ink: #efe6d2;            /* the job sheet's paper, used as ink on the road */
+    --ink-dim: rgba(239, 230, 210, 0.42);
+    --ink-hot: #f5c95c;
+    --ink-link: #7fe0c0;
+    --ink-warn: #ff8a6a;
+    --mono: "IBM Plex Mono", "Cascadia Mono", "Consolas", ui-monospace, monospace;
+    --hand: "Segoe Script", "Bradley Hand", "Ink Free", "Comic Sans MS", cursive;
+  }
+  html, body { margin: 0; width: 1920px; height: 1080px; overflow: hidden; background: transparent; pointer-events: none; }
+  #plate { position: absolute; left: 50%; bottom: 150px; width: 300px; margin-left: -150px; color: var(--ink);
+    font-family: var(--mono); text-shadow: 0 1px 3px rgba(0,0,0,0.85); opacity: 0; transition: opacity 0.35s ease; }
+  #plate.on { opacity: 1; }
+  svg { display: block; overflow: visible; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.8)); }
+  .stroke { fill: none; stroke: var(--ink); stroke-linecap: round; stroke-linejoin: round; }
+  .wake path { fill: none; stroke: var(--ink); stroke-linecap: round; stroke-width: 1.6; }
+  #you { fill: var(--ink); }
+  #lock { fill: none; stroke: var(--ink-hot); stroke-width: 2.6; stroke-linecap: round; transform-origin: center; }
+  #ripple { fill: none; stroke: var(--ink-warn); stroke-width: 1.8; opacity: 0; }
+  #ripple.on { animation: ripple 1.3s ease-out infinite; }
+  @keyframes ripple { 0% { opacity: 0.9; r: 6; } 100% { opacity: 0; r: 26; } }
+  .label { margin-top: 6px; text-align: center; font: 700 14px var(--mono); letter-spacing: 0.24em; text-transform: uppercase; }
+  .label.active { color: var(--ink-hot); }
+  .sub { text-align: center; font: 600 12px var(--mono); letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-dim); min-height: 16px; }
+  .sub.link { color: var(--ink-link); }
+  .sub.warn { color: var(--ink-warn); }
+  .mark { text-align: center; font: 600 10px var(--mono); letter-spacing: 0.3em; color: var(--ink-dim); margin-top: 3px; }
+  /* the boot: the unit writes itself onto the screen */
+  #boot { position: absolute; left: 50%; bottom: 150px; width: 520px; margin-left: -260px; color: var(--ink);
+    text-shadow: 0 1px 3px rgba(0,0,0,0.9); opacity: 0; transition: opacity 0.4s ease; }
+  #boot.on { opacity: 1; }
+  #boot .maker { text-align: center; font: 700 12px var(--mono); letter-spacing: 0.42em; text-transform: uppercase; color: var(--ink-dim); }
+  #boot .product { text-align: center; font: 26px var(--hand); margin: 2px 0 8px; }
+  #boot .line { font: 700 13px var(--mono); letter-spacing: 0.2em; text-transform: uppercase; text-align: center; margin: 4px 0;
+    clip-path: inset(0 100% 0 0); }
+  #boot .line.write { animation: write 1.1s steps(28) forwards; }
+  #boot .line.slogan { font: 19px var(--hand); letter-spacing: 0.02em; text-transform: none; color: var(--ink-hot); }
+  @keyframes write { to { clip-path: inset(0 0 0 0); } }
+  #boot svg path { stroke-dasharray: 600; stroke-dashoffset: 600; }
+  #boot.draw svg path { animation: pen 1.6s ease-out forwards; }
+  @keyframes pen { to { stroke-dashoffset: 0; } }
+</style>
+</head>
+<body>
+<div id="plate">
+  <svg id="plan" width="300" height="190" viewBox="-150 -10 300 190">
+    <!-- the car ahead, at the top; the air it leaves runs down the page -->
+    <path class="stroke" stroke-width="2" d="M-9 4 Q-10 -6 0 -8 Q10 -6 9 4 L8 16 Q0 19 -8 16 Z"/>
+    <g class="wake" id="wake"></g>
+    <circle id="ripple" cx="0" cy="0" r="6"/>
+    <circle id="lock" cx="0" cy="0" r="12" pathLength="100" stroke-dasharray="0 100" transform="rotate(-90)"/>
+    <circle id="you" cx="0" cy="0" r="4.5"/>
+  </svg>
+  <div class="label" id="label"></div>
+  <div class="sub" id="sub"></div>
+  <div class="mark">EDDYWRIGHT · SL-1</div>
+</div>
+
+<div id="boot">
+  <svg width="520" height="40" viewBox="0 0 520 40"><path class="stroke" stroke-width="1.6" d="M30 24 Q130 10 260 22 T490 18"/></svg>
+  <div class="maker" id="bootMaker"></div>
+  <div class="product" id="bootProduct"></div>
+  <div id="bootLines"></div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+  const plate = $("plate"), wake = $("wake"), you = $("you"), lock = $("lock"), ripple = $("ripple");
+  const label = $("label"), sub = $("sub");
+  const boot = $("boot"), bootLines = $("bootLines");
+  const NS = "http://www.w3.org/2000/svg";
+
+  // plan view scale: metres -> px. Down the page is distance behind the leader; across is offset from its line.
+  const PX_PER_M_AHEAD = 2.2, PX_PER_M_LAT = 16, TOP = 22, MAX_AHEAD_M = 70;
+  const ay = (m) => TOP + Math.max(0, Math.min(MAX_AHEAD_M, m)) * PX_PER_M_AHEAD;
+
+  // The wake drawn in ink: five wavy strokes whose spread is the real lateral sigma at each distance and whose ink is
+  // the real quality. A wobble per stroke so it reads hand-drawn, stable between frames (no random per draw).
+  const strokes = [];
+  for (let i = 0; i < 5; i++) { const p = document.createElementNS(NS, "path"); wake.append(p); strokes.push(p); }
+  function drawWake(q, sigmaAt) {
+    for (let i = 0; i < strokes.length; i++) {
+      const k = (i - 2) / 2;                       // -1 .. 1 across the wake
+      let d = "";
+      for (let m = 4; m <= MAX_AHEAD_M; m += 4) {
+        const x = k * sigmaAt(m) * PX_PER_M_LAT * 1.1 + Math.sin(m * 0.35 + i * 1.7) * 1.6;
+        d += (d ? " L" : "M") + x.toFixed(1) + " " + ay(m).toFixed(1);
+      }
+      strokes[i].setAttribute("d", d);
+      strokes[i].style.opacity = String(0.18 + 0.82 * q * (1 - Math.abs(k) * 0.45));
+      strokes[i].style.strokeWidth = String(1 + 2.2 * q * (1 - Math.abs(k) * 0.5));
+    }
+  }
+
+  const LABEL = { detected: "WAKE DETECTED", acquiring: "ACQUIRING", active: "SLIPSTREAM", lost: "WAKE LOST", searching: "" };
+
+  function state(s) {
+    plate.classList.add("on");
+    const q = Number(s.q) || 0, lk = Number(s.lock) || 0;
+    const sigma0 = Number(s.sigma) || 1.2, ahead = Number(s.ahead);
+    // the wake's own widening (aero.wake: halfWidth + spread x distance), anchored to the sigma at our gap
+    const spread = 0.035;
+    const sigmaAt = (m) => Math.max(0.5, sigma0 + spread * (m - (isFinite(ahead) ? ahead : m)));
+    drawWake(q, sigmaAt);
+    const y = isFinite(ahead) ? ay(ahead) : ay(MAX_AHEAD_M);
+    const x = Math.max(-140, Math.min(140, (Number(s.lateral) || 0) * PX_PER_M_LAT));
+    for (const el of [you, lock, ripple]) { el.setAttribute("cx", x.toFixed(1)); el.setAttribute("cy", y.toFixed(1)); }
+    lock.setAttribute("transform", "rotate(-90 " + x.toFixed(1) + " " + y.toFixed(1) + ")");
+    lock.setAttribute("stroke-dasharray", (lk * 100).toFixed(1) + " 100");
+    label.textContent = LABEL[s.phase] || "";
+    label.className = "label" + (s.phase === "active" ? " active" : "");
+    if (s.inbound) { sub.textContent = "IN YOUR WAKE · " + s.inbound; sub.className = "sub warn"; ripple.classList.add("on"); }
+    else {
+      ripple.classList.remove("on");
+      if (s.peer && s.phase === "active") { sub.textContent = "LINKED · " + s.peer; sub.className = "sub link"; }
+      else { sub.textContent = s.phase === "acquiring" ? "HOLD THE LINE" : ""; sub.className = "sub"; }
+    }
+  }
+
+  function bootStep(b) {
+    if (b.done) { boot.classList.remove("on"); setTimeout(() => { bootLines.innerHTML = ""; boot.classList.remove("draw"); }, 500); plate.classList.remove("on"); return; }
+    if (b.step === 0) {
+      bootLines.innerHTML = "";
+      $("bootMaker").textContent = String(b.maker || "") + " " + String(b.line || "");
+      $("bootProduct").textContent = String(b.product || "");
+      boot.classList.add("on"); boot.classList.add("draw");
+      // the interface shows itself once, empty, so the driver knows it exists
+      state({ phase: "searching", q: 0.55, lock: 0, ahead: 12, lateral: 0, sigma: 1.2 });
+      plate.style.bottom = "300px";
+      return;
+    }
+    const l = document.createElement("div");
+    l.className = "line" + (b.last ? " slogan" : "");
+    l.textContent = b.last ? String(b.text || "").replace(/^Eddywright\.\s*/, "") : String(b.hud || "");
+    bootLines.append(l);
+    requestAnimationFrame(() => l.classList.add("write"));
+    if (b.last) setTimeout(() => { plate.style.bottom = ""; }, 1800);
+  }
+
+  Open77.on("slip:state", (s) => { if (s && typeof s === "object") state(s); });
+  Open77.on("slip:boot", (b) => { if (b && typeof b === "object") bootStep(b); });
+  Open77.emit("slip:ready", {});
+})();
+</script>
+</body>
+</html>

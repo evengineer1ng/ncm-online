@@ -1,7 +1,7 @@
 # 56 - R&D overhaul: flight parts arrive through manufacturer R&D, not through typing
 
-> **STATUS: PROPOSAL** - drafted 2026-10-07 for the next coder (L341). Nothing here is built or ruled beyond L341 itself.
-> Decision: [DECISION_RECORD.md](DECISION_RECORD.md) L341. Authority map: [INDEX.md](INDEX.md).
+> **STATUS: SPEC** - Q1-Q6 ruled by the owner on 2026-10-07 (L342). Implementation and live validation are tracked separately.
+> Decision: [DECISION_RECORD.md](DECISION_RECORD.md) L341-L342. Authority map: [INDEX.md](INDEX.md).
 > Governing docs it builds on: [54_ENGINEERING_II.md](54_ENGINEERING_II.md) §E (lineage), [50_ENGINEERING_ARCHITECTURE.md](50_ENGINEERING_ARCHITECTURE.md), [17_MARKET_NETWORK.md](17_MARKET_NETWORK.md).
 
 **In one paragraph.** On 2026-10-07 the owner ruled (L341) that *"all parts buying defines flight and race potential"*
@@ -11,6 +11,11 @@ and flight shipped to Online. But today's R&D (`parts.rnd`) can only invent **ha
 development fabricates for free. **So right now no Online player can obtain anything that flies.** This proposal makes
 manufacturer R&D the only source of flight hardware: physical designs, derived from lineages, bounded by physics, with
 competency that grows and failures that are real, listed on markets and bought with eddies.
+
+**Build status (2026-10-07):** the shared core, migrations 071-072, five physical programmes, database/client spec delivery,
+market stock and fitment, Panel Parts purchase tiles, and WIRE release stories are built and headless-green. Single-player
+tapes replay missed physical runs in order. Online and dev have been restarted with this code; the live acceptance rows
+are `wp/MASTER_TEST.md` §RN1-§RN6, and none has a live gameplay PASS.
 
 ---
 
@@ -107,14 +112,13 @@ attitude waiver is off -- a Machine in Deep has no way to turn (Q4).
    a physical run lands; the design is buyable; bought + mounted it flies; a second client sees it; restart keeps it;
    v1 scalar runs replay identically).
 
-## 5. Open questions for the owner
-- **Q1.** Are the five roots ever sold, or only their R&D descendants?
-- **Q2.** Who gets R&D: makers only, or also players' own engineering (doc 48/54 reverse engineering from a bought specimen)?
-- **Q3.** Physics truth: honour `ISP_CEILING` (RP-16 class ~ 300-360 s, flight becomes fuel-limited) or keep dev's 2000 s?
-- **Q4.** Attitude: should the first physical programme be an attitude component (so Deep is flyable on Online), and
-  does the dev attitude waiver stay until one exists?
-- **Q5.** Cadence and pace: how many days from Baseline 3 to the first buyable flight part is acceptable?
-- **Q6.** Single player: same R&D on each tape (seeded per tape `server_id`) -- confirm.
+## 5. Owner rulings (L342, 2026-10-07)
+- **Q1.** The five roots are lineage references, never direct market stock. Only successful R&D descendants are sold.
+- **Q2.** Manufacturers perform the first physical R&D. Player reverse engineering is a later feature and cannot bypass the first Online flight ladder.
+- **Q3.** Physical ceilings govern: a fuelled RP-16 class engine is capped at about 360 s, not the dev value of 2000 s. L342 explicitly retires the RP-16's 2000 s and IA-10's 3000 s development balance on the existing revision-1 roots; their fuel use changes on dev. The development fuel waiver remains explicit. Online players never held these roots. Fusion fuel is a separate system.
+- **Q4.** Begin with an attitude programme alongside propulsion and tank programmes. Attitude alone is not a flight kit. The attitude waiver stays development-only.
+- **Q5.** Target a first buyable flight part within 48 hours and a plausible complete kit within one Racing Week. Measure the actual outcome distribution in the dev soak; a 50% no-candidate roll on serial programmes cannot meet these targets reliably.
+- **Q6.** Single player uses the same rules independently per tape, seeded and persisted under that tape's `server_id`. Resolve missed runs in order on return.
 
 ## 6. Do not
 - Do not reintroduce a typed path to any of this (L341).

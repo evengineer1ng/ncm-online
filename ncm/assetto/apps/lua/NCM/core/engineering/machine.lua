@@ -46,6 +46,31 @@ Core.define("engineering.machine", function(C)
             parts = {}, devices = {}, tanks = {}, stores = {}, radiators = {}, sources = {}, surfaces = {}, attitude = {},
             dryMassKg = 0, propellantKg = {}, energyJ = 0, losses = {},
         }
+        -- L360 addendum: a part on a CENTRED hardpoint (`part.centred`, the floor pan) sits directly under the balance
+        -- point of everything else -- tanks at their fill included -- so its own mass never moves that point sideways
+        -- and a thrust along the vertical through it makes no torque.
+        do
+            local cm, cmm = ch.massKg or 0, scale(v3(ch.com or {}), ch.massKg or 0)
+            local any = false
+            for _, part in ipairs(design.parts or {}) do
+                if part.centred then any = true else
+                    local b = part.body or {}
+                    local perf = b.perf or {}
+                    local w = b.massKg or 0
+                    if perf.kind == "propellant_tank" then w = w + (perf.capacityKg or 0) * (perf.fill == nil and 1 or perf.fill) end
+                    cm, cmm = cm + w, add(cmm, scale(add(v3(part.pos or {}), v3(b.com or {})), w))
+                end
+            end
+            if any and cm > 0 then
+                local c = scale(cmm, 1 / cm)
+                for _, part in ipairs(design.parts or {}) do
+                    if part.centred then
+                        local p = v3(part.pos or {})
+                        part.pos = { c[1], c[2], p[3] }
+                    end
+                end
+            end
+        end
         -- mass and centre of mass (dry), with propellant at its tank
         local mass, moment = (ch.massKg or 0), scale(v3(ch.com or {}), ch.massKg or 0)
         local points = { { m = ch.massKg or 0, p = v3(ch.com or {}), box = ch.bounds and v3(ch.bounds) or nil } }

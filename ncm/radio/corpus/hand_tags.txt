@@ -1,0 +1,625 @@
+# Race Week Live -- hand tags, read beat by beat (2026-10-08). Overrides tag_corpus.py's inference.
+# Format:  BEAT-ID: SHAPES | direction        (prefix match with a trailing *)
+# Shapes (bible §206):
+#   AT ask_translate      Mara asks, Jules/Nia explains          EP epistemic_check     somebody polices a claim / "we don't know"
+#   TM tease_machines     Mara teases Jules about machines        D1 dry_one_word        Jules answers in a word or two, repeatedly
+#   PR prediction         a call made, questioned or audited      SR support_refuses     a supporting voice declines to speculate
+#   CB same_fact_callback yesterday / earlier / last night        ST standings           points, the board, the title
+#   MF / DF / LF          machine-, driver-, location-first lens  NA no_analysis         the call and nothing else
+#   LP long_philosophical a long conversation about an idea       JU joke_utility        a short utility beat carried by a joke
+#   RE reflective         emotional, reflective                   BA banter              the hosts' sparring ("counsel", "coward")
+# Directions (bible §208, rendered as pace): bright | neutral | late | tired | grave
+
+# ---- batch 0 ------------------------------------------------------------------------------------------------------
+S4-4-THE-CHEMISTRY: BA | neutral
+S7-DAY-3-CONSEQUENCE: RE CB | grave
+S12-WORKING-FIXED-OPENING-VERSION-A: BA | bright
+D1-H0-01: AT BA | bright
+D1-H0-02: D1 RE BA | neutral
+D1-H0-03: D1 BA | neutral
+D1-H0-04: D1 EP | neutral
+D1-H0-05: RE BA | neutral
+D1-H0-06: D1 RE | neutral
+D1-H0-07: JU BA | bright
+D1-H0-08: RE D1 | neutral
+R1-PRE-01: PR BA | bright
+R1-PRE-02: RE | bright
+R1-START-01: NA | bright
+R1-POST-NORMAL-01: PR RE | bright
+R1-POST-UPSET-01: PR | bright
+R1-POST-RACING-TROUBLE-01: RE | neutral
+R1-POST-SEVERE-01: EP RE | grave
+R2-PRE-NORMAL-01: PR BA | neutral
+R2-POST-DIFFERENT-WINNER: RE | neutral
+R2-POST-REPEAT-WINNER: EP DF | neutral
+R3-PRE-01: PR EP BA | neutral
+R3-POST-THREE-WINNERS: RE BA | bright
+R4-PRE-01: ST PR BA | neutral
+R5-PRE-01: D1 BA | neutral
+R5-POST-01: AT RE | bright
+S18-EXAMPLE-ORDINARY-FINISH: DF | neutral
+S18-EXAMPLE-RACE-AT-A-LOCATION-WITH-RECENT-TROUBLE: LF CB | neutral
+S18-EXAMPLE-PRE-RACE: RE | neutral
+S18-EXAMPLE-GOOD-RACE-INSIDE-A-SUBPAR-WEEK: DF RE | neutral
+S18-EXAMPLE-RACE-STILL-PROCEEDING: EP RE | grave
+S18-EXAMPLE-FINISH: EP NA | grave
+S18-EXAMPLE-ANOTHER-RACE-IS-SOMEHOW-STILL-HAPPENING: EP RE | grave
+S18-EXAMPLE-FINISH-UNDER-CATASTROPHIC-CONDITIONS: NA RE | grave
+S23-D1-MORNING-THERE-ARE-TOO-MANY-NAMES: RE BA | bright
+S23-D1-MORNING-WHAT-ARE-YOU-DRIVING: D1 MF BA | bright
+S23-D1-MORNING-THE-CITY-IS-THE-CIRCUIT: AT LF | bright
+S23-D1-FIRST-MEANINGFUL-STANDINGS-DISCUS*: ST CB | neutral
+S23-D1-A-CLOSE-FINISH: DF BA | bright
+S23-D1-A-DOMINANT-WIN: EP DF | neutral
+S23-D1-MECHANICAL-RETIREMENT: DF RE | neutral
+S23-D1-FIRST-QUICKHACK*: AT BA | neutral
+S23-D1-MONEY-STARTS-BECOMING-REAL: SR EP | neutral
+S23-D1-MIDDAY*: RE | neutral
+S23-D1-QUIET-PERIOD: D1 BA | neutral
+S23-D1-GARAGE-LONG-FORM-TIRES: AT EP BA | neutral
+S23-D1-MOODY-EVENT-BENIGN-FUN-CHANGE: EP BA | bright
+S23-D1-MOODY-EVENT-INCONVENIENT-CHANGE: AT EP | neutral
+S23-D1-FIRST-OFFICIAL-INTERVENTION*: EP RE | neutral
+S23-D1-RETURN-TO-A-TROUBLED-LOCATION*: LF CB | neutral
+S23-D1-PLAYER-S-FIRST-RACE: EP BA | neutral
+S23-D1-PLAYER-FIRST-PODIUM: EP BA | bright
+S23-D1-PLAYER-FIRST-WIN: RE | bright
+S23-D1-PLAYER-DNF: NA RE | neutral
+S23-D1-LATE-AFTERNOON-PREDICTION-AUDIT: PR CB BA | neutral
+S23-D1-SUNSET-NIGHT-RACING-BEGINS: EP BA | bright
+S23-D1-HEALTHY-END-OF-DAY-CONVERSATION: CB RE | tired
+S23-D1-TROUBLED-END-OF-DAY-CONVERSATION: RE | grave
+S24-D2-OPENING-HEALTHY-WEEK: CB BA | tired
+S24-D2-OPENING-TROUBLED-WEEK: CB RE | grave
+S24-D2-YESTERDAY-S-WINNER-RETURNS: CB DF | neutral
+S24-D2-OVERNIGHT-REPAIR-CULTURE: SR AT EP | neutral
+S24-D2-A-DRIVER-AVENGES*: EP CB BA | neutral
+
+# ---- batch 1 ------------------------------------------------------------------------------------------------------
+S24-D2-RECURRING-MATCHUP*: CB EP BA | neutral
+S24-D2-STANDINGS-BECOME-CONSEQUENTIAL: ST CB EP | neutral
+S24-D2-SPEED-POLICY-CHANGE*: EP AT | neutral
+S24-D2-ARE-WE-LEARNING-OR-ESCALATING: AT D1 LP | neutral
+S24-D2-MONEY-HAS-MEMORY: AT CB EP | neutral
+S24-D2-FIRST-FATIGUE-CONVERSATION: RE JU | tired
+S24-D2-HEALTHY-AFTERNOON*: AT D1 RE | neutral
+S24-D2-BAD-WEEK-WHY-ARE-WE-ACCELERATING-THIS: AT EP RE | grave
+S24-D2-EVENING-A-GOOD-DAY-AFTER-A-BAD-DAY-1: CB EP RE | neutral
+S24-D2-EVENING-DETERIORATION: CB RE | grave
+S25-D3-HEALTHY-OPENING: BA ST | tired
+S25-D3-HEALTHY-WEEK-WE-KNOW-THESE-PEOPLE-NOW: EP DF BA | neutral
+S25-D3-HEALTHY-WEEK-ESTABLISHED-MACHINE*: MF EP TM | neutral
+S25-D3-CHAMPIONSHIP-PRESSURE: ST BA | neutral
+S25-D3-TROUBLED-OPENING: EP NA | grave
+S25-D3-I-THOUGHT-THIS-WAS-GOING-TO-BE-DIFFERENT: RE CB | grave
+S25-D3-JULES-REACHES-HIS-OWN-LIMIT: RE AT | grave
+S25-D3-INFRASTRUCTURE-ACTUALLY-HELPS: EP LF | neutral
+S25-D3-DARNELL-ON-A-SCARRED-LOCATION: LF SR RE | tired
+S25-D3-GOOD-RACE-DURING-A-TERRIBLE-DAY: DF RE | grave
+S25-D3-CATASTROPHIC-WHY-ARE-WE-STILL-ON: RE EP | grave
+S25-D3-CATASTROPHIC-RACE-START: SR EP | grave
+S25-D3-HEALTHY-EVENING*: ST RE BA | neutral
+S25-D3-BAD-EVENING-TOMORROW-IS-NOT-PROMISED: EP RE | grave
+S26-D4-HEALTHY-WE-LIVE-HERE-NOW: RE BA | tired
+S26-D4-HEALTHY-DEEP-FIELD-KNOWLEDGE: CB BA RE | neutral
+S26-D4-HEALTHY-SEVEN-DAYS*: RE | neutral
+S26-D4-TROUBLED-NORMALIZATION*: RE | grave
+S26-D4-TROUBLED-DARNELL-IS-DONE-WITH-THEM: SR RE BA | tired
+S26-D5-THE-SHOW-IS-EXHAUSTED: JU BA | tired
+S26-D5-A-LATE-NEW-WINNER: DF RE | bright
+S26-D6-D7-HEALTHY-THIS-ACTUALLY-WORKED: RE EP BA | bright
+S26-D6-D7-TROUBLED-HOW-MUCH-LONGER: RE | tired
+S26-D7-FINAL-MORNING-HEALTHY: CB BA RE | bright
+S26-D7-FINAL-RACE-APPROACH: RE CB | neutral
+S26-D7-FINAL-RACE-FINISH-HEALTHY: NA RE | bright
+S28-MOODY-EXCITING-EXPANSIVE: NA | bright
+S28-MOODY-RESTRICTIVE: EP | neutral
+S28-MOODY-ECONOMICALLY-SIGNIFICANT: AT | neutral
+S28-MOODY-WEIRD-BUT-NOT-DANGEROUS: BA JU | bright
+S32-RAIN-ARRIVES-BEFORE-A-RACE: PR AT EP | neutral
+S32-RAIN-CATCHES-A-RACE-ALREADY-UNDERWAY: BA | bright
+S35-SPECTACULAR-CRASH*: EP JU | neutral
+S36-TWO-RACES-FINISH-NEARLY-TOGETHER: BA NA | bright
+S36-THE-SHOW-MISSES-A-RACE: CB NA | neutral
+S36-THREE-THINGS-COMPETE-FOR-AIRTIME: JU | neutral
+S37-TEAM-FOUNDED: AT SR | neutral
+S37-FIRST-TEAM-WIN: JU | bright
+S37-DRIVER-SIGNED: AT | neutral
+S37-DRIVER-RELEASED: SR | neutral
+S37-TEAM-FOLDS*: RE SR | grave
+S38-SPONSOR-SIGNS: SR EP | neutral
+S38-SPONSOR-LEAVES: SR EP | neutral
+S39-PUBLIC-R-D-RELEASE: SR EP JU | neutral
+S41-NPC-VERSUS-NPC-CYBER-BATTLE: D1 | bright
+S41-TOTAL-FAILURE-DESTROYS-A-VEHICLE: EP SR | grave
+S42-SERIES-FINALE: ST | neutral
+S42-CHAMPIONSHIP-CLINCHED*: ST RE | bright
+S43-FIRST-CAREER-WIN: EP RE | bright
+S43-RETIREMENT-ANNOUNCEMENT: RE | neutral
+S44-EVERYBODY-IS-TALKING-ABOUT*: EP | neutral
+S44-PUBLISHED-QUOTE-STATEMENT-EXISTS: EP | neutral
+S44-NO-QUOTE-EXISTS: EP | neutral
+S45-LUNCH-THAT-NEVER-HAPPENS: JU BA | tired
+S45-AFTERNOON-SLUMP: JU BA | tired
+S45-MIDNIGHT-VERY-LATE-RACING: JU BA | late
+S45-DAWN-AFTER-BROADCASTING-THROUGH-NIGHT: JU BA | late
+S46-MARA-LOVES-A-RIDICULOUS-MACHINE: MF TM BA | bright
+S46-JULES-BECOMES-ATTACHED-DESPITE-HIMSELF: MF TM | neutral
+S46-HOSTS-DISAGREE-ON-FAVORITE-DRIVER: DF BA PR | neutral
+S50-FINAL-CHAMPIONSHIP-CONFIRMATION: ST NA | bright
+S50-FINAL-SIGNOFF-HEALTHY-WEEK: RE CB | tired
+S50-FINAL-SIGNOFF-SCARRED-BUT-COMPLETED-WEEK: RE | grave
+S56-ODDS-BOARD-DISCUSSION: PR AT | neutral
+S56-LONG-SHOT-WINS: SR JU | bright
+S56-FAVORITE-DELIVERS: PR | neutral
+S61-HUGE-UPCOMING-BLOCK: JU | bright
+S61-UNEXPECTED-QUIET-WINDOW: RE | neutral
+S63-BROAD-MIXED-FIELD: MF | bright
+S64-DRIVER-BECOMES-FAMILIAR-TO-THE-SHOW: DF CB BA | neutral
+S64-DRIVER-BECOMES-PUBLICLY-NOTABLE*: EP | neutral
+S65-SAFETY-VERSUS-COMPETITION: EP RE | neutral
+S65-ENGINEERING-LOOPHOLE: TM BA D1 | neutral
+S65-MARA-OVER-NARRATIVIZES-A-RIVALRY: EP BA | neutral
+S66-GREAT-FINISH-NEEDS-NO-IMMEDIATE-ANALYSIS: NA D1 | bright
+S66-BAD-EVENT-NO-NEW-FACTS: NA EP | grave
+S66-EMOTIONAL-RESULT: RE NA | bright
+S68-MARA-LOSES-HER-PLACE: JU BA | neutral
+S68-JULES-STARTS-EXPLAINING-THE-WRONG-CLASS: JU BA | neutral
+S70-PREDICTION-CALLBACK: PR CB BA | neutral
+S70-MARA-RETRACTS-AN-OPINION: CB BA | neutral
+S70-JULES-CHANGES-HIS-MIND: CB BA | neutral
+S71-DAY-1-INTO-DAY-2: JU BA | late
+S71-DAY-2-INTO-DAY-3: JU | late
+S71-LATE-WEEK-DAY-BOUNDARY: JU | tired
+S72-NPC-RACE-GETS-FULL-ATTENTION: DF RE | bright
+S72-PLAYER-RETURNS-AFTER-ABSENCE: CB | neutral
+S74-TOO-MANY-CALLBACKS: CB RE | tired
+S74-A-COMPLETELY-NEW-ENTRANT-LATE-IN-WEEK: DF RE | bright
+S75-TOMMY-FINALLY-LEAVES-TRACKSIDE: JU BA | tired
+S75-NIA-REFUSES-ONE-LAST-SPECULATIVE-QUESTION: SR EP | tired
+S75-CELESTE-S-FINAL-ECONOMIC-SUMMARY: SR JU | tired
+FINISH-NORMAL-A: NA DF | neutral
+FINISH-NORMAL-B: DF | neutral
+FINISH-NORMAL-C: DF RE | neutral
+FINISH-NORMAL-D: DF EP CB | neutral
+FINISH-NORMAL-E: NA | bright
+FINISH-NORMAL-F: NA | neutral
+FINISH-NORMAL-G: NA CB | neutral
+FINISH-NORMAL-H: NA | neutral
+CLOSE-A: EP BA | bright
+CLOSE-B: RE | neutral
+CLOSE-C: RE | bright
+CLOSE-D: CB | bright
+CLOSE-E: RE | grave
+DOMINANT-A: NA DF | neutral
+DOMINANT-B: EP | neutral
+DOMINANT-C: ST | neutral
+DOMINANT-D: EP | neutral
+DOMINANT-E: CB | neutral
+DNF-A: NA | neutral
+
+# ---- batch 2 ------------------------------------------------------------------------------------------------------
+DNF-B: DF RE | neutral
+DNF-C: CB D1 | neutral
+DNF-D: CB RE | neutral
+DNF-E: NA | neutral
+DNF-F: NA EP | grave
+UPSET-A: AT RE | bright
+UPSET-B: EP D1 | bright
+UPSET-C: SR NA | bright
+UPSET-D: EP | neutral
+UPSET-E: ST | bright
+HACK-A: NA | neutral
+HACK-C: NA | neutral
+HACK-D: CB | neutral
+HACK-F: RE | grave
+PLAYER-ENTRY-A: NA | neutral
+PLAYER-ENTRY-B: CB | neutral
+PLAYER-ENTRY-C: CB | neutral
+PLAYER-ENTRY-D: CB | neutral
+PLAYER-ENTRY-E: CB | neutral
+PLAYER-WIN-A: RE | bright
+PLAYER-WIN-B: CB | bright
+PLAYER-WIN-C: MF BA | bright
+PLAYER-PODIUM-A: NA | bright
+PLAYER-DNF-A: NA | neutral
+PLAYER-DNF-B: RE EP | neutral
+STANDINGS-A: ST EP | neutral
+STANDINGS-B: ST CB | neutral
+STANDINGS-C: ST | neutral
+STANDINGS-D: ST EP | neutral
+STANDINGS-E: ST | neutral
+STANDINGS-F: ST | neutral
+WEATHER-RAIN-A: JU BA | bright
+WEATHER-RAIN-B: SR AT | neutral
+WEATHER-RAIN-C: EP BA | neutral
+RND-A: AT | neutral
+RND-B: EP TM | neutral
+RND-C: JU | neutral
+RND-D: MF | neutral
+RND-E: SR EP | neutral
+INFRA-A: NA | neutral
+INFRA-B: EP | neutral
+INFRA-C: EP | neutral
+INFRA-D: JU | neutral
+INFRA-E: CB RE | neutral
+TEAM-A: SR JU | neutral
+TEAM-B: JU | neutral
+SPONSOR-A: SR EP | neutral
+MONEY-A: SR | neutral
+QUIET-A: JU BA | neutral
+QUIET-B: AT JU | neutral
+QUIET-C: ST JU | neutral
+QUIET-D: RE D1 | grave
+QUIET-E: JU BA | tired
+D2-OPEN-A: CB ST | neutral
+D2-OPEN-B: ST BA | neutral
+D2-OPEN-C: CB | neutral
+D2-OPEN-D: NA | grave
+D3-OPEN-A: BA | neutral
+D3-OPEN-B: ST | neutral
+D3-OPEN-C: NA | grave
+D3-OPEN-D: CB | neutral
+D1-CLOSE-A: D1 BA | bright
+D1-CLOSE-B: CB D1 | neutral
+D1-CLOSE-C: RE | neutral
+D1-CLOSE-D: RE | grave
+D2-CLOSE-A: BA EP | neutral
+D2-CLOSE-B: RE | tired
+D3-CLOSE-A: RE | neutral
+D3-CLOSE-B: BA | tired
+S97-HEALTHY: NA DF | bright
+S97-SLIGHTLY-BELOW-EXPECTATIONS: DF RE | neutral
+S97-SUBPAR: DF | neutral
+S97-BAD: NA | grave
+S97-CATASTROPHIC: NA | grave
+SEVERE-A: EP NA | grave
+SEVERE-B: EP NA | grave
+SEVERE-D: EP | grave
+SEVERE-E: NA | grave
+SEVERE-F: RE | grave
+SEVERE-G: EP | grave
+SEVERE-H: NA | grave
+RECOVERY-A: D1 | neutral
+RECOVERY-B: EP | neutral
+RECOVERY-C: JU | bright
+RECOVERY-D: RE | bright
+RECOVERY-E: RE | neutral
+HANDOFF-*: JU | neutral
+S101-*: JU | neutral
+S102-RADIO: JU BA | tired
+S102-SHIRTS: JU BA | bright
+QUAL-G: NA | bright
+QUAL-H: EP | neutral
+START-D: NA | bright
+START-E: NA | neutral
+BATTLE-H: CB | neutral
+BATTLE-I: NA | neutral
+BATTLE-J: NA | neutral
+ODDS-A: SR JU | neutral
+ODDS-B: PR SR | neutral
+ODDS-C: PR EP | neutral
+ODDS-D: SR EP | bright
+ODDS-E: SR EP | neutral
+SCHED-A: JU | neutral
+SCHED-B: JU | neutral
+SCHED-C: NA | neutral
+SCHED-D: JU BA | neutral
+SCHED-E: JU BA | tired
+RECOG-A: DF CB | neutral
+RECOG-B: EP | neutral
+ARGUE-A: RE BA | neutral
+ARGUE-C: DF BA | neutral
+ARGUE-D: TM BA | neutral
+ARGUE-E: CB RE | neutral
+SILENCE-A: NA | bright
+SILENCE-C: NA | grave
+SILENCE-D: NA RE | bright
+ERROR-A: EP JU | neutral
+ERROR-B: JU BA | neutral
+ERROR-C: JU | neutral
+ERROR-D: JU | neutral
+ERROR-E: EP | neutral
+SMALL-D: JU | bright
+SMALL-E: RE | neutral
+CALLBACK-A: PR CB | neutral
+CALLBACK-B: PR CB BA | neutral
+CALLBACK-C: PR CB BA | neutral
+CALLBACK-E: CB RE | neutral
+DAYBOUND-A: BA | late
+DAYBOUND-B: D1 | late
+DAYBOUND-C: JU | late
+DAYBOUND-D: NA | grave
+DAYBOUND-E: JU | tired
+NPC-A: DF RE | neutral
+NPC-C: CB | neutral
+MEMORY-A: CB DF | neutral
+MEMORY-B: CB MF | neutral
+MEMORY-C: CB LF | neutral
+MEMORY-D: BA | tired
+MOODY-A: NA | neutral
+MOODY-B: RE | neutral
+MOODY-C: TM | neutral
+MOODY-D: BA | neutral
+MOODY-E: CB | neutral
+MOODY-F: RE | neutral
+MOODY-G: CB RE | neutral
+MOODY-H: SR | neutral
+MOODY-I: AT | neutral
+CAREER-D: RE NA | bright
+CAREER-G: RE | neutral
+SERIES-FINAL-*: ST | neutral
+TITLE-A: ST NA | bright
+TITLE-B: ST JU | neutral
+TITLE-C: ST EP | neutral
+TITLE-D: ST | neutral
+TITLE-F: ST CB | neutral
+HEALTHY-LATE-A: BA | neutral
+HEALTHY-LATE-B: CB | neutral
+HEALTHY-LATE-C: SR RE | neutral
+HEALTHY-LATE-D: RE | tired
+HEALTHY-LATE-E: RE BA | bright
+TROUBLED-LATE-A: RE | neutral
+TROUBLED-LATE-B: NA | neutral
+TROUBLED-LATE-C: RE CB | tired
+TROUBLED-LATE-D: RE | neutral
+TROUBLED-LATE-E: RE | grave
+CATA-*: EP RE | grave
+FINAL-A: ST | neutral
+FINAL-B: ST | neutral
+FINAL-C: RE | neutral
+FINAL-D: RE | grave
+FINAL-E: NA | bright
+FINAL-F: NA | bright
+SIGNOFF-A: BA RE | bright
+SIGNOFF-B: CB RE | neutral
+SIGNOFF-C: JU | tired
+SIGNOFF-D: RE | grave
+SIGNOFF-E: NA | tired
+ORD-PRE-A: NA | neutral
+ORD-PRE-B: AT EP LF | neutral
+ORD-PRE-C: PR MF | neutral
+ORD-PRE-D: DF | neutral
+ORD-PRE-E: PR D1 | neutral
+ORD-PRE-F: PR BA | neutral
+ORD-PRE-G: RE | neutral
+ORD-PRE-H: CB | neutral
+ORD-PRE-I: JU | neutral
+ORD-PRE-J: NA | neutral
+ORD-PRE-K: LF | bright
+ORD-PRE-L: NA | bright
+ORD-OPEN-F: NA | neutral
+CLOSEPHASE-E: NA | bright
+CLOSEPHASE-F: JU | neutral
+FINISH-DEEP-A: NA | bright
+FINISH-DEEP-B: RE | bright
+FINISH-DEEP-C: AT | neutral
+FINISH-DEEP-D: NA | neutral
+FINISH-DEEP-E: DF | neutral
+FINISH-DEEP-F: MF | neutral
+FINISH-DEEP-G: LF | neutral
+FINISH-DEEP-H: NA | neutral
+FINISH-DEEP-I: BA | neutral
+FINISH-DEEP-J: DF | neutral
+RECAP-A: NA | neutral
+RECAP-B: DF | neutral
+RECAP-C: SR MF | neutral
+RECAP-D: ST | neutral
+RECAP-E: NA | neutral
+D1-GOOD-A: BA RE | bright
+D1-GOOD-B: EP RE | bright
+D1-GOOD-C: RE | bright
+D1-GOOD-D: LF RE | bright
+D1-GOOD-E: MF | bright
+D1-GOOD-F: NA | bright
+D1-GOOD-G: JU PR | bright
+D1-GOOD-H: PR BA | bright
+D1-GOOD-I: LF | bright
+D1-GOOD-J: RE | late
+D1-GOOD-K: JU D1 | tired
+D1-GOOD-L: RE | bright
+D1-SLIGHT-A: NA | neutral
+D1-SLIGHT-B: NA | neutral
+D1-SLIGHT-C: RE | neutral
+D1-SLIGHT-D: EP | neutral
+D1-SLIGHT-E: JU BA | neutral
+D1-SLIGHT-F: NA | neutral
+D1-SUBPAR-A: RE | neutral
+D1-SUBPAR-B: RE | neutral
+D1-SUBPAR-C: RE JU | neutral
+D1-SUBPAR-D: EP | neutral
+D1-SUBPAR-E: SR | neutral
+D1-BAD-A: RE D1 | grave
+D1-BAD-B: NA | grave
+D1-BAD-C: EP RE | grave
+
+# ---- batch 3 ------------------------------------------------------------------------------------------------------
+D1-CATA-A: EP RE | grave
+D1-CATA-B: NA | grave
+D1-CATA-C: NA RE | grave
+D2-MEM-A: CB DF | neutral
+D2-MEM-B: PR CB BA | neutral
+D2-MEM-C: CB MF SR | neutral
+D2-MEM-D: CB LF SR | neutral
+D2-MEM-E: CB | neutral
+D2-MEM-F: DF | neutral
+D2-MEM-G: EP ST | neutral
+D2-MEM-H: CB DF RE | neutral
+D2-MEM-I: BA | neutral
+D3-HEALTHY-A: RE | bright
+D3-HEALTHY-B: ST | neutral
+D3-MIXED-A: RE | neutral
+D3-MIXED-B: CB | tired
+D3-BAD-A: CB RE | grave
+D3-BAD-B: RE | grave
+D3-CATA-A: NA | grave
+D3-CATA-B: NA | grave
+PLAYER-HIST-A: EP | neutral
+PLAYER-HIST-B: MF CB | neutral
+PLAYER-HIST-C: MF BA | neutral
+PLAYER-HIST-D: CB | neutral
+PLAYER-HIST-E: CB | bright
+PLAYER-HIST-F: CB | neutral
+PLAYER-HIST-G: CB BA | neutral
+PLAYER-HIST-H: CB | neutral
+PLAYER-HIST-I: MF CB | neutral
+AFTERMATH-A: NA | grave
+AFTERMATH-B: EP | grave
+AFTERMATH-C: EP | grave
+AFTERMATH-D: RE | grave
+AFTERMATH-E: RE | grave
+AFTERMATH-F: CB RE AT | grave
+AFTERMATH-G: RE | neutral
+BOARD-*: ST NA | neutral
+PRE-ORD-13: D1 BA | neutral
+PRE-ORD-16: LF BA | neutral
+PRE-ORD-19: JU | neutral
+PRE-ORD-20: BA | neutral
+PRE-ORD-21: PR EP | neutral
+PRE-ORD-22: PR EP | neutral
+PRE-ORD-25: NA | neutral
+PRE-ORD-27: BA | neutral
+PRE-ORD-28: RE | neutral
+PRE-ORD-30: EP BA | late
+PRE-ORD-32: NA | neutral
+OPEN-12: EP | neutral
+OPEN-13: EP | neutral
+OPEN-18: RE | neutral
+FIN-10: NA | neutral
+FIN-11: BA | bright
+FIN-12: DF | neutral
+FIN-14: LF | neutral
+FIN-17: DF | neutral
+FIN-18: CB DF | neutral
+FIN-19: RE | bright
+FIN-20: BA | bright
+FIN-21: EP BA | neutral
+FIN-22: NA | bright
+FIN-23: EP | bright
+FIN-24: RE | neutral
+FIN-25: EP NA | neutral
+FIN-28: RE BA | neutral
+FIN-29: NA | neutral
+FIN-30: BA | neutral
+RECAP-08: NA | neutral
+RECAP-09: NA | neutral
+RECAP-10: MF TM | neutral
+RECAP-11: ST | neutral
+RECAP-12: EP | neutral
+RECAP-13: EP BA | neutral
+RECAP-14: NA CB | neutral
+RECAP-15: NA | neutral
+UTIL-01: JU | neutral
+UTIL-02: EP JU | neutral
+UTIL-03: JU | neutral
+UTIL-04: NA | neutral
+UTIL-05: ST NA | neutral
+UTIL-06: ST | neutral
+UTIL-07: JU BA | neutral
+UTIL-13: JU | neutral
+UTIL-14: JU | neutral
+UTIL-15: JU BA | neutral
+UTIL-16: JU | neutral
+UTIL-17: ST JU | neutral
+UTIL-19: NA | late
+UTIL-20: JU BA | tired
+D1-HEALTH-13: EP BA | neutral
+D1-HEALTH-14: RE | neutral
+D1-HEALTH-15: D1 RE | neutral
+D1-HEALTH-16: MF TM BA | neutral
+D1-HEALTH-17: PR CB BA | neutral
+D1-HEALTH-18: PR CB BA | bright
+D1-HEALTH-19: LF RE | neutral
+D1-HEALTH-20: RE | bright
+D1-HEALTH-21: BA | bright
+D1-HEALTH-22: CB RE BA | neutral
+D1-HEALTH-23: AT BA | neutral
+D1-HEALTH-24: RE | late
+D1-HEALTH-26: BA | tired
+D1-HEALTH-27: RE | bright
+D1-HEALTH-28: RE BA | tired
+D1-HEALTH-29: EP | neutral
+D1-HEALTH-30: CB RE | tired
+D1-SLIGHT-07: LF RE | neutral
+D1-SLIGHT-08: CB EP | neutral
+D1-SLIGHT-09: EP BA | neutral
+D1-SLIGHT-10: EP | neutral
+D1-SLIGHT-11: RE | neutral
+D1-SLIGHT-12: RE | tired
+D1-NIGHT-01: BA | late
+D1-NIGHT-02: RE | late
+D1-NIGHT-03: RE BA | late
+D1-NIGHT-04: JU | late
+D1-NIGHT-05: CB PR BA | late
+D1-NIGHT-08: EP RE | late
+D1-NIGHT-09: EP | late
+D1-NIGHT-10: EP | late
+D2-AM-01: CB | neutral
+D2-AM-02: CB | neutral
+D2-AM-03: ST CB | neutral
+D2-AM-11: EP | neutral
+D2-AM-12: EP BA | neutral
+D2-AM-13: BA | bright
+D2-AM-14: BA | tired
+D2-AM-15: EP BA | bright
+D2-AM-16: CB EP | neutral
+D2-AM-18: CB | grave
+D2-AM-19: DF | neutral
+D2-AM-20: BA | neutral
+S194-*: AT LP LF | neutral
+S195-*: AT LP EP DF | neutral
+S196-*: AT LP MF CB | neutral
+S197-*: AT LP EP | neutral
+S198-*: EP LP RE | neutral
+S199-*: SR AT LP | neutral
+S200-*: SR AT LP EP | neutral
+S201-*: LP RE EP | neutral
+S202-*: AT LP BA MF | neutral
+
+# ---- batch 4 ------------------------------------------------------------------------------------------------------
+S203-*: CB LP BA | tired
+SUPPORT-03: SR EP JU | neutral
+SUPPORT-07: NA | grave
+TUNE-SAFE-01: EP BA | neutral
+TUNE-SAFE-02: NA ST | neutral
+TUNE-SAFE-03: NA | bright
+TUNE-SAFE-04: SR EP | neutral
+TUNE-SAFE-05: JU BA | neutral
+TUNE-SAFE-06: ST NA | neutral
+S211-*: LP BA TM | bright
+S212-*: LP BA AT | neutral
+S213-*: LP D1 TM BA | neutral
+S214-*: LP BA | neutral
+S215-*: LP TM BA RE | neutral
+S216-*: LP AT BA | neutral
+S217-*: LP BA JU | bright
+S218-*: LP BA JU | neutral
+S219-*: LP TM D1 | neutral
+S220-*: LP AT BA | late
+S221-*: LP BA JU | neutral
+S222-*: LP D1 BA JU | bright
+S223-*: LP RE AT | neutral
+S224-*: LP D1 BA | neutral
+S225-*: LP D1 RE | neutral
+S226-*: LP AT TM | neutral
+S227-*: LP BA JU | neutral
+S228-*: LP BA | tired
+S229-*: LP D1 TM | neutral
+S230-*: LP AT RE | neutral
+S231-*: LP BA D1 | neutral
+S232-*: LP AT TM | neutral
+S233-*: LP AT BA | neutral
+S234-*: LP D1 BA | neutral
+S235-*: LP RE TM D1 | neutral
+
+# ---- batch 5 ------------------------------------------------------------------------------------------------------
+S236-*: LP BA AT | neutral
+S237-*: LP BA RE | neutral
+S238-*: LP BA D1 | neutral
+S239-*: LP RE BA | late
+S240-*: LP D1 BA | late
+S241-*: LP BA D1 | neutral
+S242-*: LP BA D1 JU | bright
+S243-*: LP BA JU | bright
+S244-*: LP RE BA | neutral
+S245-*: LP BA JU | tired

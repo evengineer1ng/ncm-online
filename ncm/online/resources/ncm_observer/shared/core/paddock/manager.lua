@@ -53,8 +53,12 @@ Core.define("paddock.manager", function(C)
             local d = world.people[args.driverId or ""]
             if not d or d.role ~= "driver" then return false, "no_such_driver" end
             if not Contracts.poachable(d, world.seasonOrdinal) then return false, "under_contract" end
+            -- the roster the queue will leave, not today's: queued signings take a place, queued releases free one
             local roster = #C.get("paddock.world").drivers(world, org.id)
-            if roster >= (Season.TIERS[org.tier].roster + 1) then return false, "roster_full" end
+            for _, p in ipairs(org.pending or {}) do
+                if p.kind == "sign" then roster = roster + 1 elseif p.kind == "release" then roster = roster - 1 end
+            end
+            if roster >= M.limits(org.tier).maxContracted then return false, "roster_full" end
             local wage = math.floor(tonumber(args.wage) or 0)
             local seasons = math.floor(tonumber(args.seasons) or 1)
             if wage < 1 then return false, "invalid_wage" end
@@ -113,6 +117,133 @@ Core.define("paddock.manager", function(C)
             return true, { kind = "resign" }
         end
         return false, "unsupported"
+    end
+
+    -- ---------------------------------------------------------------------------------------------------------
+    -- The queue (owner 2026-10-09: "need the ability to cancel pending actions ... should be clear about number of
+    -- drivers who can be racers for your team"). Roster moves wait for the Cup boundary; until then they can be
+    -- taken back, a second seat move for the same driver REPLACES the first, and the panel shows the roster the
+    -- queue will leave behind.
+    -- ---------------------------------------------------------------------------------------------------------
+    M.MAX_PENDING = 6
+    M.ROSTER_MOVES = { sign = true, release = true, seat = true }
+
+    --- The seats a tier gives a team: race seats (cars it fields per race) and how many drivers it may contract.
+    function M.limits(tier)
+        local spec = Season.TIERS[tier] or Season.TIERS.street
+        return { raceSeats = spec.carsPerOrg, squad = spec.roster, maxContracted = spec.roster + 1 }
+    end
+
+    --- Add a validated roster `plan` to `pending` (a list, changed in place). A seat move for a driver who already
+    --- has one replaces it; a second release or signing of the same driver is refused. Returns true, "added" |
+    --- "replaced" or false, reason.
+    function M.enqueue(pending, plan)
+        for i, p in ipairs(pending) do
+            if p.driverId == plan.driverId and p.kind == plan.kind then
+                if plan.kind == "seat" then pending[i] = plan; return true, "replaced" end
+                return false, "already_pending"
+            end
+        end
+        if #pending >= M.MAX_PENDING then return false, "too_many_pending" end
+        pending[#pending + 1] = plan
+        return true, "added"
+    end
+
+    --- Take back the move at `index`. `expect` = { kind, driverId } must match it, so a stale panel can never cancel
+    --- a different move than the one its button showed. Returns true, removedPlan or false, reason.
+    function M.cancel(pending, index, expect)
+        index = math.floor(tonumber(index) or 0)
+        local p = pending[index]
+        if not p then return false, "no_such_move" end
+        expect = expect or {}
+        if (expect.kind and expect.kind ~= p.kind) or (expect.driverId and expect.driverId ~= p.driverId) then
+            return false, "queue_changed"
+        end
+        table.remove(pending, index)
+        return true, p
+    end
+
+    --- Fill empty race seats from reserves, best rated first. `drivers` = persons (seat changed in place).
+    --- Returns the ids moved up.
+    function M.fillRaceSeats(drivers, cars, rating)
+        rating = rating or function(p) return C.get("paddock.attributes").rating(p.attrs) end
+        local taken, moved = {}, {}
+        for _, d in ipairs(drivers) do if d.seat then taken[d.seat] = true end end
+        local reserves = {}
+        for _, d in ipairs(drivers) do if d.seat == "reserve" or not d.seat then reserves[#reserves + 1] = d end end
+        local r = {}
+        for _, d in ipairs(reserves) do r[d] = rating(d) end
+        table.sort(reserves, function(a, b)
+            if r[a] ~= r[b] then return r[a] > r[b] end
+            return tostring(a.id) < tostring(b.id)
+        end)
+        local nextR = 1
+        for i = 1, cars do
+            local seat = "race" .. i
+            if not taken[seat] and reserves[nextR] then
+                reserves[nextR].seat = seat
+                moved[#moved + 1] = reserves[nextR].id
+                nextR = nextR + 1
+            end
+        end
+        return moved
+    end
+
+    --- Apply one queued seat move to `drivers` (persons or copies; changed in place): the driver takes the seat and
+    --- whoever held it takes theirs (a swap). Shared by the boundary and the preview, so they cannot disagree.
+    function M.applySeat(drivers, plan)
+        local dr
+        for _, d in ipairs(drivers) do if d.id == plan.driverId then dr = d end end
+        if not dr then return false end
+        for _, other in ipairs(drivers) do
+            if other.id ~= dr.id and other.seat == plan.seat and plan.seat ~= "reserve" then other.seat = dr.seat end
+        end
+        dr.seat = plan.seat
+        return true
+    end
+
+    --- The roster the queue leaves behind, assuming every signing says yes. `drivers` = the org's contracted
+    --- persons now; `names` (optional) = { [personId] = display } for signings. Returns
+    --- { roster = { { id, name, seat, was, new?, maybe? } }, notes = { text } } -- nothing is changed.
+    function M.project(drivers, pending, cars, names, rating)
+        local rows, byId = {}, {}
+        for _, d in ipairs(drivers) do
+            local c = { id = d.id, name = d.display, seat = d.seat, was = d.seat, attrs = d.attrs }
+            rows[#rows + 1] = c; byId[d.id] = c
+        end
+        local notes = {}
+        for _, plan in ipairs(pending or {}) do
+            if plan.kind == "release" and byId[plan.driverId] then
+                local c = byId[plan.driverId]
+                for i, x in ipairs(rows) do if x == c then table.remove(rows, i) break end end
+                byId[plan.driverId] = nil
+                notes[#notes + 1] = c.name .. " leaves"
+            elseif plan.kind == "sign" and not byId[plan.driverId] then
+                local name = (names and names[plan.driverId]) or plan.driverId
+                local c = { id = plan.driverId, name = name, seat = "reserve", new = true, maybe = true,
+                    attrs = plan.attrs, chance = plan.willingness }
+                rows[#rows + 1] = c; byId[c.id] = c
+                notes[#notes + 1] = ("%s joins if they say yes (%d%% likely)"):format(name, math.floor((plan.willingness or 0.5) * 100 + 0.5))
+            elseif plan.kind == "seat" then
+                M.applySeat(rows, plan)
+            end
+        end
+        local filled = M.fillRaceSeats(rows, cars, rating or function(p)
+            return p.attrs and C.get("paddock.attributes").rating(p.attrs) or 0 end)
+        for _, id in ipairs(filled) do
+            notes[#notes + 1] = (byId[id] and byId[id].name or id) .. " fills the empty race seat"
+        end
+        local empty = 0
+        local taken = {}
+        for _, c in ipairs(rows) do if c.seat then taken[c.seat] = true end end
+        for i = 1, cars do if not taken["race" .. i] then empty = empty + 1 end end
+        if empty > 0 then notes[#notes + 1] = ("%d race seat(s) left empty: sign a driver"):format(empty) end
+        table.sort(rows, function(a, b)
+            if (a.seat or "z") ~= (b.seat or "z") then return (a.seat or "z") < (b.seat or "z") end
+            return tostring(a.id) < tostring(b.id)
+        end)
+        for _, c in ipairs(rows) do c.attrs = nil end
+        return { roster = rows, notes = notes, emptySeats = empty }
     end
 
     --- How the roster reacts to a manager's move: morale deltas by driver id.

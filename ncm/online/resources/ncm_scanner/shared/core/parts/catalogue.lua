@@ -128,5 +128,13 @@ Core.define("parts.catalogue", function(C)
         else a,b,x=p30,1.75*p30,(e-1.30)/.10 end
         return math.max(200,math.floor((a+(b-a)*x)/50+.5)*50)
     end
+    -- Physical stock is priced from its root's real bill and the thrust/capacity and mass it supplies.
+    function M.pricePhysical(spec, root)
+        local p, base = spec.perf or {}, root.perf or {}
+        local field = p.thrustN and "thrustN" or (p.forceN and "forceN" or (p.torqueNm and "torqueNm" or "capacityKg"))
+        local value = (tonumber(p[field]) or 1) / math.max(1, tonumber(base[field]) or 1)
+        local mass = math.max(0.5, math.min(2, (tonumber(base.massKg) or 1) / math.max(1, tonumber(spec.massKg) or 1)))
+        return math.max(500, math.floor((tonumber(root.price) or 1000) * math.max(0.7, math.min(1.5, 0.7 * value + 0.3 * mass)) / 50 + 0.5) * 50)
+    end
     return M
 end)

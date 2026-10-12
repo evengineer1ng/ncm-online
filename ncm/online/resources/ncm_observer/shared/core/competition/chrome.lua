@@ -61,10 +61,47 @@ Core.define("competition.chrome", function()
         { id = "self_ice", label = "SELF-ICE", target = "self", passive = true },
     }
 
+    -- What each hack MEANS, for anyone who has to choose one (NPC racers, `npc.hacking`; owner brief 2026-10-08:
+    -- "NPCs should understand hacks by useful semantics, not merely by ID"). `severity` 0..5 is how much physical harm
+    -- the effect can do to the car and whoever is near it: an engine limiter is not a car bomb.
+    --   performance  limits or perturbs how fast the car can go        disruption  temporary, nothing breaks
+    --   propulsion   the engine stops pushing for a moment               control     the car is crippled for a while
+    --   tire         a tyre fails until repaired                        catastrophic the car is destroyed (explodes)
+    --   defensive    clears, restores or protects
+    M.SEMANTICS = {
+        limiter = { class = "performance", severity = 1 }, power_surge = { class = "performance", severity = 2 },
+        overclock = { class = "performance", severity = 2 }, blackout = { class = "disruption", severity = 1 },
+        engine_cut = { class = "propulsion", severity = 2 }, limp = { class = "control", severity = 3 },
+        tire_sabotage = { class = "tire", severity = 3 }, total_failure = { class = "catastrophic", severity = 5 },
+        ally_purge = { class = "defensive", severity = 0 }, system_restore = { class = "defensive", severity = 0 },
+        purge = { class = "defensive", severity = 0 }, self_ice = { class = "defensive", severity = 0 },
+    }
+
     M.BY_ID = {}
-    for i, h in ipairs(M.ROSTER) do h.order = i; M.BY_ID[h.id] = h end
+    for i, h in ipairs(M.ROSTER) do
+        h.order = i
+        M.BY_ID[h.id] = h
+        local s = M.SEMANTICS[h.id] or { class = "disruption", severity = 1 }
+        h.class, h.severity = s.class, s.severity
+    end
 
     function M.hack(id) return M.BY_ID[id] end
+
+    --- Offensive hacks a car with no Carrier can be hit by -- what an NPC racer can use on any other racer. The
+    --- governor hacks need a Carrier-bound, player-driven Machine on the receiving end; on a human's car they work too.
+    function M.offensive(targetBound)
+        local out = {}
+        for _, h in ipairs(M.ROSTER) do
+            if h.target == "other" and not h.support and (targetBound or not h.carrier) then out[#out + 1] = h end
+        end
+        return out
+    end
+
+    --- Does landing this hack count as something HAPPENING to the target car (as opposed to a repair or a purge)?
+    function M.harms(id)
+        local h = M.BY_ID[id]
+        return h ~= nil and h.target == "other" and not h.support
+    end
 
     --- The hacks that are grades of the platform deck: everything uploaded onto another vehicle.
     function M.deckHacks()

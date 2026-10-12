@@ -124,6 +124,20 @@ if ($node -and (Test-Path $resRoot)) {
             Write-Host ("=== panel render check: {0} assertion(s), 0 bad" -f $passes)
         }
     }
+    # The Engineering panel (ncm_engineering): the same KB-61 rule -- `eng:drawn` only when the render did not throw.
+    $engCheck = Join-Path $here 'engineering-render-check.js'
+    $engWeb = Join-Path $here (Join-Path '..' 'ncm/online/resources/ncm_engineering/web')
+    if ((Test-Path $engCheck) -and (Test-Path $engWeb)) {
+        $ec = & node $engCheck $engWeb 2>&1
+        if ($LASTEXITCODE -ne 0) {
+            $overall = 1
+            Write-Host '=== engineering render check FAILED'
+            $ec | Select-String -Pattern 'FAIL' | Select-Object -First 12 | ForEach-Object { Write-Host ("  {0}" -f $_) }
+        } else {
+            $passes = ($ec | Select-String -Pattern '  PASS ').Count
+            Write-Host ("=== engineering render check: {0} assertion(s), 0 bad" -f $passes)
+        }
+    }
     $nameplateCheck = Join-Path $here 'nameplate-render-check.js'
     if ((Test-Path $nameplateCheck) -and (Test-Path $webRoot)) {
         $nc = & node $nameplateCheck $webRoot 2>&1

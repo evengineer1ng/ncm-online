@@ -132,7 +132,7 @@ if h then
     check(type(snap) == "table" and snap.running and #(snap.tower or {}) == 6, "a six-car %s field is on the grid (%s)", tostring(mineKey),
         type(snap) == "table" and tostring(#(snap.tower or {})) or tostring(snap))
     local maxAltKm, legs = 0, {}
-    for _ = 1, 120 do
+    for _ = 1, 150 do
         h:advance(10, 1)
         local s = app.aero
         for _, o in ipairs((s and s.tower) or {}) do
@@ -190,6 +190,15 @@ if h then
     h = app.world
     h:advance(30 * 60, 5)
     check(errorsOf(h, "return") == 0, "the return ran 30 minutes without an error")
+    local physicalRuns=count(("SELECT COUNT(*) FROM component_rnd_run WHERE server_id = %s AND logic_version = 2"):format(q(t1.serverId)))
+    local physicalDesigns=count(("SELECT COUNT(*) FROM component_rnd_run r JOIN component_design d ON d.design_id = r.design_id WHERE r.server_id = %s AND r.logic_version = 2 AND d.spec_json IS NOT NULL"):format(q(t1.serverId)))
+    check(physicalRuns >= 45, "all five physical programmes replayed missed evaluations in order (%d)", physicalRuns)
+    check(physicalDesigns >= 1, "at least one physical Design is persisted with its physics (%d)", physicalDesigns)
+    -- Race Week collapse archives historical WIRE rows under <server_id>#Rnnn.
+    local physicalNews=count(("SELECT COUNT(*) FROM paddock_news WHERE server_id LIKE %s AND kind = 'rnd_release'"):format(q(t1.serverId.."%")))
+    check(physicalNews == physicalDesigns, "each accepted physical Design has one public news record (%d/%d)", physicalNews, physicalDesigns)
+    local physicalStock=count(("SELECT COUNT(*) FROM component_market_inventory mi JOIN component_asset a ON a.asset_id = mi.asset_id JOIN component_rnd_run r ON r.design_id = a.design_id WHERE r.server_id = %s AND r.logic_version = 2 AND mi.state = 'available'"):format(q(t1.serverId)))
+    check(physicalStock >= 1, "researched hardware reaches buyable market stock (%d)", physicalStock)
     local wk = h.global.ncmWeek
     check(wk and p and wk.run == p.run, "the world's Race Week equals the deck's (world %s, deck %s)", wk and wk.run or "?", p and p.run or "?")
     local verdicts = count(("SELECT COUNT(*) FROM racing_week_verdict WHERE server_id = %s"):format(q(t1.serverId)))

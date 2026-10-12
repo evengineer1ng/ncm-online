@@ -258,12 +258,15 @@ void loadConfig(const std::wstring& path)
             }
             {
                 float landing = 2600.0f, redline = 5300.0f, floorRpm = -30000.0f;
+                int slices = 7;
                 if (j["manual"].contains("band") && j["manual"]["band"].is_object()) {
                     const auto& b = j["manual"]["band"];
                     landing = b.value("landingRpm", landing); redline = b.value("redlineRpm", redline);
                     floorRpm = b.value("minRpmFloor", floorRpm);
+                    slices = b.value("slices", slices);
                 }
                 manual::setBand(landing, redline, floorRpm);
+                manual::setSlices(slices);
             }
             manual::setAudioCycleKey(j["manual"].value("audioCycleKey", std::string("PAGEUP")));
             std::vector<std::string> layers = {"fraction", "off", "rpm", "limiter"};

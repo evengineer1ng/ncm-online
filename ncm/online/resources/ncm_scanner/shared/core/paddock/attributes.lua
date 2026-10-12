@@ -39,7 +39,7 @@ Core.define("paddock.attributes", function(C)
     for _, list in ipairs({ M.SKILLS, M.TRAITS, M.META, M.AXES, M.PRINCIPAL, M.STAFF }) do
         for _, k in ipairs(list) do M.HIDDEN[k] = true end
     end
-    for _, k in ipairs({ "attrs", "personality", "principal", "rating", "morale", "form", "stats" }) do M.HIDDEN[k] = true end
+    for _, k in ipairs({ "attrs", "personality", "principal", "rating", "morale", "form", "stats", "hacks" }) do M.HIDDEN[k] = true end
 
     -- Tier distributions (FTB1 TIER_CONFIG shape: 32/44/56/68/80 +- 7-9, mapped onto four tiers).
     M.TIER_STATS = {

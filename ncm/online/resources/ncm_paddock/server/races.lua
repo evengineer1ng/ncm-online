@@ -151,15 +151,31 @@ function PaddockRaces.buildField(race, humanCount)
         -- a whole league's attendance, then qualifying: give the slice back in between (KB-211)
         if coroutine.isyieldable() then Wait(0) end
     end
+    -- A car on a lift cannot grid. A spec entrant borrows an actual organiser asset, never their personal car.
+    if PaddockCars then
+        for i = #list, 1, -1 do
+            local p = list[i].driver
+            local spec = Season.specFor(race.seriesId)
+            local fixed = ids and race.frozen.carOf and race.frozen.carOf[p.id]
+            local supplied = not fixed and spec and PaddockCars.specCar(p,race.seriesId,U.now())
+            if not fixed and not spec and not p.raceCarId then PaddockCars.ensure(p,U.now()) end
+            list[i].assetId = fixed or (spec and supplied and supplied.assetId or p.raceCarId)
+            if not list[i].assetId or not PaddockCars.raceFactor(list[i].assetId) then table.remove(list, i) end
+            -- Each first spec entrant can mint eleven component assets. Keep a pricing pass under the VM slice cap.
+            if coroutine.isyieldable() then Wait(0) end
+        end
+    end
     local n = #list
     for _, e in ipairs(list) do
         local org = e.org or {}
         -- an independent races their own car (L249)
+        local conditionFactor = PaddockCars and e.assetId and PaddockCars.raceFactor(e.assetId) or 1
         field[#field + 1] = { id = e.driver.id, orgId = org.id or (race.frozen and race.frozen.orgOf and race.frozen.orgOf[e.driver.id]),
+            assetId = e.assetId,
             -- L298: the car this driver races (derived from its parts) when they have one; else the team's abstract car
             -- L303: a spec series gives every entrant the organisers' identical car
             attrs = e.driver.attrs, carPerf = Car.performance(Season.specFor(race.seriesId) and Season.specCar(race.tier)
-                or (e.driver.raceCarId and e.driver.car) or org.car or e.driver.car), morale = e.driver.morale,
+                or (e.driver.raceCarId and e.driver.car) or org.car or e.driver.car) * (conditionFactor or 1), morale = e.driver.morale,
             form = Progression.form((e.driver.evidence or {}).recent or {}, n),
             lureRisk = PaddockWeek and PaddockWeek.risk and PaddockWeek.risk(race, e.driver, e.org) or 1,
             humanManaged = org.humanManagerDriverId ~= nil }
@@ -183,16 +199,17 @@ function PaddockRaces.freeze(race)
     if race.frozen then return race.frozen end
     local humans = PaddockHumans and PaddockHumans.entered(race) or {}
     local field = PaddockRaces.buildField(race, #humans)
-    local grid, orgOf, quali = {}, {}, {}
+    local grid, orgOf, quali, carOf = {}, {}, {}, {}
     local w = PaddockStore.world
     for i, e in ipairs(field) do
         grid[i] = e.id; orgOf[e.id] = e.orgId
         quali[e.id] = e.qualiMs
-        -- they turned up: a street racer is far less likely to make the next one (paddock.attendance RECENT_SEC)
         local p = w.people[e.id]
+        carOf[e.id] = e.assetId
+        -- they turned up: a street racer is far less likely to make the next one (paddock.attendance RECENT_SEC)
         if p then p.evidence = p.evidence or {}; p.evidence.lastStartAt = race.opensAt; PaddockStore.markPerson(p.id) end
     end
-    race.frozen = { grid = grid, orgOf = orgOf, absent = race.absent, quali = quali }
+    race.frozen = { grid = grid, orgOf = orgOf, carOf = carOf, absent = race.absent, quali = quali }
     -- L250: a mixed grid -- everyone by qualifying time, entered-but-unqualified humans at the back
     if #humans > 0 then
         local Mixed = NcmCore.get("paddock.mixed")
@@ -420,12 +437,13 @@ function PaddockRaces.resolve(race, t)
             book("person", p.id, -fee, "entry_fee", "race_entry", p.id)
             book("person", p.id, res.purse or 0, "purse", "race_result", p.id)
         end
-        if p and p.raceCarId then
-            if res.state == "finished" then raced[#raced + 1] = p.id else half[#half + 1] = p.id end
+        local suppliedAsset = Season.specFor(race.seriesId) and race.frozen and race.frozen.carOf and race.frozen.carOf[res.id]
+        if p and (suppliedAsset or p.raceCarId) then
+            if res.state == "finished" then raced[#raced + 1] = suppliedAsset or p.id else half[#half + 1] = suppliedAsset or p.id end
             -- L305: RUNNING COSTS -- every start burns tyres, fuel and consumables, a share of the car's value, paid by
             -- whoever runs the car. The pressure that keeps idle millions moving and makes a fast car cost something.
             local share = PaddockSettings.get("npcRunningShare", 0.005)
-            if share > 0 and PaddockCars then
+            if share > 0 and PaddockCars and not suppliedAsset then
                 local okC, rc = pcall(PaddockCars.load, p.raceCarId)
                 local running = (okC and rc and rc.value) and math.floor(rc.value * share + 0.5) or 0
                 if running > 0 then
@@ -433,16 +451,14 @@ function PaddockRaces.resolve(race, t)
                     else p.cash = (tonumber(p.cash) or 0) - running; PaddockStore.markPerson(p.id); book("person", p.id, -running, "running", "race_start", p.id) end
                 end
             end
-            -- a crash in a player's bubble is a repair bill (bubble.lua records the damage a physical car took)
+            -- Physical and simulated results damage the same serialized chassis. Service is a later decision.
             local dmg = race.carDamage and race.carDamage[p.id]
-            if dmg and PaddockCars then
-                local c = PaddockCars.load(p.raceCarId)
-                local cost = Garage.repairCost(c and c.value or 10000, dmg.frac, dmg.wrecked)
-                if cost > 0 then
-                    if org then org.cash = (org.cash or 0) - cost; PaddockStore.markOrg(org.id); book("org", org.id, -cost, "repair", dmg.wrecked and "wreck" or "crash_damage", p.id)
-                    else p.cash = (tonumber(p.cash) or 0) - cost; PaddockStore.markPerson(p.id); book("person", p.id, -cost, "repair", dmg.wrecked and "wreck" or "crash_damage", p.id) end
-                end
-            end
+        end
+        local racedAsset = race.frozen and race.frozen.carOf and race.frozen.carOf[res.id]
+        if p and racedAsset and PaddockCars then
+            local physical = race.carDamage and race.carDamage[p.id]
+            if physical and not physical.wrecked and (tonumber(physical.frac) or 0) <= 0 then physical = nil end
+            PaddockCars.recordIncident(p,race,res,physical,t,racedAsset)
         end
     end
     if #ledger > 0 then pcall(U.transact, ledger) end

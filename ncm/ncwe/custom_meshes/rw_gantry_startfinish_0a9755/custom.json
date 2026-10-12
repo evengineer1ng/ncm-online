@@ -1,0 +1,71 @@
+{
+  "Id": "rw_gantry_startfinish_0a9755",
+  "Name": "rw_gantry_startfinish",
+  "Version": 3,
+  "SourceFile": "rw_gantry_startfinish.obj",
+  "SourceModel": "rw_gantry_startfinish.obj",
+  "Created": "2026-10-08T08:32:51.580894-04:00",
+  "Modified": "2026-10-08T08:41:15.7531309-04:00",
+  "Import": {
+    "Scale": 1,
+    "UpAxis": "Z",
+    "Pivot": "BottomCenter",
+    "Yaw": 0,
+    "ImportMaterials": true,
+    "MaxTextureSize": 4096
+  },
+  "Materials": [
+    {
+      "Name": "banner",
+      "Kind": "Standard",
+      "GameMaterial": null,
+      "BaseColor": {
+        "X": 1,
+        "Y": 1,
+        "Z": 1,
+        "W": 1
+      },
+      "BaseColorTexture": "rw_gantry_startfinish_3.png",
+      "Roughness": 0.6,
+      "RoughnessTexture": null,
+      "RoughnessChannel": 0,
+      "InvertRoughness": false,
+      "Metalness": 0,
+      "MetalnessTexture": null,
+      "MetalnessChannel": 0,
+      "NormalTexture": null,
+      "NormalStrength": 1,
+      "FlipNormalGreen": false,
+      "EmissiveColor": {
+        "X": 1,
+        "Y": 1,
+        "Z": 1
+      },
+      "EmissiveEV": 3,
+      "EmissiveTexture": "rw_gantry_startfinish_4.png",
+      "AlphaCutout": false,
+      "AlphaThreshold": 0.5,
+      "DoubleSided": false,
+      "GlassOpacity": 0.25
+    }
+  ],
+  "Bounds": {
+    "Min": {
+      "X": -7.5,
+      "Y": 0,
+      "Z": 0
+    },
+    "Max": {
+      "X": 7.5,
+      "Y": 1.4,
+      "Z": 0
+    }
+  },
+  "Vertices": 4,
+  "Triangles": 2,
+  "Submeshes": 1,
+  "Warnings": [],
+  "Credits": "",
+  "MeshPath": "ncwe\\custom\\rw_gantry_startfinish_0a9755\\rw_gantry_startfinish_0a9755.mesh",
+  "Hash": 16064449015811374250
+}

@@ -36,6 +36,22 @@ return {
         T.eq(#K.anchors({}, {}, 3), 0, "no cars, no anchors")
     end,
 
+    online_keeps_one_chosen_or_last_driven_car = function(T)
+        local K = T.Core.get("week.collapse")
+        local cars = {
+            { assetId = "old", races = 20, lastDrivenAt = 100 },
+            { assetId = "recent", races = 1, lastDrivenAt = 200 },
+            { assetId = "grant", lastDrivenAt = 300, conditionGrant = true, sanctionedWins = 0 },
+        }
+        local auto = K.onlineAnchor(cars, {})
+        T.eq(#auto, 1); T.eq(auto[1].assetId, "recent"); T.eq(auto[1].source, "last_driven")
+        local chosen = K.onlineAnchor(cars, { "old", "recent" })
+        T.eq(#chosen, 1); T.eq(chosen[1].assetId, "old")
+        local fallback, refused = K.onlineAnchor(cars, { "grant" })
+        T.eq(#refused, 1); T.eq(fallback[1].assetId, "recent")
+        T.eq(#K.onlineAnchor({ { assetId = "unseen", races = 99 } }, {}), 0)
+    end,
+
     sr_halves_toward_neutral_and_wallets_reset = function(T)
         local K = T.Core.get("week.collapse")
         T.eq(K.srReset(1.0), 3.0)

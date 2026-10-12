@@ -1,0 +1,790 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>NCM Engineering</title>
+<style>
+  :root {
+    --panel: rgba(8, 14, 26, 0.94);
+    --line: rgba(174, 211, 224, 0.26);
+    --text: #f2f6f8;
+    --dim: #8d99a8;
+    --accent: #22d8e2;
+    --ok: #4fe3a9;
+    --warn: #f5c95c;
+    --red: #ff4a5a;
+    --display: "Rajdhani", "Bahnschrift Condensed", "Bahnschrift SemiCondensed", "Arial Narrow", "Segoe UI", sans-serif;
+    --mono: "IBM Plex Mono", "Cascadia Mono", "Consolas", ui-monospace, monospace;
+    --hand: "Segoe Script", "Bradley Hand", "Ink Free", "Comic Sans MS", cursive;
+    --paper: #efe6d2;
+    --ink: #1d2433;
+    --ink-good: #1f6b45;
+    --ink-bad: #8e1f24;
+  }
+  html, body { margin: 0; width: 1920px; height: 1080px; overflow: hidden; background: transparent; font-family: var(--display);
+    color: var(--text); pointer-events: none; }
+  .hidden { display: none !important; }
+  /* docked on the right; the rest of the screen stays the game's */
+  #dock { position: absolute; top: 96px; right: 28px; bottom: 96px; width: 480px; display: flex; flex-direction: column;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 18px 60px rgba(0,0,0,0.6);
+    pointer-events: auto; overflow: hidden; backdrop-filter: blur(6px); }
+  header { display: flex; align-items: center; padding: 16px 18px 10px; gap: 10px; }
+  .eyebrow { font: 700 12px/1 var(--mono); letter-spacing: 0.24em; color: var(--accent); text-transform: uppercase; }
+  h1 { margin: 4px 0 0; font-size: 30px; letter-spacing: 0.04em; font-weight: 700; }
+  header .grow { flex: 1; }
+  #closeBtn { background: transparent; border: 1px solid var(--line); color: var(--dim); border-radius: 8px; padding: 6px 10px;
+    font: 700 13px var(--mono); cursor: pointer; }
+  #closeBtn:hover { color: var(--text); border-color: var(--accent); }
+  nav { display: flex; gap: 6px; padding: 0 18px 12px; border-bottom: 1px solid var(--line); }
+  nav button { flex: 1; background: rgba(255,255,255,0.04); border: 1px solid var(--line); color: var(--dim); border-radius: 8px;
+    padding: 9px 0; font: 700 15px var(--display); letter-spacing: 0.12em; cursor: pointer; }
+  nav button.active { color: #04161a; background: var(--accent); border-color: var(--accent); }
+  main { flex: 1; overflow-y: auto; padding: 14px 18px 18px; }
+  main::-webkit-scrollbar { width: 8px; } main::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 4px; }
+  .strip { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; margin-bottom: 12px; font-size: 16px; }
+  .strip .row { display: flex; justify-content: space-between; gap: 10px; align-items: center; }
+  .muted { color: var(--dim); }
+  .good { color: var(--ok); } .bad { color: var(--red); } .warnc { color: var(--warn); }
+  .card { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; margin-bottom: 12px; background: rgba(255,255,255,0.025); }
+  .card.selected { border-color: var(--accent); }
+  .card .maker { font: 600 12px var(--mono); letter-spacing: 0.18em; color: var(--dim); text-transform: uppercase; }
+  .card .name { font-size: 24px; font-weight: 700; }
+  .card .state { font: 600 12px var(--mono); letter-spacing: 0.14em; }
+  .bar { height: 8px; background: rgba(255,255,255,0.08); border-radius: 4px; overflow: hidden; margin: 8px 0 4px; }
+  .bar > i { display: block; height: 100%; background: linear-gradient(90deg, var(--warn), var(--red)); }
+  .areas { display: grid; grid-template-columns: 1fr 1fr; gap: 3px 14px; font-size: 15px; margin: 6px 0 4px; }
+  .areas div { display: flex; justify-content: space-between; }
+  .label { font: 700 11px var(--mono); letter-spacing: 0.2em; color: var(--dim); text-transform: uppercase; margin-top: 10px; }
+  .scalars { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 4px; }
+  .scalars div { text-align: center; border: 1px solid var(--line); border-radius: 8px; padding: 5px 0; font-size: 14px; }
+  .scalars b { display: block; font: 700 11px var(--mono); letter-spacing: 0.14em; color: var(--dim); }
+  button.act { display: block; width: 100%; margin-top: 8px; position: relative; overflow: hidden; text-align: left;
+    background: rgba(255,255,255,0.05); border: 1px solid var(--line); color: var(--text); border-radius: 10px; padding: 11px 14px;
+    font: 600 17px var(--display); cursor: pointer; }
+  button.act:disabled { opacity: 0.45; cursor: default; }
+  button.act.primary { border-color: var(--accent); }
+  button.act::after { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: var(--hold, 0%); background: rgba(34,216,226,0.22); }
+  .note { font-size: 14px; color: var(--dim); margin-top: 4px; line-height: 1.3; }
+  .warnbox { border: 1px solid rgba(245,201,92,0.4); color: var(--warn); border-radius: 8px; padding: 8px 10px; font-size: 14px; margin-top: 8px; }
+  .fit { border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; margin-top: 6px; font-size: 15px; cursor: pointer; }
+  .fit.ok { border-color: rgba(79,227,169,0.5); } .fit.no { color: var(--dim); } .fit.picked { box-shadow: inset 0 0 0 2px var(--accent); }
+  .partrow { display: flex; justify-content: space-between; gap: 8px; border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px;
+    margin-bottom: 6px; cursor: pointer; font-size: 16px; }
+  .partrow.selected { border-color: var(--accent); background: rgba(34,216,226,0.06); }
+  .partrow small { font: 600 11px var(--mono); color: var(--dim); letter-spacing: 0.12em; }
+  .empty { color: var(--dim); font-size: 16px; padding: 18px 4px; }
+  .bench { margin-top: 10px; }
+  .bench .bar > i { background: linear-gradient(90deg, var(--accent), var(--ok)); transition: width 0.25s linear; }
+
+  /* ---- the ceremony: the work, written in ink on the job sheet */
+  #sheet { position: absolute; inset: 0; background: rgba(4,8,14,0.72); display: flex; align-items: center; justify-content: center; }
+  .paper { width: 410px; padding: 22px 24px 20px; color: var(--ink); border-radius: 4px; transform: rotate(-0.6deg);
+    background: radial-gradient(ellipse at 20% 15%, rgba(255,255,255,0.35), transparent 55%),
+                radial-gradient(ellipse at 80% 90%, rgba(120,90,40,0.12), transparent 60%),
+                repeating-linear-gradient(0deg, transparent 0 31px, rgba(60,80,120,0.16) 31px 32px), var(--paper);
+    box-shadow: 0 16px 50px rgba(0,0,0,0.7); font-family: var(--hand); }
+  .paper .head { font: 700 12px var(--mono); letter-spacing: 0.22em; color: #5b4a2e; text-transform: uppercase; }
+  .paper .car { font-size: 24px; margin: 4px 0 10px; }
+  .line { display: grid; grid-template-columns: 110px 1fr 90px; align-items: center; height: 40px; }
+  .line .sec { font-size: 21px; }
+  .line svg { width: 100%; height: 30px; overflow: visible; }
+  .line path { fill: none; stroke: var(--ink); stroke-width: 2.2; stroke-linecap: round; stroke-dasharray: 400; stroke-dashoffset: 400; }
+  .line.drawn path { animation: pen 0.9s ease-out forwards; }
+  .line .val { font-size: 23px; text-align: right; clip-path: inset(0 100% 0 0); }
+  .line.drawn .val { animation: write 0.55s 0.75s steps(12) forwards; }
+  .line .val.up { color: var(--ink-good); } .line .val.down { color: var(--ink-bad); }
+  .line .why { grid-column: 1 / -1; font: 600 11px var(--mono); color: #6a5a3c; letter-spacing: 0.1em; margin-top: -4px; opacity: 0; }
+  .line.drawn .why { animation: fade 0.4s 1.2s forwards; }
+  .stamp { margin-top: 14px; text-align: center; font: 800 22px var(--mono); letter-spacing: 0.3em; text-transform: uppercase;
+    border: 3px solid currentColor; border-radius: 6px; padding: 6px 0; opacity: 0; transform: scale(1.6) rotate(-4deg); }
+  .stamp.show { animation: stamp 0.35s ease-out forwards; }
+  .stamp.good { color: var(--ink-good); } .stamp.bad { color: var(--ink-bad); } .stamp.fair { color: #5b4a2e; }
+  .paper .foot { margin-top: 12px; font: 600 12px var(--mono); color: #5b4a2e; display: flex; justify-content: space-between; }
+  .paper button { font: 700 13px var(--mono); letter-spacing: 0.14em; background: transparent; border: 1px solid #5b4a2e; color: #3b2f1c;
+    border-radius: 6px; padding: 6px 10px; cursor: pointer; }
+  @keyframes pen { to { stroke-dashoffset: 0; } }
+  @keyframes write { to { clip-path: inset(0 0 0 0); } }
+  @keyframes fade { to { opacity: 1; } }
+  @keyframes stamp { to { opacity: 0.9; transform: scale(1) rotate(-4deg); } }
+</style>
+<script>
+// 2026-10-12: this page is authored on a fixed 1920x1080 canvas. Its surface follows the screen (any size, any aspect --
+// 2176x1812 streamed), so the canvas is scaled UNIFORMLY to fit and centred: never stretched. 1920x1080: scale 1.
+(function () {
+  function fit() {
+    var W = window.innerWidth, H = window.innerHeight, r = document.documentElement;
+    if (!W || !H || !r) return;
+    var s = Math.min(W / 1920, H / 1080);
+    r.style.zoom = String(s);
+    r.style.position = "relative";
+    r.style.left = Math.max(0, (W / s - 1920) / 2) + "px";
+    r.style.top = Math.max(0, (H / s - 1080) / 2) + "px";
+  }
+  window.addEventListener("resize", fit);
+  document.addEventListener("DOMContentLoaded", fit);
+  fit();
+})();
+</script>
+</head>
+<body>
+<div id="dock" class="hidden">
+  <header>
+    <div class="grow"><div class="eyebrow">NCM · WORKSHOP</div><h1>Engineering</h1></div>
+    <button id="closeBtn" title="Close (F9)">F9 ✕</button>
+  </header>
+  <nav>
+    <button data-tab="service" class="active">SERVICE</button>
+    <button data-tab="parts">PARTS</button>
+    <button data-tab="build">BUILD</button>
+    <button data-tab="workshop">WORKSHOP</button>
+  </nav>
+  <main id="main"></main>
+  <div id="sheet" class="hidden"></div>
+</div>
+<script>
+(function () {
+  "use strict";
+  const $ = (t, cls, text) => { const e = document.createElement(t); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+  const eddies = (n) => "€$" + Math.round(Number(n) || 0).toLocaleString();
+  const pct = (x) => Math.round((Number(x) || 0) * 100) + "%";
+  const uuid4 = () => "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, c => { const r = Math.random() * 16 | 0; return (c === "x" ? r : (r & 0x3 | 0x8)).toString(16); });
+  const dock = document.getElementById("dock"), main = document.getElementById("main"), sheet = document.getElementById("sheet");
+  let tab = "service";
+  const svc = { cars: [], balance: 0, skill: 0, site: null, error: null, loaded: false };
+  const parts = { list: [], machines: [], states: {}, balance: 0, partsEnabled: false, fabricable: null, loaded: false };
+  let selectedPart = null, fitMachine = null;
+  const busy = {};          // assetId -> { provider, until, started }
+  const SECTION = { grip: "Grip", drive: "Drive", brake: "Brakes", drag: "Drag" };
+
+  function holdAction(btn, action) {
+    let timer = null, started = 0, raf = null;
+    const stop = () => { if (timer) clearTimeout(timer); timer = null; if (raf) cancelAnimationFrame(raf); raf = null; btn.style.setProperty("--hold", "0%"); };
+    const tick = () => { const p = Math.min(100, (performance.now() - started) / 9); btn.style.setProperty("--hold", p + "%"); if (timer) raf = requestAnimationFrame(tick); };
+    const start = (e) => { if (btn.disabled || timer) return; if (e) e.preventDefault(); started = performance.now(); raf = requestAnimationFrame(tick); timer = setTimeout(() => { stop(); action(); }, 900); };
+    btn.addEventListener("pointerdown", start); btn.addEventListener("pointerup", stop); btn.addEventListener("pointerleave", stop); btn.addEventListener("pointercancel", stop);
+  }
+
+  // ------------------------------------------------------------------------------------------------ SERVICE
+  function workshopStrip() {
+    const s = $("div", "strip");
+    const site = svc.site;
+    const r1 = $("div", "row");
+    r1.append($("span", null, site ? site.label : "No workshop known"), $("span", site && site.usable ? "good" : "muted",
+      site ? (site.usable ? "IN REACH" : site.distance.toLocaleString() + " m") : ""));
+    s.append(r1);
+    const r2 = $("div", "row");
+    r2.append($("span", "muted", "Restoration skill " + Math.round(Number(svc.skill) || 0) + " · " + eddies(svc.balance)));
+    if (site && !site.usable) {
+      const b = $("button", "act", "ROUTE ME THERE"); b.style.width = "auto"; b.style.marginTop = "0";
+      b.addEventListener("click", () => { b.disabled = true; b.textContent = "ROUTING…"; Open77.emit("eng:route", { x: site.x, y: site.y, z: site.z, name: site.label }); });
+      r2.append(b);
+    }
+    s.append(r2);
+    return s;
+  }
+
+  function scalarsBox(work) {
+    const box = $("div", "scalars");
+    const byName = {};
+    for (const s of (work.sections || [])) byName[s.section] = s;
+    for (const key of ["grip", "drive", "brake", "drag"]) {
+      const s = byName[key];
+      const scal = work.scalars || {};
+      const raw = Number(scal[{ grip: "gripScale", drive: "driveScale", brake: "brakeScale", drag: "dragScale" }[key]]);
+      const delta = s ? Number(s.delta) : (Number.isFinite(raw) ? (key === "drag" ? 1 - raw : raw - 1) : 0);
+      const d = $("div", delta > 0.0005 ? "good" : (delta < -0.0005 ? "bad" : "muted"));
+      d.append($("b", null, SECTION[key].toUpperCase()), document.createTextNode((delta >= 0 ? "+" : "") + (delta * 100).toFixed(1) + "%"));
+      box.append(d);
+    }
+    return box;
+  }
+
+  function carCard(car) {
+    const c = $("div", "card");
+    c.append($("div", "maker", car.maker || "Machine"), $("div", "name", car.name || car.vehicleKey));
+    c.append($("div", "state " + (car.stored ? "muted" : "warnc"), (car.stored ? "STORED" : "OUT IN THE WORLD") + " · " + String(car.assetId).slice(0, 8)));
+    const sev = Number(car.severity) || 0;
+    const bar = $("div", "bar"), fill = $("i"); fill.style.width = Math.round(sev * 100) + "%"; bar.append(fill);
+    c.append($("div", null, sev > 0 ? "Needs work · " + pct(sev) : "In full health"), bar);
+    if (sev > 0 && Array.isArray(car.areas)) {
+      const g = $("div", "areas");
+      for (const a of car.areas) {
+        if (!(Number(a.value) > 0)) continue;
+        const row = $("div");
+        row.append($("span", "muted", a.label), $("span", null, a.count != null ? a.count + " broken" : pct(a.value)));
+        g.append(row);
+      }
+      c.append(g);
+    }
+    if (car.work && (car.work.sections || car.work.scalars)) {
+      c.append($("div", "label", "Last job · " + String(car.work.grade || "recorded") + (car.work.provider === "shop" ? " · shop" : " · your hands")));
+      c.append(scalarsBox(car.work));
+    }
+    const job = busy[car.assetId];
+    if (job) {
+      const bench = $("div", "bench");
+      const total = Math.max(1, job.until - job.started);
+      const done = Math.min(1, (Date.now() - job.started) / total);
+      bench.append($("div", null, job.provider === "self" ? "At the bench…" : "In the shop…"));
+      const b = $("div", "bar"), f = $("i"); f.style.width = Math.round(done * 100) + "%"; b.append(f); bench.append(b);
+      bench.append($("div", "note", "Stay at the workshop until the work is done."));
+      c.append(bench);
+      return c;
+    }
+    if (sev > 0) {
+      const site = svc.site;
+      const q = car.selfQuote;
+      if (q) {
+        const why = !car.stored ? "Store this car first" : (!(site && site.usable) ? "Go to a workshop" : (svc.balance < q.cost ? "Not enough eddies" : null));
+        const b = $("button", "act primary", "HOLD · SERVICE IT YOURSELF · " + eddies(q.cost));
+        b.disabled = !!why;
+        c.append(b, $("div", "note", why ? why + "." : "Materials only — your own hands cost nothing. About " + q.benchSeconds + " s at the bench; four rolls decide how each section comes out."));
+        if (!why) holdAction(b, () => startJob(car, "self", q));
+      }
+      const s2 = car.shopQuote;
+      if (s2) {
+        const why = !car.stored ? "Store this car first" : (svc.balance < s2.cost ? "Not enough eddies" : null);
+        const b = $("button", "act", "HOLD · HAVE A SHOP DO IT · " + eddies(s2.cost));
+        b.disabled = !!why;
+        c.append(b, $("div", "note", why ? why + "." : "Materials " + eddies(s2.materials) + " + labour " + eddies(s2.labour) + ". Steadier hands than yours, at a price."));
+        if (!why) holdAction(b, () => startJob(car, "shop", s2));
+      }
+    }
+    return c;
+  }
+
+  function startJob(car, provider, quote) {
+    const seconds = Math.max(5, Number(quote.benchSeconds) || 20);
+    busy[car.assetId] = { provider, started: Date.now(), until: Date.now() + seconds * 1000, car };
+    Open77.emit("eng:repair", { assetId: car.assetId, provider, key: uuid4() });
+    render();
+  }
+
+  function renderService() {
+    main.append(workshopStrip());
+    if (svc.error) main.append($("div", "warnbox", "Service records unavailable: " + svc.error));
+    if (!svc.loaded) { main.append($("div", "empty", "Reading your garage…")); return; }
+    if (!svc.cars.length) { main.append($("div", "empty", "You don't own a Machine yet.")); return; }
+    for (const car of svc.cars) main.append(carCard(car));
+  }
+
+  // ------------------------------------------------------------------------------------------------ the ceremony
+  function inkPath(seed) {
+    // a hand-drawn underline: a few gentle wobbles, never the same twice for the same sheet
+    let x = 2, y = 18 + (seed % 3), d = "M" + x + " " + y;
+    for (let i = 1; i <= 6; i++) { x = i * 30; y = 15 + ((seed * (i + 3)) % 7); d += " Q" + (x - 15) + " " + (y + ((i % 2) ? -6 : 6)) + " " + x + " " + y; }
+    return d;
+  }
+
+  function ceremony(result) {
+    const work = result.workmanship || {};
+    const sections = Array.isArray(work.sections) ? work.sections : [];
+    const job = busy[result.assetId];
+    delete busy[result.assetId];
+    sheet.innerHTML = "";
+    const paper = $("div", "paper");
+    paper.append($("div", "head", (work.provider === "shop" ? "Shop job sheet" : "Job sheet · your own work")));
+    const carName = (job && job.car && job.car.name) || (svc.cars.find(c => c.assetId === result.assetId) || {}).name || "The Machine";
+    paper.append($("div", "car", carName));
+    if (!result.ok) {
+      paper.append($("div", "line", ""), $("div", "car", String(result.message || "The work could not be done.")));
+    }
+    const lines = [];
+    sections.forEach((s, i) => {
+      const line = $("div", "line");
+      line.append($("div", "sec", SECTION[s.section] || s.section));
+      const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      svg.setAttribute("viewBox", "0 0 180 30");
+      const p = document.createElementNS("http://www.w3.org/2000/svg", "path");
+      p.setAttribute("d", inkPath(Math.floor((Number(s.roll) || 0.5) * 97) + i * 13));
+      svg.append(p); line.append(svg);
+      const delta = Number(s.delta) || 0;
+      line.append($("div", "val " + (delta > 0.0005 ? "up" : (delta < -0.0005 ? "down" : "")), (delta >= 0 ? "+" : "") + (delta * 100).toFixed(1) + "%"));
+      line.append($("div", "why", String(s.grade || "").toUpperCase()));
+      paper.append(line); lines.push(line);
+    });
+    const grade = String(work.grade || (result.ok ? "done" : "refused"));
+    const stamp = $("div", "stamp " + (grade === "excellent" || grade === "good" ? "good" : (grade === "fair" ? "fair" : "bad")), grade);
+    paper.append(stamp);
+    const foot = $("div", "foot");
+    foot.append($("span", null, result.ok ? "Chassis restored · " + eddies(work.cost) : ""));
+    const ok = $("button", null, "FILE IT");
+    ok.addEventListener("click", () => { sheet.classList.add("hidden"); render(); });
+    foot.append(ok); paper.append(foot);
+    sheet.append(paper);
+    sheet.classList.remove("hidden");
+    // one section at a time: "oh, I wonder how my repair went"
+    lines.forEach((l, i) => setTimeout(() => l.classList.add("drawn"), 500 + i * 1500));
+    setTimeout(() => stamp.classList.add("show"), 500 + lines.length * 1500 + 300);
+  }
+
+  // ------------------------------------------------------------------------------------------------ PARTS
+  function serialText(p) { return p.global_ordinal ? ("#" + p.global_ordinal + " · MAKER #" + p.maker_ordinal + " · DESIGN #" + p.design_ordinal) : "FACTORY ORIGINAL"; }
+  function partDetail(p) {
+    const c = $("div", "card selected");
+    c.append($("div", "maker", p.display_manufacturer || "Factory"), $("div", "name", p.code || p.design_id));
+    c.append($("div", "note", String(p.family || "").replaceAll("_", " ").toUpperCase() + " · " + serialText(p)));
+    const wear = p.wear || { status: "normal", conditions: [] };
+    c.append($("div", "label", "Condition"), $("div", wear.status === "normal" ? "good" : "warnc",
+      wear.status === "normal" ? "No active condition" : String(wear.status || "attention").toUpperCase() + " · " + ((wear.conditions && wear.conditions[0] && wear.conditions[0].label) || "service required")));
+    c.append($("div", "label", "Where"), $("div", null, String(p.location_kind || "storage").toUpperCase() + (p.machine_asset_id ? " · " + String(p.machine_asset_id).slice(0, 8) : "") + " · " + Number(p.exposure_m || 0).toLocaleString() + " m exposure"));
+    if (p.addOn && p.location_kind === "installed" && p.mountId)
+      c.append($("div", "note", "MOUNT " + String(p.mountId).replace(/^mount\./, "").toUpperCase() + (p.facing ? " · FACING " + String(p.facing).toUpperCase() : "")));
+    if (p.service_quote && p.location_kind !== "trunk") {
+      const q = p.service_quote, can = Number(parts.balance || 0) >= Number(q.cost || 0);
+      const b = $("button", "act primary", can ? "HOLD · SERVICE · " + eddies(q.cost) : "SERVICE " + eddies(q.cost) + " · NOT ENOUGH EDDIES");
+      b.disabled = !can;
+      if (can) holdAction(b, () => { b.disabled = true; b.textContent = "SERVICING…"; Open77.emit("eng:part.service", { componentAssetId: p.asset_id, conditionId: q.condition_id, key: uuid4() }); });
+      c.append(b);
+    }
+    if (p.location_kind === "trunk") {
+      const b = $("button", "act", "HOLD · UNLOAD FROM THE TRUNK");
+      holdAction(b, () => { b.disabled = true; Open77.emit("eng:part.trunk", { componentAssetId: p.asset_id, machineAssetId: p.machine_asset_id, unload: true }); });
+      c.append(b, $("div", "note", "Stand beside the called Machine; its trunk opens first."));
+      return c;
+    }
+    if (p.location_kind === "storage") {
+      for (const m of parts.machines) {
+        const b = $("button", "act", "HOLD · LOAD IN TRUNK · " + String(m.vehicle_key || "Machine") + " · " + String(m.asset_id).slice(0, 8));
+        holdAction(b, () => { b.disabled = true; Open77.emit("eng:part.trunk", { componentAssetId: p.asset_id, machineAssetId: m.asset_id, unload: false }); });
+        c.append(b);
+      }
+    }
+    if (p.addOn && p.location_kind === "installed" && p.family === "gearbox") {
+      c.append($("div", "warnbox", "Engage this box with a control of your choice — tap it while driving, tap again for the car's own box."));
+      for (const [label, ctl] of [["LB", "padLeftShoulder"], ["RB", "padRightShoulder"], ["D-PAD UP", "padUp"], ["D-PAD DOWN", "padDown"], ["D-PAD LEFT", "padLeft"], ["D-PAD RIGHT", "padRight"], ["Y / TRIANGLE", "padY"], ["B / CIRCLE", "padB"], ["L-STICK CLICK", "padLeftThumb"], ["R-STICK CLICK", "padRightThumb"], ["KEY G", "G"], ["KEY H", "H"], ["KEY J", "J"], ["KEY K", "K"]]) {
+        const b = $("button", "act", "HOLD · BIND ENGAGE · " + label);
+        holdAction(b, () => { b.disabled = true; b.textContent = "BINDING…"; Open77.emit("eng:part.bind", { componentAssetId: p.asset_id, control: ctl }); });
+        c.append(b);
+      }
+      const u = $("button", "act", "HOLD · CLEAR ITS BINDINGS");
+      holdAction(u, () => { u.disabled = true; Open77.emit("eng:part.unbind", { componentAssetId: p.asset_id }); });
+      c.append(u);
+    }
+    if (p.addOn && p.location_kind === "installed" && (p.family === "impulse_actuator" || p.family === "propulsor")) {
+      const pulse = p.family === "impulse_actuator";
+      const gesture = pulse ? "tap" : "hold", command = pulse ? "discharge" : "throttle";
+      c.append($("div", "warnbox", pulse
+        ? "This actuator needs a TAP control to discharge. Its mounting direction decides where the Machine moves."
+        : "This propulsor needs a HOLD control for throttle. Its mounting direction decides where the Machine moves."));
+      const current = Array.isArray(p.bindings) ? p.bindings : [];
+      c.append($("div", "label", "CURRENT CONTROL"), $("div", current.length ? "good" : "warnc",
+        current.length ? current.map(x => String(x.control) + " " + String(x.gesture) + " → " + String(x.command)).join(" · ") : "NONE — this part cannot answer a button yet"));
+      c.append($("div", "label", "On Switch Pro, top X sends Y and left Y sends X. Other controllers keep their existing mappings."));
+      for (const [label, ctl] of [["Y / TRIANGLE (SWITCH TOP X)", "padY"], ["X / SQUARE (SWITCH LEFT Y)", "padX"], ["B / CIRCLE (SWITCH RIGHT A)", "padB"],
+        ["LB", "padLeftShoulder"], ["RB", "padRightShoulder"], ["D-PAD UP", "padUp"],
+        ["D-PAD DOWN", "padDown"], ["L-STICK CLICK", "padLeftThumb"], ["R-STICK CLICK", "padRightThumb"],
+        ["KEY H", "H"], ["KEY G", "G"]]) {
+        const b = $("button", "act", "HOLD · BIND " + gesture.toUpperCase() + " · " + label);
+        holdAction(b, () => { b.disabled = true; b.textContent = "BINDING…"; Open77.emit("eng:part.bind", {
+          componentAssetId: p.asset_id, control: ctl, gesture, command }); });
+        c.append(b);
+      }
+      if (current.length) {
+        const u = $("button", "act", "HOLD · CLEAR ITS BINDINGS");
+        holdAction(u, () => { u.disabled = true; Open77.emit("eng:part.unbind", { componentAssetId: p.asset_id }); });
+        c.append(u);
+      }
+    }
+    // L356: a Slipstream unit switches off here (no lock, no assist, no HUD, no network; the natural draft remains)
+    if (p.addOn && p.location_kind === "installed" && p.family === "slipstream") {
+      const on = p.unitEnabled !== false;
+      c.append($("div", on ? "good" : "warnc", on ? "UNIT ON · acquiring wakes, visible to other units" : "UNIT OFF · natural draft only, invisible to other units"));
+      const s = $("button", "act primary", on ? "HOLD · SWITCH THE UNIT OFF" : "HOLD · SWITCH THE UNIT ON");
+      holdAction(s, () => { s.disabled = true; s.textContent = on ? "SWITCHING OFF…" : "SWITCHING ON…"; Open77.emit("eng:part.slip", { componentAssetId: p.asset_id, machineAssetId: p.machine_asset_id, enabled: !on }); });
+      c.append(s);
+    }
+    if (p.addOn && p.location_kind === "installed") {
+      const b = $("button", "act", "HOLD · REMOVE FROM ITS MOUNT");
+      holdAction(b, () => { b.disabled = true; b.textContent = "REMOVING…"; Open77.emit("eng:part.unmount", { componentAssetId: p.asset_id }); });
+      c.append(b, $("div", "note", "Park the Machine and get out first."));
+      return c;
+    }
+    if (p.addOn) {
+      for (const m of parts.machines) {
+        const opts = (p.mounts && p.mounts[m.asset_id]) || [];
+        const row = $("div", "fit " + (opts.length ? "ok" : "no") + (fitMachine === m.asset_id ? " picked" : ""),
+          (opts.length ? "✓ " : "⊘ ") + String(m.vehicle_key || "Machine") + " · " + (opts.length ? opts.length + " mount positions" : "no mount takes it"));
+        row.addEventListener("click", () => { fitMachine = m.asset_id; render(); });
+        c.append(row);
+      }
+      for (const o of ((fitMachine && p.mounts && p.mounts[fitMachine]) || [])) {
+        const occupied = parts.list.find(x => x.location_kind === "installed" && x.machine_asset_id === fitMachine && x.mountId === o.mountId);
+        const b = $("button", "act", "HOLD · MOUNT · " + String(o.mountId).replace(/^mount\./, "").toUpperCase() + " · FACING " + String(o.facing).toUpperCase()
+          + (occupied ? " · REPLACES " + String(occupied.code || "PART") : ""));
+        holdAction(b, () => { b.disabled = true; b.textContent = "MOUNTING…"; Open77.emit("eng:part.mount", { componentAssetId: p.asset_id, machineAssetId: fitMachine, mountId: o.mountId, facing: o.facing }); });
+        c.append(b);
+      }
+      return c;
+    }
+    if (p.location_kind === "installed") { c.append($("div", "warnbox", "Fitted. To change it, fit another compatible part — the Machine must be parked and empty.")); return c; }
+    for (const m of parts.machines) {
+      const fit = m.fitment && m.fitment[p.asset_id];
+      const st = parts.states[m.asset_id] || { eligible: false, reason: "Checking…" };
+      const row = $("div", "fit " + (fit && fit.compatible && st.eligible ? "ok" : "no") + (fitMachine === m.asset_id ? " picked" : ""),
+        (fit && fit.compatible ? "✓ " : "⊘ ") + String(m.vehicle_key || "Machine") + " · " + (fit && fit.compatible ? st.reason : ((fit && fit.reason) || "does not fit")));
+      row.addEventListener("click", () => { fitMachine = m.asset_id; render(); });
+      c.append(row);
+    }
+    const target = parts.machines.find(m => m.asset_id === fitMachine);
+    const fit = target && target.fitment && target.fitment[p.asset_id];
+    const st = target && parts.states[target.asset_id];
+    if (target && fit && fit.compatible && st && st.eligible) {
+      const b = $("button", "act primary", "HOLD · FIT TO THIS MACHINE");
+      holdAction(b, () => { b.disabled = true; b.textContent = "FITTING…"; Open77.emit("eng:part.install", { componentAssetId: p.asset_id, machineAssetId: target.asset_id, key: uuid4() }); });
+      c.append(b);
+    }
+    return c;
+  }
+
+  function renderParts() {
+    if (!parts.loaded) { main.append($("div", "empty", "Reading your parts…")); return; }
+    if (Array.isArray(parts.fabricable)) {
+      for (const f of parts.fabricable) {
+        const b = $("button", "act", "HOLD · FABRICATE (DEV) · " + f.code);
+        holdAction(b, () => { b.disabled = true; Open77.emit("eng:part.fabricate", { key: f.key }); });
+        main.append(b);
+      }
+    }
+    if (!parts.list.length) { main.append($("div", "empty", "No parts yet. Parts are bought at the Market.")); return; }
+    if (!selectedPart || !parts.list.find(p => p.asset_id === selectedPart)) selectedPart = parts.list[0].asset_id;
+    const sel = parts.list.find(p => p.asset_id === selectedPart);
+    main.append(partDetail(sel));
+    for (const p of parts.list) {
+      const r = $("div", "partrow" + (p.asset_id === selectedPart ? " selected" : ""));
+      const left = $("div"); left.append($("div", null, p.code || p.design_id), $("small", null, String(p.family || "").replaceAll("_", " ").toUpperCase()));
+      const condition = p.wear && p.wear.status && p.wear.status !== "normal";
+      r.append(left, $("small", condition ? "warnc" : null, (condition ? "NEEDS SERVICE · " : "") + String(p.location_kind || "storage").toUpperCase()));
+      r.addEventListener("click", () => { selectedPart = p.asset_id; fitMachine = null; render(); });
+      main.append(r);
+    }
+  }
+
+  // ------------------------------------------------------------------------------------------------ BUILD
+  // IDEA-1282: the Build primitive -- an approved physical thing attached to another physical thing, placed freely.
+  // ncm_build owns placement and the attachments; this tab is only its controls (eng:build -> ncm_build's exports).
+  let bld = null, bldKey = "", bldMachine = null, bldParent = null;
+  const build = (op, a, b, c) => Open77.emit("eng:build", { op, a, b, c });
+  const n2 = (v) => (Number(v) || 0).toFixed(2);
+  const n0 = (v) => Math.round(Number(v) || 0);
+  const inline = (b) => { b.style.width = "auto"; b.style.display = "inline-block"; b.style.marginRight = "6px"; return b; };
+  function renderBuild() {
+    const head = $("div", "card");
+    head.append($("div", "maker", "Engineering"), $("div", "name", "Build"));
+    head.append($("div", "note", "Mount an approved object anywhere on a Machine you own that is out in the city. It stays where you put it, and it comes back with that Machine."));
+    main.append(head);
+    if (!bld) { main.append($("div", "empty", "Reading the bench…")); return; }
+    if (bld.unavailable) { main.append($("div", "warnbox", "Build cannot be reached from this panel" + (bld.why ? (": " + bld.why) : ".") )); return; }
+    if (bld.result && bld.result.text) main.append($("div", bld.result.ok ? "strip good" : "warnbox", bld.result.text));
+    const machines = bld.machines || [];
+    if (!machines.length) { main.append($("div", "empty", "Call one of your Machines first: you build on a car that is standing in the city.")); return; }
+    if (!bldMachine || !machines.some(m => m.machineId === bldMachine)) bldMachine = machines[0].machineId;
+    if (bld.placing) { renderPlacing(bld.placing); return; }
+    if (machines.length > 1) {
+      const pick = $("div", "strip");
+      for (const m of machines) {
+        const b = $("button", "act" + (m.machineId === bldMachine ? " primary" : ""), (m.name || "Machine") + " · " + String(m.machineId).slice(-6));
+        b.addEventListener("click", () => { bldMachine = m.machineId; bldParent = null; guard(render); });
+        pick.append(b);
+      }
+      main.append(pick);
+    }
+    const catalogue = bld.catalogue || [];
+    const carries = (assetId) => catalogue.some(c => c.id === assetId && c.carries);
+    const on = (bld.attachments || []).filter(a => a.machineId === bldMachine);
+    const list = $("div", "card");
+    list.append($("div", "label", "Mounted on this Machine · " + on.length + " / " + ((bld.limits || {}).perParent || "?")));
+    if (!on.length) list.append($("div", "note", "Nothing yet."));
+    for (const a of on) {
+      const r = $("div", "partrow" + (bldParent === a.id ? " selected" : ""));
+      const left = $("div");
+      left.append($("div", null, a.label || a.assetId), $("small", null, (a.parent && a.parent.kind === "attachment" ? "ON A MEMBER · " : "") +
+        "x " + n2(a.pos[0]) + " y " + n2(a.pos[1]) + " z " + n2(a.pos[2]) + " · r " + n0(a.rot[0]) + " p " + n0(a.rot[1]) + " y " + n0(a.rot[2]) +
+        (a.drawn ? "" : " · NOT DRAWN")));
+      const right = $("div");
+      const ed = inline($("button", "act", "MOVE"));
+      ed.addEventListener("click", (e) => { e.stopPropagation(); build("edit", a.id); });
+      const rm = inline($("button", "act", "HOLD · REMOVE"));
+      holdAction(rm, () => build("remove", a.id));
+      right.append(ed, rm);
+      if (carries(a.assetId)) r.addEventListener("click", () => { bldParent = bldParent === a.id ? null : a.id; guard(render); });
+      r.append(left, right);
+      list.append(r);
+    }
+    main.append(list);
+    const cat = $("div", "card");
+    const parentLabel = bldParent ? (on.find(a => a.id === bldParent) || {}).label : null;
+    cat.append($("div", "label", parentLabel ? "Mount on the " + parentLabel :
+      "Mount on the Machine" + (on.some(a => carries(a.assetId)) ? " · or select a bar or beam above" : "")));
+    for (const c of catalogue) {
+      const b = $("button", "act", c.label + "  ·  " + c.massKg + " kg");
+      b.addEventListener("click", () => build("begin", c.id, bldMachine, bldParent || undefined));
+      cat.append(b);
+    }
+    main.append(cat);
+  }
+  function renderPlacing(p) {
+    const c = $("div", "card selected");
+    c.append($("div", "maker", p.editing ? "Moving" : "Placing"), $("div", "name", p.label || p.assetId));
+    c.append($("div", "note", "The preview on the car is yours alone until you attach it. " +
+      (p.parent && p.parent.kind === "attachment" ? "Moves follow the member's own axes." : "X is right, Y is forward, Z is up, from the car's centre.")));
+    const stepRow = $("div", "row");
+    for (const s of ["coarse", "fine"]) {
+      const b = inline($("button", "act" + (bld.step === s ? " primary" : ""), s === "coarse" ? "COARSE · 10 cm / 15°" : "FINE · 1 cm / 1°"));
+      b.addEventListener("click", () => build("step", s));
+      stepRow.append(b);
+    }
+    c.append(stepRow);
+    const axes = [["x", "X", p.pos[0], "m"], ["y", "Y", p.pos[1], "m"], ["z", "Z", p.pos[2], "m"],
+      ["roll", "ROLL", p.rot[0], "deg"], ["pitch", "PITCH", p.rot[1], "deg"], ["yaw", "YAW", p.rot[2], "deg"]];
+    for (const [ax, label, v, unit] of axes) {
+      const row = $("div", "strip");
+      const inner = $("div", "row");
+      const minus = $("button", "act", "−"), plus = $("button", "act", "+");
+      for (const b of [minus, plus]) { b.style.width = "64px"; b.style.textAlign = "center"; b.style.marginTop = "0"; }
+      minus.addEventListener("click", () => build("nudge", ax, -1));
+      plus.addEventListener("click", () => build("nudge", ax, 1));
+      inner.append(minus, $("div", null, label + "  " + (unit === "m" ? n2(v) + " m" : n0(v) + "°")), plus);
+      row.append(inner);
+      c.append(row);
+    }
+    const go = $("button", "act primary", p.editing ? "HOLD · SAVE POSITION" : "HOLD · ATTACH");
+    holdAction(go, () => build("commit"));
+    const cancel = $("button", "act", "CANCEL");
+    cancel.addEventListener("click", () => build("cancel"));
+    c.append(go, cancel);
+    main.append(c);
+  }
+
+
+  // ------------------------------------------------------------------------------------------------ WORKSHOP
+  // L361: the bench. Tear a part down to learn it, fabricate a prototype, promote it to your own design, make runs.
+  // ncm_workshop owns everything; this tab draws its state and sends holds (cursor-only, L353).
+  let ws = null, wsSkew = 0;
+  const wsEmit = (d) => Open77.emit("eng:workshop", d);
+  const KIND = { teardown: "TEARDOWN", fabricate: "FABRICATION", promote: "PROMOTION", run: "RUN" };
+  const mins = (s) => { s = Math.max(0, Math.round(s)); return s >= 60 ? Math.floor(s / 60) + " min " + (s % 60) + " s" : s + " s"; };
+  const fmtFact = (k, f) => {
+    const v = f && f.value;
+    if (v == null) return null;
+    const band = f.band ? " ±" + Math.round(f.band * 100) + "%" : "";
+    if (k === "thrustN" || k === "forceN") return (Number(v) / 1000).toFixed(1) + " kN" + band;
+    if (k === "torqueNm") return Math.round(v) + " N m" + band;
+    if (k === "massKg") return Math.round(v) + " kg" + band;
+    if (k === "capacityKg") return Math.round(v) + " kg capacity" + band;
+    if (k === "ispS") return "Isp " + Math.round(v) + " s" + band;
+    if (k === "heatKw") return Math.round(v) + " kW heat" + band;
+    if (k === "limitK") return "limit " + Math.round(v) + " K" + band;
+    if (k === "envelope" && Array.isArray(v)) return v.map(x => Number(x).toFixed(2)).join(" × ") + " m";
+    if (typeof v === "number") return k + " " + (Math.round(v * 100) / 100) + band;
+    return String(v);
+  };
+  const FACT_ORDER = ["kind", "propellant", "massKg", "envelope", "thrustN", "forceN", "torqueNm", "capacityKg", "ispS", "heatKw", "limitK", "process", "principles"];
+
+  function renderWorkshop() {
+    const head = $("div", "card");
+    head.append($("div", "maker", "Engineering"), $("div", "name", "Workshop"));
+    head.append($("div", "note", "Tear a part down to learn how it was made. Once you know its method, build your own. A prototype you are proud of can become your own design, and your designs can be made in runs and sold."));
+    main.append(head);
+    if (!ws) { main.append($("div", "empty", "Reading the bench…")); wsEmit({ op: "refresh" }); return; }
+    if (ws.unavailable) { main.append($("div", "warnbox", "The workshop cannot be reached" + (ws.why ? ": " + ws.why : "."))); return; }
+    if (ws.result && ws.result.text) main.append($("div", ws.result.ok ? "strip good" : "warnbox", ws.result.text));
+    if (!ws.enabled) main.append($("div", "warnbox", "The workshop is closed on this server."));
+
+    // the engineer, in words
+    const eng = $("div", "strip");
+    const r1 = $("div", "row"); r1.append($("span", null, "Your engineering"), $("span", "muted", "a teardown reaches stage " + ((ws.card && ws.card.depth) || 1) + " of 4"));
+    eng.append(r1);
+    const r2 = $("div", "row");
+    r2.append($("span", "muted", ((ws.card && ws.card.disciplines) || []).map(d => d.id.toUpperCase() + " " + d.word).join(" · ")));
+    eng.append(r2);
+    main.append(eng);
+
+    // the bench
+    main.append($("div", "label", "THE BENCH"));
+    const now = Date.now() + wsSkew;
+    for (let slot = 1; slot <= (ws.slots || 2); slot++) {
+      const job = (ws.bench || []).find(j => j.slot === slot);
+      const c = $("div", "card bench");
+      if (!job) { c.append($("div", "maker", "Slot " + slot), $("div", "note", "Free. Start work from your storage or your knowledge below.")); main.append(c); continue; }
+      c.append($("div", "maker", "Slot " + slot + " · " + (KIND[job.kind] || job.kind)), $("div", "name", job.label || job.kind));
+      if (job.state === "resolved") {
+        c.append($("div", "state good", "DONE"));
+        const b = $("button", "act primary", "HOLD · COLLECT THE JOB SHEET");
+        holdAction(b, () => { b.disabled = true; wsEmit({ op: "collect", projectId: job.projectId }); });
+        c.append(b);
+      } else {
+        const total = Math.max(1, (job.dueAt - job.startedAt) * 1000), left = Math.max(0, job.dueAt * 1000 - now);
+        const bar = $("div", "bar"); const fill = $("i"); fill.style.width = Math.min(100, (1 - left / total) * 100) + "%"; bar.append(fill);
+        c.append(bar, $("div", "note", left > 0 ? mins(left / 1000) + " left · materials " + eddies(job.cost) : "finishing…"));
+      }
+      main.append(c);
+    }
+
+    // storage: what you can tear down, promote or sell
+    main.append($("div", "label", "YOUR STORAGE"));
+    const storage = ws.storage || [];
+    if (!storage.length) main.append($("div", "empty", "Nothing in storage. Buy a part at an Autofixer or the Base Market to tear it down."));
+    for (const a of storage) {
+      const c = $("div", "card");
+      c.append($("div", "maker", (a.junk ? "NONFUNCTIONAL · " : "") + (a.origin === "prototype" ? "PROTOTYPE" : (a.origin === "player_design" ? "YOUR DESIGN" : "COMPONENT"))),
+        $("div", "name", a.name || a.code));
+      if (!a.physical) c.append($("div", "note", "A factory-interface part: the bench can only analyse physical add-ons for now."));
+      if (a.physical && !a.junk) {
+        const t = $("button", "act", "HOLD · TEAR DOWN · " + eddies(a.teardownCost) + " materials (destroys it)");
+        holdAction(t, () => { t.disabled = true; wsEmit({ op: "start", kind: "teardown", assetId: a.assetId, key: uuid4() }); });
+        c.append(t);
+      }
+      if (a.origin === "prototype" && !a.junk) {
+        const pr = $("button", "act", "HOLD · PROMOTE TO MY DESIGN");
+        holdAction(pr, () => { pr.disabled = true; wsEmit({ op: "start", kind: "promote", assetId: a.assetId, key: uuid4() }); });
+        c.append(pr);
+      }
+      if (a.origin === "player_design" && a.mine && !a.junk) {
+        const l = $("button", "act", "HOLD · LIST ON THE BASE MARKET · " + eddies(a.price));
+        holdAction(l, () => { l.disabled = true; wsEmit({ op: "list", assetId: a.assetId, price: a.price, key: uuid4() }); });
+        c.append(l);
+      }
+      if (a.junk) c.append($("div", "note", "It exists and it is yours, but it cannot do the job. It still tells a story."));
+      main.append(c);
+    }
+
+    // knowledge: what you have learned, and what it lets you build
+    main.append($("div", "label", "WHAT YOU KNOW"));
+    const known = ws.knowledge || [];
+    if (!known.length) main.append($("div", "empty", "Nothing yet. Tear something down."));
+    for (const k of known) {
+      const c = $("div", "card");
+      c.append($("div", "maker", "Known to stage " + k.stage + " of 4" + (k.stageLabel ? " · " + k.stageLabel : "")), $("div", "name", k.name || k.code));
+      const facts = [];
+      for (const key of FACT_ORDER) { const t = fmtFact(key, (k.facts || {})[key]); if (t) facts.push(t); }
+      if (facts.length) c.append($("div", "note", facts.join(" · ")));
+      if (k.canFabricate) {
+        const f = $("button", "act primary", "HOLD · FABRICATE A PROTOTYPE · " + eddies(k.fabricateCost) + " · ~" + k.fabricateMinutes + " min");
+        holdAction(f, () => { f.disabled = true; wsEmit({ op: "start", kind: "fabricate", designId: k.designId, key: uuid4() }); });
+        c.append(f);
+      } else {
+        c.append($("div", "note", "Building one needs stage 3: its manufacturing method."));
+      }
+      main.append(c);
+    }
+
+    // your designs
+    if ((ws.designs || []).length) main.append($("div", "label", "YOUR DESIGNS"));
+    for (const d of ws.designs || []) {
+      const c = $("div", "card");
+      c.append($("div", "maker", (d.listed ? "ON SALE · " : "") + d.code), $("div", "name", d.name));
+      for (const n of [1, 3]) {
+        const b = $("button", "act", "HOLD · MAKE " + n + " · " + eddies(d.runCost * n) + " materials");
+        holdAction(b, () => { b.disabled = true; wsEmit({ op: "start", kind: "run", designId: d.designId, n, key: uuid4() }); });
+        c.append(b);
+      }
+      main.append(c);
+    }
+  }
+
+  // the job sheet: what the work turned out to be, written in ink and stamped
+  function workshopSheet(r) {
+    sheet.innerHTML = "";
+    const paper = $("div", "paper");
+    paper.append($("div", "head", "Workshop job sheet · " + (KIND[r.kind] || r.kind || "")));
+    paper.append($("div", "car", r.name || r.code || r.label || "The work"));
+    const rows = [];
+    const add = (sec, val, why, up) => {
+      const line = $("div", "line");
+      line.append($("div", "sec", sec));
+      const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg"); svg.setAttribute("viewBox", "0 0 180 30");
+      const pth = document.createElementNS("http://www.w3.org/2000/svg", "path"); pth.setAttribute("d", inkPath(rows.length * 17 + 5)); svg.append(pth); line.append(svg);
+      line.append($("div", "val " + (up === true ? "up" : (up === false ? "down" : "")), val), $("div", "why", why || ""));
+      paper.append(line); rows.push(line);
+    };
+    if (r.kind === "teardown") {
+      (r.lines || []).forEach((l, i) => add("Stage " + (i + 1), "✓", l.replace(/^Stage \d+: /, "")));
+      add("Known", (r.known || 0) + " / 4", r.canFabricate ? "you can build one now" : "tear down another to go deeper");
+    } else if (r.kind === "fabricate") {
+      if (r.outcome === "junk") add("Result", "—", r.text || "nothing usable", false);
+      else {
+        const k = r.perf && (r.perf.thrustN != null ? "thrustN" : (r.perf.forceN != null ? "forceN" : (r.perf.torqueNm != null ? "torqueNm" : "capacityKg")));
+        if (k && r.source && r.source.perf) {
+          const ratio = r.perf[k] / r.source.perf[k] - 1;
+          add("Output", (ratio >= 0 ? "+" : "") + (ratio * 100).toFixed(1) + "%", fmtFact(k, { value: r.perf[k] }), ratio >= 0);
+        }
+        if (r.massKg && r.source) { const m = r.massKg / r.source.massKg - 1; add("Mass", (m >= 0 ? "+" : "") + (m * 100).toFixed(1) + "%", Math.round(r.massKg) + " kg", m <= 0); }
+      }
+    } else if (r.kind === "promote") {
+      add("Design", r.code || "", "registered as yours, from " + (r.from || "the prototype"), true);
+    } else if (r.kind === "run") {
+      add("Good", String(r.good || 0), "units in your storage", true);
+      add("Rejects", String(r.rejects || 0), r.rejects ? "kept, nonfunctional" : "none", r.rejects ? false : null);
+    }
+    if (r.outcome === "failed" && r.text) add("Note", "!", r.text, false);
+    const grade = String(r.outcome || "done");
+    const stamp = $("div", "stamp " + (grade === "good" || grade === "done" ? "good" : (grade === "neutral" ? "fair" : "bad")),
+      grade === "junk" ? "NONFUNCTIONAL" : grade);
+    paper.append(stamp);
+    const foot = $("div", "foot");
+    foot.append($("span", null, "Materials " + eddies(r.cost)));
+    const ok = $("button", null, "FILE IT");
+    ok.addEventListener("click", () => { sheet.classList.add("hidden"); render(); });
+    foot.append(ok); paper.append(foot);
+    sheet.append(paper); sheet.classList.remove("hidden");
+    rows.forEach((l, i) => setTimeout(() => l.classList.add("drawn"), 500 + i * 1200));
+    setTimeout(() => stamp.classList.add("show"), 500 + rows.length * 1200 + 300);
+  }
+
+  // ------------------------------------------------------------------------------------------------ frame
+  function render() {
+    main.innerHTML = "";
+    for (const b of document.querySelectorAll("nav button")) b.classList.toggle("active", b.dataset.tab === tab);
+    if (tab === "service") renderService(); else if (tab === "parts") renderParts(); else if (tab === "workshop") renderWorkshop(); else renderBuild();
+  }
+  function guard(fn) { try { fn(); return true; } catch (e) { main.innerHTML = ""; main.append($("div", "warnbox", "Engineering could not draw: " + e)); return false; } }
+
+  for (const b of document.querySelectorAll("nav button")) b.addEventListener("click", () => { tab = b.dataset.tab; Open77.emit("eng:tab", { tab }); guard(render); });
+  document.getElementById("closeBtn").addEventListener("click", () => Open77.emit("eng:close", {}));
+  setInterval(() => { if (!dock.classList.contains("hidden") && tab === "service" && Object.keys(busy).length) guard(render); }, 500);
+  // the bench's progress bars move between server pushes
+  setInterval(() => { if (!dock.classList.contains("hidden") && tab === "workshop" && sheet.classList.contains("hidden") && ws && (ws.bench || []).length) guard(render); }, 1000);
+
+  Open77.on("eng:show", (d) => {
+    if (d && d.tab) tab = d.tab;
+    dock.classList.remove("hidden");
+    // KB-61: say "drawn" only if the panel actually drew; silence is how Lua knows to give the cursor back
+    if (guard(render)) Open77.emit("eng:drawn", {});
+  });
+  Open77.on("eng:hide", () => { dock.classList.add("hidden"); sheet.classList.add("hidden"); });
+
+  let incomingCars = [];
+  Open77.on("eng:service.head", (d) => { svc.balance = d.balance; svc.skill = d.skill; svc.site = d.site; svc.error = d.error || null; incomingCars = []; });
+  Open77.on("eng:service.car", (d) => { if (d && d.car) incomingCars[(d.index || incomingCars.length + 1) - 1] = d.car; });
+  Open77.on("eng:service.done", () => { svc.cars = incomingCars.filter(Boolean); svc.loaded = true; if (!dock.classList.contains("hidden") && tab === "service" && sheet.classList.contains("hidden")) guard(render); });
+
+  let inParts = [], inMachines = [];
+  Open77.on("eng:parts.head", (d) => { parts.balance = d.balance; parts.partsEnabled = d.partsEnabled; parts.fabricable = d.fabricable || null; inParts = []; inMachines = []; });
+  Open77.on("eng:parts.machine", (d) => { if (d && d.machine) inMachines[(d.index || inMachines.length + 1) - 1] = d.machine; });
+  Open77.on("eng:parts.item", (d) => { if (d && d.part) inParts[(d.index || inParts.length + 1) - 1] = d.part; });
+  Open77.on("eng:parts.done", () => { parts.list = inParts.filter(Boolean); parts.machines = inMachines.filter(Boolean); parts.loaded = true; if (!dock.classList.contains("hidden") && tab === "parts") guard(render); });
+  Open77.on("eng:parts.states", (d) => { parts.states = d || {}; if (!dock.classList.contains("hidden") && tab === "parts") guard(render); });
+  Open77.on("eng:result", () => { /* the views are re-read; the next head/done redraws */ });
+  Open77.on("eng:build.state", (d) => {
+    const key = JSON.stringify(d || {});
+    if (key === bldKey) return;            // no redraw while nothing changed (the tab polls twice a second)
+    bldKey = key; bld = d || {};
+    if (!dock.classList.contains("hidden") && tab === "build" && sheet.classList.contains("hidden")) guard(render);
+  });
+  Open77.on("eng:repair.result", (d) => { guard(() => ceremony(d || {})); });
+  Open77.on("eng:workshop.state", (d) => {
+    const keep = ws && ws.result;
+    ws = d || {}; if (keep && !ws.result) ws.result = keep;
+    if (typeof ws.now === "number") wsSkew = ws.now * 1000 - Date.now();
+    if (!dock.classList.contains("hidden") && tab === "workshop" && sheet.classList.contains("hidden")) guard(render);
+  });
+  Open77.on("eng:workshop.result", (d) => { if (ws) ws.result = d || null; if (tab === "workshop" && sheet.classList.contains("hidden")) guard(render); });
+  Open77.on("eng:workshop.sheet", (d) => { if (ws) ws.result = null; guard(() => workshopSheet(d || {})); });
+  Open77.on("eng:routed", (d) => { if (tab === "service") guard(render); });
+
+  Open77.emit("eng:ready", {});
+})();
+</script>
+</body>
+</html>

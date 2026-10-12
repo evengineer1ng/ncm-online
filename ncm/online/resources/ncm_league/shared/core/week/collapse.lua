@@ -62,6 +62,32 @@ Core.define("week.collapse", function()
         return out, refused
     end
 
+    --- Online's one-car temporal-loop rule. An explicit choice wins; otherwise the most recently
+    --- driven eligible car survives. A missing drive timestamp is not evidence of a last drive.
+    --- `chosen` is newest-first, so a legacy week with several choices still keeps only one.
+    function M.onlineAnchor(cars, chosen)
+        local byId, refused = {}, {}
+        for _, car in ipairs(cars or {}) do byId[car.assetId] = car end
+        for _, id in ipairs(chosen or {}) do
+            local car = byId[id]
+            if car then
+                local ok, why = M.anchorable(car)
+                if ok then return { { assetId = id, source = "chosen" } }, refused end
+                refused[#refused + 1] = { assetId = id, reason = why }
+            end
+        end
+        local recent
+        for _, car in ipairs(cars or {}) do
+            local at = tonumber(car.lastDrivenAt)
+            if at and at > 0 and M.anchorable(car) and
+                (not recent or at > recent.lastDrivenAt or
+                    (at == recent.lastDrivenAt and tostring(car.assetId) < tostring(recent.assetId))) then
+                recent = { assetId = car.assetId, lastDrivenAt = at }
+            end
+        end
+        return recent and { { assetId = recent.assetId, source = "last_driven" } } or {}, refused
+    end
+
     --- W-3: halfway back to neutral.
     function M.srReset(sr)
         sr = tonumber(sr) or M.SR_NEUTRAL

@@ -1,0 +1,539 @@
+{
+  "SchemaVersion": 1,
+  "Id": "75efe8ad-332d-4875-a9fa-556f490ab139",
+  "Name": "NCM Space",
+  "ArchiveProfile": "vanilla-content-v1",
+  "Sources": {},
+  "Changes": {
+    "Modified": {},
+    "Added": {
+      "a:2e5747920a7442799970fc8488c589d2": {
+        "Id": "a:2e5747920a7442799970fc8488c589d2",
+        "Name": "lab_portal_A_to_B",
+        "Mesh": {
+          "Hash": 14492040869936987490,
+          "Path": "base\\quest\\side_quests\\sq024\\entities\\meshes\\sq024_race_hologram.mesh",
+          "Appearance": "default"
+        },
+        "Transform": {
+          "Position": {
+            "X": -24995,
+            "Y": -25005,
+            "Z": 2000.05
+          },
+          "Rotation": {
+            "IsIdentity": true,
+            "X": 0,
+            "Y": 0,
+            "Z": 0,
+            "W": 1
+          },
+          "Scale": {
+            "X": 1,
+            "Y": 1,
+            "Z": 1
+          }
+        },
+        "Template": null,
+        "Replaces": [],
+        "Occluder": null
+      },
+      "a:80657c1c279b47f08a693c103045d66b": {
+        "Id": "a:80657c1c279b47f08a693c103045d66b",
+        "Name": "lab_portal_A_home",
+        "Mesh": {
+          "Hash": 14492040869936987490,
+          "Path": "base\\quest\\side_quests\\sq024\\entities\\meshes\\sq024_race_hologram.mesh",
+          "Appearance": "holo_jt"
+        },
+        "Transform": {
+          "Position": {
+            "X": -25005,
+            "Y": -25005,
+            "Z": 2000.05
+          },
+          "Rotation": {
+            "IsIdentity": true,
+            "X": 0,
+            "Y": 0,
+            "Z": 0,
+            "W": 1
+          },
+          "Scale": {
+            "X": 1,
+            "Y": 1,
+            "Z": 1
+          }
+        },
+        "Template": null,
+        "Replaces": [],
+        "Occluder": null
+      },
+      "a:edae654b525b4c21bdb6b1c27bfc395f": {
+        "Id": "a:edae654b525b4c21bdb6b1c27bfc395f",
+        "Name": "lab_A_earth",
+        "Mesh": {
+          "Hash": 7260653185295373734,
+          "Path": "base\\environment\\decoration\\unique\\quest\\q201_q203\\q201_q203_earth_globe.mesh",
+          "Appearance": "default"
+        },
+        "Transform": {
+          "Position": {
+            "X": -25000,
+            "Y": -25000,
+            "Z": -8628
+          },
+          "Rotation": {
+            "IsIdentity": true,
+            "X": 0,
+            "Y": 0,
+            "Z": 0,
+            "W": 1
+          },
+          "Scale": {
+            "X": 20387,
+            "Y": 20387,
+            "Z": 20387
+          }
+        },
+        "Template": null,
+        "Replaces": [],
+        "Occluder": null
+      },
+      "a:ac479791d00a494f9ba493d4205adf82": {
+        "Id": "a:ac479791d00a494f9ba493d4205adf82",
+        "Name": "lab_A_pad",
+        "Mesh": {
+          "Hash": 17680665140467668041,
+          "Path": "base\\environment\\decoration\\industrial\\platform\\stage\\stage_a_platform_l200_a.mesh",
+          "Appearance": "black"
+        },
+        "Transform": {
+          "Position": {
+            "X": -24992,
+            "Y": -24992,
+            "Z": 2000
+          },
+          "Rotation": {
+            "IsIdentity": true,
+            "X": 0,
+            "Y": 0,
+            "Z": 0,
+            "W": 1
+          },
+          "Scale": {
+            "X": 8,
+            "Y": 8,
+            "Z": 2
+          }
+        },
+        "Template": null,
+        "Replaces": [],
+        "Occluder": null
+      },
+      "a:ed3419e07923416ab32f1a5033dc2f9c": {
+        "Id": "a:ed3419e07923416ab32f1a5033dc2f9c",
+        "Name": "lab_B_earth_100m",
+        "Mesh": {
+          "Hash": 7260653185295373734,
+          "Path": "base\\environment\\decoration\\unique\\quest\\q201_q203\\q201_q203_earth_globe.mesh",
+          "Appearance": "default"
+        },
+        "Transform": {
+          "Position": {
+            "X": -25000,
+            "Y": -85000,
+            "Z": 1857
+          },
+          "Rotation": {
+            "IsIdentity": true,
+            "X": 0,
+            "Y": 0,
+            "Z": 0,
+            "W": 1
+          },
+          "Scale": {
+            "X": 100,
+            "Y": 100,
+            "Z": 100
+          }
+        },
+        "Template": null,
+        "Replaces": [],
+        "Occluder": null
+      },
+      "a:e30a7c7011954266b447aa19467dc5a4": {
+        "Id": "a:e30a7c7011954266b447aa19467dc5a4",
+        "Name": "lab_B_starfield_200m",
+        "Mesh": {
+          "Hash": 7827351605623902208,
+          "Path": "base\\environment\\decoration\\unique\\quest\\q201_q203\\q201_q203_starfield.mesh",
+          "Appearance": "default"
+        },
+        "Transform": {
+          "Position": {
+            "X": -25000,
+            "Y": -85000,
+            "Z": 2000
+          },
+          "Rotation": {
+            "IsIdentity": true,
+            "X": 0,
+            "Y": 0,
+            "Z": 0,
+            "W": 1
+          },
+          "Scale": {
+            "X": 194,
+            "Y": 194,
+            "Z": 194
+          }
+        },
+        "Template": null,
+        "Replaces": [],
+        "Occluder": null
+      },
+      "a:77e7e796dcc542c9a84556f291808831": {
+        "Id": "a:77e7e796dcc542c9a84556f291808831",
+        "Name": "lab_A_earth_atmosphere",
+        "Mesh": {
+          "Hash": 7260653185295373734,
+          "Path": "base\\environment\\decoration\\unique\\quest\\q201_q203\\q201_q203_earth_globe.mesh",
+          "Appearance": "atmosphere"
+        },
+        "Transform": {
+          "Position": {
+            "X": -25000,
+            "Y": -25000,
+            "Z": -8628
+          },
+          "Rotation": {
+            "IsIdentity": true,
+            "X": 0,
+            "Y": 0,
+            "Z": 0,
+            "W": 1
+          },
+          "Scale": {
+            "X": 20700,
+            "Y": 20700,
+            "Z": 20700
+          }
+        },
+        "Template": null,
+        "Replaces": [],
+        "Occluder": null
+      },
+      "a:04b8c881c09c410eafde710bf9a23c5f": {
+        "Id": "a:04b8c881c09c410eafde710bf9a23c5f",
+        "Name": "lab_portal_B_home",
+        "Mesh": {
+          "Hash": 14492040869936987490,
+          "Path": "base\\quest\\side_quests\\sq024\\entities\\meshes\\sq024_race_hologram.mesh",
+          "Appearance": "holo_jt"
+        },
+        "Transform": {
+          "Position": {
+            "X": -25005,
+            "Y": -85005,
+            "Z": 2000.05
+          },
+          "Rotation": {
+            "IsIdentity": true,
+            "X": 0,
+            "Y": 0,
+            "Z": 0,
+            "W": 1
+          },
+          "Scale": {
+            "X": 1,
+            "Y": 1,
+            "Z": 1
+          }
+        },
+        "Template": null,
+        "Replaces": [],
+        "Occluder": null
+      },
+      "a:bf055bcabfc74c14bed7a3e1c198f7f8": {
+        "Id": "a:bf055bcabfc74c14bed7a3e1c198f7f8",
+        "Name": "lab_B_moon",
+        "Mesh": {
+          "Hash": 2073597970666508445,
+          "Path": "base\\environment\\decoration\\unique\\quest\\q201_q203\\q201_q203_moon.mesh",
+          "Appearance": "default"
+        },
+        "Transform": {
+          "Position": {
+            "X": -24900,
+            "Y": -84880,
+            "Z": 2060
+          },
+          "Rotation": {
+            "IsIdentity": true,
+            "X": 0,
+            "Y": 0,
+            "Z": 0,
+            "W": 1
+          },
+          "Scale": {
+            "X": 12,
+            "Y": 12,
+            "Z": 12
+          }
+        },
+        "Template": null,
+        "Replaces": [],
+        "Occluder": null
+      },
+      "a:76e651c65b504a23bb93200594da24a7": {
+        "Id": "a:76e651c65b504a23bb93200594da24a7",
+        "Name": "lab_portal_nc_to_A",
+        "Mesh": {
+          "Hash": 14492040869936987490,
+          "Path": "base\\quest\\side_quests\\sq024\\entities\\meshes\\sq024_race_hologram.mesh",
+          "Appearance": "holo_jt"
+        },
+        "Transform": {
+          "Position": {
+            "X": -2380,
+            "Y": -1150,
+            "Z": 0.98750544
+          },
+          "Rotation": {
+            "IsIdentity": true,
+            "X": 0,
+            "Y": 0,
+            "Z": 0,
+            "W": 1
+          },
+          "Scale": {
+            "X": 1,
+            "Y": 1,
+            "Z": 1
+          }
+        },
+        "Template": null,
+        "Replaces": [],
+        "Occluder": null
+      },
+      "a:db1515ab94bf4c5bbfe816d08b13119d": {
+        "Id": "a:db1515ab94bf4c5bbfe816d08b13119d",
+        "Name": "lab_A_starfield_30km",
+        "Mesh": {
+          "Hash": 7827351605623902208,
+          "Path": "base\\environment\\decoration\\unique\\quest\\q201_q203\\q201_q203_starfield.mesh",
+          "Appearance": "default"
+        },
+        "Transform": {
+          "Position": {
+            "X": -25000,
+            "Y": -25000,
+            "Z": 2000
+          },
+          "Rotation": {
+            "IsIdentity": true,
+            "X": 0,
+            "Y": 0,
+            "Z": 0,
+            "W": 1
+          },
+          "Scale": {
+            "X": 29126,
+            "Y": 29126,
+            "Z": 29126
+          }
+        },
+        "Template": null,
+        "Replaces": [],
+        "Occluder": null
+      },
+      "a:8ab8861c1c964d20b1d4b7d3378fbce4": {
+        "Id": "a:8ab8861c1c964d20b1d4b7d3378fbce4",
+        "Name": "lab_B_pad",
+        "Mesh": {
+          "Hash": 17680665140467668041,
+          "Path": "base\\environment\\decoration\\industrial\\platform\\stage\\stage_a_platform_l200_a.mesh",
+          "Appearance": "black"
+        },
+        "Transform": {
+          "Position": {
+            "X": -24992,
+            "Y": -84992,
+            "Z": 2000
+          },
+          "Rotation": {
+            "IsIdentity": true,
+            "X": 0,
+            "Y": 0,
+            "Z": 0,
+            "W": 1
+          },
+          "Scale": {
+            "X": 8,
+            "Y": 8,
+            "Z": 2
+          }
+        },
+        "Template": null,
+        "Replaces": [],
+        "Occluder": null
+      },
+      "a:14c6e17805674e3a8b6ed3bc2ce8e9d2": {
+        "Id": "a:14c6e17805674e3a8b6ed3bc2ce8e9d2",
+        "Name": "lab_B_earth_100m_atmosphere",
+        "Mesh": {
+          "Hash": 7260653185295373734,
+          "Path": "base\\environment\\decoration\\unique\\quest\\q201_q203\\q201_q203_earth_globe.mesh",
+          "Appearance": "atmosphere"
+        },
+        "Transform": {
+          "Position": {
+            "X": -25000,
+            "Y": -85000,
+            "Z": 1857
+          },
+          "Rotation": {
+            "IsIdentity": true,
+            "X": 0,
+            "Y": 0,
+            "Z": 0,
+            "W": 1
+          },
+          "Scale": {
+            "X": 101.5,
+            "Y": 101.5,
+            "Z": 101.5
+          }
+        },
+        "Template": null,
+        "Replaces": [],
+        "Occluder": null
+      }
+    },
+    "Roads": {},
+    "Elements": {},
+    "Collisions": {
+      "c:94bed975677e4602b04df4d20bdc15ea": {
+        "Id": "c:94bed975677e4602b04df4d20bdc15ea",
+        "Name": "lab_B_pad_collision",
+        "Transform": {
+          "Position": {
+            "X": -25000,
+            "Y": -85000,
+            "Z": 1999.5
+          },
+          "Rotation": {
+            "IsIdentity": true,
+            "X": 0,
+            "Y": 0,
+            "Z": 0,
+            "W": 1
+          },
+          "Scale": {
+            "X": 1,
+            "Y": 1,
+            "Z": 1
+          }
+        },
+        "Shapes": [
+          {
+            "Kind": 0,
+            "Position": {
+              "X": 0,
+              "Y": 0,
+              "Z": 0
+            },
+            "Rotation": {
+              "IsIdentity": true,
+              "X": 0,
+              "Y": 0,
+              "Z": 0,
+              "W": 1
+            },
+            "Size": {
+              "X": 8,
+              "Y": 8,
+              "Z": 0.5
+            },
+            "MeshHash": 0,
+            "Preset": "World Static",
+            "Material": "concrete.physmat",
+            "IsMesh": false,
+            "HalfExtents": {
+              "X": 8,
+              "Y": 8,
+              "Z": 0.5
+            }
+          }
+        ],
+        "Replaces": [],
+        "AttachedTo": null,
+        "CookedSector": 0
+      },
+      "c:fb6ae08cc0c9410b89d8475ae6a07d9f": {
+        "Id": "c:fb6ae08cc0c9410b89d8475ae6a07d9f",
+        "Name": "lab_A_pad_collision",
+        "Transform": {
+          "Position": {
+            "X": -25000,
+            "Y": -25000,
+            "Z": 1999.5
+          },
+          "Rotation": {
+            "IsIdentity": true,
+            "X": 0,
+            "Y": 0,
+            "Z": 0,
+            "W": 1
+          },
+          "Scale": {
+            "X": 1,
+            "Y": 1,
+            "Z": 1
+          }
+        },
+        "Shapes": [
+          {
+            "Kind": 0,
+            "Position": {
+              "X": 0,
+              "Y": 0,
+              "Z": 0
+            },
+            "Rotation": {
+              "IsIdentity": true,
+              "X": 0,
+              "Y": 0,
+              "Z": 0,
+              "W": 1
+            },
+            "Size": {
+              "X": 8,
+              "Y": 8,
+              "Z": 0.5
+            },
+            "MeshHash": 0,
+            "Preset": "World Static",
+            "Material": "concrete.physmat",
+            "IsMesh": false,
+            "HalfExtents": {
+              "X": 8,
+              "Y": 8,
+              "Z": 0.5
+            }
+          }
+        ],
+        "Replaces": [],
+        "AttachedTo": null,
+        "CookedSector": 0
+      }
+    },
+    "Outliner": {
+      "Folders": {},
+      "Entries": {}
+    },
+    "Traffic": {},
+    "Elevators": {}
+  }
+}

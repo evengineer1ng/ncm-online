@@ -105,19 +105,35 @@ local function humanDriver(vid)
     return tonumber(type(d) == "table" and (d.playerId or d.id) or d)
 end
 
+local raceCars = {}      -- vehicleId -> { personId, ice = bool } (Paddock race cars, registered by ncm_paddock)
+
+--- The ATTRIBUTION ledger: who did what to which car, and how it ended. Race Week no longer gets a point per hack
+--- (owner brief 2026-10-08: "Race Week should care about what physically happened"): a car a hack destroys is a
+--- destroyed car, recorded through the incident pipeline like any other; see `destroyedOutsideRace` and ncm_paddock.
 local function record(fields)
-    -- Racing Week's live signal (L302): a hack that landed is something the city saw racing do
-    if fields.outcome == "impact" and NcmWeek then NcmWeek.fact("chrome_impact", 1) end
     local ok, err = pcall(function()
         MySQL.insert.await([[INSERT INTO chrome_event (event_id, server_id, attacker_driver_id, target_driver_id,
             hack, outcome, route, target_vehicle_id, target_record, catastrophic, detail, occurred_at)
             VALUES (UUID(), ?, NULLIF(?, ''), NULLIF(?, ''), ?, ?, ?, NULLIF(?, -1), NULLIF(?, ''), ?, NULLIF(?, ''), ?)]],
             { (NcmIdentity and NcmIdentity.serverId and NcmIdentity.serverId()) or (GetConvar and GetConvar("ncm_server_id", "ncm")) or "ncm",
-              fields.attacker and driverId(fields.attacker) or "", fields.target and driverId(fields.target) or "",
+              fields.attackerDriver or (type(fields.attacker) == "number" and driverId(fields.attacker)) or "",
+              fields.targetDriver or (type(fields.target) == "number" and driverId(fields.target)) or "",
               fields.hack, fields.outcome, fields.route, tonumber(fields.vehicleId) or -1, fields.record or "",
               fields.catastrophic and 1 or 0, fields.detail or "", math.floor(nowMs() / 1000) })
     end)
     if not ok then log("ledger write failed (%s %s): %s", tostring(fields.hack), tostring(fields.outcome), tostring(err)) end
+    -- every decisive outcome, to whoever races these cars (ncm_paddock's hacking agents learn from it)
+    TriggerEvent("ncm:chrome:outcome", { attacker = fields.actor or (type(fields.attacker) == "number" and ("player:" .. fields.attacker)) or nil,
+        targetVid = tonumber(fields.vehicleId), hack = fields.hack, outcome = fields.outcome, route = fields.route, detail = fields.detail })
+end
+
+--- A TOTAL FAILURE outside a race destroys a car in the street: the physical incident Race Week counts. Race cars are
+--- ncm_paddock's to report (it sees the wreck and classifies it), so they are not counted twice.
+local function destroyedOutsideRace(vid)
+    if raceCars[tonumber(vid)] then return end
+    local pos = vehiclePos(vid)
+    TriggerEvent("ncm:week:fact", "vehicle_destroyed", 1)
+    log("vehicle=%s destroyed in the street at %s", tostring(vid), pos and ("%.0f,%.0f"):format(pos.x, pos.y) or "?")
 end
 
 local function tell(pid, body)
@@ -204,8 +220,11 @@ local function applyEffect(vid, hack, actor)
         local hp = tonumber((vcall("getHealth", vid))) or 1
         vcall("setHealth", vid, math.max(hp, 0.6))
     end
-    if e.explode then vcall("explode", vid) end
-    log("IMPACT %s on vehicle=%s by player=%s", hack, tostring(vid), tostring(actor))
+    if e.explode then
+        vcall("explode", vid)
+        destroyedOutsideRace(vid)
+    end
+    log("IMPACT %s on vehicle=%s by %s", hack, tostring(vid), type(actor) == "number" and ("player=" .. actor) or tostring(actor))
     return true
 end
 
@@ -428,6 +447,86 @@ end)
 
 local refusalsLogged = {}   -- pid -> count; the first few per session are logged, so a silent refusal is visible
 
+-- ---- Self-ICE on the NCM route (owner brief 2026-10-08: defence must exist for every racer) -------------------
+-- The platform's Self-ICE only guards platform uploads, which need a PLAYER attacker. On the NCM route -- every
+-- upload an NPC racer makes, and every upload onto an NPC car -- the same grade is applied here: a human's car and an
+-- ICE-equipped racer's car each hold `Chrome.ICE_GRADE` charges, one spent per upload it stops at the start,
+-- recharging one at a time. (A human's platform charges and these are separate counters: an expression loss.)
+local ice = {}              -- vehicleId -> { charges, nextAt }
+
+local function iceBlocks(vid, t)
+    local g = Chrome.ICE_GRADE
+    local s = ice[vid]
+    if not s then
+        local race = raceCars[vid]
+        local guarded = (race and race.ice) or humanDriver(vid) ~= nil
+        if not guarded then return false end
+        s = { charges = g.charges, nextAt = nil }
+        ice[vid] = s
+    end
+    while s.nextAt and t >= s.nextAt and s.charges < g.charges do
+        s.charges = s.charges + 1
+        s.nextAt = s.charges < g.charges and (s.nextAt + g.rechargeMs) or nil
+    end
+    if s.charges <= 0 then return false end
+    s.charges = s.charges - 1
+    s.nextAt = s.nextAt or (t + g.rechargeMs)
+    return true
+end
+
+local function actorOf(key) return type(key) == "number" and ("player:" .. key) or tostring(key) end
+
+--- End an NCM-route upload: tell everyone who should know, and the ledger.
+local function finishUpload(key, u, outcome, why)
+    ncmUploads[key] = nil
+    local h = Chrome.hack(u.hack)
+    local phase = outcome == "impact" and "impact" or (outcome == "blocked" and "block" or "cancel")
+    if type(key) == "number" then present(key, u.actionId, phase, outcome == "impact" and 1 or 0, h.label) end
+    present(u.defender, u.actionId, phase, outcome == "impact" and 1 or 0, h.label)
+    if outcome == "impact" then applyEffect(u.vehicleId, u.hack, actorOf(key)) end
+    record({ attacker = type(key) == "number" and key or nil, actor = actorOf(key), attackerDriver = u.npc,
+             target = u.defender, targetDriver = raceCars[u.vehicleId] and raceCars[u.vehicleId].personId or nil,
+             hack = u.hack, outcome = outcome, route = "ncm", vehicleId = u.vehicleId,
+             catastrophic = outcome == "impact" and h.catastrophic or nil, detail = why })
+    if type(key) == "number" then
+        tell(key, { token = u.token, result = outcome == "impact" and "impact" or (outcome == "blocked" and "blocked" or "interrupted"),
+                    reason = why, hack = u.hack })
+    end
+    TriggerEvent("ncm:chrome:resolved", { key = actorOf(key), targetVid = u.vehicleId, hack = u.hack, outcome = outcome })
+end
+
+--- Start an NCM-route upload for any actor -- a player (`key` = pid) or an NPC racer (`key` = "npc:<personId>",
+--- `npc` = personId, `attackerVid` = their car). Returns "uploading" | "blocked".
+local function startUpload(key, hackId, target, t, extra)
+    local h = Chrome.hack(hackId)
+    local u = { hack = hackId, vehicleId = target, startedAt = t, deadline = t + (h.uploadMs or 2000), heartbeat = t,
+                token = extra.token, actionId = 900000000 + (t % 100000000), defender = extra.defender,
+                npc = extra.npc, attackerVid = extra.attackerVid }
+    if Chrome.harms(hackId) and iceBlocks(target, t) then
+        ncmUploads[key] = u
+        log("start %s %s -> vehicle=%s BLOCKED by Self-ICE (%d charge(s) left)", hackId, actorOf(key), tostring(target), ice[target].charges)
+        finishUpload(key, u, "blocked", "self_ice")
+        return "blocked"
+    end
+    ncmUploads[key] = u
+    log("start %s %s -> vehicle=%s defender=%s (ncm)", hackId, actorOf(key), tostring(target), tostring(extra.defender))
+    -- whoever drives the target can respond: a defending racer (ncm_paddock), or the human through INCOMING below
+    TriggerEvent("ncm:chrome:incoming", { key = actorOf(key), attacker = actorOf(key), targetVid = target, hack = hackId,
+        startedMs = t, uploadMs = h.uploadMs or 2000 })
+    return "uploading"
+end
+
+--- PURGE on a vehicle: clears what has landed AND stops every upload still running against it (KB fix 2026-10-08:
+--- purge used to leave NCM-route uploads running).
+local function purgeVehicle(vid, actor)
+    local n = 0
+    for k, u in pairs(ncmUploads) do
+        if u.vehicleId == vid and Chrome.harms(u.hack) then finishUpload(k, u, "purged", "target purged"); n = n + 1 end
+    end
+    applyEffect(vid, "purge", actor)
+    return n
+end
+
 local function refuse(pid, token, hack, why)
     local n = (refusalsLogged[pid] or 0) + 1
     refusalsLogged[pid] = n
@@ -473,7 +572,8 @@ RegisterNetEvent("ncm:chrome.start", function(req)
             local okOp, opId = pcall(Open77.cyberware.newOperationId)
             pcall(Open77.hacking.purge, pid, pid, Chrome.PURGE_ID, Chrome.PURGE_GRADE.id,
                 { operationId = okOp and opId or ("purge-" .. pid .. "-" .. t) })
-            applyEffect(own, "purge", pid)
+            local stopped = purgeVehicle(own, pid)
+            if stopped > 0 then log("purge player=%d stopped %d upload(s) against vehicle=%s", pid, stopped, tostring(own)) end
             record({ attacker = pid, hack = hackId, outcome = "purged", route = "ncm", vehicleId = own })
             tell(pid, { token = token, result = "impact", hack = hackId })
         elseif hackId == "system_restore" then
@@ -525,12 +625,59 @@ RegisterNetEvent("ncm:chrome.start", function(req)
     -- they are warned exactly as a driver would be, and their PURGE still clears whatever lands.
     local defender = asset and tonumber(asset.pid) or nil
     if defender == pid then defender = nil end
-    ncmUploads[pid] = { hack = hackId, vehicleId = target, startedAt = t, deadline = t + (h.uploadMs or 2000),
-                        heartbeat = t, token = token, actionId = 900000000 + (t % 100000000), defender = defender }
     cooldowns[pid] = cooldowns[pid] or {}
     cooldowns[pid][hackId] = t + (h.cooldownMs or 0)
-    log("start %s player=%d -> vehicle=%s defender=%s (ncm)", hackId, pid, tostring(target), tostring(defender))
-    tell(pid, { token = token, result = "uploading", hack = hackId, route = "ncm" })
+    if startUpload(pid, hackId, target, t, { token = token, defender = defender }) == "uploading" then
+        tell(pid, { token = token, result = "uploading", hack = hackId, route = "ncm" })
+    end
+end)
+
+-- ---------------------------------------------------------------------------------------------------------
+-- NPC racers (ncm_paddock's hacking agents) on the same machinery
+-- ---------------------------------------------------------------------------------------------------------
+
+--- A Paddock race car: who drives it, and whether it carries Self-ICE. Registered when the car is spawned.
+AddEventHandler("ncm:chrome:raceCar", function(vid, info)
+    vid = tonumber(vid)
+    if not vid then return end
+    if info == nil then raceCars[vid], ice[vid] = nil, nil; return end
+    raceCars[vid] = { personId = tostring(info.personId or ""), ice = info.ice == true }
+end)
+
+--- An NPC racer starts an upload: { personId, vid (its car), hack, targetVid }. The same admission a player gets.
+AddEventHandler("ncm:chrome:npcStart", function(req)
+    if type(req) ~= "table" then return end
+    local key = "npc:" .. tostring(req.personId)
+    local hackId, target, own = tostring(req.hack or ""), tonumber(req.targetVid), tonumber(req.vid)
+    local h = Chrome.hack(hackId)
+    local t = nowMs()
+    local me, there = own and vehiclePos(own), target and vehiclePos(target)
+    local admitted, why = Chrome.admit({ hack = hackId, ownVehicle = own, targetVehicle = target,
+        distance = (me and there) and math.max(0, dist(me, there) - RANGE_SLACK_M) or nil,
+        targetBound = humanDriver(target) ~= nil and assetFor(target) ~= nil, now = t })
+    if not admitted or ncmUploads[key] then
+        why = why or "already_uploading"
+        log("start %s %s refused: %s", hackId, key, tostring(why))
+        TriggerEvent("ncm:chrome:resolved", { key = key, targetVid = target, hack = hackId, outcome = "refused", detail = why })
+        return
+    end
+    -- a human driving the target is warned exactly as by another player: INCOMING, purge or break range
+    startUpload(key, hackId, target, t, { npc = tostring(req.personId), attackerVid = own, defender = humanDriver(target) })
+end)
+
+AddEventHandler("ncm:chrome:npcCancel", function(personId)
+    local key = "npc:" .. tostring(personId)
+    local u = ncmUploads[key]
+    if u then finishUpload(key, u, "interrupted", "cancelled") end
+end)
+
+--- An NPC racer purges its own car: stops what is incoming and clears what landed.
+AddEventHandler("ncm:chrome:npcPurge", function(personId, vid)
+    vid = tonumber(vid)
+    if not vid then return end
+    local n = purgeVehicle(vid, "npc:" .. tostring(personId))
+    record({ actor = "npc:" .. tostring(personId), attackerDriver = tostring(personId), hack = "purge", outcome = "purged",
+             route = "ncm", vehicleId = vid, detail = ("stopped %d upload(s)"):format(n) })
 end)
 
 AddEventHandler("ncm:chrome.internalSelect", function(pid, hackId)
@@ -554,11 +701,7 @@ RegisterNetEvent("ncm:chrome.cancel", function()
         if a.attacker == pid and Open77.hacking and Open77.hacking.cancel then pcall(Open77.hacking.cancel, actionId) end
     end
     local u = ncmUploads[pid]
-    if u then
-        ncmUploads[pid] = nil
-        present(pid, u.actionId, "cancel", 0, u.hack)
-        tell(pid, { token = u.token, result = "interrupted", reason = "cancelled", hack = u.hack })
-    end
+    if u then finishUpload(pid, u, "interrupted", "cancelled") end
     channels[pid] = nil
 end)
 
@@ -570,31 +713,22 @@ local lastScope = 0
 
 local function tick()
     local t = nowMs()
-    for pid, u in pairs(ncmUploads) do
+    for key, u in pairs(ncmUploads) do
         local h = Chrome.hack(u.hack)
-        local me, there = playerPos(pid), vehiclePos(u.vehicleId)
+        -- an NPC racer's position is its car's; it holds its own lock (its agent cancels when it gives up)
+        local me = u.npc and vehiclePos(u.attackerVid) or playerPos(key)
+        local there = vehiclePos(u.vehicleId)
         local why
         if not there then why = "target_lost"
         elseif not me or dist(me, there) > (h.range or 60) + RANGE_SLACK_M then why = "out_of_range"
-        elseif t - u.heartbeat > HEARTBEAT_MS then why = "lock_lost" end
+        elseif not u.npc and t - u.heartbeat > HEARTBEAT_MS then why = "lock_lost" end
         if why then
-            ncmUploads[pid] = nil
-            present(pid, u.actionId, "cancel", 0, h.label)
-            present(u.defender, u.actionId, "cancel", 0, h.label)
-            record({ attacker = pid, target = u.defender, hack = u.hack, outcome = "interrupted", route = "ncm",
-                     vehicleId = u.vehicleId, detail = why })
-            tell(pid, { token = u.token, result = "interrupted", reason = why, hack = u.hack })
+            finishUpload(key, u, "interrupted", why)
         elseif t >= u.deadline then
-            ncmUploads[pid] = nil
-            present(pid, u.actionId, "impact", 1, h.label)
-            present(u.defender, u.actionId, "impact", 1, h.label)
-            applyEffect(u.vehicleId, u.hack, pid)
-            record({ attacker = pid, target = u.defender, hack = u.hack, outcome = "impact", route = "ncm", vehicleId = u.vehicleId,
-                     catastrophic = h.catastrophic })
-            tell(pid, { token = u.token, result = "impact", hack = u.hack })
+            finishUpload(key, u, "impact", nil)
         else
             local pr = (t - u.startedAt) / (u.deadline - u.startedAt)
-            present(pid, u.actionId, "upload", pr, h.label)
+            if type(key) == "number" then present(key, u.actionId, "upload", pr, h.label) end
             present(u.defender, u.actionId, "incoming", pr, h.label)
         end
     end
@@ -605,7 +739,8 @@ local function tick()
         elseif t >= c.deadline then
             channels[pid] = nil
             applyEffect(c.vehicleId, c.hack, pid)
-            record({ attacker = pid, hack = c.hack, outcome = "impact", route = "ncm", vehicleId = c.vehicleId })
+            -- a repair, not something done TO the car
+            record({ attacker = pid, hack = c.hack, outcome = "restored", route = "ncm", vehicleId = c.vehicleId })
             tell(pid, { token = c.token, result = "impact", hack = c.hack })
         end
     end

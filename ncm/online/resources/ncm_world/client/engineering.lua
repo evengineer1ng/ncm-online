@@ -38,18 +38,45 @@ function NcmClientCoolAll(state)
 end
 
 local function apply(p)
-    local devices, refused = Install.resolve(p.items or {}, p.vehicleKey)
+    for _, spec in ipairs(p.specs or {}) do Install.register(spec) end
+    local all, refused = Install.resolve(p.items or {}, p.vehicleKey)
+    -- stacked gearboxes (client/gearing.lua) are driveline, never propulsion: kept out of the force loop, so a Machine
+    -- whose only add-on is a gearbox never sends a wrench (which would park NCM Thrust's hop)
+    local devices, driveline = {}, {}
+    for _, d in ipairs(all) do
+        -- L356: electronics (a Slipstream unit) push nothing and are run by ncm_slipstream: kept out of the force loop too
+        if Install.isDriveline(d.kind) then driveline[#driveline + 1] = d
+        elseif not Install.isElectronic(d.kind) then devices[#devices + 1] = d end
+    end
+    if NcmClientGearingApply then NcmClientGearingApply(p.assetId, driveline, p.bindings or {}) end
     local fuelMl = p.fuel and tonumber(p.fuel.ml)
+    -- KB-429: the server re-sends an UNCHANGED Machine on every odometer checkpoint (~every 250 m: every few seconds in
+    -- a climb). Rebuilding from scratch reset the throttle lag, the hold gesture, heat and the fuel reading each time,
+    -- so a sustained burn kept collapsing (in Deep: "thrust 0 N"). Same parts, same bindings: keep the running state.
+    local sig = {}
+    for _, d in ipairs(devices) do sig[#sig + 1] = ("%s@%s/%s"):format(tostring(d.componentId), tostring(d.mountId), tostring(d.facing)) end
+    for _, x in ipairs(p.bindings or {}) do sig[#sig + 1] = ("%s:%s:%s:%s"):format(tostring(x.control), tostring(x.gesture), tostring(x.componentId), tostring(x.command)) end
+    sig = table.concat(sig, ",")
+    local keep = E and E.assetId == p.assetId and E.sig == sig and E or nil
     E = {
-        assetId = p.assetId, vehicleKey = p.vehicleKey, devices = devices, bindings = p.bindings or {}, state = Install.newState(devices),
-        ctl = Controls.newState(), fuelKg = fuelMl and (fuelMl / 1000 * Install.FUEL_KG_PER_L) or 0, fuelKnown = fuelMl ~= nil,
-        controls = Controls.controls(p.bindings or {}), report = { kg = 0, fusionKg = 0, pulses = 0, since = ms() }, lastSend = 0, lastF = nil,
+        assetId = p.assetId, vehicleKey = p.vehicleKey, devices = devices, bindings = p.bindings or {}, sig = sig,
+        state = keep and keep.state or Install.newState(devices), ctl = keep and keep.ctl or Controls.newState(),
+        fuelKg = fuelMl and (fuelMl / 1000 * Install.FUEL_KG_PER_L) or 0, fuelKnown = fuelMl ~= nil,
+        controls = Controls.controls(p.bindings or {}), report = keep and keep.report or { kg = 0, fusionKg = 0, pulses = 0, since = ms() },
+        lastSend = keep and keep.lastSend or 0, lastF = keep and keep.lastF or nil,
     }
     -- L334: a tank PART's own propellant (the Fusion Drive's), apart from the car's fuel
     E.fusionKg = 0
     for _, d in ipairs(devices) do if d.kind == "propellant_tank" and (d.perf.propellant or "fuel") == "fusion" then E.fusionKg = E.fusionKg + (d.fillKg or 0) end end
+    if keep then
+        -- the server's figures are as of its last burn report; what has burned since is still in our report
+        E.fusionKg = math.max(0, E.fusionKg - (keep.report.fusionKg or 0))
+        if fuelMl then E.fuelKg = math.max(0, E.fuelKg - (keep.report.kg or 0))
+        else E.fuelKg, E.fuelKnown = keep.fuelKg, keep.fuelKnown end
+        return
+    end
     local parts = {}
-    for _, d in ipairs(devices) do parts[#parts + 1] = ("%s@%s/%s"):format(d.code, d.mountId:gsub("^mount%.", ""), d.facing) end
+    for _, d in ipairs(all) do parts[#parts + 1] = ("%s@%s/%s"):format(d.code, d.mountId:gsub("^mount%.", ""), d.facing) end
     for _, r in ipairs(refused) do parts[#parts + 1] = "REFUSED " .. tostring(r.reason) end
     local b = {}
     for _, x in ipairs(E.bindings) do b[#b + 1] = ("%s:%s->..%s.%s"):format(x.control, x.gesture, tostring(x.componentId):sub(-6), x.command) end
@@ -95,16 +122,31 @@ end
 
 -- Owner, 2026-10-06: the clean architecture is the installed one -- tap = the hop (an impulse actuator), hold = forward
 -- (a propulsor). Once a Machine carries components they own its propulsion, so NCM Thrust's legacy hop is parked.
-local function lease(fx, fy, fz)
+local function lease(fx, fy, fz, assetId)
     if not NcmClientMachineWrench then return false end
-    return NcmClientMachineWrench({ v = 1, assetId = E.assetId, vehicleId = tostring(boundVehicle), fx = fx, fy = fy, fz = fz,
+    return NcmClientMachineWrench({ v = 1, assetId = assetId, vehicleId = tostring(boundVehicle), fx = fx, fy = fy, fz = fz,
         ttlMs = LEASE_TTL_MS, supersedeLift = true })
 end
 
-local function pulse(w, durationMs)
+-- L356: the aerodynamic tow (natural draft + an SL-1's active share), a WORLD force computed by ncm_slipstream from
+-- the wake and handed over here, because this file owns the Machine's one wrench lease. It is added to whatever the
+-- installed devices push; with no devices pushing, it goes out as its own lease. It is never Thrust's lift owner.
+local tow = { x = 0, y = 0, z = 0, untilMs = 0, asset = nil }
+exports("slipTow", function(fx, fy, fz, ttlMs, assetId)
+    tow.x, tow.y, tow.z = tonumber(fx) or 0, tonumber(fy) or 0, tonumber(fz) or 0
+    tow.untilMs = ms() + math.max(0, math.min(500, tonumber(ttlMs) or 0))
+    tow.asset = assetId
+    return true
+end)
+local function towNow(assetId)
+    if tow.untilMs <= ms() or (assetId and tow.asset and tow.asset ~= assetId) then return nil end
+    return tow
+end
+
+local function pulse(w, durationMs, assetId)
     if not NcmClientMachineWrench then return false end
     pulseSeq = pulseSeq + 1
-    return NcmClientMachineWrench({ v = 1, assetId = E.assetId, vehicleId = tostring(boundVehicle), fx = 0, fy = 0, fz = 0,
+    return NcmClientMachineWrench({ v = 1, assetId = assetId, vehicleId = tostring(boundVehicle), fx = 0, fy = 0, fz = 0,
         ttlMs = LEASE_TTL_MS, supersedeLift = true, pulse = { seq = pulseSeq, fx = w[1], fy = w[2], fz = w[3], ms = durationMs } })
 end
 
@@ -113,6 +155,9 @@ CreateThread(function()
     Wait(10000)
     while true do
         local aid, vid = readBinding()
+        -- KB-429: in Deep the car is server-frozen and moved into a stage; a passing gap in the binding bag must not
+        -- take the Machine's parts away mid-flight ("no installed components")
+        if not aid and NcmClientDeepActive and boundAsset then aid, vid = boundAsset, boundVehicle end
         if aid ~= boundAsset then
             boundAsset, boundVehicle = aid, vid
             if E and E.assetId ~= aid then E = nil end
@@ -126,19 +171,10 @@ CreateThread(function()
     end
 end)
 
--- the devices, every frame while they exist and we drive them
-CreateThread(function()
-    local last = ms()
-    while true do
-        -- L326: while NCM's universe owns the Machine (client/deep.lua) the car is frozen in REDengine: no wrench, no burn here.
-        if NcmClientDeepActive or not (E and #E.devices > 0 and boundVehicle and seatedIn(boundVehicle)) then
-            last = ms()
-            Wait(250)
-        else
-            Wait(0)
-            local t = ms()
-            local dt = math.min(0.1, math.max(0.001, (t - last) / 1000))
-            last = t
+-- One frame of the devices. KB-436 (2026-10-10): the binding thread can drop `E` while this thread is parked in
+-- Wait(0) (it did on the drop back from Deep), and `E.controls` then threw and killed the whole loop -- the propulsor and
+-- actuator stayed dead for the rest of the session. The frame now works on the Machine it was handed.
+local function deviceFrame(E, dt, t)
             local pressed = {}
             for _, c in ipairs(E.controls) do pressed[c] = down(c) end
             local commands = Controls.step(E.ctl, E.bindings, E.devices, pressed, t)
@@ -170,14 +206,17 @@ CreateThread(function()
                 end
                 if d.kind == "pulse_reaction" and (E.state.dev[d.componentId] or {}).sinceS == 0 and frame then   -- fired this step
                     local w = Install.toWorld({ d.axis[1] * d.perf.forceN, d.axis[2] * d.perf.forceN, d.axis[3] * d.perf.forceN }, frame)
-                    if w then pulse(w, math.floor(d.perf.pulseS * 1000 + 0.5)) end
+                    if w then pulse(w, math.floor(d.perf.pulseS * 1000 + 0.5), E.assetId) end
                 end
             end
             local w = frame and Install.toWorld(sustained, frame) or { 0, 0, 0 }
+            local tw = towNow(E.assetId)
+            if tw then w[1], w[2], w[3] = w[1] + tw.x, w[2] + tw.y, w[3] + tw.z end
+            NcmClientEngineeringLoopAt = t
             local mag = math.sqrt(w[1] ^ 2 + w[2] ^ 2 + w[3] ^ 2)
             local changed = (E.lastF == nil) or math.abs(mag - E.lastF) > 50
             if (mag > 0 and (t - E.lastSend >= SEND_MS)) or (changed and t - E.lastSend >= SEND_MS) or (t - E.lastSend >= HEARTBEAT_MS) then
-                lease(w[1], w[2], w[3])
+                lease(w[1], w[2], w[3], E.assetId)
                 E.lastSend, E.lastF = t, mag
             end
             E.lastW, E.lastFrame, E.hot = w, frame, hot
@@ -204,6 +243,51 @@ CreateThread(function()
                 end
                 E.report = { kg = 0, fusionKg = 0, pulses = 0, since = t }
             end
+end
+
+-- the devices, every frame while they exist and we drive them
+CreateThread(function()
+    local last = ms()
+    local faults = 0
+    while true do
+        -- L326: while NCM's universe owns the Machine (client/deep.lua) the car is frozen in REDengine: no wrench, no burn here.
+        if NcmClientDeepActive or not (E and #E.devices > 0 and boundVehicle and seatedIn(boundVehicle)) then
+            last = ms()
+            Wait(250)
+        else
+            Wait(0)
+            local e = E   -- whatever the binding thread did while we waited
+            local t = ms()
+            local dt = math.min(0.1, math.max(0.001, (t - last) / 1000))
+            last = t
+            if e and #e.devices > 0 and not NcmClientDeepActive then
+                local ok, err = pcall(deviceFrame, e, dt, t)
+                if not ok then
+                    faults = faults + 1
+                    if faults <= 5 or faults % 600 == 0 then log("device frame fault #%d (the loop keeps running): %s", faults, tostring(err)) end
+                end
+            end
+        end
+    end
+end)
+
+-- L356: the tow alone, when the device loop above is not running (a Machine whose only add-on is a Slipstream unit,
+-- or none: the natural draft needs no part). Never supersedes Thrust's lift: the car's propulsion owner is unchanged.
+CreateThread(function()
+    local lastSend = 0
+    while true do
+        local t = ms()
+        local tw = towNow(boundAsset)
+        local loopRunning = NcmClientEngineeringLoopAt and (t - NcmClientEngineeringLoopAt) < 200
+        if tw and boundAsset and boundVehicle and not loopRunning and not NcmClientDeepActive and NcmClientMachineWrench then
+            if t - lastSend >= SEND_MS then
+                NcmClientMachineWrench({ v = 1, assetId = boundAsset, vehicleId = tostring(boundVehicle), fx = tw.x, fy = tw.y, fz = tw.z,
+                    ttlMs = LEASE_TTL_MS, supersedeLift = false })
+                lastSend = t
+            end
+            Wait(0)
+        else
+            Wait(100)
         end
     end
 end)

@@ -79,6 +79,12 @@ const std::map<int, const char*> kPrimaryButtons = {
     {0, "b"}, {1, "a"}, {2, "y"}, {3, "x"}, {4, "minus"}, {5, "home"}, {6, "plus"}, {7, "ls"}, {8, "rs"},
     {9, "lb"}, {10, "rb"}, {11, "dpad_up"}, {12, "dpad_down"}, {13, "dpad_left"}, {14, "dpad_right"},
     {15, "capture"}, {20, "capture"}};
+// Switch Pro needs physical face positions translated to XInput positions. Keep every other primary pad's
+// established mapping unchanged; this applies only when SDL identifies the device as a Switch Pro.
+const std::map<int, const char*> kSwitchProButtons = {
+    {0, "a"}, {1, "b"}, {2, "x"}, {3, "y"}, {4, "minus"}, {5, "home"}, {6, "plus"}, {7, "ls"}, {8, "rs"},
+    {9, "lb"}, {10, "rb"}, {11, "dpad_up"}, {12, "dpad_down"}, {13, "dpad_left"}, {14, "dpad_right"},
+    {15, "capture"}, {20, "capture"}};
 
 float axis(int16_t raw) { return std::clamp(raw / (raw >= 0 ? 32767.0f : 32768.0f), -1.0f, 1.0f); }
 
@@ -376,7 +382,9 @@ void SdlInput::run()
         impl.orientation[p.hand] = o;
         impl.lastNs[p.hand] = s.tNs;
         s.orientation = o;
-        const auto& table = p.hand == "controller" ? kGamepadButtons : p.hand == "primary" ? kPrimaryButtons : kJoyConButtons;
+        const auto& table = p.hand == "controller" ? kGamepadButtons
+            : p.hand == "primary" ? (p.type == kTypeSwitchPro ? kSwitchProButtons : kPrimaryButtons)
+            : kJoyConButtons;
         for (const auto& [index, name] : table) if (sdl.GetGamepadButton(p.handle, index)) s.buttons.insert(name);
         s.triggerLeft = axis(sdl.GetGamepadAxis(p.handle, kAxisLeftTrigger));
         s.triggerRight = axis(sdl.GetGamepadAxis(p.handle, kAxisRightTrigger));

@@ -8,7 +8,7 @@ local function now() return math.floor(Open77.time.unix()) end
 -- reads full. Online is untouched. A deliberate dev fuel test turns it off with the convar `ncm_dev_fuel 0`.
 local function devFuel()
  local ok,id=pcall(function() return GlobalState.ncmIdentity end)
- local env=ok and type(id)=="table" and id.environment or "development"
+ local env=ok and type(id)=="table" and id.environment or "unknown"
  if tostring(env)~="development" then return false end
  local okC,v=pcall(GetConvar,"ncm_dev_fuel","1")
  return not okC or tostring(v)~="0"
@@ -41,6 +41,14 @@ NcmFuel.level=function(asset) local s=state[asset];if s then return s.fuelMl,s.c
 local function persist(asset,s)
  MySQL.update.await("UPDATE machine_fuel SET fuel_ml=?,capacity_ml=?,updated_at=? WHERE asset_id=?",{s.fuelMl,s.capacityMl,now(),asset})
  s.dirtyMl=0;s.lastWrite=now()
+end
+-- Doc 58: an owner-grant kit fills the tank. Through the loaded state, never around it: a database write alone is
+-- overwritten by the next persist of the cached level (2026-10-12: the lab_alcubierre kit's "full" became 18,121 ml again).
+NcmFuel.refill=function(asset)
+ local s=load(asset);local before=s.fuelMl
+ s.fuelMl=s.capacityMl;s.remainderMl=0
+ persist(asset,s)
+ return before,s.fuelMl
 end
 local function notifyEmpty(pid)
  local msg="Stuck? Type /ncm.nofuel for help."

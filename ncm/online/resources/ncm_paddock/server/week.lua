@@ -241,7 +241,7 @@ end, false)
 --- Driven by ncm_league's collapse (`ncm:week:collapse.paddock`) in live mode only. One transaction: every run-local
 --- `paddock_*` table (week.collapse.paddockMoves -- what the Paddock learned about the physical world stays), NPC-owned
 --- cars and parts, NPC money and the Exchange. Nothing is deleted; `<server>#R<run>` keeps the whole week.
-local EXTRA = { "npc_money", "exchange_post", "exchange_bid", "exchange_reservation", "exchange_settlement" }
+local EXTRA = { "npc_money", "npc_vehicle_incident", "npc_vehicle_work", "exchange_post", "exchange_bid", "exchange_reservation", "exchange_settlement" }
 
 AddEventHandler("ncm:week:collapse.paddock", function(run, archive)
     CreateThread(function()
@@ -259,9 +259,12 @@ AddEventHandler("ncm:week:collapse.paddock", function(run, archive)
             tx[#tx + 1] = { query = ("UPDATE `%s` SET server_id = ? WHERE server_id = ?"):format(t), values = { archive, base } }
         end
         tx[#tx + 1] = { query = [[UPDATE component_asset SET server_id = ? WHERE server_id = ? AND ncm_driver_id IS NULL
-            AND owner_principal_kind IN ('person','org')]], values = { archive, base } }
+            AND owner_principal_kind IN ('person','org','series')]], values = { archive, base } }
+        tx[#tx + 1] = { query = [[UPDATE vehicle_week_condition c JOIN vehicle_asset a ON a.asset_id=c.asset_id
+            SET c.server_id=? WHERE c.server_id=? AND a.server_id=? AND a.ncm_driver_id IS NULL
+            AND a.owner_principal_kind IN ('person','org','series')]], values = { archive,base,base } }
         tx[#tx + 1] = { query = [[UPDATE vehicle_asset SET server_id = ? WHERE server_id = ? AND ncm_driver_id IS NULL
-            AND owner_principal_kind IN ('person','org')]], values = { archive, base } }
+            AND owner_principal_kind IN ('person','org','series')]], values = { archive, base } }
         local ok, err = MySQL.transaction.await(tx)
         if not ok then
             PaddockWeek.collapsing = false

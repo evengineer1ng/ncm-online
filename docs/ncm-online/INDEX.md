@@ -35,11 +35,18 @@ corpus claiming migrations 001-007 while the schema was at 023.
 | Topic | Authority | Affirmed |
 |---|---|---|
 | **NCM 3.0 single player**: the NCM Host (the dev resources in-process over SQLite), Race Week tapes, offline canonical time, the deck, the seam report toward Nexus | [55_NCM3_SINGLE_PLAYER.md](55_NCM3_SINGLE_PLAYER.md) | L338 |
+| **NCM Deep's universe**: catalogue, multi-body gravity, frames, astronomical coordinates, the `ncm_universe` reporter | [60_ASTRONOMICAL_SUBSTRATE.md](60_ASTRONOMICAL_SUBSTRATE.md) | L363 |
+| **The experimental propulsion stable**: six Deep drives, the propulsion laboratory and grant ledger, drive telemetry, the travel ledger | [61_EXPERIMENTAL_PROPULSION.md](61_EXPERIMENTAL_PROPULSION.md) | L364 |
+| **Race Week Live (NCM Radio)**: the in-game station, corpus compiler, trigger map, director, OmniVoice voice render, `ncm-radio` required mod and `ncm_radio` resource | [59_NCM_RADIO.md](59_NCM_RADIO.md) | L348 |
+| **Race Week Live cast and every on-air line**: the owner's authoring bible, imported verbatim | [radio/RACE_WEEK_RADIO_BIBLE.md](radio/RACE_WEEK_RADIO_BIBLE.md) | L348 |
+| **Deterministic Race Week radio**: simulation-truth/commentary-surface audit for writer-authored show; equal primary co-hosts; hosted voice packs intended; settled unobserved results may air with provenance undisclosed | [58_DETERMINISTIC_RACE_WEEK_RADIO_AUDIT.md](58_DETERMINISTIC_RACE_WEEK_RADIO_AUDIT.md) | L346-L347 |
+| **Night City Chronicles prior narration work**: LLM realization and local audio pipeline, retained as historical/session context; Race Week commentary now airs from doc 59 (L348) | [57_NIGHT_CITY_CHRONICLES.md](57_NIGHT_CITY_CHRONICLES.md) | L344-L346; superseded as the target for new Race Week radio |
 | Organisations, team ownership, governance, grid slots | [14_TEAM_ORGANIZATIONS.md](14_TEAM_ORGANIZATIONS.md) | L92, L93; reaffirmed L123 |
 | Foundational primitives, contradictions, build sequencing | [24_FOUNDATION_RECONCILIATION.md](24_FOUNDATION_RECONCILIATION.md) | L123 |
 | NPC motorsport world: organizations, calendar, sim, WIRE, Billie's board, manager mode, garages, live races | [44_THE_PADDOCK.md](44_THE_PADDOCK.md); [DECISION_RECORD.md](DECISION_RECORD.md) L248 for the oval spline candidate and its live gate | L222, L224-L227, L248 |
 | Environments, promotion discipline (Online vs Development) | [16_ENVIRONMENTS.md](16_ENVIRONMENTS.md) | L112, L121, L223 (Online frozen at Baseline 1) |
 | **Database schema** | CODE: `ncm/online/resources/ncm_league/server/schema/` | - |
+| **Online temporal-loop carryover, one anchor, Week vehicle damage and repair, physical trunk cargo; NPC damage and engineering** | [DECISION_RECORD.md](DECISION_RECORD.md) L349-L350, [45_RACING_WEEK.md](45_RACING_WEEK.md) §Q-§R; code in `week.collapse`, migrations 073-076, `ncm_world/server/vehicle_condition.lua` and Paddock race/car hosts | L349-L350; repair correction, scalar display and workshop route deployed Online; MASTER_TEST §WL16 server correction PASS, client PASS owed; team loaners and native item custody open |
 | Lap ghost replay | [39_GHOST_REPLAY.md](39_GHOST_REPLAY.md) | L166 |
 | Overall system shape | [01_ARCHITECTURE.md](01_ARCHITECTURE.md) | L28-L33 - see conflict C-1 |
 | Milestone vocabulary (M0-M12) only | [02_ROADMAP.md](02_ROADMAP.md) | L39-L42, L59-L63 |
@@ -94,9 +101,15 @@ and amends §0.1. The code still implements fixed three-day runs until doc 47 §
 
 ---
 
-## Current (19)
+## Current (21)
 
+- [61_EXPERIMENTAL_PROPULSION.md](61_EXPERIMENTAL_PROPULSION.md) - the experimental propulsion stable (L364): impulse, fusion, warp, Alcubierre, jump, wormhole; lab kits and the one-shot grant ledger; telemetry; travel ledger
+- [60_ASTRONOMICAL_SUBSTRATE.md](60_ASTRONOMICAL_SUBSTRATE.md) - NCM Deep's universe (L363): Solar System + Hipparcos catalogue, multi-body gravity, inertial frames, OpenSpace audit
+- [59_NCM_RADIO.md](59_NCM_RADIO.md) - Race Week Live (L348): the deterministic talk-radio station in the game's own radio list; corpus (1,088 beats, 5,689 lines), trigger map, director, OmniVoice render, `ncm-radio` plugin + `ncm_radio` resource
+- [radio/RACE_WEEK_RADIO_BIBLE.md](radio/RACE_WEEK_RADIO_BIBLE.md) - the owner's Race Week Live authoring bible, verbatim: cast, rules and every on-air line
 - [55_NCM3_SINGLE_PLAYER.md](55_NCM3_SINGLE_PLAYER.md) - NCM 3.0 single player (L338): the NCM Host runs the dev server's resources unchanged inside Cyberpunk over SQLite; Race Week tapes (one continuity = one server_id), the present calculated on return (`week.catchup`), the deck, the Time Lab; the seam report (doc §8). Headless gates green; MASTER_TEST §TP NOT RUN
+- [58_DETERMINISTIC_RACE_WEEK_RADIO_AUDIT.md](58_DETERMINISTIC_RACE_WEEK_RADIO_AUDIT.md) - SPEC / audit only (L346): source-by-source deterministic commentary inventory, provenance and knowledge boundaries, open writer questions; no implementation authorized by this audit
+- [57_NIGHT_CITY_CHRONICLES.md](57_NIGHT_CITY_CHRONICLES.md) - prior Night City Chronicles narration work (L344-L346): audit of the NCM 2.0 bridge, Radio OS and Ribbon OS; a thin NCM-owned engine in `ncm/chronicles/`; retained as history pending owner disposition
 - [01_ARCHITECTURE.md](01_ARCHITECTURE.md) - overall system shape - SEE CONFLICT C-1 in INDEX.md
 - [02_ROADMAP.md](02_ROADMAP.md) - milestone vocabulary (M0-M12) ONLY; current sequencing is 24
 - [07_NODE_NETWORK.md](07_NODE_NETWORK.md) - nodes, routes, ordered chains
@@ -144,7 +157,7 @@ and amends §0.1. The code still implements fixed three-day runs until doc 47 §
 ## Proposal - no authority until ruled (20)
 
 
-- [56_RND_OVERHAUL.md](56_RND_OVERHAUL.md) - R&D overhaul (L341): flight parts arrive only through manufacturer R&D -- physical design points from lineages, physics-capped, competency-banded, specs persisted in the database (`spec_json`), sold on markets; today no Online player can obtain flight hardware. **PROPOSAL for the next coder; Q1-Q6 open; nothing built**
+- [56_RND_OVERHAUL.md](56_RND_OVERHAUL.md) - **SPEC (L342)** for physical manufacturer R&D and the flight-parts market; §5 records the six owner rulings. Implementation and live PASS remain separate.
 - [21_ENGINEERING_PROPOSAL.md](21_ENGINEERING_PROPOSAL.md) - engineering architecture - ACCEPTED; decisions live in L120
 - [22_WEAR_PROPOSAL.md](22_WEAR_PROPOSAL.md) - wear architecture - ACCEPTED; decisions live in L120
 - [25_MACHINE_ARCHITECTURE_PROFILE.md](25_MACHINE_ARCHITECTURE_PROFILE.md) - machine architecture profile - awaiting Q18/Q19; section 10 undecided

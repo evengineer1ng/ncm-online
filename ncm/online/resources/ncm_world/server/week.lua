@@ -433,6 +433,13 @@ end
 --- The timeline (runIndex -> { endUtc, endKind, survived }), for other server code in this resource.
 function NcmWeek.runs() return loadRuns() end
 
+--- This run's window for server code that keys on it (scars, IDEA-1262): { index, startUnix, scratch }.
+function NcmWeek.window()
+    if not run then pcall(NcmWeek.step) end
+    if not run then return nil end
+    return { index = run.index, startUnix = tonumber(run.startUtc) or tonumber(run.openedAt), scratch = run.scratch or nil }
+end
+
 --- Tally a fact for the next step. Kinds: week.curve IMPULSE keys plus `race`; unknown kinds are kept and logged.
 function NcmWeek.fact(kind, n)
     if type(kind) ~= "string" then return end

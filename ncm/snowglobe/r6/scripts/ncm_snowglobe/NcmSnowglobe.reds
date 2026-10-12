@@ -355,19 +355,11 @@ public class NcmSnowglobeAltimeter {
       this.rate.SetText("FALL " + FloatToStringPrec(vz, 1) + " m/s");
       this.rate.SetTintColor(new HDRColor(1.0, 0.75, 0.2, 1.0));
     }
-    if offset > 0.0 {
-      this.label.SetText("ALTITUDE - IN SPACE (NCM owns it)");
-      this.ceiling.SetText("game z " + IntToString(Cast<Int32>(z)) + " m | rebase at 14000 | home below 3000");
-      this.alt.SetTintColor(new HDRColor(0.45, 0.85, 1.0, 1.0));
-    } else {
-      this.label.SetText("ALTITUDE");
-      this.ceiling.SetText("doorway at 14000 m: " + IntToString(Cast<Int32>(14000.0 - z)) + " m to go");
-      if z > 12000.0 {
-        this.alt.SetTintColor(new HDRColor(1.0, 0.75, 0.2, 1.0));
-      } else {
-        this.alt.SetTintColor(new HDRColor(0.95, 0.97, 1.0, 1.0));
-      }
-    }
+    // A player's altimeter: altitude and climb, nothing else. The doorway, the rebase and where NCM takes over are
+    // the player's to discover, never a countdown or a colour change (owner, 2026-10-08).
+    this.label.SetText("ALTITUDE");
+    this.ceiling.SetText("");
+    this.alt.SetTintColor(new HDRColor(0.95, 0.97, 1.0, 1.0));
     this.root.SetVisible(true);
   }
 

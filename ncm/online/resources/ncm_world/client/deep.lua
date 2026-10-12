@@ -21,6 +21,8 @@ local Flight = Core.get("engineering.flightmodel")   -- L331: the full machine m
 local Venues = Core.get("space.venues")
 local GeoLod = Core.get("space.geolod")   -- L332: which real imagery the Deep page holds
 local Dyn = Core.get("engineering.dynamics")
+local Drives = Core.get("space.drives")   -- doc 58: the experimental propulsion stable
+local Travel = Core.get("space.travel")
 -- KB-375 (owner, 2026-10-07: "cant have ksa opening way before you know its there ... a consent screen saying that there is
 -- a deeper simulation layer and activating it ... on demand when approaching the border of ncm deep"): nothing about KSA is
 -- asked, probed or launched until the player consents, approaching the border. `consent` nil = not asked yet, true =
@@ -32,7 +34,8 @@ local KSA = { consent = nil, ask = false, activating = false, ready = false, why
 local TARGETS = nil
 local function targets()
     if not TARGETS then
-        TARGETS = { Guid.BORDER }
+        -- L351/L352: KSA is retired from the player path; the border is no longer a Guidance target
+        TARGETS = {}
         for _, v in ipairs(Venues.VENUES) do TARGETS[#TARGETS + 1] = v end
     end
     return TARGETS
@@ -53,14 +56,52 @@ local cfg = { enabled = false, enterZ = 12000, exitZ = 11500, ascentZ = 4000, ma
 --- NCM's one clock on this client: the server's UTC at config time, advanced by the game timer
 local utcBase, utcAtMs = nil, 0
 local function utcNow() return utcBase and (utcBase + (GetGameTimer() - utcAtMs) / 1000) or nil end
-local function sunNow() local u = utcNow(); return u and Deep.sunAt(u) or Deep.sun(13) end
+-- doc 57 §5.4: the Deep page draws the SAME universe NCM flies in -- the Sun, the Moon, the planets and the naked-eye stars
+-- come from space.catalogue (positions Earth-centred, Earth-fixed, the page's frame). A host without the substrate
+-- falls back to space.deep's sun, as before.
+local SkyOk, Astro, Cat, BrightStars = pcall(function()
+    return NcmCore.get("space.astro"), NcmCore.get("space.catalogue"), NcmCore.get("space.data.brightstars")
+end)
+if not SkyOk then Astro, Cat, BrightStars = nil, nil, nil end
+--- Every catalogued body except home and barycentres, Earth-centred Earth-fixed metres (the page's frame).
+local function catalogueBodies(utc)
+    if not (Astro and Cat) then return nil end
+    Cat.load()
+    local home
+    for _, r in ipairs(Cat.list()) do if r.home then home = r end end
+    local Rh = Cat.stateAt(home, utc)
+    local out = {}
+    for _, rec in ipairs(Cat.list()) do
+        if not rec.home and rec.kind ~= "barycentre" then
+            local e = Astro.eciToEcefVec(Astro.delta(Cat.stateAt(rec, utc), Rh), utc)
+            out[#out + 1] = { id = rec.id, name = rec.name, kind = rec.kind, p = e, r = rec.radius or 0 }
+        end
+    end
+    return out
+end
+local sunCache = { u = nil, d = nil }
+local function sunNow()
+    local u = utcNow()
+    if u and sunCache.u and math.abs(u - sunCache.u) < 1 then return sunCache.d end   -- the Sun moves 0.004 deg/s here
+    if u and Astro and Cat then
+        local ok, d = pcall(function()
+            Cat.load()
+            local home
+            for _, r in ipairs(Cat.list()) do if r.home then home = r end end
+            return Astro.vec.unit(Astro.eciToEcefVec(Astro.delta(Cat.stateAt("sun", u), Cat.stateAt(home, u)), u))
+        end)
+        if ok and d then sunCache.u, sunCache.d = u, d; return d end
+    end
+    return u and Deep.sunAt(u) or Deep.sun(13)
+end
 local ASC = nil                 -- the ascent page (transparent Deep, before the seam): { page, ready }
 local A = nil                   -- the active flight
 local GD                        -- the guidance computer (below); exit() resets it
 local samples = {}              -- recent { t, x, y, z } of the car, for a velocity at the handoff
 local rig = true
 local camMode = 1
-local CAM_NAMES = { "chase", "high", "earth" }
+-- L352: "native" first -- the car in the game's own world (client/deepview.lua); the WebGL views stay for scale
+local CAM_NAMES = { "native", "chase", "high", "earth" }
 
 NcmClientDeepActive = false
 
@@ -175,9 +216,18 @@ local function checkpoint(place, transition, locationId)
     local rec = Canon.fromDeep(A.s, 0, { asset = A.asset, massKg = A.mass, devices = EN and EN.devices or {},
         devState = EN and EN.state or nil, fuelKg = EN and EN.fuelKg or nil, devFuel = NcmClientDevFuel == true,
         devHeat = NcmClientDevHeat == true, devAttitude = NcmClientDevAttitude == true, host = "cyberpunk",
-        vehicleKey = EN and EN.vehicleKey or "archer_hella", dyn = A.dyn and Flight.carry(A.dyn) or nil,
+        vehicleKey = EN and EN.vehicleKey or "archer_hella", dyn = A.dyn and Flight.carry(A.dyn, true) or nil,   -- doc 58: compact
         guidance = (GD and GD.route) and { venueId = GD.route.venue.id, engaged = GD.engaged == true } or nil })
-    TriggerServerEvent("ncm:canonical.save", { place = place or "deep", rec = rec, transition = transition == true, locationId = locationId })
+    -- doc 58 (2026-10-12 10:07): the record goes as ONE JSON string. As a table, every save that held a drive activation
+    -- in progress (a jump charging, a wormhole open) was silently dropped by the net serializer; the server took the
+    -- Machine over from a stale copy.
+    local okJ, js = pcall(Json.encode, rec)
+    if okJ then
+        TriggerServerEvent("ncm:canonical.save", { place = place or "deep", json = js, transition = transition == true, locationId = locationId })
+    else
+        log("checkpoint not encoded (%s): sent as a table", tostring(js))
+        TriggerServerEvent("ncm:canonical.save", { place = place or "deep", rec = rec, transition = transition == true, locationId = locationId })
+    end
 end
 
 local function enter(vid, pos, why, resumeRec)
@@ -191,7 +241,7 @@ local function enter(vid, pos, why, resumeRec)
     else
         if ASC and ASC.page then pcall(function() ASC.page:destroy() end); ASC = nil end
         ok, page, reason = pcall(Open77.webui.create, { entry = "web/deep.html", layer = "hud", zIndex = 950,
-            transparent = false, visible = true, fps = 60 })
+            transparent = true, visible = true, fps = 60 })   -- L352: the native view shows through it
     end
     if not ok or not page then log("could not open the deep surface (%s %s): staying in Night City", tostring(page), tostring(reason)); return end
     if not seamless then watchPage(page) end
@@ -211,6 +261,8 @@ local function enter(vid, pos, why, resumeRec)
         local vs = {}
         for _, v in ipairs(Venues.VENUES) do vs[#vs + 1] = { id = v.id, name = v.name, region = v.region, lat = v.lat, lon = v.lon } end
         send("deep:init", { nc = Deep.ORIGIN, R = Deep.R, sun = sunNow(), sprite = "deep/sprites/machine.png", earth = "deep/earth.jpg", venues = vs })
+        -- doc 57 §5.4: the real naked-eye sky (Hipparcos, ICRF directions); the page turns it by sidereal time
+        if BrightStars then send("deep:sky", { stars = BrightStars, source = "Hipparcos (ESA, van Leeuwen 2007)" }) end
     end
     if seamless then send("deep:mode", { mode = "deep" }); init() else page:on("deep:ready", init) end
     local codes = {}
@@ -223,6 +275,16 @@ local function enter(vid, pos, why, resumeRec)
     checkpoint("deep", true)
     log("ENTER (%s) at game (%.0f, %.0f, %.0f) v (%.1f, %.1f, %.1f) m/s | mass %.0f kg | devices %d",
         why, pos.x, pos.y, pos.z, vx, vy, vz, A.mass, EN and #EN.devices or 0)
+    do   -- KB-437: the Machine as it crosses -- tanks, heat, and which control drives which part
+        local d, b = {}, {}
+        for _, x in ipairs(EN and EN.devices or {}) do
+            local st = EN.state and EN.state.dev and EN.state.dev[x.componentId] or {}
+            d[#d + 1] = ("%s %s ..%s %.0f K%s"):format(x.code, x.kind, tostring(x.componentId):sub(-6), st.heatK or 0, st.hot and " HOT" or "")
+        end
+        for _, x in ipairs(EN and EN.bindings or {}) do b[#b + 1] = ("%s:%s->..%s.%s"):format(x.control, x.gesture, tostring(x.componentId):sub(-6), x.command) end
+        log("ENTER Machine: fuel %.1f kg fusion %.1f kg | %s | controls %s", EN and EN.fuelKg or 0, EN and EN.fusionKg or 0,
+            #d > 0 and table.concat(d, " | ") or "no devices", #b > 0 and table.concat(b, ", ") or "none")
+    end
 end
 
 local function exit(why, home)
@@ -245,6 +307,8 @@ local function exit(why, home)
     local yaw = math.deg((math.atan2 or math.atan)(-fEnu[1], fEnu[2]))
     local landKm = Deep.distance(lat, lon, Deep.ORIGIN.lat, Deep.ORIGIN.lon) / 1000
     send("deep:leave", {})
+    if NcmDeepView then pcall(NcmDeepView.clear) end
+    if NcmDriveFx then pcall(NcmDriveFx.clear, A.page) end
     TriggerServerEvent("ncm:deep.exit", { x = x, y = y, z = math.min(alt, cfg.exitZ), yaw = yaw, clamped = clamped, landKm = landKm, why = why })
     log("EXIT (%s) at %.4f, %.4f alt %.0f -> game (%.0f, %.0f)%s, %.1f km from Night City | v ENU (%.1f, %.1f, %.1f) | %.0f s out",
         why, lat, lon, alt, x, y, clamped and " CLAMPED" or "", landKm, vEnu[1], vEnu[2], vEnu[3], (ms() - A.startedAt) / 1000)
@@ -410,6 +474,7 @@ RegisterNetEvent("ncm:deep.resume", function(r)
     local up, hz = tonumber(r.up) or 0, tonumber(r.horizontal) or 0
     A.s.v = Deep.vec.add(Deep.vec.scale(u, up), Deep.vec.scale(n, hz))
     A.s.basis = { right = e, forward = n, up = u }
+    A.s.frame, A.s.ip, A.s.iv, A.s.ibasis = nil, nil, nil, nil   -- doc 57: a state set here is Earth-fixed
     A.embodied = nil
     A.last = ms()
     GD.msg = ("Back in NCM Deep above %s. Guidance (D-pad up) for the next place."):format(v.name)
@@ -704,6 +769,8 @@ local function ksaPreflight()
         add(okB, "Delta-v to the border", ("%.0f km/s needed, %.0f available (%s)"):format(need / 1000, have / 1000, prop))
         local okP = Flight.canPoint(A.fm, NcmClientDevAttitude == true)
         add(okP, "Attitude authority", Flight.authorityText(A.fm))
+        local okT, twT, whyT = Guid.trimFeasible(A.fm, A.mass)
+        add(okT, "Thrust line", okT and "through the centre of mass, or trimmed" or tostring(whyT))
     end
     return allOk, list
 end
@@ -721,7 +788,7 @@ local function ksaRehearse()
     local vI = Deep.vec.add(Deep.vec.scale(u, speed), Deep.vec.scale(e, 3))
     local vFixed = Deep.vec.add(vI, Deep.vec.scale(Deep.vec.cross({ 0, 0, Deep.OMEGA }, p), -1))
     A.s = { p = p, v = vFixed, basis = { right = e, forward = u, up = Deep.vec.scale(n, -1) }, t = A.s.t }
-    A.dyn = Flight.state(A.fm, A.s, Flight.carry(A.dyn))
+    A.dyn = Flight.state(A.fm, A.s, Flight.carry(A.dyn), utcNow())
     GD.route = Guid.planBorder(A.s)
     GD.engaged, GD.rehearsal, GD.open = true, true, false
     A.borderHold, A.atBorder = nil, nil
@@ -813,6 +880,7 @@ local function guidanceInput(now, dt)
                 local EN = NcmClientEngineering and NcmClientEngineering.get() or nil
                 local sus = Guid.thrustBudget(EN and EN.devices or {}, nil, NcmClientDevHeat)
                 local okF, tw, why = Guid.feasible(sus, A.mass)
+                if okF and A.fm then okF, tw, why = Guid.trimFeasible(A.fm, A.mass) end   -- KB-442: a thrust line off the centre of mass
                 if not okF then
                     GD.msg = ("Guidance cannot fly this Machine to %s: %s."):format(targets()[GD.sel].name, why)
                     log("GUIDANCE refused -> %s: %s", targets()[GD.sel].id, why)
@@ -873,7 +941,73 @@ local function guidanceInput(now, dt)
     end
 end
 
+-- Doc 58 (2026-10-12): where a Deep frame's time goes, section by section (Open77.time.monotonic), logged every 5 s
+-- with the frames OPEN//77 skipped for its script budget -- so a budget problem names its section instead of a guess.
+local PROF = { at = 0, n = 0, sum = {}, max = {}, order = {} }
+local function profNow() local ok, t = pcall(Open77.time.monotonic); return ok and tonumber(t) or 0 end
+local profT0 = 0
+local function prof(name)
+    local t = profNow()
+    if name then
+        local d = (t - profT0) * 1000
+        if not PROF.sum[name] then PROF.sum[name], PROF.max[name] = 0, 0; PROF.order[#PROF.order + 1] = name end
+        PROF.sum[name] = PROF.sum[name] + d
+        if d > PROF.max[name] then PROF.max[name] = d end
+    end
+    profT0 = t
+end
+local function profReport(now)
+    PROF.n = PROF.n + 1
+    if now - PROF.at < 5000 then return end
+    local parts = {}
+    for _, k in ipairs(PROF.order) do parts[#parts + 1] = ("%s %.2f/%.1f"):format(k, PROF.sum[k] / math.max(1, PROF.n), PROF.max[k]) end
+    log("PROFILE %d frames, ms avg/max: %s | budget-skipped %d", PROF.n, table.concat(parts, "  "), (A and A.overBudgetWindow) or 0)
+    if A then A.overBudgetWindow = 0 end
+    PROF.at, PROF.n, PROF.sum, PROF.max, PROF.order = now, 0, {}, {}, {}
+end
+
+-- doc 58 (2026-10-12 07:13): the 1 Hz canonical checkpoint, built and sent from its own thread. Inside the flight frame
+-- it was the last thing before the budget ran out on heavy frames; for 15 s none arrived and the server took over a
+-- Machine that was mid-jump.
+CreateThread(function()
+    while true do
+        Wait(0)
+        if A and A.ckptDue then
+            A.ckptDue = false
+            local okC, errC = pcall(checkpoint, "deep", false)
+            if not okC and A then A.ckptDue = true; if not A.ckptWarned then A.ckptWarned = true; log("checkpoint retried: %s", tostring(errC)) end end
+        end
+    end
+end)
+
+-- doc 58: the drive-event sender. One event per frame, encoded here (never in the flight frame), sent as one JSON
+-- string (the net serializer dropped tables holding a bubble's 8.7e57 J estimate). An event that cannot be encoded is
+-- retried on the next frame, then dropped and said so.
+DriveOut = DriveOut or {}
+CreateThread(function()
+    while true do
+        Wait(0)
+        local e = DriveOut[1]
+        if e then
+            local okJ, js = pcall(Json.encode, { events = { e }, realMs = GetGameTimer(), travel = DriveOut.travel })
+            if okJ then
+                table.remove(DriveOut, 1)
+                DriveOut.travel = nil
+                pcall(TriggerServerEvent, "ncm:deep.drive", { json = js })
+                e.tries = nil
+            else
+                e.tries = (e.tries or 0) + 1
+                if e.tries >= 5 then
+                    table.remove(DriveOut, 1)
+                    log("DRIVE event %s not sent after 5 tries (%s)", tostring(e.type), tostring(js))
+                end
+            end
+        end
+    end
+end)
+
 local function tick()
+    prof(nil)
     local now = ms()
     local dt = math.min(0.05, math.max(0.001, (now - A.last) / 1000))
     A.last = now
@@ -890,6 +1024,7 @@ local function tick()
         return
     end
     guidanceInput(now, dt)
+    prof("guidance")
     if not A then return end   -- held B brought us home
     if A.yieldFrame then A.yieldFrame = nil; return end
 
@@ -928,21 +1063,34 @@ local function tick()
         local fk = EN and tonumber(EN.fuelKg) or 0
         if fk <= 0 and NcmClientDevFuel then fk = 40 end
         A.fm = Flight.build(devs, { vehicleKey = EN and EN.vehicleKey or "archer_hella", fuelKg = fk })
-        A.dyn = Flight.state(A.fm, A.s, A.dyn and Flight.carry(A.dyn) or A.resumeDyn)
+        A.dyn = Flight.state(A.fm, A.s, A.dyn and Flight.carry(A.dyn) or A.resumeDyn, utcNow())
         A.fmKey = key
     end
     local m, ds = A.fm, A.dyn
     local devAtt = NcmClientDevAttitude == true
     local cmd = { throttle = {}, discharge = {} }
-    local opts = { devFuel = NcmClientDevFuel == true, devHeat = NcmClientDevHeat == true }
+    -- doc 57: NCM's clock turns on the astronomical substrate (every relevant body's gravity; inertial frames far from
+    -- home); guidance and the border hold plan Earth-fixed, so they keep the Earth-fixed frame
+    local opts = { devFuel = NcmClientDevFuel == true, devHeat = NcmClientDevHeat == true, utc = utcNow(),
+                   earthFixed = (GD and GD.engaged) or A.atBorder or nil }
     if EN and #devs > 0 then
         local pressed = {}
         for _, c in ipairs(EN.controls) do pressed[c] = down(c) end
+        -- KB-437: what the controls did, for the once-a-second line and the HUD (the 2026-10-10 stay had zero thrust
+        -- for 22 s and nothing said why)
+        local okC, cap = pcall(Open77.input.isCaptured)
+        A.captured = okC and cap == true
+        for c, d in pairs(pressed) do if d then A.pressedSeen = A.pressedSeen or {}; A.pressedSeen[c] = true end end
         local cmds = Controls.step(EN.ctl, EN.bindings, EN.devices, pressed, now)
         if GD.hold then for _, c in pairs(pressed) do if c then GD.hold, GD.route = nil, nil; GD.msg = "You have the Machine." break end end end
         for id, c in pairs(cmds) do
             if c.throttle then cmd.throttle[id] = c.throttle end
             if c.discharge then cmd.discharge[id] = true; A.report.pulses = A.report.pulses + 1 end
+            -- doc 58: a drive's own commands (engage / abort / up / down / next / prev) go to space.drives
+            if c.engage or c.abort or c.up or c.down or c.next or c.prev then
+                cmd.drive = cmd.drive or {}
+                cmd.drive[tostring(id)] = c
+            end
         end
     end
     -- the sticks: torque from attitude parts, or the development waiver
@@ -959,6 +1107,7 @@ local function tick()
         elseif not canPoint then
             GD.engaged, GD.hold, GD.msg = false, nil, "Guidance cannot point this Machine: " .. tostring(why)
         else
+            if Flight.toEarthFixed then ds.utc = ds.utc or opts.utc; Flight.toEarthFixed(ds) end   -- doc 57: guidance reads Earth-fixed
             local gc, waiver, info = Guid.fly(GD.route, m, ds, { devHeat = opts.devHeat, waiver = devAtt and #(m.attitude or {}) == 0 })
             Guid.apply(cmd, gc)   -- KB-376: ALL of Guidance's command (it steers by torqueNm with a gimballed engine)
             opts.waiver = waiver
@@ -998,8 +1147,38 @@ local function tick()
     A.fusion0 = Dyn.propellantLeft(m, ds, "fusion")
     local tel
     A.dtMax = math.max(A.dtMax or 0, dt)   -- KB-376: the longest physics step this second (telemetry)
+    prof("controls")
     ds, tel = Flight.step(m, ds, cmd, dt, opts)
+    prof("flight.step")
     A.dyn = ds
+    -- doc 58: what the drives did this step, to the server (an activation's start / end / transit at once, the rest batched)
+    if tel.driveEvents and #tel.driveEvents > 0 then
+        A.dq = A.dq or {}
+        for _, e in ipairs(tel.driveEvents) do
+            A.dq[#A.dq + 1] = e
+            if e.type == "diag" then log("DRIVE %s %s", tostring(e.drive), tostring(e.text)) end
+            if e.type ~= "stream" and e.type ~= "state" and e.type ~= "diag" then A.dqUrgent = true end
+            if e.type == "start" or e.type == "end" or e.type == "restored" or e.type == "transit" or e.type == "error" then
+                log("DRIVE %s %s%s%s", tostring(e.drive), tostring(e.type), e.act and (" " .. tostring(e.act.id or e.act)) or "",
+                    e.type == "end" and e.act and (" " .. tostring(e.act.reason) .. (" | endpoint %.6g m path %.6g m"):format(e.act.endpointM or 0, e.act.pathM or 0)) or (e.why and (" " .. tostring(e.why)) or ""))
+            end
+        end
+    end
+    -- the events go out from their own thread, one per frame (the sender below): encoding an activation's record in
+    -- the flight frame ran it out of the script budget and the start / end were dropped (2026-10-12 07:13)
+    if A.dq and #A.dq > 0 then
+        for _, e in ipairs(A.dq) do
+            if e.checkpoint then e.checkpoint = nil end   -- the server stores its own (deep_dev_checkpoint)
+            DriveOut[#DriveOut + 1] = e
+        end
+        A.dq = {}
+        if now - (A.travelAt or 0) >= 30000 and ds.travel then DriveOut.travel = Travel.save(ds.travel); A.travelAt = now end
+    end
+    A.ev = A.ev or {}
+    for _, ev in ipairs(tel.events or {}) do
+        local k = tostring(ev.device) .. ":" .. tostring(ev.what)
+        A.ev[k] = (A.ev[k] or 0) + 1
+    end
     if EN and not opts.devFuel then
         local usedF = math.max(0, (A.fusion0 or 0) - Dyn.propellantLeft(m, ds, "fusion"))
         EN.fusionKg = math.max(0, (EN.fusionKg or 0) - usedF)
@@ -1017,10 +1196,19 @@ local function tick()
             parts[#parts + 1] = d.kind == "pulse_reaction" and ((d.perf.code or d.key or "IA") .. ((ds.pulse and (ds.pulse[i] or 0) > 0) and " FIRING" or ""))
                 or ("%s %.0f%%%s"):format(tostring(d.key):sub(1, 8), ((ds.thr and ds.thr[i]) or 0) * 100, st.hot and " HOT" or "")
         end
+        local boundIds = {}
+        for _, x in ipairs(EN and EN.bindings or {}) do boundIds[tostring(x.componentId)] = true end
+        for i, md in ipairs(m.devices) do
+            local evs = A.evShown or {}
+            if (evs[tostring(md.key) .. ":starved"] or 0) > 0 then parts[i] = parts[i] .. " NO FUEL" end
+            if (evs[tostring(md.key) .. ":no_energy"] or 0) > 0 then parts[i] = parts[i] .. " NO ENERGY" end
+            if md.kind ~= "propellant_tank" and md.componentId and not boundIds[tostring(md.componentId)]
+                and (md.kind == "reaction_engine" or md.kind == "pulse_reaction") then parts[i] = parts[i] .. " NO CONTROL" end
+        end
         for _, d in ipairs(devs) do
             for i, md in ipairs(m.devices) do if md.componentId == d.componentId then parts[i] = parts[i]:gsub("^[^ ]+", d.code) end end
         end
-        devText = table.concat(parts, " | ")
+        devText = (A.captured and "CONTROLS BLOCKED (input captured) | " or "") .. table.concat(parts, " | ")
     elseif GD.engaged then
         GD.engaged, GD.msg = false, "Guidance cannot fly this Machine: it has no installed propulsion."
     end
@@ -1033,6 +1221,7 @@ local function tick()
     local vs = Deep.vec.dot(A.s.v, u)
     local speed = Deep.vec.len(A.s.v)
     local hs = math.sqrt(math.max(0, speed * speed - vs * vs))
+    prof("after-step")
     if now - A.lastImpact > 500 then
         A.lastImpact = now
         local la, lo = Deep.impact(A.s.p, A.s.v)   -- closed form: one evaluation (KB-348)
@@ -1043,7 +1232,42 @@ local function tick()
             A.impact, A.land = (lo == "escape") and "none: escaping Earth" or "none: in orbit", nil
         end
     end
+    prof("impact")
     geoTick(A.page, A.s, now, GD.route and GD.route.venue and { lat = GD.route.venue.lat, lon = GD.route.venue.lon } or nil)
+    prof("geolod")
+    -- L352: what REDengine shows -- the held car in its stage, the bodies at their true angular size (guarded: a view
+    -- problem never ends a flight)
+    if NcmDeepView then
+        local okV, errV = pcall(NcmDeepView.update, A.s, utcNow(), now)
+        if not okV and not A.viewErr then A.viewErr = true; log("native view skipped: %s", tostring(errV)) end
+    end
+    -- doc 58: the drives' layer (native and NCM's own views) -- guarded: a drawing problem never ends a flight
+    prof("deepview")
+    if NcmDriveFx and utcNow() then
+        local thrMax, pulsing = 0, false
+        for i, md in ipairs(m.devices or {}) do
+            if md.kind == "reaction_engine" then thrMax = math.max(thrMax, (ds.thr and ds.thr[i]) or 0) end
+            if md.kind == "pulse_reaction" and ds.pulse and (ds.pulse[i] or 0) > 0 then pulsing = true end
+        end
+        local conv = ds.conv and ds.conv.method and { method = ds.conv.method, throttle = thrMax, pulse = pulsing } or (pulsing and { method = "impulse", pulse = true }) or nil
+        local okX, errX = pcall(NcmDriveFx.update, { page = A.page, m = m, dyn = ds, s = A.s, utc = utcNow(), now = now,
+            native = CAM_NAMES[camMode] == "native" and not GD.open, conv = conv })
+        if not okX and not A.fxErr then A.fxErr = true; log("drive layer skipped: %s", tostring(errX)) end
+    end
+    -- doc 58: each drive's store, to the server (it only ever lowers it) every two seconds when it changed
+    if #(m.drives or {}) > 0 and now - (A.chargeAt or 0) >= 2000 then
+        A.chargeAt = now
+        local left, changed = {}, false
+        for _, d in ipairs(m.drives) do
+            local dsd = ds.drv and ds.drv[d.componentId]
+            if dsd then
+                left[d.componentId] = dsd.charge
+                if not A.chargeSent or A.chargeSent[d.componentId] ~= dsd.charge then changed = true end
+            end
+        end
+        if changed then A.chargeSent = left; TriggerServerEvent("ncm:deep.drive.charge", { left = left }) end
+    end
+    prof("drivefx+charge")
     if now - A.lastSend >= 33 then
         A.lastSend = now
         local sel = targets()[GD.sel]
@@ -1077,14 +1301,34 @@ local function tick()
             twr = (A.fm and (function() local t = 0 for _, d in ipairs(A.fm.devices) do if d.kind == "reaction_engine" then t = t + (d.perf.thrustN or 0) end end return t end)() or 0)
                 / (A.mass * Deep.vec.len(Deep.gravity(A.s.p))), guidance = g, sun = sunNow(),
             authority = A.authority, waiver = A.waiverOn, spin = A.spin, rho = Flight.density(alt),
+            gmst = Astro and utcNow() and Astro.gmst(utcNow()) or nil, frame = A.dyn and A.dyn.frame and (A.dyn.frame.body or "anchor") or "earth_fixed",
         })
+        -- doc 57 §5.4: the Sun, the Moon, the planets (and the Galactic Centre) where the catalogue says, once a second
+        if Astro and utcNow() and now - (A.bodiesAt or 0) >= 1000 then
+            A.bodiesAt = now
+            local okB, bodies = pcall(catalogueBodies, utcNow())
+            if okB and bodies then send("deep:bodies", { bodies = bodies }) end
+        end
     end
+    prof("page-state")
     if now - A.lastTele >= 1000 then
-        checkpoint("deep", false)
+        A.ckptDue = true   -- doc 58: sent from its own thread (below), never inside the flight frame's budget
         A.lastTele = now
+        do
+            local evs = {}
+            for k, n in pairs(A.ev or {}) do if not k:find(":fired$") then evs[#evs + 1] = ("%s x%d"):format(k, n) end end
+            table.sort(evs)
+            local pr = {}
+            for c in pairs(A.pressedSeen or {}) do pr[#pr + 1] = c end
+            table.sort(pr)
+            log("STAY t+%.0fs alt %.0f vz %.1f | thrust %.1f kN | fuel %.1f kg fusion %.1f kg | %s | pressed %s%s | events %s",
+                (now - A.startedAt) / 1000, alt, vs, (A.thrustN or 0) / 1000, EN and EN.fuelKg or 0, EN and EN.fusionKg or 0, devText,
+                #pr > 0 and table.concat(pr, ",") or "none", A.captured and " (INPUT CAPTURED)" or "", #evs > 0 and table.concat(evs, ", ") or "none")
+            A.evShown, A.ev, A.pressedSeen = A.ev or {}, {}, nil
+        end
         local ncKm = Deep.distance(lat, lon, Deep.ORIGIN.lat, Deep.ORIGIN.lon) / 1000
         TriggerServerEvent("ncm:deep.telemetry", { alt = alt, speed = speed, hspeed = hs, vspeed = vs, orbit = Deep.orbitSpeed(alt),
-            lat = lat, lon = lon, ncKm = ncKm, landing = A.impact, fuelKg = EN and EN.fuelKg or 0, thrust = A.thrustN, rig = rig,
+            lat = lat, lon = lon, ncKm = ncKm, landing = A.impact, fuelKg = EN and EN.fuelKg or 0, thrust = A.thrustN, rig = rig and NcmClientDevAttitude == true,   -- the waiver as APPLIED (Online never applies it)
             -- KB-376: how the Machine is pointing (alignment of its thrust with what Guidance wants, spin rate) and how the
             -- frames ran -- the live climb fell in bursts the simulation never shows
             devices = devText, guidance = gcmd and ("%s -> %s %.0f km eta %.0f s throttle %.2f | align %.2f spin %.2f rad/s | dt max %.0f ms skipped %d"):format(
@@ -1100,6 +1344,8 @@ local function tick()
     end
     -- back into Night City only near Night City; anywhere else low altitude is that place's business (its embodiment
     -- host), and coming down to the ground far from any host ends the trip home
+    prof("1hz")
+    profReport(now)
     local ncKm2 = Deep.distance(lat, lon, Deep.ORIGIN.lat, Deep.ORIGIN.lon) / 1000
     -- KB-349: Deep has no terrain, so the ground is a floor here; engaged or not, the Machine never goes through it
     -- (the 06:37 and 06:42 flights reached -18 km and -2.4 km)
@@ -1116,28 +1362,38 @@ end
 
 -- KB-348: a frame that throws (a script budget, a bad value) must never strand the driver on a white screen with a
 -- frozen car. The error is logged and the Machine is brought home over Night City.
-CreateThread(function()
-    while true do
-        if not A then
-            Wait(100)
-        else
-            Wait(0)
+-- Doc 58 (2026-10-12 05:44): a budget error raised OUTSIDE pcall(tick) -- in the handling below -- killed this thread
+-- and left the Machine to the server. The whole iteration is guarded now; only Wait() is outside it.
+local function frameOnce()
             local ok, err = pcall(tick)
             -- KB-369: a frame that only ran out of OPEN//77's per-frame budget (1.5 M instructions / ~6 ms; a garbage
             -- collection pause on a heavy frame is enough) is SKIPPED and the next frame carries on. Only a run of them
             -- (about two seconds) -- or any other error -- still brings the Machine home (KB-348).
             if ok then
                 if A and (A.overBudget or 0) > 0 then log("budget recovered after %d skipped frame(s)", A.overBudget); A.overBudget = 0 end
-            elseif A and tostring(err):find("budget exceeded", 1, true) and (A.overBudget or 0) < 120 then
+            elseif A and tostring(err):find("budget exceeded", 1, true) then
+                -- doc 58 (2026-10-12 05:58): a RUN of budget-skipped frames used to bring the Machine home (an Alcubierre
+                -- engage was thrown back to Night City). A budget overrun is never a reason to end a flight: the frame is
+                -- skipped, the Machine waits where it is, and the profile says why.
                 A.overBudget = (A.overBudget or 0) + 1
                 A.overBudgetTotal = (A.overBudgetTotal or 0) + 1
-                if A.overBudget == 1 then log("frame over the script budget -- skipped (%s)", tostring(err)) end
+                A.overBudgetWindow = (A.overBudgetWindow or 0) + 1
+                if A.overBudget == 1 or A.overBudget % 300 == 0 then log("frame over the script budget -- skipped (%s)%s", tostring(err),
+                    A.overBudget > 1 and (" -- %d in a row"):format(A.overBudget) or "") end
             else
                 log("FLIGHT ERROR, bringing you home: %s", tostring(err))
                 -- KB-372: the reason reaches the server log too (it was only in the player's client log)
                 pcall(TriggerServerEvent, "ncm:deep.render", '{"what":"flight_error","error":' .. string.format("%q", tostring(err):sub(1, 300)) .. '}')
                 pcall(exit, "flight error", true)
             end
+end
+CreateThread(function()
+    while true do
+        if not A then
+            Wait(100)
+        else
+            Wait(0)
+            pcall(frameOnce)
         end
     end
 end)

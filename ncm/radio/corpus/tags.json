@@ -1,0 +1,94 @@
+{
+  "_doc": "Hand-authored show-history and delivery tags for Race Week Live (doc 59 §3, bible §206-§208, §247). `motifs`: a running joke's ORIGIN beat (airing it gives the listener the motif) and its RECALL beats (eligible only after the origin aired for that listener). `shapes` / `direction` here OVERRIDE what ncm/radio/tools/tag_corpus.py infers from the text; add a beat id with a list of shapes, or a direction name, to correct it. Beat ids are the corpus ids (prefix match allowed with a trailing *).",
+  "motifs": {
+    "MOTIF_TEN_MM_SOCKET": {
+      "origin": [
+        "S224-*"
+      ],
+      "recall": [
+        "S243-*"
+      ]
+    },
+    "MOTIF_SAD_PHARMACY": {
+      "origin": [
+        "S214-*"
+      ],
+      "recall": [
+        "S243-*"
+      ]
+    },
+    "MOTIF_OLD_CAR_VIBRATION": {
+      "origin": [
+        "S235-*"
+      ],
+      "recall": [
+        "S240-*"
+      ]
+    },
+    "MOTIF_GARAGE_CHAIR": {
+      "origin": [
+        "S213-*"
+      ],
+      "recall": [
+        "S243-*",
+        "S244-*"
+      ]
+    },
+    "MOTIF_FLUORESCENT_COFFEE": {
+      "origin": [
+        "S211-*"
+      ],
+      "recall": [
+        "S245-*"
+      ]
+    },
+    "MOTIF_CUP_HOLDERS": {
+      "origin": [
+        "S211-*"
+      ],
+      "recall": []
+    },
+    "MOTIF_GLOVE_COMPARTMENT": {
+      "origin": [
+        "S218-*"
+      ],
+      "recall": [
+        "S224-*",
+        "S238-*"
+      ]
+    },
+    "MOTIF_WARNING_LIGHTS": {
+      "origin": [
+        "S231-*"
+      ],
+      "recall": [
+        "S240-*",
+        "S243-*"
+      ]
+    },
+    "MOTIF_TRUNK_RATTLE": {
+      "origin": [
+        "S238-*"
+      ],
+      "recall": [
+        "S241-*"
+      ]
+    },
+    "MOTIF_TERRIBLE_MERCH": {
+      "origin": [
+        "S243-*"
+      ],
+      "recall": []
+    },
+    "MOTIF_DRIVER_QUESTION": {
+      "origin": [
+        "S195-*"
+      ],
+      "recall": [
+        "S196-*"
+      ]
+    }
+  },
+  "shapes": {},
+  "direction": {}
+}

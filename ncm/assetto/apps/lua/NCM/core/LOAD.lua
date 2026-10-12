@@ -12,6 +12,7 @@ return {
     "space/guidance",
     "engineering/flightmodel",
     "space/canonical",
+    "space/travel",
     "space/places",
     "space/geolod",
 }

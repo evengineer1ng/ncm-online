@@ -1,0 +1,29 @@
+{
+  "generator": "NCWE Studio",
+  "project": "NCM Race Week Day 1",
+  "projectId": "ab160525-3dec-425f-bd43-29bdad21c57f",
+  "exportedUtc": "2026-10-08T20:57:53.1890237+00:00",
+  "game": "2.31",
+  "archiveXl": "1.27.1",
+  "resource": "ncm_race_week_map",
+  "version": "1.0.1",
+  "requiredMod": "ncm_race_week_map-assets",
+  "package": "dist/ncm-race-week-map.zip",
+  "sha256": "2aa29870c7de01614dc697e032f002fad87ec1e9dda786615ce30ad7f917446c",
+  "bytes": 33851335,
+  "entries": [
+    "archive/pc/mod/ncwe_ab1605253dec425fbd4329bdad21c57f.archive",
+    "archive/pc/mod/ncwe_ab1605253dec425fbd4329bdad21c57f.archive.xl"
+  ],
+  "changes": {
+    "Transformed": 0,
+    "Deleted": 138,
+    "Added": 3381,
+    "Roads": 0,
+    "Elements": 4
+  },
+  "sounds": [],
+  "soundEmitters": 0,
+  "syncedSounds": 0,
+  "sourceExport": "C:\\Users\\eveng\\AppData\\Local\\NCWE\\Open77Exports\\ncwe-ab1605253dec425fbd4329bdad21c57f-20261008-205751-fe3ed180"
+}

@@ -1,0 +1,8 @@
+# NCM Radio (doc 59): Race Week Live as a radio station record. The index is NCM's own (7700), far above the
+# vanilla 0-13 and the range other station mods count up from, so the engine never maps it to a vanilla station:
+# `NcmRadio.reds` recognises it and the plugin plays the programme.
+RadioStation.NcmRaceWeekLive:
+  $base: RadioStation.Pop
+  displayName: "Race Week Live"
+  index: 7700
+  icon: UIIcon.RadioHipHop
