@@ -1,3 +1,9 @@
+**LATEST 2026-10-12 10:40 UTC - ONE REPO AGAIN: THE PROXMOX VM'S WORK (SUBSTRATE, PROPULSION STABLE, PANELS) RECONCILED WITH THE BARE-METAL CHECKPOINT ON ONE BRANCH (IDEA-1300).**
+- Since the bare-metal baseline (checkpoint branch 06c3f8b, 2026-10-11 00:46) everything was built on the Proxmox VM and deployed to Online: the astronomical substrate (L363, doc 60), the experimental propulsion stable (L364, doc 61; §DRV4-§DRV6 PASS: Alcubierre to Barnard's Star, jump to Proxima, wormhole home), the panel fit (L365), KB-449..KB-456. The branch `reconcile/proxmox-live-2026-10-12` carries the live tree; `tools/ncm-build.ps1` keeps a resource's own core data (star chunks).
+- The lab Hella (Alabino, ..560c94) carries the XLB-WH1 kit; the Galena (baremetaleven) coasts at ~290,000 km. L362: the Racing Week reset applies to both.
+- Still owed: §DRV1-§DRV3 (impulse, fusion, warp), §DRV7 (panels on the 2176x1812 client); NCWE maps (`ncm/ncwe/*.ncwe`): stars and planets in the native Deep view, the Earth underlay on the Race Week map.
+- **THE ONE NEXT ACTION:** owner reviews and merges the reconcile PR; then the NCWE map pass (stars/planets natively, underlay on the Race Week map).
+
 **LATEST 2026-10-11 03:50 UTC - KB-448 LIVE ON ONLINE; THE 03:09 REJOIN STAGED THE GALENA INTO THE SPACE STAGE; §SKY7 VISUAL VERDICT OWED.**
 - Deployed `ncm_world` server/deep.lua + server/canonical.lua 03:07 (backup `pre-kb448-20261011T030602Z`); `BOOT driver ..3d2be6 is deep` before the join. 03:09:57 `JOIN player=1 resumes deep`, 03:10:03 `ENTER ... frozen true true`, `STAGE ... move true true`; client `stage confirmed by the server after 1 request(s)`; NCM Sky spawned sky_dome, Earth, Moon. FRAME 03:43: via cyberpunk, 62,911 km, thrust 0, energy on curve.
 - Open: ENTER used the normal binding, so the KB-448 claim path is unexercised live (and should clear on every accepted ENTER); 3 `vowner-loss` lines in the client log not yet placed in time.

@@ -6924,3 +6924,27 @@ The session landing screen is a permanent player orientation surface, not a mand
 - Earth-only Deep is a test bed, not the finished universe. The next space architecture is per-body ephemerides/frames and gravity regimes that hand over between bodies (IDEA-1292, IDEA-1293), using the OpenSpace/WebGL universe rather than stretching the Earth-only model.
 
 Supersedes IDEA-1291's open question.
+
+## L363 - THE ASTRONOMICAL SUBSTRATE IS NCM DEEP'S UNIVERSE (2026-10-11, recorded 2026-10-12)
+
+**Owner (abridged):** "build the ocean, not the next island."
+
+**LOCKED:**
+- Where things are in NCM Deep is `space.catalogue` (Solar System records + 60,777 Hipparcos stars), `space.astro` positions (cell + offset), `space.gravity` (multi-body, relevance by acceleration) and `space.frames` (Earth-fixed near home, inertial / anchored beyond). Spec: [60_ASTRONOMICAL_SUBSTRATE.md](60_ASTRONOMICAL_SUBSTRATE.md). Deployed to Online 2026-10-11 22:45 UTC; the `ncm_universe` resource reports positions (shadow, read-only).
+- The client carries no star catalogue (bright stars for drawing only); the server's unhosted flight feels every relevant star.
+
+## L364 - OWNER BRIEF / THE EXPERIMENTAL PROPULSION STABLE AND THE ONE-SHOT GRANT LEDGER (2026-10-12)
+
+**Owner (abridged):** "These must not be six differently sized speed boosts ... First, make the toys. We're going to strap them to Alabino's Hella one at a time."
+
+**LOCKED:**
+- Six distinct technologies: impulse (IA-10), fusion (FD-1), warp (XLB-WD1), Alcubierre (XLB-AB1), jump (XLB-JD1), wormhole (XLB-WH1). Spec: [61_EXPERIMENTAL_PROPULSION.md](61_EXPERIMENTAL_PROPULSION.md). The four XLB designs are `lab = true`: never sold, no R&D, no progression.
+- The laboratory fits ONE drive at a time to Alabino's Hella through an owner-grant kit (`lab_<drive>`), applied by `tools/deep/ops/deeplab.sh` (one restart). Every grant spec is written to `owner_grant_ledger` before anything is touched and is never applied again (the KB-449 fix); `NcmCanonical.refreshMachine` rewrites the presence record's parts after a kit.
+- Distance accounting keeps path (continuous motion) apart from discontinuous displacement (jump, wormhole: endpoint separation, never path) and Earth distance. Race Week scoring semantics: **OPEN**.
+- The Racing Week reset applies to the lab Hella as to every Machine (L362, reaffirmed 2026-10-12).
+
+## L365 - THE PANEL SURFACES FOLLOW THE SCREEN (2026-10-12)
+
+**Owner:** "fix f3 f5 f6 f9 webui panels at 2176x1812 resolution client".
+
+**LOCKED:** the F3 observer, F5 race builder (race HUD page), F6 hub and F9 engineering surfaces are created without a fixed size (1920x1080 only if the platform refuses), and each page scales its authored 1920x1080 canvas UNIFORMLY to the screen and centres it. Never stretched. Deployed to Online 2026-10-12 07:04 UTC.

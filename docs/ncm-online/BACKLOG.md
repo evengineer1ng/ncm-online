@@ -17,7 +17,7 @@ a milestone or batch) → `built` (code + offline proof) → `validated` (live P
 **Where things live:** ideas and work → here. Choices made and questions for the owner → `DECISION_RECORD.md`.
 Defects → `KNOWN_BUGS.md`. Live PASS/FAIL → `wp/MASTER_TEST.md`. What to do next → `NOW.md`.
 
-**IDs are permanent.** Next free ID: **IDEA-1295**.
+**IDs are permanent.** Next free ID: **IDEA-1301**.
 *(This line has now been stale twice — left at IDEA-127 while the ledger ran to IDEA-183, then at IDEA-205 while it
 ran to IDEA-294. It is the only guard against reusing an ID. Check it against the last row before you append.)*
 
@@ -1832,3 +1832,9 @@ Owner: "its time to build out from paddock and into life sim pve layer ... concr
 | IDEA-1292 | DEEP | 2026-10-11 | **Concern: Deep is Earth-only two-body gravity.** The Galena's coast reaches ~1.69 million km apogee, past the Moon's orbit and Earth's Hill sphere (~1.5 million km), where the Sun and Moon dominate; NCM and the WebGL view agree with each other, not with nature, out there. Needed before Moon/Mars intercepts. | RECORDED |
 | IDEA-1293 | DEEP | 2026-10-11 | **Planetary NCWE maps on the same architecture.** The Deep stage is a floating origin: the car held near a safe local origin, astronomical state kept in `space.deep`/`space.canonical`, bodies drawn at true direction and angular size. A Moon/Mars surface map is a second stage + a handoff like the 12 km seam in reverse (approach altitude -> surface stage, lat/lon -> local metres), needing: per-body frames and ephemerides in core, a body-relative `space.deep`, a generated NCWE surface package per site (static: server restart + fresh launch, KB-409), and the reverse seam's position/velocity hand-back (today only Earth's `exit`). | RECORDED |
 | IDEA-1294 | DEEP | 2026-10-11 | **FRAME instrumentation (owner accepted 2026-10-11: keep it).** `ncm_world/server/deep.lua` logs every Deep presence row once a minute in both frames (Earth-fixed v with horizontal E/N, vertical and the W*rho sweep; inertial v radial/tangential; g and Coriolis+centrifugal; thrust state, spin; energy, h, e, apo/peri; the Jacobi constant). Read-only. It showed the coast's rising SPEED is the rotating frame (inertial speed falls, energy holds) and found KB-447. | **DEPLOYED ONLINE 2026-10-11 02:42 UTC** |
+| IDEA-1295 | DEEP | 2026-10-12 | **Native depth-tested drive effects and dome reprojection.** The drive layer draws over the cabin (not depth-tested) and the J2000 dome is Earth's sky everywhere; both want NCM Sky DLL templates (doc 61 §7). |
+| IDEA-1296 | DEEP | 2026-10-12 | **Race Week scoring of discontinuous travel** (jump, wormhole): path only, path + endpoint separation, or maximum Earth distance (L364 OPEN). |
+| IDEA-1297 | DEEP | 2026-10-12 | **The ncm_world client frame sits near OPEN//77's script budget at idle** (budget skips every ~10-20 s with drives fitted; PROFILE shows the flight tick itself ~0.5 ms). Find the other ncm_world client scripts that spend the shared budget (FFB rig-bridge probe logs ~6/s). |
+| IDEA-1298 | DEEP | 2026-10-12 | **Natural wormholes for F-I-S-H-I-N-G / Nessie** on `space.wormholes` (`origin = natural`, no lifetime). |
+| IDEA-1299 | DEEP | 2026-10-12 | **Drive parts in the engineering economy**: acquisition, engineering quality (range, precision, stability, cost), combined builds (doc 61 (do not make a simple power ladder)). |
+| IDEA-1300 | OPS | 2026-10-12 | **One repo again (2026-10-12).** The Proxmox VM (live Online + `~/deepwork`) and the bare-metal checkpoint branch were reconciled into one branch and PR; `tools/ncm-build.ps1` now keeps core data a resource loads itself (star chunks, bright stars). |

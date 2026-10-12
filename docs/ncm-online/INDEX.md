@@ -35,6 +35,8 @@ corpus claiming migrations 001-007 while the schema was at 023.
 | Topic | Authority | Affirmed |
 |---|---|---|
 | **NCM 3.0 single player**: the NCM Host (the dev resources in-process over SQLite), Race Week tapes, offline canonical time, the deck, the seam report toward Nexus | [55_NCM3_SINGLE_PLAYER.md](55_NCM3_SINGLE_PLAYER.md) | L338 |
+| **NCM Deep's universe**: catalogue, multi-body gravity, frames, astronomical coordinates, the `ncm_universe` reporter | [60_ASTRONOMICAL_SUBSTRATE.md](60_ASTRONOMICAL_SUBSTRATE.md) | L363 |
+| **The experimental propulsion stable**: six Deep drives, the propulsion laboratory and grant ledger, drive telemetry, the travel ledger | [61_EXPERIMENTAL_PROPULSION.md](61_EXPERIMENTAL_PROPULSION.md) | L364 |
 | **Race Week Live (NCM Radio)**: the in-game station, corpus compiler, trigger map, director, OmniVoice voice render, `ncm-radio` required mod and `ncm_radio` resource | [59_NCM_RADIO.md](59_NCM_RADIO.md) | L348 |
 | **Race Week Live cast and every on-air line**: the owner's authoring bible, imported verbatim | [radio/RACE_WEEK_RADIO_BIBLE.md](radio/RACE_WEEK_RADIO_BIBLE.md) | L348 |
 | **Deterministic Race Week radio**: simulation-truth/commentary-surface audit for writer-authored show; equal primary co-hosts; hosted voice packs intended; settled unobserved results may air with provenance undisclosed | [58_DETERMINISTIC_RACE_WEEK_RADIO_AUDIT.md](58_DETERMINISTIC_RACE_WEEK_RADIO_AUDIT.md) | L346-L347 |
@@ -101,6 +103,8 @@ and amends §0.1. The code still implements fixed three-day runs until doc 47 §
 
 ## Current (21)
 
+- [61_EXPERIMENTAL_PROPULSION.md](61_EXPERIMENTAL_PROPULSION.md) - the experimental propulsion stable (L364): impulse, fusion, warp, Alcubierre, jump, wormhole; lab kits and the one-shot grant ledger; telemetry; travel ledger
+- [60_ASTRONOMICAL_SUBSTRATE.md](60_ASTRONOMICAL_SUBSTRATE.md) - NCM Deep's universe (L363): Solar System + Hipparcos catalogue, multi-body gravity, inertial frames, OpenSpace audit
 - [59_NCM_RADIO.md](59_NCM_RADIO.md) - Race Week Live (L348): the deterministic talk-radio station in the game's own radio list; corpus (1,088 beats, 5,689 lines), trigger map, director, OmniVoice render, `ncm-radio` plugin + `ncm_radio` resource
 - [radio/RACE_WEEK_RADIO_BIBLE.md](radio/RACE_WEEK_RADIO_BIBLE.md) - the owner's Race Week Live authoring bible, verbatim: cast, rules and every on-air line
 - [55_NCM3_SINGLE_PLAYER.md](55_NCM3_SINGLE_PLAYER.md) - NCM 3.0 single player (L338): the NCM Host runs the dev server's resources unchanged inside Cyberpunk over SQLite; Race Week tapes (one continuity = one server_id), the present calculated on return (`week.catchup`), the deck, the Time Lab; the seam report (doc §8). Headless gates green; MASTER_TEST §TP NOT RUN
