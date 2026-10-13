@@ -1,3 +1,9 @@
+**LATEST 2026-10-13 09:02 UTC - KB-475/476 LIVE: THE AV'S FLY-BY-WIRE KEEPS FLYING IN DEEP; WEBGL DEEP DRAWS EACH MACHINE'S OWN MODEL; HIDHIDE CLOAK OFF (GAMEPADS).**
+- Deep: Space climbs, C descends, W/S A/D Q/E steer, the computer holds attitude (it coasted and fell out before: every engine idle in Deep). Offline test passes; not flown.
+- WebGL Deep: the game's own lowest-LOD body shells, 38 models; not yet seen in game (front/back orientation unverified).
+- Bare-metal gamepads: HidHide (inverse mode, Cyberpunk listed) hid every pad from the game; its cloak is OFF now. Uninstall still owed (needs the desktop UAC prompt).
+- **THE ONE NEXT ACTION:** owner relaunches Cyberpunk (pads should work), flies the Atlus through 12 km and holds Space in Deep: it should keep climbing, level; the WebGL view shows an Atlus, not a Hella.
+
 **LATEST 2026-10-13 08:21 UTC - KB-474 LIVE: THE ATLUS FLIES ON FUSION ALONE (VL-28E FANS + FL-6) WITH A FAST-CLIMB COMPUTER (FC-2, 120 M/S); NOT YET FLOWN.**
 - Owner: car fuel for space made no sense, and 9 m/s took far too long. VL-28E (fusion-electric fans) + FC-2 (120 m/s up, 25 m/s down) retrofitted onto the owner's Atlus by grant at 08:20 UTC with nobody online; the old VL-28s and FC-1 are in storage.
 - Offline: >60 m/s and >900 m after 20 s of Space; level; no car fuel for lift (the AC-6's trims are the last, <2 g/s). KB-473 (the speed readout lies on the car-class AV) still open.
