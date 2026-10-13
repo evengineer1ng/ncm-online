@@ -1,7 +1,7 @@
 -- ncm_world / client / av_board -- the Enter prompt the game's AVs never had (owner, 2026-10-12: "same button as
--- entering a car"). The server says when you stand at an AV or sit in one (`ncm:av.near`); F -- the vanilla enter key,
--- pad A -- boards it, and F again gets you out. Seating goes through OPEN//77 (server/av_board.lua).
-local KEYS = { "F", "padA" }
+-- entering a car"). The server says when you stand at an AV or sit in one (`ncm:av.near`); F / pad X (Square on a DS4)
+-- -- the game's own enter key -- boards it, and again gets you out (was pad A = Cross, not the game's enter, 2026-10-13). Seating goes through OPEN//77 (server/av_board.lua).
+local KEYS = { "F", "padX" }
 
 local state = nil              -- { vehicleId, seated, name } or nil
 RegisterNetEvent("ncm:av.near", function(s)
