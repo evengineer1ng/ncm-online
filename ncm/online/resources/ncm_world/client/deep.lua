@@ -1173,7 +1173,9 @@ local function tick()
     -- +77 m/s at the seam, 1 g of deceleration, every engine 0 %). Same computer, same keys as below: Space / right
     -- trigger climb, C / left trigger descend, W/S A/D Q/E steer; it holds attitude with whatever torque the Machine has.
     -- Deep's state is Earth-centred, so the computer gets a local east/north/up view of it.
-    local fcPerf = (EN and #devs > 0) and FC.computer(EN.devices) or nil
+    -- KB-477: the computer is avionics, which the client keeps OUT of EN.devices (the force loop) -- it is EN.fc. Reading
+    -- it from EN.devices found nothing on the first live Deep stay (05:13 local: "NO CONTROL", fly-by-wire never ran).
+    local fcPerf = (EN and #devs > 0) and (EN.fc or FC.computer(EN.devices)) or nil
     local holdNow = GD.route and not GD.engaged and (GD.prompt or A.embodyPending or GD.hold) and true or false
     A.fbw = nil
     if fcPerf and not GD.engaged and not holdNow and not GD.open and ds.pos and ds.rot then
