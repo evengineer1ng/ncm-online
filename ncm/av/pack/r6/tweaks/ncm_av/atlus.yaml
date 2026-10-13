@@ -11,6 +11,9 @@
 # (slots named *pilot* / *cockpit* / *cabin*) fell through to `fx_wheel_front_left_skid`, and its exit watchdog
 # re-parked the AV every ~2 s (vexit-restore / vflt-parkexit: the flicker). basic_01 is the same Atlus with the chassis
 # collider AND a pilot slot (`weyland_pilot`), and the same appearances (default Trauma Team).
+#
+# 0.1.2 (KB-469): REVERTED to basic_02. basic_01's root is a plain entEntity (a scene prop), so OPEN//77 refused to
+# spawn it (`spawned_entity_is_not_game_object`) and the AV never appeared.
 Vehicle.av_zetatech_atlus:
-  entityTemplatePath: 'base\vehicles\special\av_zetatech_atlus_basic_01.ent'
+  entityTemplatePath: 'base\vehicles\special\av_zetatech_atlus_basic_02.ent'
   appearanceName: zetatech_atlus_trama_team

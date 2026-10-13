@@ -1,7 +1,7 @@
 """Package NCM AV (ncm/av/pack) as dist/ncm-av-<version>.zip, laid out as the game folder."""
 import hashlib, os, sys, zipfile
 
-VERSION = "0.1.1"
+VERSION = "0.1.2"
 root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 pack = os.path.join(root, "ncm", "av", "pack")
 out = os.path.join(root, "dist", "ncm-av-%s.zip" % VERSION)
