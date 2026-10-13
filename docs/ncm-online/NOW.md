@@ -1,3 +1,7 @@
+**LATEST 2026-10-13 04:41 UTC - KB-464 LIVE ON ONLINE: THE MARKET TAB'S PAYLOAD DIED ON THE INSTRUCTION QUOTA; IT NOW YIELDS.**
+- Every market push since 04:08 UTC failed `Open77 instruction quota exceeded` (last good 01:25). `ncm_league` market.lua + components.lua yield per line, gearbox variant and component design; a failure now names its stage. `cbcea87`; restarted 04:40 UTC, generation 1, QA `online`, no ERR; backup `/opt/ncm/backups/pre-kb464-20261013T043920Z`.
+- **THE ONE NEXT ACTION:** owner joins and opens MARKET: offerings and parts list; the log shows `market] payload player=.. N bytes`, not `payload failed`. Then the KB-462 15-minute FPS check below.
+
 **LATEST 2026-10-13 04:00 UTC - KB-462 LIVE ON ONLINE: THE CLIENT EXPORT FLOOD BEHIND "BAD FPS AND LATENCY" IS FIXED; BARE METAL IS THE WORKING REPO AGAIN (PROXMOX DOWN).**
 - The server was idle (~5% CPU, 12-28 ms from the owner's PC). The owner's client lost ~11 ms a frame within ~12 min of a join (125-165 Hz on 10-10, ~45-53 Hz on 10-12): L367's kit loop called `ncm_sky.scene` 10x a second unawaited until the client hit `export_request_limit`, after which venue rings failed too. Fix in `7d943b8` (ncm_build client, ncm_world deep + carrier_bridge); deployed 03:57 UTC with nobody connected, generation 1, QA line `online`, no ERR; backup `/opt/ncm/backups/pre-kb462-20261013T035541Z`.
 - Gate: green except KB-463 (migration 081 vs the single-player host's SQL translator; Online unaffected). The build host test no longer hangs.
