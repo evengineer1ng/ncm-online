@@ -1,0 +1,11 @@
+# NCM AV (KB-467, 2026-10-13): the Zetatech Atlus gets a rigid body again.
+#
+# Phantom Liberty's override of the Atlus entity (ep1\vehicles\special\av_zetatech_atlus_basic_02.ent) has a
+# vehicleChassisComponent with NO collisionResource, so a spawned Atlus has no rigid body: ForceEnablePhysics
+# switches on nothing, the physics data is never integrated, and no force moves it (NCM Carrier 0.1.41's report:
+# velocity 0, force accumulator never consumed). The base-game entity carries the chassis collider
+# (base\vehicles\special\av_zetatech_atlus\entities\meshes\av_zetatech_atlus__ext01_interaction_collider.phys) --
+# the same one Drive an Aerial Vehicle puts on its own Atlus. Vanilla files only; nothing is copied from DAV.
+Vehicle.av_zetatech_atlus:
+  entityTemplatePath: 'base\vehicles\special\av_zetatech_atlus_basic_02.ent'
+  appearanceName: zetatech_atlus_trama_team
