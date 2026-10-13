@@ -97,6 +97,7 @@ return {
     "space/venues.lua",
     "space/guidance.lua",
     "engineering/flightmodel.lua",
+    "engineering/flightcontrol.lua",
     "space/canonical.lua",
     "space/travel.lua",   -- doc 61 (code: doc 58): the experimental propulsion stable
     "space/wormholes.lua",

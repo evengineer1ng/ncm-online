@@ -17,7 +17,7 @@ a milestone or batch) → `built` (code + offline proof) → `validated` (live P
 **Where things live:** ideas and work → here. Choices made and questions for the owner → `DECISION_RECORD.md`.
 Defects → `KNOWN_BUGS.md`. Live PASS/FAIL → `wp/MASTER_TEST.md`. What to do next → `NOW.md`.
 
-**IDs are permanent.** Next free ID: **IDEA-1313**.
+**IDs are permanent.** Next free ID: **IDEA-1316**.
 *(This line has now been stale twice — left at IDEA-127 while the ledger ran to IDEA-183, then at IDEA-205 while it
 ran to IDEA-294. It is the only guard against reusing an ID. Check it against the last row before you append.)*
 
@@ -1850,3 +1850,6 @@ Owner: "its time to build out from paddock and into life sim pve layer ... concr
 | IDEA-1310 | PRESENTATION | 2026-10-12 | **VFX/SFX inventory across the whole game** (owner: 'so far behind'): atmosphere entry, propulsor and actuator plumes and sounds, drives, hops, building, damage. Survey every actuator and event first. |
 | IDEA-1311 | ENDGAME | 2026-10-12 | **Nessie, the end game** (owner): track a stealthy sentient black hole into deep space. On contact it asks 'WHAT DO YOU WANT?' with answers the game can fulfil ('the fastest car ever'...). A cutscene: Nessie embodies a black copy of the car you brought and plays chicken with you in space; you wake in Night City, closing the loop. Builds on doc 10's Nessie note and IDEA-1298. |
 | IDEA-1312 | ENDGAME | 2026-10-12 | **Bennu** (owner): an asteroid that hits every so often at the end of a Race Week. Players may divert, thwart or destroy it with whatever space technology they leverage; otherwise an extinction event. The reset covers the run, so an impact should cost the PERSISTENT layer (infrastructure). PvE stays last (owner). |
+| IDEA-1313 | ENGINEERING | 2026-10-12 | **Every AV is a Machine** (L368): Manticore, Excalibur, Valgus and the Atlus variants get engine-pod mounts from their own meshes, so the same lift fans and flight computer fly any of them. |
+| IDEA-1314 | ENGINEERING | 2026-10-12 | **Hover modes on the FC-1** (L368): position hold, a landing assist that flares on ground proximity, and a helicopter mode (collective on the stick) as flight-computer revisions, not new code paths. |
+| IDEA-1315 | WORLD | 2026-10-12 | **A third NCWE map for planets** (owner): within docking distance, descend onto the Moon or Mars on a barebones NCWE map with procedural projections. Offered; not planned yet. |

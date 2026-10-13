@@ -31,6 +31,9 @@ Core.define("engineering.flightmodel", function(C)
     -- others fall back to its class until they are measured.
     M.CHASSIS = {
         archer_hella = { massKg = 1800, com = { 0, 0, 0.5 }, bounds = { 1.9, 4.6, 1.4 }, cd = 0.32, areaM2 = 2.2 },
+        -- 2026-10-12: the Zetatech Atlus AV airframe (empty: no engines, no fuel -- those are its installed parts and its
+        -- tank). Balance point between its fore and aft engine pods; a boxy body, so a high drag area.
+        zetatech_atlus_trauma = { massKg = 4200, com = { 0, -0.27, 1.0 }, bounds = { 5.2, 10.0, 3.0 }, cd = 0.7, areaM2 = 12 },
         default = { massKg = 1700, com = { 0, 0, 0.5 }, bounds = { 1.9, 4.6, 1.4 }, cd = 0.33, areaM2 = 2.2 },
     }
     M.TANK_POS = { 0, -1.4, 0.4 }          -- behind the rear axle

@@ -169,6 +169,18 @@ Core.define("engineering.dynamics", function(C)
         local fireEdge = cmd and cmd.fire and not s.fired
         s.fired = cmd and cmd.fire and true or false
 
+        -- 2026-10-12 (the AV's four swivelling pods): a torque request is SHARED among the gimballed engines in proportion
+        -- to their thrust, so N engines make the asked torque once, not N times. The share is fixed from the commanded
+        -- throttles (the lagged value is what each engine actually makes next).
+        local gimbalShareN = 0
+        if cmd and type(cmd.torqueNm) == "table" then
+            for i, d in ipairs(m.devices) do
+                local p = d.perf
+                if (p.gimbalDeg or 0) > 0 and d.kind ~= "ground_ram" and d.kind ~= "pulse_reaction" then
+                    gimbalShareN = gimbalShareN + (p.thrustN or 0) * math.max(0, math.min(1, (s.thr and s.thr[i]) or throttleFor(cmd, i, d)))
+                end
+            end
+        end
         for i, d in ipairs(m.devices) do
             local p = d.perf
             if d.kind == "ground_ram" then
@@ -257,10 +269,14 @@ Core.define("engineering.dynamics", function(C)
                         local lever = sub(com, d.at)
                         local L = len(lever)
                         if L > 1e-6 then
+                            -- the trim through the centre of mass is only a TRIM: an engine whose line already runs
+                            -- (nearly) through it leans onto it; one far off it (an AV's splayed pods) keeps its own axis
                             local w = scale(lever, 1 / L)
+                            if dot(w, d.dir) < math.cos(gmax) then w = d.dir end
                             local tw = cmd and cmd.torqueNm
                             if type(tw) == "table" then
-                                local want = { tonumber(tw[1]) or 0, tonumber(tw[2]) or 0, tonumber(tw[3]) or 0 }
+                                local share = gimbalShareN > 0 and math.min(1, (p.thrustN or 0) * math.max(0, math.min(1, s.thr[i] or 0)) / gimbalShareN) or 1
+                                local want = { (tonumber(tw[1]) or 0) * share, (tonumber(tw[2]) or 0) * share, (tonumber(tw[3]) or 0) * share }
                                 w = add(w, scale(cross(lever, want), 1 / (F * L * L)))
                             end
                             w = unit(w)

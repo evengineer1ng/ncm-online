@@ -6973,3 +6973,20 @@ Supersedes IDEA-1291's open question.
 - KB-458: Deep's Earth/Moon/dome yaw fixed in NCM Sky 0.2.4.
 
 **Not yet built:** a working part on a kit piece (a propulsor on a strut as a real mount); markets returning to their opening stock at the Week reset; a 72 h market soak simulation; players posting their own cars on the Exchange. **Install:** `bash tools/deep/ops/install-l367.sh` with nobody online, then relaunch (accept NCM Audio, NCM Sky 0.2.4, the Build kit).
+
+
+## L368 - OWNER: THE AV FLIES ON NCM ENGINEERING (NOT YET LIVE) (2026-10-12)
+
+**Owner:** "look into flying avs as player please and how mods do it"; "not chat command, make it same button as entering a car"; "make it fly then i will test"; "arent we using our engineering parts and vfx???"; "also give it a wormhole drive".
+
+**How the mods do it** (tidusmd's Drive an Aerial Vehicle, MIT; its RED4ext plugin on Jack Humbert's Let There Be Flight code): the game's AVs have a driver seat (`seat_front_left`) but no player Enter interaction, so the mod draws its own entry area and mounts V through the mounting facility; an AV body is scripted (kinematic) until `vehicleBaseObject::ForceEnablePhysics` (hash 2793083181) runs; it then writes the body's velocity and angular velocity every frame.
+
+**Decided:**
+- **Entering is OPEN//77's seat ledger, on the car's key.** `ncm_world` `av_board`: the server says when a player on foot stands at an AV (`ncm:av.near`); F / pad A boards (`warpPlayerIntoVehicle`, driver seat; an NCM Machine only by its owner), F again gets out. One persistent hint.
+- **The AV flies on NCM engineering, not on a mod's velocity writes.** Its engines are installed parts and its flight is the canonical model: four **ZTC-VL28** lift fans (`jet`: air-breathing, 28 kN at sea level, nothing in vacuum, +-20 deg swivel) on new Atlus-only engine-pod mounts, and the **ZTC-FC1** flight computer (`avionics`, kind `flight_computer`). Core `engineering.flightcontrol` turns the stick into lift-engine throttles (air first, rockets for the shortfall; pitch and roll by differential throttle) and a torque request the parts' swivel and attitude sets meet. The client steps `engineering.flightmodel` + `engineering.dynamics` on the body's real state every frame; force AND torque go to the Carrier.
+- **NCM Carrier 0.1.39:** the wrench carries `massKg` (force lands as NCM's acceleration whatever the host body weighs), `ax/ay/az` (angular acceleration, written into the body's spin at the gravity entry -- torque IS expressed for the first time), and `av`, which switches a bound `vehicleAVBaseObject`'s physics on from the game thread. Gated like every write.
+- **Engineering correction (dynamics):** a gimbal trims through the centre of mass only when that is a trim; a torque request is shared among gimballed engines by thrust (it was asked of every engine in full). The Hella's single FD-1 is unchanged (1301/1301 core tests).
+- **The kit (`av`, ledgered owner grant):** 4x VL-28, 2x FD-1 (centred under the floor and at the rear: the fans run short in thin air; with them thrust/weight 1.2 at the 12 km seam), AC-6, PT-500 in a cabin-bay mount, **XLB-WH1 wormhole drive**, FC-1. The fitted Atlus is ~7.3 t on a 4.2 t airframe; its own tank is 1,500 L.
+- The Trauma Team AV is catalogued as `Vehicle.av_zetatech_atlus` (`Vehicle.av_trauma` never projected on a client).
+
+**Expression losses (said in telemetry):** host collisions and damping are not in the model; the model is re-seeded from the body every frame.

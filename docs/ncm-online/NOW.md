@@ -1,3 +1,7 @@
+**LATEST 2026-10-12 - L368 BUILT, NOT YET LIVE: THE AV FLIES ON NCM ENGINEERING (F TO BOARD, FLY-BY-WIRE, CARRIER 0.1.39, WORMHOLE DRIVE).**
+- The Atlus Trauma Team AV is a Machine: four VL-28 lift fans on its pods, an FC-1 flight computer (core `engineering.flightcontrol`), two FD-1s for the thin air, AC-6, PT-500, XLB-WH1. F boards it (`av_board`). NCM Carrier 0.1.39 expresses torque and switches the AV's physics on. KB-460 (client changes need a full restart) and KB-461 logged.
+- **THE ONE NEXT ACTION:** owner runs `bash tools/deep/ops/install-av.sh` with nobody online (it fits pellerino's AV with the `av` kit), relaunches (accept NCM Carrier 0.1.39), and walks §AV1-§AV6.
+
 **LATEST 2026-10-12 - L367 BUILT, NOT YET LIVE: NCM FX + NCM AUDIO, BUILD YOU CAN SEE (KIT + KB-443), MARKETS + EXCHANGE, KB-458 EARTH YAW.**
 - Toolchain on the Proxmox VM (VS Build Tools, CMake, Ninja, WolvenKit 8.20): NCM Sky and NCM Audio build from source.
 - New: `ncm-audio` (required mod), `ncm_audio`, `ncm_build_kit` (required mod), NCM Sky 0.2.4, migration 081. Underlay v3 (L366 amendment) is also still waiting to be installed.

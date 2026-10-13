@@ -19,6 +19,7 @@
 #include "vehicle/hook.hpp"
 #include "vehicle/arch_dump.hpp"
 #include "vehicle/physics_probe.hpp"
+#include "vehicle/av_physics.hpp"
 
 #include <RED4ext/RED4ext.hpp>
 #include <nlohmann/json.hpp>
@@ -234,7 +235,8 @@ void onLoad()
         // `L324`: installed components push the bound Machine. The probe checks the assetId against the binding.
         c.server->onWrench([](const ncm::bridge::Wrench& w) {
             ncm::vehicle::probe::applyWrench(w.assetId, w.fx, w.fy, w.fz, w.ttlMs, w.supersedeLift,
-                                             w.hasPulse, w.pulseSeq, w.px, w.py, w.pz, w.pulseMs);
+                                             w.hasPulse, w.pulseSeq, w.px, w.py, w.pz, w.pulseMs,
+                                             w.av, w.hasMass ? w.massKg : 0.0, w.ax, w.ay, w.az);
         });
         c.server->onConnect([&c] { sendHealth(c); });
         c.server->onDisconnect([&c] {
@@ -263,6 +265,8 @@ void onLoad()
         stage("physics probe", [&] {
             ncm::vehicle::probe::attach(g_handle, g_sdk, directoryOf(g_module));
         });
+        // 2026-10-12: an AV's physics switch (vehicle/av_physics.cpp) -- checked once here, used only for a bound AV
+        stage("av physics", [&] { ncm::vehicle::av::prepare(); });
     } else {
         NCM_INFO("physics probe disabled by config");
     }
@@ -311,6 +315,13 @@ bool onRunningEnter(RED4ext::CGameApplication*)
         NCM_ERR("running-state startup failed entirely -- the carrier is inert");
     }
     return true;
+}
+
+// Every game frame, on the game thread: the AV's physics switch (a no-op unless an `av` wrench lease is fresh).
+bool onRunningUpdate(RED4ext::CGameApplication*)
+{
+    if (g_carrier) ncm::vehicle::av::tick();
+    return false;
 }
 
 bool onRunningExit(RED4ext::CGameApplication*)
@@ -375,7 +386,7 @@ RED4EXT_C_EXPORT bool RED4EXT_CALL Main(RED4ext::v1::PluginHandle handle, RED4ex
             // RED4ext has not initialized the game's memory yet.
             RED4ext::v1::GameState state{
                 .OnEnter = &onRunningEnter,
-                .OnUpdate = nullptr,
+                .OnUpdate = &onRunningUpdate,
                 .OnExit = &onRunningExit,
             };
             if (!sdk || !sdk->gameStates || !sdk->gameStates->Add(

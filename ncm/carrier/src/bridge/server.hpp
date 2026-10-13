@@ -80,6 +80,12 @@ struct Wrench {
     uint32_t pulseSeq = 0;
     double px = 0, py = 0, pz = 0;
     int pulseMs = 0;
+    // 2026-10-12, a Machine flown by an installed flight computer (the AV): `massKg` is the NCM Machine's mass, so the
+    // force lands as the acceleration NCM computed whatever mass the host body has; `ax/ay/az` is the angular
+    // acceleration (world rad/s^2) the model's torque makes; `av` asks for an AV body's physics to be switched on.
+    bool av = false;
+    bool hasMass = false; double massKg = 0;
+    double ax = 0, ay = 0, az = 0;
 };
 
 /// One telemetry frame, the shape `driver.feedback.frame` produces. **A channel that could not be read is

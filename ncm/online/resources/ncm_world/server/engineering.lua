@@ -285,7 +285,7 @@ RegisterNetEvent("ncm:engineering.burn", function(r)
         for _, d in ipairs(c.devices) do
             -- L334: a part that burns something other than the car's fuel is accounted to its own tank
             if d.kind == "reaction_engine" and (d.perf.propellant or "fuel") ~= "fuel" then maxFusion = maxFusion + Sys.massFlow(d.perf) * dtS
-            elseif d.kind == "reaction_engine" then maxKg = maxKg + Sys.massFlow(d.perf) * dtS
+            elseif d.kind == "reaction_engine" or d.kind == "jet" then maxKg = maxKg + Sys.massFlow(d.perf) * dtS   -- an AV's lift fans burn fuel too
             elseif d.kind == "pulse_reaction" then
                 local per = d.perf.retrigger and 0.05 or ((d.perf.pulseS or 0.2) + (d.perf.rechargeS or 0))   -- a retriggered hop can fire on every press
                 maxKg = maxKg + Sys.pulseMass(d.perf) * (math.floor(dtS / math.max(0.05, per)) + 1)
@@ -846,6 +846,27 @@ local KITS = {
     lab_alcubierre = labKit("XLB-AB1", LAB_BINDS_TARGET),
     lab_jump = labKit("XLB-JD1", LAB_BINDS_TARGET),
     lab_wormhole = labKit("XLB-WH1", LAB_BINDS_TARGET),
+    -- 2026-10-12 (owner: "make it fly ... aren't we using our engineering parts and vfx" / "also give it a wormhole
+    -- drive"): the Zetatech Atlus AV, flown on NCM engineering. Four VL-28 lift fans on its engine pods and the FC-1
+    -- flight computer fly it in Night City (fly-by-wire: W/S A/D Q/E, Space/R up, C down); two FD-1s under it take it
+    -- through the thin air to the Deep seam (the computer adds them when the fans run short) and drive it in Deep on HOLD
+    -- Triangle; the AC-6 turns it in vacuum; the PT-500 in the cabin bay feeds the FD-1s; the XLB-WH1 opens the wormhole
+    -- (Deep: TAP Triangle engage, RB/LB TAP target, LB HOLD abort). `another`: a second part of a design on its own mount.
+    av = {
+        { clear = { "triangle", "lb", "rb" } },
+        { code = "ZTC-VL28", mount = "mount.av.pod.fl", facing = "down", another = true },
+        { code = "ZTC-VL28", mount = "mount.av.pod.fr", facing = "down", another = true },
+        { code = "ZTC-VL28", mount = "mount.av.pod.rl", facing = "down", another = true },
+        { code = "ZTC-VL28", mount = "mount.av.pod.rr", facing = "down", another = true },
+        { code = "ZTC-FD1", mount = "mount.underside", facing = "down", another = true, bind = { "triangle", "hold", "throttle" } },
+        { code = "ZTC-FD1", mount = "mount.rear", facing = "down", another = true, bind = { "triangle", "hold", "throttle" } },
+        { code = "ZTC-AC6", mount = "mount.roof", facing = "up", refit = true },
+        { code = "ZTC-PT500", mount = "mount.av.bay", facing = "fore", refit = true },
+        { code = "XLB-WH1", mount = "mount.front", facing = "fore", refit = true, charge = true,
+          binds = { { "triangle", "tap", "engage" }, { "lb", "hold", "abort" }, { "rb", "tap", "next" }, { "lb", "tap", "prev" } } },
+        { code = "ZTC-FC1", mount = "mount.electronics", facing = "fore", refit = true },
+        { fuel = "full" }, { fusionMinKg = 400 },
+    },
 }
 NcmEngineering.KITS = KITS
 
@@ -918,13 +939,25 @@ local function ownerGrantPart(driverId, machineId, item)
     local d = designByCode(item.code)
     if not d then return "no design " .. tostring(item.code) end
     local on = installedOf(machineId, d.designId)
+    local out
+    if item.another then
+        -- one of several of this design: only the one already ON this mount counts (the others stay where they are)
+        on = MySQL.scalar.await([[SELECT a.asset_id FROM machine_configuration_current x
+            JOIN machine_configuration_item i ON i.configuration_id=x.configuration_id
+            JOIN component_asset a ON a.asset_id=i.component_asset_id
+            WHERE x.machine_asset_id=? AND i.interface_id=? AND a.design_id=? AND a.lifecycle='active' LIMIT 1]], { machineId, item.mount, d.designId })
+        if on then
+            out = ("%s already on %s: kept"):format(d.code, item.mount)
+        end
+    end
     if item.stow then
         if not on then return d.code .. " not fitted: nothing to stow" end
         local okR, mR = NcmEngineering.remove(0, on)
         return ("%s stowed: %s (%s)"):format(d.code, tostring(okR), tostring(mR))
     end
-    local out
-    if on and item.refit then
+    if on and item.another then
+        -- kept above
+    elseif on and item.refit then
         -- a refit moves the part: where is it now in the current configuration?
         local cur = MySQL.single.await([[SELECT i.interface_id, i.install_json FROM machine_configuration_current x
             JOIN machine_configuration_item i ON i.configuration_id=x.configuration_id

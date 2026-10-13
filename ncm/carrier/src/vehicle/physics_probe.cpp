@@ -839,7 +839,8 @@ void thrustAtGravity(void* body, const float* force, bool authorised) noexcept
 // session kill switch, SEH. A stale lease (> ttl) applies nothing.
 bool readForce(const void* body, float* outForceXyz) noexcept;
 
-constexpr float kMaxWrenchN = 150000.0f;
+constexpr float kMaxWrenchN = 400000.0f;      // 2026-10-12: an AV's lift (four fans + two FD-1s, ~172 kN) plus margin
+constexpr float kMaxAngularAcc = 8.0f;        // rad/s^2: the most any lease may spin a body up, per axis
 constexpr int kMaxWrenchTtlMs = 300;
 constexpr int kMaxPulseMs = 1000;
 
@@ -858,7 +859,14 @@ struct WrenchState {
     double impulse[3] = {0, 0, 0};
     double activeS = 0;
     float lastSus[3] = {0, 0, 0};
+    // 2026-10-12, the AV (a Machine flown by an installed flight computer)
+    float alpha[3] = {0, 0, 0};   // world rad/s^2, applied with the force at the gravity entry
+    float ncmMass = 0;            // the NCM Machine's mass: force * (body mass / this) = NCM's acceleration
+    bool av = false;
+    uint32_t spinWrites = 0, spinFaults = 0;
 };
+std::atomic<uint64_t> g_avUntilMs{0};       // GetTickCount64() until which an `av` lease asks for physics on the bound body
+std::atomic<uint64_t> g_boundTickMs{0};     // monotonicMs() of the bound body's last Recalculate
 std::mutex g_wrenchMutex;
 WrenchState g_wrench;
 std::atomic<uint32_t> g_wrenchRefusedAsset{0};
@@ -873,6 +881,9 @@ void clearWrench() noexcept
     g_liftSupersededUntilMs.store(0, std::memory_order_relaxed);
 }
 
+bool readSpin(const void* body, float* outXyz) noexcept;
+bool writeSpin(void* body, const float* xyz) noexcept;
+
 void wrenchAtGravity(void* body, const float* force, bool authorised) noexcept
 {
     std::unique_lock<std::mutex> lock(g_wrenchMutex, std::try_to_lock);
@@ -886,7 +897,8 @@ void wrenchAtGravity(void* body, const float* force, bool authorised) noexcept
         w.pulseRemainingS = w.pendingS;
         w.pulsesStarted++;
     }
-    const bool sus = now < w.susExpireMs && (w.sus[0] != 0.0f || w.sus[1] != 0.0f || w.sus[2] != 0.0f);
+    const bool spin = now < w.susExpireMs && (w.alpha[0] != 0.0f || w.alpha[1] != 0.0f || w.alpha[2] != 0.0f);
+    const bool sus = (now < w.susExpireMs && (w.sus[0] != 0.0f || w.sus[1] != 0.0f || w.sus[2] != 0.0f)) || spin;
     if (!sus && !w.pulseActive) return;
     if (!(authorised && g_writesEnabled.load(std::memory_order_relaxed))) {
         w.refusedUnbound++;
@@ -904,7 +916,16 @@ void wrenchAtGravity(void* body, const float* force, bool authorised) noexcept
         if (d > 0.0005f && d < 0.1f) dt = d;
     }
     float add[3] = {0, 0, 0};
-    if (sus) for (int i = 0; i < 3; ++i) add[i] += w.sus[i] * dt;
+    // the NCM Machine's acceleration, whatever the host body weighs (an AV body's mass is the game's, not the Machine's)
+    const float massScale = (w.ncmMass > 100.0f && w.mass > 100.0f) ? w.mass / w.ncmMass : 1.0f;
+    if (sus) for (int i = 0; i < 3; ++i) add[i] += w.sus[i] * massScale * dt;
+    if (spin && now < w.susExpireMs) {
+        float om[3];
+        if (readSpin(body, om)) {
+            for (int i = 0; i < 3; ++i) om[i] += w.alpha[i] * dt;
+            if (writeSpin(body, om)) w.spinWrites++; else { w.spinFaults++; }
+        }
+    }
     if (w.pulseActive) {
         const float a = dt < w.pulseRemainingS ? dt : w.pulseRemainingS;
         for (int i = 0; i < 3; ++i) add[i] += w.pf[i] * a;
@@ -1092,6 +1113,30 @@ bool writeForceXYZ(void* body, float fx, float fy, float fz) noexcept
         f[0] = fx;
         f[1] = fy;
         f[2] = fz;
+        return true;
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        return false;
+    }
+}
+
+/// The body's angular velocity (world rad/s, `+0x24`), guarded like every access. 2026-10-12: the AV's torque channel.
+bool readSpin(const void* body, float* outXyz) noexcept
+{
+    __try {
+        const auto* w = reinterpret_cast<const float*>(reinterpret_cast<const uint8_t*>(body) + kOffAngularVelocity);
+        outXyz[0] = w[0]; outXyz[1] = w[1]; outXyz[2] = w[2];
+        return true;
+    } __except (EXCEPTION_EXECUTE_HANDLER) {
+        return false;
+    }
+}
+
+bool writeSpin(void* body, const float* xyz) noexcept
+{
+    if (!(xyz[0] == xyz[0]) || !(xyz[1] == xyz[1]) || !(xyz[2] == xyz[2])) return false;
+    __try {
+        auto* w = reinterpret_cast<float*>(reinterpret_cast<uint8_t*>(body) + kOffAngularVelocity);
+        w[0] = xyz[0]; w[1] = xyz[1]; w[2] = xyz[2];
         return true;
     } __except (EXCEPTION_EXECUTE_HANDLER) {
         return false;
@@ -1375,6 +1420,7 @@ void observe(void* body) noexcept
                     }
                 }
                 handlingAuthorised = g_boundBody.load(std::memory_order_acquire) == address;
+                if (handlingAuthorised) g_boundTickMs.store(monotonicMs(), std::memory_order_relaxed);
             } else if (currentlyBound == address) {
                 uintptr_t stale = address;
                 if (g_boundBody.compare_exchange_strong(stale, 0, std::memory_order_acq_rel)) {
@@ -2241,6 +2287,7 @@ void reportWrench()
         snap = g_wrench;
         g_wrench.frames = g_wrench.pulsesStarted = g_wrench.pulsesDropped = g_wrench.refusedUnbound = g_wrench.faults = 0;
         g_wrench.impulse[0] = g_wrench.impulse[1] = g_wrench.impulse[2] = 0.0;
+        g_wrench.spinWrites = g_wrench.spinFaults = 0;
         g_wrench.activeS = 0.0;
     }
     const uint32_t refusedAsset = g_wrenchRefusedAsset.exchange(0, std::memory_order_relaxed);
@@ -2257,6 +2304,10 @@ void reportWrench()
              snap.impulse[0] / t, snap.impulse[1] / t, snap.impulse[2] / t,
              snap.mass > 100.0f ? imp / t / snap.mass : 0.0,
              snap.lastSus[0], snap.lastSus[1], snap.lastSus[2], snap.pulsesStarted, snap.pulsesDropped, snap.faults);
+    if (snap.av || snap.spinWrites || snap.spinFaults)
+        NCM_INFO("wrench AV: Machine %.0f kg on a %.0f kg body (force x%.2f) | spin (%.2f, %.2f, %.2f) rad/s^2, %u write(s), %u fault(s)",
+                 snap.ncmMass, snap.mass, (snap.ncmMass > 100.0f && snap.mass > 100.0f) ? snap.mass / snap.ncmMass : 1.0f,
+                 snap.alpha[0], snap.alpha[1], snap.alpha[2], snap.spinWrites, snap.spinFaults);
 }
 
 /// The seam kick's report: found, and one measured line per kick (asked for, velocity before, velocity two entries after).
@@ -2869,7 +2920,8 @@ void applyHandling(const std::string& assetId, const std::string& vehicleId,
 }
 
 bool applyWrench(const std::string& assetId, double fx, double fy, double fz, int ttlMs, bool supersedeLift,
-                 bool hasPulse, uint32_t pulseSeq, double px, double py, double pz, int pulseMs) noexcept
+                 bool hasPulse, uint32_t pulseSeq, double px, double py, double pz, int pulseMs,
+                 bool av, double ncmMassKg, double ax, double ay, double az) noexcept
 {
     {
         std::lock_guard<std::mutex> guard(g_bindingMetaMutex);
@@ -2891,6 +2943,13 @@ bool applyWrench(const std::string& assetId, double fx, double fy, double fz, in
         WrenchState& w = g_wrench;
         clampVec(fx, fy, fz, w.sus);
         for (int i = 0; i < 3; ++i) w.lastSus[i] = w.sus[i];
+        auto clampAcc = [](double a) -> float {
+            if (!(a == a)) return 0.0f;
+            return static_cast<float>(a > kMaxAngularAcc ? kMaxAngularAcc : (a < -kMaxAngularAcc ? -kMaxAngularAcc : a));
+        };
+        w.alpha[0] = clampAcc(ax); w.alpha[1] = clampAcc(ay); w.alpha[2] = clampAcc(az);
+        w.ncmMass = (ncmMassKg == ncmMassKg && ncmMassKg > 100.0 && ncmMassKg < 1.0e6) ? static_cast<float>(ncmMassKg) : 0.0f;
+        w.av = av;
         w.susExpireMs = now + static_cast<uint64_t>(ttl);
         if (hasPulse) {
             const bool fresh = !w.pulseSeqKnown || pulseSeq != w.lastPulseSeq;
@@ -2904,6 +2963,7 @@ bool applyWrench(const std::string& assetId, double fx, double fy, double fz, in
         }
     }
     if (supersedeLift) g_liftSupersededUntilMs.store(now + 600, std::memory_order_relaxed);
+    if (av) g_avUntilMs.store(now + 600, std::memory_order_relaxed);
     if (!g_wrenchSeen.exchange(true, std::memory_order_relaxed)) g_wrenchFirstPending.store(true, std::memory_order_release);
     return true;
 }
@@ -2972,4 +3032,16 @@ std::string status()
     return n > 0 ? std::string(buffer, static_cast<size_t>(n)) : std::string("probe=?");
 }
 
+}  // namespace ncm::vehicle::probe
+
+namespace ncm::vehicle::probe {
+uint64_t avEntityNeedingPhysics() noexcept
+{
+    if (GetTickCount64() >= g_avUntilMs.load(std::memory_order_relaxed)) return 0;
+    const uint64_t entity = g_expectedEngineEntity.load(std::memory_order_acquire);
+    if (entity == 0) return 0;
+    const uint64_t last = g_boundTickMs.load(std::memory_order_relaxed);
+    if (last != 0 && monotonicMs() - last < 300) return 0;   // its physics is running: nothing to switch on
+    return entity;
+}
 }  // namespace ncm::vehicle::probe

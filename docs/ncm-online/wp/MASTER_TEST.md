@@ -3415,3 +3415,13 @@ Offline: core `test_build_attach` (6), `tools/test-build-host.lua` (23: attach, 
 | §MKT3 | Bid on a used car near its ask. | The NPC accepts within a pass; the car is yours in Machine Index. | **NOT RUN** |
 | §BLD7 | F9 -> BUILD (KB-443). Attach a kit wing and a strut. | The palette lists the kit; the wing shows on the car (real mesh) and rides it while driving; a second client sees it. | **NOT RUN** |
 | §SKY10 | Fly into Deep over Night City (KB-458). | Night City's coast is where the Earth shows it, not in the ocean. | **NOT RUN** |
+
+## §AV - The AV on NCM engineering (L368) - **BUILT, NOT YET LIVE**
+| ID | Steps | Expected | Result |
+|---|---|---|---|
+| §AV1 | Machine Index: CALL the Atlus Trauma Team AV. Walk to it. | It appears (Trauma livery); one "[F] Enter" hint while you stand at it, gone when you walk away. | **NOT RUN** |
+| §AV2 | F at the AV, then F again. | Seated in the cockpit (the other client sees the pilot); F gets you out. | **NOT RUN** |
+| §AV3 | Seated: Space (or R) to climb, let go. | Plumes at the four pods; it lifts, then holds its height and stays level hands-off. Carrier log: `AV: physics switch ... enable(s)` and `wrench AV:` lines. | **NOT RUN** |
+| §AV4 | W/S, A/D, Q/E, C. | Nose down flies forward, A/D turns, Q/E banks, C descends; on the ground with nothing pressed it sits idle. | **NOT RUN** |
+| §AV5 | Climb out over the map edge to the 12 km seam. | The fans fade with height and the FD-1s take over (server TELEMETRY: FLY-BY-WIRE ... fusion %); Deep takes the AV at the seam. | **NOT RUN** |
+| §AV6 | In Deep: TAP Triangle (XLB-WH1 engage). | The wormhole drive runs as on the Hella (doc 58). | **NOT RUN** |

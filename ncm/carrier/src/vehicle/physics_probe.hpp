@@ -135,7 +135,13 @@ void clearHandling(bool releaseBenchConfig = true) noexcept;
 /// handling binding names; applied only at the positively bound, seated body's gravity entry, under the same gates
 /// as every write. `supersedeLift` parks NCM Thrust's legacy lift lever while fresh. Returns false when refused.
 bool applyWrench(const std::string& assetId, double fx, double fy, double fz, int ttlMs, bool supersedeLift,
-                 bool hasPulse, uint32_t pulseSeq, double px, double py, double pz, int pulseMs) noexcept;
+                 bool hasPulse, uint32_t pulseSeq, double px, double py, double pz, int pulseMs,
+                 bool av = false, double ncmMassKg = 0.0, double ax = 0.0, double ay = 0.0, double az = 0.0) noexcept;
+
+/// 2026-10-12, the AV: the engine entity whose physics must be switched on now -- an `av` wrench lease is fresh, the
+/// handling binding names an entity, and its body has not ticked through Recalculate lately (an AV is a scripted,
+/// kinematic body until something calls ForceEnablePhysics). 0 = nothing to do. Cheap; called every game frame.
+uint64_t avEntityNeedingPhysics() noexcept;
 
 /// One line, in the spirit of MtClutchDiag: everything the probe currently knows, cheap to call.
 std::string status();

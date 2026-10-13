@@ -57,6 +57,15 @@ Core.define("engineering.installation", function(C)
         -- L356: aero-electronics. Every road car has room behind the dash for a unit; it pushes nothing, so the bay's
         -- rating is irrelevant. It takes electronics only, and electronics go nowhere else.
         { id = "mount.electronics", label = "electronics bay, behind the dash", pos = { 0, 0.8, 0.7 }, ratedN = 1e9, electronics = true },
+        -- 2026-10-12 (owner: "aren't we using our engineering parts"): the Zetatech Atlus AV's four ENGINE PODS. Only an
+        -- airframe built for them has them (`vehicles`). Positions are the pod nozzles' places on the Atlus body (the
+        -- `av_zetatech_atlus__ext01_engines_*` meshes, as the Drive an Aerial Vehicle mod measured them), Machine frame.
+        { id = "mount.av.pod.fl", label = "front-left engine pod", pos = { -1.55, 2.2, 1.2 },   ratedN = 60000, blocked = { up = true }, vehicles = { zetatech_atlus_trauma = true } },
+        { id = "mount.av.pod.fr", label = "front-right engine pod", pos = { 1.55, 2.2, 1.2 },   ratedN = 60000, blocked = { up = true }, vehicles = { zetatech_atlus_trauma = true } },
+        { id = "mount.av.pod.rl", label = "rear-left engine pod", pos = { -1.45, -2.75, 1.0 },  ratedN = 60000, blocked = { up = true }, vehicles = { zetatech_atlus_trauma = true } },
+        { id = "mount.av.pod.rr", label = "rear-right engine pod", pos = { 1.45, -2.75, 1.0 },  ratedN = 60000, blocked = { up = true }, vehicles = { zetatech_atlus_trauma = true } },
+        -- the cabin's equipment bay, on the centre line over the balance point (a tank or a drive rides here)
+        { id = "mount.av.bay", label = "cabin equipment bay", pos = { 0, -0.3, 0.9 }, ratedN = 60000, blocked = { up = true, down = true }, vehicles = { zetatech_atlus_trauma = true } },
     }
     for _, m in ipairs(M.MOUNTS) do m.blocked = m.blocked or {} end
     local mountById = {}
@@ -67,7 +76,8 @@ Core.define("engineering.installation", function(C)
     --- Families that install on a mount (add-ons), as opposed to the effect-scalar families that replace a
     --- factory component at a fixed interface (parts.catalogue). Handling composition must never see these.
     M.FAMILIES = { propulsor = true, impulse_actuator = true, attitude = true, tank = true, gearbox = true, slipstream = true,
-        exotic_drive = true }   -- doc 58: the lab-only experimental drives
+        exotic_drive = true,    -- doc 58: the lab-only experimental drives
+        avionics = true }       -- 2026-10-12: the AV's flight computer
     function M.isAddOnFamily(family) return M.FAMILIES[family] == true end
 
     --- Driveline kinds (engineering.drivetrain's vocabulary): they change ratios, never push. NCM Gearbox drives them.
@@ -75,7 +85,7 @@ Core.define("engineering.installation", function(C)
     function M.isDriveline(kind) return M.DRIVELINE_KINDS[kind] == true end
 
     --- Electronic kinds (L356): they sense and decide, never push. Installed in the electronics bay, facing fore.
-    M.ELECTRONIC_KINDS = { wake_system = true }
+    M.ELECTRONIC_KINDS = { wake_system = true, flight_computer = true }
     function M.isElectronic(kind) return M.ELECTRONIC_KINDS[kind] == true end
 
     -- ------------------------------------------------------------------------------------------ designs
@@ -189,6 +199,35 @@ Core.define("engineering.installation", function(C)
         -- L356: the Slipstream Module. An aftermarket product for any road car, sold on the Base Market (`sale`), installed
         -- in the electronics bay. Its numbers are the unit's own (aero.slipstream reads perf over its defaults), so a
         -- later revision -- or an engineer's -- is a new design, never an edited constant.
+        -- 2026-10-12 (owner: "make it fly ... aren't we using our engineering parts and vfx"): the AV's lift engines. A
+        -- ducted lift fan is an AIR-BREATHING reaction device (`jet`): its reaction mass is the air, so its fuel Isp is far
+        -- above the 360 s chemistry ceiling (L342 covers rockets, which carry all their reaction mass), and it pushes nothing
+        -- in vacuum. Four give the fitted Atlus (~7.3 t) thrust/weight 1.5 at sea level; its two FD-1s take it the rest of the
+        -- way (with them: 2.4 at sea level, 1.2 at the 12 km Deep seam, where the air leaves the fans a quarter of their thrust). The pods swivel (+-20 deg): the
+        -- dynamics tilts each engine's thrust line for whatever torque the flight computer asks, so pitch, roll and yaw come
+        -- from the engines themselves -- no attitude set needed.
+        {
+            designId = "eng:zetatech:vl28:r1", lineageId = "eng:zetatech:vl28", revision = 1,
+            manufacturer = "Zetatech", makerKey = "zetatech", code = "ZTC-VL28", family = "propulsor",
+            name = "AV Lift Engine VL-28",
+            subtitle = "A swivelling ducted lift fan for an AV engine pod. 28 kN at sea level, nothing in vacuum. Burns the Machine's own fuel.",
+            interface = "hardpoint.h1", massKg = 260, envelope = { 1.2, 1.6, 1.2 }, price = 64000,
+            perf = { kind = "jet", thrustN = 28000, ispS = 8000, propellant = "fuel", throttleTauS = 0.35, gimbalDeg = 20, heatKw = 120 },
+            thermal = { capacityKjK = 120, rejectKw = 140, limitK = 400, resumeK = 250 },
+            lab = true,
+        },
+        -- ... and the computer that flies them. It pushes nothing: it reads the stick and the Machine's attitude and spin and
+        -- commands each engine's throttle and the torque the engines' swivel must make (engineering.flightcontrol). Fly-by-
+        -- wire, the way every AV in Night City flies: let go of the stick and it holds itself level and its height.
+        {
+            designId = "eng:zetatech:fc1:r1", lineageId = "eng:zetatech:fc1", revision = 1,
+            manufacturer = "Zetatech", makerKey = "zetatech", code = "ZTC-FC1", family = "avionics",
+            name = "AV Flight Computer FC-1",
+            subtitle = "Fly-by-wire for a lift-engine Machine: holds it level and at height; the stick asks for attitude and climb.",
+            interface = "hardpoint.h1", massKg = 12, envelope = { 0.4, 0.3, 0.15 }, price = 22000,
+            perf = { kind = "flight_computer", maxTiltDeg = 22, maxClimbMs = 9, maxYawRateDegS = 45 },
+            lab = true,
+        },
         {
             designId = "eng:eddywright:sl1:r1", lineageId = "eng:eddywright:sl1", revision = 1,
             manufacturer = "Eddywright", makerKey = "eddywright", code = "EDW-SL1", family = "slipstream",
@@ -282,6 +321,7 @@ Core.define("engineering.installation", function(C)
         if not (vehicleKey and Vehicles.byKey(vehicleKey)) then return { ok = false, reason = "no hardpoint profile for this Machine" } end
         local m = mountById[mountId or ""]
         if not m then return { ok = false, reason = "no such mount (" .. tostring(mountId) .. ")" } end
+        if m.vehicles and not m.vehicles[vehicleKey] then return { ok = false, reason = ("this Machine has no %s"):format(m.label) } end
         if d.interface ~= M.STANDARD then return { ok = false, reason = ("interface %s does not mate with %s"):format(tostring(d.interface), M.STANDARD) } end
         local f = M.FACINGS[facing or ""]
         if not f then return { ok = false, reason = "facing must be one of: " .. table.concat(M.FACING_ORDER, ", ") } end

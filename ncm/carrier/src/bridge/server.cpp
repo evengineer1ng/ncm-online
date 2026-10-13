@@ -746,6 +746,9 @@ void Server::dispatch(const std::string& payload)
         out.fx = num(w, "fx"); out.fy = num(w, "fy"); out.fz = num(w, "fz");
         out.ttlMs = static_cast<int>(num(w, "ttlMs"));
         out.supersedeLift = w.value("supersedeLift", false);
+        out.av = w.contains("av") && w["av"].is_boolean() && w["av"].get<bool>();
+        if (w.contains("massKg") && w["massKg"].is_number()) { out.hasMass = true; out.massKg = w["massKg"].get<double>(); }
+        out.ax = num(w, "ax"); out.ay = num(w, "ay"); out.az = num(w, "az");
         if (w.contains("pulse") && w["pulse"].is_object()) {
             const auto& p = w["pulse"];
             out.hasPulse = true;
