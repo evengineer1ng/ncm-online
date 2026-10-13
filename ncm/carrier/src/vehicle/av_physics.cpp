@@ -61,6 +61,7 @@ RED4ext::Handle<RED4ext::IScriptable> g_vehicle;   // keeps the AV alive while w
 uint64_t g_vehicleEntity = 0;
 uint64_t g_nextFindMs = 0;
 bool g_flying = false;
+bool g_isAvClass = false;                 // the bound body is the game's AV object (script-moved) rather than a car body
 LARGE_INTEGER g_freq{}, g_last{};
 
 // the AV whose own forces are dropped (the detours run wherever the game applies them; a plain pointer compare)
@@ -207,9 +208,14 @@ void find(uint64_t entity, uint64_t now)
         RED4ext::Handle<RED4ext::IScriptable> found;
         if (!RED4ext::ExecuteFunction("ScriptGameInstance", "FindEntityByID", &found, game, id) || !found) { ++g_notFound; return; }
         auto* rtti = RED4ext::CRTTISystem::Get();
+        // 0.1.42 (KB-469): any vehicle body. NCM AV's Atlus is a CAR-class body (vehicleArmedCarBaseObject), as Drive an
+        // Aerial Vehicle's is -- the game's own AV object is script-moved and never integrates a force. The entity is
+        // still the one the server bound to this lease (the probe's identity), never a guess.
+        auto* vehClass = rtti ? rtti->GetClass("vehicleBaseObject") : nullptr;
         auto* avClass = rtti ? rtti->GetClass("vehicleAVBaseObject") : nullptr;
         auto* type = found->GetType();
-        if (!avClass || !type || !type->IsA(avClass)) { ++g_notAv; return; }
+        if (!vehClass || !type || !type->IsA(vehClass)) { ++g_notAv; return; }
+        g_isAvClass = avClass && type->IsA(avClass);
         g_vehicle = found;
     } catch (...) {
         ++g_notFound;
@@ -225,10 +231,10 @@ void report(uint64_t now, uint64_t entity, bool active)
     char line[640];
     std::snprintf(line, sizeof line,
         "frames=%u state=%u gravity=%u enables=%u notAv=%u notFound=%u badPd=%u bodyMass=%.0f invMass=%.6f ncmMass=%.0f "
-        "v=(%.2f,%.2f,%.2f) F=(%.0f,%.0f,%.0f) acc0=(%.0f,%.0f,%.0f) blocked=%u/%u hooks=%s inertia=%s entity=%llu%s",
+        "v=(%.2f,%.2f,%.2f) F=(%.0f,%.0f,%.0f) acc0=(%.0f,%.0f,%.0f) blocked=%u/%u hooks=%s inertia=%s body=%s entity=%llu%s",
         g_frames, g_lastState, static_cast<unsigned>(g_lastGravity), g_enables, g_notAv, g_notFound, g_badPd,
         g_lastMass, g_lastInvMass, g_lastNcmMass, g_lastV[0], g_lastV[1], g_lastV[2], g_lastF[0], g_lastF[1], g_lastF[2],
-        g_lastAccF[0], g_lastAccF[1], g_lastAccF[2], bf, bt, g_hooksAttached ? "on" : "OFF", g_lastInertiaFallback ? "FALLBACK" : "body",
+        g_lastAccF[0], g_lastAccF[1], g_lastAccF[2], bf, bt, g_hooksAttached ? "on" : "OFF", g_lastInertiaFallback ? "FALLBACK" : "body", g_isAvClass ? "av" : "car",
         static_cast<unsigned long long>(entity), g_dead ? " DEAD" : "");
     NCM_INFO("AV: %s", line);
     if (g_report) g_report(line);

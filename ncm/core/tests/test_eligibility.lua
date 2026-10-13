@@ -2,7 +2,7 @@
 local MAIMAI = "Vehicle.v_standard2_makigai_maimai"
 local PICKUP = "Vehicle.v_standard25_thorton_colby_pickup"     -- Muscle AND Nomad
 local CALIBURN = "Vehicle.v_sport1_rayfield_caliburn"          -- Sport, prestige 5, halo
-local AV = "Vehicle.av_zetatech_atlus"                          -- Tech, tagged aerial
+local AV = "Vehicle.ncm_atlus_av"                               -- Tech, tagged aerial (NCM AV mod record)
 
 return {
     an_empty_spec_admits_every_ground_car = function(T)

@@ -50,7 +50,7 @@ Core.define("data.vehicle_catalogue", function(C)
         Vehicle_v_standard25_thorton_merrimac     = { "Thorton", "Merrimac" },
         Vehicle_v_standard3_makigai_tanishi       = { "Makigai", "Tanishi" },
         Vehicle_v_standard3_militech_hellhound    = { "Militech", "Hellhound" },
-        Vehicle_av_zetatech_atlus                 = { "Zetatech", "Atlus Trauma Team AV" },
+        Vehicle_ncm_atlus_av                      = { "Zetatech", "Atlus Trauma Team AV" },
         Vehicle_v_utility4_chevalier_legatus      = { "Chevillon", "Legatus" },
         Vehicle_v_sportbike1_yaiba_kusanagi       = { "Yaiba", "Kusanagi CT-3X" },
         Vehicle_v_sportbike1_yaiba_muramasa       = { "Yaiba", "Muramasa" },
@@ -96,7 +96,7 @@ Core.define("data.vehicle_catalogue", function(C)
         Vehicle_v_standard2_archer_bandit="archer_bandit", Vehicle_v_standard2_archer_quartz="archer_quartz",
         Vehicle_v_standard2_mizutani_hozuki="mizutani_hozuki", Vehicle_v_standard25_thorton_merrimac="thorton_merrimac",
         Vehicle_v_standard3_makigai_tanishi="makigai_tanishi", Vehicle_v_standard3_militech_hellhound="militech_hellhound",
-        Vehicle_av_zetatech_atlus="zetatech_atlus_trauma",
+        Vehicle_ncm_atlus_av="zetatech_atlus_trauma",
         Vehicle_v_utility4_chevalier_legatus="chevillon_legatus", Vehicle_v_sportbike1_yaiba_kusanagi="yaiba_kusanagi",
         Vehicle_v_sportbike1_yaiba_muramasa="yaiba_muramasa", Vehicle_v_sportbike2_arch="arch_nazare",
     }

@@ -27,7 +27,10 @@ Core.define("data.vehicle_templates", function(C)
 
     --- Model strings proven live, keyed by TweakDB record. **Authored only from an observed projection**, one
     --- row per confirmed record, never from inference. Empty until the first live session fills it.
-    M.OVERRIDE = {}
+    M.OVERRIDE = {
+        -- KB-469: the NCM AV mod's car-class Atlus (ncm\av\atlus in its archive)
+        ["Vehicle.ncm_atlus_av"] = "ncm\\av\\atlus\\ncm_atlus.ent",
+    }
 
     --- Folder under `base\vehicles` for a class token: `sport2` -> `sport`, `standard25` -> `standard`,
     --- `sportbike1` -> `sportbike`. The trailing digits are a variant index, not part of the path.
@@ -46,6 +49,8 @@ Core.define("data.vehicle_templates", function(C)
         base = base:gsub("_player$", "")
         -- AVs (`Vehicle.av_zetatech_atlus`, 2026-10-12; `av_trauma` never projected on a client) live under base\vehicles\special
         if base:match("^av_") then return base, "special" end
+        -- NCM's own records (`Vehicle.ncm_atlus_av`, the NCM AV mod) name their template in OVERRIDE
+        if base:match("^ncm_") then return base, "ncm" end
         local token = base:match("^v_(%a+%d*)_")
         if not token then return nil, "no_class_token" end
         return base, token

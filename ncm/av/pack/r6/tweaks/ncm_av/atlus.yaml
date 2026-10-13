@@ -1,19 +1,36 @@
-# NCM AV (KB-467, 2026-10-13): the Zetatech Atlus gets a rigid body again.
+# NCM AV 0.2.0 (KB-469, 2026-10-13): the Trauma Team Atlus as a flyable Machine, built the way Drive an Aerial Vehicle
+# builds its own (tidusmd0806/CP2077-DriveAerialVehicle, MIT -- see ncm/av/README.md for the licence and credit).
 #
-# Phantom Liberty's override of the Atlus entity (ep1\vehicles\special\av_zetatech_atlus_basic_02.ent) has a
-# vehicleChassisComponent with NO collisionResource, so a spawned Atlus has no rigid body: ForceEnablePhysics
-# switches on nothing, the physics data is never integrated, and no force moves it (NCM Carrier 0.1.41's report:
-# velocity 0, force accumulator never consumed). The base-game entities carry the chassis collider
-# (base\vehicles\special\av_zetatech_atlus\entities\meshes\av_zetatech_atlus__ext01_interaction_collider.phys) --
-# the same one Drive an Aerial Vehicle puts on its own Atlus. Vanilla files only; nothing is copied from DAV.
+# Why a new record and a new entity:
+#   * the game's AV object (vehicleAVBaseObject) is moved by scripts: NCM Carrier 0.1.41 found its physics data never
+#     integrated (velocity 0, force accumulator never consumed) however its physics was switched on (KB-467);
+#   * Phantom Liberty's Atlus entity has no chassis collider; the cargo variant has no front seats, so OPEN//77's AV
+#     pilot search took a tyre-effect slot and re-parked the AV every ~2 s (KB-468); basic_01 is a prop (KB-469).
+#   * DAV's Atlus is a vehicleArmedCarBaseObject (a CAR body: CarComponent, wheeled physics, seat_front_left/right)
+#     with the Atlus appearances, the chassis collider and a thruster effect. ncm\av\atlus\ncm_atlus.ent is that entity,
+#     re-pathed (tools/ncm-av-repath.py); its two .app files and the effect come with it; everything else is vanilla.
+#   * The record is named Vehicle.ncm_atlus_av -- not Vehicle.av_* -- so OPEN//77's AV-only handling (pilot search,
+#     exit watchdog, vflt) leaves it alone, while ncm_world's av_board still knows it (`_av$`).
 #
-# 0.1.1 (KB-468): basic_02 is the cargo variant -- its only seats are passenger_seat_a..e, so OPEN//77's AV pilot search
-# (slots named *pilot* / *cockpit* / *cabin*) fell through to `fx_wheel_front_left_skid`, and its exit watchdog
-# re-parked the AV every ~2 s (vexit-restore / vflt-parkexit: the flicker). basic_01 is the same Atlus with the chassis
-# collider AND a pilot slot (`weyland_pilot`), and the same appearances (default Trauma Team).
-#
-# 0.1.2 (KB-469): REVERTED to basic_02. basic_01's root is a plain entEntity (a scene prop), so OPEN//77 refused to
-# spawn it (`spawned_entity_is_not_game_object`) and the AV never appeared.
-Vehicle.av_zetatech_atlus:
-  entityTemplatePath: 'base\vehicles\special\av_zetatech_atlus_basic_02.ent'
-  appearanceName: zetatech_atlus_trama_team
+# 0.1.x pointed the stock Vehicle.av_zetatech_atlus at other entities; that override is gone: the stock record is vanilla.
+
+Vehicle.ncm_atlus_av:
+  $base: Vehicle.av_zetatech_atlus
+  entityTemplatePath: 'ncm\av\atlus\ncm_atlus.ent'
+  appearanceName: trama_team
+  player_audio_resource: v_av_basilisk_tank
+  vehDriver_FPPCameraParams: Vehicle.VehicleDriverFPPCameraParamsDefault
+  vehDriverCombat_FPPCameraParams: Vehicle.VehicleDriverFPPCameraParamsDefault
+  tppCameraPresets:
+    - Camera.VehicleTPP_4w_Preset_High_Close
+    - Camera.VehicleTPP_4w_Preset_Low_Close
+    - Camera.VehicleTPP_4w_Preset_High_Medium
+    - Camera.VehicleTPP_4w_Preset_Low_Medium
+    - Camera.VehicleTPP_4w_Preset_High_Far
+    - Camera.VehicleTPP_4w_Preset_Low_Far
+    - Camera.VehicleTPP_4w_Preset_High_DriverCombatClose
+    - Camera.VehicleTPP_4w_Preset_Low_DriverCombatClose
+    - Camera.VehicleTPP_4w_Preset_High_DriverCombatMedium
+    - Camera.VehicleTPP_4w_Preset_Low_DriverCombatMedium
+    - Camera.VehicleTPP_4w_Preset_High_DriverCombatFar
+    - Camera.VehicleTPP_4w_Preset_Low_DriverCombatFar
