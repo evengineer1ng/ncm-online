@@ -38,7 +38,9 @@ Core.define("presentation.fx_cues", function(C)
                     gain = { q = "frac", from = { 0, 1 }, to = { 0.3, 1.0 } } } },
         { id = "plume.jet", on = { kind = "propulsor", sub = { jet = true } },
           require = { throttle = { gt = 0.02 } }, drive = "thrustN", exhaust = true, priority = 7,
-          tiers = { { at = 0, asset = "jet_s" }, { at = 10000, asset = "jet_l" } },
+          -- 2026-10-12 (owner, first AV flight: "too much fx"): an AV pod's lift fan (28 kN) is the small thruster; the
+          -- big one is for a jet past 40 kN
+          tiers = { { at = 0, asset = "jet_s" }, { at = 40000, asset = "jet_l" } },
           audio = { voice = "jet_whine", pitch = { q = "throttle", from = { 0, 1 }, to = { 0.7, 1.4 } },
                     gain = { q = "frac", from = { 0, 1 }, to = { 0.2, 1.0 } } } },
         { id = "fan.wash", on = { kind = "propulsor", sub = { propeller = true } },

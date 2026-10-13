@@ -213,8 +213,13 @@ local function vec(p) return p and { tonumber(p.x or p[1]) or 0, tonumber(p.y or
 local function avFrame(E, dt, t)
     local okF, frame = pcall(Open77.character.frame, { vehicleId = boundVehicle })
     local okV, v = pcall(Open77.vehicles.get, boundVehicle)
-    if not (okF and type(frame) == "table" and frame.right and frame.forward and frame.up and okV and type(v) == "table" and v.position) then return end
-    local r, f, u, pos = vec(frame.right), vec(frame.forward), vec(frame.up), vec(v.position)
+    if not (okF and type(frame) == "table" and frame.right and frame.forward and frame.up and okV and type(v) == "table") then return end
+    -- 2026-10-12 (owner, first AV flight: "janky af, doesnt rise properly"): the BODY's own position, from
+    -- `character.frame` -- the replicated snapshot moves in steps, so its frame-to-frame difference read 0 m/s for most
+    -- frames and then 29 m/s, and the computer fought its own bad readings
+    local bodyPos = frame.position or v.position
+    if not bodyPos then return end
+    local r, f, u, pos = vec(frame.right), vec(frame.forward), vec(frame.up), vec(bodyPos)
     local rot = { { r[1], f[1], u[1] }, { r[2], f[2], u[2] }, { r[3], f[3], u[3] } }
 
     -- the model: built once per installed configuration; its state (tanks, throttle lag, heat) is kept across frames
@@ -241,8 +246,22 @@ local function avFrame(E, dt, t)
 
     local rho = Flight.density(pos[3])
     local mass = Dyn.mass(m, s)
-    local contact = v.onGround == true
-    local cmd, rep = FC.step(m, s, stick(), { mass = mass, inertia = m.inertia, rho = rho, g = 9.81, contact = contact, perf = E.fc })
+    -- PARKED until the pilot asks for lift; parked again once it has settled after a descent (the snapshot carries no
+    -- ground contact: on the first flight the computer hovered on the pad with every plume burning)
+    local st = stick()
+    F.parked = F.parked ~= false
+    if F.parked then
+        if st.lift > 0 then F.parked, F.settleMs = false, nil end
+    else
+        if st.lift < 0 and math.abs(F.vel[3]) < 0.4 then
+            F.settleMs = (F.settleMs or 0) + dt * 1000
+            if F.settleMs > 1500 then F.parked = true end
+        else
+            F.settleMs = nil
+        end
+    end
+    local contact = F.parked
+    local cmd, rep = FC.step(m, s, st, { mass = mass, inertia = m.inertia, rho = rho, g = 9.81, contact = contact, perf = E.fc })
     if NcmClientDevHeat then for _, st in pairs(s.dev or {}) do st.heatK, st.hot = 0, false end end
     local fuelBefore, fusionBefore = Dyn.propellantLeft(m, s, "fuel"), Dyn.propellantLeft(m, s, "fusion")
     local _, tel = Dyn.step(m, s, { g = { 0, 0, -9.81 }, rho = rho, contact = contact }, cmd, dt)
@@ -282,12 +301,13 @@ local function avFrame(E, dt, t)
     end
     if NcmFx then
         local env = { rho = rho, contact = contact, altitude = pos[3] }
+        if F.parked then out = {} end   -- parked: nothing burns, nothing is drawn
         local em = Fx.fromInstall(E.assetId, E.devices, out, E.state, env)
         local body = Fx.machine(E.assetId, { speed = tonumber(v.speed) or 0, rho = rho, contact = contact, altitude = pos[3] }, E.fxBody)
         E.fxBody = body[1].q
         em[#em + 1] = body[1]
         NcmFx.publish(E.assetId, boundVehicle, em)
-        NcmFx.frame(E.assetId, em, frame, v.position)
+        NcmFx.frame(E.assetId, em, frame, bodyPos)
     end
 
     if t - E.report.since >= REPORT_MS then
@@ -300,12 +320,14 @@ local function avFrame(E, dt, t)
         local state = rep.idle and " PARKED" or (rep.short and " SHORT" or "")
         TriggerServerEvent("ncm:engineering.burn", { assetId = E.assetId, kg = E.report.kg, fusionKg = E.report.fusionKg or 0,
             dtS = (t - E.report.since) / 1000, pulses = 0,
-            t = { devices = ("FLY-BY-WIRE need %.0f kN (air %.0f%%, fusion %.0f%%)%s pitch %.1f roll %.1f vz %.1f | %s"):format(
+            t = { devices = ("FLY-BY-WIRE [%s z %.1f snap %.1f] need %.0f kN (air %.0f%%, fusion %.0f%%)%s pitch %.1f roll %.1f vz %.1f | %s"):format(
+                    frame.position and "body" or "SNAPSHOT", pos[3], v.position and tonumber(v.position.z) or -1,
                     (rep.needN or 0) / 1000, (rep.uAir or 0) * 100, (rep.uRocket or 0) * 100, state,
                     math.deg(pitch), math.deg(roll), F.vel[3], table.concat(parts, " | ")),
                 fx = Fw[1], fy = Fw[2], fz = Fw[3], f = math.sqrt(Fw[1] ^ 2 + Fw[2] ^ 2 + Fw[3] ^ 2),
                 fwx = f[1], fwy = f[2], fwz = f[3], upx = u[1], upy = u[2], upz = u[3],
                 speed = tonumber(v.speed) or 0, z = pos[3], hot = false,
+                snapZ = v.position and tonumber(v.position.z) or nil, src = frame.position and "body" or "snapshot",
                 loss = "torque expressed as angular acceleration on the body; host collisions and damping not in the model" } })
         E.report = { kg = 0, fusionKg = 0, pulses = 0, since = t }
     end

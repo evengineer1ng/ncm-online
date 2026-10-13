@@ -27,6 +27,7 @@ Core.define("engineering.flightcontrol", function(C)
     M.K_RATE = 5.0       -- 1/s: turn-rate error -> wanted angular acceleration
     M.K_CLIMB = 1.6      -- 1/s: vertical-speed error -> wanted vertical acceleration
     M.MAX_ANG_ACC = 2.5  -- rad/s^2: the most the computer asks of the airframe about any axis
+    M.THIN_AIR_MARGIN = 1.15   -- rockets join only when the fans' whole thrust is under 1.15 x the weight
 
     local function clamp(x, a, b) return x < a and a or (x > b and b or x) end
 
@@ -119,7 +120,10 @@ Core.define("engineering.flightcontrol", function(C)
         end
         local uAir = airCap > 0 and clamp(need / airCap, 0, 1) or 0
         local left = math.max(0, need - uAir * airCap)
-        local uRocket = rocketCap > 0 and clamp(left / rocketCap, 0, 1) or 0
+        -- 2026-10-12 (owner, first AV flight: the FD-1s flickered on and off over the city): the rockets are for air too
+        -- thin to HOLD the Machine, never for a brisk climb the fans could make a moment later
+        local thin = airCap < mass * g * M.THIN_AIR_MARGIN
+        local uRocket = (thin and rocketCap > 0) and clamp(left / rocketCap, 0, 1) or 0
         local com = m.com or { 0, 0, 0 }
         -- the torque the rockets' fixed lines make at that throttle (an off-centre FD-1): the fans balance it out
         local rocketTx, rocketTy = 0, 0
