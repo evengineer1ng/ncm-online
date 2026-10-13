@@ -354,7 +354,8 @@ end
 -- away; a record written before this run began is reset the moment it is seen (boot, the periodic check, a join).
 local function loopSpawn()
     local x, y, z, h = tostring(GetConvar and GetConvar("ncm_loop_spawn", "") or ""):match("([%-%d%.]+),([%-%d%.]+),([%-%d%.]+),?([%-%d%.]*)")
-    return { x = tonumber(x) or -1442.2, y = tonumber(y) or 127.4, z = tonumber(z) or 18.0, heading = tonumber(h) or 0 }
+    -- KB-471: the old default (-1442.2, 127.4, 18.0) is inside the Arasaka lobby; open ground beside the AV pad instead
+    return { x = tonumber(x) or -3061.9, y = tonumber(y) or 375.4, z = tonumber(z) or 31.8, heading = tonumber(h) or 0 }
 end
 local function runStart()
     local ok, w = pcall(function() return NcmWeek and NcmWeek.read and NcmWeek.read() end)

@@ -10,8 +10,11 @@ local function log(fmt, ...) print(("[ncm_world/life] " .. fmt):format(...)) end
 local RESPAWN_DELAY_MS = 3000
 local SWEEP_MS = 5000
 -- Ground points the platform's own freeroam ships as spawns (validated positions), one per region.
+-- KB-471 (owner, 2026-10-13: "make sure i never spawn in arasaka lobby wtf i cant get out"): the freeroam "Westbrook
+-- dealership" point (-1442.2, 127.4, 18.0) is INSIDE the Arasaka lobby -- a respawn there is a trap. Removed; the first
+-- point (the fallback) is ground the owner has stood on in the open (beside the AV pad, client world probe 2026-10-13).
 local SAFE = {
-    { name = "Westbrook dealership", x = -1442.2, y = 127.4, z = 18.0, heading = 0 },
+    { name = "AV pad, open ground", x = -3061.9, y = 375.4, z = 31.8, heading = 0 },
     { name = "City Center west", x = -667.14, y = -382.61, z = 9.16, heading = 0 },
     { name = "East laboratory", x = 1669.75, y = -739.12, z = 49.86, heading = 0 },
     { name = "Badlands arena", x = 381.36, y = -2401.79, z = 181.99, heading = 0 },

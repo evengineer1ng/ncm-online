@@ -401,11 +401,25 @@ local function saveLocation(pid, driverId, reason)
         end
         return
     end
-    if not Location.worthSaving(lastSaved[driverId], here) and reason ~= "disconnect" then return end
-    lastSaved[driverId] = here
+    -- KB-471: a seat is not a place, and the snapshot's own flags do not see every seat -- an AV hovering at 110 m was
+    -- saved as ground and the next join was restored into the sky (fell, died, respawned into the Arasaka lobby). Ask
+    -- the seat ledger; while seated, keep the last place they stood.
     local seated = false
     local okV, v = pcall(function() return p.vehicle or p.inVehicle end)
     if okV and v then seated = true end
+    if not seated then
+        local okS, seat = pcall(Open77.vehicles.getPlayerSeat, pid)
+        if okS and type(seat) == "table" and (seat.vehicleId or seat.vehicle or seat.id) then seated = true end
+    end
+    if seated then
+        if saveRefused[pid] ~= "seated" then
+            saveRefused[pid] = "seated"
+            log("location: not saving for driver=%s -- seated in a vehicle (keeping the last place they stood)", tostring(driverId):sub(1, 8))
+        end
+        return
+    end
+    if not Location.worthSaving(lastSaved[driverId], here) and reason ~= "disconnect" then return end
+    lastSaved[driverId] = here
     pcall(function()
         MySQL.insert.await(
             "INSERT INTO driver_location (ncm_driver_id, server_id, x, y, z, heading, bucket, in_vehicle, saved_at) " ..
