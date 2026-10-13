@@ -1,3 +1,8 @@
+**LATEST 2026-10-13 07:20 UTC - KB-469 LIVE ON ONLINE: THE ATLUS IS NOW A CAR-CLASS BODY (DAV'S METHOD), NCM AV 0.2.0 + CARRIER 0.1.42; NOT YET FLOWN.**
+- DAV flies a `vehicleArmedCarBaseObject` Atlus, not the game's script-moved AV object. NCM AV 0.2.0 = that entity re-pathed under `ncmv\` + record `Vehicle.ncm_atlus_av`; Carrier 0.1.42 flies any bound vehicle body; both stored Atlus assets moved to the new record. Deployed 07:19 UTC with nobody online, clean boot, required mods 23 (`dbd9743c...`).
+- Checked offline before handing over: entity class, chassis collider, `seat_front_left`, appearance paths, all four game-function hashes, gate green except KB-463. NOT checkable offline: TweakXL applying the record in game, the spawn, the boarding, the flight.
+- **THE ONE NEXT ACTION:** owner relaunches (accept NCM Carrier 0.1.42 + NCM AV 0.2.0), CALLs the Atlus, F / Square, holds Space. Then read the client log on this PC (`Dynamic entity service` for the spawn, no `vexit-restore` loop) and the TELEMETRY CARRIER line (`body=car`, `v` z non-zero, `acc0` near 0).
+
 **LATEST 2026-10-13 07:05 UTC - KB-469: THE AV STOPPED SPAWNING (ATLUS basic_01 IS A PROP); REVERT BUILT (NCM AV 0.1.2), WAITING FOR AN EMPTY SERVER; DAV FLIES A CAR-CLASS ATLUS.**
 - `spawned_entity_is_not_game_object`: basic_01's root is `entEntity`. NCM AV 0.1.2 (basic_02) is committed; publish + restart only with nobody online.
 - DAV's flyable Atlus is a `vehicleArmedCarBaseObject` (car physics, car seats), not an AV object -- the step every earlier attempt missed.
