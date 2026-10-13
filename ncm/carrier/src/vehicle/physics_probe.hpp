@@ -143,6 +143,10 @@ bool applyWrench(const std::string& assetId, double fx, double fy, double fz, in
 /// kinematic body until something calls ForceEnablePhysics). 0 = nothing to do. Cheap; called every game frame.
 uint64_t avEntityNeedingPhysics() noexcept;
 
+/// 0.1.40: the fresh `av` lease, for the game-thread AV writer. Returns false when there is none (or the wrench is busy
+/// this instant). `entity` = the handling binding's engine entity; force world N; alpha world rad/s^2; the NCM mass.
+bool avCommand(uint64_t& entity, float* forceN, float* alpha, float& ncmMassKg) noexcept;
+
 /// One line, in the spirit of MtClutchDiag: everything the probe currently knows, cheap to call.
 std::string status();
 

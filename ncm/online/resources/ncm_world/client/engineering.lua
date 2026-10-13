@@ -196,7 +196,7 @@ local function axis(n)
 end
 
 --- The pilot's stick, on Deep's keys (one grammar on the ground and in space): W/S pitch to fly forward/back, A/D turn,
---- Q/E bank, Space or R climb, C descend; on a pad the left stick (pitch, turn), right stick X (bank), the triggers (lift).
+--- Q/E bank, R climb, C descend; on a pad the left stick (pitch, turn), right stick X (bank), the triggers (lift).
 local function stick()
     local function k(c) return down(c) and 1 or 0 end
     local function cl(x) return math.max(-1, math.min(1, x)) end
@@ -204,7 +204,8 @@ local function stick()
         pitch = cl(k("W") - k("S") + axis("padLeftStickY")),
         yaw = cl(k("D") - k("A") + axis("padLeftStickX")),
         roll = cl(k("E") - k("Q") + axis("padRightStickX")),
-        lift = cl(math.max(k("Space"), k("R")) - k("C") + axis("padRightTrigger") - axis("padLeftTrigger")),
+        -- R climbs, C descends (2026-10-13: "Space" is not a control OPEN//77 reads -- the climb never arrived)
+        lift = cl(k("R") - k("C") + axis("padRightTrigger") - axis("padLeftTrigger")),
     }
 end
 
@@ -323,7 +324,9 @@ local function avFrame(E, dt, t)
             t = { devices = ("FLY-BY-WIRE [%s z %.1f snap %.1f] need %.0f kN (air %.0f%%, fusion %.0f%%)%s pitch %.1f roll %.1f vz %.1f | %s"):format(
                     frame.position and "body" or "SNAPSHOT", pos[3], v.position and tonumber(v.position.z) or -1,
                     (rep.needN or 0) / 1000, (rep.uAir or 0) * 100, (rep.uRocket or 0) * 100, state,
-                    math.deg(pitch), math.deg(roll), F.vel[3], table.concat(parts, " | ")),
+                    math.deg(pitch), math.deg(roll), F.vel[3], table.concat(parts, " | "))
+                    .. (" | stick lift %.1f pitch %.1f | CARRIER %s"):format(st.lift, st.pitch,
+                        (NcmClientCarrierAv and GetGameTimer() - NcmClientCarrierAv.at < 3000) and NcmClientCarrierAv.line or "no AV report"),
                 fx = Fw[1], fy = Fw[2], fz = Fw[3], f = math.sqrt(Fw[1] ^ 2 + Fw[2] ^ 2 + Fw[3] ^ 2),
                 fwx = f[1], fwy = f[2], fwz = f[3], upx = u[1], upy = u[2], upz = u[3],
                 speed = tonumber(v.speed) or 0, z = pos[3], hot = false,

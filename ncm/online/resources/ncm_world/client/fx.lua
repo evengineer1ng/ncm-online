@@ -90,18 +90,40 @@ local function audio()
     local tnow = GetGameTimer()
     if tnow - audioAt < AUDIO_MS then return end
     audioAt = tnow
-    local voices = {}
+    -- 2026-10-13 (owner, AV: "sound is nightmarish"): ONE loop per sound per Machine. Four pods each playing the same
+    -- whine at slightly different pitches beat against each other; they are merged (loudest gain, gain-weighted pitch,
+    -- gain-weighted place). A one-shot plays on its edge only -- never again every 100 ms while its cue stays active.
+    local voices, loops = {}, {}
     for owner, o in pairs(owners) do
         for _, a in ipairs(o.acts or {}) do
             if a.audio then
                 local v = Cues.VOICES[a.audio.voice]
                 if v then
                     local t = placement(a, o.frame, o.pos)
-                    voices[#voices + 1] = { key = owner .. "|" .. a.key .. ((a.edge or a.audio.oneShot) and ("@" .. GetGameTimer()) or ""), file = v.file, loop = v.loop and not a.audio.oneShot,
-                        oneShot = a.audio.oneShot or a.edge, pitch = a.audio.pitch, gain = a.audio.gain, position = t.position }
+                    local g = tonumber(a.audio.gain) or 0
+                    if a.edge then
+                        voices[#voices + 1] = { key = owner .. "|" .. a.key .. "@" .. GetGameTimer(), file = v.file, loop = false,
+                            oneShot = true, pitch = a.audio.pitch, gain = g, position = t.position }
+                    elseif v.loop and not a.audio.oneShot then
+                        local k = owner .. "|" .. a.audio.voice
+                        local L = loops[k]
+                        if not L then
+                            L = { key = k, file = v.file, loop = true, gain = 0, w = 0, pitch = 0, px = 0, py = 0, pz = 0 }
+                            loops[k] = L
+                        end
+                        local w = math.max(1e-3, g)
+                        L.gain = math.max(L.gain, g)
+                        L.w = L.w + w
+                        L.pitch = L.pitch + (tonumber(a.audio.pitch) or 1) * w
+                        L.px, L.py, L.pz = L.px + t.position.x * w, L.py + t.position.y * w, L.pz + t.position.z * w
+                    end
                 end
             end
         end
+    end
+    for _, L in pairs(loops) do
+        voices[#voices + 1] = { key = L.key, file = L.file, loop = true, oneShot = false, gain = L.gain, pitch = L.pitch / L.w,
+            position = { x = L.px / L.w, y = L.py / L.w, z = L.pz / L.w } }
     end
     local me = owners[NcmFx.localOwner or ""]
     local lis = me and { pos = me.pos, right = me.frame.right, forward = me.frame.forward } or nil

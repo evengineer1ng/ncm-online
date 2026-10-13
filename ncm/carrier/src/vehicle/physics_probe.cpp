@@ -897,6 +897,9 @@ void wrenchAtGravity(void* body, const float* force, bool authorised) noexcept
         w.pulseRemainingS = w.pendingS;
         w.pulsesStarted++;
     }
+    // 0.1.40: an AV lease is applied on the game thread (vehicle/av_physics.cpp), never here: the AV's body does not
+    // pass through this integrator at all (first live flight, 2026-10-13: 0 calls while bound)
+    if (w.av && now < w.susExpireMs && !w.pulseActive) return;
     const bool spin = now < w.susExpireMs && (w.alpha[0] != 0.0f || w.alpha[1] != 0.0f || w.alpha[2] != 0.0f);
     const bool sus = (now < w.susExpireMs && (w.sus[0] != 0.0f || w.sus[1] != 0.0f || w.sus[2] != 0.0f)) || spin;
     if (!sus && !w.pulseActive) return;
@@ -3043,5 +3046,19 @@ uint64_t avEntityNeedingPhysics() noexcept
     const uint64_t last = g_boundTickMs.load(std::memory_order_relaxed);
     if (last != 0 && monotonicMs() - last < 300) return 0;   // its physics is running: nothing to switch on
     return entity;
+}
+}  // namespace ncm::vehicle::probe
+
+namespace ncm::vehicle::probe {
+bool avCommand(uint64_t& entity, float* forceN, float* alpha, float& ncmMassKg) noexcept
+{
+    entity = g_expectedEngineEntity.load(std::memory_order_acquire);
+    std::unique_lock<std::mutex> lock(g_wrenchMutex, std::try_to_lock);
+    if (!lock.owns_lock()) return false;
+    const WrenchState& w = g_wrench;
+    if (!w.av || GetTickCount64() >= w.susExpireMs || entity == 0) return false;
+    for (int i = 0; i < 3; ++i) { forceN[i] = w.sus[i]; alpha[i] = w.alpha[i]; }
+    ncmMassKg = w.ncmMass;
+    return true;
 }
 }  // namespace ncm::vehicle::probe

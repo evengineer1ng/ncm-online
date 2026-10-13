@@ -45,6 +45,7 @@ const char* kBridgeHtml = R"HTML(<!doctype html>
         if (!msg || !window.Open77 || !Open77.emit) return;
         if (msg.device) Open77.emit("ncm:ffb.device", msg.device);
         if (msg.health) Open77.emit("ncm:carrier.health", msg.health);
+        if (msg.av) Open77.emit("ncm:carrier.av", { line: msg.av });
       } catch (e) {}
     };
     ws.onclose = function () { ready = false; tell("ncm:ffb.closed", "socket closed"); setTimeout(connect, 2000); };

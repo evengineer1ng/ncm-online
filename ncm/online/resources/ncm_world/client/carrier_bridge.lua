@@ -595,6 +595,11 @@ local function bringUpMachine()
         machineReady = false
         peerIsCarrier, peerVersion = false, nil
     end)
+    -- Carrier 0.1.40: the AV writer's one-second report (what it read and wrote on the bound AV); engineering.lua puts
+    -- it in the server telemetry, so a flight is diagnosed from the server log
+    page:on("ncm:carrier.av", function(p)
+        if type(p) == "table" and p.line then NcmClientCarrierAv = { line = tostring(p.line), at = GetGameTimer() } end
+    end)
     page:on("ncm:carrier.health", function(h)
         if type(h) == "table" and h.version and not peerIsCarrier then
             peerIsCarrier, peerVersion = true, tostring(h.version)

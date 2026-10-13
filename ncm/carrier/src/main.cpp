@@ -239,6 +239,10 @@ void onLoad()
                                              w.av, w.hasMass ? w.massKg : 0.0, w.ax, w.ay, w.az);
         });
         c.server->onConnect([&c] { sendHealth(c); });
+        // 0.1.40: the AV writer's one-second report goes up to NCM (client engineering -> the server log)
+        ncm::vehicle::av::setReporter([&c](const std::string& line) {
+            if (c.server && c.server->connected()) c.server->sendJson(nlohmann::json{ { "av", line } }.dump());
+        });
         c.server->onDisconnect([&c] {
             // The world went away. Put the player's game back the way we found it, immediately, without
             // waiting to be asked -- the resource may not get a chance to ask.
