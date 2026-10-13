@@ -1427,6 +1427,7 @@ local function tick()
         end
         send("deep:state", {
             p = A.s.p, v = A.s.v, r = A.s.basis.right, f = A.s.basis.forward, u = A.s.basis.up,
+            model = EN and EN.vehicleKey or nil,   -- the page draws this Machine's own model (deep/models), not a Hella
             alt = alt, lat = lat, lon = lon, speed = speed, hs = hs, vs = vs, orbit = Deep.orbitSpeed(alt),
             orb = (function() local o = Deep.orbit(A.s.p, A.s.v); return { apo = o.apoM, peri = o.periM, escape = o.escape, vi = o.speed } end)(),
             borderKm = math.max(0, Guid.BORDER.radiusM - Deep.vec.len(A.s.p)) / 1000,

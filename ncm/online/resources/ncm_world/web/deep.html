@@ -18,6 +18,8 @@
 <!-- doc 58: the experimental drives' layer (our own Hipparcos stars, drawn from where the Machine is) -->
 <script src="deep/skystars.js"></script>
 <script src="deep/drivefx.js"></script>
+<!-- 2026-10-13 (owner: "everyone is a hella"): each Machine's own model, the game's lowest-LOD body shell (tools/build-deep-models.py) -->
+<script src="deep/models/index.js"></script>
 <div id="fade"></div>
 <script>
 // NCM Deep (L326): the universe beyond Night City, drawn inside Cyberpunk. Lua owns the physics (core space.deep) and
@@ -46,6 +48,52 @@
   var R = 6371000, NC = { lat: 35.37, lon: -120.85 }, SUN = [1, 0, 0];
   var S = null, prev = null, prevAt = 0, at = 0;      // the last two states, for interpolation
   var earthTex = null, spriteImg = null, VENUES = [], ROUTE = null;
+  // the Machine's own model (deep/models): { p: Float32Array (game metres: x right, y forward, z up), n: Float32Array, i: Uint16Array, len }
+  var MODEL = null, MODEL_KEY = null, MODELS_LOADED = {};
+  function b64(str, Type) { var bin = atob(str), u8 = new Uint8Array(bin.length); for (var k = 0; k < bin.length; k++) u8[k] = bin.charCodeAt(k); return new Type(u8.buffer); }
+  window.NCM_DEEP_MODEL = function (name, d) {
+    var q = b64(d.p, Int16Array), nq = b64(d.n, Int8Array), p = new Float32Array(q.length), n = new Float32Array(nq.length), len = 0;
+    for (var k = 0; k < q.length; k++) { p[k] = q[k] * d.s; }
+    for (var k2 = 0; k2 < nq.length; k2++) n[k2] = nq[k2] / 127;
+    for (var k3 = 1; k3 < p.length; k3 += 3) len = Math.max(len, Math.abs(p[k3]));
+    MODELS_LOADED[name] = { p: p, n: n, i: b64(d.i, Uint16Array), len: 2 * len };
+    if (MODEL_KEY && window.NCM_DEEP_MODELS && NCM_DEEP_MODELS[MODEL_KEY] === name) MODEL = MODELS_LOADED[name];
+  };
+  function loadModel(key) {
+    MODEL_KEY = key; MODEL = null;
+    var file = window.NCM_DEEP_MODELS && NCM_DEEP_MODELS[key];
+    if (!file) return;   // not built (rb15, muramasa, r7): the sprite
+    if (MODELS_LOADED[file]) { MODEL = MODELS_LOADED[file]; return; }
+    var sc = document.createElement("script"); sc.src = "deep/models/" + file + ".js";
+    sc.onerror = function () { emit("deep:error", { where: "model missing", log: file }); };
+    document.body.appendChild(sc);
+  }
+  // the model, flat-shaded in the sun, projected through the camera (painter's order; faces turned away are skipped)
+  function drawModel(M, car, cam, VP) {
+    var p = M.p, n = M.n, I = M.i, nv = p.length / 3, sx = new Float32Array(nv), sy = new Float32Array(nv), sz = new Float32Array(nv);
+    var r = S.r, f = S.f, u = S.u, rel0 = sub(car, cam), ok = new Uint8Array(nv);
+    for (var k = 0; k < nv; k++) {
+      var x = p[3 * k], y = p[3 * k + 1], z = p[3 * k + 2];
+      var rel = [rel0[0] + r[0] * x + f[0] * y + u[0] * z, rel0[1] + r[1] * x + f[1] * y + u[1] * z, rel0[2] + r[2] * x + f[2] * y + u[2] * z];
+      var s = project(VP, rel); if (s) { sx[k] = s[0]; sy[k] = s[1]; sz[k] = s[2]; ok[k] = 1; }
+    }
+    var sun = unit(SUN), view = unit(sc(rel0, -1)), tris = [];
+    for (var t = 0; t < I.length; t += 3) {
+      var a = I[t], b = I[t + 1], c = I[t + 2];
+      if (!ok[a] || !ok[b] || !ok[c]) continue;
+      var nx = n[3 * a] + n[3 * b] + n[3 * c], ny = n[3 * a + 1] + n[3 * b + 1] + n[3 * c + 1], nz = n[3 * a + 2] + n[3 * b + 2] + n[3 * c + 2];
+      var wn = [r[0] * nx + f[0] * ny + u[0] * nz, r[1] * nx + f[1] * ny + u[1] * nz, r[2] * nx + f[2] * ny + u[2] * nz];
+      if (dot(wn, view) < 0) continue;   // facing away
+      var lit = 0.22 + 0.78 * Math.max(0, dot(unit(wn), sun));
+      tris.push([sz[a] + sz[b] + sz[c], a, b, c, lit]);
+    }
+    tris.sort(function (A, B) { return B[0] - A[0]; });
+    for (var q = 0; q < tris.length; q++) {
+      var T = tris[q], g = Math.round(40 + 190 * T[4]);
+      hud.fillStyle = "rgb(" + g + "," + Math.round(g * 1.02) + "," + Math.round(g * 1.06) + ")";
+      hud.beginPath(); hud.moveTo(sx[T[1]], sy[T[1]]); hud.lineTo(sx[T[2]], sy[T[2]]); hud.lineTo(sx[T[3]], sy[T[3]]); hud.closePath(); hud.fill();
+    }
+  }
   // ASCENT (owner, 2026-10-06: "begin the Deep visual transition before 12,000 m"): the same page, transparent, over
   // REDengine while the car is still in Night City. It draws NCM's Earth only BEYOND the distance where REDengine's world
   // is still useful (no depth from the game reaches a WebUI layer, so the mask is distance from the camera), fading in
@@ -460,6 +508,7 @@
     bridge.on("deep:sky", function (m) { if (m && m.stars && m.stars.length) { SKY = m.stars; SKY_THETA = null; rebuildSky(GMST); } });
     bridge.on("deep:bodies", function (m) { if (m && m.bodies) BODIES = m.bodies; });
     bridge.on("deep:state", function (m) {
+      if (m.model && m.model !== MODEL_KEY) loadModel(m.model);
       if (m.gmst !== undefined && m.gmst !== null) { GMST = Number(m.gmst); rebuildSky(GMST); }
       if (m.sun) SUN = arr(m.sun);   // the real sun on NCM's clock
       var st = { p: arr(m.p), v: arr(m.v), r: arr(m.r), f: arr(m.f), u: arr(m.u), m: m };
@@ -600,8 +649,10 @@
     if (!hidden(cam, car)) {
       var s2 = project(VP, sub(car, cam));
       if (s2) {
-        var pxPerM = (H / 2) / Math.tan(0.5) / s2[2], wpx = HELLA_M * pxPerM;
-        if (spriteImg && spriteImg.complete && spriteImg.naturalWidth > 0 && wpx >= 2 * px) {
+        var pxPerM = (H / 2) / Math.tan(0.5) / s2[2], wpx = (MODEL ? MODEL.len : HELLA_M) * pxPerM;
+        if (MODEL && wpx >= 6 * px) {
+          hud.save(); hud.globalAlpha = Math.min(1, (wpx / px - 6) / 6); drawModel(MODEL, car, cam, VP); hud.restore();
+        } else if (spriteImg && spriteImg.complete && spriteImg.naturalWidth > 0 && wpx >= 2 * px) {
           var draw = Math.min(W * 0.6, wpx), hpx = draw * spriteImg.naturalHeight / spriteImg.naturalWidth;
           var ahead = project(VP, sub(add(car, sc(S.f, 5)), cam)), flip = ahead && ahead[0] < s2[0];
           hud.save(); hud.globalAlpha = Math.min(1, (wpx / px - 2) / 6); hud.translate(s2[0], s2[1]); if (flip) hud.scale(-1, 1);
