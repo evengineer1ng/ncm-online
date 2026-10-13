@@ -64,6 +64,10 @@ Core.define("engineering.installation", function(C)
         { id = "mount.av.pod.fr", label = "front-right engine pod", pos = { 1.55, 2.2, 1.2 },   ratedN = 60000, blocked = { up = true }, vehicles = { zetatech_atlus_trauma = true } },
         { id = "mount.av.pod.rl", label = "rear-left engine pod", pos = { -1.45, -2.75, 1.0 },  ratedN = 60000, blocked = { up = true }, vehicles = { zetatech_atlus_trauma = true } },
         { id = "mount.av.pod.rr", label = "rear-right engine pod", pos = { 1.45, -2.75, 1.0 },  ratedN = 60000, blocked = { up = true }, vehicles = { zetatech_atlus_trauma = true } },
+        -- 2026-10-13 (owner: "we need some fusion drives designed specifically for hauling a trauma team vehicle up"):
+        -- two BELLY mounts on the centre line, 2.0 m either side of the balance point (com y -0.27), for the FL-6 lift drives
+        { id = "mount.av.belly.f", label = "forward belly lift mount", pos = { 0, 1.73, 0.3 },  ratedN = 80000, blocked = { up = true }, vehicles = { zetatech_atlus_trauma = true } },
+        { id = "mount.av.belly.r", label = "aft belly lift mount",     pos = { 0, -2.27, 0.3 }, ratedN = 80000, blocked = { up = true }, vehicles = { zetatech_atlus_trauma = true } },
         -- the cabin's equipment bay, on the centre line over the balance point (a tank or a drive rides here)
         { id = "mount.av.bay", label = "cabin equipment bay", pos = { 0, -0.3, 0.9 }, ratedN = 60000, blocked = { up = true, down = true }, vehicles = { zetatech_atlus_trauma = true } },
     }
@@ -214,6 +218,25 @@ Core.define("engineering.installation", function(C)
             interface = "hardpoint.h1", massKg = 260, envelope = { 1.2, 1.6, 1.2 }, price = 64000,
             perf = { kind = "jet", thrustN = 28000, ispS = 8000, propellant = "fuel", throttleTauS = 0.35, gimbalDeg = 20, heatKw = 120 },
             thermal = { capacityKjK = 120, rejectKw = 140, limitK = 400, resumeK = 250 },
+            lab = true,
+        },
+        -- 2026-10-13 (owner: "we need some fusion drives designed specifically for hauling a trauma team vehicle up, it ...
+        -- ran out of fuel 3km up"): the flight to 3 km hung the whole ~7.3 t on the four VL-28s (~2 L/s of the car's fuel)
+        -- while both FD-1s sat at 0 % -- a torch only joins when the air is too thin for the fans. The FL-6 is a fusion
+        -- LIFT drive (`lift = true`: the flight computer flies it with the fans from the ground up, not as a thin-air
+        -- reserve). Two on the belly mounts carry ~half the weight at any height (air or not), so the fans burn half the
+        -- fuel, and at the 12 km seam -- where the fans keep a quarter of their thrust -- they still lift it on their own
+        -- (2 x 60 kN against ~76 kN). Same propellant and Isp class as the FD-1 (the PT-500 feeds it): at a hover's share
+        -- (~40 kN) 400 kg lasts ~2.7 h. A wide +-5 deg gimbal helps the fans hold pitch.
+        {
+            designId = "eng:zetatech:fl6:r1", lineageId = "eng:zetatech:fl6", revision = 1,
+            manufacturer = "Zetatech", makerKey = "zetatech", code = "ZTC-FL6", family = "propulsor",
+            name = "Fusion Lift Drive FL-6",
+            subtitle = "A downward fusion torch built to haul an AV: 60 kN at any height, flown by the flight computer. Burns fusion pellets from a tank part.",
+            interface = "hardpoint.h1", massKg = 220, envelope = { 0.8, 1.2, 0.7 }, price = 92000,
+            perf = { kind = "reaction_engine", thrustN = 60000, ispS = 100000, propellant = "fusion", seaLevelFactor = 1.0,
+                throttleTauS = 0.4, minThrottle = 0, heatKw = 700, gimbalDeg = 5, lift = true },
+            thermal = { capacityKjK = 90, rejectKw = 720, limitK = 500, resumeK = 300 },
             lab = true,
         },
         -- ... and the computer that flies them. It pushes nothing: it reads the stick and the Machine's attitude and spin and

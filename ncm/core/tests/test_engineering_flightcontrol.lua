@@ -9,11 +9,18 @@ local KIT = {
     { "eng:ncmlab:wh1:r1", "mount.front", "fore" }, { "eng:zetatech:fc1:r1", "mount.electronics", "fore" },
 }
 
-local function atlus(T)
+-- 2026-10-13: the same Atlus with the two FL-6 fusion lift drives on its belly mounts (the `av` kit now)
+local KIT_LIFT = {}
+for i, k in ipairs(KIT) do KIT_LIFT[i] = k end
+KIT_LIFT[#KIT_LIFT + 1] = { "eng:zetatech:fl6:r1", "mount.av.belly.f", "down" }
+KIT_LIFT[#KIT_LIFT + 1] = { "eng:zetatech:fl6:r1", "mount.av.belly.r", "down" }
+
+local function atlus(T, kit)
+    kit = kit or KIT
     local Install = T.Core.get("engineering.installation")
     local Flight = T.Core.get("engineering.flightmodel")
     local items = {}
-    for i, k in ipairs(KIT) do items[i] = { componentId = ("c%02d"):format(i), designId = k[1], mountId = k[2], facing = k[3], fillKg = 400 } end
+    for i, k in ipairs(kit) do items[i] = { componentId = ("c%02d"):format(i), designId = k[1], mountId = k[2], facing = k[3], fillKg = 400 } end
     local devices, refused = Install.resolve(items, KEY)
     local pushing = {}
     for _, d in ipairs(devices) do if not Install.isElectronic(d.kind) then pushing[#pushing + 1] = d end end
@@ -107,6 +114,52 @@ return {
         local s = fly(T, m, devices, { yaw = 1 }, 2)
         -- forward's world x grows when it turns right from +y (clockwise seen from above)
         T.ok(s.rot[1][2] > 0.3, ("heading swung right: forward x %.2f"):format(s.rot[1][2]))
+    end,
+
+    -- owner, 2026-10-13: "we need some fusion drives designed specifically for hauling a trauma team vehicle up ... ran out
+    -- of fuel 3km up" (the fans carried it all, ~2 L/s, the FD-1s at 0 %)
+    the_fl6_kit_fits_the_atlus = function(T)
+        local _, devices, refused = atlus(T, KIT_LIFT)
+        T.eq(#refused, 0, "the FL-6s fit the belly mounts: " .. (refused[1] and refused[1].reason or ""))
+        T.eq(#devices, #KIT_LIFT)
+    end,
+
+    the_fl6s_carry_half_the_hover_and_halve_the_fuel = function(T)
+        local FC = T.Core.get("engineering.flightcontrol")
+        local Dyn = T.Core.get("engineering.dynamics")
+        local function fuelPerS(kit)
+            local m, devices = atlus(T, kit)
+            local s = fly(T, m, devices, {}, 2)
+            local before = Dyn.propellantLeft(m, s, "fuel")
+            s = fly(T, m, devices, {}, 10, s)
+            return (before - Dyn.propellantLeft(m, s, "fuel")) / 10, m, s
+        end
+        local without = fuelPerS(KIT)
+        local with, m, s = fuelPerS(KIT_LIFT)
+        T.ok(without > 0, ("fans alone burn %.3f kg/s"):format(without))
+        T.ok(with < without * 0.6, ("with the FL-6s %.3f kg/s of car fuel (was %.3f)"):format(with, without))
+        T.ok(math.abs(s.pos[3] - 100) < 3, ("height held: %.1f m"):format(s.pos[3]))
+    end,
+
+    at_the_seam_the_fl6s_hold_it_without_the_torches = function(T)
+        local FC = T.Core.get("engineering.flightcontrol")
+        local Dyn = T.Core.get("engineering.dynamics")
+        local Flight = T.Core.get("engineering.flightmodel")
+        local m, devices = atlus(T, KIT_LIFT)
+        local s = Dyn.init(m, { pos = { 0, 0, 12000 } })
+        local _, rep = FC.step(m, s, {}, { mass = Dyn.mass(m, s), rho = Flight.density(12000), contact = false, perf = FC.computer(devices) })
+        T.ok(not rep.short, "it holds itself at the Deep seam")
+        T.ok(rep.uAir < 1, ("lift drives and fans together are not flat out (%.2f)"):format(rep.uAir))
+    end,
+
+    with_the_fl6s_it_still_climbs_and_flies_level = function(T)
+        local FC = T.Core.get("engineering.flightcontrol")
+        local m, devices = atlus(T, KIT_LIFT)
+        local s = fly(T, m, devices, { lift = 1 }, 6)
+        T.ok(s.vel[3] > 6, ("climbing %.1f m/s"):format(s.vel[3]))
+        s = fly(T, m, devices, {}, 12, s)
+        local pitch, roll = FC.attitude(s.rot)
+        T.ok(math.abs(math.deg(pitch)) < 2 and math.abs(math.deg(roll)) < 2, ("level: pitch %.2f roll %.2f deg"):format(math.deg(pitch), math.deg(roll)))
     end,
 
     omega_comes_back_from_two_attitudes = function(T)

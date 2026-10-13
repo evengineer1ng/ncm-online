@@ -865,6 +865,15 @@ local KITS = {
         { code = "XLB-WH1", mount = "mount.front", facing = "fore", refit = true, charge = true,
           binds = { { "triangle", "tap", "engage" }, { "lb", "hold", "abort" }, { "rb", "tap", "next" }, { "lb", "tap", "prev" } } },
         { code = "ZTC-FC1", mount = "mount.electronics", facing = "fore", refit = true },
+        -- 2026-10-13: the FL-6 fusion lift drives (installation.lua) haul it up with the fans
+        { code = "ZTC-FL6", mount = "mount.av.belly.f", facing = "down", another = true },
+        { code = "ZTC-FL6", mount = "mount.av.belly.r", facing = "down", another = true },
+        { fuel = "full" }, { fusionMinKg = 400 },
+    },
+    -- the retrofit for an Atlus already carrying the `av` kit: the two FL-6s, both tanks topped up
+    av_lift = {
+        { code = "ZTC-FL6", mount = "mount.av.belly.f", facing = "down", another = true },
+        { code = "ZTC-FL6", mount = "mount.av.belly.r", facing = "down", another = true },
         { fuel = "full" }, { fusionMinKg = 400 },
     },
 }

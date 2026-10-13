@@ -54,7 +54,9 @@ Core.define("engineering.flightcontrol", function(C)
         local out = {}
         for i, d in ipairs(m.devices or {}) do
             if LIFT_KINDS[d.kind] and d.dir and d.dir[3] > 0.7 then
-                out[#out + 1] = { index = i, device = d, up = d.dir[3], air = d.kind ~= "reaction_engine" }
+                -- `air` = flown from the ground up; a torch only in thin air -- unless it is a LIFT drive (the FL-6, 2026-10-13)
+                local lift = type(d.perf) == "table" and d.perf.lift == true
+                out[#out + 1] = { index = i, device = d, up = d.dir[3], air = d.kind ~= "reaction_engine" or lift }
             end
         end
         return out
