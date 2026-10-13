@@ -3421,7 +3421,7 @@ Offline: core `test_build_attach` (6), `tools/test-build-host.lua` (23: attach, 
 |---|---|---|---|
 | §AV1 | Machine Index: CALL the Atlus Trauma Team AV. Walk to it. | It appears (Trauma livery); one "[F] Enter" hint while you stand at it, gone when you walk away. | **NOT RUN** |
 | §AV2 | F at the AV, then F again. | Seated in the cockpit (the other client sees the pilot); F gets you out. | **NOT RUN** |
-| §AV3 | Seated: Space (or R) to climb, let go. | Plumes at the four pods; it lifts, then holds its height and stays level hands-off. Carrier log: `AV: physics switch ... enable(s)` and `wrench AV:` lines. | **NOT RUN** |
+| §AV3 | Seated: Space (pad: right trigger) to climb, let go. | Plumes at the four pods; it lifts, then holds its height and stays level hands-off. Server TELEMETRY `CARRIER ... hooks=on blocked=N/N`, `acc0` near 0, `v` z positive while climbing (Carrier 0.1.41, KB-467). | **NOT RUN** |
 | §AV4 | W/S, A/D, Q/E, C. | Nose down flies forward, A/D turns, Q/E banks, C descends; on the ground with nothing pressed it sits idle. | **NOT RUN** |
 | §AV5 | Climb out over the map edge to the 12 km seam. | The fans fade with height and the FD-1s take over (server TELEMETRY: FLY-BY-WIRE ... fusion %); Deep takes the AV at the seam. | **NOT RUN** |
 | §AV6 | In Deep: TAP Triangle (XLB-WH1 engage). | The wormhole drive runs as on the Hella (doc 58). | **NOT RUN** |
