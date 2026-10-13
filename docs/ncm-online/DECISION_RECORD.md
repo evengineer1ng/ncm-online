@@ -6990,3 +6990,15 @@ Supersedes IDEA-1291's open question.
 - The Trauma Team AV is catalogued as `Vehicle.av_zetatech_atlus` (`Vehicle.av_trauma` never projected on a client).
 
 **Expression losses (said in telemetry):** host collisions and damping are not in the model; the model is re-seeded from the body every frame.
+
+## L369 - OWNER: THE RACING WEEK COLLAPSE GOES LIVE FROM RUN 4; FLIGHT MACHINES ARE NOT STREET CARS (2026-10-13)
+
+**Owner:** "weekly reset temporal loop did fuck all to reset most things, i still have all my cars and money was unchanged, and there is no temporal loop like we had decided there would be"; on the choice offered: "Live from next reset only".
+
+**What happened at the run 3 -> 4 rollover (2026-10-12 16:00 UTC, Online log):** the rewind played (`REWIND run 3 (collapse): shared freeze, screen drugged, 1 player(s)`), every Machine went back to Night City (`LOOP Racing Week run 3 -> 4`), and the collapse ran as L303 built it: **dry run** (`ncm_week_collapse` default, "dryrun until the owner says live"). It planned 16 drivers, 3 cars anchored, 9 archived, EUR$115,169 of wallets closed, and changed nothing. Runs 1-3 were all dry runs.
+
+**Decided:**
+- `ncm_week_collapse = live` on Online, with `ncm_week_collapse_live_from = 4`: run 3's end is not executed late; the first live collapse is run 4's end (2026-10-15 16:00 UTC, unless the verdict extends the run). From then on, every Racing Week end closes wallets to the new-player grant, archives every unanchored car and its parts, resets licence/rating to the archive and SR to 5.0 (Online), and restarts the Paddock from the historical seed (L303 W-4, KB-404's one-car reset).
+- Flight machines (tag `aerial`) are in the Machine Index but never street cars: no ground race admits one unless its spec asks for it, and no class draw issues one (KB-465).
+
+**Not yet live:** both wait on `tools/deep/ops/install-kb465.sh` (one full restart with nobody online). MASTER_TEST §RW15 is the live PASS.
