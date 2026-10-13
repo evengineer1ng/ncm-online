@@ -196,6 +196,39 @@ return {
         T.ok(s.vel[3] > -26 and s.vel[3] < 0, ("descending %.1f m/s (cap 25)"):format(s.vel[3]))
     end,
 
+    -- KB-475 (owner: "everytime i get to deep, the av spirals out and i cant stay in deep or go any higher"): the same
+    -- computer flies in Deep's Earth-centred frame through FC.localView, under Earth's gravity and thin air
+    in_deep_it_holds_and_climbs_on_fusion = function(T)
+        local FC = T.Core.get("engineering.flightcontrol")
+        local Dyn = T.Core.get("engineering.dynamics")
+        local Flight = T.Core.get("engineering.flightmodel")
+        local Deep = T.Core.get("space.deep")
+        local m, devices = atlus(T, KIT_FUSION)
+        local lat, lon = Deep.ORIGIN.lat, Deep.ORIGIN.lon
+        local e, n, u = Deep.enu(lat, lon)
+        local R = Deep.R + 12100
+        local s = Dyn.init(m, { pos = { u[1] * R, u[2] * R, u[3] * R }, vel = { 0, 0, 0 },
+            rot = { { e[1], n[1], u[1] }, { e[2], n[2], u[2] }, { e[3], n[3], u[3] } } })
+        local perf = FC.computer(devices)
+        local function deepFly(stick, seconds)
+            local dt = 1 / 60
+            for _ = 1, math.floor(seconds / dt) do
+                local view, alt = FC.localView(s)
+                local cmd = FC.step(m, view, stick, { mass = Dyn.mass(m, s), inertia = m.inertia, rho = Flight.density(alt), g = 9.81, contact = false, perf = perf })
+                s = Flight.step(m, s, cmd, dt, {})
+            end
+            local view, alt = FC.localView(s)
+            return view, alt
+        end
+        local view, alt = deepFly({}, 15)
+        T.ok(math.abs(alt - 12100) < 30, ("let go in Deep it holds its height: %.0f m"):format(alt))
+        local pitch, roll = FC.attitude(view.rot)
+        T.ok(math.abs(math.deg(pitch)) < 3 and math.abs(math.deg(roll)) < 3, ("and stays level: %.2f %.2f deg"):format(math.deg(pitch), math.deg(roll)))
+        view, alt = deepFly({ lift = 1 }, 20)
+        T.ok(alt > 12100 + 600, ("Space climbs on through Deep: %.0f m"):format(alt))
+        T.ok(view.vel[3] > 30, ("climbing %.1f m/s"):format(view.vel[3]))
+    end,
+
     omega_comes_back_from_two_attitudes = function(T)
         local FC = T.Core.get("engineering.flightcontrol")
         local Dyn = T.Core.get("engineering.dynamics")

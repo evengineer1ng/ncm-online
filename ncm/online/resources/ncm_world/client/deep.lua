@@ -21,6 +21,7 @@ local Flight = Core.get("engineering.flightmodel")   -- L331: the full machine m
 local Venues = Core.get("space.venues")
 local GeoLod = Core.get("space.geolod")   -- L332: which real imagery the Deep page holds
 local Dyn = Core.get("engineering.dynamics")
+local FC = Core.get("engineering.flightcontrol")   -- KB-475: an AV's fly-by-wire keeps flying in Deep
 local Drives = Core.get("space.drives")   -- doc 58: the experimental propulsion stable
 local Travel = Core.get("space.travel")
 local Fx = Core.get("presentation.fx")   -- NCM FX: physics -> native effects (client/fx.lua draws)
@@ -1165,6 +1166,33 @@ local function tick()
             end
         end
     end
+    -- KB-475 (owner, 2026-10-13: "everytime i get to deep, the av spirals out and i cant stay in deep or go any higher"):
+    -- a Machine with a FLIGHT COMPUTER keeps its fly-by-wire in Deep. Below the seam the client's flight frame flies the
+    -- AV; above it that frame is parked (Deep owns the Machine) and Deep fired only BOUND engines -- the FL-6s have no
+    -- binding ("NO CONTROL"), the FD-1s sit on Triangle -- so the AV coasted up, tumbled and fell back out (08:29 UTC:
+    -- +77 m/s at the seam, 1 g of deceleration, every engine 0 %). Same computer, same keys as below: Space / right
+    -- trigger climb, C / left trigger descend, W/S A/D Q/E steer; it holds attitude with whatever torque the Machine has.
+    -- Deep's state is Earth-centred, so the computer gets a local east/north/up view of it.
+    local fcPerf = (EN and #devs > 0) and FC.computer(EN.devices) or nil
+    local holdNow = GD.route and not GD.engaged and (GD.prompt or A.embodyPending or GD.hold) and true or false
+    A.fbw = nil
+    if fcPerf and not GD.engaged and not holdNow and not GD.open and ds.pos and ds.rot then
+        local function k(c) return down(c) and 1 or 0 end
+        local function cl(x) return math.max(-1, math.min(1, x)) end
+        local fstick = {
+            pitch = cl(k("W") - k("S") + dead(axis("padLeftStickY"))),
+            yaw = cl(k("D") - k("A") + dead(axis("padLeftStickX"))),
+            roll = cl(k("E") - k("Q") + dead(axis("padRightStickX"))),
+            lift = cl(k("Space") - k("C") + dead(axis("padRightTrigger")) - dead(axis("padLeftTrigger"))),
+        }
+        local view, alt = FC.localView(ds)
+        local fcmd, frep = FC.step(m, view, fstick, { mass = Dyn.mass(m, ds), inertia = m.inertia, rho = Flight.density(alt),
+            g = 9.81, contact = false, perf = fcPerf })
+        for i, th in pairs(fcmd.throttle) do cmd.throttle[i] = th end
+        cmd.torqueNm, cmd.torque = fcmd.torqueNm, nil
+        stick = { pitch = 0, yaw = 0, roll = 0 }   -- the computer owns attitude; the stick went into it
+        A.fbw = { lift = fstick.lift, vz = view.vel[3], needN = frep.needN, short = frep.short }
+    end
     -- the sticks: torque from attitude parts, or the development waiver
     if stick.pitch ~= 0 or stick.yaw ~= 0 or stick.roll ~= 0 then
         if #(m.attitude or {}) > 0 then cmd.torque = { stick.pitch, stick.roll, -stick.yaw }
@@ -1275,7 +1303,9 @@ local function tick()
             if (evs[tostring(md.key) .. ":starved"] or 0) > 0 then parts[i] = parts[i] .. " NO FUEL" end
             if (evs[tostring(md.key) .. ":no_energy"] or 0) > 0 then parts[i] = parts[i] .. " NO ENERGY" end
             if md.kind ~= "propellant_tank" and md.componentId and not boundIds[tostring(md.componentId)]
-                and (md.kind == "reaction_engine" or md.kind == "pulse_reaction") then parts[i] = parts[i] .. " NO CONTROL" end
+                and (md.kind == "reaction_engine" or md.kind == "pulse_reaction") then
+                parts[i] = parts[i] .. (A.fbw and " FLY-BY-WIRE" or " NO CONTROL")   -- KB-475: the computer flies it
+            end
         end
         for _, d in ipairs(devs) do
             for i, md in ipairs(m.devices) do if md.componentId == d.componentId then parts[i] = parts[i]:gsub("^[^ ]+", d.code) end end

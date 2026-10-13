@@ -188,6 +188,19 @@ Core.define("engineering.flightcontrol", function(C)
         return cmd, rep
     end
 
+    --- KB-475: an Earth-centred state (NCM Deep: pos/vel/rot in ECEF or an Earth-centred frame) seen from where it is --
+    --- x east, y north, z up -- the frame `step` flies in. Returns the view ({ rot, vel, omega }) and the altitude (m).
+    function M.localView(s)
+        local Deep = C.get("space.deep")
+        local lat, lon, alt = Deep.ecefToLla(s.pos)
+        local e, n, u = Deep.enu(lat, lon)
+        local function toL(v) return { v[1] * e[1] + v[2] * e[2] + v[3] * e[3], v[1] * n[1] + v[2] * n[2] + v[3] * n[3], v[1] * u[1] + v[2] * u[2] + v[3] * u[3] } end
+        local R = s.rot
+        local bx, by, bz = toL({ R[1][1], R[2][1], R[3][1] }), toL({ R[1][2], R[2][2], R[3][2] }), toL({ R[1][3], R[2][3], R[3][3] })
+        return { rot = { { bx[1], by[1], bz[1] }, { bx[2], by[2], bz[2] }, { bx[3], by[3], bz[3] } },
+                 vel = toL(s.vel or { 0, 0, 0 }), omega = s.omega }, alt
+    end
+
     --- The body angular velocity between two rotations dt apart (rows; world = rot * body), small-angle.
     function M.omegaFrom(prev, cur, dt)
         if not prev or not cur or not dt or dt <= 0 then return { 0, 0, 0 } end
