@@ -15,6 +15,14 @@ for i, k in ipairs(KIT) do KIT_LIFT[i] = k end
 KIT_LIFT[#KIT_LIFT + 1] = { "eng:zetatech:fl6:r1", "mount.av.belly.f", "down" }
 KIT_LIFT[#KIT_LIFT + 1] = { "eng:zetatech:fl6:r1", "mount.av.belly.r", "down" }
 
+-- 2026-10-13: one propellant, fast climb -- VL-28E fans and the FC-2 computer, with the FL-6s (the `av` kit now)
+local KIT_FUSION = {}
+for i, k in ipairs(KIT_LIFT) do
+    local d = k[1]
+    if d == "eng:zetatech:vl28:r1" then d = "eng:zetatech:vl28:r2" elseif d == "eng:zetatech:fc1:r1" then d = "eng:zetatech:fc1:r2" end
+    KIT_FUSION[i] = { d, k[2], k[3] }
+end
+
 local function atlus(T, kit)
     kit = kit or KIT
     local Install = T.Core.get("engineering.installation")
@@ -160,6 +168,32 @@ return {
         s = fly(T, m, devices, {}, 12, s)
         local pitch, roll = FC.attitude(s.rot)
         T.ok(math.abs(math.deg(pitch)) < 2 and math.abs(math.deg(roll)) < 2, ("level: pitch %.2f roll %.2f deg"):format(math.deg(pitch), math.deg(roll)))
+    end,
+
+    -- owner: "why am i using car fuel to go to space" / "it takes way too long to get up there"
+    the_fusion_atlus_burns_no_car_fuel = function(T)
+        local Dyn = T.Core.get("engineering.dynamics")
+        local m, devices = atlus(T, KIT_FUSION)
+        local s = fly(T, m, devices, {}, 2)
+        local fuel, fusion = Dyn.propellantLeft(m, s, "fuel"), Dyn.propellantLeft(m, s, "fusion")
+        s = fly(T, m, devices, {}, 10, s)
+        -- the lift is all fusion; the only car fuel left is the AC-6 attitude set's trims (shared with the Hella)
+        local carPerS = (fuel - Dyn.propellantLeft(m, s, "fuel")) / 10
+        T.ok(carPerS < 0.002, ("car fuel %.4f kg/s at hover: the AC-6's trims only (the fans burned ~1.5)"):format(carPerS))
+        local perS = (fusion - Dyn.propellantLeft(m, s, "fusion")) / 10
+        T.ok(perS > 0 and perS < 0.1, ("fusion pellets %.4f kg/s at hover"):format(perS))
+    end,
+
+    the_fc2_climbs_fast_and_comes_down_gently = function(T)
+        local FC = T.Core.get("engineering.flightcontrol")
+        local m, devices = atlus(T, KIT_FUSION)
+        local s = fly(T, m, devices, { lift = 1 }, 20)
+        local pitch, roll = FC.attitude(s.rot)
+        T.ok(s.vel[3] > 60, ("climbing %.1f m/s after 20 s"):format(s.vel[3]))
+        T.ok(s.pos[3] > 900, ("%.0f m up after 20 s"):format(s.pos[3]))
+        T.ok(math.abs(math.deg(pitch)) < 3 and math.abs(math.deg(roll)) < 3, ("level in the climb: %.2f %.2f"):format(math.deg(pitch), math.deg(roll)))
+        s = fly(T, m, devices, { lift = -1 }, 40, s)
+        T.ok(s.vel[3] > -26 and s.vel[3] < 0, ("descending %.1f m/s (cap 25)"):format(s.vel[3]))
     end,
 
     omega_comes_back_from_two_attitudes = function(T)

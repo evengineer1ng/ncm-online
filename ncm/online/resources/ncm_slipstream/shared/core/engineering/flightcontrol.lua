@@ -110,7 +110,9 @@ Core.define("engineering.flightcontrol", function(C)
 
         -- climb: the stick asks for a vertical speed; hold it with the lift along the body's up
         local vz = s.vel and s.vel[3] or 0
-        local wantVz = sl * (p.maxClimbMs or M.DEFAULTS.maxClimbMs)
+        -- climb and descent limits are the computer's own (the FC-2 climbs far faster than it lets you come down)
+        local wantVz = sl >= 0 and sl * (p.maxClimbMs or M.DEFAULTS.maxClimbMs)
+            or sl * (p.maxDescentMs or p.maxClimbMs or M.DEFAULTS.maxClimbMs)
         local az = M.K_CLIMB * (wantVz - vz) + g
         local upZ = math.max(0.5, s.rot[3][3])                  -- body up's world z: lift lost to the tilt comes back here
         local need = math.max(0, mass * az / upZ)

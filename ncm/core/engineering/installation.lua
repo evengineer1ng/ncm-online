@@ -220,6 +220,21 @@ Core.define("engineering.installation", function(C)
             thermal = { capacityKjK = 120, rejectKw = 140, limitK = 400, resumeK = 250 },
             lab = true,
         },
+        -- 2026-10-13 (owner: "why am i using car fuel to go to space in your model" -> "yes definitely"): the VL-28E. The same
+        -- swivelling ducted lift fan, driven by a fusion-electric plant instead of burning the Machine's fuel (L368 fed the
+        -- r1 from the car's tank only because it was the one liquid store a Machine had). Its reaction mass is still the air
+        -- -- nothing in vacuum, a quarter of its thrust at the 12 km seam -- so it draws almost nothing from the PT-500: the
+        -- AV flies on one propellant from the ground to space, and its car tank no longer matters.
+        {
+            designId = "eng:zetatech:vl28:r2", lineageId = "eng:zetatech:vl28", revision = 2,
+            manufacturer = "Zetatech", makerKey = "zetatech", code = "ZTC-VL28E", family = "propulsor",
+            name = "AV Lift Engine VL-28E (fusion-electric)",
+            subtitle = "The VL-28 lift fan on a fusion-electric drive: 28 kN at sea level, nothing in vacuum. Draws fusion pellets from a tank part, not the car's fuel.",
+            interface = "hardpoint.h1", massKg = 280, envelope = { 1.2, 1.6, 1.2 }, price = 88000,
+            perf = { kind = "jet", thrustN = 28000, ispS = 400000, propellant = "fusion", throttleTauS = 0.35, gimbalDeg = 20, heatKw = 120 },
+            thermal = { capacityKjK = 120, rejectKw = 140, limitK = 400, resumeK = 250 },
+            lab = true,
+        },
         -- 2026-10-13 (owner: "we need some fusion drives designed specifically for hauling a trauma team vehicle up, it ...
         -- ran out of fuel 3km up"): the flight to 3 km hung the whole ~7.3 t on the four VL-28s (~2 L/s of the car's fuel)
         -- while both FD-1s sat at 0 % -- a torch only joins when the air is too thin for the fans. The FL-6 is a fusion
@@ -249,6 +264,19 @@ Core.define("engineering.installation", function(C)
             subtitle = "Fly-by-wire for a lift-engine Machine: holds it level and at height; the stick asks for attitude and climb.",
             interface = "hardpoint.h1", massKg = 12, envelope = { 0.4, 0.3, 0.15 }, price = 22000,
             perf = { kind = "flight_computer", maxTiltDeg = 22, maxClimbMs = 9, maxYawRateDegS = 45 },
+            lab = true,
+        },
+        -- 2026-10-13 (owner: "it takes way too long to get up there ... vastly slower to increment altimeter than hella"):
+        -- the FC-2. The FC-1 held the climb to 9 m/s whatever the engines could do -- with the FL-6s the Atlus has ~3x its
+        -- weight in thrust. The FC-2 climbs as fast as 120 m/s (the thrust and the air decide below that) and comes DOWN at
+        -- no more than 25 m/s, so letting go near the ground is never a dive.
+        {
+            designId = "eng:zetatech:fc1:r2", lineageId = "eng:zetatech:fc1", revision = 2,
+            manufacturer = "Zetatech", makerKey = "zetatech", code = "ZTC-FC2", family = "avionics",
+            name = "AV Flight Computer FC-2",
+            subtitle = "Fly-by-wire for a lift-engine Machine, cleared for fast climbs: up to 120 m/s up, 25 m/s down.",
+            interface = "hardpoint.h1", massKg = 12, envelope = { 0.4, 0.3, 0.15 }, price = 30000,
+            perf = { kind = "flight_computer", maxTiltDeg = 22, maxClimbMs = 120, maxDescentMs = 25, maxYawRateDegS = 45 },
             lab = true,
         },
         {

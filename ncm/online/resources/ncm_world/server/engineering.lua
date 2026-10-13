@@ -854,17 +854,18 @@ local KITS = {
     -- (Deep: TAP Triangle engage, RB/LB TAP target, LB HOLD abort). `another`: a second part of a design on its own mount.
     av = {
         { clear = { "triangle", "lb", "rb" } },
-        { code = "ZTC-VL28", mount = "mount.av.pod.fl", facing = "down", another = true },
-        { code = "ZTC-VL28", mount = "mount.av.pod.fr", facing = "down", another = true },
-        { code = "ZTC-VL28", mount = "mount.av.pod.rl", facing = "down", another = true },
-        { code = "ZTC-VL28", mount = "mount.av.pod.rr", facing = "down", another = true },
+        -- 2026-10-13: fusion-electric fans (VL-28E) and the fast-climb computer (FC-2): one propellant, ground to space
+        { code = "ZTC-VL28E", mount = "mount.av.pod.fl", facing = "down", another = true },
+        { code = "ZTC-VL28E", mount = "mount.av.pod.fr", facing = "down", another = true },
+        { code = "ZTC-VL28E", mount = "mount.av.pod.rl", facing = "down", another = true },
+        { code = "ZTC-VL28E", mount = "mount.av.pod.rr", facing = "down", another = true },
         { code = "ZTC-FD1", mount = "mount.underside", facing = "down", another = true, bind = { "triangle", "hold", "throttle" } },
         { code = "ZTC-FD1", mount = "mount.rear", facing = "down", another = true, bind = { "triangle", "hold", "throttle" } },
         { code = "ZTC-AC6", mount = "mount.roof", facing = "up", refit = true },
         { code = "ZTC-PT500", mount = "mount.av.bay", facing = "fore", refit = true },
         { code = "XLB-WH1", mount = "mount.front", facing = "fore", refit = true, charge = true,
           binds = { { "triangle", "tap", "engage" }, { "lb", "hold", "abort" }, { "rb", "tap", "next" }, { "lb", "tap", "prev" } } },
-        { code = "ZTC-FC1", mount = "mount.electronics", facing = "fore", refit = true },
+        { code = "ZTC-FC2", mount = "mount.electronics", facing = "fore", refit = true },
         -- 2026-10-13: the FL-6 fusion lift drives (installation.lua) haul it up with the fans
         { code = "ZTC-FL6", mount = "mount.av.belly.f", facing = "down", another = true },
         { code = "ZTC-FL6", mount = "mount.av.belly.r", facing = "down", another = true },
@@ -875,6 +876,19 @@ local KITS = {
         { code = "ZTC-FL6", mount = "mount.av.belly.f", facing = "down", another = true },
         { code = "ZTC-FL6", mount = "mount.av.belly.r", facing = "down", another = true },
         { fuel = "full" }, { fusionMinKg = 400 },
+    },
+    -- the retrofit to one propellant and a fast climb: the four car-fuel VL-28s and the FC-1 to storage, the VL-28Es and
+    -- the FC-2 in their places
+    av_fusion = {
+        { code = "ZTC-VL28", stow = true }, { code = "ZTC-VL28", stow = true },
+        { code = "ZTC-VL28", stow = true }, { code = "ZTC-VL28", stow = true },
+        { code = "ZTC-FC1", stow = true },
+        { code = "ZTC-VL28E", mount = "mount.av.pod.fl", facing = "down", another = true },
+        { code = "ZTC-VL28E", mount = "mount.av.pod.fr", facing = "down", another = true },
+        { code = "ZTC-VL28E", mount = "mount.av.pod.rl", facing = "down", another = true },
+        { code = "ZTC-VL28E", mount = "mount.av.pod.rr", facing = "down", another = true },
+        { code = "ZTC-FC2", mount = "mount.electronics", facing = "fore", refit = true },
+        { fusionMinKg = 400 },
     },
 }
 NcmEngineering.KITS = KITS

@@ -3,19 +3,20 @@
 #   * every NCM resource from git (the FL-6 design and the Atlus belly mounts are seeded at boot)
 #   * the `av_lift` kit on the driver's Atlus by the ledgered owner grant (two FL-6s, both tanks topped up)
 # The grant runs at ncm_world's start; an Atlus already has its configuration record, so the parts mount at once.
-# Usage: KEY=~/.ssh/lightsail-ncm.pem bash tools/deep/ops/install-fl6.sh [driver prefix] [Atlus asset suffix]
+# Usage: KEY=~/.ssh/lightsail-ncm.pem bash tools/deep/ops/install-fl6.sh [driver prefix] [Atlus asset suffix] [kit: av_lift | av_fusion]
 set -euo pipefail
 HOST=ubuntu@52.60.225.137
 KEY="${KEY:-$HOME/.ssh/id_ed25519}"
 DRV="${1:-72519ab3}"
 AV="${2:-78a10cb7f609}"
+KIT="${3:-av_lift}"
 [ -z "$(git status --porcelain ncm/online/resources)" ] || { echo "uncommitted changes under ncm/online/resources: commit first"; exit 1; }
 REV=$(git rev-parse --short HEAD)
 TMP=$(mktemp -d)
 git ls-files ncm/online/resources | sed 's#^ncm/online/resources/##' > "$TMP/list"
 tar czf "$TMP/res.tgz" -C ncm/online/resources -T "$TMP/list"
 scp -i "$KEY" -q "$TMP/res.tgz" $HOST:/tmp/res-fl6.tgz
-ssh -i "$KEY" $HOST "REV=$REV DRV=$DRV AVS=$AV bash -s" <<'REMOTE'
+ssh -i "$KEY" $HOST "REV=$REV DRV=$DRV AVS=$AV KIT=$KIT bash -s" <<'REMOTE'
 set -euo pipefail
 LOG=/opt/ncm/logs/server.log
 TUN=/opt/ncm/server/tunables.json
@@ -29,7 +30,7 @@ sudo mysqldump ncm machine_configuration machine_configuration_current machine_c
 echo "backup $B (git $REV)"
 sudo systemctl stop ncm-server
 tar xzf /tmp/res-fl6.tgz -C /opt/ncm/resources/ncm
-SPEC="${DRV}|${AVS}|av_lift#${T}"
+SPEC="${DRV}|${AVS}|${KIT}#${T}"
 python3 - "$TUN" "$SPEC" <<'PY'
 import json, sys
 p, spec = sys.argv[1], sys.argv[2]
