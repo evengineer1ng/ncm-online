@@ -236,12 +236,13 @@ local function avFrame(E, dt, t)
     local m, s = F.m, F.s
 
     -- the body's real state: velocity and spin from the frames it actually moved through (smoothed)
-    local a = 0.35
+    -- the spin is smoothed less than the velocity (KB-470): its lag fed the attitude loop's oscillation
+    local a, aw = 0.35, 0.7
     local vRaw = { (pos[1] - F.prevPos[1]) / dt, (pos[2] - F.prevPos[2]) / dt, (pos[3] - F.prevPos[3]) / dt }
     local wRaw = FC.omegaFrom(F.prevRot, rot, dt)
     for i = 1, 3 do
         F.vel[i] = F.vel[i] + (vRaw[i] - F.vel[i]) * a
-        F.omega[i] = F.omega[i] + (wRaw[i] - F.omega[i]) * a
+        F.omega[i] = F.omega[i] + (wRaw[i] - F.omega[i]) * aw
     end
     F.prevPos, F.prevRot = pos, rot
     s.pos, s.rot, s.vel, s.omega = pos, rot, { F.vel[1], F.vel[2], F.vel[3] }, { F.omega[1], F.omega[2], F.omega[3] }

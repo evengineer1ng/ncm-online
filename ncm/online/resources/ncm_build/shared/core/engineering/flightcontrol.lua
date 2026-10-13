@@ -23,8 +23,12 @@ Core.define("engineering.flightcontrol", function(C)
     local Sys = C.get("engineering.systems")
 
     M.DEFAULTS = { maxTiltDeg = 22, maxClimbMs = 9, maxYawRateDegS = 45 }
-    M.K_ATT = 2.2        -- 1/s: attitude error -> wanted turn rate
-    M.K_RATE = 5.0       -- 1/s: turn-rate error -> wanted angular acceleration
+    -- 2026-10-13 (KB-470, owner, first car-class flight: "rocks back and forth a lot"): 2.2 / 5.0 diverged -- the fans
+    -- turn the Machine by DIFFERENTIAL throttle through their 0.35 s spool, and the host reads the attitude ~4-8 frames
+    -- late; one axis simulated with both (tools/sim-attitude-loop.py): 5 deg grew past 100 deg at 2.2 / 5.0, and settles at
+    -- 0.8 / 1.6 even at twice the measured delay.
+    M.K_ATT = 0.8        -- 1/s: attitude error -> wanted turn rate
+    M.K_RATE = 1.6       -- 1/s: turn-rate error -> wanted angular acceleration
     M.K_CLIMB = 1.6      -- 1/s: vertical-speed error -> wanted vertical acceleration
     M.MAX_ANG_ACC = 2.5  -- rad/s^2: the most the computer asks of the airframe about any axis
     M.THIN_AIR_MARGIN = 1.15   -- rockets join only when the fans' whole thrust is under 1.15 x the weight

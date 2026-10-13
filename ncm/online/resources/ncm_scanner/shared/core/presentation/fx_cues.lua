@@ -65,8 +65,9 @@ Core.define("presentation.fx_cues", function(C)
         { id = "ram.dust", on = { kind = "ram" }, edge = "fired", drive = "energyJ", priority = 6,
           tiers = { { at = 0, asset = "ground_dust" } } },
         { id = "ram.dry", on = { kind = "ram" }, edge = "dry", priority = 2, audio = { voice = "click", oneShot = true } },
-        { id = "rcs.puff", on = { kind = "attitude" }, require = { frac = { gt = 0.05 } }, drive = "frac", priority = 4,
-          tiers = { { at = 0.05, asset = "rcs_puff" } },
+        -- KB-470: hard manoeuvres only -- at 5 % the AC-6 puffed steam on every small correction of a hover
+        { id = "rcs.puff", on = { kind = "attitude" }, require = { frac = { gt = 0.5 } }, drive = "frac", priority = 4,
+          tiers = { { at = 0.5, asset = "rcs_puff" } },
           audio = { voice = "cold_gas", gain = { q = "frac", from = { 0, 1 }, to = { 0.2, 0.9 } } } },
 
         -- ----------------------------------------------------------------------------- the body in the air
@@ -119,7 +120,10 @@ Core.define("presentation.fx_cues", function(C)
         plume_vac_l  = { effect = "base\\fx\\quest\\q104\\q104_rocket_trail.effect", orient = "-z", seen = false },
         fusion_s     = { effect = "base\\fx\\quest\\q000\\q000_cargo_av_thruster.effect", orient = "-z", seen = false },
         fusion_l     = { effect = "base\\fx\\quest\\q104\\q104_av_thrusters.effect", orient = "-z", seen = false },
-        jet_s        = { effect = "base\\fx\\quest\\q000\\q000_cargo_av_thruster.effect", orient = "-z", seen = false },
+        -- KB-470 (owner: "the vfx are obnoxiously overwhelming"): the Trauma Team Atlus's own authored thruster (its
+        -- entity's `thrusters` event, on engine-bone slots with no rotation: it fires down -Z like the q000 one), not the
+        -- prologue cargo AV's -- four of those burned at hover the whole flight
+        jet_s        = { effect = "base\\fx\\vehicles\\av\\v_av_trauma_team_thruster.effect", orient = "-z", seen = false },
         jet_l        = { effect = "base\\fx\\quest\\q104\\q104_av_thrusters.effect", orient = "-z", seen = false },
         fan_wash     = { effect = "weather.dust", orient = "z", seen = false },
         heat_shimmer = { effect = "base\\fx\\quest\\q112\\q112_10_safe_house\\e_steam_jet_hot_small_q112.effect", orient = "-z", seen = false },

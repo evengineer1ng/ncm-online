@@ -67,11 +67,14 @@ return {
             perf = { kind = "reaction_engine", thrustN = 30000, ispS = 100000, propellant = "fusion" } } },
             attitude = { { key = "ac6", perf = { torqueNm = 4000 } } }, com = { 0, 0, 0.5 } }
         local s = { thr = { 0.8 }, dev = { { heatK = 0 } }, pulse = {}, rams = {} }
-        local tel = { rho = 0, derate = 1, events = {}, attitudeNm = 2000 }
+        local tel = { rho = 0, derate = 1, events = {}, attitudeNm = 3000 }
         local acts = Fx.activations(Fx.fromDynamics("m1", m, s, tel, {}))
         T.ok(find(acts, "plume.fusion"), "a fusion drive glows")
         T.eq(find(acts, "plume.chemical"), nil, "and is not a chemical plume")
-        T.ok(find(acts, "rcs.puff"), "attitude work puffs")
+        T.ok(find(acts, "rcs.puff"), "hard attitude work puffs")
+        -- KB-470: a hover's small corrections do not
+        local calm = Fx.activations(Fx.fromDynamics("m1", m, s, { rho = 0, derate = 1, events = {}, attitudeNm = 400 }, {}))
+        T.eq(find(calm, "rcs.puff"), nil, "small corrections stay quiet")
     end,
 
     the_body_booms_once_through_mach_one_and_glows_coming_home = function(T)
