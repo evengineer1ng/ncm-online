@@ -4,7 +4,7 @@
 # Usage: bash tools/deep/ops/install-resources.sh [dist/ncm-carrier-X.Y.Z.zip]   (optional: also publish that NCM Carrier)
 set -euo pipefail
 HOST=ubuntu@52.60.225.137
-KEY=~/.ssh/id_ed25519
+KEY="${KEY:-$HOME/.ssh/id_ed25519}"
 [ -z "$(git status --porcelain ncm/online/resources)" ] || { echo "uncommitted changes under ncm/online/resources: commit first"; exit 1; }
 REV=$(git rev-parse --short HEAD)
 TMP=$(mktemp -d)
