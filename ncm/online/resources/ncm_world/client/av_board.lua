@@ -2,7 +2,6 @@
 -- entering a car"). The server says when you stand at an AV or sit in one (`ncm:av.near`); F -- the vanilla enter key,
 -- pad A -- boards it, and F again gets you out. Seating goes through OPEN//77 (server/av_board.lua).
 local KEYS = { "F", "padA" }
-local HINT_MS = 1500           -- the hint is re-shown every second while it applies, so it simply lapses when you leave
 
 local state = nil              -- { vehicleId, seated, name } or nil
 RegisterNetEvent("ncm:av.near", function(s)
@@ -15,18 +14,31 @@ local function call(resource, name, ...)
     return promise:await()
 end
 
+-- One persistent hint, shown when the state changes and dismissed when you walk away (2026-10-12: re-showing it every
+-- second made the toast animate in forever).
+local hintHandle, hintKey = nil, nil
 local function hint(s)
-    pcall(call, "open77_notifications", "show", {
+    local key = s and ((s.seated and "s" or "n") .. tostring(s.vehicleId)) or nil
+    if key == hintKey then return end
+    hintKey = key
+    if not s then
+        if hintHandle then pcall(call, "open77_notifications", "dismiss", hintHandle) end
+        hintHandle = nil
+        return
+    end
+    local ok, res = pcall(call, "open77_notifications", "show", {
         id = "ncm_av_board", replace = true, type = "info", icon = "NCM",
         title = s.name or "AV",
         message = s.seated and "[F] Exit" or "[F] Enter",
-        position = "middle_left", durationMs = HINT_MS, color = "#22D8E2",
+        position = "middle_left", durationMs = 0, color = "#22D8E2",
     })
+    if ok and type(res) == "table" and res.handle then hintHandle = res.handle end
 end
 
 CreateThread(function()
-    local wasDown, hintAt = true, 0
+    local wasDown = true
     while true do
+        hint(state)
         if not state then
             wasDown = true          -- a key held while walking up does not count as a press
             Wait(200)
@@ -44,8 +56,6 @@ CreateThread(function()
                 TriggerServerEvent(state.seated and "ncm:av.leave" or "ncm:av.board")
             end
             wasDown = down
-            local now = GetGameTimer()
-            if now - hintAt >= 1000 then hintAt = now; hint(state) end
             Wait(30)
         end
     end
