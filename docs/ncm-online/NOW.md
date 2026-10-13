@@ -1,3 +1,8 @@
+**LATEST 2026-10-13 08:08 UTC - KB-472 LIVE: FL-6 FUSION LIFT DRIVES ON THE OWNER'S ATLUS; KB-470 CONFIRMED (LEVEL CLIMB TO 3 KM); KB-473 OPEN (SPEED READOUT).**
+- 07:49 flight: level all the way (pitch +-1.5, roll +-4: KB-470 works), 8.5 m/s straight up to 3,105 m on the fans alone, then out of car fuel; the FD-1s never ran and the fusion tank was full. The HUD speed read ~1 m/s the whole climb (KB-473: car-body speed, not 3D).
+- ZTC-FL6 (60 kN fusion lift, flown with the fans from the ground) x2 on new belly mounts; retrofitted by grant 08:07 UTC with nobody online; car fuel refilled to 1,500 L.
+- **THE ONE NEXT ACTION:** owner flies the Atlus up past 3 km: fuel should fall about half as fast, and it should keep climbing toward the 12 km seam on fusion. Then KB-473: an AV climb-rate/airspeed readout.
+
 **LATEST 2026-10-13 07:46 UTC - KB-471 LIVE: NO RESPAWN OR LOOP WAKE-UP IN THE ARASAKA LOBBY; AN AV SEAT IS NEVER SAVED AS A PLACE.**
 - The 07:37 join restored the owner into the sky (the AV hover saved as ground), they fell and respawned at the freeroam 'Westbrook dealership' point -- inside the Arasaka lobby. Fixed (`8fd4890`, deployed 07:45 with nobody online); the owner's stored position is now open ground beside the AV pad.
 - Unverified: the remaining five respawn points (freeroam spawns nobody has walked). KB-470 (AV attitude/FX) still owes its flight.
