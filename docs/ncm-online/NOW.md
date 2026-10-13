@@ -1,3 +1,6 @@
+**LATEST 2026-10-13 09:20 UTC - KB-477 LIVE: DEEP'S FLY-BY-WIRE NOW FINDS THE FLIGHT COMPUTER (IT NEVER RAN IN KB-475); CONTROLLERS: OPEN77 READS THE PAD, OWNER SAYS THEY STILL FAIL -- SYMPTOM OWED.**
+- **THE ONE NEXT ACTION:** owner says what the pad fails to do (menus? driving? NCM's F9/AV controls?) and flies the Atlus into Deep holding Space; the client STAY line must read FLY-BY-WIRE with FL-6 thrust > 0.
+
 **LATEST 2026-10-13 09:02 UTC - KB-475/476 LIVE: THE AV'S FLY-BY-WIRE KEEPS FLYING IN DEEP; WEBGL DEEP DRAWS EACH MACHINE'S OWN MODEL; HIDHIDE CLOAK OFF (GAMEPADS).**
 - Deep: Space climbs, C descends, W/S A/D Q/E steer, the computer holds attitude (it coasted and fell out before: every engine idle in Deep). Offline test passes; not flown.
 - WebGL Deep: the game's own lowest-LOD body shells, 38 models; not yet seen in game (front/back orientation unverified).
