@@ -76,7 +76,10 @@ Core.define("competition.class", function(C)
     function M.eligible(id, record)
         local c = M.byId(id)
         if not c then return false, "unknown_class" end
-        if c.records == "any" then return true end
+        if c.records == "any" then
+            if Pool.isAerial(record) then return false, "aerial" end   -- open to every street car, never a flight machine
+            return true
+        end
         for _, r in ipairs(c.records) do if r == record then return true end end
         return false, "record_not_in_class"
     end

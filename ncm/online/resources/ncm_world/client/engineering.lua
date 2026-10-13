@@ -196,7 +196,7 @@ local function axis(n)
 end
 
 --- The pilot's stick, on Deep's keys (one grammar on the ground and in space): W/S pitch to fly forward/back, A/D turn,
---- Q/E bank, R climb, C descend; on a pad the left stick (pitch, turn), right stick X (bank), the triggers (lift).
+--- Q/E bank, Space or R climb, C descend; on a pad the left stick (pitch, turn), right stick X (bank), the triggers (lift).
 local function stick()
     local function k(c) return down(c) and 1 or 0 end
     local function cl(x) return math.max(-1, math.min(1, x)) end
@@ -204,8 +204,9 @@ local function stick()
         pitch = cl(k("W") - k("S") + axis("padLeftStickY")),
         yaw = cl(k("D") - k("A") + axis("padLeftStickX")),
         roll = cl(k("E") - k("Q") + axis("padRightStickX")),
-        -- R climbs, C descends (2026-10-13: "Space" is not a control OPEN//77 reads -- the climb never arrived)
-        lift = cl(k("R") - k("C") + axis("padRightTrigger") - axis("padLeftTrigger")),
+        -- Space or R climbs, C descends. Space IS an OPEN//77 control (Open77.dll's key table, 2026-10-13); dropping it
+        -- left a pilot pressing Space parked at 01:25 UTC (25 s of `stick lift 0.0`) after it had lifted at 00:53
+        lift = cl(math.max(k("Space"), k("R")) - k("C") + axis("padRightTrigger") - axis("padLeftTrigger")),
     }
 end
 

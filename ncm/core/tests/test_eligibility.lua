@@ -2,13 +2,33 @@
 local MAIMAI = "Vehicle.v_standard2_makigai_maimai"
 local PICKUP = "Vehicle.v_standard25_thorton_colby_pickup"     -- Muscle AND Nomad
 local CALIBURN = "Vehicle.v_sport1_rayfield_caliburn"          -- Sport, prestige 5, halo
+local AV = "Vehicle.av_zetatech_atlus"                          -- Tech, tagged aerial
 
 return {
-    an_empty_spec_admits_the_whole_pool = function(T)
+    an_empty_spec_admits_every_ground_car = function(T)
         local E = T.Core.get("competition.eligibility")
         local P = T.Core.get("data.vehicle_pool")
-        T.eq(#E.recordsFor({}), #P.allRecords(), "an open street series admits everything")
+        local ground = 0
+        for _, r in ipairs(P.allRecords()) do if not P.isAerial(r.id) then ground = ground + 1 end end
+        T.eq(#E.recordsFor({}), ground, "an open street series admits every street car")
         T.eq(E.matches({}, MAIMAI), true)
+    end,
+
+    a_flight_machine_never_enters_a_ground_race = function(T)
+        -- owner, 2026-10-13: "thats a flight machine you allowed to join ground races" (45 eligible became 46)
+        local E = T.Core.get("competition.eligibility")
+        local P = T.Core.get("data.vehicle_pool")
+        local C = T.Core.get("competition.class")
+        T.eq(P.isAerial(AV), true)
+        for _, spec in ipairs({ {}, { classes = { "Tech" } }, { prestigeMin = 5 } }) do
+            local ok, why = E.matches(spec, AV)
+            T.eq(ok, false); T.eq(why, "aerial")
+        end
+        T.eq(E.matches({ records = { AV } }, AV), true, "a spec that names the AV admits it")
+        T.eq(E.matches({ tagsAll = { "aerial" } }, AV), true, "an aerial series admits it")
+        T.eq(C.eligible("street_open", AV), false)
+        T.eq(C.eligible("street_open", MAIMAI), true)
+        for _, r in ipairs(P.records("Tech")) do T.eq(r.id ~= AV, true, "no class draw hands out an AV") end
     end,
 
     an_explicit_list_is_the_whole_answer = function(T)

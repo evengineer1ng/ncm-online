@@ -143,13 +143,26 @@ Core.define("data.vehicle_pool", function(C)
         return out
     end
 
-    --- Records of one class, optionally filtered to prestige <= maxPrestige. Returns a new array.
+    --- An aerial machine (tag "aerial": the Trauma Team AV) is in the Machine Index but is never a street car: no
+    --- ground race admits it, no NPC is issued one (owner, 2026-10-13: "thats a flight machine you allowed to join
+    --- ground races").
+    function M.isAerial(id)
+        local e = M.byRecord(id)
+        if not e then return false end
+        for _, t in ipairs(e.tags) do if t == "aerial" then return true end end
+        return false
+    end
+
+    --- Ground records of one class (aerial machines excluded), optionally filtered to prestige <= maxPrestige.
+    --- Returns a new array.
     function M.records(class, maxPrestige)
         local list = M.RECORDS[class]
         if not list then return {} end
         local out = {}
         for _, r in ipairs(list) do
-            if maxPrestige == nil or (tonumber(r.prestige) or 1) <= maxPrestige then
+            if M.isAerial(r.id) then
+                -- the Machine Index lists it (allRecords); a class draw never hands it out
+            elseif maxPrestige == nil or (tonumber(r.prestige) or 1) <= maxPrestige then
                 out[#out + 1] = r
             end
         end

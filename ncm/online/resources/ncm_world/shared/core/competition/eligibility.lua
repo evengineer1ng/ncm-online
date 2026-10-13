@@ -14,7 +14,9 @@
 --   tagsAny     = { "race" }    at least one of these tags
 --   tagsAll     = { "offroad" } every one of these tags
 --   exclude     = { id, ... }   removed whatever else says
--- An empty spec admits everything in the pool, which is what an open street series wants.
+-- An empty spec admits everything in the pool, which is what an open street series wants -- except aerial machines
+-- (`data.vehicle_pool.isAerial`): a ground race never admits one unless the spec names its record or requires the
+-- "aerial" tag.
 --
 -- Deliberately NOT here: manufacturer families. The pool has no `make` field, and deriving one by reading the
 -- maker out of a TweakDB id is the "a parsed id is not a catalogue" mistake this module exists to avoid. A
@@ -37,6 +39,10 @@ Core.define("competition.eligibility", function(C)
         local meta = Pool.byRecord(recordId)
         if not meta then return false, "unknown_record" end
         if has(spec.exclude, recordId) then return false, "excluded" end
+        if Pool.isAerial(recordId) and not has(spec.records, recordId) and not has(spec.tagsAll, "aerial")
+            and not has(spec.tagsAny, "aerial") then
+            return false, "aerial"
+        end
         if spec.records then
             if has(spec.records, recordId) then return true end
             return false, "not_in_list"

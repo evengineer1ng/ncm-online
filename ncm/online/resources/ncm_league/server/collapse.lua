@@ -9,6 +9,8 @@
 -- MODE (convar `ncm_week_collapse`): "dryrun" (THE DEFAULT) computes and records the complete plan and changes
 -- nothing; "live" executes it; "off" does neither. The owner reads a dry run before flipping to live, because live
 -- moves real garages and wallets. Console: `ncm.week.collapse plan` plans the CURRENT run now, as if it had ended.
+-- `ncm_week_collapse_live_from` (run index, default 1): a run before it is never collapsed live -- going live does not
+-- retro-execute a run whose end already passed in dry run (owner, 2026-10-13: "live from next reset only", from run 4).
 --
 -- WHAT (week.collapse): every driver's wallet closes to zero and reopens at the new-player grant; every car not
 -- anchored, and the parts on it and in the driver's inventory, is re-keyed to the run's archive namespace; SR halves
@@ -28,6 +30,7 @@ local function now() return math.floor(Open77.time.unix()) end
 local function sid() return NcmCalendar.serverId() end
 local function cfg() return Week.config(GetConvar or function(_, d) return d end) end
 local function mode() return (GetConvar and GetConvar("ncm_week_collapse", "dryrun")) or "dryrun" end
+local function liveFrom() return tonumber(GetConvar and GetConvar("ncm_week_collapse_live_from", "1")) or 1 end
 local function enc(v) local ok, x = pcall(Json.encode, v); return ok and x or "{}" end
 
 local function singlePlayer()
@@ -283,6 +286,7 @@ end
 
 -- ---------------------------------------------------------------------------------------------------- the watch
 
+local skippedLive = nil
 CreateThread(function()
     Wait(20000)
     while true do
@@ -292,7 +296,12 @@ CreateThread(function()
                 local c, t = cfg(), now()
                 local rec = Week.locate(c, timeline(), t)
                 local finished = rec and rec.run - 1 or 0
-                if finished >= 1 then
+                if m == "live" and finished >= 1 and finished < liveFrom() then
+                    if skippedLive ~= finished then
+                        skippedLive = finished
+                        log("run %d ended before live began (ncm_week_collapse_live_from %d): not collapsed live", finished, liveFrom())
+                    end
+                elseif finished >= 1 then
                     -- the next run opened where this one ended (recorded, or Day 7 if the world never judged it)
                     local endUtc = (runs[finished] and runs[finished].endUtc) or rec.startUtc
                     if crowned[finished] or t >= endUtc + CROWN_GRACE_S then
@@ -415,4 +424,4 @@ RegisterNetEvent("ncm:week.anchor.select", function(assetId)
     end)
 end)
 
-log("ready: collapse mode %s (dryrun until the owner says live)", mode())
+log("ready: collapse mode %s%s", mode(), mode() == "live" and (" from run %d"):format(liveFrom()) or " (dryrun until the owner says live)")
