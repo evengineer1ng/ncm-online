@@ -1,3 +1,8 @@
+**LATEST 2026-10-13 07:46 UTC - KB-471 LIVE: NO RESPAWN OR LOOP WAKE-UP IN THE ARASAKA LOBBY; AN AV SEAT IS NEVER SAVED AS A PLACE.**
+- The 07:37 join restored the owner into the sky (the AV hover saved as ground), they fell and respawned at the freeroam 'Westbrook dealership' point -- inside the Arasaka lobby. Fixed (`8fd4890`, deployed 07:45 with nobody online); the owner's stored position is now open ground beside the AV pad.
+- Unverified: the remaining five respawn points (freeroam spawns nobody has walked). KB-470 (AV attitude/FX) still owes its flight.
+- **THE ONE NEXT ACTION:** owner rejoins (lands beside the AV pad), then the KB-470 flight: Space up, let go, it should settle level.
+
 **LATEST 2026-10-13 07:35 UTC - THE AV FLIES (KB-469 CONFIRMED: 31 -> 121 m); KB-470 LIVE: STABLE ATTITUDE GAINS + QUIETER EFFECTS; NOT YET FLOWN.**
 - Owner 07:23: "av gets off the ground this time" -- first lift on the car-class Atlus. It then rocked (diverging attitude loop) under four oversized cargo-AV flames and AC-6 steam puffs.
 - `ad52a75` deployed 07:34 UTC with nobody online: flight computer K_ATT 0.8 / K_RATE 1.6 (simulated stable at twice the measured delay), spin smoothing 0.7, the Atlus's own thruster effect, AC-6 puffs only on hard manoeuvres.
