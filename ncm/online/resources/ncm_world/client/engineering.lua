@@ -264,6 +264,9 @@ local function avFrame(E, dt, t)
     end
     local contact = F.parked
     local cmd, rep = FC.step(m, s, st, { mass = mass, inertia = m.inertia, rho = rho, g = 9.81, contact = contact, perf = E.fc })
+    -- KB-468: the whole AV frame in one slice ran out of OPEN//77's script budget nearly every frame (600 faults in
+    -- 13 s on 2026-10-13: the flight computer and the plumes were cut off mid-frame). Each stage gets its own slice.
+    Wait(0)
     if NcmClientDevHeat then for _, st in pairs(s.dev or {}) do st.heatK, st.hot = 0, false end end
     local fuelBefore, fusionBefore = Dyn.propellantLeft(m, s, "fuel"), Dyn.propellantLeft(m, s, "fusion")
     local _, tel = Dyn.step(m, s, { g = { 0, 0, -9.81 }, rho = rho, contact = contact }, cmd, dt)
@@ -294,6 +297,7 @@ local function avFrame(E, dt, t)
     end
     NcmClientEngineeringLoopAt = t
     E.lastW, E.lastFrame = Fw, frame
+    Wait(0)
 
     -- what each engine is doing, for NCM FX (the plumes at the pods) and the report
     local out = {}
@@ -310,6 +314,7 @@ local function avFrame(E, dt, t)
         em[#em + 1] = body[1]
         NcmFx.publish(E.assetId, boundVehicle, em)
         NcmFx.frame(E.assetId, em, frame, bodyPos)
+        Wait(0)
     end
 
     if t - E.report.since >= REPORT_MS then
