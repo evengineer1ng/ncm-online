@@ -270,7 +270,7 @@ void onLoad()
             ncm::vehicle::probe::attach(g_handle, g_sdk, directoryOf(g_module));
         });
         // 2026-10-12: an AV's physics switch (vehicle/av_physics.cpp) -- checked once here, used only for a bound AV
-        stage("av physics", [&] { ncm::vehicle::av::prepare(); });
+        stage("av physics", [&] { ncm::vehicle::av::prepare(g_handle, g_sdk); });
     } else {
         NCM_INFO("physics probe disabled by config");
     }
@@ -294,6 +294,7 @@ void onUnload()
     if (c.server) c.server->stop();
     // Before anything else touches game memory: stop observing and unhook while the game thread is still
     // alive, which is the whole reason teardown lives in Running::OnExit rather than Main(Unload).
+    ncm::vehicle::av::release(g_handle, g_sdk);
     ncm::vehicle::probe::detach(g_handle, g_sdk);
     ncm::vehicle::removeHook();
     if (c.mixer) c.mixer->shutdown();
