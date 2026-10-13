@@ -1,3 +1,8 @@
+**LATEST 2026-10-13 07:35 UTC - THE AV FLIES (KB-469 CONFIRMED: 31 -> 121 m); KB-470 LIVE: STABLE ATTITUDE GAINS + QUIETER EFFECTS; NOT YET FLOWN.**
+- Owner 07:23: "av gets off the ground this time" -- first lift on the car-class Atlus. It then rocked (diverging attitude loop) under four oversized cargo-AV flames and AC-6 steam puffs.
+- `ad52a75` deployed 07:34 UTC with nobody online: flight computer K_ATT 0.8 / K_RATE 1.6 (simulated stable at twice the measured delay), spin smoothing 0.7, the Atlus's own thruster effect, AC-6 puffs only on hard manoeuvres.
+- **THE ONE NEXT ACTION:** owner relaunches, flies: Space up, let go -- it should settle level; W/S A/D Q/E. Telemetry: pitch/roll within a few degrees hands-off. If the new plume draws wrong (up through the cabin, or nothing), the client log names `jet_s` and the fix is its `orient`.
+
 **LATEST 2026-10-13 07:20 UTC - KB-469 LIVE ON ONLINE: THE ATLUS IS NOW A CAR-CLASS BODY (DAV'S METHOD), NCM AV 0.2.0 + CARRIER 0.1.42; NOT YET FLOWN.**
 - DAV flies a `vehicleArmedCarBaseObject` Atlus, not the game's script-moved AV object. NCM AV 0.2.0 = that entity re-pathed under `ncmv\` + record `Vehicle.ncm_atlus_av`; Carrier 0.1.42 flies any bound vehicle body; both stored Atlus assets moved to the new record. Deployed 07:19 UTC with nobody online, clean boot, required mods 23 (`dbd9743c...`).
 - Checked offline before handing over: entity class, chassis collider, `seat_front_left`, appearance paths, all four game-function hashes, gate green except KB-463. NOT checkable offline: TweakXL applying the record in game, the spawn, the boarding, the flight.
