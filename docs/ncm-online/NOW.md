@@ -1,3 +1,7 @@
+**LATEST 2026-10-13 23:33 UTC - KB-480 LIVE: RIG BRIDGE 0.1.9 STOPS RE-ACQUIRING EVERY CONTROLLER EVERY 2 S (A MISSING BOUND G29 KEPT IT REBUILDING); NOT YET CONFIRMED AS THE GAMEPAD FIX.**
+- The owner's rig/pad buttons died a few minutes in, before boarding anything. Rig Bridge's config still binds steering to an absent G29, so it tore down and re-created every DirectInput device and reopened the Evenracing rig through SDL every 2 s.
+- **THE ONE NEXT ACTION:** owner relaunches through the launcher (0.1.9 downloads), plays with rig and pad connected together; buttons should keep working. The newest `ncm_rig_bridge-*.log` should show no repeating `device ...` lines.
+
 **LATEST 2026-10-13 22:51 UTC - KB-478 LIVE: HOLD TRIANGLE IN DEEP BURNS THE FD-1S (THE FLIGHT COMPUTER HAD BEEN ZEROING THEM); KB-479 LIVE: THE WEBGL MODELS ARE FINALLY ON THE SERVER; KB-477 CONFIRMED.**
 - Owner's 18:17 local flight: fly-by-wire held in Deep at ~19.8 km (KB-477 works), but Triangle's FD-1 burn was overwritten to 0 % every frame. Now: HOLD Triangle = every lift drive from full, trimmed to stay balanced; stick points the AV (let go: it holds that attitude); the STAY line reads BURN.
 - WebGL Hella everywhere: the model files are gitignored game art and no deploy ever shipped them; copied by hand now (like earth.jpg).

@@ -581,7 +581,12 @@ struct DirectInputRig::Impl {
                 ticksSinceScan = 0;
                 bool changed;
                 { std::lock_guard lock(mutex); changed = deviceSetChanged(); }
-                if (changed || !complete) rebuildDevices();
+                // NOT `|| !complete` (owner, 2026-10-13: "we def have a connectivity issue with gamepads"): a bound
+                // device that is simply not plugged in (a G29 left in the config) made EVERY tick a full rebuild --
+                // every game controller on the PC released and re-acquired every 2 s, and SDL opening and closing
+                // the rig each time DirectInput's list went empty mid-rebuild. Arrival changes the count; the
+                // count is the trigger.
+                if (changed) rebuildDevices();
                 // An output that failed to open (wheel owned by another program, driver mid-reset) is
                 // retried here rather than staying dead for the session.
                 else { std::lock_guard lock(mutex); if (ffbDevice && !ffb.isOpen()) selectFfbDevice(); }
