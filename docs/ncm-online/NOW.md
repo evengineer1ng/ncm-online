@@ -1,3 +1,8 @@
+**LATEST 2026-10-13 07:05 UTC - KB-469: THE AV STOPPED SPAWNING (ATLUS basic_01 IS A PROP); REVERT BUILT (NCM AV 0.1.2), WAITING FOR AN EMPTY SERVER; DAV FLIES A CAR-CLASS ATLUS.**
+- `spawned_entity_is_not_game_object`: basic_01's root is `entEntity`. NCM AV 0.1.2 (basic_02) is committed; publish + restart only with nobody online.
+- DAV's flyable Atlus is a `vehicleArmedCarBaseObject` (car physics, car seats), not an AV object -- the step every earlier attempt missed.
+- **THE ONE NEXT ACTION:** with nobody online, publish NCM AV 0.1.2 and restart (the AV appears again). Then the owner's call on building a car-class NCM Atlus (DAV's approach) before any further flight test.
+
 **LATEST 2026-10-13 06:57 UTC - KB-468 LIVE ON ONLINE: ATLUS basic_01 (A PILOT SEAT OPEN//77 FINDS) + THE AV FRAME IN BUDGET-SIZED SLICES; NOT YET FLOWN.**
 - 06:42 flight on NCM AV 0.1.0: the body now exists (snapshot rose 31.6 -> 42.5 m on lift) but OPEN//77's exit watchdog re-parked the AV every ~2.1 s because basic_02 has no pilot slot (it picked `fx_wheel_front_left_skid`), and the flight loop hit the script budget nearly every frame (600 faults in 13 s).
 - NCM AV 0.1.1 -> `av_zetatech_atlus_basic_01.ent` (collider + `weyland_pilot`, same Trauma Team look); the AV frame yields between stages. Deployed 06:54/06:56 UTC with nobody online; required mods 23 (`efdcdb37...`).
