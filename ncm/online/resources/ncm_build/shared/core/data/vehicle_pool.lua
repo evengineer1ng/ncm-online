@@ -49,7 +49,7 @@ Core.define("data.vehicle_pool", function(C)
         { id = "Vehicle.v_standard3_militech_hellhound",     prestige = 5, tags = { "armored", "phantom_liberty" } },
         -- 2026-10-12 (owner: "expand the machine index to include the av flying vehicle from trauma team"): the Trauma
         -- Team AV -- the Zetatech Atlus on the game's own four-wheel vehicle rig. Flies only on NCM's propulsion.
-        { id = "Vehicle.av_trauma",                          prestige = 5, tags = { "aerial", "trauma_team"     } },
+        { id = "Vehicle.av_zetatech_atlus",                  prestige = 5, tags = { "aerial", "trauma_team"     } },
         { id = "Vehicle.v_utility4_chevalier_legatus",       prestige = 4, tags = { "utility", "update"           } },
     },
     Nomad = {

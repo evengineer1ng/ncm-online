@@ -44,7 +44,7 @@ Core.define("data.vehicle_templates", function(C)
         local base = record:match("^Vehicle%.(.+)$")
         if not base then return nil, "not_a_vehicle_record" end
         base = base:gsub("_player$", "")
-        -- AVs (`Vehicle.av_trauma`, 2026-10-12) live under base\vehicles\special
+        -- AVs (`Vehicle.av_zetatech_atlus`, 2026-10-12; `av_trauma` never projected on a client) live under base\vehicles\special
         if base:match("^av_") then return base, "special" end
         local token = base:match("^v_(%a+%d*)_")
         if not token then return nil, "no_class_token" end
