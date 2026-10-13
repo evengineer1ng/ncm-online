@@ -1,3 +1,8 @@
+**LATEST 2026-10-13 08:21 UTC - KB-474 LIVE: THE ATLUS FLIES ON FUSION ALONE (VL-28E FANS + FL-6) WITH A FAST-CLIMB COMPUTER (FC-2, 120 M/S); NOT YET FLOWN.**
+- Owner: car fuel for space made no sense, and 9 m/s took far too long. VL-28E (fusion-electric fans) + FC-2 (120 m/s up, 25 m/s down) retrofitted onto the owner's Atlus by grant at 08:20 UTC with nobody online; the old VL-28s and FC-1 are in storage.
+- Offline: >60 m/s and >900 m after 20 s of Space; level; no car fuel for lift (the AC-6's trims are the last, <2 g/s). KB-473 (the speed readout lies on the car-class AV) still open.
+- **THE ONE NEXT ACTION:** owner holds Space from the ground to the 12 km seam (should take a few minutes, not tens); let go to stop; C comes down at <= 25 m/s.
+
 **LATEST 2026-10-13 08:08 UTC - KB-472 LIVE: FL-6 FUSION LIFT DRIVES ON THE OWNER'S ATLUS; KB-470 CONFIRMED (LEVEL CLIMB TO 3 KM); KB-473 OPEN (SPEED READOUT).**
 - 07:49 flight: level all the way (pitch +-1.5, roll +-4: KB-470 works), 8.5 m/s straight up to 3,105 m on the fans alone, then out of car fuel; the FD-1s never ran and the fusion tank was full. The HUD speed read ~1 m/s the whole climb (KB-473: car-body speed, not 3D).
 - ZTC-FL6 (60 kN fusion lift, flown with the fans from the ground) x2 on new belly mounts; retrofitted by grant 08:07 UTC with nobody online; car fuel refilled to 1,500 L.
