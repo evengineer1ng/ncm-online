@@ -443,7 +443,9 @@ function NcmComponents.marketOfferings(driverId,marketId,vehicleKeys)
       WHERE s.server_id=? AND s.market_id=? AND d.distribution IN ('base','autofixer') ORDER BY d.family,d.effect]],{serverId(),marketId}) or {}
     local ownedKeys={}; for _,r in ipairs(MySQL.query.await("SELECT DISTINCT vehicle_key FROM vehicle_asset WHERE server_id=? AND ncm_driver_id=?",{serverId(),driverId}) or {}) do ownedKeys[#ownedKeys+1]=r.vehicle_key end
     local out={}
-    for _,r in ipairs(rows) do local d=designFromRow(r); local s=Cat.SUPPLY[d.tier] or {ceiling=3}
+    for i,r in ipairs(rows) do Wait(0) -- KB-464: one slice per design (the instruction quota is per slice)
+        if NcmMarket then NcmMarket.stage=("components %s %d/%d %s"):format(marketId,i,#rows,tostring(r.design_id)) end
+        local d=designFromRow(r); local s=Cat.SUPPLY[d.tier] or {ceiling=3}
         local nextAsset=MySQL.single.await([[SELECT a.asset_id,a.global_ordinal,a.maker_ordinal,a.design_ordinal,run.produced_at
           FROM component_market_inventory mi JOIN component_asset a ON a.asset_id=mi.asset_id
           LEFT JOIN component_manufacturing_run run ON run.run_id=a.run_id
@@ -459,6 +461,7 @@ function NcmComponents.marketOfferings(driverId,marketId,vehicleKeys)
         local inst=Install.isAddOnFamily(d.family) and Install.design(d.designId)
         if inst then d.name=inst.name;d.subtitle=inst.subtitle end
         if not Install.isAddOnFamily(d.family) then
+            Wait(0)
             local setup=Handling.compose({vehicle="market-preview",parts={{id=d.designId,family=d.family,effect=d.effect}}},{at=now()})
             if setup then d.projection={levers=setup.levers,topSpeedScale=setup.topSpeedScale,limited=setup.limited} end
         end

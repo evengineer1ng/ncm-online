@@ -449,7 +449,10 @@ function NcmMarket.offerings(marketId)
             lines[#lines + 1] = l
         end
     end
-    for _, line in ipairs(lines) do
+    for li, line in ipairs(lines) do
+        -- KB-464: one slice per line (the instruction quota is per slice; see KB-459)
+        Wait(0)
+        NcmMarket.stage = ("offerings %s line %d/%d %s"):format(tostring(marketId), li, #lines, tostring(line.vehicleKey))
         -- The LIVE committed plan, not the authored starting one: what a player sees is this manufacturer's
         -- current intention. The profile that chose it and the envelope it moves in stay server-side.
         local st = MySQL.single.await([[SELECT next_tick_at, batch, interval_sec FROM market_supply_state
@@ -488,6 +491,7 @@ function NcmMarket.offerings(marketId)
                 { marketId, serverId(), line.vehicleKey }) or {}) do counts[r.spec] = tonumber(r.n) or 0 end
             local manualOpen = NcmGearbox.manualSales()
             for _, specId in ipairs(order) do
+                Wait(0)
                 local spec = Gearbox.spec(specId) or Gearbox.SPECS.a
                 local gb = { kind = spec.kind, spec = spec.id }
                 local each = {}
@@ -570,6 +574,7 @@ function NcmMarket.payload(pid)
     -- authored data rather than a rewrite. Each row carries the market that offers it, so a part can say
     -- where it came from -- the vehicle half has done that since the display name bug.
     local componentOfferings = {}
+    NcmMarket.stage = "components"
     if NcmComponents and NcmComponents.marketOfferings then
         local keys = {} for _, o in ipairs(offerings) do keys[#keys + 1] = o.vehicleKey end
         for _, market in ipairs(known) do
@@ -631,9 +636,10 @@ local marketStreamSeq = 0
 local MARKET_ROWS_PER_PACKET = 1
 
 function NcmMarket.push(pid)
+    NcmMarket.stage = "start"
     local ok, payload = pcall(NcmMarket.payload, pid)
     if not ok or not payload then
-        log("payload failed player=%s: %s", tostring(pid), tostring(payload))
+        log("payload failed player=%s at %s: %s", tostring(pid), tostring(NcmMarket.stage), tostring(payload))
         return
     end
     local bytes, breakdown = payloadBytes(payload)
