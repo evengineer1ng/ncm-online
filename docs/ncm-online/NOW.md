@@ -1,3 +1,9 @@
+**LATEST 2026-10-13 22:51 UTC - KB-478 LIVE: HOLD TRIANGLE IN DEEP BURNS THE FD-1S (THE FLIGHT COMPUTER HAD BEEN ZEROING THEM); KB-479 LIVE: THE WEBGL MODELS ARE FINALLY ON THE SERVER; KB-477 CONFIRMED.**
+- Owner's 18:17 local flight: fly-by-wire held in Deep at ~19.8 km (KB-477 works), but Triangle's FD-1 burn was overwritten to 0 % every frame. Now: HOLD Triangle = every lift drive from full, trimmed to stay balanced; stick points the AV (let go: it holds that attitude); the STAY line reads BURN.
+- WebGL Hella everywhere: the model files are gitignored game art and no deploy ever shipped them; copied by hand now (like earth.jpg).
+- Owner: controllers mostly work once the sim pedals are unplugged (multiple game controllers at once was the "two control schemes").
+- **THE ONE NEXT ACTION:** owner flies the Atlus into Deep, holds Triangle, points the nose with the left stick: it should accelerate hard where the nose points (STAY: BURN, both FD-1s and FL-6s high); the WebGL view should show an Atlus.
+
 **LATEST 2026-10-13 09:20 UTC - KB-477 LIVE: DEEP'S FLY-BY-WIRE NOW FINDS THE FLIGHT COMPUTER (IT NEVER RAN IN KB-475); CONTROLLERS: OPEN77 READS THE PAD, OWNER SAYS THEY STILL FAIL -- SYMPTOM OWED.**
 - **THE ONE NEXT ACTION:** owner says what the pad fails to do (menus? driving? NCM's F9/AV controls?) and flies the Atlus into Deep holding Space; the client STAY line must read FLY-BY-WIRE with FL-6 thrust > 0.
 
