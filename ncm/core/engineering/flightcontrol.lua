@@ -85,6 +85,77 @@ Core.define("engineering.flightcontrol", function(C)
         local cmd = { throttle = {}, torqueNm = { 0, 0, 0 } }
         local rep = { idle = false }
 
+        -- KB-478 (owner, 2026-10-13: "takes forever to go anywhere ... why isnt fd available?"): a drive the driver burns
+        -- through its own binding (`ctx.burn` = { [deviceIndex] = throttle }: the FD-1s on HOLD Triangle) is never the
+        -- computer's to switch off -- it used to zero them every frame as a thin-air reserve (18:17 local: "pressed padY",
+        -- both FD-1s 0 %). While anything burns the computer stops holding height: every lift drive runs from full, the
+        -- stick asks for a turn RATE (point anywhere; let go and it holds that attitude), and the burn goes where the nose
+        -- goes. It steers by taking thrust off the side that must drop -- never by adding (they are already at full): the
+        -- AV's rear FD-1 sits 2.2 m behind the centre of mass, and left at a fixed full throttle it looped the Machine.
+        local burning = false
+        for _, th in pairs(ctx.burn or {}) do if (tonumber(th) or 0) > 0 then burning = true end end
+        if burning then
+            local yawRate = math.rad(p.maxYawRateDegS or M.DEFAULTS.maxYawRateDegS)
+            local w = s.omega or { 0, 0, 0 }
+            local hold = ctx.holdRot
+            local wantW = { -sp * yawRate, sr * yawRate, -sy * yawRate }
+            if hold and sp == 0 and sr == 0 and sy == 0 then
+                -- let go: back to the attitude it had when the stick was released (body-frame small-angle error)
+                local R, H = s.rot, hold
+                local function col(Mx, j) return { Mx[1][j], Mx[2][j], Mx[3][j] } end
+                local function dot(a, b) return a[1] * b[1] + a[2] * b[2] + a[3] * b[3] end
+                local bx, by, bz = col(R, 1), col(R, 2), col(R, 3)
+                local hx, hy, hz = col(H, 1), col(H, 2), col(H, 3)
+                -- rotation needed (body axes): about x from y/z mismatch, etc.
+                local ex = 0.5 * (dot(bz, hy) - dot(by, hz))
+                local ey = 0.5 * (dot(bx, hz) - dot(bz, hx))
+                local ez = 0.5 * (dot(by, hx) - dot(bx, hy))
+                wantW = { M.K_ATT * ex, M.K_ATT * ey, M.K_ATT * ez }
+            end
+            for a = 1, 3 do
+                cmd.torqueNm[a] = clamp(M.K_RATE * (wantW[a] - (w[a] or 0)), -M.MAX_ANG_ACC, M.MAX_ANG_ACC) * (I[a] or 1000)
+            end
+            local com = m.com or { 0, 0, 0 }
+            local lifts = M.liftDevices(m)
+            local G = {}
+            for _, l in ipairs(lifts) do
+                l.cap = Sys.thrustAt(l.device.perf, rho, 1) * l.up
+                cmd.throttle[l.index] = 1
+                if l.cap > 1 then
+                    G[#G + 1] = { l = l, ay = l.device.at[2] - com[2], ax = -(l.device.at[1] - com[1]), f = l.cap }
+                end
+            end
+            -- projected least squares: the smallest thrust changes that make the asked pitch/roll torque, kept within
+            -- 0..full (a few passes; each clamps and re-solves what is left)
+            local function torque() local tx, ty = 0, 0 for _, g in ipairs(G) do tx, ty = tx + g.ay * g.f, ty + g.ax * g.f end return tx, ty end
+            for _ = 1, 6 do
+                local tx, ty = torque()
+                local ex, ey = cmd.torqueNm[1] - tx, cmd.torqueNm[2] - ty
+                if math.abs(ex) < 50 and math.abs(ey) < 50 then break end
+                local s11, s12, s22 = 0, 0, 0
+                for _, g in ipairs(G) do
+                    local free = (g.f > 0 and g.f < g.l.cap) or (g.f <= 0 and (g.ay * ex + g.ax * ey) > 0) or (g.f >= g.l.cap and (g.ay * ex + g.ax * ey) < 0)
+                    g.free = free
+                    if free then s11, s12, s22 = s11 + g.ay * g.ay, s12 + g.ay * g.ax, s22 + g.ax * g.ax end
+                end
+                local D = s11 * s22 - s12 * s12
+                local y1, y2
+                if math.abs(D) > 1e-6 then y1, y2 = (s22 * ex - s12 * ey) / D, (s11 * ey - s12 * ex) / D
+                elseif s11 > 1e-6 then y1, y2 = ex / s11, 0
+                elseif s22 > 1e-6 then y1, y2 = 0, ey / s22
+                else break end
+                for _, g in ipairs(G) do
+                    if g.free then g.f = clamp(g.f + g.ay * y1 + g.ax * y2, 0, g.l.cap) end
+                end
+            end
+            local tx, ty = torque()
+            for _, g in ipairs(G) do cmd.throttle[g.l.index] = g.f / g.l.cap end
+            -- what the throttles made is no longer asked of the swivel and the AC-6; yaw (and any shortfall) still is
+            cmd.torqueNm[1], cmd.torqueNm[2] = cmd.torqueNm[1] - tx, cmd.torqueNm[2] - ty
+            rep.burn = true
+            return cmd, rep
+        end
+
         -- parked: on the ground with no climb asked, everything idles (it does not hover a hair above the pad)
         if ctx.contact and sl <= 0 then
             for _, l in ipairs(M.liftDevices(m)) do cmd.throttle[l.index] = 0 end

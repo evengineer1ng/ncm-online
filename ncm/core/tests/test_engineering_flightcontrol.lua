@@ -229,6 +229,58 @@ return {
         T.ok(view.vel[3] > 30, ("climbing %.1f m/s"):format(view.vel[3]))
     end,
 
+    -- KB-478 (owner: "takes forever to go anywhere ... why isnt fd available?"): HOLD Triangle burns the FD-1s; the
+    -- computer used to write them back to 0 every frame (18:17 local: "pressed padY", both FD-1s 0 %). Burning, every lift
+    -- drive runs from full (trimmed for balance), the stick points the Machine, and the burn goes where the nose goes.
+    a_driver_burn_is_never_overwritten_and_goes_where_it_points = function(T)
+        local FC = T.Core.get("engineering.flightcontrol")
+        local Dyn = T.Core.get("engineering.dynamics")
+        local Flight = T.Core.get("engineering.flightmodel")
+        local Sys = T.Core.get("engineering.systems")
+        local Deep = T.Core.get("space.deep")
+        local m, devices = atlus(T, KIT_FUSION)
+        local fd, isFd = {}, {}
+        for _, d in ipairs(devices) do if d.designId == "eng:zetatech:fd1:r1" then isFd[d.componentId] = true end end
+        -- by componentId, the way client/deep.lua hands the binding's throttle over
+        for i, d in ipairs(m.devices) do if isFd[d.componentId] then fd[#fd + 1] = i end end
+        T.eq(#fd, 2, "two FD-1s")
+        local burn = { [fd[1]] = 1, [fd[2]] = 1 }
+        local lat, lon = Deep.ORIGIN.lat, Deep.ORIGIN.lon
+        local e, n, u = Deep.enu(lat, lon)
+        local R = Deep.R + 20000
+        local s = Dyn.init(m, { pos = { u[1] * R, u[2] * R, u[3] * R }, vel = { 0, 0, 0 },
+            rot = { { e[1], n[1], u[1] }, { e[2], n[2], u[2] }, { e[3], n[3], u[3] } } })
+        local perf = FC.computer(devices)
+        local rho = Flight.density(20000)
+        local view = FC.localView(s)
+        local cmd0 = FC.step(m, view, {}, { mass = Dyn.mass(m, s), inertia = m.inertia, rho = rho, g = 9.81, perf = perf })
+        T.eq(cmd0.throttle[fd[1]], 0, "not burning: the FD-1s stay the computer's thin-air reserve")
+        local cmd1, rep = FC.step(m, view, {}, { mass = Dyn.mass(m, s), inertia = m.inertia, rho = rho, g = 9.81, perf = perf, burn = burn })
+        T.ok(rep.burn, "the computer knows the driver is burning")
+        T.ok(cmd1.throttle[fd[1]] > 0.5 and cmd1.throttle[fd[2]] > 0.5,
+            ("both FD-1s burn (%.2f, %.2f): trimmed for balance, never zeroed"):format(cmd1.throttle[fd[1]], cmd1.throttle[fd[2]]))
+        local push = 0
+        for _, l in ipairs(FC.liftDevices(m)) do push = push + cmd1.throttle[l.index] * Sys.thrustAt(m.devices[l.index].perf, rho, 1) end
+        T.ok(push > 140000, ("burning, the lift drives push %.0f kN (FL-6s 120 + FD-1s 60 at full)"):format(push / 1000))
+        -- nose forward for 2.5 s, let the stick go, burn on for 20 s: it goes somewhere, fast, and stays pointed
+        local dt = 1 / 60
+        local pitchAtRelease, hold
+        for k = 1, math.floor(21 / dt) do
+            local v, alt = FC.localView(s)
+            local stick = k * dt < 2.5 and { pitch = 1 } or {}
+            -- client/deep.lua's hold: the attitude when the stick was let go
+            if k * dt < 2.5 then hold = nil else hold = hold or v.rot end
+            if hold and not pitchAtRelease then pitchAtRelease = FC.attitude(v.rot) end
+            local cmd = FC.step(m, v, stick, { mass = Dyn.mass(m, s), inertia = m.inertia, rho = Flight.density(alt), g = 9.81, perf = perf, burn = burn, holdRot = hold })
+            s = Flight.step(m, s, cmd, dt, {})
+        end
+        local v = FC.localView(s)
+        local pitchEnd = FC.attitude(v.rot)
+        T.ok(math.abs(math.deg(pitchEnd - pitchAtRelease)) < 10, ("let go, it stays pointed: %.1f -> %.1f deg"):format(math.deg(pitchAtRelease), math.deg(pitchEnd)))
+        local horiz = math.sqrt(v.vel[1] ^ 2 + v.vel[2] ^ 2)
+        T.ok(horiz > 150, ("the burn goes where the nose went: %.0f m/s across at %.0f deg (the hover's tilt gave ~0)"):format(horiz, math.deg(pitchEnd)))
+    end,
+
     omega_comes_back_from_two_attitudes = function(T)
         local FC = T.Core.get("engineering.flightcontrol")
         local Dyn = T.Core.get("engineering.dynamics")

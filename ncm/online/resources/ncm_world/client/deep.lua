@@ -1188,12 +1188,27 @@ local function tick()
             lift = cl(k("Space") - k("C") + dead(axis("padRightTrigger")) - dead(axis("padLeftTrigger"))),
         }
         local view, alt = FC.localView(ds)
+        -- KB-478: what the driver burns through a binding (keyed by componentId) is handed to the computer by device index,
+        -- so it is the driver's throttle, not overwritten
+        local burn = {}
+        for i, d in ipairs(m.devices or {}) do
+            local th = d.componentId and tonumber(cmd.throttle[d.componentId])
+            if th and th > 0 then burn[i] = th end
+        end
+        -- burning with the stick let go, the computer holds the attitude the stick left it at
+        local burning = next(burn) ~= nil
+        if burning and fstick.pitch == 0 and fstick.yaw == 0 and fstick.roll == 0 then
+            A.burnHold = A.burnHold or { { view.rot[1][1], view.rot[1][2], view.rot[1][3] }, { view.rot[2][1], view.rot[2][2], view.rot[2][3] },
+                { view.rot[3][1], view.rot[3][2], view.rot[3][3] } }
+        else
+            A.burnHold = nil
+        end
         local fcmd, frep = FC.step(m, view, fstick, { mass = Dyn.mass(m, ds), inertia = m.inertia, rho = Flight.density(alt),
-            g = 9.81, contact = false, perf = fcPerf })
+            g = 9.81, contact = false, perf = fcPerf, burn = burn, holdRot = A.burnHold })
         for i, th in pairs(fcmd.throttle) do cmd.throttle[i] = th end
         cmd.torqueNm, cmd.torque = fcmd.torqueNm, nil
         stick = { pitch = 0, yaw = 0, roll = 0 }   -- the computer owns attitude; the stick went into it
-        A.fbw = { lift = fstick.lift, vz = view.vel[3], needN = frep.needN, short = frep.short }
+        A.fbw = { lift = fstick.lift, vz = view.vel[3], needN = frep.needN, short = frep.short, burn = frep.burn }
     end
     -- the sticks: torque from attitude parts, or the development waiver
     if stick.pitch ~= 0 or stick.yaw ~= 0 or stick.roll ~= 0 then
@@ -1306,7 +1321,7 @@ local function tick()
             if (evs[tostring(md.key) .. ":no_energy"] or 0) > 0 then parts[i] = parts[i] .. " NO ENERGY" end
             if md.kind ~= "propellant_tank" and md.componentId and not boundIds[tostring(md.componentId)]
                 and (md.kind == "reaction_engine" or md.kind == "pulse_reaction") then
-                parts[i] = parts[i] .. (A.fbw and " FLY-BY-WIRE" or " NO CONTROL")   -- KB-475: the computer flies it
+                parts[i] = parts[i] .. (A.fbw and (A.fbw.burn and " BURN" or " FLY-BY-WIRE") or " NO CONTROL")   -- KB-475: the computer flies it
             end
         end
         for _, d in ipairs(devs) do
