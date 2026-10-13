@@ -204,7 +204,7 @@ end
 CreateThread(function()
     Wait(6000)
     TriggerServerEvent("ncm:build.worldRequest")
-    local warned = false
+    local warned, sentEmpty = false, false
     while true do
         Wait(100)
         local bodies = {}
@@ -219,10 +219,18 @@ CreateThread(function()
             local b = body("b_preview", kp.kind, kp.pos, kp.rot, placing.vehicleId, mineVid ~= nil and tostring(placing.vehicleId) == mineVid)
             if b then bodies[#bodies + 1] = b end
         end
-        local okC, promise, why = pcall(Open77.exports.call, "ncm_sky", "scene", "build", bodies)
-        if not (okC and promise) and not warned then
-            warned = true
-            log("ncm_sky unreachable (%s): kit pieces are not drawn", tostring(okC and why or promise))
+        -- KB-462: no call when nothing is drawn and nothing was, and every call is awaited. Ten unawaited calls a
+        -- second ran the client into export_request_limit ~12 min after a join (2026-10-12), and the frame cost grew
+        -- from ~1 ms to ~12 ms until it did; every other resource's exports then failed too (venue rings).
+        if #bodies > 0 or not sentEmpty then
+            local okC, promise, why = pcall(Open77.exports.call, "ncm_sky", "scene", "build", bodies)
+            if okC and promise then
+                pcall(promise.await, promise)
+                sentEmpty = #bodies == 0
+            elseif not warned then
+                warned = true
+                log("ncm_sky unreachable (%s): kit pieces are not drawn", tostring(okC and why or promise))
+            end
         end
     end
 end)

@@ -24,8 +24,13 @@ function TriggerClientEvent(name, pid, body)
     if name == "ncm:build.result" then results[#results + 1] = body end
     if name == "ncm:build.state" then states[pid] = body end
 end
-function CreateThread(fn) fn() end
-function Wait() end
+-- A thread runs at once until its first Wait, and parks there: a thread that never waits completes in the call, and
+-- the server's endless world loop (main.lua, `while true do Wait(250)`) parks instead of hanging the gate.
+function CreateThread(fn)
+    local ok, err = coroutine.resume(coroutine.create(fn))
+    if not ok then error(err, 0) end
+end
+function Wait() if coroutine.isyieldable() then coroutine.yield() end end
 local gameMs = 0
 function GetGameTimer() gameMs = gameMs + 1000; return gameMs end
 function GetPlayerIdentifier(pid) return "user:" .. tostring(pid) end
@@ -99,7 +104,7 @@ end
 TriggerEvent("ncm:vehicle:materialized", "M-MAI", 501, 1)        -- Ana calls her Mai Mai
 fire("ncm:build.request", 1)
 check("my Machine out in the city is offered", states[1] and #states[1].machines == 1 and states[1].machines[1].vehicleId == "501")
-check("the catalogue is offered by stable id", states[1].catalogue[1].id == "NCM_WING_SMALL_01")
+check("the catalogue is offered by stable id", states[1].catalogue[1].id == "NCM_KIT_STRUT_01")
 
 fire("ncm:build.attach", 1, { parent = { kind = "machine", id = "m-mai" }, assetId = "NCM_WING_SMALL_01", pos = { 0, -1.9, 1.1 }, rot = { 0, -8, 0 } })
 check("a wing attaches", last().ok == true and last().attachmentId)

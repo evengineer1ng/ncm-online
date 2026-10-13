@@ -96,6 +96,7 @@ local portIndex = 0
 -- successful handshake, we are talking to the companion, and saying so by name is worth more than any
 -- amount of re-testing the thing on the other end of the wrong socket.
 local peerIsCarrier, peerVersion = false, nil
+NcmClientCarrierAv = nil                     -- the Carrier's last AV report { line, at }; engineering.lua reads it
 
 -- ---------------------------------------------------------------------------------------------------
 -- TWO PEERS, TWO SURFACES. The rig is proven; the Carrier is not. Neither has to lose.

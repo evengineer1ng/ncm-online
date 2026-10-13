@@ -695,8 +695,11 @@ local RING_OVERLAP_MS = 1500
 local RING_ID = { 0.0, 0.0, 0.0, 1.0 }
 local RING = nil                                         -- { kind, prev, prevUntil }
 
-local function ringScene(bodies)
-    pcall(Open77.exports.call, "ncm_sky", "scene", "ascent", bodies)
+-- Awaited from the ring's thread (KB-462: unawaited calls ten times a second fill the export request table); the
+-- resource-stop handler is not a coroutine, so it only sends.
+local function ringScene(bodies, await)
+    local ok, promise = pcall(Open77.exports.call, "ncm_sky", "scene", "ascent", bodies)
+    if await and ok and promise then pcall(promise.await, promise) end
 end
 
 local function ringKind(h)
@@ -735,10 +738,10 @@ CreateThread(function()
             else
                 RING.prev = nil
             end
-            ringScene(bodies)
+            ringScene(bodies, true)
         elseif RING then
             RING = nil
-            ringScene({})
+            ringScene({}, true)
             log("ASCENT RING off%s", z and (" at game z %.0f"):format(z) or " (Deep, or out of the car)")
         end
     end
