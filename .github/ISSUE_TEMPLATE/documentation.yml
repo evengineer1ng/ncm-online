@@ -1,0 +1,23 @@
+name: Documentation issue
+description: Something on the website or in the docs is wrong, out of date or unclear.
+labels: ["documentation"]
+body:
+  - type: input
+    id: page
+    attributes:
+      label: Page
+      description: URL or file path.
+      placeholder: "https://evengineer1ng.github.io/ncm-online/getting-started.html"
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: What is wrong or missing?
+      description: If the game behaves differently from what the page says, describe what the game does.
+    validations:
+      required: true
+  - type: textarea
+    id: suggestion
+    attributes:
+      label: Suggested wording (optional)

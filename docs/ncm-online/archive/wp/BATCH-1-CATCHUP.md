@@ -48,7 +48,7 @@ session, `ncm.telemetry`) · 7 zero-fault incidents + corrected time + live race
 - Never print secrets (licence key, DB password); read `server.jsonc` only through the masking tools.
 - Never restart the server with clients connected.
 - Warden console is reached at http://127.0.0.1:11790 through the SSH tunnel
-  (`ssh -i C:\Users\eveng\.ssh\lightsail-ncm.pem -N -L 11790:127.0.0.1:11780 ubuntu@52.60.225.137`, keep the window open).
+  (`ssh -i <ssh-key> -N -L 11790:127.0.0.1:11780 ubuntu@<online-host>`, keep the window open).
 - Second local client: `powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\o77-client.ps1 -Profile ncm-tester2 -Name ncmtester2 -Server 52.60.225.137:11778`,
   then in its dev console (`) `resource.emit open77:shell:autoconnect 52.60.225.137:11778 alpha`. It has no WebUI (KB-4): drive it from the Warden console.
 

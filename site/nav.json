@@ -1,0 +1,35 @@
+[
+  {"title": "Home", "url": "index.html"},
+  {"title": "Getting Started", "url": "getting-started.html"},
+  {"title": "How to Play", "url": "how-to-play.html"},
+  {"title": "Systems", "url": "systems/index.html", "children": [
+    {"title": "Racing", "url": "systems/racing.html"},
+    {"title": "NPC Racing & the Paddock", "url": "systems/npc-racing.html"},
+    {"title": "Race Week", "url": "systems/race-week.html"},
+    {"title": "Cars & Machine Index", "url": "systems/machines.html"},
+    {"title": "Engineering & Parts", "url": "systems/engineering.html"},
+    {"title": "Manual Gearboxes", "url": "systems/gearbox.html"},
+    {"title": "Fuel", "url": "systems/fuel.html"},
+    {"title": "Weather & Time", "url": "systems/weather.html"},
+    {"title": "Economy, Markets & Betting", "url": "systems/economy.html"},
+    {"title": "Wheel & Rig Support", "url": "systems/rig.html"},
+    {"title": "Broadcast & Race Week Radio", "url": "systems/broadcast.html"},
+    {"title": "City Memory", "url": "systems/city-memory.html"},
+    {"title": "Experimental Systems", "url": "systems/experimental.html"}
+  ]},
+  {"title": "Controls & Commands", "url": "commands.html"},
+  {"title": "FAQ", "url": "faq.html"},
+  {"title": "Known Issues", "url": "known-issues.html"},
+  {"title": "Changelog", "url": "changelog.html"},
+  {"title": "Roadmap", "url": "roadmap.html"},
+  {"title": "The NCM Family", "url": "about.html"},
+  {"title": "Developers", "url": "developers/index.html", "children": [
+    {"title": "Architecture", "url": "developers/architecture.html"},
+    {"title": "Repository Map", "url": "developers/repo-map.html"},
+    {"title": "Running NCM", "url": "developers/running.html"},
+    {"title": "Testing", "url": "developers/testing.html"},
+    {"title": "Extending NCM", "url": "developers/extending.html"},
+    {"title": "Maintaining These Docs", "url": "developers/docs.html"}
+  ]},
+  {"title": "Status Labels", "url": "status.html"}
+]

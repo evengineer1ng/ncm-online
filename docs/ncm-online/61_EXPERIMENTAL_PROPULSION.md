@@ -83,8 +83,8 @@ The pad cycles Earth, Moon, Mars, Jupiter, Saturn, Neptune, 0.05 ly ahead, Proxi
 
 **Read it with:**
 ```
-ssh -i ~/.ssh/id_ed25519 ubuntu@52.60.225.137 'tail -c 20000000 /opt/ncm/logs/server.log | grep -a "DRIVE " | cut -c1-400 | tail -40'
-ssh -i ~/.ssh/id_ed25519 ubuntu@52.60.225.137 'sudo mysql ncm -t -e "SELECT activation_id, drive, ok, reason, ROUND(path_m/9.4607e15,6) path_ly, ROUND(endpoint_m/9.4607e15,6) endpoint_ly, ROUND(sim_s,1) sim_s, ROUND(real_s,1) real_s, charge_used FROM deep_drive_activation ORDER BY started_utc"'
+ssh -i ~/.ssh/id_ed25519 ubuntu@<online-host> 'tail -c 20000000 /opt/ncm/logs/server.log | grep -a "DRIVE " | cut -c1-400 | tail -40'
+ssh -i ~/.ssh/id_ed25519 ubuntu@<online-host> 'sudo mysql ncm -t -e "SELECT activation_id, drive, ok, reason, ROUND(path_m/9.4607e15,6) path_ly, ROUND(endpoint_m/9.4607e15,6) endpoint_ly, ROUND(sim_s,1) sim_s, ROUND(real_s,1) real_s, charge_used FROM deep_drive_activation ORDER BY started_utc"'
 ```
 
 **Termination reasons:**
@@ -115,7 +115,7 @@ Every kit fills the Machine's fuel tank, which the AC-6 and IA-10 burn.
 
 **Workflow:**
 ```
-ssh -i ~/.ssh/id_ed25519 ubuntu@52.60.225.137 'bash ~/deeplab.sh warp'      # impulse | fusion | warp | alcubierre | jump | wormhole
+ssh -i ~/.ssh/id_ed25519 ubuntu@<online-host> 'bash ~/deeplab.sh warp'      # impulse | fusion | warp | alcubierre | jump | wormhole
 ```
 The script backs up `tunables.json` and both presence rows, sets the grant with a UTC nonce, restarts, and prints the kit's lines and the Hella's fit and bindings. It then **removes the grant** and prints both expeditions' positions before and after. Join as Alabino, test, read `DRIVE` lines, and run the next drive.
 

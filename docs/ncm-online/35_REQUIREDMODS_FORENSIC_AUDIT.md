@@ -22,7 +22,7 @@ Both launcher `2.31.13+op77.89` (the build that produced the retained failure lo
 1. `MasterClient.Sanitize` passes each hosted URL through `CatalogUrls.ModBlob`.
 2. `ModBlob` returns null for every `http:` URL whose host is not loopback. HTTPS and loopback HTTP survive.
 3. NCM advertised `http://52.60.225.137:11779/...` in Online and currently advertises
-   `http://10.0.0.70:11779/...` in Development.
+   `http://<lan-host>:11779/...` in Development.
 4. After the player accepts the unsecured warning, `WorldRequirement.Resolve` sees a blank URL and returns
    `WorldModRefusalKind.Unverifiable`: the world did not say where/how large the package was.
 5. The generic UI/log collapses that to “requires mods that cannot be installed.” No HTTP request occurs.
@@ -159,7 +159,7 @@ to hosted public-HTTP declarations, they followed the same URL-null/`Unverifiabl
 |---|---|---|---|
 | Awaiting review / unknown attestation | Resolver source inspected; live attestation endpoint queried for all four hashes | Unknown is warn/consent, not `Unverifiable`; none is blocked/refused | **ELIMINATED** |
 | Unsecured flag or consent did not propagate | Historic log records pause, explicit acceptance and capability-lift line before refusal | Capability lift reached resolver | **ELIMINATED** |
-| Public HTTP URL rejected | Live config is `http://52.60.225.137:11779/`; Dev is `http://10.0.0.70:11779/`; `.89` and verified current `.100` source null non-loopback HTTP URLs | Exact input and return branch recovered | **PROVEN ROOT CAUSE** |
+| Public HTTP URL rejected | Live config is `http://52.60.225.137:11779/`; Dev is `http://<lan-host>:11779/`; `.89` and verified current `.100` source null non-loopback HTTP URLs | Exact input and return branch recovered | **PROVEN ROOT CAUSE** |
 | Declared size/hash wrong | Active blobs hashed; local full endpoint downloads hashed; sizes compared | Both exact | **ELIMINATED** |
 | HTML/error/redirect/compression/auth/range problem | Full and Range GETs inspected locally; public live endpoint inspected while parked | Correct bytes and behavior when enabled; no request occurred in failed run | **ELIMINATED as historic refusal cause** |
 | Malformed hosted declaration | IDs, versions, SHA-256 and positive archive sizes compared with current schema and startup acceptance | Shape is valid | **ELIMINATED** |

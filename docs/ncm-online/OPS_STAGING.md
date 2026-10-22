@@ -3,6 +3,14 @@
 > **STATUS: CURRENT** - authority for: *day-to-day operation of NCM Online* - affirmed 2026-09-24
 > Authority map: [INDEX.md](INDEX.md) - classified 2026-09-24 (L125)
 
+> **FROZEN 2026-10-17 (L370):** NCM Online keeps running the build it has. No feature deploys; a deploy only fixes
+> breakage, with the usual backup and nobody online. The tree at the freeze is the local git tag
+> `online-frozen-2026-10-17` (`a0b7898`). Energy goes to single player (doc 55 §12).
+>
+> **UNFROZEN 2026-10-22 (L371):** the freeze above is lifted and single player is on hold. New work deploys to
+> **Online first, not dev first**; every Online step (backup, code, mods, restart) is still confirmed with the owner,
+> and players are checked before any restart.
+
 Day-to-day recipe for the staging server. Facts: Ubuntu 24.04, 2 vCPU / 4 GB, static IP `52.60.225.137`,
 OPEN//77 `2.31.21+op77.124 linux-x64` (platform-only upgrade 2026-10-02, L290), server id `6b154fdc-d515-4903-97dd-df37cb966151`, name "NCM Online",
 unlisted. Layout `/opt/ncm/{server,resources/ncm,mods,logs}`; systemd unit `ncm-server` (`Restart=always`, so any
@@ -18,10 +26,10 @@ Secrets rule: never `cat server.jsonc` (it holds the licence). Read it through `
 targeted python scripts in `tools/staging/`, which print only the section they touch.
 
 ## Access
-- SSH key: `C:\Users\eveng\.ssh\lightsail-ncm.pem` (the Lightsail download, copied). User `ubuntu`.
+- SSH key: `<ssh-key>` (the Lightsail download, copied). User `ubuntu`.
 - Warden is bound to `127.0.0.1:11780` on the box and is **never** opened to the internet. Reach it through a tunnel:
   ```
-  ssh -i C:\Users\eveng\.ssh\lightsail-ncm.pem -N -L 11790:127.0.0.1:11780 -o ServerAliveInterval=30 ubuntu@52.60.225.137
+  ssh -i <ssh-key> -N -L 11790:127.0.0.1:11780 -o ServerAliveInterval=30 ubuntu@<online-host>
   ```
   then browse `http://127.0.0.1:11790`. Leave that window open while you work.
 
@@ -42,10 +50,10 @@ targeted python scripts in `tools/staging/`, which print only the section they t
 ## Everyday commands (any terminal; `ssh` ships with Windows)
 | Want | Command |
 |---|---|
-| Restart the server | Warden → **RESTART** (top right), or `ssh -i C:\Users\eveng\.ssh\lightsail-ncm.pem ubuntu@52.60.225.137 sudo systemctl restart ncm-server` |
-| Is it up | `ssh -i C:\Users\eveng\.ssh\lightsail-ncm.pem ubuntu@52.60.225.137 systemctl is-active ncm-server` |
-| Required-mods line | `ssh -i C:\Users\eveng\.ssh\lightsail-ncm.pem ubuntu@52.60.225.137 grep -i "required mods" /opt/ncm/logs/server.log` |
-| Tail the log | `ssh -i C:\Users\eveng\.ssh\lightsail-ncm.pem ubuntu@52.60.225.137 tail -n 60 /opt/ncm/logs/server.log` |
+| Restart the server | Warden → **RESTART** (top right), or `ssh -i <ssh-key> ubuntu@<online-host> sudo systemctl restart ncm-server` |
+| Is it up | `ssh -i <ssh-key> ubuntu@<online-host> systemctl is-active ncm-server` |
+| Required-mods line | `ssh -i <ssh-key> ubuntu@<online-host> grep -i "required mods" /opt/ncm/logs/server.log` |
+| Tail the log | `ssh -i <ssh-key> ubuntu@<online-host> tail -n 60 /opt/ncm/logs/server.log` |
 | Console commands | Warden → Live console (`ncm.calendar`, `ncm.race.now <route>`, `ncm.car <pid> formula <team>`, `ncm.rc.*`, …) |
 
 Do not restart with clients connected unless you accept the kick (KB-5).
@@ -56,9 +64,9 @@ The platform's resource tree is vendor-owned and an upgrade rewrites it, so two 
 before the restart -- neither is optional and neither announces itself when it is missing:
 
 ```
-scp -i C:\Users\eveng\.ssh\lightsail-ncm.pem tools\staging\check-load-list.py         ubuntu@52.60.225.137:/tmp/
-scp -i C:\Users\eveng\.ssh\lightsail-ncm.pem tools\staging\close-freeroam-sandbox.py  ubuntu@52.60.225.137:/tmp/
-ssh -i C:\Users\eveng\.ssh\lightsail-ncm.pem ubuntu@52.60.225.137 'sudo python3 /tmp/check-load-list.py && sudo python3 /tmp/close-freeroam-sandbox.py'
+scp -i <ssh-key> tools\staging\check-load-list.py         ubuntu@<online-host>:/tmp/
+scp -i <ssh-key> tools\staging\close-freeroam-sandbox.py  ubuntu@<online-host>:/tmp/
+ssh -i <ssh-key> ubuntu@<online-host> 'sudo python3 /tmp/check-load-list.py && sudo python3 /tmp/close-freeroam-sandbox.py'
 ```
 
 `check-load-list.py` catches a new dependency missing from `resources.load`, which aborts the whole automatic
@@ -82,7 +90,7 @@ sits open until someone notices. It has now happened twice.
 Two things must hold after any upgrade, and `upgrade-open77.sh` asserts both:
 
 ```
-ssh -i C:\Users\eveng\.ssh\lightsail-ncm.pem ubuntu@52.60.225.137 \
+ssh -i <ssh-key> ubuntu@<online-host> \
   'ls -l /opt/ncm/server/access.json; stat -c "%A %U:%G %n" /opt/ncm/server'
 ```
 
@@ -96,8 +104,8 @@ ssh -i C:\Users\eveng\.ssh\lightsail-ncm.pem ubuntu@52.60.225.137 \
 
 **Order matters when rebuilding a whitelist by hand:** add the identities first, enable the whitelist second.
 Enabling with an empty list disconnects and refuses everyone, the owner included. The owner's identity is
-`ae3e440b-1384-4337-ba01-3bcc0a369d95` (easporks); the second test client, ncmtester2, is
-`d82ed6cf-c5cb-4dd8-8473-3a1d0057d3b7`.
+`44444444-4444-4444-8444-444444444444` (easporks); the second test client, ncmtester2, is
+`33333333-3333-4333-8333-333333333333`.
 
 **A player can join after an empty-server check while systemd is already stopping the old process (KB-102).**
 Re-check immediately before every restart, but do not call that a drain lock. A supported maintenance/admission
@@ -180,8 +188,8 @@ backs the old tree up to `/opt/ncm/backups/server-<UTC>` with automatic rollback
 **After upgrading, before restarting, ALWAYS run the load-list guard:**
 
 ```
-scp -i <key> tools\staging\check-load-list.py ubuntu@52.60.225.137:/tmp/
-ssh -i <key> ubuntu@52.60.225.137 "python3 /tmp/check-load-list.py"
+scp -i <key> tools\staging\check-load-list.py ubuntu@<online-host>:/tmp/
+ssh -i <key> ubuntu@<online-host> "python3 /tmp/check-load-list.py"
 ```
 
 Exit 0 = every dependency of every loaded resource is itself in `resources.load`. Non-zero = **the server will
@@ -327,8 +335,8 @@ full download matched the release ZIP's declared size/SHA-256; Range returned 20
 Warden stayed on loopback. `sslip.io` is an interim proof hostname, not permanent owned infrastructure
 (`IDEA-452`). Certificate observed: Let's Encrypt, TLS 1.3, expires 2026-12-24; Caddy renews automatically.
 
-Flag scripts (upload with `scp -i <key> tools\staging\<name>.py ubuntu@52.60.225.137:/tmp/`, run with
-`ssh -i <key> ubuntu@52.60.225.137 "python3 /tmp/<name>.py && sudo systemctl restart ncm-server"`):
+Flag scripts (upload with `scp -i <key> tools\staging\<name>.py ubuntu@<online-host>:/tmp/`, run with
+`ssh -i <key> ubuntu@<online-host> "python3 /tmp/<name>.py && sudo systemctl restart ncm-server"`):
 - `set-unsecured.py` — `enabled=true, unsecured=true`, drops indexed loader entries. **Run it after any Warden
   import**: an import rewrites the `requiredMods` block and silently drops `unsecured`.
 - `set-mods-off.py` — `enabled=false, unsecured=false` (emergency/manual park; not the current state).

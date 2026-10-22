@@ -1,0 +1,28 @@
+name: Feature request
+description: An idea for NCM Online.
+labels: ["idea"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        NCM is built by one developer, so not every idea gets built. Every idea that is raised is recorded in the
+        project's append-only idea ledger (`docs/ncm-online/BACKLOG.md`). Check the
+        [Roadmap](https://evengineer1ng.github.io/ncm-online/roadmap.html) first.
+  - type: textarea
+    id: idea
+    attributes:
+      label: The idea
+      description: What should exist, from a player's point of view?
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why?
+      description: What would it make better, or what problem does it solve?
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Anything else

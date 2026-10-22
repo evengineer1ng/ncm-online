@@ -112,7 +112,7 @@ Read through `tools/o77-config-show.ps1` (the masking tool — `server.jsonc` is
 
 | | Online | Development |
 |---|---|---|
-| Mod base URL | `https://52-60-225-137.sslip.io:11779/` (Caddy → loopback `11782`) | **`http://10.0.0.70:11779/` — KB-112-broken** |
+| Mod base URL | `https://52-60-225-137.sslip.io:11779/` (Caddy → loopback `11782`) | **`http://<lan-host>:11779/` — KB-112-broken** |
 | `requiredMods.enabled` | `true` | `true` |
 | `requiredMods.unsecured` | `true` | **`false`** |
 | Declared packages | **four** — ArchiveXL 1.27.1, TweakXL 1.11.4, RB15 10.0.0, NCM liveries 1.0.0 | **two** — RB15 10.0.0, NCM liveries 1.0.0 only |

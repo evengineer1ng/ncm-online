@@ -144,11 +144,11 @@ local snapshotJson = [[{"asset":"10000000-0000-4000-8000-000000000002","basis":{
 local queries = 0
 MySQL = { query = { await = function(sql) queries = queries + 1
     check("FRAME reads only Deep presence rows", sql:find("^SELECT") and sql:find("place='deep'"))
-    return { { driver_id = "72519ab3-010d-4a3e-b5d9-ed5e653d2be6", place = "deep", host = "cyberpunk", state_json = snapshotJson } } end } }
+    return { { driver_id = "11111111-1111-4111-8111-111111111111", place = "deep", host = "cyberpunk", state_json = snapshotJson } } end } }
 pcall(frameThreadFn)
 check("the FRAME pass ran one query", queries == 1)
 local frame = nil
-for _, l in ipairs(logs) do if l:find("FRAME driver ..3d2be6") then frame = l end end
+for _, l in ipairs(logs) do if l:find("FRAME driver ..111111") then frame = l end end
 check("the FRAME line is written", frame ~= nil)
 check("FRAME: Earth-fixed speed and its horizontal part (the HUD's numbers)", frame and frame:find("|v| 4881.9 = horizontal 2814.4", 1, true) ~= nil)
 check("FRAME: inertial speed, almost all radial", frame and frame:find("INERTIAL |v| 3989.8 = radial +3988.9", 1, true) ~= nil)

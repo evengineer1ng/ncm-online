@@ -125,3 +125,28 @@ tools/assetto/
 
 # Scratch from the 2026-10 index hotfix (tarballs and hash lists)
 /.tmp-indexfix/
+
+# --- Public release (2026-10-22): third-party work we have no right to redistribute (L) ----------------------------
+# Patched/backup copies of keanuWheeze's "Manual Transmission" mod (licence unknown). NCM Gearbox replaced it (L306).
+# Kept on disk for the record; removed from the tree and from history before the repository went public.
+/manual-transmission-*.lua
+/manual-transmission-*.json
+/install-records/checkpoint-03/hotfix-block-change-gear/bin/
+/install-records/checkpoint-04/clutch-bridge-backup/clutch.lua
+/install-records/checkpoint-04/clutch-bridge-backup/init.lua
+/install-records/checkpoint-04/mt-blockchangegear-fix/
+/install-records/checkpoint-04/mt-blockchangegear-fix-backup/
+/install-records/checkpoint-04/mt-init.lua.pre-diag.bak
+# Files derived from the third-party RB15 car mod's own mesh/entity/appearance. The liveries' artwork and tools stay.
+/wolvenkit-projects/ncm_rb15_liveries/source/ncm/rb15_liveries/meshes/
+/wolvenkit-projects/ncm_rb15_liveries/source/ncm/rb15_liveries/*.ent
+/wolvenkit-projects/ncm_rb15_liveries/source/ncm/rb15_liveries/*.ent.json
+/wolvenkit-projects/ncm_rb15_liveries/source/ncm/rb15_liveries/*.app
+/wolvenkit-projects/ncm_rb15_liveries/source/ncm/rb15_liveries/*.app.json
+
+# Root-level screenshots and stray scratch files: may show other players' names or session ids
+/Screenshot*.png
+/3b887e44f0b6
+
+# The website's build output (site/build.py) -- deployed by .github/workflows/pages.yml, never committed
+/site/_site/

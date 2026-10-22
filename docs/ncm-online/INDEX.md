@@ -34,7 +34,8 @@ corpus claiming migrations 001-007 while the schema was at 023.
 
 | Topic | Authority | Affirmed |
 |---|---|---|
-| **NCM 3.0 single player**: the NCM Host (the dev resources in-process over SQLite), Race Week tapes, offline canonical time, the deck, the seam report toward Nexus | [55_NCM3_SINGLE_PLAYER.md](55_NCM3_SINGLE_PLAYER.md) | L338 |
+| **NCM 3.0 single player**: the NCM Host (the dev resources in-process over SQLite), Race Week tapes, offline canonical time, the deck, the seam report toward Nexus; **the Online port programme (chapters 0-10, §12; on hold since 2026-10-22, L371)** | [55_NCM3_SINGLE_PLAYER.md](55_NCM3_SINGLE_PLAYER.md) | L338, L370, L371 |
+| **The public release and the website**: the safety audit, licensing, the publication checklist and steps, the GitHub Pages site (`site/`) | [63_PUBLIC_RELEASE.md](63_PUBLIC_RELEASE.md) | L372 |
 | **NCM Deep's universe**: catalogue, multi-body gravity, frames, astronomical coordinates, the `ncm_universe` reporter | [60_ASTRONOMICAL_SUBSTRATE.md](60_ASTRONOMICAL_SUBSTRATE.md) | L363 |
 | **The experimental propulsion stable**: six Deep drives, the propulsion laboratory and grant ledger, drive telemetry, the travel ledger | [61_EXPERIMENTAL_PROPULSION.md](61_EXPERIMENTAL_PROPULSION.md) | L364 |
 | **Race Week Live (NCM Radio)**: the in-game station, corpus compiler, trigger map, director, OmniVoice voice render, `ncm-radio` required mod and `ncm_radio` resource | [59_NCM_RADIO.md](59_NCM_RADIO.md) | L348 |
@@ -58,7 +59,7 @@ corpus claiming migrations 001-007 while the schema was at 023.
 | Discovery and collection | [13_VEHICLE_COLLECTION.md](13_VEHICLE_COLLECTION.md) | - |
 | Weather as world state | [11_WEATHER.md](11_WEATHER.md) | - |
 | Vehicle artwork | [15_GENERATION_1_VEHICLE_ARTWORK_MANIFEST.md](15_GENERATION_1_VEHICLE_ARTWORK_MANIFEST.md) | - |
-| Day-to-day operation of NCM Online | [OPS_STAGING.md](OPS_STAGING.md) | - |
+| Day-to-day operation of NCM Online (frozen 2026-10-17 by L370; **unfrozen 2026-10-22, deploys Online first**, L371) | [OPS_STAGING.md](OPS_STAGING.md) | L370, L371 |
 | Carrier follow-up and in-place Production package upgrade | [CARRIER_NEXT_STEPS_AND_UPGRADE.md](CARRIER_NEXT_STEPS_AND_UPGRADE.md) | L146-L147; KB-132-KB-136 |
 | Rig integration ownership and separation from Carrier | [43_RIG_BRIDGE_ASSESSMENT.md](43_RIG_BRIDGE_ASSESSMENT.md), [DECISION_RECORD.md](DECISION_RECORD.md#l191---executed-in-code-live-gated---rig-bridge-is-a-full-dedicated-mod-not-a-probe-and-not-carrier), plus CODE: `ncm/rig_bridge/` | L185, L186, L188, L191; dedicated multi-vendor product built, Carrier unchanged, `MASTER_TEST §BU` live PASS owed |
 | QA instrumentation mapping | [wp/QA_INSTRUMENTATION.md](wp/QA_INSTRUMENTATION.md) | - |
@@ -101,7 +102,9 @@ and amends §0.1. The code still implements fixed three-day runs until doc 47 §
 
 ---
 
-## Current (21)
+## Current (22)
+
+- [63_PUBLIC_RELEASE.md](63_PUBLIC_RELEASE.md) - making NCM Online public (L372): the audit of HEAD and history (no credential ever committed), MIT and third-party notices, the history rewrite, the website and its generated sections, the publication checklist and the owner's exact steps
 
 - [61_EXPERIMENTAL_PROPULSION.md](61_EXPERIMENTAL_PROPULSION.md) - the experimental propulsion stable (L364): impulse, fusion, warp, Alcubierre, jump, wormhole; lab kits and the one-shot grant ledger; telemetry; travel ledger
 - [60_ASTRONOMICAL_SUBSTRATE.md](60_ASTRONOMICAL_SUBSTRATE.md) - NCM Deep's universe (L363): Solar System + Hipparcos catalogue, multi-body gravity, inertial frames, OpenSpace audit
@@ -154,8 +157,9 @@ and amends §0.1. The code still implements fixed three-day runs until doc 47 §
 - [48_ENGINEERING_ENVELOPE.md](48_ENGINEERING_ENVELOPE.md) - the engineering envelope: a car's multidimensional capacity instead of 11 slots, physical components, "it fits", the packaging puzzle, staged reverse engineering into lineages, NCM taking authority over systems; Engineering Architecture pass after the manual (L311); nothing built
 - [49_CITY_MEMORY.md](49_CITY_MEMORY.md) - city memory and civil engineering: author Day 1 and let Day 3 be the evidence; a sparse server-side Campaign Scar Ledger (clustered by segment + radius, accumulated burden → levels 1-4, physical incidents only in v0, ends with the campaign), an Infrastructure Knowledge Ledger across runs, a hand-run Campaign A/B experiment before any automation (L312 + addendum, Q1-Q4 ruled); civil engineering as engineering pointed outward, with a six-piece snapping kit judged by the race, anyone builds and dismantles for modest money (L313, C1-C4 ruled); the end-of-cycle Night City seed map with danger heatmap and infrastructure pins, chosen publicly at rollover; infrastructure belief proportional to evidence. The spatial half of doc 47, not a new end rule; nothing built
 
-## Proposal - no authority until ruled (20)
+## Proposal - no authority until ruled (21)
 
+- [62_NCM_TALK.md](62_NCM_TALK.md) - **NCM Talk (L371)**: spoken, grounded NPC conversation on NCM Online adapted from NPCTalk (MIT, @ `59635ceb`): identity model, knowledge scopes, structured memory (migration 082), allowlisted server-validated actions, sessions/overhearing, optional `ncm-talk` client mod, localhost provider service, phases T0-T8. Approved as a plan; nothing built
 
 - [56_RND_OVERHAUL.md](56_RND_OVERHAUL.md) - **SPEC (L342)** for physical manufacturer R&D and the flight-parts market; §5 records the six owner rulings. Implementation and live PASS remain separate.
 - [21_ENGINEERING_PROPOSAL.md](21_ENGINEERING_PROPOSAL.md) - engineering architecture - ACCEPTED; decisions live in L120

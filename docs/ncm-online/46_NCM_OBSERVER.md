@@ -60,7 +60,7 @@ it. It is a ghost camera operator, race reporter, streaming bubble and broadcast
 
 | Spec stage | What is in the tree today | Where |
 |---|---|---|
-| 1 Tester 2 | `ncmtester2` is a real identity (`d82ed6cf-c5cb-4dd8-8473-3a1d0057d3b7`). A second local client runs its Lua normally. | KB-52; KB-4 |
+| 1 Tester 2 | `ncmtester2` is a real identity (`33333333-3333-4333-8333-333333333333`). A second local client runs its Lua normally. | KB-52; KB-4 |
 | 2 Physical bubble | Any connected client counts: the bubble reads `Open77.players.positions` and materialises a model car within `bubbleInM` **100 m** of any player, handing it back past **150 m** (L247). With `liveMode = watched` (L228), a player within 600 m of a route lets a live race start. *(Corrected at L308: the bubble is `bubbleInM` **250 m** / `bubbleOutM` **300 m** today, restored after L247's diagnostic 100/150.)* | `ncm_paddock/server/bubble.lua`; L228-L230, L247 |
 | 2 Bubble driving | The client has to run NCM Pace at the street or oval minimum for the bubble to drive cars in its game. | `bubble.lua` `paceAtLeast` |
 | 2 Moving it | `ncm.tp <playerId> <toPlayerId\|venue>` and the `ncm:warp` event (`Open77.players.teleport`). | `ncm_world/server/main.lua:803` |

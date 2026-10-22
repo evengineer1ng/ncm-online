@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: NCM Online website and player guide
+    url: https://evengineer1ng.github.io/ncm-online/
+    about: Getting Started, How to Play, FAQ and Known Issues.
+  - name: Security vulnerability
+    url: https://github.com/evengineer1ng/ncm-online/security/advisories/new
+    about: Report privately. Please do not open a public issue for security problems.

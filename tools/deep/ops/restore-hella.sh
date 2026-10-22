@@ -35,7 +35,7 @@ PY
 # 2. stop the server; fusion to 308 kg (the tank's own state and the flight record's carried tanks)
 sudo systemctl stop ncm-server
 sudo mysql ncm -e "UPDATE component_state SET propellant_kg=308 WHERE asset_id='4f0a42ea-c1ad-4c94-932c-9c8b75f8b7d5'; SELECT asset_id, propellant_kg FROM component_state WHERE asset_id='4f0a42ea-c1ad-4c94-932c-9c8b75f8b7d5';"
-sudo mysql ncm -N -B -e "SELECT state_json FROM ncm_presence WHERE driver_id='70353cc8-7fbc-4148-81c5-37d8cebbda69'" > ~/hella-presence-$ts.json
+sudo mysql ncm -N -B -e "SELECT state_json FROM ncm_presence WHERE driver_id='22222222-2222-4222-8222-222222222222'" > ~/hella-presence-$ts.json
 python3 - ~/hella-presence-$ts.json <<'PY' > ~/hella-presence-new.b64
 import base64, json, sys
 s = json.loads(open(sys.argv[1], encoding="utf-8").read())
@@ -48,7 +48,7 @@ else:
     print("no fusion tank entry near 308 found; record unchanged", file=sys.stderr)
 print(base64.b64encode(json.dumps(s, separators=(",", ":")).encode()).decode())
 PY
-sudo mysql ncm -e "UPDATE ncm_presence SET state_json=FROM_BASE64('$(cat ~/hella-presence-new.b64)') WHERE driver_id='70353cc8-7fbc-4148-81c5-37d8cebbda69'"
+sudo mysql ncm -e "UPDATE ncm_presence SET state_json=FROM_BASE64('$(cat ~/hella-presence-new.b64)') WHERE driver_id='22222222-2222-4222-8222-222222222222'"
 
 # 3. the grant, once
 python3 -c "import json;p='$tun';d=json.load(open(p));d['resources']['ncm_world']['ownerGrant']='70353cc8|hella|restore';json.dump(d,open(p,'w'),indent=2)"

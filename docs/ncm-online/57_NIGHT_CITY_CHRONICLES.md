@@ -123,7 +123,7 @@ inverted attacker and victim (caught by the number check, not by understanding: 
 
 ## 7. To run it on a real world
 
-**Online is authorised (owner, 2026-10-08) and configured** in `ncm/chronicles/chronicles.json` (gitignored): tape `ncm-dev`, driver `baremetaleven` (`72519ab3-010d-4a3e-b5d9-ed5e653d2be6`, the only human in Online's `paddock_entry`). The ssh source keeps ONE `sudo mariadb -B` session open with `SET SESSION TRANSACTION READ ONLY` (verified: even DDL is refused, ERROR 1792) and reopens it on failure; a poll is ~0.2 s. On start, everything older than 5 minutes is learned into the Tape's memory silently (`backfill`); first pass: 660 facts, 532 backfilled, two fresh WIRE streak stories spoken.
+**Online is authorised (owner, 2026-10-08) and configured** in `ncm/chronicles/chronicles.json` (gitignored): tape `ncm-dev`, driver `baremetaleven` (`11111111-1111-4111-8111-111111111111`, the only human in Online's `paddock_entry`). The ssh source keeps ONE `sudo mariadb -B` session open with `SET SESSION TRANSACTION READ ONLY` (verified: even DDL is refused, ERROR 1792) and reopens it on failure; a poll is ~0.2 s. On start, everything older than 5 minutes is learned into the Tape's memory silently (`backfill`); first pass: 660 facts, 532 backfilled, two fresh WIRE streak stories spoken.
 
 
 Dev: a read-only MariaDB user on dev's database in `chronicles.json` (`source.kind = mysql`). Online: the `ssh` source

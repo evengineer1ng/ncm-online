@@ -4,7 +4,7 @@
 set -euo pipefail
 ts=$(date -u +%Y%m%dT%H%M%SZ)
 asset=3be4c57f-5bac-43ae-8a37-16cca8560c94
-driver=70353cc8-7fbc-4148-81c5-37d8cebbda69
+driver=22222222-2222-4222-8222-222222222222
 sudo systemctl stop ncm-server
 sudo mysql ncm -N -B -e "SELECT fuel_ml FROM machine_fuel WHERE asset_id='$asset'" > ~/hella-fuel-before-$ts.txt
 sudo mysql ncm -e "UPDATE machine_fuel SET fuel_ml=18121, updated_at=UNIX_TIMESTAMP() WHERE asset_id='$asset'"

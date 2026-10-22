@@ -7002,3 +7002,51 @@ Supersedes IDEA-1291's open question.
 - Flight machines (tag `aerial`) are in the Machine Index but never street cars: no ground race admits one unless its spec asks for it, and no class draw issues one (KB-465).
 
 **Not yet live:** both wait on `tools/deep/ops/install-kb465.sh` (one full restart with nobody online). MASTER_TEST §RW15 is the live PASS.
+
+## L370 - OWNER RULINGS / SINGLE PLAYER IS WHERE THE ENERGY GOES: ONLINE IS PORTED TO THE NCM 3.0 HOST, ONE SYSTEM AT A TIME; EVERY SCREEN IN NATIVE INK; ONLINE FROZEN (2026-10-17)
+
+**Owner:** "so we have an in depth cyberpunk 2077 custom server . lots of unique content and mods. i am starting to cool on the idea of this project being a server build , i think i want to divert energy towards remaking the single player mod to behave like the server, except without multiplayer ability of course ... lets go through all aspects of ncm online one by one and port them to single player ncm."
+
+**Rulings (2026-10-17, on the plan's three questions):**
+1. **The base is the NCM 3.0 host (L338/L340 stand).** The dev server's resources run unchanged inside `ncm_host`; Online features reach single player by catching the host up, never by porting them into NCM 2.0 (`ncm-localized/`, still frozen) and never by forking the resources.
+2. **Every screen is rewritten in native ink** (L340 rule 3 reaffirmed; no embedded browser). Each WebUI page becomes an ink renderer over a host page adapter that turns the page's messages into lines and its actions back into the resource's own WebUI callbacks.
+3. **NCM Online is frozen as-is.** Lightsail keeps running the build it has; deploys only for breakage. The development server stays as the Open77 test rig. Resource changes made for single player must still pass the offline gate (they must boot on Open77), but they are not deployed to Online. Local tag `online-frozen-2026-10-17` marks the tree at the freeze (`a0b7898`).
+
+**The programme (doc 55 §12):** chapters 0 (freeze + catch-up), 1 (front door, tapes, the ink kit), 2 (map), 3 (machines + eddies), 4 (the F6 hub in ink), 5 (racing), 6 (the living league + Observer), 7 (engineering), 8 (plugins + devices + radio), 9 (flight + Deep), 10 (release shape). Each chapter: an audit table, the owner's review of every multiplayer-only reinterpretation, the build, the gate, an alpha package, a live §SP PASS, and the owner's sign-off before the next.
+
+**Built today (Ch 0, offline):** KB-463 fixed host side (`SQLITE_DML`); the translator learns `FIELD()`; the host ships 16 resources (adds `ncm_universe`, `ncm_engineering`, `ncm_workshop`, `ncm_build`, `ncm_slipstream`, `ncm_sky`, `ncm_audio`, `ncm_radio`; the four archive carriers ship as archives in Ch 9/10, not as resources); headless `Open77.io` (per tape, in the host database), `resource.readFile`, server/client `vehicles.nearby`. Evidence: host SQL 31/31, host boot 68/68 with zero unsupported calls (now asserted), `ncm-test` ALL GREEN. KB-481 records that zero unsupported is not zero unbound. **No live PASS** (§SP0 NOT RUN).
+
+## L371 - OWNER RULINGS / ONLINE IS UNFROZEN, SINGLE PLAYER ON HOLD, ONLINE FIRST; NCM TALK PLANNED, NOT BUILT (2026-10-22)
+
+**Owner (2026-10-22, during the NCM Talk /plan):** "online is unfrozen btw, sp on hold", then "not dev first, online first". On the NCM Talk client mod: "change course, i dont necessarily want a required mod quite yet but maybe later. save a detailed plan to act on later when were ready since you have the up to date info on this mod".
+
+**Rulings:**
+1. **NCM Online is unfrozen.** L370 rule 3 (Online frozen, fixes only) is lifted. The L370 port programme (doc 55 §12, chapters 0-10) is **on hold**: Ch 0 stays built offline (3.0.0-alpha.8, §SP0 NOT RUN) and nothing more is ported until the owner resumes it. L370 rules 1-2 (the NCM 3.0 host is the SP base; SP screens are native ink) still stand for when it does.
+2. **Online first, not dev first.** New NCM work deploys to NCM Online first. Each Online deploy step (DB backup, code, mods, restart) is still confirmed with the owner before it runs, and the player check before a restart still applies.
+3. **NCM Talk is approved as a plan, not a build.** Doc 62 (PROPOSAL) is the spec; IDEA-1319..IDEA-1329 are its rows. Provider stack: NPCTalk's (fal STT/TTS, Cerebras or any OpenAI-compatible LLM). Activation: the "Talk to X" prompt, then open mic, push-to-talk as a setting. The `ncm-talk` client mod is **not a required mod** for now.
+4. **Scope of the LLM.** The brief makes LLM *dialogue* for NPC conversation the owner's direction. This does not reopen L307 O-1 or L348: commentary and the radio stay deterministic. NCM stays the authority for facts and consequences; a reply that invents an authoritative name or number falls back to the deterministic `life.voice` line (doc 62 §6).
+5. **L221.5 stands.** No Python process runs beside the game client. NCM Talk's provider service runs on the server box, localhost only, and holds no game state.
+
+**OPEN (NCM Talk):**
+- O-T1: when, if ever, `ncm-talk` becomes a required mod ("maybe later").
+- O-T2: provider accounts and keys (fal, Cerebras), and a monthly spend cap expressed as `talkDailyCallCap`.
+- O-T3: transcript retention: off, or 7 days.
+- O-T4: whether NCM Talk runs on single player when SP resumes (needs the host's WinHTTP seam and a local service story that respects L221.5).
+
+**Nothing was built or deployed.** The session wrote doc 62, these rulings and the ledger rows only.
+
+## L372 - OWNER BRIEF + RULINGS / NCM ONLINE GOES PUBLIC: MIT, THIRD-PARTY FILES PURGED FROM HISTORY, NOREPLY EMAIL, HEAD SCRUB; THE WEBSITE (2026-10-22)
+
+**Owner brief (pasted, 2026-10-22):** make NCM Online publicly inspectable and open source, and launch a substantial GitHub Pages website from this repository as NCM Online's public front door (players first, developers later). Audit for anything that must not become public, in HEAD and in history. Don't invent licensing terms. No Discord. Don't make the repository public while blockers remain.
+
+**Audit result (doc 63 §1):** no credential has ever been committed, so there is nothing to rotate. The blockers were licensing and privacy, not secrets.
+
+**Rulings (AskUserQuestion, 2026-10-22):**
+1. **Licence: MIT.** It covers NCM's own work; bundled third-party code keeps its licence (`THIRD_PARTY_NOTICES.md`).
+2. **Third-party files: remove from the tree and from history.** This covers keanuWheeze's Manual Transmission copies (unknown licence) and the files derived from the RB15 mod. In-World Navigation (MIT) stays, with credit.
+3. **Commit email: rewrite to the GitHub noreply address** in the same history rewrite.
+4. **Infrastructure detail: scrub the SSH target, LAN IP and player/account UUIDs in HEAD.** The public game IP and tester handles are kept, and history keeps the old text.
+
+**Built (local, not committed or pushed):** `site/` (static generator, one pinned dependency, generated command reference/release notes/capabilities, search, link and path checks), `.github/workflows/pages.yml`, issue templates, README, LICENSE, CONTRIBUTING, SECURITY, CHANGELOG, THIRD_PARTY_NOTICES; the HEAD scrub; third-party files untracked and ignored. **Space stays a spoiler on the site** (Experimental page, collapsed), which reconciles this brief with the space-is-secret ruling.
+
+**OPEN:** the owner confirms the commit and the force-push of the rewritten history (doc 63 §6 steps 1-4); the visibility switch, Pages source and private vulnerability reporting are the owner's clicks (§6 steps 6-8); the Online `identity.website` / `description` change needs a restart (§6 step 9). Live gates: MASTER_TEST §PUB1-3.

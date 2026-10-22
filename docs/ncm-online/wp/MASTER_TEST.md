@@ -3426,3 +3426,19 @@ Offline: core `test_build_attach` (6), `tools/test-build-host.lua` (23: attach, 
 | §AV5 | Climb out over the map edge to the 12 km seam. | The fans fade with height and the FD-1s take over (server TELEMETRY: FLY-BY-WIRE ... fusion %); Deep takes the AV at the seam. | **NOT RUN** |
 | §AV6 | In Deep: TAP Triangle (XLB-WH1 engage). | The wormhole drive runs as on the Hella (doc 58). | **NOT RUN** |
 | §AV7 | Race Guide / any street series after `install-kb465.sh`. | The eligible count no longer includes the AV (back to 45 for an open series); entering a street race in the AV is refused (`aerial`). | **NOT RUN** |
+
+## §SP - NCM single player: the Online port (L370, doc 55 §12) - **CH 0 BUILT (3.0.0-alpha.8); LIVE NOT RUN**
+Back up your Cyberpunk saves first. Install: close the game, `tools/install-ncm3-kimiko.ps1 -UpdateNcm`, then start Cyberpunk from Steam (not the OPEN//77 launcher, KB-391).
+| ID | Steps | Expected | Result |
+|---|---|---|---|
+| §SP0-1 | **Boot.** Start Cyberpunk, load your save. | A toast says NCM is off and how to choose a tape. `red4ext/plugins/ncm_host/ncm_host.log`: `version 3.0.0-alpha.8`, the `database:` line (migration data steps run, no `data step failed` for 081), no `BOOT FAILED`. | **NOT RUN** |
+| §SP0-2 | **Choose a tape.** Esc -> Settings -> Mod Settings -> Night City Motorsports -> Tape in play = 1 -> Apply. | The Race Week line top right. The log shows all 16 resources started (ncm_engineering, ncm_workshop, ncm_build, ncm_slipstream, ncm_sky, ncm_audio, ncm_radio, ncm_universe among them) and no `tick error`. | **NOT RUN** |
+| §SP0-3 | **Frame-time baseline.** Play normally ~10 min with the tape in play, drive some of it. | The game stays smooth. Send `ncm_host.log`: every `slow frame ... slowest <resource> <job>` line and its count is the baseline Ch 1 starts from (KB-388). | **NOT RUN** |
+
+## §PUB - The public repository and the NCM Online website (L372, doc 63) - **BUILT LOCALLY; NOT PUBLISHED**
+
+| ID | Steps | Expected | Result |
+|---|---|---|---|
+| §PUB1 | **A new player's path.** On a fresh client, follow https://evengineer1ng.github.io/ncm-online/getting-started.html word for word: launcher, NCM Online, required mods, F6, Market, Machine Index, Race Guide, a race. | Every step matches the game. Note any wording that does not. | **NOT RUN** |
+| §PUB2 | **The launcher link.** After doc 63 §6 step 9, open NCM Online's card in the OPEN//77 launcher. | The description reads "Motorsports in Night City \| evengineer1ng.github.io/ncm-online" and the website link opens the site. | **NOT RUN** |
+| §PUB3 | **The site on a phone.** Open the site on a real phone: menu, search, a command table, an image. | Nothing scrolls sideways; the menu opens and closes; search finds "refuel". | **NOT RUN** |

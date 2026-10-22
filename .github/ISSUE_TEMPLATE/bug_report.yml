@@ -1,0 +1,87 @@
+name: Bug report
+description: Something in NCM Online is broken or behaves wrongly.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. Check [Known Issues](https://evengineer1ng.github.io/ncm-online/known-issues.html) first.
+        You can also report from inside the game: F6 → HELP → report a problem.
+
+        **Never paste passwords, tokens, licence keys, IP addresses or other private information.**
+        **Security problems:** do not open a public issue. Follow [SECURITY.md](https://github.com/evengineer1ng/ncm-online/blob/main/SECURITY.md).
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What you saw, in a sentence or two.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open F6 → RACE GUIDE
+        2. Enter the 21:00 Pacifica sprint at the venue
+        3. ...
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Racing / Race Guide / grid
+        - Paddock / NPC racers
+        - Race Week
+        - Cars / Machine Index / Scanner
+        - Engineering / repair / parts / Workshop
+        - Fuel
+        - Economy / Market / Exchange / betting
+        - Wheel / rig / controller (Rig Bridge)
+        - HUD / panels / menus
+        - Radio / Broadcast
+        - Joining / required mods / launcher
+        - Experimental (flight, AVs, ...)
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: when
+    attributes:
+      label: When did it happen? (date, time and time zone)
+      placeholder: "2026-10-22 21:40 UTC"
+  - type: input
+    id: ncm_version
+    attributes:
+      label: NCM build, if known
+      description: Shown on F6 → HELP, or the commit if you run your own server.
+  - type: input
+    id: open77_version
+    attributes:
+      label: OPEN//77 version, if known
+  - type: input
+    id: input_device
+    attributes:
+      label: Input device
+      placeholder: "keyboard / Xbox controller / Logitech G29 + Thrustmaster pedals"
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: |
+        Relevant lines from your OPEN//77 client log or an NCM plugin log (for example `ncm_rig_bridge-<pid>.log`).
+        Look through them before pasting, and remove anything private.
+      render: text
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: Screenshots or video
+      description: Drag files here. Crop out other players' names and anything private.

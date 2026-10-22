@@ -49,7 +49,7 @@ return {
         T.eq(P.validatePrincipal(nil), true, "nil means unowned")
         T.eq(P.validatePrincipal({}), true, "empty means unowned")
 
-        T.eq(P.validatePrincipal({ kind = "driver", id = "72519ab3-010d-4a3e-b5d9-ed5e653d2be6" }), true)
+        T.eq(P.validatePrincipal({ kind = "driver", id = "11111111-1111-4111-8111-111111111111" }), true)
         T.eq(P.validatePrincipal({ kind = "organization", id = "ncx_rayfield" }), true,
              "a team holds title the same way a driver does -- one model, not two")
 

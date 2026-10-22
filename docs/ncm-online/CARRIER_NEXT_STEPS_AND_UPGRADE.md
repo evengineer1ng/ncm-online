@@ -266,8 +266,8 @@ The target is explicitly NCM Online at `52.60.225.137`. Never infer it from a cu
 Upload and run a fresh protective snapshot:
 
 ```powershell
-$key = 'C:\Users\eveng\.ssh\lightsail-ncm.pem'
-$hostName = 'ubuntu@52.60.225.137'
+$key = '<ssh-key>'
+$hostName = 'ubuntu@<online-host>'
 scp -q -i $key .\tools\staging\backup-production-state.sh "${hostName}:/tmp/backup-production-state.sh"
 ssh -i $key $hostName "bash /tmp/backup-production-state.sh"
 ```
