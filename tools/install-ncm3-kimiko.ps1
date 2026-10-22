@@ -17,7 +17,7 @@ param(
     [string]$Game = 'C:\Program Files (x86)\Steam\steamapps\common\Cyberpunk 2077',
     [switch]$Uninstall,
     [switch]$UpdateNcm,
-    [string]$NcmVersion = '3.0.0-alpha.7'
+    [string]$NcmVersion = '3.0.0-alpha.8'
 )
 $ErrorActionPreference = 'Stop'
 $repo = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path

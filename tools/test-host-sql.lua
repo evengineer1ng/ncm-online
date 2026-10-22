@@ -35,6 +35,8 @@ do
     check(tr("SELECT CONCAT(a, '-', b)"):gsub("%s", "") == "SELECT((a)||('-')||(b))", "concat: %s", tr("SELECT CONCAT(a, '-', b)"))
     check(tr("SELECT NOW(), UUID(), UNIX_TIMESTAMP()") == "SELECT '2026-10-07 12:00:00', '00000000-0000-4000-8000-000000000000', 1791388800", "clock fns: %s", tr("SELECT NOW(), UUID(), UNIX_TIMESTAMP()"))
     check(tr([[SELECT "x\'y"]]) == "SELECT 'x''y'", "string normalisation: %s", tr([[SELECT "x\'y"]]))
+    local fld = tr("SELECT a FROM t ORDER BY FIELD(s, 'gp', 'f2')")
+    check(fld == "SELECT a FROM t ORDER BY (CASE s WHEN 'gp' THEN 1 WHEN 'f2' THEN 2 ELSE 0 END)", "field(): %s", fld)
     local uj = tr("UPDATE a x JOIN b y ON y.id = x.bid SET x.v = y.v, x.n = ? WHERE x.k = ?")
     check(uj == "UPDATE a AS x SET v = y.v, n = ? FROM b AS y WHERE ( y.id = x.bid ) AND ( x.k = ?)", "update join: %s", uj)
     local b = T.bind("SELECT ? , '?' , ?", { "it's", nil, n = 2 }, 2)
@@ -90,12 +92,45 @@ else
     -- the migrations' own DML (seed rows, backfills), in order, against the final schema
     local dmlBad = 0
     for _, s in ipairs(dml) do
-        local ok, e = pcall(function() d.exec(T.dml(s.sql, ctx)) end)
+        local ok, e = pcall(function() d.exec(s.raw and s.sql or T.dml(s.sql, ctx)) end)
         if not ok then dmlBad = dmlBad + 1; print(("  migration %03d DML: %s"):format(s.version, tostring(e):sub(1, 220))) end
     end
     check(dmlBad == 0, "%d migration DML statement(s) ran, %d failed", #dml, dmlBad)
     local again = S.sync(d, model, 1791388800)
     check(#again.created == 0 and #again.altered == 0 and #again.rebuilt == 0, "second sync is a no-op")
+
+    -- the host's own SQLite DML (schema.SQLITE_DML) has the MariaDB statement's effect, not just its syntax
+    do
+        local function seed(tbl, vals)
+            local cols, out = {}, {}
+            for k, v in pairs(vals) do cols[#cols + 1] = k; out[#out + 1] = type(v) == "number" and tostring(v) or T.quote(v) end
+            for _, c in ipairs(d.query(("SELECT name, type, \"notnull\" AS nn, dflt_value AS dv, pk FROM pragma_table_info('%s')"):format(tbl))) do
+                if vals[c.name] == nil and tonumber(c.nn) == 1 and c.dv == nil then
+                    cols[#cols + 1] = c.name
+                    out[#out + 1] = (tostring(c.type):upper():find("INT") or tostring(c.type):upper():find("REAL")) and "0" or "'x'"
+                end
+            end
+            d.exec(("INSERT INTO %s (%s) VALUES (%s)"):format(tbl, table.concat(cols, ", "), table.concat(out, ", ")))
+        end
+        local own = {}
+        for _, s in ipairs(dml) do if s.raw and s.version == 81 then own[#own + 1] = s.sql end end
+        check(#own == 2, "081 carries the host's two SQLite statements (%d)", #own)
+        seed("vehicle_asset", { asset_id = "kb463-a", origin = "paddock_genesis", lifecycle = "active" })
+        seed("vehicle_asset", { asset_id = "kb463-b", origin = "paddock_genesis", lifecycle = "active" })   -- never traded in
+        seed("market_inventory", { asset_id = "kb463-a", state = "available" })
+        seed("market_inventory", { asset_id = "kb463-b", state = "available" })
+        seed("vehicle_asset_transfer", { asset_id = "kb463-a", kind = "traded_in", from_principal = "npc:old", occurred_at = 1, transfer_id = "kb463-t1", idem_key = "kb463-t1" })
+        seed("vehicle_asset_transfer", { asset_id = "kb463-a", kind = "traded_in", from_principal = "npc:drv-42", occurred_at = 2, transfer_id = "kb463-t2", idem_key = "kb463-t2" })
+        for _, s in ipairs(own) do d.exec(s) end
+        local a = d.query("SELECT owner_principal_kind AS k, owner_principal_id AS i, lifecycle AS l FROM vehicle_asset WHERE asset_id = 'kb463-a'")[1] or {}
+        check(a.k == "npc" and a.i == "drv-42" and a.l == "npc_spare", "081: the traded-in car returns to its latest NPC (%s:%s %s)", tostring(a.k), tostring(a.i), tostring(a.l))
+        check(d.scalar("SELECT state FROM market_inventory WHERE asset_id = 'kb463-a'") == "withdrawn", "081: its shelf row is withdrawn")
+        check(d.scalar("SELECT lifecycle FROM vehicle_asset WHERE asset_id = 'kb463-b'") == "active"
+            and d.scalar("SELECT state FROM market_inventory WHERE asset_id = 'kb463-b'") == "available", "081: a car never traded in is untouched")
+        d.exec("DELETE FROM vehicle_asset_transfer WHERE asset_id LIKE 'kb463-%'")
+        d.exec("DELETE FROM market_inventory WHERE asset_id LIKE 'kb463-%'")
+        d.exec("DELETE FROM vehicle_asset WHERE asset_id LIKE 'kb463-%'")
+    end
 
     -- an appended column takes the fast path; a changed key rebuilds and keeps rows
     local m2 = S.replay(migrations)

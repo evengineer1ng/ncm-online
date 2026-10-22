@@ -1,6 +1,6 @@
 # 55 - NCM 3.0: the single-player product, Race Week tapes, the NCM Host
 
-> **STATUS: CURRENT** - authority for: *NCM 3.0 single player -- the NCM Host runtime, Race Week tapes and offline canonical time, the front door, the seam report toward a Nexus release* - affirmed 2026-10-07 (L338)
+> **STATUS: CURRENT** - authority for: *NCM 3.0 single player -- the NCM Host runtime, Race Week tapes and offline canonical time, the front door, the seam report toward a Nexus release* - affirmed 2026-10-07 (L338); the Online port programme, §12, 2026-10-17 (L370)
 > Decision: [DECISION_RECORD.md](DECISION_RECORD.md) L338. Authority map: [INDEX.md](INDEX.md).
 
 **In one paragraph.** NCM 3.0 is a single-player Cyberpunk 2077 mod with a curated Nexus Collection around it. It is
@@ -81,7 +81,7 @@ mods/NCM/                      (CET mod; tools/ncm-host-build.ps1 stages + zips 
   resources/<ncm_*>            ncm/online/resources/*, BYTE-IDENTICAL (build -Check verifies 1,314 Lua files)
 ```
 
-**Resources shipped:** ncm_league, ncm_world, ncm_paddock, ncm_speed, ncm_broadcast, ncm_scanner, ncm_observer.
+**Resources shipped:** ncm_league, ncm_world, ncm_paddock, ncm_speed, ncm_broadcast, ncm_scanner, ncm_observer, ncm_aero; since L370 also ncm_universe, ncm_engineering, ncm_workshop, ncm_build, ncm_slipstream, ncm_sky, ncm_audio, ncm_radio (16; `App.RESOURCES`). The archive carriers (ncm_world_layer, ncm_race_week_map, ncm_earth_underlay, ncm_build_kit) ship as plain archives (Ch 9/10).
 **Not shipped (dev only):** ncm_link, ncm_space, ncm_probe, ncm_weather_probe, prototypes. **Environment:** the host
 sets the `environment` tunable to **`single_player`**, a third role beside `online` and `development`
 (`calendar.lua`): no dev waivers (fuel burns, parts heat), Deep stays development-only (no single-player renderer
@@ -284,3 +284,68 @@ unchanged, the database at `red4ext/plugins/ncm_host/ncm.sqlite3`, the tape inde
 CET is the front end: the deck (§6) through a port, the Race Week line, and the game bindings, over one native,
 `NcmHost_Call(cmd, json) -> json`, once per frame (`tick` sends V's position and car; the answer carries the game
 commands -- pins, toasts, teleports, a car into V's garage). §3's in-CET layout is superseded by this one.
+
+---
+
+## 12. The Online port programme (L370, 2026-10-17)
+
+Online is frozen (fixes only). Every Online system reaches single player through this host, one chapter at a time.
+**Each chapter:** an audit table (feature -> resource files -> Open77 calls -> host status), the owner's review of every
+multiplayer-only reinterpretation, the build (game bindings + ink screens + host tests), `ncm-test` ALL GREEN, an alpha
+package installed over backed-up saves, a live §SP PASS in MASTER_TEST, then the owner's sign-off before the next.
+
+**Screens:** native ink only (L370). A WebUI page becomes an ink renderer over a host **page adapter**
+(`ncm/host/webui/`): the resource still calls `WebUI.create/send`; the adapter turns messages into lines for redscript
+and ink actions back into the resource's own page callbacks. The ink kit `NcmInk` is built once in Ch 1 (IDEA-1318):
+docked, cursor-only focus like F9 (L353), never a modal layer (KB-389), its key and Esc always close it.
+
+| Ch | Scope | State |
+|---|---|---|
+| 0 | Freeze, catch the host up to the current tree, measure the binding backlog, frame-time baseline live | **offline done 2026-10-17; §SP0 live NOT RUN** |
+| 1 | Front door + tapes (non-modal), Race Week line, `NcmInk` proven on the How to Play screen (L354) | not started |
+| 2 | The map: blips/markers/anchors -> MappinSystem under a pin budget (KB-387/388), GPS, Route Me There | not started |
+| 3 | Your machines and money: garage cars as Machines, `vehicles.create` spawning (paint/damage re-applied), claim + unknown-vehicle minting, the eddies wallet seam, fuel; Machine Index (F10) in ink | not started |
+| 4 | The F6 hub in ink, view by view: Race Guide + Race Graph (F8), Messages (quest graph), Market + parts + Parts Inventory, Exchange (NPC traders), weather ribbon, Help | not started |
+| 5 | Racing: venue rings + card, race HUD, race flow, Street Call (F5), ghosts/PB, Safety Rating, grids; AI opponents through NCM Pace on the local game (one opponent first) | not started |
+| 6 | The living league: Paddock (live races, off-screen sim, scouting, My Org, the queue), calendar, Moody, verdicts/rollover/collapse (money kept), ambient population; Observer (F3) on NPC races; the Paddock's absence catch-up (§8.12) designed | not started |
+| 7 | Engineering: F9 (Service/Parts/Build/Workshop), Carrier force channel, wear/damage, stacked gearboxes, Slipstream SL-1 + HUD, Build attachments, quickhacks | not started |
+| 8 | Plugins and devices: Rig Bridge + DEVICES/WHEEL/PAD, Vision/Scanner key, radial menu, Broadcast nameplates (NPC racers), NCM Audio/FX, NCM Radio played locally per tape | not started |
+| 9 | Flight and Deep: AV, propulsion, snowglobe/seam, NCM Sky + an ink instrument panel in place of `deep.html`, presence/stranding, `ncm_aero` | not started |
+| 10 | Release shape: Nexus requirements, the Collection, per-tape backup (IDEA-1183), mutation restore (IDEA-1184), coexistence with NCM 2.0 | not started |
+
+**Multiplayer-only things (the owner rules on each in its chapter):** other players on the map, their nameplates and
+chat -> gone (NPC racers keep nameplates); the player Exchange -> NPC traders only; human team managers -> the player
+is the only one; Observer of players -> of NPC races; launcher requiredMods, master tickets, Warden, Lightsail -> Nexus
+requirements, nothing hosted; `ncm_link`, the dev probes, the KSA rehearsal -> out; the server radio render loop ->
+a pre-rendered corpus played locally.
+
+### 12.1 Ch 0 audit: what the 16 shipped resources call, and what reaches the game (2026-10-17)
+
+Measured by grep over the shipped resources' `server/` and `client/` Lua (call sites in parentheses where it matters)
+and by the boot gate. **Bound** = reaches Cyberpunk today through the native frame (`ncm/host/native.lua` ->
+`NcmHostRuntime.reds`, which draws only `toast`, `teleport`, `waypoint`, `givecar` and the Race Week `hud`/`state`
+line; the frame's `chat` and `pin` lines are sent and dropped: pins left with CET in L340 phase 2). **Headless** = a working model, nothing in the game.
+**Missing** = not modelled; a call returns nil (KB-481: the boot run never reached these).
+
+| Open77 namespace | Side | Host today | Chapter |
+|---|---|---|---|
+| notifications.send (41), hud.notify | both | **bound** (toast) | 1 |
+| chat.send (45) | both | sent, dropped by redscript (no chat in single player; owner rules in Ch 1 whether any line becomes a toast) | 1 |
+| players.teleport (12), travel.teleport* | both | **bound** | 1 |
+| blips.* (44), markers.*, anchors.* | client | GPS waypoint **bound**; blips sent as `pin` lines and dropped; markers, anchors headless | 2 |
+| map.open, camera.project (4), world.raycast | client | headless | 2 / 5 |
+| vehicles.create (9) / remove (17) / setTransform / setPaint / setDamage / getDamage / doors | server | headless (setDamage, getDamage, doors, freeSeats, seatFree, openDoor **missing**) | 3 |
+| vehicles.get / getPosition / getPlayerSeat / owner / requestAuthority, players.getVehicleSeat / warpIntoVehicle | both | headless (fed by the frame's V position + car) | 3 |
+| vehicles.setPerformance / ratedTopSpeed / setEngine / setFrozen | both | headless; the real channel is the Carrier adapter (§PB1) | 7 |
+| vehicles.ai.* (40), npcs.* (~70), world.setPopulation / clearArea / groundZ | server | headless (clearArea **missing**); NCM Pace adapter built but no spawn | 5 / 6 |
+| webui.create (4 resources' pages + plugin pages) | client | plugin pages -> native adapters (§PB); player pages recorded only | 1, 4-9 |
+| input.isDown (14) / isCaptured (10) / axis / registerKeyMapping / devices | client | headless (nothing pressed) | 1 / 8 |
+| camera.*, screen.fade*, hud.setVisible / setCinematic | client | headless | 5 / 6 |
+| vfx.play / update / stop, props.create / attach / setTransform | both | props headless; vfx and props.attach **missing** | 7 / 9 |
+| nameplates.stream, inspector.outline, hacking.*, combat.*, cyberware.*, effects.screen | both | headless (cyberware.install, hacking.start refuse) | 7 / 8 |
+| environment.* (weather/time), world.setTimeScale | server | headless (a CET-era setWeather/setTime hook exists, unbound natively) | 6 |
+| io.read / write / makeDirectory, resource.readFile, kvp.* | both | **host-complete** (L370: io per tape in `_ncm_host_files`) | 0 |
+| tunables, state bags, exports, routingBuckets, ready, players.positions, time, runtime | both | **host-complete** (single player has one bucket, one player) | 0 |
+| network.status, players.kick, routingBuckets (multiplayer) | both | answered as single player | -- |
+
+**Ch 0 still owed (live):** §SP0 below: install the current build, boot, choose a tape, read the slow-frame log.

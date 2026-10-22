@@ -11,6 +11,7 @@
 --   NOW() / CURRENT_TIMESTAMP / UUID() / UNIX_TIMESTAMP() -> literals from the HOST clock (dev skew applies)
 --   UNIX_TIMESTAMP(x) -> CAST(strftime('%s', x) AS INTEGER);  GREATEST/LEAST -> MAX/MIN;  IF -> IIF
 --   CONCAT(a, b) -> (a || b);  LEFT(s, n) -> SUBSTR(s, 1, n);  VERSION() / DATABASE() -> constants
+--   FIELD(x, a, b) -> (CASE x WHEN a THEN 1 WHEN b THEN 2 ELSE 0 END)
 --   UPDATE t a JOIN u b ON c SET a.x=.. WHERE w -> UPDATE t AS a SET x=.. FROM u AS b WHERE (c) AND (w)
 --   information_schema.COLUMNS -> a sqlite_master x pragma_table_info view
 --   "double quoted" strings -> 'single quoted';  MariaDB backslash escapes decoded
@@ -195,6 +196,21 @@ local function rewriteFunctions(toks, ctx)
             out[#out + 1] = lit(", 1, ")
             for j = parts[2][1], parts[2][2] do out[#out + 1] = inner[j] end
             out[#out + 1] = lit(")")
+            k = close + 1
+        elseif call and not qualified and w == "FIELD" then
+            -- FIELD(x, a, b, ..) -> (CASE x WHEN a THEN 1 WHEN b THEN 2 .. ELSE 0 END): MariaDB's 1-based position,
+            -- 0 when absent. (A NULL x also gives 0 in both.)
+            local close = matchParen(toks, nk)
+            local inner = rewriteFunctions(slice(toks, nk + 1, close - 1), ctx)
+            local parts = splitArgs(inner, 1, #inner)
+            out[#out + 1] = lit("(CASE ")
+            for j = parts[1][1], parts[1][2] do out[#out + 1] = inner[j] end
+            for p = 2, #parts do
+                out[#out + 1] = lit(" WHEN ")
+                for j = parts[p][1], parts[p][2] do out[#out + 1] = inner[j] end
+                out[#out + 1] = lit(" THEN " .. (p - 1))
+            end
+            out[#out + 1] = lit(" ELSE 0 END)")
             k = close + 1
         elseif call and not qualified and w == "MEDIAN" then
             -- MEDIAN(x) OVER (...) AS a -> json_group_array(x) OVER (...) AS a; the MySQL shim reduces the array to

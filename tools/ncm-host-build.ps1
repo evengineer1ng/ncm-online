@@ -13,13 +13,17 @@
   own code, byte for byte) or a required file is missing.
 #>
 [CmdletBinding(PositionalBinding = $false)]
-param([switch]$Check, [string]$Version = '3.0.0-alpha.7')
+param([switch]$Check, [string]$Version = '3.0.0-alpha.8')
 $ErrorActionPreference = 'Stop'
 $repo = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $stage = Join-Path $repo ("dist\ncm-" + $Version)
 $mod = Join-Path $stage 'bin\x64\plugins\cyber_engine_tweaks\mods\NCM'
 $plugin = Join-Path $stage 'red4ext\plugins\ncm_host'
-$resources = @('ncm_league', 'ncm_world', 'ncm_paddock', 'ncm_speed', 'ncm_broadcast', 'ncm_scanner', 'ncm_observer', 'ncm_aero')
+# ONE list: ncm/host/app.lua App.RESOURCES (build-host-native.ps1 reads the same)
+$appLua = Get-Content -Raw (Join-Path $repo 'ncm\host\app.lua')
+if ($appLua -notmatch 'App\.RESOURCES\s*=\s*\{([^}]*)\}') { throw 'App.RESOURCES not found in ncm/host/app.lua' }
+$resources = @([regex]::Matches($Matches[1], '"([a-z0-9_]+)"') | ForEach-Object { $_.Groups[1].Value })
+if ($resources.Count -lt 1) { throw 'App.RESOURCES is empty' }
 
 if (-not $Check) {
     & (Join-Path $PSScriptRoot 'build-host-native.ps1')   # builds, stages dist/ncm-host-native, runs the self-test (throws on FAIL)

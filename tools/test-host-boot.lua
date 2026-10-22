@@ -230,6 +230,13 @@ if h then
         "tape 02 running never touched tape 01's timeline")
     check(count(("SELECT COUNT(*) FROM ncm_driver_binding WHERE server_id = %s"):format(q(t2.serverId))) == 1,
         "tape 02 has its own driver identity")
+    -- Open77.io files (ncm_radio's lexicon / history) live per tape in the host database
+    local f1 = count(("SELECT COUNT(*) FROM _ncm_host_files WHERE server_id = %s"):format(q(t1.serverId)))
+    local fw = app.world.files.write("ncm_radio", "history/kb-test.json", "{}")
+    check(fw == 2 and app.world.files.read("ncm_radio", "history/kb-test.json") == "{}", "a resource file round-trips on tape 02")
+    check(app.world.files.read("ncm_radio", "../escape") == nil, "a path out of the resource is refused")
+    check(count(("SELECT COUNT(*) FROM _ncm_host_files WHERE server_id = %s"):format(q(t1.serverId))) == f1,
+        "tape 02's files never touch tape 01's (%d)", f1)
     app:unmount("quit")
 
     -- ---------------------------------------------------------------------------------------------- the clock goes back
@@ -243,6 +250,7 @@ if h then
     local un = app.world:unsupportedList()
     print(("  unsupported API calls over the whole run: %d distinct"):format(#un))
     for _, u in ipairs(un) do print(("    %-58s x%d"):format(u.key, u.n)) end
+    check(#un == 0, "no unsupported Open77 call over the whole run (%d distinct)", #un)
     app:unmount("quit")
 end
 

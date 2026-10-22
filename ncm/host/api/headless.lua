@@ -27,6 +27,20 @@ M.world = world
 
 local function vec(p) if not p then return nil end return { x = tonumber(p.x) or 0, y = tonumber(p.y) or 0, z = tonumber(p.z) or 0 } end
 
+-- vehicles of the model within `radius` of `at`, nearest first: { id, vehicleId, record, position, distance }
+local function nearbyVehicles(w, at, radius, opts)
+    local out, r = {}, tonumber(radius) or 50
+    for id, v in pairs(w.vehicles) do
+        local p = v.position or { x = 0, y = 0, z = 0 }
+        local d = math.sqrt((p.x - at.x) ^ 2 + (p.y - at.y) ^ 2 + (p.z - at.z) ^ 2)
+        if d <= r then out[#out + 1] = { id = id, vehicleId = id, record = v.record, position = vec(p), distance = d } end
+    end
+    table.sort(out, function(a, b) return a.distance < b.distance end)
+    local limit = opts and tonumber(opts.limit)
+    while limit and #out > limit do out[#out] = nil end
+    return out
+end
+
 -- seconds of the in-game day: headless follows the host clock (UTC) unless fixed
 local function secondsOfDay(h)
     local w = world(h)
@@ -50,6 +64,21 @@ local function common(h, vm)
             generation = function() return 1 end,
             restart = function() return nil, "unsupported_in_ncm_host" end,
             state = function() return "started" end,
+            -- a file shipped in the resource folder (`files { .. }` in the manifest); paths stay inside the resource
+            readFile = function(path)
+                path = tostring(path or "")
+                if path == "" or path:find("..", 1, true) or path:match("^[/\\]") or path:match("^%a:") then return nil, "invalid_path" end
+                local text = h.read and h.read(h.root .. vm.resource .. "/" .. path)
+                if not text then return nil, "not_found" end
+                return text
+            end,
+        },
+        -- Open77.io: a resource's own data files. In single player they live in the host database, per tape and per
+        -- resource (`h.files`, set by the app at mount), so a tape carries its files with it and two tapes never share.
+        io = {
+            read = function(path) if not h.files then return nil, "no_files" end; return h.files.read(vm.resource, path) end,
+            write = function(path, text) if not h.files then return nil, "no_files" end; return h.files.write(vm.resource, path, text) end,
+            makeDirectory = function() return true end,
         },
         kvp = {
             get = function(k) local b = w.kvp[vm.resource]; return b and b[k] end,
@@ -205,6 +234,7 @@ function M.server(h, vm)
         getPosition = function(vid) local v = w.vehicles[vid]; return v and vec(v.position) or nil end,
         getPlayerSeat = function(pid) if tonumber(pid) == 1 and P.seat then return { vehicleId = P.seat.vehicleId, seat = P.seat.seat } end return nil end,
         all = function() local out = {}; for id in pairs(w.vehicles) do out[#out + 1] = id end; table.sort(out); return out end,
+        nearby = function(pid, radius, opts) if tonumber(pid) ~= 1 then return {} end; return nearbyVehicles(w, P.position, radius, opts) end,
         owner = function(vid) local v = w.vehicles[vid]; if not v then return nil, "not_streamed" end
             return { authorityPlayerId = 1, physicsOwner = 1, aiDriven = v.ai ~= nil, epoch = 1, readyClients = 1 } end,
         setTransform = function(vid, pos, yaw) local v = w.vehicles[vid]; if not v then return nil, "no_such_vehicle" end
@@ -293,7 +323,7 @@ function M.client(h, vm)
             return { id = vid, record = v.record, position = vec(v.position), x = v.position.x, y = v.position.y, z = v.position.z,
                 yaw = v.yaw, speed = v.ai and v.ai.speedNow or 0, health = v.health } end,
         getPlayerSeat = function() if P.seat then return { vehicleId = P.seat.vehicleId, seat = P.seat.seat } end return nil end,
-        nearby = function() local out = {}; for id in pairs(w.vehicles) do out[#out + 1] = id end; return out end,
+        nearby = function(radius, opts) return nearbyVehicles(w, P.position, radius, opts) end,
         ratedTopSpeed = function() return nil end,
         setPerformanceClass = function() return true end, clearPerformanceClass = function() return true end,
     }

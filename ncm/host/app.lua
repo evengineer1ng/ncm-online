@@ -14,7 +14,7 @@ App.__index = App
 
 -- The resources NCM 3.0 runs (dev-only ones -- ncm_link, ncm_space, ncm_probe, ncm_weather_probe -- are not loaded).
 -- ncm_aero (L339) is single-player only: auto_start false, and it idles unless the world says single_player.
-App.RESOURCES = { "ncm_league", "ncm_world", "ncm_paddock", "ncm_speed", "ncm_broadcast", "ncm_scanner", "ncm_observer", "ncm_aero" }
+App.RESOURCES = { "ncm_universe", "ncm_league", "ncm_world", "ncm_paddock", "ncm_speed", "ncm_broadcast", "ncm_scanner", "ncm_observer", "ncm_aero", "ncm_engineering", "ncm_workshop", "ncm_build", "ncm_slipstream", "ncm_sky", "ncm_audio", "ncm_radio" }
 -- The host's own view of core (deck arithmetic, json): loaded privately from a resource's vendored copy.
 App.CORE = { "init.lua", "vocabulary/ids.lua", "vocabulary/json.lua", "vocabulary/hash.lua", "world/clock.lua",
     "week/clock.lua", "week/curve.lua", "week/continuation.lua", "week/catchup.lua", "data/liveries.lua" }
@@ -101,7 +101,7 @@ function App:database()
     local ran = 0
     for _, s in ipairs(dml) do
         if not applied[s.version] then
-            local ok, e = pcall(function() d.exec(self.T.dml(s.sql, ctx)) end)
+            local ok, e = pcall(function() d.exec(s.raw and s.sql or self.T.dml(s.sql, ctx)) end)
             if not ok then self.log("migration %03d data step failed (continuing): %s", s.version, tostring(e)) else ran = ran + 1 end
         end
     end
@@ -112,8 +112,38 @@ function App:database()
     end
     self.log("database: %d table(s) created, %d altered, %d rebuilt; %d migration data step(s); SQLite %s",
         #rep.created, #rep.altered, #rep.rebuilt, ran, d.version and d.version() or "?")
+    -- Open77.io files of the resources, per tape (headless `io`): host-owned, outside the resources' schema
+    d.exec([[CREATE TABLE IF NOT EXISTS "_ncm_host_files" ("server_id" TEXT NOT NULL, "resource" TEXT NOT NULL,
+        "path" TEXT NOT NULL, "body" TEXT NOT NULL, "updated_at" INTEGER NOT NULL, PRIMARY KEY ("server_id", "resource", "path"))]])
     self.db, self.model = d, model
     return d, model
+end
+
+--- The Open77.io store of one tape: { read(resource, path), write(resource, path, text) }, in the host database.
+function App:fileStore(serverId)
+    local d, T, clock = self.db, self.T, self.clock
+    local function clean(path)
+        path = tostring(path or ""):gsub("\\", "/")
+        if path == "" or path:find("..", 1, true) or path:sub(1, 1) == "/" or path:match("^%a:") then return nil end
+        return path
+    end
+    return {
+        read = function(resource, path)
+            local p = clean(path); if not p then return nil, "invalid_path" end
+            local row = d.query(([[SELECT "body" FROM "_ncm_host_files" WHERE "server_id" = %s AND "resource" = %s AND "path" = %s]])
+                :format(T.quote(serverId), T.quote(resource), T.quote(p)))[1]
+            if not row then return nil, "not_found" end
+            return row.body
+        end,
+        write = function(resource, path, text)
+            local p = clean(path); if not p then return nil, "invalid_path" end
+            text = tostring(text or "")
+            d.exec(([[INSERT INTO "_ncm_host_files" ("server_id", "resource", "path", "body", "updated_at") VALUES (%s, %s, %s, %s, %d)
+                ON CONFLICT ("server_id", "resource", "path") DO UPDATE SET "body" = excluded."body", "updated_at" = excluded."updated_at"]])
+                :format(T.quote(serverId), T.quote(resource), T.quote(p), T.quote(text), math.floor(clock.unix())))
+            return #text
+        end,
+    }
 end
 
 -- ------------------------------------------------------------------------------------------------ mount
@@ -141,6 +171,7 @@ function App:mount(id)
     })
     h.exports = self.Headless.exports(h)
     h.game = env.game
+    h.files = self:fileStore(tape.serverId)
     -- phase 1: the NCM plugins' hidden pages, played natively (host/webui) when the host has loopback networking
     if env.net then
         self.Webui = self.Webui or env.load("webui/init.lua")

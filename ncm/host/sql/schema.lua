@@ -482,15 +482,45 @@ M.BOOTSTRAP = [[CREATE TABLE IF NOT EXISTS schema_migrations (
     PRIMARY KEY (version)
 )]]
 
+-- Migration DML that SQLite cannot express at all, as the host's own SQLite equivalent, keyed by migration version and
+-- the statement's position in that migration. Entries come back from `M.replay` marked `raw` (run as written, never
+-- translated). The resource's MariaDB text stays the authority; keep each entry's effect identical to it.
+M.SQLITE_DML = {
+    -- 081 #2 (KB-463): one MariaDB UPDATE sets columns in TWO tables (vehicle_asset and market_inventory); SQLite
+    -- updates one table per statement. Same rows, in an order that keeps the match: the cars first, then their shelves.
+    [81] = { [2] = {
+[[UPDATE vehicle_asset AS a SET
+    owner_principal_kind = substr(tr.fp, 1, instr(tr.fp, ':') - 1),
+    owner_principal_id = substr(tr.fp, instr(tr.fp, ':') + 1),
+    lifecycle = 'npc_spare'
+  FROM (SELECT t.asset_id, t.from_principal AS fp FROM vehicle_asset_transfer t
+        JOIN (SELECT asset_id, MAX(occurred_at) AS m FROM vehicle_asset_transfer WHERE kind = 'traded_in' GROUP BY asset_id) x
+          ON x.asset_id = t.asset_id AND x.m = t.occurred_at
+        WHERE t.kind = 'traded_in' AND t.from_principal LIKE '%:%') AS tr
+  WHERE tr.asset_id = a.asset_id AND a.ncm_driver_id IS NULL AND a.origin = 'paddock_genesis'
+    AND EXISTS (SELECT 1 FROM market_inventory mi WHERE mi.asset_id = a.asset_id AND mi.state = 'available')]],
+[[UPDATE market_inventory SET state = 'withdrawn'
+  WHERE state = 'available' AND asset_id IN (SELECT asset_id FROM vehicle_asset
+    WHERE lifecycle = 'npc_spare' AND ncm_driver_id IS NULL AND origin = 'paddock_genesis')]],
+    } },
+}
+
 function M.replay(migrations, model)
     model = model or M.newModel()
     M.apply(model, M.BOOTSTRAP)
     local dml = {}
     for _, m in ipairs(migrations) do
-        for _, sql in ipairs(m.statements or {}) do
+        for n, sql in ipairs(m.statements or {}) do
             local ok, err = pcall(M.apply, model, sql)
             if not ok then error(("migration %03d %s: %s"):format(m.version, m.name, tostring(err)), 0) end
-            if M.kind(sql) == "dml" then dml[#dml + 1] = { version = m.version, sql = sql } end
+            if M.kind(sql) == "dml" then
+                local own = M.SQLITE_DML[m.version] and M.SQLITE_DML[m.version][n]
+                if own then
+                    for _, s in ipairs(own) do dml[#dml + 1] = { version = m.version, sql = s, raw = true } end
+                else
+                    dml[#dml + 1] = { version = m.version, sql = sql }
+                end
+            end
         end
     end
     return model, dml

@@ -37,8 +37,12 @@ foreach ($f in @('native.lua', 'app.lua', 'runtime.lua', 'clock.lua', 'tapes.lua
     New-Item -ItemType Directory -Force (Split-Path $dst) | Out-Null
     Copy-Item (Join-Path $hostSrc $f) $dst
 }
-# the NCM resources, as the dev server runs them (same list as ncm/host/app.lua App.RESOURCES); no CEF pages
-$resources = @('ncm_league', 'ncm_world', 'ncm_paddock', 'ncm_speed', 'ncm_broadcast', 'ncm_scanner', 'ncm_observer', 'ncm_aero')
+# the NCM resources, as the dev server runs them: ONE list, ncm/host/app.lua App.RESOURCES (read here, never copied);
+# no CEF pages: web/ stays behind (L370: every screen is ink)
+$appLua = Get-Content -Raw (Join-Path $repo 'ncm\host\app.lua')
+if ($appLua -notmatch 'App\.RESOURCES\s*=\s*\{([^}]*)\}') { throw 'App.RESOURCES not found in ncm/host/app.lua' }
+$resources = @([regex]::Matches($Matches[1], '"([a-z0-9_]+)"') | ForEach-Object { $_.Groups[1].Value })
+if ($resources.Count -lt 1) { throw 'App.RESOURCES is empty' }
 foreach ($r in $resources) {
     $from = Join-Path $repo "ncm\online\resources\$r"
     Get-ChildItem -LiteralPath $from -Recurse -File | ForEach-Object {

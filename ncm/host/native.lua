@@ -94,7 +94,7 @@ local function hud()
 end
 
 local handlers = {}
-function handlers.boot(p) boot(p); local out = deckRows(); out.version = "3.0.0-alpha.7"; out.host = _VERSION; return out end
+function handlers.boot(p) boot(p); local out = deckRows(); out.version = "3.0.0-alpha.8"; out.host = _VERSION; return out end
 function handlers.deck() return deckRows() end
 function handlers.newTape() local t = app:newTape(); return { id = t.id, ordinal = t.ordinal } end
 function handlers.setDoc(p)
