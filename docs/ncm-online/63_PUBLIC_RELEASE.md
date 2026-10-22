@@ -74,7 +74,7 @@ wolvenkit-projects/ncm_rb15_liveries/source/ncm/rb15_liveries/*.ent, *.ent.json,
 
 - [x] Working tree reviewed (another session's uncommitted L370 host work is present; it is committed with this
       work, see §6).
-- [ ] Important local changes committed and pushed (§6 step 1).
+- [x] Important local changes committed and pushed (§6 step 1).
 - [x] Secrets scan clean (gitleaks + blob scan, HEAD and history).
 - [x] Git history reviewed for secrets: none ever committed.
 - [x] Sensitive credentials rotated if necessary: none needed.
@@ -84,7 +84,7 @@ wolvenkit-projects/ncm_rb15_liveries/source/ncm/rb15_liveries/*.ent, *.ent.json,
 - [x] Player/private data excluded (UUIDs placeholdered in HEAD, handles kept by ruling).
 - [x] Licensing reviewed (MIT + notices).
 - [x] Third-party code and licence obligations reviewed.
-- [ ] Third-party files purged from history and the email rewritten (§6 steps 2-4).
+- [x] Third-party files purged from history and the email rewritten (§6 steps 2-4); verified: no purged path in any commit, no old address in any commit or blob, gitleaks shows only the known false positives, ncm-test ALL GREEN and the site check green on the rewritten checkout, and the tip tree is byte-identical to the pre-rewrite HEAD.
 - [x] README, LICENSE, CONTRIBUTING, SECURITY, CHANGELOG, THIRD_PARTY_NOTICES ready.
 - [x] GitHub Pages builds (`python site/build.py --check`).
 - [x] Works on desktop and mobile (checked headless at 1366 px and 390 px, light and dark).
@@ -93,7 +93,7 @@ wolvenkit-projects/ncm_rb15_liveries/source/ncm/rb15_liveries/*.ent, *.ent.json,
 - [x] Repository links work (link and path check in the build).
 - [x] Issue templates ready.
 - [x] No private infrastructure details unintentionally exposed (docs scrubbed).
-- [ ] Repository visibility changed to public (§6 step 6, owner only).
+- [x] Repository public (2026-10-22): published as a **fresh** repository, see §7.
 - [ ] Pages enabled with source "GitHub Actions" (§6 step 7).
 - [ ] Private vulnerability reporting enabled (§6 step 8).
 
@@ -133,3 +133,19 @@ wolvenkit-projects/ncm_rb15_liveries/source/ncm/rb15_liveries/*.ent, *.ent.json,
     > Its source and documentation are public at **evengineer1ng.github.io/ncm-online**, and the work there is also
     > informing the future NCM 3.0 single-player release. NCM Online is a separate product from this mod and from
     > NCM 3.0.
+
+## 7. What actually happened (2026-10-22)
+
+The old repository had a pull-request ref (`refs/pull/1/head`) reaching 211 commits with the old email and 18 of
+the purged paths. GitHub keeps pull refs even after a force-push, so publishing that repository would have exposed
+exactly what the rewrite removed. **Owner ruling:** publish to a fresh repository.
+
+- The owner renamed the old repository to `evengineer1ng/ncm-online-private` (private, kept with its PR) and created
+  a new, empty, public `evengineer1ng/ncm-online`.
+- The rewritten `main` and tags `online-baseline-1..3` and `online-frozen-2026-10-17` were pushed to it. Local-only
+  refs (another tool's checkpoint refs, the stash, `checkpoint/pre-op77-upgrade-2026-10-02`) were not pushed.
+- The local repository now tracks the new `origin`, keeps the old one as remote `private`, and its local git
+  identity is the noreply address. A bundle of the pre-rewrite history was kept outside the repository.
+- **Still owed by the owner:** Settings → Pages → Source **GitHub Actions**, then Actions → *Website* → **Run
+  workflow** (the first push did not trigger the path filter); private vulnerability reporting; the Online
+  `identity.website` change; the Nexus link.
