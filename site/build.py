@@ -423,7 +423,12 @@ def check_repo_paths():
                 if not REPO_PATH.match(c) or '<' in c or 'NNN' in c or '…' in c:
                     continue
                 pattern = re.sub(r'<[^>]+>', '*', c)
-                if not glob.glob(os.path.join(REPO, pattern.rstrip('/'))):
+                if glob.glob(os.path.join(REPO, pattern.rstrip('/'))):
+                    continue
+                # a documented path that is git-ignored on purpose (a downloaded runtime, a local build) is fine
+                ignored = subprocess.run(['git', '-C', REPO, 'check-ignore', '-q', '--no-index', pattern],
+                                         capture_output=True).returncode == 0
+                if not ignored:
                     bad.append((os.path.relpath(os.path.join(dirpath, f), OUT), c))
     return bad
 
